@@ -5,19 +5,22 @@
  * Open-source platform for cybersecurity Attack Surface Management (ASM)
  * OpenAPI spec version: 1.0
  */
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseInfiniteQueryResult,
   DefinedUseQueryResult,
   InfiniteData,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
   UseInfiniteQueryOptions,
   UseInfiniteQueryResult,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from '@tanstack/react-query';
@@ -2659,163 +2662,79 @@ export const targetsControllerCreateMultipleTargets = (
   );
 };
 
-export const getTargetsControllerCreateMultipleTargetsQueryKey = (
-  createMultipleTargetsDto?: CreateMultipleTargetsDto,
-) => {
-  return ['POST', `/api/targets/bulk`, createMultipleTargetsDto] as const;
-};
-
-export const getTargetsControllerCreateMultipleTargetsQueryOptions = <
-  TData = Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+export const getTargetsControllerCreateMultipleTargetsMutationOptions = <
   TError = unknown,
->(
-  createMultipleTargetsDto: CreateMultipleTargetsDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTargetsControllerCreateMultipleTargetsQueryKey(createMultipleTargetsDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>
-  > = ({ signal }) =>
-    targetsControllerCreateMultipleTargets(
-      createMultipleTargetsDto,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateMultipleTargetsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+  TError,
+  { data: CreateMultipleTargetsDto },
+  TContext
+> => {
+  const mutationKey = ['targetsControllerCreateMultipleTargets'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+    { data: CreateMultipleTargetsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return targetsControllerCreateMultipleTargets(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type TargetsControllerCreateMultipleTargetsQueryResult = NonNullable<
+export type TargetsControllerCreateMultipleTargetsMutationResult = NonNullable<
   Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>
 >;
-export type TargetsControllerCreateMultipleTargetsQueryError = unknown;
+export type TargetsControllerCreateMultipleTargetsMutationBody =
+  CreateMultipleTargetsDto;
+export type TargetsControllerCreateMultipleTargetsMutationError = unknown;
 
-export function useTargetsControllerCreateMultipleTargets<
-  TData = Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-  TError = unknown,
->(
-  createMultipleTargetsDto: CreateMultipleTargetsDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerCreateMultipleTargets<
-  TData = Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-  TError = unknown,
->(
-  createMultipleTargetsDto: CreateMultipleTargetsDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerCreateMultipleTargets<
-  TData = Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-  TError = unknown,
->(
-  createMultipleTargetsDto: CreateMultipleTargetsDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create multiple targets in bulk
  */
-
-export function useTargetsControllerCreateMultipleTargets<
-  TData = Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+export const useTargetsControllerCreateMultipleTargets = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createMultipleTargetsDto: CreateMultipleTargetsDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+      TError,
+      { data: CreateMultipleTargetsDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getTargetsControllerCreateMultipleTargetsQueryOptions(
-    createMultipleTargetsDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+  TError,
+  { data: CreateMultipleTargetsDto },
+  TContext
+> => {
+  return useMutation(
+    getTargetsControllerCreateMultipleTargetsMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Fetches a comprehensive list of all registered security testing targets within the specified workspace for vulnerability management and assessment tracking.
@@ -3528,171 +3447,78 @@ export const targetsControllerUpdateTarget = (
   );
 };
 
-export const getTargetsControllerUpdateTargetQueryKey = (
-  id: string,
-  updateTargetDto?: UpdateTargetDto,
-) => {
-  return ['PATCH', `/api/targets/${id}`, updateTargetDto] as const;
-};
-
-export const getTargetsControllerUpdateTargetQueryOptions = <
-  TData = Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+export const getTargetsControllerUpdateTargetMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateTargetDto: UpdateTargetDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTargetsControllerUpdateTargetQueryKey(id, updateTargetDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof targetsControllerUpdateTarget>>
-  > = ({ signal }) =>
-    targetsControllerUpdateTarget(id, updateTargetDto, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateTargetDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+  TError,
+  { id: string; data: UpdateTargetDto },
+  TContext
+> => {
+  const mutationKey = ['targetsControllerUpdateTarget'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+    { id: string; data: UpdateTargetDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return targetsControllerUpdateTarget(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type TargetsControllerUpdateTargetQueryResult = NonNullable<
+export type TargetsControllerUpdateTargetMutationResult = NonNullable<
   Awaited<ReturnType<typeof targetsControllerUpdateTarget>>
 >;
-export type TargetsControllerUpdateTargetQueryError = unknown;
+export type TargetsControllerUpdateTargetMutationBody = UpdateTargetDto;
+export type TargetsControllerUpdateTargetMutationError = unknown;
 
-export function useTargetsControllerUpdateTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-  TError = unknown,
->(
-  id: string,
-  updateTargetDto: UpdateTargetDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerUpdateTarget>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerUpdateTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-  TError = unknown,
->(
-  id: string,
-  updateTargetDto: UpdateTargetDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerUpdateTarget>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerUpdateTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-  TError = unknown,
->(
-  id: string,
-  updateTargetDto: UpdateTargetDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update a target
  */
-
-export function useTargetsControllerUpdateTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+export const useTargetsControllerUpdateTarget = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateTargetDto: UpdateTargetDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+      TError,
+      { id: string; data: UpdateTargetDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getTargetsControllerUpdateTargetQueryOptions(
-    id,
-    updateTargetDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+  TError,
+  { id: string; data: UpdateTargetDto },
+  TContext
+> => {
+  return useMutation(
+    getTargetsControllerUpdateTargetMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Removes a security testing target from the specified workspace, terminating all associated monitoring and assessment activities.
@@ -3714,195 +3540,83 @@ export const targetsControllerDeleteTargetFromWorkspace = (
   );
 };
 
-export const getTargetsControllerDeleteTargetFromWorkspaceQueryKey = (
-  id: string,
-  workspaceId: string,
-) => {
-  return ['DELETE', `/api/targets/${id}/workspace/${workspaceId}`] as const;
-};
-
-export const getTargetsControllerDeleteTargetFromWorkspaceQueryOptions = <
-  TData = Awaited<
-    ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>
-  >,
+export const getTargetsControllerDeleteTargetFromWorkspaceMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  workspaceId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
+    TError,
+    { id: string; workspaceId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
+  TError,
+  { id: string; workspaceId: string },
+  TContext
+> => {
+  const mutationKey = ['targetsControllerDeleteTargetFromWorkspace'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTargetsControllerDeleteTargetFromWorkspaceQueryKey(id, workspaceId);
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
+    { id: string; workspaceId: string }
+  > = (props) => {
+    const { id, workspaceId } = props ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>
-  > = ({ signal }) =>
-    targetsControllerDeleteTargetFromWorkspace(
+    return targetsControllerDeleteTargetFromWorkspace(
       id,
       workspaceId,
       requestOptions,
-      signal,
     );
+  };
 
-  return {
-    queryKey,
-    queryFn,
-    enabled:
-      id !== null &&
-      id !== undefined &&
-      workspaceId !== null &&
-      workspaceId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+  return { mutationFn, ...mutationOptions };
 };
 
-export type TargetsControllerDeleteTargetFromWorkspaceQueryResult = NonNullable<
-  Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>
->;
-export type TargetsControllerDeleteTargetFromWorkspaceQueryError = unknown;
+export type TargetsControllerDeleteTargetFromWorkspaceMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>
+  >;
 
-export function useTargetsControllerDeleteTargetFromWorkspace<
-  TData = Awaited<
-    ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>
-  >,
-  TError = unknown,
->(
-  id: string,
-  workspaceId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>
-          >,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerDeleteTargetFromWorkspace<
-  TData = Awaited<
-    ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>
-  >,
-  TError = unknown,
->(
-  id: string,
-  workspaceId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>
-          >,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerDeleteTargetFromWorkspace<
-  TData = Awaited<
-    ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>
-  >,
-  TError = unknown,
->(
-  id: string,
-  workspaceId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type TargetsControllerDeleteTargetFromWorkspaceMutationError = unknown;
+
 /**
  * @summary Delete a target from a workspace
  */
-
-export function useTargetsControllerDeleteTargetFromWorkspace<
-  TData = Awaited<
-    ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>
-  >,
+export const useTargetsControllerDeleteTargetFromWorkspace = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  workspaceId: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
+      TError,
+      { id: string; workspaceId: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getTargetsControllerDeleteTargetFromWorkspaceQueryOptions(
-      id,
-      workspaceId,
-      options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof targetsControllerDeleteTargetFromWorkspace>>,
+  TError,
+  { id: string; workspaceId: string },
+  TContext
+> => {
+  return useMutation(
+    getTargetsControllerDeleteTargetFromWorkspaceMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Initiates a comprehensive security re-assessment of the specified target, triggering new vulnerability scans to identify potential security risks.
@@ -3919,160 +3633,78 @@ export const targetsControllerReScanTarget = (
   );
 };
 
-export const getTargetsControllerReScanTargetQueryKey = (id: string) => {
-  return ['POST', `/api/targets/${id}/re-scan`] as const;
-};
-
-export const getTargetsControllerReScanTargetQueryOptions = <
-  TData = Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
+export const getTargetsControllerReScanTargetMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getTargetsControllerReScanTargetQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof targetsControllerReScanTarget>>
-  > = ({ signal }) => targetsControllerReScanTarget(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['targetsControllerReScanTarget'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return targetsControllerReScanTarget(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type TargetsControllerReScanTargetQueryResult = NonNullable<
+export type TargetsControllerReScanTargetMutationResult = NonNullable<
   Awaited<ReturnType<typeof targetsControllerReScanTarget>>
 >;
-export type TargetsControllerReScanTargetQueryError = unknown;
 
-export function useTargetsControllerReScanTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerReScanTarget>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerReScanTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerReScanTarget>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerReScanTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type TargetsControllerReScanTargetMutationError = unknown;
+
 /**
  * @summary Rescan a target
  */
-
-export function useTargetsControllerReScanTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
+export const useTargetsControllerReScanTarget = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getTargetsControllerReScanTargetQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof targetsControllerReScanTarget>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getTargetsControllerReScanTargetMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Establishes a new isolated security workspace for organizing and managing assets, targets, and vulnerabilities within a dedicated environment.
@@ -4095,163 +3727,79 @@ export const workspacesControllerCreateWorkspace = (
   );
 };
 
-export const getWorkspacesControllerCreateWorkspaceQueryKey = (
-  createWorkspaceDto?: CreateWorkspaceDto,
-) => {
-  return ['POST', `/api/workspaces`, createWorkspaceDto] as const;
-};
-
-export const getWorkspacesControllerCreateWorkspaceQueryOptions = <
-  TData = Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
+export const getWorkspacesControllerCreateWorkspaceMutationOptions = <
   TError = unknown,
->(
-  createWorkspaceDto: CreateWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkspacesControllerCreateWorkspaceQueryKey(createWorkspaceDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>
-  > = ({ signal }) =>
-    workspacesControllerCreateWorkspace(
-      createWorkspaceDto,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateWorkspaceDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
+  TError,
+  { data: CreateWorkspaceDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerCreateWorkspace'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
+    { data: CreateWorkspaceDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workspacesControllerCreateWorkspace(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkspacesControllerCreateWorkspaceQueryResult = NonNullable<
+export type WorkspacesControllerCreateWorkspaceMutationResult = NonNullable<
   Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>
 >;
-export type WorkspacesControllerCreateWorkspaceQueryError = unknown;
+export type WorkspacesControllerCreateWorkspaceMutationBody =
+  CreateWorkspaceDto;
+export type WorkspacesControllerCreateWorkspaceMutationError = unknown;
 
-export function useWorkspacesControllerCreateWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-  TError = unknown,
->(
-  createWorkspaceDto: CreateWorkspaceDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerCreateWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-  TError = unknown,
->(
-  createWorkspaceDto: CreateWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerCreateWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-  TError = unknown,
->(
-  createWorkspaceDto: CreateWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create Workspace
  */
-
-export function useWorkspacesControllerCreateWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
+export const useWorkspacesControllerCreateWorkspace = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createWorkspaceDto: CreateWorkspaceDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
+      TError,
+      { data: CreateWorkspaceDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkspacesControllerCreateWorkspaceQueryOptions(
-    createWorkspaceDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerCreateWorkspace>>,
+  TError,
+  { data: CreateWorkspaceDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerCreateWorkspaceMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Fetches a comprehensive list of security workspaces that the authenticated user has access to, providing multi-tenant organization capabilities.
@@ -4948,184 +4496,80 @@ export const workspacesControllerUpdateWorkspaceConfigs = (
   );
 };
 
-export const getWorkspacesControllerUpdateWorkspaceConfigsQueryKey = (
-  updateWorkspaceConfigsDto?: UpdateWorkspaceConfigsDto,
-) => {
-  return [
-    'PATCH',
-    `/api/workspaces/configs`,
-    updateWorkspaceConfigsDto,
-  ] as const;
-};
-
-export const getWorkspacesControllerUpdateWorkspaceConfigsQueryOptions = <
-  TData = Awaited<
-    ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>
-  >,
+export const getWorkspacesControllerUpdateWorkspaceConfigsMutationOptions = <
   TError = unknown,
->(
-  updateWorkspaceConfigsDto: UpdateWorkspaceConfigsDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkspacesControllerUpdateWorkspaceConfigsQueryKey(
-      updateWorkspaceConfigsDto,
-    );
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>
-  > = ({ signal }) =>
-    workspacesControllerUpdateWorkspaceConfigs(
-      updateWorkspaceConfigsDto,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: UpdateWorkspaceConfigsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
+  TError,
+  { data: UpdateWorkspaceConfigsDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerUpdateWorkspaceConfigs'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
+    { data: UpdateWorkspaceConfigsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workspacesControllerUpdateWorkspaceConfigs(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkspacesControllerUpdateWorkspaceConfigsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>
->;
-export type WorkspacesControllerUpdateWorkspaceConfigsQueryError = unknown;
+export type WorkspacesControllerUpdateWorkspaceConfigsMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>
+  >;
+export type WorkspacesControllerUpdateWorkspaceConfigsMutationBody =
+  UpdateWorkspaceConfigsDto;
+export type WorkspacesControllerUpdateWorkspaceConfigsMutationError = unknown;
 
-export function useWorkspacesControllerUpdateWorkspaceConfigs<
-  TData = Awaited<
-    ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>
-  >,
-  TError = unknown,
->(
-  updateWorkspaceConfigsDto: UpdateWorkspaceConfigsDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>
-          >,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerUpdateWorkspaceConfigs<
-  TData = Awaited<
-    ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>
-  >,
-  TError = unknown,
->(
-  updateWorkspaceConfigsDto: UpdateWorkspaceConfigsDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>
-          >,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerUpdateWorkspaceConfigs<
-  TData = Awaited<
-    ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>
-  >,
-  TError = unknown,
->(
-  updateWorkspaceConfigsDto: UpdateWorkspaceConfigsDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update workspace configs
  */
-
-export function useWorkspacesControllerUpdateWorkspaceConfigs<
-  TData = Awaited<
-    ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>
-  >,
+export const useWorkspacesControllerUpdateWorkspaceConfigs = <
   TError = unknown,
+  TContext = unknown,
 >(
-  updateWorkspaceConfigsDto: UpdateWorkspaceConfigsDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
+      TError,
+      { data: UpdateWorkspaceConfigsDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getWorkspacesControllerUpdateWorkspaceConfigsQueryOptions(
-      updateWorkspaceConfigsDto,
-      options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
+  TError,
+  { data: UpdateWorkspaceConfigsDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerUpdateWorkspaceConfigsMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration.
@@ -5321,176 +4765,79 @@ export const workspacesControllerUpdateWorkspace = (
   );
 };
 
-export const getWorkspacesControllerUpdateWorkspaceQueryKey = (
-  id: string,
-  updateWorkspaceDto?: UpdateWorkspaceDto,
-) => {
-  return ['PATCH', `/api/workspaces/${id}`, updateWorkspaceDto] as const;
-};
-
-export const getWorkspacesControllerUpdateWorkspaceQueryOptions = <
-  TData = Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
+export const getWorkspacesControllerUpdateWorkspaceMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateWorkspaceDto: UpdateWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkspacesControllerUpdateWorkspaceQueryKey(id, updateWorkspaceDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>
-  > = ({ signal }) =>
-    workspacesControllerUpdateWorkspace(
-      id,
-      updateWorkspaceDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateWorkspaceDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
+  TError,
+  { id: string; data: UpdateWorkspaceDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerUpdateWorkspace'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
+    { id: string; data: UpdateWorkspaceDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return workspacesControllerUpdateWorkspace(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkspacesControllerUpdateWorkspaceQueryResult = NonNullable<
+export type WorkspacesControllerUpdateWorkspaceMutationResult = NonNullable<
   Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>
 >;
-export type WorkspacesControllerUpdateWorkspaceQueryError = unknown;
+export type WorkspacesControllerUpdateWorkspaceMutationBody =
+  UpdateWorkspaceDto;
+export type WorkspacesControllerUpdateWorkspaceMutationError = unknown;
 
-export function useWorkspacesControllerUpdateWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  updateWorkspaceDto: UpdateWorkspaceDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerUpdateWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  updateWorkspaceDto: UpdateWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerUpdateWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  updateWorkspaceDto: UpdateWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update Workspace
  */
-
-export function useWorkspacesControllerUpdateWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
+export const useWorkspacesControllerUpdateWorkspace = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateWorkspaceDto: UpdateWorkspaceDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
+      TError,
+      { id: string; data: UpdateWorkspaceDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkspacesControllerUpdateWorkspaceQueryOptions(
-    id,
-    updateWorkspaceDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerUpdateWorkspace>>,
+  TError,
+  { id: string; data: UpdateWorkspaceDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerUpdateWorkspaceMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Permanently removes a security workspace and all its associated data, including assets, targets, vulnerabilities, and configurations.
@@ -5507,162 +4854,78 @@ export const workspacesControllerDeleteWorkspace = (
   );
 };
 
-export const getWorkspacesControllerDeleteWorkspaceQueryKey = (id: string) => {
-  return ['DELETE', `/api/workspaces/${id}`] as const;
-};
-
-export const getWorkspacesControllerDeleteWorkspaceQueryOptions = <
-  TData = Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
+export const getWorkspacesControllerDeleteWorkspaceMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkspacesControllerDeleteWorkspaceQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>
-  > = ({ signal }) =>
-    workspacesControllerDeleteWorkspace(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerDeleteWorkspace'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workspacesControllerDeleteWorkspace(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkspacesControllerDeleteWorkspaceQueryResult = NonNullable<
+export type WorkspacesControllerDeleteWorkspaceMutationResult = NonNullable<
   Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>
 >;
-export type WorkspacesControllerDeleteWorkspaceQueryError = unknown;
 
-export function useWorkspacesControllerDeleteWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerDeleteWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerDeleteWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type WorkspacesControllerDeleteWorkspaceMutationError = unknown;
+
 /**
  * @summary Delete Workspace
  */
-
-export function useWorkspacesControllerDeleteWorkspace<
-  TData = Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
+export const useWorkspacesControllerDeleteWorkspace = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkspacesControllerDeleteWorkspaceQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerDeleteWorkspace>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerDeleteWorkspaceMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Generates a new API key for the specified workspace, invalidating the previous key to enhance security and maintain authorized access.
@@ -5679,161 +4942,78 @@ export const workspacesControllerRotateApiKey = (
   );
 };
 
-export const getWorkspacesControllerRotateApiKeyQueryKey = (id: string) => {
-  return ['POST', `/api/workspaces/${id}/api-key/rotate`] as const;
-};
-
-export const getWorkspacesControllerRotateApiKeyQueryOptions = <
-  TData = Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+export const getWorkspacesControllerRotateApiKeyMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getWorkspacesControllerRotateApiKeyQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>
-  > = ({ signal }) =>
-    workspacesControllerRotateApiKey(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerRotateApiKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workspacesControllerRotateApiKey(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkspacesControllerRotateApiKeyQueryResult = NonNullable<
+export type WorkspacesControllerRotateApiKeyMutationResult = NonNullable<
   Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>
 >;
-export type WorkspacesControllerRotateApiKeyQueryError = unknown;
 
-export function useWorkspacesControllerRotateApiKey<
-  TData = Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerRotateApiKey<
-  TData = Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerRotateApiKey<
-  TData = Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type WorkspacesControllerRotateApiKeyMutationError = unknown;
+
 /**
  * @summary Rotate API key
  */
-
-export function useWorkspacesControllerRotateApiKey<
-  TData = Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+export const useWorkspacesControllerRotateApiKey = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkspacesControllerRotateApiKeyQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerRotateApiKeyMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Changes the archival status of a workspace, allowing for temporary deactivation or reactivation of workspace resources without permanent deletion.
@@ -5857,180 +5037,78 @@ export const workspacesControllerMakeArchived = (
   );
 };
 
-export const getWorkspacesControllerMakeArchivedQueryKey = (
-  id: string,
-  archiveWorkspaceDto?: ArchiveWorkspaceDto,
-) => {
-  return [
-    'PATCH',
-    `/api/workspaces/${id}/archived`,
-    archiveWorkspaceDto,
-  ] as const;
-};
-
-export const getWorkspacesControllerMakeArchivedQueryOptions = <
-  TData = Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+export const getWorkspacesControllerMakeArchivedMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  archiveWorkspaceDto: ArchiveWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkspacesControllerMakeArchivedQueryKey(id, archiveWorkspaceDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workspacesControllerMakeArchived>>
-  > = ({ signal }) =>
-    workspacesControllerMakeArchived(
-      id,
-      archiveWorkspaceDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: ArchiveWorkspaceDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+  TError,
+  { id: string; data: ArchiveWorkspaceDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerMakeArchived'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+    { id: string; data: ArchiveWorkspaceDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return workspacesControllerMakeArchived(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkspacesControllerMakeArchivedQueryResult = NonNullable<
+export type WorkspacesControllerMakeArchivedMutationResult = NonNullable<
   Awaited<ReturnType<typeof workspacesControllerMakeArchived>>
 >;
-export type WorkspacesControllerMakeArchivedQueryError = unknown;
+export type WorkspacesControllerMakeArchivedMutationBody = ArchiveWorkspaceDto;
+export type WorkspacesControllerMakeArchivedMutationError = unknown;
 
-export function useWorkspacesControllerMakeArchived<
-  TData = Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-  TError = unknown,
->(
-  id: string,
-  archiveWorkspaceDto: ArchiveWorkspaceDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerMakeArchived>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerMakeArchived<
-  TData = Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-  TError = unknown,
->(
-  id: string,
-  archiveWorkspaceDto: ArchiveWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerMakeArchived>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerMakeArchived<
-  TData = Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-  TError = unknown,
->(
-  id: string,
-  archiveWorkspaceDto: ArchiveWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Archive/Unarchive Workspace
  */
-
-export function useWorkspacesControllerMakeArchived<
-  TData = Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+export const useWorkspacesControllerMakeArchived = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  archiveWorkspaceDto: ArchiveWorkspaceDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+      TError,
+      { id: string; data: ArchiveWorkspaceDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkspacesControllerMakeArchivedQueryOptions(
-    id,
-    archiveWorkspaceDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+  TError,
+  { id: string; data: ArchiveWorkspaceDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerMakeArchivedMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieves a list of all available workflow templates in YAML format.
@@ -6564,163 +5642,78 @@ export const workflowsControllerCreateWorkflow = (
   );
 };
 
-export const getWorkflowsControllerCreateWorkflowQueryKey = (
-  createWorkflowDto?: CreateWorkflowDto,
-) => {
-  return ['POST', `/api/workflows`, createWorkflowDto] as const;
-};
-
-export const getWorkflowsControllerCreateWorkflowQueryOptions = <
-  TData = Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+export const getWorkflowsControllerCreateWorkflowMutationOptions = <
   TError = unknown,
->(
-  createWorkflowDto: CreateWorkflowDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkflowsControllerCreateWorkflowQueryKey(createWorkflowDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>
-  > = ({ signal }) =>
-    workflowsControllerCreateWorkflow(
-      createWorkflowDto,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+  TError,
+  { data: CreateWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerCreateWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+    { data: CreateWorkflowDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workflowsControllerCreateWorkflow(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkflowsControllerCreateWorkflowQueryResult = NonNullable<
+export type WorkflowsControllerCreateWorkflowMutationResult = NonNullable<
   Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>
 >;
-export type WorkflowsControllerCreateWorkflowQueryError = unknown;
+export type WorkflowsControllerCreateWorkflowMutationBody = CreateWorkflowDto;
+export type WorkflowsControllerCreateWorkflowMutationError = unknown;
 
-export function useWorkflowsControllerCreateWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-  TError = unknown,
->(
-  createWorkflowDto: CreateWorkflowDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerCreateWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-  TError = unknown,
->(
-  createWorkflowDto: CreateWorkflowDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerCreateWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-  TError = unknown,
->(
-  createWorkflowDto: CreateWorkflowDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create workflow
  */
-
-export function useWorkflowsControllerCreateWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+export const useWorkflowsControllerCreateWorkflow = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createWorkflowDto: CreateWorkflowDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+      TError,
+      { data: CreateWorkflowDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkflowsControllerCreateWorkflowQueryOptions(
-    createWorkflowDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+  TError,
+  { data: CreateWorkflowDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkflowsControllerCreateWorkflowMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieves a specific workflow by its ID within the specified workspace.
@@ -6918,176 +5911,78 @@ export const workflowsControllerUpdateWorkflow = (
   );
 };
 
-export const getWorkflowsControllerUpdateWorkflowQueryKey = (
-  id: string,
-  updateWorkflowDto?: UpdateWorkflowDto,
-) => {
-  return ['PATCH', `/api/workflows/${id}`, updateWorkflowDto] as const;
-};
-
-export const getWorkflowsControllerUpdateWorkflowQueryOptions = <
-  TData = Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+export const getWorkflowsControllerUpdateWorkflowMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateWorkflowDto: UpdateWorkflowDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkflowsControllerUpdateWorkflowQueryKey(id, updateWorkflowDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>
-  > = ({ signal }) =>
-    workflowsControllerUpdateWorkflow(
-      id,
-      updateWorkflowDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+  TError,
+  { id: string; data: UpdateWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerUpdateWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+    { id: string; data: UpdateWorkflowDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return workflowsControllerUpdateWorkflow(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkflowsControllerUpdateWorkflowQueryResult = NonNullable<
+export type WorkflowsControllerUpdateWorkflowMutationResult = NonNullable<
   Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>
 >;
-export type WorkflowsControllerUpdateWorkflowQueryError = unknown;
+export type WorkflowsControllerUpdateWorkflowMutationBody = UpdateWorkflowDto;
+export type WorkflowsControllerUpdateWorkflowMutationError = unknown;
 
-export function useWorkflowsControllerUpdateWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  updateWorkflowDto: UpdateWorkflowDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerUpdateWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  updateWorkflowDto: UpdateWorkflowDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerUpdateWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  updateWorkflowDto: UpdateWorkflowDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update workflow
  */
-
-export function useWorkflowsControllerUpdateWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+export const useWorkflowsControllerUpdateWorkflow = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateWorkflowDto: UpdateWorkflowDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+      TError,
+      { id: string; data: UpdateWorkflowDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkflowsControllerUpdateWorkflowQueryOptions(
-    id,
-    updateWorkflowDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+  TError,
+  { id: string; data: UpdateWorkflowDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkflowsControllerUpdateWorkflowMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Deletes a workflow by its ID.
@@ -7104,161 +5999,78 @@ export const workflowsControllerDeleteWorkflow = (
   );
 };
 
-export const getWorkflowsControllerDeleteWorkflowQueryKey = (id: string) => {
-  return ['DELETE', `/api/workflows/${id}`] as const;
-};
-
-export const getWorkflowsControllerDeleteWorkflowQueryOptions = <
-  TData = Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+export const getWorkflowsControllerDeleteWorkflowMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getWorkflowsControllerDeleteWorkflowQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>
-  > = ({ signal }) =>
-    workflowsControllerDeleteWorkflow(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerDeleteWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workflowsControllerDeleteWorkflow(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkflowsControllerDeleteWorkflowQueryResult = NonNullable<
+export type WorkflowsControllerDeleteWorkflowMutationResult = NonNullable<
   Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>
 >;
-export type WorkflowsControllerDeleteWorkflowQueryError = unknown;
 
-export function useWorkflowsControllerDeleteWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerDeleteWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerDeleteWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type WorkflowsControllerDeleteWorkflowMutationError = unknown;
+
 /**
  * @summary Delete workflow
  */
-
-export function useWorkflowsControllerDeleteWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+export const useWorkflowsControllerDeleteWorkflow = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkflowsControllerDeleteWorkflowQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkflowsControllerDeleteWorkflowMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 export const rootControllerGetHealth = (
   options?: SecondParameter<typeof orvalClient>,
@@ -7428,159 +6240,78 @@ export const rootControllerCreateFirstAdmin = (
   );
 };
 
-export const getRootControllerCreateFirstAdminQueryKey = (
-  createFirstAdminDto?: CreateFirstAdminDto,
-) => {
-  return ['POST', `/api/init-admin`, createFirstAdminDto] as const;
-};
-
-export const getRootControllerCreateFirstAdminQueryOptions = <
-  TData = Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
+export const getRootControllerCreateFirstAdminMutationOptions = <
   TError = unknown,
->(
-  createFirstAdminDto: CreateFirstAdminDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getRootControllerCreateFirstAdminQueryKey(createFirstAdminDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>
-  > = ({ signal }) =>
-    rootControllerCreateFirstAdmin(createFirstAdminDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateFirstAdminDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
+  TError,
+  { data: CreateFirstAdminDto },
+  TContext
+> => {
+  const mutationKey = ['rootControllerCreateFirstAdmin'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
+    { data: CreateFirstAdminDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return rootControllerCreateFirstAdmin(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type RootControllerCreateFirstAdminQueryResult = NonNullable<
+export type RootControllerCreateFirstAdminMutationResult = NonNullable<
   Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>
 >;
-export type RootControllerCreateFirstAdminQueryError = unknown;
+export type RootControllerCreateFirstAdminMutationBody = CreateFirstAdminDto;
+export type RootControllerCreateFirstAdminMutationError = unknown;
 
-export function useRootControllerCreateFirstAdmin<
-  TData = Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-  TError = unknown,
->(
-  createFirstAdminDto: CreateFirstAdminDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useRootControllerCreateFirstAdmin<
-  TData = Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-  TError = unknown,
->(
-  createFirstAdminDto: CreateFirstAdminDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useRootControllerCreateFirstAdmin<
-  TData = Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-  TError = unknown,
->(
-  createFirstAdminDto: CreateFirstAdminDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Creates the first admin user in the system.
  */
-
-export function useRootControllerCreateFirstAdmin<
-  TData = Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
+export const useRootControllerCreateFirstAdmin = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createFirstAdminDto: CreateFirstAdminDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
+      TError,
+      { data: CreateFirstAdminDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getRootControllerCreateFirstAdminQueryOptions(
-    createFirstAdminDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
+  TError,
+  { data: CreateFirstAdminDto },
+  TContext
+> => {
+  return useMutation(
+    getRootControllerCreateFirstAdminMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Returns metadata about the system state, like whether it has been initialized.
@@ -8065,163 +6796,79 @@ export const systemConfigsControllerUpdateConfig = (
   );
 };
 
-export const getSystemConfigsControllerUpdateConfigQueryKey = (
-  updateSystemConfigDto?: UpdateSystemConfigDto,
-) => {
-  return ['PUT', `/api/system-configs`, updateSystemConfigDto] as const;
-};
-
-export const getSystemConfigsControllerUpdateConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+export const getSystemConfigsControllerUpdateConfigMutationOptions = <
   TError = unknown,
->(
-  updateSystemConfigDto: UpdateSystemConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getSystemConfigsControllerUpdateConfigQueryKey(updateSystemConfigDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>
-  > = ({ signal }) =>
-    systemConfigsControllerUpdateConfig(
-      updateSystemConfigDto,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: UpdateSystemConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+  TError,
+  { data: UpdateSystemConfigDto },
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerUpdateConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+    { data: UpdateSystemConfigDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return systemConfigsControllerUpdateConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type SystemConfigsControllerUpdateConfigQueryResult = NonNullable<
+export type SystemConfigsControllerUpdateConfigMutationResult = NonNullable<
   Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>
 >;
-export type SystemConfigsControllerUpdateConfigQueryError = unknown;
+export type SystemConfigsControllerUpdateConfigMutationBody =
+  UpdateSystemConfigDto;
+export type SystemConfigsControllerUpdateConfigMutationError = unknown;
 
-export function useSystemConfigsControllerUpdateConfig<
-  TData = Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-  TError = unknown,
->(
-  updateSystemConfigDto: UpdateSystemConfigDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-          TError,
-          Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useSystemConfigsControllerUpdateConfig<
-  TData = Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-  TError = unknown,
->(
-  updateSystemConfigDto: UpdateSystemConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-          TError,
-          Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useSystemConfigsControllerUpdateConfig<
-  TData = Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-  TError = unknown,
->(
-  updateSystemConfigDto: UpdateSystemConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update system configuration
  */
-
-export function useSystemConfigsControllerUpdateConfig<
-  TData = Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+export const useSystemConfigsControllerUpdateConfig = <
   TError = unknown,
+  TContext = unknown,
 >(
-  updateSystemConfigDto: UpdateSystemConfigDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+      TError,
+      { data: UpdateSystemConfigDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getSystemConfigsControllerUpdateConfigQueryOptions(
-    updateSystemConfigDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+  TError,
+  { data: UpdateSystemConfigDto },
+  TContext
+> => {
+  return useMutation(
+    getSystemConfigsControllerUpdateConfigMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Removes the system logo and reverts to default avatar
@@ -8237,146 +6884,76 @@ export const systemConfigsControllerRemoveLogo = (
   );
 };
 
-export const getSystemConfigsControllerRemoveLogoQueryKey = () => {
-  return ['DELETE', `/api/system-configs/logo`] as const;
-};
-
-export const getSystemConfigsControllerRemoveLogoQueryOptions = <
-  TData = Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+export const getSystemConfigsControllerRemoveLogoMutationOptions = <
   TError = unknown,
+  TContext = unknown,
 >(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getSystemConfigsControllerRemoveLogoQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>
-  > = ({ signal }) => systemConfigsControllerRemoveLogo(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerRemoveLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+    void
+  > = () => {
+    return systemConfigsControllerRemoveLogo(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type SystemConfigsControllerRemoveLogoQueryResult = NonNullable<
+export type SystemConfigsControllerRemoveLogoMutationResult = NonNullable<
   Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>
 >;
-export type SystemConfigsControllerRemoveLogoQueryError = unknown;
 
-export function useSystemConfigsControllerRemoveLogo<
-  TData = Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-          TError,
-          Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useSystemConfigsControllerRemoveLogo<
-  TData = Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-          TError,
-          Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useSystemConfigsControllerRemoveLogo<
-  TData = Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type SystemConfigsControllerRemoveLogoMutationError = unknown;
+
 /**
  * @summary Remove system logo
  */
-
-export function useSystemConfigsControllerRemoveLogo<
-  TData = Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+export const useSystemConfigsControllerRemoveLogo = <
   TError = unknown,
+  TContext = unknown,
 >(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+      TError,
+      void,
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getSystemConfigsControllerRemoveLogoQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getSystemConfigsControllerRemoveLogoMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Retrieves a list of jobs that the user is a member of.
@@ -9093,180 +7670,78 @@ export const jobsRegistryControllerUpdateResult = (
   );
 };
 
-export const getJobsRegistryControllerUpdateResultQueryKey = (
-  workerId: string,
-  updateResultDto?: UpdateResultDto,
-) => {
-  return [
-    'POST',
-    `/api/jobs-registry/${workerId}/result`,
-    updateResultDto,
-  ] as const;
-};
-
-export const getJobsRegistryControllerUpdateResultQueryOptions = <
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
+export const getJobsRegistryControllerUpdateResultMutationOptions = <
   TError = unknown,
->(
-  workerId: string,
-  updateResultDto: UpdateResultDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getJobsRegistryControllerUpdateResultQueryKey(workerId, updateResultDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>
-  > = ({ signal }) =>
-    jobsRegistryControllerUpdateResult(
-      workerId,
-      updateResultDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: workerId !== null && workerId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { workerId: string; data: UpdateResultDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
+  TError,
+  { workerId: string; data: UpdateResultDto },
+  TContext
+> => {
+  const mutationKey = ['jobsRegistryControllerUpdateResult'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
+    { workerId: string; data: UpdateResultDto }
+  > = (props) => {
+    const { workerId, data } = props ?? {};
+
+    return jobsRegistryControllerUpdateResult(workerId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type JobsRegistryControllerUpdateResultQueryResult = NonNullable<
+export type JobsRegistryControllerUpdateResultMutationResult = NonNullable<
   Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>
 >;
-export type JobsRegistryControllerUpdateResultQueryError = unknown;
+export type JobsRegistryControllerUpdateResultMutationBody = UpdateResultDto;
+export type JobsRegistryControllerUpdateResultMutationError = unknown;
 
-export function useJobsRegistryControllerUpdateResult<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-  TError = unknown,
->(
-  workerId: string,
-  updateResultDto: UpdateResultDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerUpdateResult<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-  TError = unknown,
->(
-  workerId: string,
-  updateResultDto: UpdateResultDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerUpdateResult<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-  TError = unknown,
->(
-  workerId: string,
-  updateResultDto: UpdateResultDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Updates the result of a job with the given worker ID.
  */
-
-export function useJobsRegistryControllerUpdateResult<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
+export const useJobsRegistryControllerUpdateResult = <
   TError = unknown,
+  TContext = unknown,
 >(
-  workerId: string,
-  updateResultDto: UpdateResultDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
+      TError,
+      { workerId: string; data: UpdateResultDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getJobsRegistryControllerUpdateResultQueryOptions(
-    workerId,
-    updateResultDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof jobsRegistryControllerUpdateResult>>,
+  TError,
+  { workerId: string; data: UpdateResultDto },
+  TContext
+> => {
+  return useMutation(
+    getJobsRegistryControllerUpdateResultMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieves a list of job histories in the current workspace with their associated jobs, assets, and targets.
@@ -9825,161 +8300,78 @@ export const jobsRegistryControllerReRunJob = (
   );
 };
 
-export const getJobsRegistryControllerReRunJobQueryKey = (id: string) => {
-  return ['POST', `/api/jobs-registry/${id}/re-run`] as const;
-};
-
-export const getJobsRegistryControllerReRunJobQueryOptions = <
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
+export const getJobsRegistryControllerReRunJobMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getJobsRegistryControllerReRunJobQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>
-  > = ({ signal }) =>
-    jobsRegistryControllerReRunJob(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['jobsRegistryControllerReRunJob'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return jobsRegistryControllerReRunJob(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type JobsRegistryControllerReRunJobQueryResult = NonNullable<
+export type JobsRegistryControllerReRunJobMutationResult = NonNullable<
   Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>
 >;
-export type JobsRegistryControllerReRunJobQueryError = unknown;
 
-export function useJobsRegistryControllerReRunJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerReRunJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerReRunJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type JobsRegistryControllerReRunJobMutationError = unknown;
+
 /**
  * @summary Re-run a job
  */
-
-export function useJobsRegistryControllerReRunJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
+export const useJobsRegistryControllerReRunJob = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getJobsRegistryControllerReRunJobQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof jobsRegistryControllerReRunJob>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getJobsRegistryControllerReRunJobMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Cancel a job by its ID in the specified workspace
@@ -9996,161 +8388,78 @@ export const jobsRegistryControllerCancelJob = (
   );
 };
 
-export const getJobsRegistryControllerCancelJobQueryKey = (id: string) => {
-  return ['POST', `/api/jobs-registry/${id}/cancel`] as const;
-};
-
-export const getJobsRegistryControllerCancelJobQueryOptions = <
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+export const getJobsRegistryControllerCancelJobMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getJobsRegistryControllerCancelJobQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>
-  > = ({ signal }) =>
-    jobsRegistryControllerCancelJob(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['jobsRegistryControllerCancelJob'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return jobsRegistryControllerCancelJob(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type JobsRegistryControllerCancelJobQueryResult = NonNullable<
+export type JobsRegistryControllerCancelJobMutationResult = NonNullable<
   Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>
 >;
-export type JobsRegistryControllerCancelJobQueryError = unknown;
 
-export function useJobsRegistryControllerCancelJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerCancelJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerCancelJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type JobsRegistryControllerCancelJobMutationError = unknown;
+
 /**
  * @summary Cancel a job
  */
-
-export function useJobsRegistryControllerCancelJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+export const useJobsRegistryControllerCancelJob = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getJobsRegistryControllerCancelJobQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getJobsRegistryControllerCancelJobMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Delete a job by its ID in the specified workspace
@@ -10167,161 +8476,78 @@ export const jobsRegistryControllerDeleteJob = (
   );
 };
 
-export const getJobsRegistryControllerDeleteJobQueryKey = (id: string) => {
-  return ['DELETE', `/api/jobs-registry/${id}`] as const;
-};
-
-export const getJobsRegistryControllerDeleteJobQueryOptions = <
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
+export const getJobsRegistryControllerDeleteJobMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getJobsRegistryControllerDeleteJobQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>
-  > = ({ signal }) =>
-    jobsRegistryControllerDeleteJob(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['jobsRegistryControllerDeleteJob'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return jobsRegistryControllerDeleteJob(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type JobsRegistryControllerDeleteJobQueryResult = NonNullable<
+export type JobsRegistryControllerDeleteJobMutationResult = NonNullable<
   Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>
 >;
-export type JobsRegistryControllerDeleteJobQueryError = unknown;
 
-export function useJobsRegistryControllerDeleteJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerDeleteJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerDeleteJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type JobsRegistryControllerDeleteJobMutationError = unknown;
+
 /**
  * @summary Delete a job
  */
-
-export function useJobsRegistryControllerDeleteJob<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
+export const useJobsRegistryControllerDeleteJob = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getJobsRegistryControllerDeleteJobQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof jobsRegistryControllerDeleteJob>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getJobsRegistryControllerDeleteJobMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieves a list of assets associated with the given target.
@@ -13026,171 +11252,78 @@ export const assetsControllerUpdateAssetById = (
   );
 };
 
-export const getAssetsControllerUpdateAssetByIdQueryKey = (
-  id: string,
-  updateAssetDto?: UpdateAssetDto,
-) => {
-  return ['PATCH', `/api/assets/${id}`, updateAssetDto] as const;
-};
-
-export const getAssetsControllerUpdateAssetByIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+export const getAssetsControllerUpdateAssetByIdMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateAssetDto: UpdateAssetDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetsControllerUpdateAssetByIdQueryKey(id, updateAssetDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>
-  > = ({ signal }) =>
-    assetsControllerUpdateAssetById(id, updateAssetDto, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateAssetDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+  TError,
+  { id: string; data: UpdateAssetDto },
+  TContext
+> => {
+  const mutationKey = ['assetsControllerUpdateAssetById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+    { id: string; data: UpdateAssetDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetsControllerUpdateAssetById(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetsControllerUpdateAssetByIdQueryResult = NonNullable<
+export type AssetsControllerUpdateAssetByIdMutationResult = NonNullable<
   Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>
 >;
-export type AssetsControllerUpdateAssetByIdQueryError = unknown;
+export type AssetsControllerUpdateAssetByIdMutationBody = UpdateAssetDto;
+export type AssetsControllerUpdateAssetByIdMutationError = unknown;
 
-export function useAssetsControllerUpdateAssetById<
-  TData = Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-  TError = unknown,
->(
-  id: string,
-  updateAssetDto: UpdateAssetDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetsControllerUpdateAssetById<
-  TData = Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-  TError = unknown,
->(
-  id: string,
-  updateAssetDto: UpdateAssetDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetsControllerUpdateAssetById<
-  TData = Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-  TError = unknown,
->(
-  id: string,
-  updateAssetDto: UpdateAssetDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update asset by ID
  */
-
-export function useAssetsControllerUpdateAssetById<
-  TData = Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+export const useAssetsControllerUpdateAssetById = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateAssetDto: UpdateAssetDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+      TError,
+      { id: string; data: UpdateAssetDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAssetsControllerUpdateAssetByIdQueryOptions(
-    id,
-    updateAssetDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+  TError,
+  { id: string; data: UpdateAssetDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetsControllerUpdateAssetByIdMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Toggle the enabled/disabled status of an asset.
@@ -13213,159 +11346,78 @@ export const assetsControllerSwitchAsset = (
   );
 };
 
-export const getAssetsControllerSwitchAssetQueryKey = (
-  switchAssetDto?: SwitchAssetDto,
-) => {
-  return ['POST', `/api/assets/switch`, switchAssetDto] as const;
-};
-
-export const getAssetsControllerSwitchAssetQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+export const getAssetsControllerSwitchAssetMutationOptions = <
   TError = unknown,
->(
-  switchAssetDto: SwitchAssetDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetsControllerSwitchAssetQueryKey(switchAssetDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerSwitchAsset>>
-  > = ({ signal }) =>
-    assetsControllerSwitchAsset(switchAssetDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: SwitchAssetDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+  TError,
+  { data: SwitchAssetDto },
+  TContext
+> => {
+  const mutationKey = ['assetsControllerSwitchAsset'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+    { data: SwitchAssetDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assetsControllerSwitchAsset(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetsControllerSwitchAssetQueryResult = NonNullable<
+export type AssetsControllerSwitchAssetMutationResult = NonNullable<
   Awaited<ReturnType<typeof assetsControllerSwitchAsset>>
 >;
-export type AssetsControllerSwitchAssetQueryError = unknown;
+export type AssetsControllerSwitchAssetMutationBody = SwitchAssetDto;
+export type AssetsControllerSwitchAssetMutationError = unknown;
 
-export function useAssetsControllerSwitchAsset<
-  TData = Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-  TError = unknown,
->(
-  switchAssetDto: SwitchAssetDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerSwitchAsset>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetsControllerSwitchAsset<
-  TData = Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-  TError = unknown,
->(
-  switchAssetDto: SwitchAssetDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerSwitchAsset>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetsControllerSwitchAsset<
-  TData = Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-  TError = unknown,
->(
-  switchAssetDto: SwitchAssetDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Switch asset enabled/disabled
  */
-
-export function useAssetsControllerSwitchAsset<
-  TData = Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+export const useAssetsControllerSwitchAsset = <
   TError = unknown,
+  TContext = unknown,
 >(
-  switchAssetDto: SwitchAssetDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+      TError,
+      { data: SwitchAssetDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAssetsControllerSwitchAssetQueryOptions(
-    switchAssetDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+  TError,
+  { data: SwitchAssetDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetsControllerSwitchAssetMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Exports all services in a workspace to a CSV file containing value, ports, technologies, and TLS information for reporting and analysis purposes.
@@ -13544,158 +11596,75 @@ export const workersControllerAlive = (
   );
 };
 
-export const getWorkersControllerAliveQueryKey = (
-  workerAliveDto?: WorkerAliveDto,
-) => {
-  return ['POST', `/api/workers/alive`, workerAliveDto] as const;
-};
-
-export const getWorkersControllerAliveQueryOptions = <
-  TData = Awaited<ReturnType<typeof workersControllerAlive>>,
+export const getWorkersControllerAliveMutationOptions = <
   TError = unknown,
->(
-  workerAliveDto: WorkerAliveDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerAlive>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getWorkersControllerAliveQueryKey(workerAliveDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workersControllerAlive>>
-  > = ({ signal }) =>
-    workersControllerAlive(workerAliveDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workersControllerAlive>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: WorkerAliveDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workersControllerAlive>>,
+  TError,
+  { data: WorkerAliveDto },
+  TContext
+> => {
+  const mutationKey = ['workersControllerAlive'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workersControllerAlive>>,
+    { data: WorkerAliveDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workersControllerAlive(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkersControllerAliveQueryResult = NonNullable<
+export type WorkersControllerAliveMutationResult = NonNullable<
   Awaited<ReturnType<typeof workersControllerAlive>>
 >;
-export type WorkersControllerAliveQueryError = unknown;
+export type WorkersControllerAliveMutationBody = WorkerAliveDto;
+export type WorkersControllerAliveMutationError = unknown;
 
-export function useWorkersControllerAlive<
-  TData = Awaited<ReturnType<typeof workersControllerAlive>>,
-  TError = unknown,
->(
-  workerAliveDto: WorkerAliveDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerAlive>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workersControllerAlive>>,
-          TError,
-          Awaited<ReturnType<typeof workersControllerAlive>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkersControllerAlive<
-  TData = Awaited<ReturnType<typeof workersControllerAlive>>,
-  TError = unknown,
->(
-  workerAliveDto: WorkerAliveDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerAlive>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workersControllerAlive>>,
-          TError,
-          Awaited<ReturnType<typeof workersControllerAlive>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkersControllerAlive<
-  TData = Awaited<ReturnType<typeof workersControllerAlive>>,
-  TError = unknown,
->(
-  workerAliveDto: WorkerAliveDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerAlive>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Worker alive
  */
-
-export function useWorkersControllerAlive<
-  TData = Awaited<ReturnType<typeof workersControllerAlive>>,
-  TError = unknown,
->(
-  workerAliveDto: WorkerAliveDto,
+export const useWorkersControllerAlive = <TError = unknown, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerAlive>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workersControllerAlive>>,
+      TError,
+      { data: WorkerAliveDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkersControllerAliveQueryOptions(
-    workerAliveDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workersControllerAlive>>,
+  TError,
+  { data: WorkerAliveDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkersControllerAliveMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Registers a new security assessment worker node to the distributed processing cluster.
@@ -13718,158 +11687,75 @@ export const workersControllerJoin = (
   );
 };
 
-export const getWorkersControllerJoinQueryKey = (
-  workerJoinDto?: WorkerJoinDto,
-) => {
-  return ['POST', `/api/workers/join`, workerJoinDto] as const;
-};
-
-export const getWorkersControllerJoinQueryOptions = <
-  TData = Awaited<ReturnType<typeof workersControllerJoin>>,
+export const getWorkersControllerJoinMutationOptions = <
   TError = unknown,
->(
-  workerJoinDto: WorkerJoinDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerJoin>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getWorkersControllerJoinQueryKey(workerJoinDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workersControllerJoin>>
-  > = ({ signal }) =>
-    workersControllerJoin(workerJoinDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof workersControllerJoin>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: WorkerJoinDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workersControllerJoin>>,
+  TError,
+  { data: WorkerJoinDto },
+  TContext
+> => {
+  const mutationKey = ['workersControllerJoin'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workersControllerJoin>>,
+    { data: WorkerJoinDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workersControllerJoin(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkersControllerJoinQueryResult = NonNullable<
+export type WorkersControllerJoinMutationResult = NonNullable<
   Awaited<ReturnType<typeof workersControllerJoin>>
 >;
-export type WorkersControllerJoinQueryError = unknown;
+export type WorkersControllerJoinMutationBody = WorkerJoinDto;
+export type WorkersControllerJoinMutationError = unknown;
 
-export function useWorkersControllerJoin<
-  TData = Awaited<ReturnType<typeof workersControllerJoin>>,
-  TError = unknown,
->(
-  workerJoinDto: WorkerJoinDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerJoin>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workersControllerJoin>>,
-          TError,
-          Awaited<ReturnType<typeof workersControllerJoin>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkersControllerJoin<
-  TData = Awaited<ReturnType<typeof workersControllerJoin>>,
-  TError = unknown,
->(
-  workerJoinDto: WorkerJoinDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerJoin>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workersControllerJoin>>,
-          TError,
-          Awaited<ReturnType<typeof workersControllerJoin>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkersControllerJoin<
-  TData = Awaited<ReturnType<typeof workersControllerJoin>>,
-  TError = unknown,
->(
-  workerJoinDto: WorkerJoinDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerJoin>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Worker join
  */
-
-export function useWorkersControllerJoin<
-  TData = Awaited<ReturnType<typeof workersControllerJoin>>,
-  TError = unknown,
->(
-  workerJoinDto: WorkerJoinDto,
+export const useWorkersControllerJoin = <TError = unknown, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workersControllerJoin>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workersControllerJoin>>,
+      TError,
+      { data: WorkerJoinDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkersControllerJoinQueryOptions(
-    workerJoinDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workersControllerJoin>>,
+  TError,
+  { data: WorkerJoinDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkersControllerJoinMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Fetches a paginated list of all active security assessment workers in the cluster.
@@ -14251,159 +12137,78 @@ export const toolsControllerCreateTool = (
   );
 };
 
-export const getToolsControllerCreateToolQueryKey = (
-  createToolDto?: CreateToolDto,
-) => {
-  return ['POST', `/api/tools`, createToolDto] as const;
-};
-
-export const getToolsControllerCreateToolQueryOptions = <
-  TData = Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+export const getToolsControllerCreateToolMutationOptions = <
   TError = unknown,
->(
-  createToolDto: CreateToolDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getToolsControllerCreateToolQueryKey(createToolDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerCreateTool>>
-  > = ({ signal }) =>
-    toolsControllerCreateTool(createToolDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof toolsControllerCreateTool>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateToolDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+  TError,
+  { data: CreateToolDto },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerCreateTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+    { data: CreateToolDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return toolsControllerCreateTool(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type ToolsControllerCreateToolQueryResult = NonNullable<
+export type ToolsControllerCreateToolMutationResult = NonNullable<
   Awaited<ReturnType<typeof toolsControllerCreateTool>>
 >;
-export type ToolsControllerCreateToolQueryError = unknown;
+export type ToolsControllerCreateToolMutationBody = CreateToolDto;
+export type ToolsControllerCreateToolMutationError = unknown;
 
-export function useToolsControllerCreateTool<
-  TData = Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-  TError = unknown,
->(
-  createToolDto: CreateToolDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerCreateTool>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerCreateTool<
-  TData = Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-  TError = unknown,
->(
-  createToolDto: CreateToolDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerCreateTool>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerCreateTool<
-  TData = Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-  TError = unknown,
->(
-  createToolDto: CreateToolDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create a new tool
  */
-
-export function useToolsControllerCreateTool<
-  TData = Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+export const useToolsControllerCreateTool = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createToolDto: CreateToolDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+      TError,
+      { data: CreateToolDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getToolsControllerCreateToolQueryOptions(
-    createToolDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+  TError,
+  { data: CreateToolDto },
+  TContext
+> => {
+  return useMutation(
+    getToolsControllerCreateToolMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Fetches a paginated list of available security assessment tools in the system.
@@ -14785,167 +12590,79 @@ export const toolsControllerAddToolToWorkspace = (
   );
 };
 
-export const getToolsControllerAddToolToWorkspaceQueryKey = (
-  addToolToWorkspaceDto?: AddToolToWorkspaceDto,
-) => {
-  return [
-    'POST',
-    `/api/tools/add-to-workspace`,
-    addToolToWorkspaceDto,
-  ] as const;
-};
-
-export const getToolsControllerAddToolToWorkspaceQueryOptions = <
-  TData = Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
+export const getToolsControllerAddToolToWorkspaceMutationOptions = <
   TError = unknown,
->(
-  addToolToWorkspaceDto: AddToolToWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getToolsControllerAddToolToWorkspaceQueryKey(addToolToWorkspaceDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>
-  > = ({ signal }) =>
-    toolsControllerAddToolToWorkspace(
-      addToolToWorkspaceDto,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: AddToolToWorkspaceDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
+  TError,
+  { data: AddToolToWorkspaceDto },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerAddToolToWorkspace'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
+    { data: AddToolToWorkspaceDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return toolsControllerAddToolToWorkspace(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type ToolsControllerAddToolToWorkspaceQueryResult = NonNullable<
+export type ToolsControllerAddToolToWorkspaceMutationResult = NonNullable<
   Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>
 >;
-export type ToolsControllerAddToolToWorkspaceQueryError = unknown;
+export type ToolsControllerAddToolToWorkspaceMutationBody =
+  AddToolToWorkspaceDto;
+export type ToolsControllerAddToolToWorkspaceMutationError = unknown;
 
-export function useToolsControllerAddToolToWorkspace<
-  TData = Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-  TError = unknown,
->(
-  addToolToWorkspaceDto: AddToolToWorkspaceDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerAddToolToWorkspace<
-  TData = Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-  TError = unknown,
->(
-  addToolToWorkspaceDto: AddToolToWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerAddToolToWorkspace<
-  TData = Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-  TError = unknown,
->(
-  addToolToWorkspaceDto: AddToolToWorkspaceDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Add tool to workspace
  */
-
-export function useToolsControllerAddToolToWorkspace<
-  TData = Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
+export const useToolsControllerAddToolToWorkspace = <
   TError = unknown,
+  TContext = unknown,
 >(
-  addToolToWorkspaceDto: AddToolToWorkspaceDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
+      TError,
+      { data: AddToolToWorkspaceDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getToolsControllerAddToolToWorkspaceQueryOptions(
-    addToolToWorkspaceDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerAddToolToWorkspace>>,
+  TError,
+  { data: AddToolToWorkspaceDto },
+  TContext
+> => {
+  return useMutation(
+    getToolsControllerAddToolToWorkspaceMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Installs a security tool to a specific workspace with duplicate checking to prevent conflicts.
@@ -14968,159 +12685,78 @@ export const toolsControllerInstallTool = (
   );
 };
 
-export const getToolsControllerInstallToolQueryKey = (
-  installToolDto?: InstallToolDto,
-) => {
-  return ['POST', `/api/tools/install`, installToolDto] as const;
-};
-
-export const getToolsControllerInstallToolQueryOptions = <
-  TData = Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+export const getToolsControllerInstallToolMutationOptions = <
   TError = unknown,
->(
-  installToolDto: InstallToolDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getToolsControllerInstallToolQueryKey(installToolDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerInstallTool>>
-  > = ({ signal }) =>
-    toolsControllerInstallTool(installToolDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof toolsControllerInstallTool>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: InstallToolDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+  TError,
+  { data: InstallToolDto },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerInstallTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+    { data: InstallToolDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return toolsControllerInstallTool(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type ToolsControllerInstallToolQueryResult = NonNullable<
+export type ToolsControllerInstallToolMutationResult = NonNullable<
   Awaited<ReturnType<typeof toolsControllerInstallTool>>
 >;
-export type ToolsControllerInstallToolQueryError = unknown;
+export type ToolsControllerInstallToolMutationBody = InstallToolDto;
+export type ToolsControllerInstallToolMutationError = unknown;
 
-export function useToolsControllerInstallTool<
-  TData = Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-  TError = unknown,
->(
-  installToolDto: InstallToolDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerInstallTool>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerInstallTool<
-  TData = Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-  TError = unknown,
->(
-  installToolDto: InstallToolDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerInstallTool>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerInstallTool<
-  TData = Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-  TError = unknown,
->(
-  installToolDto: InstallToolDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Install tool
  */
-
-export function useToolsControllerInstallTool<
-  TData = Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+export const useToolsControllerInstallTool = <
   TError = unknown,
+  TContext = unknown,
 >(
-  installToolDto: InstallToolDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerInstallTool>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+      TError,
+      { data: InstallToolDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getToolsControllerInstallToolQueryOptions(
-    installToolDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+  TError,
+  { data: InstallToolDto },
+  TContext
+> => {
+  return useMutation(
+    getToolsControllerInstallToolMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Removes a security tool from a specific workspace by deleting its association record.
@@ -15143,159 +12779,78 @@ export const toolsControllerUninstallTool = (
   );
 };
 
-export const getToolsControllerUninstallToolQueryKey = (
-  installToolDto?: InstallToolDto,
-) => {
-  return ['POST', `/api/tools/uninstall`, installToolDto] as const;
-};
-
-export const getToolsControllerUninstallToolQueryOptions = <
-  TData = Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+export const getToolsControllerUninstallToolMutationOptions = <
   TError = unknown,
->(
-  installToolDto: InstallToolDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getToolsControllerUninstallToolQueryKey(installToolDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerUninstallTool>>
-  > = ({ signal }) =>
-    toolsControllerUninstallTool(installToolDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: InstallToolDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+  TError,
+  { data: InstallToolDto },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerUninstallTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+    { data: InstallToolDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return toolsControllerUninstallTool(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type ToolsControllerUninstallToolQueryResult = NonNullable<
+export type ToolsControllerUninstallToolMutationResult = NonNullable<
   Awaited<ReturnType<typeof toolsControllerUninstallTool>>
 >;
-export type ToolsControllerUninstallToolQueryError = unknown;
+export type ToolsControllerUninstallToolMutationBody = InstallToolDto;
+export type ToolsControllerUninstallToolMutationError = unknown;
 
-export function useToolsControllerUninstallTool<
-  TData = Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-  TError = unknown,
->(
-  installToolDto: InstallToolDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerUninstallTool>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerUninstallTool<
-  TData = Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-  TError = unknown,
->(
-  installToolDto: InstallToolDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerUninstallTool>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerUninstallTool<
-  TData = Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-  TError = unknown,
->(
-  installToolDto: InstallToolDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Uninstall tool
  */
-
-export function useToolsControllerUninstallTool<
-  TData = Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+export const useToolsControllerUninstallTool = <
   TError = unknown,
+  TContext = unknown,
 >(
-  installToolDto: InstallToolDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+      TError,
+      { data: InstallToolDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getToolsControllerUninstallToolQueryOptions(
-    installToolDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+  TError,
+  { data: InstallToolDto },
+  TContext
+> => {
+  return useMutation(
+    getToolsControllerUninstallToolMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * @deprecated
@@ -15970,161 +13525,78 @@ export const toolsControllerRotateToolApiKey = (
   );
 };
 
-export const getToolsControllerRotateToolApiKeyQueryKey = (id: string) => {
-  return ['POST', `/api/tools/${id}/api-key/rotate`] as const;
-};
-
-export const getToolsControllerRotateToolApiKeyQueryOptions = <
-  TData = Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+export const getToolsControllerRotateToolApiKeyMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getToolsControllerRotateToolApiKeyQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>
-  > = ({ signal }) =>
-    toolsControllerRotateToolApiKey(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerRotateToolApiKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return toolsControllerRotateToolApiKey(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type ToolsControllerRotateToolApiKeyQueryResult = NonNullable<
+export type ToolsControllerRotateToolApiKeyMutationResult = NonNullable<
   Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>
 >;
-export type ToolsControllerRotateToolApiKeyQueryError = unknown;
 
-export function useToolsControllerRotateToolApiKey<
-  TData = Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerRotateToolApiKey<
-  TData = Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerRotateToolApiKey<
-  TData = Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type ToolsControllerRotateToolApiKeyMutationError = unknown;
+
 /**
  * @summary Rotate tool API key
  */
-
-export function useToolsControllerRotateToolApiKey<
-  TData = Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+export const useToolsControllerRotateToolApiKey = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getToolsControllerRotateToolApiKeyQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getToolsControllerRotateToolApiKeyMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Search assets and targets
@@ -16861,148 +14333,77 @@ export const searchControllerDeleteAllSearchHistories = (
   );
 };
 
-export const getSearchControllerDeleteAllSearchHistoriesQueryKey = () => {
-  return ['DELETE', `/api/search/histories`] as const;
-};
-
-export const getSearchControllerDeleteAllSearchHistoriesQueryOptions = <
-  TData = Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+export const getSearchControllerDeleteAllSearchHistoriesMutationOptions = <
   TError = unknown,
+  TContext = unknown,
 >(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getSearchControllerDeleteAllSearchHistoriesQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>
-  > = ({ signal }) =>
-    searchControllerDeleteAllSearchHistories(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['searchControllerDeleteAllSearchHistories'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+    void
+  > = () => {
+    return searchControllerDeleteAllSearchHistories(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type SearchControllerDeleteAllSearchHistoriesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>
->;
-export type SearchControllerDeleteAllSearchHistoriesQueryError = unknown;
+export type SearchControllerDeleteAllSearchHistoriesMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>
+  >;
 
-export function useSearchControllerDeleteAllSearchHistories<
-  TData = Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useSearchControllerDeleteAllSearchHistories<
-  TData = Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useSearchControllerDeleteAllSearchHistories<
-  TData = Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type SearchControllerDeleteAllSearchHistoriesMutationError = unknown;
+
 /**
  * @summary Delete all search history
  */
-
-export function useSearchControllerDeleteAllSearchHistories<
-  TData = Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+export const useSearchControllerDeleteAllSearchHistories = <
   TError = unknown,
+  TContext = unknown,
 >(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+      TError,
+      void,
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getSearchControllerDeleteAllSearchHistoriesQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getSearchControllerDeleteAllSearchHistoriesMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Delete a specific search history entry by its ID
@@ -17019,162 +14420,78 @@ export const searchControllerDeleteSearchHistory = (
   );
 };
 
-export const getSearchControllerDeleteSearchHistoryQueryKey = (id: string) => {
-  return ['DELETE', `/api/search/histories/${id}`] as const;
-};
-
-export const getSearchControllerDeleteSearchHistoryQueryOptions = <
-  TData = Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+export const getSearchControllerDeleteSearchHistoryMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getSearchControllerDeleteSearchHistoryQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>
-  > = ({ signal }) =>
-    searchControllerDeleteSearchHistory(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['searchControllerDeleteSearchHistory'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return searchControllerDeleteSearchHistory(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type SearchControllerDeleteSearchHistoryQueryResult = NonNullable<
+export type SearchControllerDeleteSearchHistoryMutationResult = NonNullable<
   Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>
 >;
-export type SearchControllerDeleteSearchHistoryQueryError = unknown;
 
-export function useSearchControllerDeleteSearchHistory<
-  TData = Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useSearchControllerDeleteSearchHistory<
-  TData = Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useSearchControllerDeleteSearchHistory<
-  TData = Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type SearchControllerDeleteSearchHistoryMutationError = unknown;
+
 /**
  * @summary Delete search history by ID
  */
-
-export function useSearchControllerDeleteSearchHistory<
-  TData = Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+export const useSearchControllerDeleteSearchHistory = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getSearchControllerDeleteSearchHistoryQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getSearchControllerDeleteSearchHistoryMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
@@ -18369,156 +15686,78 @@ export const vulnerabilitiesControllerScan = (
   );
 };
 
-export const getVulnerabilitiesControllerScanQueryKey = (scanDto?: ScanDto) => {
-  return ['POST', `/api/vulnerabilities/scan`, scanDto] as const;
-};
-
-export const getVulnerabilitiesControllerScanQueryOptions = <
-  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+export const getVulnerabilitiesControllerScanMutationOptions = <
   TError = unknown,
->(
-  scanDto: ScanDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getVulnerabilitiesControllerScanQueryKey(scanDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>
-  > = ({ signal }) =>
-    vulnerabilitiesControllerScan(scanDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: ScanDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+  TError,
+  { data: ScanDto },
+  TContext
+> => {
+  const mutationKey = ['vulnerabilitiesControllerScan'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+    { data: ScanDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return vulnerabilitiesControllerScan(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type VulnerabilitiesControllerScanQueryResult = NonNullable<
+export type VulnerabilitiesControllerScanMutationResult = NonNullable<
   Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>
 >;
-export type VulnerabilitiesControllerScanQueryError = unknown;
+export type VulnerabilitiesControllerScanMutationBody = ScanDto;
+export type VulnerabilitiesControllerScanMutationError = unknown;
 
-export function useVulnerabilitiesControllerScan<
-  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-  TError = unknown,
->(
-  scanDto: ScanDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-          TError,
-          Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerScan<
-  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-  TError = unknown,
->(
-  scanDto: ScanDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-          TError,
-          Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerScan<
-  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-  TError = unknown,
->(
-  scanDto: ScanDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Scan target
  */
-
-export function useVulnerabilitiesControllerScan<
-  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+export const useVulnerabilitiesControllerScan = <
   TError = unknown,
+  TContext = unknown,
 >(
-  scanDto: ScanDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+      TError,
+      { data: ScanDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getVulnerabilitiesControllerScanQueryOptions(
-    scanDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+  TError,
+  { data: ScanDto },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerScanMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.
@@ -19369,213 +16608,85 @@ export const vulnerabilitiesControllerAnalyzeVulnerability = (
   );
 };
 
-export const getVulnerabilitiesControllerAnalyzeVulnerabilityQueryKey = (
-  id: string,
-  analyzeVulnerabilityDto?: AnalyzeVulnerabilityDto,
-) => {
-  return [
-    'POST',
-    `/api/vulnerabilities/${id}/analyze`,
-    analyzeVulnerabilityDto,
-  ] as const;
-};
-
-export const getVulnerabilitiesControllerAnalyzeVulnerabilityQueryOptions = <
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-  >,
+export const getVulnerabilitiesControllerAnalyzeVulnerabilityMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  analyzeVulnerabilityDto: AnalyzeVulnerabilityDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getVulnerabilitiesControllerAnalyzeVulnerabilityQueryKey(
-      id,
-      analyzeVulnerabilityDto,
-    );
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>
-  > = ({ signal }) =>
-    vulnerabilitiesControllerAnalyzeVulnerability(
-      id,
-      analyzeVulnerabilityDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: AnalyzeVulnerabilityDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
+  TError,
+  { id: string; data: AnalyzeVulnerabilityDto },
+  TContext
+> => {
+  const mutationKey = ['vulnerabilitiesControllerAnalyzeVulnerability'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
+    { id: string; data: AnalyzeVulnerabilityDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return vulnerabilitiesControllerAnalyzeVulnerability(
+      id,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type VulnerabilitiesControllerAnalyzeVulnerabilityQueryResult =
+export type VulnerabilitiesControllerAnalyzeVulnerabilityMutationResult =
   NonNullable<
     Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>
   >;
-export type VulnerabilitiesControllerAnalyzeVulnerabilityQueryError = unknown;
+export type VulnerabilitiesControllerAnalyzeVulnerabilityMutationBody =
+  AnalyzeVulnerabilityDto;
+export type VulnerabilitiesControllerAnalyzeVulnerabilityMutationError =
+  unknown;
 
-export function useVulnerabilitiesControllerAnalyzeVulnerability<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-  >,
-  TError = unknown,
->(
-  id: string,
-  analyzeVulnerabilityDto: AnalyzeVulnerabilityDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerAnalyzeVulnerability<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-  >,
-  TError = unknown,
->(
-  id: string,
-  analyzeVulnerabilityDto: AnalyzeVulnerabilityDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerAnalyzeVulnerability<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-  >,
-  TError = unknown,
->(
-  id: string,
-  analyzeVulnerabilityDto: AnalyzeVulnerabilityDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Analyze a vulnerability
  */
-
-export function useVulnerabilitiesControllerAnalyzeVulnerability<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-  >,
+export const useVulnerabilitiesControllerAnalyzeVulnerability = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  analyzeVulnerabilityDto: AnalyzeVulnerabilityDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
+      TError,
+      { id: string; data: AnalyzeVulnerabilityDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getVulnerabilitiesControllerAnalyzeVulnerabilityQueryOptions(
-      id,
-      analyzeVulnerabilityDto,
-      options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
+  TError,
+  { id: string; data: AnalyzeVulnerabilityDto },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerAnalyzeVulnerabilityMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Removes the AI analysis result from a vulnerability and resets its status to not analyzed.
@@ -19592,224 +16703,97 @@ export const vulnerabilitiesControllerDeleteVulnerabilityAnalysis = (
   );
 };
 
-export const getVulnerabilitiesControllerDeleteVulnerabilityAnalysisQueryKey = (
-  id: string,
-) => {
-  return ['DELETE', `/api/vulnerabilities/${id}/analyze`] as const;
-};
-
-export const getVulnerabilitiesControllerDeleteVulnerabilityAnalysisQueryOptions =
-  <
-    TData = Awaited<
-      ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
-    >,
-    TError = unknown,
-  >(
-    id: string,
-    options?: {
-      query?: Partial<
-        UseQueryOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis
-            >
-          >,
-          TError,
-          TData
-        >
-      >;
-      request?: SecondParameter<typeof orvalClient>;
-    },
-  ) => {
-    const { query: queryOptions, request: requestOptions } = options ?? {};
-
-    const queryKey =
-      queryOptions?.queryKey ??
-      getVulnerabilitiesControllerDeleteVulnerabilityAnalysisQueryKey(id);
-
-    const queryFn: QueryFunction<
-      Awaited<
-        ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
-      >
-    > = ({ signal }) =>
-      vulnerabilitiesControllerDeleteVulnerabilityAnalysis(
-        id,
-        requestOptions,
-        signal,
-      );
-
-    return {
-      queryKey,
-      queryFn,
-      enabled: id !== null && id !== undefined,
-      ...queryOptions,
-    } as UseQueryOptions<
+export const getVulnerabilitiesControllerDeleteVulnerabilityAnalysisMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
       Awaited<
         ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
       >,
       TError,
-      TData
-    > & { queryKey: DataTag<QueryKey, TData, TError> };
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
+    >,
+    TError,
+    { id: string },
+    TContext
+  > => {
+    const mutationKey = [
+      'vulnerabilitiesControllerDeleteVulnerabilityAnalysis',
+    ];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
+      >,
+      { id: string }
+    > = (props) => {
+      const { id } = props ?? {};
+
+      return vulnerabilitiesControllerDeleteVulnerabilityAnalysis(
+        id,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
   };
 
-export type VulnerabilitiesControllerDeleteVulnerabilityAnalysisQueryResult =
+export type VulnerabilitiesControllerDeleteVulnerabilityAnalysisMutationResult =
   NonNullable<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
     >
   >;
-export type VulnerabilitiesControllerDeleteVulnerabilityAnalysisQueryError =
+
+export type VulnerabilitiesControllerDeleteVulnerabilityAnalysisMutationError =
   unknown;
 
-export function useVulnerabilitiesControllerDeleteVulnerabilityAnalysis<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis
-          >
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerDeleteVulnerabilityAnalysis<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis
-          >
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerDeleteVulnerabilityAnalysis<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis
-          >
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Delete vulnerability analysis result
  */
-
-export function useVulnerabilitiesControllerDeleteVulnerabilityAnalysis<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
-  >,
+export const useVulnerabilitiesControllerDeleteVulnerabilityAnalysis = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis
-          >
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
+      >,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getVulnerabilitiesControllerDeleteVulnerabilityAnalysisQueryOptions(
-      id,
+): UseMutationResult<
+  Awaited<
+    ReturnType<typeof vulnerabilitiesControllerDeleteVulnerabilityAnalysis>
+  >,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerDeleteVulnerabilityAnalysisMutationOptions(
       options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+    ),
+    queryClient,
+  );
+};
 
 /**
  * Dismisses multiple security vulnerabilities identified within the system, removing them from active tracking and analysis.
@@ -19832,217 +16816,96 @@ export const vulnerabilitiesControllerBulkDismissVulnerabilities = (
   );
 };
 
-export const getVulnerabilitiesControllerBulkDismissVulnerabilitiesQueryKey = (
-  bulkDismissVulnerabilitiesDto?: BulkDismissVulnerabilitiesDto,
-) => {
-  return [
-    'POST',
-    `/api/vulnerabilities/dismiss`,
-    bulkDismissVulnerabilitiesDto,
-  ] as const;
-};
-
-export const getVulnerabilitiesControllerBulkDismissVulnerabilitiesQueryOptions =
-  <
-    TData = Awaited<
-      ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-    >,
-    TError = unknown,
-  >(
-    bulkDismissVulnerabilitiesDto: BulkDismissVulnerabilitiesDto,
-    options?: {
-      query?: Partial<
-        UseQueryOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkDismissVulnerabilities
-            >
-          >,
-          TError,
-          TData
-        >
-      >;
-      request?: SecondParameter<typeof orvalClient>;
-    },
-  ) => {
-    const { query: queryOptions, request: requestOptions } = options ?? {};
-
-    const queryKey =
-      queryOptions?.queryKey ??
-      getVulnerabilitiesControllerBulkDismissVulnerabilitiesQueryKey(
-        bulkDismissVulnerabilitiesDto,
-      );
-
-    const queryFn: QueryFunction<
-      Awaited<
-        ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-      >
-    > = ({ signal }) =>
-      vulnerabilitiesControllerBulkDismissVulnerabilities(
-        bulkDismissVulnerabilitiesDto,
-        requestOptions,
-        signal,
-      );
-
-    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+export const getVulnerabilitiesControllerBulkDismissVulnerabilitiesMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
       Awaited<
         ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
       >,
       TError,
-      TData
-    > & { queryKey: DataTag<QueryKey, TData, TError> };
+      { data: BulkDismissVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+    >,
+    TError,
+    { data: BulkDismissVulnerabilitiesDto },
+    TContext
+  > => {
+    const mutationKey = ['vulnerabilitiesControllerBulkDismissVulnerabilities'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+      >,
+      { data: BulkDismissVulnerabilitiesDto }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return vulnerabilitiesControllerBulkDismissVulnerabilities(
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
   };
 
-export type VulnerabilitiesControllerBulkDismissVulnerabilitiesQueryResult =
+export type VulnerabilitiesControllerBulkDismissVulnerabilitiesMutationResult =
   NonNullable<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
     >
   >;
-export type VulnerabilitiesControllerBulkDismissVulnerabilitiesQueryError =
+export type VulnerabilitiesControllerBulkDismissVulnerabilitiesMutationBody =
+  BulkDismissVulnerabilitiesDto;
+export type VulnerabilitiesControllerBulkDismissVulnerabilitiesMutationError =
   unknown;
 
-export function useVulnerabilitiesControllerBulkDismissVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-  >,
-  TError = unknown,
->(
-  bulkDismissVulnerabilitiesDto: BulkDismissVulnerabilitiesDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkDismissVulnerabilities
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkDismissVulnerabilities
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerBulkDismissVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-  >,
-  TError = unknown,
->(
-  bulkDismissVulnerabilitiesDto: BulkDismissVulnerabilitiesDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkDismissVulnerabilities
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkDismissVulnerabilities
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerBulkDismissVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-  >,
-  TError = unknown,
->(
-  bulkDismissVulnerabilitiesDto: BulkDismissVulnerabilitiesDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Bulk dismiss vulnerabilities
  */
-
-export function useVulnerabilitiesControllerBulkDismissVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-  >,
+export const useVulnerabilitiesControllerBulkDismissVulnerabilities = <
   TError = unknown,
+  TContext = unknown,
 >(
-  bulkDismissVulnerabilitiesDto: BulkDismissVulnerabilitiesDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+      >,
+      TError,
+      { data: BulkDismissVulnerabilitiesDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getVulnerabilitiesControllerBulkDismissVulnerabilitiesQueryOptions(
-      bulkDismissVulnerabilitiesDto,
+): UseMutationResult<
+  Awaited<
+    ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+  >,
+  TError,
+  { data: BulkDismissVulnerabilitiesDto },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerBulkDismissVulnerabilitiesMutationOptions(
       options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+    ),
+    queryClient,
+  );
+};
 
 /**
  * Reopens multiple security vulnerabilities identified within the system, restoring them to active tracking and analysis.
@@ -20065,217 +16928,96 @@ export const vulnerabilitiesControllerBulkReopenVulnerabilities = (
   );
 };
 
-export const getVulnerabilitiesControllerBulkReopenVulnerabilitiesQueryKey = (
-  bulkReopenVulnerabilitiesDto?: BulkReopenVulnerabilitiesDto,
-) => {
-  return [
-    'POST',
-    `/api/vulnerabilities/reopen`,
-    bulkReopenVulnerabilitiesDto,
-  ] as const;
-};
-
-export const getVulnerabilitiesControllerBulkReopenVulnerabilitiesQueryOptions =
-  <
-    TData = Awaited<
-      ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-    >,
-    TError = unknown,
-  >(
-    bulkReopenVulnerabilitiesDto: BulkReopenVulnerabilitiesDto,
-    options?: {
-      query?: Partial<
-        UseQueryOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkReopenVulnerabilities
-            >
-          >,
-          TError,
-          TData
-        >
-      >;
-      request?: SecondParameter<typeof orvalClient>;
-    },
-  ) => {
-    const { query: queryOptions, request: requestOptions } = options ?? {};
-
-    const queryKey =
-      queryOptions?.queryKey ??
-      getVulnerabilitiesControllerBulkReopenVulnerabilitiesQueryKey(
-        bulkReopenVulnerabilitiesDto,
-      );
-
-    const queryFn: QueryFunction<
-      Awaited<
-        ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-      >
-    > = ({ signal }) =>
-      vulnerabilitiesControllerBulkReopenVulnerabilities(
-        bulkReopenVulnerabilitiesDto,
-        requestOptions,
-        signal,
-      );
-
-    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+export const getVulnerabilitiesControllerBulkReopenVulnerabilitiesMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
       Awaited<
         ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
       >,
       TError,
-      TData
-    > & { queryKey: DataTag<QueryKey, TData, TError> };
+      { data: BulkReopenVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+    >,
+    TError,
+    { data: BulkReopenVulnerabilitiesDto },
+    TContext
+  > => {
+    const mutationKey = ['vulnerabilitiesControllerBulkReopenVulnerabilities'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+      >,
+      { data: BulkReopenVulnerabilitiesDto }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return vulnerabilitiesControllerBulkReopenVulnerabilities(
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
   };
 
-export type VulnerabilitiesControllerBulkReopenVulnerabilitiesQueryResult =
+export type VulnerabilitiesControllerBulkReopenVulnerabilitiesMutationResult =
   NonNullable<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
     >
   >;
-export type VulnerabilitiesControllerBulkReopenVulnerabilitiesQueryError =
+export type VulnerabilitiesControllerBulkReopenVulnerabilitiesMutationBody =
+  BulkReopenVulnerabilitiesDto;
+export type VulnerabilitiesControllerBulkReopenVulnerabilitiesMutationError =
   unknown;
 
-export function useVulnerabilitiesControllerBulkReopenVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-  >,
-  TError = unknown,
->(
-  bulkReopenVulnerabilitiesDto: BulkReopenVulnerabilitiesDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkReopenVulnerabilities
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkReopenVulnerabilities
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerBulkReopenVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-  >,
-  TError = unknown,
->(
-  bulkReopenVulnerabilitiesDto: BulkReopenVulnerabilitiesDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkReopenVulnerabilities
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerBulkReopenVulnerabilities
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useVulnerabilitiesControllerBulkReopenVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-  >,
-  TError = unknown,
->(
-  bulkReopenVulnerabilitiesDto: BulkReopenVulnerabilitiesDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Bulk reopen vulnerabilities
  */
-
-export function useVulnerabilitiesControllerBulkReopenVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-  >,
+export const useVulnerabilitiesControllerBulkReopenVulnerabilities = <
   TError = unknown,
+  TContext = unknown,
 >(
-  bulkReopenVulnerabilitiesDto: BulkReopenVulnerabilitiesDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+      >,
+      TError,
+      { data: BulkReopenVulnerabilitiesDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getVulnerabilitiesControllerBulkReopenVulnerabilitiesQueryOptions(
-      bulkReopenVulnerabilitiesDto,
+): UseMutationResult<
+  Awaited<
+    ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+  >,
+  TError,
+  { data: BulkReopenVulnerabilitiesDto },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerBulkReopenVulnerabilitiesMutationOptions(
       options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+    ),
+    queryClient,
+  );
+};
 
 /**
  * Get all available modes for AI chat box and enabled workers
@@ -20452,159 +17194,78 @@ export const agentsControllerCreateLLMConfig = (
   );
 };
 
-export const getAgentsControllerCreateLLMConfigQueryKey = (
-  createLLMConfigDto?: CreateLLMConfigDto,
-) => {
-  return ['POST', `/api/agents/llm-configs`, createLLMConfigDto] as const;
-};
-
-export const getAgentsControllerCreateLLMConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+export const getAgentsControllerCreateLLMConfigMutationOptions = <
   TError = unknown,
->(
-  createLLMConfigDto: CreateLLMConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerCreateLLMConfigQueryKey(createLLMConfigDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>
-  > = ({ signal }) =>
-    agentsControllerCreateLLMConfig(createLLMConfigDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateLLMConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+  TError,
+  { data: CreateLLMConfigDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerCreateLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+    { data: CreateLLMConfigDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerCreateLLMConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerCreateLLMConfigQueryResult = NonNullable<
+export type AgentsControllerCreateLLMConfigMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>
 >;
-export type AgentsControllerCreateLLMConfigQueryError = unknown;
+export type AgentsControllerCreateLLMConfigMutationBody = CreateLLMConfigDto;
+export type AgentsControllerCreateLLMConfigMutationError = unknown;
 
-export function useAgentsControllerCreateLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-  TError = unknown,
->(
-  createLLMConfigDto: CreateLLMConfigDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerCreateLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-  TError = unknown,
->(
-  createLLMConfigDto: CreateLLMConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerCreateLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-  TError = unknown,
->(
-  createLLMConfigDto: CreateLLMConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create LLM config
  */
-
-export function useAgentsControllerCreateLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+export const useAgentsControllerCreateLLMConfig = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createLLMConfigDto: CreateLLMConfigDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+      TError,
+      { data: CreateLLMConfigDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerCreateLLMConfigQueryOptions(
-    createLLMConfigDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+  TError,
+  { data: CreateLLMConfigDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerCreateLLMConfigMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Get all LLM providers with their configuration status for the workspace
@@ -20953,180 +17614,78 @@ export const agentsControllerUpdateLLMConfig = (
   );
 };
 
-export const getAgentsControllerUpdateLLMConfigQueryKey = (
-  id: string,
-  updateLLMConfigDto?: UpdateLLMConfigDto,
-) => {
-  return [
-    'PATCH',
-    `/api/agents/llm-configs/${id}`,
-    updateLLMConfigDto,
-  ] as const;
-};
-
-export const getAgentsControllerUpdateLLMConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+export const getAgentsControllerUpdateLLMConfigMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateLLMConfigDto: UpdateLLMConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerUpdateLLMConfigQueryKey(id, updateLLMConfigDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>
-  > = ({ signal }) =>
-    agentsControllerUpdateLLMConfig(
-      id,
-      updateLLMConfigDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateLLMConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+  TError,
+  { id: string; data: UpdateLLMConfigDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpdateLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+    { id: string; data: UpdateLLMConfigDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerUpdateLLMConfig(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerUpdateLLMConfigQueryResult = NonNullable<
+export type AgentsControllerUpdateLLMConfigMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>
 >;
-export type AgentsControllerUpdateLLMConfigQueryError = unknown;
+export type AgentsControllerUpdateLLMConfigMutationBody = UpdateLLMConfigDto;
+export type AgentsControllerUpdateLLMConfigMutationError = unknown;
 
-export function useAgentsControllerUpdateLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-  TError = unknown,
->(
-  id: string,
-  updateLLMConfigDto: UpdateLLMConfigDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerUpdateLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-  TError = unknown,
->(
-  id: string,
-  updateLLMConfigDto: UpdateLLMConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerUpdateLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-  TError = unknown,
->(
-  id: string,
-  updateLLMConfigDto: UpdateLLMConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update LLM config
  */
-
-export function useAgentsControllerUpdateLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+export const useAgentsControllerUpdateLLMConfig = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateLLMConfigDto: UpdateLLMConfigDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+      TError,
+      { id: string; data: UpdateLLMConfigDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerUpdateLLMConfigQueryOptions(
-    id,
-    updateLLMConfigDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+  TError,
+  { id: string; data: UpdateLLMConfigDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpdateLLMConfigMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Delete an LLM configuration
@@ -21143,161 +17702,78 @@ export const agentsControllerDeleteLLMConfig = (
   );
 };
 
-export const getAgentsControllerDeleteLLMConfigQueryKey = (id: string) => {
-  return ['DELETE', `/api/agents/llm-configs/${id}`] as const;
-};
-
-export const getAgentsControllerDeleteLLMConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+export const getAgentsControllerDeleteLLMConfigMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getAgentsControllerDeleteLLMConfigQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>
-  > = ({ signal }) =>
-    agentsControllerDeleteLLMConfig(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteLLMConfig(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerDeleteLLMConfigQueryResult = NonNullable<
+export type AgentsControllerDeleteLLMConfigMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>
 >;
-export type AgentsControllerDeleteLLMConfigQueryError = unknown;
 
-export function useAgentsControllerDeleteLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type AgentsControllerDeleteLLMConfigMutationError = unknown;
+
 /**
  * @summary Delete LLM config
  */
-
-export function useAgentsControllerDeleteLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+export const useAgentsControllerDeleteLLMConfig = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerDeleteLLMConfigQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteLLMConfigMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Set an LLM config as the preferred one for the workspace
@@ -21318,164 +17794,78 @@ export const agentsControllerSetPreferredLLMConfig = (
   );
 };
 
-export const getAgentsControllerSetPreferredLLMConfigQueryKey = (
-  id: string,
-) => {
-  return ['PATCH', `/api/agents/llm-configs/${id}/set-preferred`] as const;
-};
-
-export const getAgentsControllerSetPreferredLLMConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+export const getAgentsControllerSetPreferredLLMConfigMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerSetPreferredLLMConfigQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>
-  > = ({ signal }) =>
-    agentsControllerSetPreferredLLMConfig(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerSetPreferredLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerSetPreferredLLMConfig(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerSetPreferredLLMConfigQueryResult = NonNullable<
+export type AgentsControllerSetPreferredLLMConfigMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>
 >;
-export type AgentsControllerSetPreferredLLMConfigQueryError = unknown;
 
-export function useAgentsControllerSetPreferredLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerSetPreferredLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerSetPreferredLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type AgentsControllerSetPreferredLLMConfigMutationError = unknown;
+
 /**
  * @summary Set preferred LLM config
  */
-
-export function useAgentsControllerSetPreferredLLMConfig<
-  TData = Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+export const useAgentsControllerSetPreferredLLMConfig = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerSetPreferredLLMConfigQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerSetPreferredLLMConfigMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Get a single conversation with full details including todos
@@ -21670,180 +18060,79 @@ export const agentsControllerUpdateConversation = (
   );
 };
 
-export const getAgentsControllerUpdateConversationQueryKey = (
-  id: string,
-  updateConversationDto?: UpdateConversationDto,
-) => {
-  return [
-    'PATCH',
-    `/api/agents/conversations/${id}`,
-    updateConversationDto,
-  ] as const;
-};
-
-export const getAgentsControllerUpdateConversationQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+export const getAgentsControllerUpdateConversationMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateConversationDto: UpdateConversationDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerUpdateConversationQueryKey(id, updateConversationDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerUpdateConversation>>
-  > = ({ signal }) =>
-    agentsControllerUpdateConversation(
-      id,
-      updateConversationDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateConversationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpdateConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+    { id: string; data: UpdateConversationDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerUpdateConversation(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerUpdateConversationQueryResult = NonNullable<
+export type AgentsControllerUpdateConversationMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerUpdateConversation>>
 >;
-export type AgentsControllerUpdateConversationQueryError = unknown;
+export type AgentsControllerUpdateConversationMutationBody =
+  UpdateConversationDto;
+export type AgentsControllerUpdateConversationMutationError = unknown;
 
-export function useAgentsControllerUpdateConversation<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-  TError = unknown,
->(
-  id: string,
-  updateConversationDto: UpdateConversationDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerUpdateConversation>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerUpdateConversation<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-  TError = unknown,
->(
-  id: string,
-  updateConversationDto: UpdateConversationDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerUpdateConversation>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerUpdateConversation<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-  TError = unknown,
->(
-  id: string,
-  updateConversationDto: UpdateConversationDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update conversation
  */
-
-export function useAgentsControllerUpdateConversation<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+export const useAgentsControllerUpdateConversation = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateConversationDto: UpdateConversationDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+      TError,
+      { id: string; data: UpdateConversationDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerUpdateConversationQueryOptions(
-    id,
-    updateConversationDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpdateConversationMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Delete a conversation and all its messages
@@ -21860,161 +18149,78 @@ export const agentsControllerDeleteConversation = (
   );
 };
 
-export const getAgentsControllerDeleteConversationQueryKey = (id: string) => {
-  return ['DELETE', `/api/agents/conversations/${id}`] as const;
-};
-
-export const getAgentsControllerDeleteConversationQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+export const getAgentsControllerDeleteConversationMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getAgentsControllerDeleteConversationQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteConversation>>
-  > = ({ signal }) =>
-    agentsControllerDeleteConversation(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteConversation(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerDeleteConversationQueryResult = NonNullable<
+export type AgentsControllerDeleteConversationMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerDeleteConversation>>
 >;
-export type AgentsControllerDeleteConversationQueryError = unknown;
 
-export function useAgentsControllerDeleteConversation<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteConversation>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteConversation<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteConversation>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteConversation<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type AgentsControllerDeleteConversationMutationError = unknown;
+
 /**
  * @summary Delete conversation
  */
-
-export function useAgentsControllerDeleteConversation<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+export const useAgentsControllerDeleteConversation = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerDeleteConversationQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteConversationMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Get all conversations for the workspace
@@ -22394,148 +18600,76 @@ export const agentsControllerDeleteAllConversations = (
   );
 };
 
-export const getAgentsControllerDeleteAllConversationsQueryKey = () => {
-  return ['DELETE', `/api/agents/conversations`] as const;
-};
-
-export const getAgentsControllerDeleteAllConversationsQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+export const getAgentsControllerDeleteAllConversationsMutationOptions = <
   TError = unknown,
+  TContext = unknown,
 >(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerDeleteAllConversationsQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>
-  > = ({ signal }) =>
-    agentsControllerDeleteAllConversations(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteAllConversations'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+    void
+  > = () => {
+    return agentsControllerDeleteAllConversations(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerDeleteAllConversationsQueryResult = NonNullable<
+export type AgentsControllerDeleteAllConversationsMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>
 >;
-export type AgentsControllerDeleteAllConversationsQueryError = unknown;
 
-export function useAgentsControllerDeleteAllConversations<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteAllConversations<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteAllConversations<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type AgentsControllerDeleteAllConversationsMutationError = unknown;
+
 /**
  * @summary Delete all conversations
  */
-
-export function useAgentsControllerDeleteAllConversations<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+export const useAgentsControllerDeleteAllConversations = <
   TError = unknown,
+  TContext = unknown,
 >(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+      TError,
+      void,
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getAgentsControllerDeleteAllConversationsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteAllConversationsMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Get all messages in a conversation
@@ -22956,159 +19090,78 @@ export const agentsControllerStreamMessage = (
   );
 };
 
-export const getAgentsControllerStreamMessageQueryKey = (
-  sendMessageDto?: SendMessageDto,
-) => {
-  return ['POST', `/api/agents/messages/stream`, sendMessageDto] as const;
-};
-
-export const getAgentsControllerStreamMessageQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+export const getAgentsControllerStreamMessageMutationOptions = <
   TError = unknown,
->(
-  sendMessageDto: SendMessageDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerStreamMessageQueryKey(sendMessageDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerStreamMessage>>
-  > = ({ signal }) =>
-    agentsControllerStreamMessage(sendMessageDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: SendMessageDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+  TError,
+  { data: SendMessageDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerStreamMessage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+    { data: SendMessageDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerStreamMessage(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerStreamMessageQueryResult = NonNullable<
+export type AgentsControllerStreamMessageMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerStreamMessage>>
 >;
-export type AgentsControllerStreamMessageQueryError = unknown;
+export type AgentsControllerStreamMessageMutationBody = SendMessageDto;
+export type AgentsControllerStreamMessageMutationError = unknown;
 
-export function useAgentsControllerStreamMessage<
-  TData = Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-  TError = unknown,
->(
-  sendMessageDto: SendMessageDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerStreamMessage>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerStreamMessage<
-  TData = Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-  TError = unknown,
->(
-  sendMessageDto: SendMessageDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerStreamMessage>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerStreamMessage<
-  TData = Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-  TError = unknown,
->(
-  sendMessageDto: SendMessageDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Send message (streaming)
  */
-
-export function useAgentsControllerStreamMessage<
-  TData = Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+export const useAgentsControllerStreamMessage = <
   TError = unknown,
+  TContext = unknown,
 >(
-  sendMessageDto: SendMessageDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+      TError,
+      { data: SendMessageDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerStreamMessageQueryOptions(
-    sendMessageDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+  TError,
+  { data: SendMessageDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerStreamMessageMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Delete a specific message in a conversation
@@ -23130,175 +19183,78 @@ export const agentsControllerDeleteMessage = (
   );
 };
 
-export const getAgentsControllerDeleteMessageQueryKey = (
-  cid: string,
-  mid: string,
-) => {
-  return [
-    'DELETE',
-    `/api/agents/conversations/${cid}/messages/${mid}`,
-  ] as const;
-};
-
-export const getAgentsControllerDeleteMessageQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+export const getAgentsControllerDeleteMessageMutationOptions = <
   TError = unknown,
->(
-  cid: string,
-  mid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerDeleteMessageQueryKey(cid, mid);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteMessage>>
-  > = ({ signal }) =>
-    agentsControllerDeleteMessage(cid, mid, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled:
-      cid !== null && cid !== undefined && mid !== null && mid !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { cid: string; mid: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+  TError,
+  { cid: string; mid: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteMessage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+    { cid: string; mid: string }
+  > = (props) => {
+    const { cid, mid } = props ?? {};
+
+    return agentsControllerDeleteMessage(cid, mid, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerDeleteMessageQueryResult = NonNullable<
+export type AgentsControllerDeleteMessageMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerDeleteMessage>>
 >;
-export type AgentsControllerDeleteMessageQueryError = unknown;
 
-export function useAgentsControllerDeleteMessage<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-  TError = unknown,
->(
-  cid: string,
-  mid: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteMessage>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteMessage<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-  TError = unknown,
->(
-  cid: string,
-  mid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteMessage>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteMessage<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-  TError = unknown,
->(
-  cid: string,
-  mid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type AgentsControllerDeleteMessageMutationError = unknown;
+
 /**
  * @summary Delete message
  */
-
-export function useAgentsControllerDeleteMessage<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+export const useAgentsControllerDeleteMessage = <
   TError = unknown,
+  TContext = unknown,
 >(
-  cid: string,
-  mid: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+      TError,
+      { cid: string; mid: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerDeleteMessageQueryOptions(
-    cid,
-    mid,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+  TError,
+  { cid: string; mid: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteMessageMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Get all MCP server configurations for the workspace
@@ -23476,180 +19432,78 @@ export const agentsControllerUpsertMCPServer = (
   );
 };
 
-export const getAgentsControllerUpsertMCPServerQueryKey = (
-  name: string,
-  mCPServerConfigDto?: MCPServerConfigDto,
-) => {
-  return [
-    'PUT',
-    `/api/agents/mcp-configs/${name}`,
-    mCPServerConfigDto,
-  ] as const;
-};
-
-export const getAgentsControllerUpsertMCPServerQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
+export const getAgentsControllerUpsertMCPServerMutationOptions = <
   TError = unknown,
->(
-  name: string,
-  mCPServerConfigDto: MCPServerConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerUpsertMCPServerQueryKey(name, mCPServerConfigDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>
-  > = ({ signal }) =>
-    agentsControllerUpsertMCPServer(
-      name,
-      mCPServerConfigDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: name !== null && name !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { name: string; data: MCPServerConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
+  TError,
+  { name: string; data: MCPServerConfigDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpsertMCPServer'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
+    { name: string; data: MCPServerConfigDto }
+  > = (props) => {
+    const { name, data } = props ?? {};
+
+    return agentsControllerUpsertMCPServer(name, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerUpsertMCPServerQueryResult = NonNullable<
+export type AgentsControllerUpsertMCPServerMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>
 >;
-export type AgentsControllerUpsertMCPServerQueryError = unknown;
+export type AgentsControllerUpsertMCPServerMutationBody = MCPServerConfigDto;
+export type AgentsControllerUpsertMCPServerMutationError = unknown;
 
-export function useAgentsControllerUpsertMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-  TError = unknown,
->(
-  name: string,
-  mCPServerConfigDto: MCPServerConfigDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerUpsertMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-  TError = unknown,
->(
-  name: string,
-  mCPServerConfigDto: MCPServerConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerUpsertMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-  TError = unknown,
->(
-  name: string,
-  mCPServerConfigDto: MCPServerConfigDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Upsert MCP server
  */
-
-export function useAgentsControllerUpsertMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
+export const useAgentsControllerUpsertMCPServer = <
   TError = unknown,
+  TContext = unknown,
 >(
-  name: string,
-  mCPServerConfigDto: MCPServerConfigDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
+      TError,
+      { name: string; data: MCPServerConfigDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerUpsertMCPServerQueryOptions(
-    name,
-    mCPServerConfigDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpsertMCPServer>>,
+  TError,
+  { name: string; data: MCPServerConfigDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpsertMCPServerMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Remove an MCP server configuration
@@ -23666,161 +19520,78 @@ export const agentsControllerDeleteMCPServer = (
   );
 };
 
-export const getAgentsControllerDeleteMCPServerQueryKey = (name: string) => {
-  return ['DELETE', `/api/agents/mcp-configs/${name}`] as const;
-};
-
-export const getAgentsControllerDeleteMCPServerQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
+export const getAgentsControllerDeleteMCPServerMutationOptions = <
   TError = unknown,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getAgentsControllerDeleteMCPServerQueryKey(name);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>
-  > = ({ signal }) =>
-    agentsControllerDeleteMCPServer(name, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: name !== null && name !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { name: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
+  TError,
+  { name: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteMCPServer'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
+    { name: string }
+  > = (props) => {
+    const { name } = props ?? {};
+
+    return agentsControllerDeleteMCPServer(name, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerDeleteMCPServerQueryResult = NonNullable<
+export type AgentsControllerDeleteMCPServerMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>
 >;
-export type AgentsControllerDeleteMCPServerQueryError = unknown;
 
-export function useAgentsControllerDeleteMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-  TError = unknown,
->(
-  name: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-  TError = unknown,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-  TError = unknown,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type AgentsControllerDeleteMCPServerMutationError = unknown;
+
 /**
  * @summary Delete MCP server
  */
-
-export function useAgentsControllerDeleteMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
+export const useAgentsControllerDeleteMCPServer = <
   TError = unknown,
+  TContext = unknown,
 >(
-  name: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
+      TError,
+      { name: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerDeleteMCPServerQueryOptions(
-    name,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteMCPServer>>,
+  TError,
+  { name: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteMCPServerMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Enable or disable an MCP server
@@ -23844,180 +19615,78 @@ export const agentsControllerToggleMCPServer = (
   );
 };
 
-export const getAgentsControllerToggleMCPServerQueryKey = (
-  name: string,
-  toggleMCPServerDto?: ToggleMCPServerDto,
-) => {
-  return [
-    'PATCH',
-    `/api/agents/mcp-configs/${name}/toggle`,
-    toggleMCPServerDto,
-  ] as const;
-};
-
-export const getAgentsControllerToggleMCPServerQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
+export const getAgentsControllerToggleMCPServerMutationOptions = <
   TError = unknown,
->(
-  name: string,
-  toggleMCPServerDto: ToggleMCPServerDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerToggleMCPServerQueryKey(name, toggleMCPServerDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>
-  > = ({ signal }) =>
-    agentsControllerToggleMCPServer(
-      name,
-      toggleMCPServerDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: name !== null && name !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { name: string; data: ToggleMCPServerDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
+  TError,
+  { name: string; data: ToggleMCPServerDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerToggleMCPServer'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
+    { name: string; data: ToggleMCPServerDto }
+  > = (props) => {
+    const { name, data } = props ?? {};
+
+    return agentsControllerToggleMCPServer(name, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerToggleMCPServerQueryResult = NonNullable<
+export type AgentsControllerToggleMCPServerMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>
 >;
-export type AgentsControllerToggleMCPServerQueryError = unknown;
+export type AgentsControllerToggleMCPServerMutationBody = ToggleMCPServerDto;
+export type AgentsControllerToggleMCPServerMutationError = unknown;
 
-export function useAgentsControllerToggleMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-  TError = unknown,
->(
-  name: string,
-  toggleMCPServerDto: ToggleMCPServerDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerToggleMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-  TError = unknown,
->(
-  name: string,
-  toggleMCPServerDto: ToggleMCPServerDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerToggleMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-  TError = unknown,
->(
-  name: string,
-  toggleMCPServerDto: ToggleMCPServerDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Toggle MCP server
  */
-
-export function useAgentsControllerToggleMCPServer<
-  TData = Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
+export const useAgentsControllerToggleMCPServer = <
   TError = unknown,
+  TContext = unknown,
 >(
-  name: string,
-  toggleMCPServerDto: ToggleMCPServerDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
+      TError,
+      { name: string; data: ToggleMCPServerDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerToggleMCPServerQueryOptions(
-    name,
-    toggleMCPServerDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerToggleMCPServer>>,
+  TError,
+  { name: string; data: ToggleMCPServerDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerToggleMCPServerMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Check connectivity status of an MCP server
@@ -24365,159 +20034,78 @@ export const agentsControllerCreateSkill = (
   );
 };
 
-export const getAgentsControllerCreateSkillQueryKey = (
-  createSkillDto?: CreateSkillDto,
-) => {
-  return ['POST', `/api/agents/skills`, createSkillDto] as const;
-};
-
-export const getAgentsControllerCreateSkillQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+export const getAgentsControllerCreateSkillMutationOptions = <
   TError = unknown,
->(
-  createSkillDto: CreateSkillDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerCreateSkillQueryKey(createSkillDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerCreateSkill>>
-  > = ({ signal }) =>
-    agentsControllerCreateSkill(createSkillDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateSkillDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+  TError,
+  { data: CreateSkillDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerCreateSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+    { data: CreateSkillDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerCreateSkill(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerCreateSkillQueryResult = NonNullable<
+export type AgentsControllerCreateSkillMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerCreateSkill>>
 >;
-export type AgentsControllerCreateSkillQueryError = unknown;
+export type AgentsControllerCreateSkillMutationBody = CreateSkillDto;
+export type AgentsControllerCreateSkillMutationError = unknown;
 
-export function useAgentsControllerCreateSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-  TError = unknown,
->(
-  createSkillDto: CreateSkillDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerCreateSkill>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerCreateSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-  TError = unknown,
->(
-  createSkillDto: CreateSkillDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerCreateSkill>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerCreateSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-  TError = unknown,
->(
-  createSkillDto: CreateSkillDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create skill
  */
-
-export function useAgentsControllerCreateSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+export const useAgentsControllerCreateSkill = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createSkillDto: CreateSkillDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+      TError,
+      { data: CreateSkillDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerCreateSkillQueryOptions(
-    createSkillDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+  TError,
+  { data: CreateSkillDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerCreateSkillMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Update a user skill (workspace owner only)
@@ -24541,171 +20129,78 @@ export const agentsControllerUpdateSkill = (
   );
 };
 
-export const getAgentsControllerUpdateSkillQueryKey = (
-  id: string,
-  updateSkillDto?: UpdateSkillDto,
-) => {
-  return ['PATCH', `/api/agents/skills/${id}`, updateSkillDto] as const;
-};
-
-export const getAgentsControllerUpdateSkillQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+export const getAgentsControllerUpdateSkillMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateSkillDto: UpdateSkillDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerUpdateSkillQueryKey(id, updateSkillDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerUpdateSkill>>
-  > = ({ signal }) =>
-    agentsControllerUpdateSkill(id, updateSkillDto, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateSkillDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+  TError,
+  { id: string; data: UpdateSkillDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpdateSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+    { id: string; data: UpdateSkillDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerUpdateSkill(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerUpdateSkillQueryResult = NonNullable<
+export type AgentsControllerUpdateSkillMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerUpdateSkill>>
 >;
-export type AgentsControllerUpdateSkillQueryError = unknown;
+export type AgentsControllerUpdateSkillMutationBody = UpdateSkillDto;
+export type AgentsControllerUpdateSkillMutationError = unknown;
 
-export function useAgentsControllerUpdateSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-  TError = unknown,
->(
-  id: string,
-  updateSkillDto: UpdateSkillDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerUpdateSkill>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerUpdateSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-  TError = unknown,
->(
-  id: string,
-  updateSkillDto: UpdateSkillDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerUpdateSkill>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerUpdateSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-  TError = unknown,
->(
-  id: string,
-  updateSkillDto: UpdateSkillDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update skill
  */
-
-export function useAgentsControllerUpdateSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+export const useAgentsControllerUpdateSkill = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateSkillDto: UpdateSkillDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+      TError,
+      { id: string; data: UpdateSkillDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerUpdateSkillQueryOptions(
-    id,
-    updateSkillDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+  TError,
+  { id: string; data: UpdateSkillDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpdateSkillMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Delete a user skill (workspace owner only)
@@ -24722,157 +20217,78 @@ export const agentsControllerDeleteSkill = (
   );
 };
 
-export const getAgentsControllerDeleteSkillQueryKey = (id: string) => {
-  return ['DELETE', `/api/agents/skills/${id}`] as const;
-};
-
-export const getAgentsControllerDeleteSkillQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+export const getAgentsControllerDeleteSkillMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getAgentsControllerDeleteSkillQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteSkill>>
-  > = ({ signal }) => agentsControllerDeleteSkill(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteSkill(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerDeleteSkillQueryResult = NonNullable<
+export type AgentsControllerDeleteSkillMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerDeleteSkill>>
 >;
-export type AgentsControllerDeleteSkillQueryError = unknown;
 
-export function useAgentsControllerDeleteSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteSkill>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerDeleteSkill>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerDeleteSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type AgentsControllerDeleteSkillMutationError = unknown;
+
 /**
  * @summary Delete skill
  */
-
-export function useAgentsControllerDeleteSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+export const useAgentsControllerDeleteSkill = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerDeleteSkillQueryOptions(id, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteSkillMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Enable or disable a user skill (workspace owner only)
@@ -24896,171 +20312,78 @@ export const agentsControllerToggleSkill = (
   );
 };
 
-export const getAgentsControllerToggleSkillQueryKey = (
-  id: string,
-  toggleSkillDto?: ToggleSkillDto,
-) => {
-  return ['PATCH', `/api/agents/skills/${id}/toggle`, toggleSkillDto] as const;
-};
-
-export const getAgentsControllerToggleSkillQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+export const getAgentsControllerToggleSkillMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  toggleSkillDto: ToggleSkillDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerToggleSkillQueryKey(id, toggleSkillDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerToggleSkill>>
-  > = ({ signal }) =>
-    agentsControllerToggleSkill(id, toggleSkillDto, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: ToggleSkillDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+  TError,
+  { id: string; data: ToggleSkillDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerToggleSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+    { id: string; data: ToggleSkillDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerToggleSkill(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerToggleSkillQueryResult = NonNullable<
+export type AgentsControllerToggleSkillMutationResult = NonNullable<
   Awaited<ReturnType<typeof agentsControllerToggleSkill>>
 >;
-export type AgentsControllerToggleSkillQueryError = unknown;
+export type AgentsControllerToggleSkillMutationBody = ToggleSkillDto;
+export type AgentsControllerToggleSkillMutationError = unknown;
 
-export function useAgentsControllerToggleSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-  TError = unknown,
->(
-  id: string,
-  toggleSkillDto: ToggleSkillDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerToggleSkill>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerToggleSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-  TError = unknown,
->(
-  id: string,
-  toggleSkillDto: ToggleSkillDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerToggleSkill>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerToggleSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-  TError = unknown,
->(
-  id: string,
-  toggleSkillDto: ToggleSkillDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Toggle skill
  */
-
-export function useAgentsControllerToggleSkill<
-  TData = Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+export const useAgentsControllerToggleSkill = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  toggleSkillDto: ToggleSkillDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+      TError,
+      { id: string; data: ToggleSkillDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerToggleSkillQueryOptions(
-    id,
-    toggleSkillDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+  TError,
+  { id: string; data: ToggleSkillDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerToggleSkillMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieve a paginated list of notifications for the current user
@@ -25449,163 +20772,80 @@ export const notificationsControllerCreateNotification = (
   );
 };
 
-export const getNotificationsControllerCreateNotificationQueryKey = (
-  createNotificationDto?: CreateNotificationDto,
-) => {
-  return ['POST', `/api/notifications`, createNotificationDto] as const;
-};
-
-export const getNotificationsControllerCreateNotificationQueryOptions = <
-  TData = Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
+export const getNotificationsControllerCreateNotificationMutationOptions = <
   TError = unknown,
->(
-  createNotificationDto: CreateNotificationDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getNotificationsControllerCreateNotificationQueryKey(createNotificationDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>
-  > = ({ signal }) =>
-    notificationsControllerCreateNotification(
-      createNotificationDto,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateNotificationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
+  TError,
+  { data: CreateNotificationDto },
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerCreateNotification'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
+    { data: CreateNotificationDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return notificationsControllerCreateNotification(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type NotificationsControllerCreateNotificationQueryResult = NonNullable<
-  Awaited<ReturnType<typeof notificationsControllerCreateNotification>>
->;
-export type NotificationsControllerCreateNotificationQueryError = unknown;
+export type NotificationsControllerCreateNotificationMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>
+  >;
+export type NotificationsControllerCreateNotificationMutationBody =
+  CreateNotificationDto;
+export type NotificationsControllerCreateNotificationMutationError = unknown;
 
-export function useNotificationsControllerCreateNotification<
-  TData = Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-  TError = unknown,
->(
-  createNotificationDto: CreateNotificationDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerCreateNotification>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerCreateNotification<
-  TData = Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-  TError = unknown,
->(
-  createNotificationDto: CreateNotificationDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerCreateNotification>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerCreateNotification<
-  TData = Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-  TError = unknown,
->(
-  createNotificationDto: CreateNotificationDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create a notification
  */
-
-export function useNotificationsControllerCreateNotification<
-  TData = Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
+export const useNotificationsControllerCreateNotification = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createNotificationDto: CreateNotificationDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
+      TError,
+      { data: CreateNotificationDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getNotificationsControllerCreateNotificationQueryOptions(
-    createNotificationDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
+  TError,
+  { data: CreateNotificationDto },
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerCreateNotificationMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Subscribe to a Server-Sent Events (SSE) stream for real-time notifications
@@ -25932,147 +21172,76 @@ export const notificationsControllerMarkAllAsRead = (
   );
 };
 
-export const getNotificationsControllerMarkAllAsReadQueryKey = () => {
-  return ['PATCH', `/api/notifications/mark-read`] as const;
-};
-
-export const getNotificationsControllerMarkAllAsReadQueryOptions = <
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+export const getNotificationsControllerMarkAllAsReadMutationOptions = <
   TError = unknown,
+  TContext = unknown,
 >(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getNotificationsControllerMarkAllAsReadQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>
-  > = ({ signal }) =>
-    notificationsControllerMarkAllAsRead(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerMarkAllAsRead'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+    void
+  > = () => {
+    return notificationsControllerMarkAllAsRead(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type NotificationsControllerMarkAllAsReadQueryResult = NonNullable<
+export type NotificationsControllerMarkAllAsReadMutationResult = NonNullable<
   Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>
 >;
-export type NotificationsControllerMarkAllAsReadQueryError = unknown;
 
-export function useNotificationsControllerMarkAllAsRead<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerMarkAllAsRead<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerMarkAllAsRead<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type NotificationsControllerMarkAllAsReadMutationError = unknown;
+
 /**
  * @summary Mark all notifications as read
  */
-
-export function useNotificationsControllerMarkAllAsRead<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+export const useNotificationsControllerMarkAllAsRead = <
   TError = unknown,
+  TContext = unknown,
 >(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+      TError,
+      void,
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getNotificationsControllerMarkAllAsReadQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerMarkAllAsReadMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Mark all notifications as unread for the current user
@@ -26088,148 +21257,76 @@ export const notificationsControllerMarkAllAsUnread = (
   );
 };
 
-export const getNotificationsControllerMarkAllAsUnreadQueryKey = () => {
-  return ['PATCH', `/api/notifications/mark-unread`] as const;
-};
-
-export const getNotificationsControllerMarkAllAsUnreadQueryOptions = <
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+export const getNotificationsControllerMarkAllAsUnreadMutationOptions = <
   TError = unknown,
+  TContext = unknown,
 >(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getNotificationsControllerMarkAllAsUnreadQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>
-  > = ({ signal }) =>
-    notificationsControllerMarkAllAsUnread(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerMarkAllAsUnread'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+    void
+  > = () => {
+    return notificationsControllerMarkAllAsUnread(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type NotificationsControllerMarkAllAsUnreadQueryResult = NonNullable<
+export type NotificationsControllerMarkAllAsUnreadMutationResult = NonNullable<
   Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>
 >;
-export type NotificationsControllerMarkAllAsUnreadQueryError = unknown;
 
-export function useNotificationsControllerMarkAllAsUnread<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerMarkAllAsUnread<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerMarkAllAsUnread<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type NotificationsControllerMarkAllAsUnreadMutationError = unknown;
+
 /**
  * @summary Mark all notifications as unread
  */
-
-export function useNotificationsControllerMarkAllAsUnread<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+export const useNotificationsControllerMarkAllAsUnread = <
   TError = unknown,
+  TContext = unknown,
 >(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+      TError,
+      void,
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getNotificationsControllerMarkAllAsUnreadQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerMarkAllAsUnreadMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Mark a single notification as read by its ID
@@ -26246,161 +21343,78 @@ export const notificationsControllerMarkAsRead = (
   );
 };
 
-export const getNotificationsControllerMarkAsReadQueryKey = (id: string) => {
-  return ['PATCH', `/api/notifications/${id}/read`] as const;
-};
-
-export const getNotificationsControllerMarkAsReadQueryOptions = <
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+export const getNotificationsControllerMarkAsReadMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getNotificationsControllerMarkAsReadQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>
-  > = ({ signal }) =>
-    notificationsControllerMarkAsRead(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerMarkAsRead'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return notificationsControllerMarkAsRead(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type NotificationsControllerMarkAsReadQueryResult = NonNullable<
+export type NotificationsControllerMarkAsReadMutationResult = NonNullable<
   Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>
 >;
-export type NotificationsControllerMarkAsReadQueryError = unknown;
 
-export function useNotificationsControllerMarkAsRead<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerMarkAsRead<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerMarkAsRead<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type NotificationsControllerMarkAsReadMutationError = unknown;
+
 /**
  * @summary Mark a specific notification as read
  */
-
-export function useNotificationsControllerMarkAsRead<
-  TData = Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+export const useNotificationsControllerMarkAsRead = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getNotificationsControllerMarkAsReadQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerMarkAsReadMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Publishes a command to the remote-execute channel via Redis pub/sub. The command is enriched with an id (nanoid) and sessionId (uuid) before publishing.
@@ -26423,159 +21437,78 @@ export const remoteExecuteControllerRunCommand = (
   );
 };
 
-export const getRemoteExecuteControllerRunCommandQueryKey = (
-  runCommandDto?: RunCommandDto,
-) => {
-  return ['POST', `/api/remote-execute/run`, runCommandDto] as const;
-};
-
-export const getRemoteExecuteControllerRunCommandQueryOptions = <
-  TData = Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+export const getRemoteExecuteControllerRunCommandMutationOptions = <
   TError = unknown,
->(
-  runCommandDto: RunCommandDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getRemoteExecuteControllerRunCommandQueryKey(runCommandDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>
-  > = ({ signal }) =>
-    remoteExecuteControllerRunCommand(runCommandDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: RunCommandDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+  TError,
+  { data: RunCommandDto },
+  TContext
+> => {
+  const mutationKey = ['remoteExecuteControllerRunCommand'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+    { data: RunCommandDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return remoteExecuteControllerRunCommand(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type RemoteExecuteControllerRunCommandQueryResult = NonNullable<
+export type RemoteExecuteControllerRunCommandMutationResult = NonNullable<
   Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>
 >;
-export type RemoteExecuteControllerRunCommandQueryError = unknown;
+export type RemoteExecuteControllerRunCommandMutationBody = RunCommandDto;
+export type RemoteExecuteControllerRunCommandMutationError = unknown;
 
-export function useRemoteExecuteControllerRunCommand<
-  TData = Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-  TError = unknown,
->(
-  runCommandDto: RunCommandDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-          TError,
-          Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useRemoteExecuteControllerRunCommand<
-  TData = Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-  TError = unknown,
->(
-  runCommandDto: RunCommandDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-          TError,
-          Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useRemoteExecuteControllerRunCommand<
-  TData = Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-  TError = unknown,
->(
-  runCommandDto: RunCommandDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Run a remote command
  */
-
-export function useRemoteExecuteControllerRunCommand<
-  TData = Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+export const useRemoteExecuteControllerRunCommand = <
   TError = unknown,
+  TContext = unknown,
 >(
-  runCommandDto: RunCommandDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+      TError,
+      { data: RunCommandDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getRemoteExecuteControllerRunCommandQueryOptions(
-    runCommandDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+  TError,
+  { data: RunCommandDto },
+  TContext
+> => {
+  return useMutation(
+    getRemoteExecuteControllerRunCommandMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Server-Sent Events endpoint that streams commands published to the remote-execute channel for a specific sessionId in real-time. Each event is a JSON-encoded RemoteCommandPayload.
@@ -27123,163 +22056,78 @@ export const providersControllerCreateProvider = (
   );
 };
 
-export const getProvidersControllerCreateProviderQueryKey = (
-  createProviderDto?: CreateProviderDto,
-) => {
-  return ['POST', `/api/providers`, createProviderDto] as const;
-};
-
-export const getProvidersControllerCreateProviderQueryOptions = <
-  TData = Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+export const getProvidersControllerCreateProviderMutationOptions = <
   TError = unknown,
->(
-  createProviderDto: CreateProviderDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getProvidersControllerCreateProviderQueryKey(createProviderDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof providersControllerCreateProvider>>
-  > = ({ signal }) =>
-    providersControllerCreateProvider(
-      createProviderDto,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof providersControllerCreateProvider>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateProviderDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+  TError,
+  { data: CreateProviderDto },
+  TContext
+> => {
+  const mutationKey = ['providersControllerCreateProvider'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+    { data: CreateProviderDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return providersControllerCreateProvider(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type ProvidersControllerCreateProviderQueryResult = NonNullable<
+export type ProvidersControllerCreateProviderMutationResult = NonNullable<
   Awaited<ReturnType<typeof providersControllerCreateProvider>>
 >;
-export type ProvidersControllerCreateProviderQueryError = unknown;
+export type ProvidersControllerCreateProviderMutationBody = CreateProviderDto;
+export type ProvidersControllerCreateProviderMutationError = unknown;
 
-export function useProvidersControllerCreateProvider<
-  TData = Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-  TError = unknown,
->(
-  createProviderDto: CreateProviderDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerCreateProvider>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useProvidersControllerCreateProvider<
-  TData = Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-  TError = unknown,
->(
-  createProviderDto: CreateProviderDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerCreateProvider>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useProvidersControllerCreateProvider<
-  TData = Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-  TError = unknown,
->(
-  createProviderDto: CreateProviderDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create a new provider
  */
-
-export function useProvidersControllerCreateProvider<
-  TData = Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+export const useProvidersControllerCreateProvider = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createProviderDto: CreateProviderDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerCreateProvider>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+      TError,
+      { data: CreateProviderDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getProvidersControllerCreateProviderQueryOptions(
-    createProviderDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+  TError,
+  { data: CreateProviderDto },
+  TContext
+> => {
+  return useMutation(
+    getProvidersControllerCreateProviderMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Get detailed information about a specific provider
@@ -27474,176 +22322,78 @@ export const providersControllerUpdateProvider = (
   );
 };
 
-export const getProvidersControllerUpdateProviderQueryKey = (
-  id: string,
-  updateProviderDto?: UpdateProviderDto,
-) => {
-  return ['PATCH', `/api/providers/${id}`, updateProviderDto] as const;
-};
-
-export const getProvidersControllerUpdateProviderQueryOptions = <
-  TData = Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+export const getProvidersControllerUpdateProviderMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateProviderDto: UpdateProviderDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getProvidersControllerUpdateProviderQueryKey(id, updateProviderDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof providersControllerUpdateProvider>>
-  > = ({ signal }) =>
-    providersControllerUpdateProvider(
-      id,
-      updateProviderDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateProviderDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+  TError,
+  { id: string; data: UpdateProviderDto },
+  TContext
+> => {
+  const mutationKey = ['providersControllerUpdateProvider'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+    { id: string; data: UpdateProviderDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return providersControllerUpdateProvider(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type ProvidersControllerUpdateProviderQueryResult = NonNullable<
+export type ProvidersControllerUpdateProviderMutationResult = NonNullable<
   Awaited<ReturnType<typeof providersControllerUpdateProvider>>
 >;
-export type ProvidersControllerUpdateProviderQueryError = unknown;
+export type ProvidersControllerUpdateProviderMutationBody = UpdateProviderDto;
+export type ProvidersControllerUpdateProviderMutationError = unknown;
 
-export function useProvidersControllerUpdateProvider<
-  TData = Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-  TError = unknown,
->(
-  id: string,
-  updateProviderDto: UpdateProviderDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerUpdateProvider>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useProvidersControllerUpdateProvider<
-  TData = Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-  TError = unknown,
->(
-  id: string,
-  updateProviderDto: UpdateProviderDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerUpdateProvider>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useProvidersControllerUpdateProvider<
-  TData = Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-  TError = unknown,
->(
-  id: string,
-  updateProviderDto: UpdateProviderDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update a provider
  */
-
-export function useProvidersControllerUpdateProvider<
-  TData = Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+export const useProvidersControllerUpdateProvider = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateProviderDto: UpdateProviderDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+      TError,
+      { id: string; data: UpdateProviderDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getProvidersControllerUpdateProviderQueryOptions(
-    id,
-    updateProviderDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+  TError,
+  { id: string; data: UpdateProviderDto },
+  TContext
+> => {
+  return useMutation(
+    getProvidersControllerUpdateProviderMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Soft delete a provider by ID
@@ -27660,161 +22410,78 @@ export const providersControllerDeleteProvider = (
   );
 };
 
-export const getProvidersControllerDeleteProviderQueryKey = (id: string) => {
-  return ['DELETE', `/api/providers/${id}`] as const;
-};
-
-export const getProvidersControllerDeleteProviderQueryOptions = <
-  TData = Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+export const getProvidersControllerDeleteProviderMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getProvidersControllerDeleteProviderQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof providersControllerDeleteProvider>>
-  > = ({ signal }) =>
-    providersControllerDeleteProvider(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['providersControllerDeleteProvider'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return providersControllerDeleteProvider(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type ProvidersControllerDeleteProviderQueryResult = NonNullable<
+export type ProvidersControllerDeleteProviderMutationResult = NonNullable<
   Awaited<ReturnType<typeof providersControllerDeleteProvider>>
 >;
-export type ProvidersControllerDeleteProviderQueryError = unknown;
 
-export function useProvidersControllerDeleteProvider<
-  TData = Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerDeleteProvider>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useProvidersControllerDeleteProvider<
-  TData = Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerDeleteProvider>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useProvidersControllerDeleteProvider<
-  TData = Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type ProvidersControllerDeleteProviderMutationError = unknown;
+
 /**
  * @summary Delete a provider
  */
-
-export function useProvidersControllerDeleteProvider<
-  TData = Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+export const useProvidersControllerDeleteProvider = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getProvidersControllerDeleteProviderQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getProvidersControllerDeleteProviderMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Create a new template with file stored in the storage
@@ -27837,163 +22504,78 @@ export const templatesControllerCreateTemplate = (
   );
 };
 
-export const getTemplatesControllerCreateTemplateQueryKey = (
-  createTemplateDTO?: CreateTemplateDTO,
-) => {
-  return ['POST', `/api/templates`, createTemplateDTO] as const;
-};
-
-export const getTemplatesControllerCreateTemplateQueryOptions = <
-  TData = Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+export const getTemplatesControllerCreateTemplateMutationOptions = <
   TError = unknown,
->(
-  createTemplateDTO: CreateTemplateDTO,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTemplatesControllerCreateTemplateQueryKey(createTemplateDTO);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof templatesControllerCreateTemplate>>
-  > = ({ signal }) =>
-    templatesControllerCreateTemplate(
-      createTemplateDTO,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateTemplateDTO },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+  TError,
+  { data: CreateTemplateDTO },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerCreateTemplate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+    { data: CreateTemplateDTO }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return templatesControllerCreateTemplate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type TemplatesControllerCreateTemplateQueryResult = NonNullable<
+export type TemplatesControllerCreateTemplateMutationResult = NonNullable<
   Awaited<ReturnType<typeof templatesControllerCreateTemplate>>
 >;
-export type TemplatesControllerCreateTemplateQueryError = unknown;
+export type TemplatesControllerCreateTemplateMutationBody = CreateTemplateDTO;
+export type TemplatesControllerCreateTemplateMutationError = unknown;
 
-export function useTemplatesControllerCreateTemplate<
-  TData = Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-  TError = unknown,
->(
-  createTemplateDTO: CreateTemplateDTO,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerCreateTemplate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTemplatesControllerCreateTemplate<
-  TData = Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-  TError = unknown,
->(
-  createTemplateDTO: CreateTemplateDTO,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerCreateTemplate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTemplatesControllerCreateTemplate<
-  TData = Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-  TError = unknown,
->(
-  createTemplateDTO: CreateTemplateDTO,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create a new templates
  */
-
-export function useTemplatesControllerCreateTemplate<
-  TData = Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+export const useTemplatesControllerCreateTemplate = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createTemplateDTO: CreateTemplateDTO,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+      TError,
+      { data: CreateTemplateDTO },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getTemplatesControllerCreateTemplateQueryOptions(
-    createTemplateDTO,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+  TError,
+  { data: CreateTemplateDTO },
+  TContext
+> => {
+  return useMutation(
+    getTemplatesControllerCreateTemplateMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieve all templates in a workspace
@@ -28374,159 +22956,78 @@ export const templatesControllerUploadFile = (
   );
 };
 
-export const getTemplatesControllerUploadFileQueryKey = (
-  uploadTemplateDTO?: UploadTemplateDTO,
-) => {
-  return ['POST', `/api/templates/upload`, uploadTemplateDTO] as const;
-};
-
-export const getTemplatesControllerUploadFileQueryOptions = <
-  TData = Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+export const getTemplatesControllerUploadFileMutationOptions = <
   TError = unknown,
->(
-  uploadTemplateDTO: UploadTemplateDTO,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTemplatesControllerUploadFileQueryKey(uploadTemplateDTO);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof templatesControllerUploadFile>>
-  > = ({ signal }) =>
-    templatesControllerUploadFile(uploadTemplateDTO, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof templatesControllerUploadFile>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: UploadTemplateDTO },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+  TError,
+  { data: UploadTemplateDTO },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerUploadFile'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+    { data: UploadTemplateDTO }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return templatesControllerUploadFile(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type TemplatesControllerUploadFileQueryResult = NonNullable<
+export type TemplatesControllerUploadFileMutationResult = NonNullable<
   Awaited<ReturnType<typeof templatesControllerUploadFile>>
 >;
-export type TemplatesControllerUploadFileQueryError = unknown;
+export type TemplatesControllerUploadFileMutationBody = UploadTemplateDTO;
+export type TemplatesControllerUploadFileMutationError = unknown;
 
-export function useTemplatesControllerUploadFile<
-  TData = Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-  TError = unknown,
->(
-  uploadTemplateDTO: UploadTemplateDTO,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerUploadFile>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTemplatesControllerUploadFile<
-  TData = Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-  TError = unknown,
->(
-  uploadTemplateDTO: UploadTemplateDTO,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerUploadFile>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTemplatesControllerUploadFile<
-  TData = Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-  TError = unknown,
->(
-  uploadTemplateDTO: UploadTemplateDTO,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Template upload
  */
-
-export function useTemplatesControllerUploadFile<
-  TData = Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+export const useTemplatesControllerUploadFile = <
   TError = unknown,
+  TContext = unknown,
 >(
-  uploadTemplateDTO: UploadTemplateDTO,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+      TError,
+      { data: UploadTemplateDTO },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getTemplatesControllerUploadFileQueryOptions(
-    uploadTemplateDTO,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+  TError,
+  { data: UploadTemplateDTO },
+  TContext
+> => {
+  return useMutation(
+    getTemplatesControllerUploadFileMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Rename the display filename of a template
@@ -28550,180 +23051,78 @@ export const templatesControllerRenameFile = (
   );
 };
 
-export const getTemplatesControllerRenameFileQueryKey = (
-  templateId: string,
-  renameTemplateDTO?: RenameTemplateDTO,
-) => {
-  return [
-    'PATCH',
-    `/api/templates/${templateId}/rename`,
-    renameTemplateDTO,
-  ] as const;
-};
-
-export const getTemplatesControllerRenameFileQueryOptions = <
-  TData = Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+export const getTemplatesControllerRenameFileMutationOptions = <
   TError = unknown,
->(
-  templateId: string,
-  renameTemplateDTO: RenameTemplateDTO,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTemplatesControllerRenameFileQueryKey(templateId, renameTemplateDTO);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof templatesControllerRenameFile>>
-  > = ({ signal }) =>
-    templatesControllerRenameFile(
-      templateId,
-      renameTemplateDTO,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: templateId !== null && templateId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof templatesControllerRenameFile>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { templateId: string; data: RenameTemplateDTO },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+  TError,
+  { templateId: string; data: RenameTemplateDTO },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerRenameFile'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+    { templateId: string; data: RenameTemplateDTO }
+  > = (props) => {
+    const { templateId, data } = props ?? {};
+
+    return templatesControllerRenameFile(templateId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type TemplatesControllerRenameFileQueryResult = NonNullable<
+export type TemplatesControllerRenameFileMutationResult = NonNullable<
   Awaited<ReturnType<typeof templatesControllerRenameFile>>
 >;
-export type TemplatesControllerRenameFileQueryError = unknown;
+export type TemplatesControllerRenameFileMutationBody = RenameTemplateDTO;
+export type TemplatesControllerRenameFileMutationError = unknown;
 
-export function useTemplatesControllerRenameFile<
-  TData = Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-  TError = unknown,
->(
-  templateId: string,
-  renameTemplateDTO: RenameTemplateDTO,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerRenameFile>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTemplatesControllerRenameFile<
-  TData = Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-  TError = unknown,
->(
-  templateId: string,
-  renameTemplateDTO: RenameTemplateDTO,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerRenameFile>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTemplatesControllerRenameFile<
-  TData = Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-  TError = unknown,
->(
-  templateId: string,
-  renameTemplateDTO: RenameTemplateDTO,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Rename a template file
  */
-
-export function useTemplatesControllerRenameFile<
-  TData = Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+export const useTemplatesControllerRenameFile = <
   TError = unknown,
+  TContext = unknown,
 >(
-  templateId: string,
-  renameTemplateDTO: RenameTemplateDTO,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+      TError,
+      { templateId: string; data: RenameTemplateDTO },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getTemplatesControllerRenameFileQueryOptions(
-    templateId,
-    renameTemplateDTO,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+  TError,
+  { templateId: string; data: RenameTemplateDTO },
+  TContext
+> => {
+  return useMutation(
+    getTemplatesControllerRenameFileMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieve a template by its ID
@@ -28914,164 +23313,78 @@ export const templatesControllerDeleteTemplate = (
   );
 };
 
-export const getTemplatesControllerDeleteTemplateQueryKey = (
-  templateId: string,
-) => {
-  return ['DELETE', `/api/templates/${templateId}`] as const;
-};
-
-export const getTemplatesControllerDeleteTemplateQueryOptions = <
-  TData = Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+export const getTemplatesControllerDeleteTemplateMutationOptions = <
   TError = unknown,
->(
-  templateId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTemplatesControllerDeleteTemplateQueryKey(templateId);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>
-  > = ({ signal }) =>
-    templatesControllerDeleteTemplate(templateId, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: templateId !== null && templateId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { templateId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+  TError,
+  { templateId: string },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerDeleteTemplate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+    { templateId: string }
+  > = (props) => {
+    const { templateId } = props ?? {};
+
+    return templatesControllerDeleteTemplate(templateId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type TemplatesControllerDeleteTemplateQueryResult = NonNullable<
+export type TemplatesControllerDeleteTemplateMutationResult = NonNullable<
   Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>
 >;
-export type TemplatesControllerDeleteTemplateQueryError = unknown;
 
-export function useTemplatesControllerDeleteTemplate<
-  TData = Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-  TError = unknown,
->(
-  templateId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTemplatesControllerDeleteTemplate<
-  TData = Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-  TError = unknown,
->(
-  templateId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTemplatesControllerDeleteTemplate<
-  TData = Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-  TError = unknown,
->(
-  templateId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type TemplatesControllerDeleteTemplateMutationError = unknown;
+
 /**
  * @summary Delete a template
  */
-
-export function useTemplatesControllerDeleteTemplate<
-  TData = Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+export const useTemplatesControllerDeleteTemplate = <
   TError = unknown,
+  TContext = unknown,
 >(
-  templateId: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+      TError,
+      { templateId: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getTemplatesControllerDeleteTemplateQueryOptions(
-    templateId,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+  TError,
+  { templateId: string },
+  TContext
+> => {
+  return useMutation(
+    getTemplatesControllerDeleteTemplateMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieves all asset groups with optional filtering and pagination.
@@ -29453,159 +23766,78 @@ export const assetGroupControllerCreate = (
   );
 };
 
-export const getAssetGroupControllerCreateQueryKey = (
-  createAssetGroupDto?: CreateAssetGroupDto,
-) => {
-  return ['POST', `/api/asset-group`, createAssetGroupDto] as const;
-};
-
-export const getAssetGroupControllerCreateQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+export const getAssetGroupControllerCreateMutationOptions = <
   TError = unknown,
->(
-  createAssetGroupDto: CreateAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetGroupControllerCreateQueryKey(createAssetGroupDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerCreate>>
-  > = ({ signal }) =>
-    assetGroupControllerCreate(createAssetGroupDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetGroupControllerCreate>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+  TError,
+  { data: CreateAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerCreate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+    { data: CreateAssetGroupDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assetGroupControllerCreate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerCreateQueryResult = NonNullable<
+export type AssetGroupControllerCreateMutationResult = NonNullable<
   Awaited<ReturnType<typeof assetGroupControllerCreate>>
 >;
-export type AssetGroupControllerCreateQueryError = unknown;
+export type AssetGroupControllerCreateMutationBody = CreateAssetGroupDto;
+export type AssetGroupControllerCreateMutationError = unknown;
 
-export function useAssetGroupControllerCreate<
-  TData = Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-  TError = unknown,
->(
-  createAssetGroupDto: CreateAssetGroupDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerCreate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerCreate<
-  TData = Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-  TError = unknown,
->(
-  createAssetGroupDto: CreateAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerCreate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerCreate<
-  TData = Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-  TError = unknown,
->(
-  createAssetGroupDto: CreateAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create asset group
  */
-
-export function useAssetGroupControllerCreate<
-  TData = Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+export const useAssetGroupControllerCreate = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createAssetGroupDto: CreateAssetGroupDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerCreate>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+      TError,
+      { data: CreateAssetGroupDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAssetGroupControllerCreateQueryOptions(
-    createAssetGroupDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+  TError,
+  { data: CreateAssetGroupDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetGroupControllerCreateMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Fetches a specific asset group by its unique identifier.
@@ -29796,179 +24028,80 @@ export const assetGroupControllerUpdateAssetGroupById = (
   );
 };
 
-export const getAssetGroupControllerUpdateAssetGroupByIdQueryKey = (
-  id: string,
-  updateAssetGroupDto?: UpdateAssetGroupDto,
-) => {
-  return ['PATCH', `/api/asset-group/${id}`, updateAssetGroupDto] as const;
-};
-
-export const getAssetGroupControllerUpdateAssetGroupByIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+export const getAssetGroupControllerUpdateAssetGroupByIdMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateAssetGroupDto: UpdateAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetGroupControllerUpdateAssetGroupByIdQueryKey(
-      id,
-      updateAssetGroupDto,
-    );
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>
-  > = ({ signal }) =>
-    assetGroupControllerUpdateAssetGroupById(
-      id,
-      updateAssetGroupDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+  TError,
+  { id: string; data: UpdateAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerUpdateAssetGroupById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+    { id: string; data: UpdateAssetGroupDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetGroupControllerUpdateAssetGroupById(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerUpdateAssetGroupByIdQueryResult = NonNullable<
-  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>
->;
-export type AssetGroupControllerUpdateAssetGroupByIdQueryError = unknown;
+export type AssetGroupControllerUpdateAssetGroupByIdMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>
+  >;
+export type AssetGroupControllerUpdateAssetGroupByIdMutationBody =
+  UpdateAssetGroupDto;
+export type AssetGroupControllerUpdateAssetGroupByIdMutationError = unknown;
 
-export function useAssetGroupControllerUpdateAssetGroupById<
-  TData = Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-  TError = unknown,
->(
-  id: string,
-  updateAssetGroupDto: UpdateAssetGroupDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerUpdateAssetGroupById<
-  TData = Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-  TError = unknown,
->(
-  id: string,
-  updateAssetGroupDto: UpdateAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerUpdateAssetGroupById<
-  TData = Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-  TError = unknown,
->(
-  id: string,
-  updateAssetGroupDto: UpdateAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update asset group
  */
-
-export function useAssetGroupControllerUpdateAssetGroupById<
-  TData = Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+export const useAssetGroupControllerUpdateAssetGroupById = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateAssetGroupDto: UpdateAssetGroupDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+      TError,
+      { id: string; data: UpdateAssetGroupDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAssetGroupControllerUpdateAssetGroupByIdQueryOptions(
-    id,
-    updateAssetGroupDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+  TError,
+  { id: string; data: UpdateAssetGroupDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetGroupControllerUpdateAssetGroupByIdMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Permanently removes an asset group.
@@ -29985,157 +24118,78 @@ export const assetGroupControllerDelete = (
   );
 };
 
-export const getAssetGroupControllerDeleteQueryKey = (id: string) => {
-  return ['DELETE', `/api/asset-group/${id}`] as const;
-};
-
-export const getAssetGroupControllerDeleteQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+export const getAssetGroupControllerDeleteMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getAssetGroupControllerDeleteQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerDelete>>
-  > = ({ signal }) => assetGroupControllerDelete(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetGroupControllerDelete>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerDelete'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return assetGroupControllerDelete(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerDeleteQueryResult = NonNullable<
+export type AssetGroupControllerDeleteMutationResult = NonNullable<
   Awaited<ReturnType<typeof assetGroupControllerDelete>>
 >;
-export type AssetGroupControllerDeleteQueryError = unknown;
 
-export function useAssetGroupControllerDelete<
-  TData = Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerDelete>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerDelete<
-  TData = Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerDelete>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerDelete<
-  TData = Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type AssetGroupControllerDeleteMutationError = unknown;
+
 /**
  * @summary Delete asset group
  */
-
-export function useAssetGroupControllerDelete<
-  TData = Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+export const useAssetGroupControllerDelete = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerDelete>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAssetGroupControllerDeleteQueryOptions(id, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAssetGroupControllerDeleteMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Associates multiple workflows with the specified asset group.
@@ -30159,183 +24213,79 @@ export const assetGroupControllerAddManyWorkflows = (
   );
 };
 
-export const getAssetGroupControllerAddManyWorkflowsQueryKey = (
-  groupId: string,
-  addManyWorkflowsToAssetGroupDto?: AddManyWorkflowsToAssetGroupDto,
-) => {
-  return [
-    'POST',
-    `/api/asset-group/${groupId}/workflows`,
-    addManyWorkflowsToAssetGroupDto,
-  ] as const;
-};
-
-export const getAssetGroupControllerAddManyWorkflowsQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+export const getAssetGroupControllerAddManyWorkflowsMutationOptions = <
   TError = unknown,
->(
-  groupId: string,
-  addManyWorkflowsToAssetGroupDto: AddManyWorkflowsToAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetGroupControllerAddManyWorkflowsQueryKey(
-      groupId,
-      addManyWorkflowsToAssetGroupDto,
-    );
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>
-  > = ({ signal }) =>
-    assetGroupControllerAddManyWorkflows(
-      groupId,
-      addManyWorkflowsToAssetGroupDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: groupId !== null && groupId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+  TError,
+  { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerAddManyWorkflows'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+    { groupId: string; data: AddManyWorkflowsToAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerAddManyWorkflows(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerAddManyWorkflowsQueryResult = NonNullable<
+export type AssetGroupControllerAddManyWorkflowsMutationResult = NonNullable<
   Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>
 >;
-export type AssetGroupControllerAddManyWorkflowsQueryError = unknown;
+export type AssetGroupControllerAddManyWorkflowsMutationBody =
+  AddManyWorkflowsToAssetGroupDto;
+export type AssetGroupControllerAddManyWorkflowsMutationError = unknown;
 
-export function useAssetGroupControllerAddManyWorkflows<
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-  TError = unknown,
->(
-  groupId: string,
-  addManyWorkflowsToAssetGroupDto: AddManyWorkflowsToAssetGroupDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerAddManyWorkflows<
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-  TError = unknown,
->(
-  groupId: string,
-  addManyWorkflowsToAssetGroupDto: AddManyWorkflowsToAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerAddManyWorkflows<
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-  TError = unknown,
->(
-  groupId: string,
-  addManyWorkflowsToAssetGroupDto: AddManyWorkflowsToAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Add multiple workflows to asset group
  */
-
-export function useAssetGroupControllerAddManyWorkflows<
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+export const useAssetGroupControllerAddManyWorkflows = <
   TError = unknown,
+  TContext = unknown,
 >(
-  groupId: string,
-  addManyWorkflowsToAssetGroupDto: AddManyWorkflowsToAssetGroupDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+      TError,
+      { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAssetGroupControllerAddManyWorkflowsQueryOptions(
-    groupId,
-    addManyWorkflowsToAssetGroupDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+  TError,
+  { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetGroupControllerAddManyWorkflowsMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Disassociates multiple workflows from the asset group.
@@ -30359,183 +24309,83 @@ export const assetGroupControllerRemoveManyWorkflows = (
   );
 };
 
-export const getAssetGroupControllerRemoveManyWorkflowsQueryKey = (
-  groupId: string,
-  removeManyWorkflowsFromAssetGroupDto?: RemoveManyWorkflowsFromAssetGroupDto,
-) => {
-  return [
-    'DELETE',
-    `/api/asset-group/${groupId}/workflows`,
-    removeManyWorkflowsFromAssetGroupDto,
-  ] as const;
-};
-
-export const getAssetGroupControllerRemoveManyWorkflowsQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+export const getAssetGroupControllerRemoveManyWorkflowsMutationOptions = <
   TError = unknown,
->(
-  groupId: string,
-  removeManyWorkflowsFromAssetGroupDto: RemoveManyWorkflowsFromAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetGroupControllerRemoveManyWorkflowsQueryKey(
-      groupId,
-      removeManyWorkflowsFromAssetGroupDto,
-    );
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>
-  > = ({ signal }) =>
-    assetGroupControllerRemoveManyWorkflows(
-      groupId,
-      removeManyWorkflowsFromAssetGroupDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: groupId !== null && groupId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+  TError,
+  { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRemoveManyWorkflows'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+    { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerRemoveManyWorkflows(
+      groupId,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerRemoveManyWorkflowsQueryResult = NonNullable<
+export type AssetGroupControllerRemoveManyWorkflowsMutationResult = NonNullable<
   Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>
 >;
-export type AssetGroupControllerRemoveManyWorkflowsQueryError = unknown;
+export type AssetGroupControllerRemoveManyWorkflowsMutationBody =
+  RemoveManyWorkflowsFromAssetGroupDto;
+export type AssetGroupControllerRemoveManyWorkflowsMutationError = unknown;
 
-export function useAssetGroupControllerRemoveManyWorkflows<
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-  TError = unknown,
->(
-  groupId: string,
-  removeManyWorkflowsFromAssetGroupDto: RemoveManyWorkflowsFromAssetGroupDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerRemoveManyWorkflows<
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-  TError = unknown,
->(
-  groupId: string,
-  removeManyWorkflowsFromAssetGroupDto: RemoveManyWorkflowsFromAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerRemoveManyWorkflows<
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-  TError = unknown,
->(
-  groupId: string,
-  removeManyWorkflowsFromAssetGroupDto: RemoveManyWorkflowsFromAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Remove multiple workflows from asset group
  */
-
-export function useAssetGroupControllerRemoveManyWorkflows<
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+export const useAssetGroupControllerRemoveManyWorkflows = <
   TError = unknown,
+  TContext = unknown,
 >(
-  groupId: string,
-  removeManyWorkflowsFromAssetGroupDto: RemoveManyWorkflowsFromAssetGroupDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+      TError,
+      { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAssetGroupControllerRemoveManyWorkflowsQueryOptions(
-    groupId,
-    removeManyWorkflowsFromAssetGroupDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+  TError,
+  { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetGroupControllerRemoveManyWorkflowsMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Associates multiple assets with the specified asset group.
@@ -30559,183 +24409,79 @@ export const assetGroupControllerAddManyAssets = (
   );
 };
 
-export const getAssetGroupControllerAddManyAssetsQueryKey = (
-  groupId: string,
-  addManyAssetsToAssetGroupDto?: AddManyAssetsToAssetGroupDto,
-) => {
-  return [
-    'POST',
-    `/api/asset-group/${groupId}/assets`,
-    addManyAssetsToAssetGroupDto,
-  ] as const;
-};
-
-export const getAssetGroupControllerAddManyAssetsQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+export const getAssetGroupControllerAddManyAssetsMutationOptions = <
   TError = unknown,
->(
-  groupId: string,
-  addManyAssetsToAssetGroupDto: AddManyAssetsToAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetGroupControllerAddManyAssetsQueryKey(
-      groupId,
-      addManyAssetsToAssetGroupDto,
-    );
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>
-  > = ({ signal }) =>
-    assetGroupControllerAddManyAssets(
-      groupId,
-      addManyAssetsToAssetGroupDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: groupId !== null && groupId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { groupId: string; data: AddManyAssetsToAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+  TError,
+  { groupId: string; data: AddManyAssetsToAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerAddManyAssets'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+    { groupId: string; data: AddManyAssetsToAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerAddManyAssets(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerAddManyAssetsQueryResult = NonNullable<
+export type AssetGroupControllerAddManyAssetsMutationResult = NonNullable<
   Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>
 >;
-export type AssetGroupControllerAddManyAssetsQueryError = unknown;
+export type AssetGroupControllerAddManyAssetsMutationBody =
+  AddManyAssetsToAssetGroupDto;
+export type AssetGroupControllerAddManyAssetsMutationError = unknown;
 
-export function useAssetGroupControllerAddManyAssets<
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-  TError = unknown,
->(
-  groupId: string,
-  addManyAssetsToAssetGroupDto: AddManyAssetsToAssetGroupDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerAddManyAssets<
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-  TError = unknown,
->(
-  groupId: string,
-  addManyAssetsToAssetGroupDto: AddManyAssetsToAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerAddManyAssets<
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-  TError = unknown,
->(
-  groupId: string,
-  addManyAssetsToAssetGroupDto: AddManyAssetsToAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Add multiple assets to asset group
  */
-
-export function useAssetGroupControllerAddManyAssets<
-  TData = Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+export const useAssetGroupControllerAddManyAssets = <
   TError = unknown,
+  TContext = unknown,
 >(
-  groupId: string,
-  addManyAssetsToAssetGroupDto: AddManyAssetsToAssetGroupDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+      TError,
+      { groupId: string; data: AddManyAssetsToAssetGroupDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAssetGroupControllerAddManyAssetsQueryOptions(
-    groupId,
-    addManyAssetsToAssetGroupDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+  TError,
+  { groupId: string; data: AddManyAssetsToAssetGroupDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetGroupControllerAddManyAssetsMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Disassociates multiple assets from the asset group.
@@ -30759,183 +24505,79 @@ export const assetGroupControllerRemoveManyAssets = (
   );
 };
 
-export const getAssetGroupControllerRemoveManyAssetsQueryKey = (
-  groupId: string,
-  removeManyAssetsFromAssetGroupDto?: RemoveManyAssetsFromAssetGroupDto,
-) => {
-  return [
-    'DELETE',
-    `/api/asset-group/${groupId}/assets`,
-    removeManyAssetsFromAssetGroupDto,
-  ] as const;
-};
-
-export const getAssetGroupControllerRemoveManyAssetsQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+export const getAssetGroupControllerRemoveManyAssetsMutationOptions = <
   TError = unknown,
->(
-  groupId: string,
-  removeManyAssetsFromAssetGroupDto: RemoveManyAssetsFromAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetGroupControllerRemoveManyAssetsQueryKey(
-      groupId,
-      removeManyAssetsFromAssetGroupDto,
-    );
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>
-  > = ({ signal }) =>
-    assetGroupControllerRemoveManyAssets(
-      groupId,
-      removeManyAssetsFromAssetGroupDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: groupId !== null && groupId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+  TError,
+  { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRemoveManyAssets'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+    { groupId: string; data: RemoveManyAssetsFromAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerRemoveManyAssets(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerRemoveManyAssetsQueryResult = NonNullable<
+export type AssetGroupControllerRemoveManyAssetsMutationResult = NonNullable<
   Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>
 >;
-export type AssetGroupControllerRemoveManyAssetsQueryError = unknown;
+export type AssetGroupControllerRemoveManyAssetsMutationBody =
+  RemoveManyAssetsFromAssetGroupDto;
+export type AssetGroupControllerRemoveManyAssetsMutationError = unknown;
 
-export function useAssetGroupControllerRemoveManyAssets<
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-  TError = unknown,
->(
-  groupId: string,
-  removeManyAssetsFromAssetGroupDto: RemoveManyAssetsFromAssetGroupDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerRemoveManyAssets<
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-  TError = unknown,
->(
-  groupId: string,
-  removeManyAssetsFromAssetGroupDto: RemoveManyAssetsFromAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerRemoveManyAssets<
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-  TError = unknown,
->(
-  groupId: string,
-  removeManyAssetsFromAssetGroupDto: RemoveManyAssetsFromAssetGroupDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Remove multiple assets from asset group
  */
-
-export function useAssetGroupControllerRemoveManyAssets<
-  TData = Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+export const useAssetGroupControllerRemoveManyAssets = <
   TError = unknown,
+  TContext = unknown,
 >(
-  groupId: string,
-  removeManyAssetsFromAssetGroupDto: RemoveManyAssetsFromAssetGroupDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+      TError,
+      { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAssetGroupControllerRemoveManyAssetsQueryOptions(
-    groupId,
-    removeManyAssetsFromAssetGroupDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+  TError,
+  { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetGroupControllerRemoveManyAssetsMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieves assets associated with a specific asset group with pagination.
@@ -32817,213 +26459,84 @@ export const assetGroupControllerUpdateAssetGroupWorkflow = (
   );
 };
 
-export const getAssetGroupControllerUpdateAssetGroupWorkflowQueryKey = (
-  id: string,
-  updateAssetGroupWorkflowDto?: UpdateAssetGroupWorkflowDto,
-) => {
-  return [
-    'PATCH',
-    `/api/asset-group/workflows/${id}`,
-    updateAssetGroupWorkflowDto,
-  ] as const;
-};
-
-export const getAssetGroupControllerUpdateAssetGroupWorkflowQueryOptions = <
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-  >,
+export const getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateAssetGroupWorkflowDto: UpdateAssetGroupWorkflowDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetGroupControllerUpdateAssetGroupWorkflowQueryKey(
-      id,
-      updateAssetGroupWorkflowDto,
-    );
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>
-  > = ({ signal }) =>
-    assetGroupControllerUpdateAssetGroupWorkflow(
-      id,
-      updateAssetGroupWorkflowDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateAssetGroupWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerUpdateAssetGroupWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+    { id: string; data: UpdateAssetGroupWorkflowDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetGroupControllerUpdateAssetGroupWorkflow(
+      id,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerUpdateAssetGroupWorkflowQueryResult =
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationResult =
   NonNullable<
     Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>
   >;
-export type AssetGroupControllerUpdateAssetGroupWorkflowQueryError = unknown;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationBody =
+  UpdateAssetGroupWorkflowDto;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationError = unknown;
 
-export function useAssetGroupControllerUpdateAssetGroupWorkflow<
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-  >,
-  TError = unknown,
->(
-  id: string,
-  updateAssetGroupWorkflowDto: UpdateAssetGroupWorkflowDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerUpdateAssetGroupWorkflow<
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-  >,
-  TError = unknown,
->(
-  id: string,
-  updateAssetGroupWorkflowDto: UpdateAssetGroupWorkflowDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerUpdateAssetGroupWorkflow<
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-  >,
-  TError = unknown,
->(
-  id: string,
-  updateAssetGroupWorkflowDto: UpdateAssetGroupWorkflowDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update asset group workflow relationship
  */
-
-export function useAssetGroupControllerUpdateAssetGroupWorkflow<
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-  >,
+export const useAssetGroupControllerUpdateAssetGroupWorkflow = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateAssetGroupWorkflowDto: UpdateAssetGroupWorkflowDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+      TError,
+      { id: string; data: UpdateAssetGroupWorkflowDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getAssetGroupControllerUpdateAssetGroupWorkflowQueryOptions(
-      id,
-      updateAssetGroupWorkflowDto,
-      options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Runs the scheduler for a specific asset group workflow.
@@ -33040,191 +26553,80 @@ export const assetGroupControllerRunGroupWorkflowScheduler = (
   );
 };
 
-export const getAssetGroupControllerRunGroupWorkflowSchedulerQueryKey = (
-  id: string,
-) => {
-  return ['POST', `/api/asset-group/workflows/${id}/run`] as const;
-};
-
-export const getAssetGroupControllerRunGroupWorkflowSchedulerQueryOptions = <
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-  >,
+export const getAssetGroupControllerRunGroupWorkflowSchedulerMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAssetGroupControllerRunGroupWorkflowSchedulerQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>
-  > = ({ signal }) =>
-    assetGroupControllerRunGroupWorkflowScheduler(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRunGroupWorkflowScheduler'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return assetGroupControllerRunGroupWorkflowScheduler(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerRunGroupWorkflowSchedulerQueryResult =
+export type AssetGroupControllerRunGroupWorkflowSchedulerMutationResult =
   NonNullable<
     Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>
   >;
-export type AssetGroupControllerRunGroupWorkflowSchedulerQueryError = unknown;
 
-export function useAssetGroupControllerRunGroupWorkflowScheduler<
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerRunGroupWorkflowScheduler<
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAssetGroupControllerRunGroupWorkflowScheduler<
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type AssetGroupControllerRunGroupWorkflowSchedulerMutationError =
+  unknown;
+
 /**
  * @summary Runs the scheduler for a specific asset group workflow.
  */
-
-export function useAssetGroupControllerRunGroupWorkflowScheduler<
-  TData = Awaited<
-    ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-  >,
+export const useAssetGroupControllerRunGroupWorkflowScheduler = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getAssetGroupControllerRunGroupWorkflowSchedulerQueryOptions(id, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAssetGroupControllerRunGroupWorkflowSchedulerMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Retrieve a list of all issues with pagination and filtering.
@@ -33602,158 +27004,75 @@ export const issuesControllerCreate = (
   );
 };
 
-export const getIssuesControllerCreateQueryKey = (
-  createIssueDto?: CreateIssueDto,
-) => {
-  return ['POST', `/api/issues`, createIssueDto] as const;
-};
-
-export const getIssuesControllerCreateQueryOptions = <
-  TData = Awaited<ReturnType<typeof issuesControllerCreate>>,
+export const getIssuesControllerCreateMutationOptions = <
   TError = unknown,
->(
-  createIssueDto: CreateIssueDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getIssuesControllerCreateQueryKey(createIssueDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof issuesControllerCreate>>
-  > = ({ signal }) =>
-    issuesControllerCreate(createIssueDto, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof issuesControllerCreate>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: CreateIssueDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerCreate>>,
+  TError,
+  { data: CreateIssueDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerCreate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerCreate>>,
+    { data: CreateIssueDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return issuesControllerCreate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type IssuesControllerCreateQueryResult = NonNullable<
+export type IssuesControllerCreateMutationResult = NonNullable<
   Awaited<ReturnType<typeof issuesControllerCreate>>
 >;
-export type IssuesControllerCreateQueryError = unknown;
+export type IssuesControllerCreateMutationBody = CreateIssueDto;
+export type IssuesControllerCreateMutationError = unknown;
 
-export function useIssuesControllerCreate<
-  TData = Awaited<ReturnType<typeof issuesControllerCreate>>,
-  TError = unknown,
->(
-  createIssueDto: CreateIssueDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerCreate>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerCreate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerCreate<
-  TData = Awaited<ReturnType<typeof issuesControllerCreate>>,
-  TError = unknown,
->(
-  createIssueDto: CreateIssueDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerCreate>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerCreate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerCreate<
-  TData = Awaited<ReturnType<typeof issuesControllerCreate>>,
-  TError = unknown,
->(
-  createIssueDto: CreateIssueDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create issue
  */
-
-export function useIssuesControllerCreate<
-  TData = Awaited<ReturnType<typeof issuesControllerCreate>>,
-  TError = unknown,
->(
-  createIssueDto: CreateIssueDto,
+export const useIssuesControllerCreate = <TError = unknown, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreate>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerCreate>>,
+      TError,
+      { data: CreateIssueDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getIssuesControllerCreateQueryOptions(
-    createIssueDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerCreate>>,
+  TError,
+  { data: CreateIssueDto },
+  TContext
+> => {
+  return useMutation(
+    getIssuesControllerCreateMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieve details of a specific issue.
@@ -33944,171 +27263,75 @@ export const issuesControllerUpdate = (
   );
 };
 
-export const getIssuesControllerUpdateQueryKey = (
-  id: string,
-  updateIssueDto?: UpdateIssueDto,
-) => {
-  return ['PATCH', `/api/issues/${id}`, updateIssueDto] as const;
-};
-
-export const getIssuesControllerUpdateQueryOptions = <
-  TData = Awaited<ReturnType<typeof issuesControllerUpdate>>,
+export const getIssuesControllerUpdateMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateIssueDto: UpdateIssueDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getIssuesControllerUpdateQueryKey(id, updateIssueDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof issuesControllerUpdate>>
-  > = ({ signal }) =>
-    issuesControllerUpdate(id, updateIssueDto, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof issuesControllerUpdate>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateIssueDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateIssueDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerUpdate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerUpdate>>,
+    { id: string; data: UpdateIssueDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return issuesControllerUpdate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type IssuesControllerUpdateQueryResult = NonNullable<
+export type IssuesControllerUpdateMutationResult = NonNullable<
   Awaited<ReturnType<typeof issuesControllerUpdate>>
 >;
-export type IssuesControllerUpdateQueryError = unknown;
+export type IssuesControllerUpdateMutationBody = UpdateIssueDto;
+export type IssuesControllerUpdateMutationError = unknown;
 
-export function useIssuesControllerUpdate<
-  TData = Awaited<ReturnType<typeof issuesControllerUpdate>>,
-  TError = unknown,
->(
-  id: string,
-  updateIssueDto: UpdateIssueDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerUpdate>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerUpdate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerUpdate<
-  TData = Awaited<ReturnType<typeof issuesControllerUpdate>>,
-  TError = unknown,
->(
-  id: string,
-  updateIssueDto: UpdateIssueDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerUpdate>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerUpdate>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerUpdate<
-  TData = Awaited<ReturnType<typeof issuesControllerUpdate>>,
-  TError = unknown,
->(
-  id: string,
-  updateIssueDto: UpdateIssueDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update issue
  */
-
-export function useIssuesControllerUpdate<
-  TData = Awaited<ReturnType<typeof issuesControllerUpdate>>,
-  TError = unknown,
->(
-  id: string,
-  updateIssueDto: UpdateIssueDto,
+export const useIssuesControllerUpdate = <TError = unknown, TContext = unknown>(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdate>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerUpdate>>,
+      TError,
+      { id: string; data: UpdateIssueDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getIssuesControllerUpdateQueryOptions(
-    id,
-    updateIssueDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateIssueDto },
+  TContext
+> => {
+  return useMutation(
+    getIssuesControllerUpdateMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Change the status of an issue.
@@ -34132,176 +27355,78 @@ export const issuesControllerChangeStatus = (
   );
 };
 
-export const getIssuesControllerChangeStatusQueryKey = (
-  id: string,
-  changeIssueStatusDto?: ChangeIssueStatusDto,
-) => {
-  return ['PATCH', `/api/issues/${id}/status`, changeIssueStatusDto] as const;
-};
-
-export const getIssuesControllerChangeStatusQueryOptions = <
-  TData = Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+export const getIssuesControllerChangeStatusMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  changeIssueStatusDto: ChangeIssueStatusDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getIssuesControllerChangeStatusQueryKey(id, changeIssueStatusDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof issuesControllerChangeStatus>>
-  > = ({ signal }) =>
-    issuesControllerChangeStatus(
-      id,
-      changeIssueStatusDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: ChangeIssueStatusDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+  TError,
+  { id: string; data: ChangeIssueStatusDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerChangeStatus'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+    { id: string; data: ChangeIssueStatusDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return issuesControllerChangeStatus(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type IssuesControllerChangeStatusQueryResult = NonNullable<
+export type IssuesControllerChangeStatusMutationResult = NonNullable<
   Awaited<ReturnType<typeof issuesControllerChangeStatus>>
 >;
-export type IssuesControllerChangeStatusQueryError = unknown;
+export type IssuesControllerChangeStatusMutationBody = ChangeIssueStatusDto;
+export type IssuesControllerChangeStatusMutationError = unknown;
 
-export function useIssuesControllerChangeStatus<
-  TData = Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-  TError = unknown,
->(
-  id: string,
-  changeIssueStatusDto: ChangeIssueStatusDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerChangeStatus>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerChangeStatus<
-  TData = Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-  TError = unknown,
->(
-  id: string,
-  changeIssueStatusDto: ChangeIssueStatusDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerChangeStatus>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerChangeStatus<
-  TData = Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-  TError = unknown,
->(
-  id: string,
-  changeIssueStatusDto: ChangeIssueStatusDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Change issue status
  */
-
-export function useIssuesControllerChangeStatus<
-  TData = Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+export const useIssuesControllerChangeStatus = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  changeIssueStatusDto: ChangeIssueStatusDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+      TError,
+      { id: string; data: ChangeIssueStatusDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getIssuesControllerChangeStatusQueryOptions(
-    id,
-    changeIssueStatusDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+  TError,
+  { id: string; data: ChangeIssueStatusDto },
+  TContext
+> => {
+  return useMutation(
+    getIssuesControllerChangeStatusMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Create a new comment for a specific issue.
@@ -34325,180 +27450,78 @@ export const issuesControllerCreateComment = (
   );
 };
 
-export const getIssuesControllerCreateCommentQueryKey = (
-  issueId: string,
-  createIssueCommentDto?: CreateIssueCommentDto,
-) => {
-  return [
-    'POST',
-    `/api/issues/${issueId}/comments`,
-    createIssueCommentDto,
-  ] as const;
-};
-
-export const getIssuesControllerCreateCommentQueryOptions = <
-  TData = Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+export const getIssuesControllerCreateCommentMutationOptions = <
   TError = unknown,
->(
-  issueId: string,
-  createIssueCommentDto: CreateIssueCommentDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getIssuesControllerCreateCommentQueryKey(issueId, createIssueCommentDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof issuesControllerCreateComment>>
-  > = ({ signal }) =>
-    issuesControllerCreateComment(
-      issueId,
-      createIssueCommentDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: issueId !== null && issueId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof issuesControllerCreateComment>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { issueId: string; data: CreateIssueCommentDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+  TError,
+  { issueId: string; data: CreateIssueCommentDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerCreateComment'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+    { issueId: string; data: CreateIssueCommentDto }
+  > = (props) => {
+    const { issueId, data } = props ?? {};
+
+    return issuesControllerCreateComment(issueId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type IssuesControllerCreateCommentQueryResult = NonNullable<
+export type IssuesControllerCreateCommentMutationResult = NonNullable<
   Awaited<ReturnType<typeof issuesControllerCreateComment>>
 >;
-export type IssuesControllerCreateCommentQueryError = unknown;
+export type IssuesControllerCreateCommentMutationBody = CreateIssueCommentDto;
+export type IssuesControllerCreateCommentMutationError = unknown;
 
-export function useIssuesControllerCreateComment<
-  TData = Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-  TError = unknown,
->(
-  issueId: string,
-  createIssueCommentDto: CreateIssueCommentDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerCreateComment>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerCreateComment<
-  TData = Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-  TError = unknown,
->(
-  issueId: string,
-  createIssueCommentDto: CreateIssueCommentDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerCreateComment>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerCreateComment<
-  TData = Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-  TError = unknown,
->(
-  issueId: string,
-  createIssueCommentDto: CreateIssueCommentDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create comment for issue
  */
-
-export function useIssuesControllerCreateComment<
-  TData = Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+export const useIssuesControllerCreateComment = <
   TError = unknown,
+  TContext = unknown,
 >(
-  issueId: string,
-  createIssueCommentDto: CreateIssueCommentDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerCreateComment>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+      TError,
+      { issueId: string; data: CreateIssueCommentDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getIssuesControllerCreateCommentQueryOptions(
-    issueId,
-    createIssueCommentDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+  TError,
+  { issueId: string; data: CreateIssueCommentDto },
+  TContext
+> => {
+  return useMutation(
+    getIssuesControllerCreateCommentMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieve paginated comments for a specific issue.
@@ -34920,180 +27943,79 @@ export const issuesControllerUpdateCommentById = (
   );
 };
 
-export const getIssuesControllerUpdateCommentByIdQueryKey = (
-  id: string,
-  updateIssueCommentDto?: UpdateIssueCommentDto,
-) => {
-  return [
-    'PATCH',
-    `/api/issues/comments/${id}`,
-    updateIssueCommentDto,
-  ] as const;
-};
-
-export const getIssuesControllerUpdateCommentByIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+export const getIssuesControllerUpdateCommentByIdMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  updateIssueCommentDto: UpdateIssueCommentDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getIssuesControllerUpdateCommentByIdQueryKey(id, updateIssueCommentDto);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>
-  > = ({ signal }) =>
-    issuesControllerUpdateCommentById(
-      id,
-      updateIssueCommentDto,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string; data: UpdateIssueCommentDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+  TError,
+  { id: string; data: UpdateIssueCommentDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerUpdateCommentById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+    { id: string; data: UpdateIssueCommentDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return issuesControllerUpdateCommentById(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type IssuesControllerUpdateCommentByIdQueryResult = NonNullable<
+export type IssuesControllerUpdateCommentByIdMutationResult = NonNullable<
   Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>
 >;
-export type IssuesControllerUpdateCommentByIdQueryError = unknown;
+export type IssuesControllerUpdateCommentByIdMutationBody =
+  UpdateIssueCommentDto;
+export type IssuesControllerUpdateCommentByIdMutationError = unknown;
 
-export function useIssuesControllerUpdateCommentById<
-  TData = Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-  TError = unknown,
->(
-  id: string,
-  updateIssueCommentDto: UpdateIssueCommentDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerUpdateCommentById<
-  TData = Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-  TError = unknown,
->(
-  id: string,
-  updateIssueCommentDto: UpdateIssueCommentDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerUpdateCommentById<
-  TData = Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-  TError = unknown,
->(
-  id: string,
-  updateIssueCommentDto: UpdateIssueCommentDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update comment by ID
  */
-
-export function useIssuesControllerUpdateCommentById<
-  TData = Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+export const useIssuesControllerUpdateCommentById = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateIssueCommentDto: UpdateIssueCommentDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+      TError,
+      { id: string; data: UpdateIssueCommentDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getIssuesControllerUpdateCommentByIdQueryOptions(
-    id,
-    updateIssueCommentDto,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+  TError,
+  { id: string; data: UpdateIssueCommentDto },
+  TContext
+> => {
+  return useMutation(
+    getIssuesControllerUpdateCommentByIdMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Delete a comment by its ID. Only the creator of the comment can delete it.
@@ -35110,161 +28032,78 @@ export const issuesControllerDeleteCommentById = (
   );
 };
 
-export const getIssuesControllerDeleteCommentByIdQueryKey = (id: string) => {
-  return ['DELETE', `/api/issues/comments/${id}`] as const;
-};
-
-export const getIssuesControllerDeleteCommentByIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+export const getIssuesControllerDeleteCommentByIdMutationOptions = <
   TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getIssuesControllerDeleteCommentByIdQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>
-  > = ({ signal }) =>
-    issuesControllerDeleteCommentById(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerDeleteCommentById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return issuesControllerDeleteCommentById(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type IssuesControllerDeleteCommentByIdQueryResult = NonNullable<
+export type IssuesControllerDeleteCommentByIdMutationResult = NonNullable<
   Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>
 >;
-export type IssuesControllerDeleteCommentByIdQueryError = unknown;
 
-export function useIssuesControllerDeleteCommentById<
-  TData = Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerDeleteCommentById<
-  TData = Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-          TError,
-          Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIssuesControllerDeleteCommentById<
-  TData = Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type IssuesControllerDeleteCommentByIdMutationError = unknown;
+
 /**
  * @summary Delete comment by ID
  */
-
-export function useIssuesControllerDeleteCommentById<
-  TData = Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+export const useIssuesControllerDeleteCommentById = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getIssuesControllerDeleteCommentByIdQueryOptions(
-    id,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getIssuesControllerDeleteCommentByIdMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * Retrieves a paginated list of internal networks for the specified workspace.
@@ -35732,195 +28571,88 @@ export const internalNetworksControllerCreateInternalNetwork = (
   );
 };
 
-export const getInternalNetworksControllerCreateInternalNetworkQueryKey = (
-  createInternalNetworkDto?: CreateInternalNetworkDto,
-) => {
-  return ['POST', `/api/internal-networks`, createInternalNetworkDto] as const;
-};
-
-export const getInternalNetworksControllerCreateInternalNetworkQueryOptions = <
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-  >,
-  TError = unknown,
->(
-  createInternalNetworkDto: CreateInternalNetworkDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-        >,
-        TError,
-        TData
-      >
+export const getInternalNetworksControllerCreateInternalNetworkMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
+      >,
+      TError,
+      { data: CreateInternalNetworkDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getInternalNetworksControllerCreateInternalNetworkQueryKey(
-      createInternalNetworkDto,
-    );
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof internalNetworksControllerCreateInternalNetwork>>
-  > = ({ signal }) =>
-    internalNetworksControllerCreateInternalNetwork(
-      createInternalNetworkDto,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  }): UseMutationOptions<
     Awaited<ReturnType<typeof internalNetworksControllerCreateInternalNetwork>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
+    { data: CreateInternalNetworkDto },
+    TContext
+  > => {
+    const mutationKey = ['internalNetworksControllerCreateInternalNetwork'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
 
-export type InternalNetworksControllerCreateInternalNetworkQueryResult =
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
+      >,
+      { data: CreateInternalNetworkDto }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return internalNetworksControllerCreateInternalNetwork(
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type InternalNetworksControllerCreateInternalNetworkMutationResult =
   NonNullable<
     Awaited<ReturnType<typeof internalNetworksControllerCreateInternalNetwork>>
   >;
-export type InternalNetworksControllerCreateInternalNetworkQueryError = unknown;
+export type InternalNetworksControllerCreateInternalNetworkMutationBody =
+  CreateInternalNetworkDto;
+export type InternalNetworksControllerCreateInternalNetworkMutationError =
+  unknown;
 
-export function useInternalNetworksControllerCreateInternalNetwork<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-  >,
-  TError = unknown,
->(
-  createInternalNetworkDto: CreateInternalNetworkDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useInternalNetworksControllerCreateInternalNetwork<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-  >,
-  TError = unknown,
->(
-  createInternalNetworkDto: CreateInternalNetworkDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useInternalNetworksControllerCreateInternalNetwork<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-  >,
-  TError = unknown,
->(
-  createInternalNetworkDto: CreateInternalNetworkDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create an internal network
  */
-
-export function useInternalNetworksControllerCreateInternalNetwork<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-  >,
+export const useInternalNetworksControllerCreateInternalNetwork = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createInternalNetworkDto: CreateInternalNetworkDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerCreateInternalNetwork>
+      >,
+      TError,
+      { data: CreateInternalNetworkDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getInternalNetworksControllerCreateInternalNetworkQueryOptions(
-      createInternalNetworkDto,
-      options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof internalNetworksControllerCreateInternalNetwork>>,
+  TError,
+  { data: CreateInternalNetworkDto },
+  TContext
+> => {
+  return useMutation(
+    getInternalNetworksControllerCreateInternalNetworkMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Creates new targets from the CIDRs of the specified network interfaces.
@@ -35943,224 +28675,98 @@ export const internalNetworksControllerCreateTargetsFromInterfaces = (
   );
 };
 
-export const getInternalNetworksControllerCreateTargetsFromInterfacesQueryKey =
-  (createTargetsFromInterfacesDto?: CreateTargetsFromInterfacesDto) => {
-    return [
-      'POST',
-      `/api/internal-networks/targets`,
-      createTargetsFromInterfacesDto,
-    ] as const;
-  };
-
-export const getInternalNetworksControllerCreateTargetsFromInterfacesQueryOptions =
-  <
-    TData = Awaited<
-      ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
-    >,
-    TError = unknown,
-  >(
-    createTargetsFromInterfacesDto: CreateTargetsFromInterfacesDto,
-    options?: {
-      query?: Partial<
-        UseQueryOptions<
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerCreateTargetsFromInterfaces
-            >
-          >,
-          TError,
-          TData
-        >
-      >;
-      request?: SecondParameter<typeof orvalClient>;
-    },
-  ) => {
-    const { query: queryOptions, request: requestOptions } = options ?? {};
-
-    const queryKey =
-      queryOptions?.queryKey ??
-      getInternalNetworksControllerCreateTargetsFromInterfacesQueryKey(
-        createTargetsFromInterfacesDto,
-      );
-
-    const queryFn: QueryFunction<
-      Awaited<
-        ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
-      >
-    > = ({ signal }) =>
-      internalNetworksControllerCreateTargetsFromInterfaces(
-        createTargetsFromInterfacesDto,
-        requestOptions,
-        signal,
-      );
-
-    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+export const getInternalNetworksControllerCreateTargetsFromInterfacesMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
       Awaited<
         ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
       >,
       TError,
-      TData
-    > & { queryKey: DataTag<QueryKey, TData, TError> };
+      { data: CreateTargetsFromInterfacesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
+    >,
+    TError,
+    { data: CreateTargetsFromInterfacesDto },
+    TContext
+  > => {
+    const mutationKey = [
+      'internalNetworksControllerCreateTargetsFromInterfaces',
+    ];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
+      >,
+      { data: CreateTargetsFromInterfacesDto }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return internalNetworksControllerCreateTargetsFromInterfaces(
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
   };
 
-export type InternalNetworksControllerCreateTargetsFromInterfacesQueryResult =
+export type InternalNetworksControllerCreateTargetsFromInterfacesMutationResult =
   NonNullable<
     Awaited<
       ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
     >
   >;
-export type InternalNetworksControllerCreateTargetsFromInterfacesQueryError =
+export type InternalNetworksControllerCreateTargetsFromInterfacesMutationBody =
+  CreateTargetsFromInterfacesDto;
+export type InternalNetworksControllerCreateTargetsFromInterfacesMutationError =
   unknown;
 
-export function useInternalNetworksControllerCreateTargetsFromInterfaces<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
-  >,
-  TError = unknown,
->(
-  createTargetsFromInterfacesDto: CreateTargetsFromInterfacesDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof internalNetworksControllerCreateTargetsFromInterfaces
-          >
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerCreateTargetsFromInterfaces
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerCreateTargetsFromInterfaces
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useInternalNetworksControllerCreateTargetsFromInterfaces<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
-  >,
-  TError = unknown,
->(
-  createTargetsFromInterfacesDto: CreateTargetsFromInterfacesDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof internalNetworksControllerCreateTargetsFromInterfaces
-          >
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerCreateTargetsFromInterfaces
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerCreateTargetsFromInterfaces
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useInternalNetworksControllerCreateTargetsFromInterfaces<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
-  >,
-  TError = unknown,
->(
-  createTargetsFromInterfacesDto: CreateTargetsFromInterfacesDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof internalNetworksControllerCreateTargetsFromInterfaces
-          >
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Create targets from network interfaces
  */
-
-export function useInternalNetworksControllerCreateTargetsFromInterfaces<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
-  >,
+export const useInternalNetworksControllerCreateTargetsFromInterfaces = <
   TError = unknown,
+  TContext = unknown,
 >(
-  createTargetsFromInterfacesDto: CreateTargetsFromInterfacesDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof internalNetworksControllerCreateTargetsFromInterfaces
-          >
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
+      >,
+      TError,
+      { data: CreateTargetsFromInterfacesDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getInternalNetworksControllerCreateTargetsFromInterfacesQueryOptions(
-      createTargetsFromInterfacesDto,
+): UseMutationResult<
+  Awaited<
+    ReturnType<typeof internalNetworksControllerCreateTargetsFromInterfaces>
+  >,
+  TError,
+  { data: CreateTargetsFromInterfacesDto },
+  TContext
+> => {
+  return useMutation(
+    getInternalNetworksControllerCreateTargetsFromInterfacesMutationOptions(
       options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+    ),
+    queryClient,
+  );
+};
 
 /**
  * Retrieves a paginated list of network interfaces for the specified internal network.
@@ -36898,231 +29504,97 @@ export const internalNetworksControllerUpdateInternalNetworkById = (
   );
 };
 
-export const getInternalNetworksControllerUpdateInternalNetworkByIdQueryKey = (
-  id: string,
-  updateInternalNetworkDto?: UpdateInternalNetworkDto,
-) => {
-  return [
-    'PATCH',
-    `/api/internal-networks/${id}`,
-    updateInternalNetworkDto,
-  ] as const;
-};
-
-export const getInternalNetworksControllerUpdateInternalNetworkByIdQueryOptions =
-  <
-    TData = Awaited<
-      ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-    >,
-    TError = unknown,
-  >(
-    id: string,
-    updateInternalNetworkDto: UpdateInternalNetworkDto,
-    options?: {
-      query?: Partial<
-        UseQueryOptions<
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerUpdateInternalNetworkById
-            >
-          >,
-          TError,
-          TData
-        >
-      >;
-      request?: SecondParameter<typeof orvalClient>;
-    },
-  ) => {
-    const { query: queryOptions, request: requestOptions } = options ?? {};
-
-    const queryKey =
-      queryOptions?.queryKey ??
-      getInternalNetworksControllerUpdateInternalNetworkByIdQueryKey(
-        id,
-        updateInternalNetworkDto,
-      );
-
-    const queryFn: QueryFunction<
-      Awaited<
-        ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-      >
-    > = ({ signal }) =>
-      internalNetworksControllerUpdateInternalNetworkById(
-        id,
-        updateInternalNetworkDto,
-        requestOptions,
-        signal,
-      );
-
-    return {
-      queryKey,
-      queryFn,
-      enabled: id !== null && id !== undefined,
-      ...queryOptions,
-    } as UseQueryOptions<
+export const getInternalNetworksControllerUpdateInternalNetworkByIdMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
       Awaited<
         ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
       >,
       TError,
-      TData
-    > & { queryKey: DataTag<QueryKey, TData, TError> };
+      { id: string; data: UpdateInternalNetworkDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
+    >,
+    TError,
+    { id: string; data: UpdateInternalNetworkDto },
+    TContext
+  > => {
+    const mutationKey = ['internalNetworksControllerUpdateInternalNetworkById'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
+      >,
+      { id: string; data: UpdateInternalNetworkDto }
+    > = (props) => {
+      const { id, data } = props ?? {};
+
+      return internalNetworksControllerUpdateInternalNetworkById(
+        id,
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
   };
 
-export type InternalNetworksControllerUpdateInternalNetworkByIdQueryResult =
+export type InternalNetworksControllerUpdateInternalNetworkByIdMutationResult =
   NonNullable<
     Awaited<
       ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
     >
   >;
-export type InternalNetworksControllerUpdateInternalNetworkByIdQueryError =
+export type InternalNetworksControllerUpdateInternalNetworkByIdMutationBody =
+  UpdateInternalNetworkDto;
+export type InternalNetworksControllerUpdateInternalNetworkByIdMutationError =
   unknown;
 
-export function useInternalNetworksControllerUpdateInternalNetworkById<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-  >,
-  TError = unknown,
->(
-  id: string,
-  updateInternalNetworkDto: UpdateInternalNetworkDto,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerUpdateInternalNetworkById
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerUpdateInternalNetworkById
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useInternalNetworksControllerUpdateInternalNetworkById<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-  >,
-  TError = unknown,
->(
-  id: string,
-  updateInternalNetworkDto: UpdateInternalNetworkDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerUpdateInternalNetworkById
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof internalNetworksControllerUpdateInternalNetworkById
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useInternalNetworksControllerUpdateInternalNetworkById<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-  >,
-  TError = unknown,
->(
-  id: string,
-  updateInternalNetworkDto: UpdateInternalNetworkDto,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Update an internal network by ID
  */
-
-export function useInternalNetworksControllerUpdateInternalNetworkById<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-  >,
+export const useInternalNetworksControllerUpdateInternalNetworkById = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
-  updateInternalNetworkDto: UpdateInternalNetworkDto,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
+      >,
+      TError,
+      { id: string; data: UpdateInternalNetworkDto },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getInternalNetworksControllerUpdateInternalNetworkByIdQueryOptions(
-      id,
-      updateInternalNetworkDto,
+): UseMutationResult<
+  Awaited<
+    ReturnType<typeof internalNetworksControllerUpdateInternalNetworkById>
+  >,
+  TError,
+  { id: string; data: UpdateInternalNetworkDto },
+  TContext
+> => {
+  return useMutation(
+    getInternalNetworksControllerUpdateInternalNetworkByIdMutationOptions(
       options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+    ),
+    queryClient,
+  );
+};
 
 /**
  * Deletes an existing internal network. Only the workspace owner can perform this action.
@@ -37139,191 +29611,87 @@ export const internalNetworksControllerDeleteInternalNetwork = (
   );
 };
 
-export const getInternalNetworksControllerDeleteInternalNetworkQueryKey = (
-  id: string,
-) => {
-  return ['DELETE', `/api/internal-networks/${id}`] as const;
-};
-
-export const getInternalNetworksControllerDeleteInternalNetworkQueryOptions = <
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-        >,
-        TError,
-        TData
-      >
+export const getInternalNetworksControllerDeleteInternalNetworkMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
+      >,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getInternalNetworksControllerDeleteInternalNetworkQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>>
-  > = ({ signal }) =>
-    internalNetworksControllerDeleteInternalNetwork(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
+  }): UseMutationOptions<
     Awaited<ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
+    { id: string },
+    TContext
+  > => {
+    const mutationKey = ['internalNetworksControllerDeleteInternalNetwork'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
 
-export type InternalNetworksControllerDeleteInternalNetworkQueryResult =
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
+      >,
+      { id: string }
+    > = (props) => {
+      const { id } = props ?? {};
+
+      return internalNetworksControllerDeleteInternalNetwork(
+        id,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type InternalNetworksControllerDeleteInternalNetworkMutationResult =
   NonNullable<
     Awaited<ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>>
   >;
-export type InternalNetworksControllerDeleteInternalNetworkQueryError = unknown;
 
-export function useInternalNetworksControllerDeleteInternalNetwork<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useInternalNetworksControllerDeleteInternalNetwork<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useInternalNetworksControllerDeleteInternalNetwork<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-  >,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type InternalNetworksControllerDeleteInternalNetworkMutationError =
+  unknown;
+
 /**
  * @summary Delete an internal network
  */
-
-export function useInternalNetworksControllerDeleteInternalNetwork<
-  TData = Awaited<
-    ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-  >,
+export const useInternalNetworksControllerDeleteInternalNetwork = <
   TError = unknown,
+  TContext = unknown,
 >(
-  id: string,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
-        >,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>
+      >,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getInternalNetworksControllerDeleteInternalNetworkQueryOptions(id, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+): UseMutationResult<
+  Awaited<ReturnType<typeof internalNetworksControllerDeleteInternalNetwork>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getInternalNetworksControllerDeleteInternalNetworkMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * @summary Upload app logo to system bucket
@@ -37348,167 +29716,79 @@ export const storageControllerUploadLogo = (
   );
 };
 
-export const getStorageControllerUploadLogoQueryKey = (
-  storageControllerUploadLogoBody?: StorageControllerUploadLogoBody,
-) => {
-  return [
-    'POST',
-    `/api/storage/logo`,
-    storageControllerUploadLogoBody,
-  ] as const;
-};
-
-export const getStorageControllerUploadLogoQueryOptions = <
-  TData = Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+export const getStorageControllerUploadLogoMutationOptions = <
   TError = void,
->(
-  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getStorageControllerUploadLogoQueryKey(storageControllerUploadLogoBody);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof storageControllerUploadLogo>>
-  > = ({ signal }) =>
-    storageControllerUploadLogo(
-      storageControllerUploadLogoBody,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof storageControllerUploadLogo>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: StorageControllerUploadLogoBody },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  const mutationKey = ['storageControllerUploadLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    { data: StorageControllerUploadLogoBody }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerUploadLogo(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type StorageControllerUploadLogoQueryResult = NonNullable<
+export type StorageControllerUploadLogoMutationResult = NonNullable<
   Awaited<ReturnType<typeof storageControllerUploadLogo>>
 >;
-export type StorageControllerUploadLogoQueryError = void;
+export type StorageControllerUploadLogoMutationBody =
+  StorageControllerUploadLogoBody;
+export type StorageControllerUploadLogoMutationError = void;
 
-export function useStorageControllerUploadLogo<
-  TData = Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-  TError = void,
->(
-  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerUploadLogo>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerUploadLogo<
-  TData = Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-  TError = void,
->(
-  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerUploadLogo>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerUploadLogo<
-  TData = Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-  TError = void,
->(
-  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Upload app logo to system bucket
  */
-
-export function useStorageControllerUploadLogo<
-  TData = Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+export const useStorageControllerUploadLogo = <
   TError = void,
+  TContext = unknown,
 >(
-  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+      TError,
+      { data: StorageControllerUploadLogoBody },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getStorageControllerUploadLogoQueryOptions(
-    storageControllerUploadLogoBody,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  return useMutation(
+    getStorageControllerUploadLogoMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * @summary Upload a file to storage
@@ -37536,167 +29816,79 @@ export const storageControllerUploadFile = (
   );
 };
 
-export const getStorageControllerUploadFileQueryKey = (
-  storageControllerUploadFileBody?: StorageControllerUploadFileBody,
-) => {
-  return [
-    'POST',
-    `/api/storage/upload`,
-    storageControllerUploadFileBody,
-  ] as const;
-};
-
-export const getStorageControllerUploadFileQueryOptions = <
-  TData = Awaited<ReturnType<typeof storageControllerUploadFile>>,
+export const getStorageControllerUploadFileMutationOptions = <
   TError = unknown,
->(
-  storageControllerUploadFileBody: StorageControllerUploadFileBody,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getStorageControllerUploadFileQueryKey(storageControllerUploadFileBody);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof storageControllerUploadFile>>
-  > = ({ signal }) =>
-    storageControllerUploadFile(
-      storageControllerUploadFileBody,
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof storageControllerUploadFile>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { data: StorageControllerUploadFileBody },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerUploadFile>>,
+  TError,
+  { data: StorageControllerUploadFileBody },
+  TContext
+> => {
+  const mutationKey = ['storageControllerUploadFile'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerUploadFile>>,
+    { data: StorageControllerUploadFileBody }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerUploadFile(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type StorageControllerUploadFileQueryResult = NonNullable<
+export type StorageControllerUploadFileMutationResult = NonNullable<
   Awaited<ReturnType<typeof storageControllerUploadFile>>
 >;
-export type StorageControllerUploadFileQueryError = unknown;
+export type StorageControllerUploadFileMutationBody =
+  StorageControllerUploadFileBody;
+export type StorageControllerUploadFileMutationError = unknown;
 
-export function useStorageControllerUploadFile<
-  TData = Awaited<ReturnType<typeof storageControllerUploadFile>>,
-  TError = unknown,
->(
-  storageControllerUploadFileBody: StorageControllerUploadFileBody,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerUploadFile>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerUploadFile>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerUploadFile<
-  TData = Awaited<ReturnType<typeof storageControllerUploadFile>>,
-  TError = unknown,
->(
-  storageControllerUploadFileBody: StorageControllerUploadFileBody,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerUploadFile>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerUploadFile>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerUploadFile<
-  TData = Awaited<ReturnType<typeof storageControllerUploadFile>>,
-  TError = unknown,
->(
-  storageControllerUploadFileBody: StorageControllerUploadFileBody,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
 /**
  * @summary Upload a file to storage
  */
-
-export function useStorageControllerUploadFile<
-  TData = Awaited<ReturnType<typeof storageControllerUploadFile>>,
+export const useStorageControllerUploadFile = <
   TError = unknown,
+  TContext = unknown,
 >(
-  storageControllerUploadFileBody: StorageControllerUploadFileBody,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerUploadFile>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerUploadFile>>,
+      TError,
+      { data: StorageControllerUploadFileBody },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getStorageControllerUploadFileQueryOptions(
-    storageControllerUploadFileBody,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerUploadFile>>,
+  TError,
+  { data: StorageControllerUploadFileBody },
+  TContext
+> => {
+  return useMutation(
+    getStorageControllerUploadFileMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};
 
 /**
  * @summary Get a file from storage (public)
