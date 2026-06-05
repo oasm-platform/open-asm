@@ -10,9 +10,9 @@ import {
 } from '@/components/ui/tooltip';
 import { AnalyzeStatusButton } from '@/components/vulnerabilities/analyze-status-button';
 import type { Vulnerability } from '@/services/apis/gen/queries';
+import { Link } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { BellOff, CircleCheck, Info } from 'lucide-react';
-import { Link } from '@tanstack/react-router';
 import BadgeList from '../assets/components/badge-list';
 
 export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
@@ -104,11 +104,7 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
     cell: ({ row }) => {
       const data = row.original;
       const value: string = data.asset?.value || data.affectedUrl;
-      return (
-        <div className="flex items-center min-h-[60px]">
-          <b>{value}</b>
-        </div>
-      );
+      return <div className="flex items-center min-h-[60px]">{value}</div>;
     },
   },
   {
@@ -190,7 +186,11 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
         );
       return (
         <div className="min-h-[60px] flex items-center">
-          <Link to="/tools/$id" params={{ id: tool.id }} className="flex items-center gap-2">
+          <Link
+            to="/tools/$id"
+            params={{ id: tool.id }}
+            className="flex items-center gap-2"
+          >
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

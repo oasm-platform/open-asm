@@ -79,10 +79,25 @@ export default function IssuesTimeline() {
             data={chartData}
             margin={{ left: 0, right: 0, top: 20, bottom: 0 }}
           >
+            <defs>
+              <linearGradient id="vulGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop
+                  offset="0%"
+                  stopColor="var(--chart-1)"
+                  stopOpacity={0.32}
+                />
+                <stop
+                  offset="100%"
+                  stopColor="var(--chart-1)"
+                  stopOpacity={0}
+                />
+              </linearGradient>
+            </defs>
             <CartesianGrid
               vertical={false}
               strokeDasharray="3 3"
-              opacity={0.2}
+              stroke="var(--border)"
+              opacity={0.5}
             />
             <XAxis
               dataKey="date"
@@ -90,14 +105,14 @@ export default function IssuesTimeline() {
               axisLine={false}
               tickMargin={10}
               minTickGap={30}
-              tick={{ fontSize: 12, fill: '#888' }}
+              tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tickMargin={10}
               width={40}
-              tick={{ fontSize: 12, fill: '#888' }}
+              tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
               tickFormatter={(value) =>
                 new Intl.NumberFormat('en-US', {
                   notation: 'compact',
@@ -107,7 +122,7 @@ export default function IssuesTimeline() {
             />
             <ChartTooltip
               cursor={{
-                stroke: '#888',
+                stroke: 'var(--muted-foreground)',
                 strokeWidth: 1,
                 strokeDasharray: '4 4',
               }}
@@ -116,8 +131,8 @@ export default function IssuesTimeline() {
             <Area
               dataKey="vuls"
               type="basis"
-              fill="hsl(var(--primary) / 0.1)"
-              stroke="hsl(var(--primary))"
+              fill="url(#vulGradient)"
+              stroke="var(--chart-1)"
               strokeWidth={2}
               strokeLinejoin="round"
               strokeLinecap="round"

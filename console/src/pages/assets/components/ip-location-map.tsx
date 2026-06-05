@@ -49,6 +49,14 @@ export default function IpLocationMap({ geoIp }: IpLocationMapProps) {
           url={`https://c.basemaps.cartocdn.com/${mapTheme}/{z}/{x}/{y}.png`}
         />
       </MapContainer>
+      <div
+        className="absolute inset-0 z-1 pointer-events-none"
+        style={{
+          background: theme === 'dark' ? '#1e3a5f' : '#3b5bdb',
+          opacity: theme === 'dark' ? 0.3 : 0.1,
+          mixBlendMode: 'color',
+        }}
+      />
       <style>{`
         .blink-marker {
           animation: blink-animation 1.5s infinite;

@@ -1,4 +1,4 @@
-import { IssueStatusFilters } from '@/components/issues/issue-status-filters';
+import { StatusFilter } from '@/components/issues/status-filter';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -11,6 +11,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Tag } from 'lucide-react';
+import { type IssuesControllerGetManyStatusItem } from '@/services/apis/gen/queries';
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import ReactMarkdown from 'react-markdown';
@@ -42,7 +43,7 @@ const issueColumns: ColumnDef<Issue>[] = [
               <span>#{issue.no || issue.id?.slice(0, 8)}</span>
               <span>•</span>
               <span>
-                <span className="font-medium text-foreground hover:underline cursor-pointer">
+                <span className="font-medium hover:underline cursor-pointer">
                   {issue.createdBy?.name || 'Unknown'}
                 </span>{' '}
                 opened {dayjs(issue.createdAt).fromNow()}
@@ -89,9 +90,15 @@ export function ListIssues() {
   });
 
   // State for status filter
-  const [statusFilters, setStatusFilters] = useState<('open' | 'closed')[]>([
-    'open',
-  ]);
+  const [statusFilter, setStatusFilter] = useState<
+    IssuesControllerGetManyStatusItem | 'all'
+  >('open');
+
+  const handleStatusFilterChange = (
+    value: IssuesControllerGetManyStatusItem | 'all',
+  ) => {
+    setStatusFilter(value);
+  };
 
   const { data, isLoading } = useIssuesControllerGetMany(
     {
@@ -101,8 +108,8 @@ export function ListIssues() {
       sortOrder,
       // Pass the filter/search parameter to the API call
       search: filter,
-      // Add status filter if selected - convert to array as expected by API
-      ...(statusFilters.length > 0 && { status: statusFilters }),
+      // Add status filter - convert to array as expected by API
+      ...(statusFilter !== 'all' && { status: [statusFilter] }),
     },
     {
       query: {
@@ -113,7 +120,7 @@ export function ListIssues() {
           sortBy,
           sortOrder,
           filter,
-          statusFilters,
+          statusFilter,
         ],
       },
     },
@@ -138,9 +145,10 @@ export function ListIssues() {
       onPageChange={setPage}
       onPageSizeChange={setPageSize}
       toolbarComponents={[
-        <IssueStatusFilters
-          onStatusChange={setStatusFilters}
-          defaultStatus="open"
+        <StatusFilter
+          key="status-filter"
+          value={statusFilter}
+          onValueChange={handleStatusFilterChange}
         />,
       ]}
       isShowHeader={false}

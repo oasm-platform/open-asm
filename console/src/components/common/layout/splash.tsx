@@ -59,9 +59,9 @@ export default function Splash({ children }: SplashProps) {
 
   if (showError) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen">
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
         <Logo width={64} height={64} />
-        <div className="mt-4 text-red-500 text-center">
+        <div className="text-destructive text-center text-sm">
           Loading failed after 5 attempts. Please refresh the page.
         </div>
       </div>

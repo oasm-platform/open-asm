@@ -114,10 +114,10 @@ export default function Statistic() {
                 <div
                   className={`flex items-center text-sm ${
                     card.trend.isIncreasing
-                      ? 'text-green-500'
+                      ? 'text-success'
                       : card.trend.isDecreasing
-                        ? 'text-red-500'
-                        : 'text-gray-500'
+                        ? 'text-destructive'
+                        : 'text-muted-foreground'
                   }`}
                 >
                   {card.trend.isIncreasing ? (
@@ -143,11 +143,31 @@ export default function Statistic() {
                   data={chartData}
                   margin={{ top: 10, right: 0, left: 0, bottom: 5 }}
                 >
+                  <defs>
+                    <linearGradient
+                      id={`gradient-${index}`}
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="0%"
+                        stopColor="var(--chart-1)"
+                        stopOpacity={0.3}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor="var(--chart-1)"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
                   <Area
                     type="basis"
                     dataKey={card.field}
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary) / 0.1)"
+                    stroke="var(--chart-1)"
+                    fill={`url(#gradient-${index})`}
                     strokeWidth={2}
                     strokeLinejoin="round"
                     strokeLinecap="round"

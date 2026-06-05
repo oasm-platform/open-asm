@@ -1,4 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/services/apis/gen/queries';
@@ -18,11 +24,11 @@ interface VulnerabilityAsset {
 }
 
 const severityColors = {
-  info: 'bg-stone-500',
-  low: 'bg-yellow-500',
-  medium: 'bg-orange-500',
-  high: 'bg-red-500',
-  critical: 'bg-red-700',
+  info: 'bg-muted-foreground/40',
+  low: 'bg-chart-1',
+  medium: 'bg-chart-2',
+  high: 'bg-chart-3',
+  critical: 'bg-chart-5',
 };
 
 const severityOrder = ['info', 'low', 'medium', 'high', 'critical'] as const;
@@ -125,9 +131,12 @@ const TopAssetsVulnerabilitiesTable = () => {
   }
 
   return (
-    <Card className="py-3 pt-6">
+    <Card className="py-3 pt-6 h-full">
       <CardHeader>
         <CardTitle>Top assets with most vulnerabilities</CardTitle>
+        <CardDescription>
+          10 assets with the highest number of vulnerabilities
+        </CardDescription>
       </CardHeader>
       <CardContent className="p-4 py-0">
         <DataTable

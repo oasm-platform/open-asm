@@ -31,8 +31,8 @@ export default defineConfig(({ mode }) => {
           scope: '/',
           start_url: '/',
           lang: 'en',
-          theme_color: '#2563eb',
-          background_color: '#ffffff',
+          theme_color: '#3b5bdb',
+          background_color: '#fbfbfd',
           display: 'standalone',
           orientation: 'portrait-primary',
           icons: [
