@@ -73,18 +73,22 @@ export default function Runs() {
     );
   }, [jobHistoryDetail?.jobs]);
 
-  const { data: paginatedJobsData } =
-    useJobsRegistryControllerGetManyJobs({
-      page: tableParams.page,
-      limit: tableParams.pageSize,
-      sortBy: tableParams.sortBy,
-      sortOrder: tableParams.sortOrder,
-      jobHistoryId: jobHistoryId || '',
-    }, {
-      query: {
-        refetchInterval: hasActiveJobs ? 1000 : false,
-      },
-    });
+  const {
+    data: paginatedJobsData,
+    isLoading: isLoadingJobs,
+    error: jobsError,
+    queryKey: paginatedJobsQueryKey,
+  } = useJobsRegistryControllerGetManyJobs({
+    page: tableParams.page,
+    limit: tableParams.pageSize,
+    sortBy: tableParams.sortBy,
+    sortOrder: tableParams.sortOrder,
+    jobHistoryId: jobHistoryId || '',
+  }, {
+    query: {
+      refetchInterval: hasActiveJobs ? 1000 : false,
+    },
+  });
 
   // Memoize jobs grouped by tool ID for efficient lookups
   // Uses full unpaginated list from jobHistoryDetail for correct pipeline indicators
@@ -239,7 +243,7 @@ export default function Runs() {
                               ],
                             });
                             queryClient.invalidateQueries({
-                              queryKey: ['JobsRegistryControllerGetManyJobs'],
+                              queryKey: paginatedJobsQueryKey,
                             });
                           },
                         },
@@ -267,7 +271,7 @@ export default function Runs() {
                             ],
                           });
                           queryClient.invalidateQueries({
-                            queryKey: ['JobsRegistryControllerGetManyJobs'],
+                            queryKey: paginatedJobsQueryKey,
                           });
                         },
                       },
@@ -406,10 +410,17 @@ export default function Runs() {
         </div>
       )}
 
+      {jobsError && (
+        <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
+          Failed to load jobs. Please try again.
+        </div>
+      )}
+
       <DataTable
         isShowHeader={false}
         columns={columns}
         data={paginatedJobsData?.data || []}
+        isLoading={isLoadingJobs}
         showColumnVisibility={true}
         showPagination={true}
         page={paginatedJobsData?.page || 1}
@@ -435,7 +446,7 @@ export default function Runs() {
             <DialogTitle>{jobError && getTitle(jobError)}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto pr-2 -mr-2 space-y-3">
-            {jobError?.errorLogs.map((errorLog, index) => (
+            {jobError?.errorLogs?.map((errorLog, index) => (
               <div
                 className="rounded-lg border bg-muted/50 p-3"
                 key={errorLog.id}
