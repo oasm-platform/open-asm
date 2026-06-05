@@ -102,7 +102,7 @@ describe('WorkersService', () => {
       updateAlive: jest.fn(),
       getActiveWorkerIds: jest.fn().mockReturnValue(new Set()),
       getActiveStreamCount: jest.fn().mockReturnValue(0),
-    } as any;
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

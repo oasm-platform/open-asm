@@ -8,6 +8,11 @@ import { IssueComment } from './issue-comment.entity';
 
 @Entity('issues')
 @Index('IDX_issues_workspaceId_status', ['workspace', 'status'])
+@Index(
+  'IDX_issues_sourceType_sourceId_workspaceId_open',
+  ['sourceType', 'sourceId', 'workspaceId'],
+  { where: "status = 'open' AND \"sourceType\" IS NOT NULL AND \"sourceId\" IS NOT NULL" },
+)
 export class Issue extends BaseEntity {
   @ApiProperty()
   @Column()

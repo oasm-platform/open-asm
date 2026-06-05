@@ -44,16 +44,13 @@ describe('IssuesService', () => {
   };
 
   beforeEach(async () => {
-    // Create mock job that simulates the async behavior
-    // The service uses polling with setTimeout, so we need to mock multiple calls
-    // The service will call getState() multiple times until it returns 'completed'
-    // We need to ensure it returns 'completed' after the first 'active' state
     const mockJob = {
       id: 'mock-job-id',
+      returnvalue: mockIssue,
       getState: jest
         .fn()
-        .mockResolvedValueOnce('active') // First call returns 'active'
-        .mockResolvedValueOnce('completed'), // Second call returns 'completed'
+        .mockResolvedValueOnce('active')
+        .mockResolvedValueOnce('completed'),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -135,8 +132,82 @@ describe('IssuesService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('findExistingOpenIssueBySource', () => {
+    it('should return existing open issue when found', async () => {
+      const existingIssue = {
+        ...mockIssue,
+        sourceId: 'vuln-123',
+        sourceType: IssueSourceType.VULNERABILITY,
+      };
+
+      jest
+        .spyOn(repository, 'findOne')
+        .mockResolvedValue(existingIssue as Issue);
+
+      const result = await service.findExistingOpenIssueBySource(
+        'vuln-123',
+        IssueSourceType.VULNERABILITY,
+        mockIssue.workspaceId,
+      );
+
+      expect(result).toEqual(existingIssue);
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: {
+          sourceId: 'vuln-123',
+          sourceType: IssueSourceType.VULNERABILITY,
+          workspaceId: mockIssue.workspaceId,
+          status: IssueStatus.OPEN,
+        },
+      });
+    });
+
+    it('should return null when no existing open issue found', async () => {
+      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
+
+      const result = await service.findExistingOpenIssueBySource(
+        'vuln-456',
+        IssueSourceType.VULNERABILITY,
+        mockIssue.workspaceId,
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('createIssue', () => {
-    it('should create a new issue', async () => {
+    it('should return existing open issue instead of creating duplicate', async () => {
+      const createIssueDto = {
+        title: 'Test Issue',
+        description: 'Test Description',
+        sourceId: 'vuln-123',
+        sourceType: IssueSourceType.VULNERABILITY,
+      };
+      const userId = '123e4567-e89b-12d3-a456-426614174002';
+      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
+
+      const existingIssue = {
+        ...mockIssue,
+        sourceId: 'vuln-123',
+        sourceType: IssueSourceType.VULNERABILITY,
+      };
+
+      // First call: check for existing issue → returns existing
+      // Second call (inside timeout fallback): also returns existing
+      jest
+        .spyOn(repository, 'findOne')
+        .mockResolvedValue(existingIssue as Issue);
+
+      const result = await service.createIssue(
+        createIssueDto,
+        workspaceId,
+        userId,
+      );
+
+      expect(result).toEqual(existingIssue);
+      // Queue add should NOT be called since we short-circuit
+    });
+
+    it('should create a new issue when no duplicate exists', async () => {
       const createIssueDto = {
         title: 'Test Issue',
         description: 'Test Description',
@@ -144,16 +215,9 @@ describe('IssuesService', () => {
       const userId = '123e4567-e89b-12d3-a456-426614174002';
       const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
 
-      // Mock the repository to return the created issue
-      // The service calls findOne twice: first to check for existing issues (with where clause)
-      // and second to get the last created issue (with order by no DESC)
       jest.spyOn(repository, 'findOne').mockImplementation((options: any) => {
-        if (options.where && options.order && options.order.no === 'DESC') {
-          // This is the call to get the last issue by no DESC
+        if (options.where && options.where.id) {
           return Promise.resolve(mockIssue as Issue);
-        } else if (options.where && !options.order) {
-          // This is the call to check if issue already exists
-          return Promise.resolve(null);
         }
         return Promise.resolve(null);
       });
@@ -180,14 +244,9 @@ describe('IssuesService', () => {
         tags: ['tag1', 'tag2', 'tag3'],
       };
 
-      // Mock the repository to return the created issue with tags
       jest.spyOn(repository, 'findOne').mockImplementation((options: any) => {
-        if (options.where && options.order && options.order.no === 'DESC') {
-          // This is the call to get the last issue by no DESC
+        if (options.where && options.where.id) {
           return Promise.resolve(mockIssueWithTags as Issue);
-        } else if (options.where && !options.order) {
-          // This is the call to check if issue already exists
-          return Promise.resolve(null);
         }
         return Promise.resolve(null);
       });
@@ -199,6 +258,31 @@ describe('IssuesService', () => {
       );
       expect(result).toEqual(mockIssueWithTags);
       expect(result.tags).toEqual(['tag1', 'tag2', 'tag3']);
+    });
+
+    it('should create a new issue when source has no match', async () => {
+      const createIssueDto = {
+        title: 'Test Issue',
+        description: 'Test Description',
+        sourceId: 'vuln-new',
+        sourceType: IssueSourceType.VULNERABILITY,
+      };
+      const userId = '123e4567-e89b-12d3-a456-426614174002';
+      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
+
+      jest.spyOn(repository, 'findOne').mockImplementation((options: any) => {
+        if (options.where && options.where.id) {
+          return Promise.resolve(mockIssue as Issue);
+        }
+        return Promise.resolve(null);
+      });
+
+      const result = await service.createIssue(
+        createIssueDto,
+        workspaceId,
+        userId,
+      );
+      expect(result).toEqual(mockIssue);
     });
   });
 

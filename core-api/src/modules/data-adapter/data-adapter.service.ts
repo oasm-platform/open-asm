@@ -277,20 +277,40 @@ export class DataAdapterService {
       );
 
       if (vulsForAlert.length > 0) {
-        await Promise.all(
-          vulsForAlert.map((v) =>
-            this.issuesService.createIssue(
-              {
-                title: `[${v.severity.charAt(0).toUpperCase() + v.severity.slice(1).toLowerCase()}] ${v.name}`,
-                description: v.description,
-                sourceId: v.id,
-                sourceType: IssueSourceType.VULNERABILITY,
-              },
-              job.jobHistory.workflow?.workspace.id,
-              BOT_ID,
-            ),
-          ),
+        const workspaceId = job.jobHistory.workflow?.workspace.id;
+
+        const vulnsWithoutExistingIssue = await Promise.all(
+          vulsForAlert.map(async (v) => {
+            const existing =
+              await this.issuesService.findExistingOpenIssueBySource(
+                v.id,
+                IssueSourceType.VULNERABILITY,
+                workspaceId,
+              );
+            return existing ? null : v;
+          }),
         );
+
+        const newVulsForAlert = vulnsWithoutExistingIssue.filter(
+          (v): v is Vulnerability => v !== null,
+        );
+
+        if (newVulsForAlert.length > 0) {
+          await Promise.all(
+            newVulsForAlert.map((v) =>
+              this.issuesService.createIssue(
+                {
+                  title: `[${v.severity.charAt(0).toUpperCase() + v.severity.slice(1).toLowerCase()}] ${v.name}`,
+                  description: v.description,
+                  sourceId: v.id,
+                  sourceType: IssueSourceType.VULNERABILITY,
+                },
+                workspaceId,
+                BOT_ID,
+              ),
+            ),
+          );
+        }
       }
     });
   }
