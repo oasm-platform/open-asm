@@ -491,7 +491,10 @@ describe('DataAdapterService', () => {
         updatedAt: new Date(),
       },
       assetServiceId: null,
-      jobHistory: { id: 'history-id' },
+      jobHistory: {
+        id: 'history-id',
+        workflow: { workspace: { id: 'workspace-id' } },
+      },
       tool: { id: 'tool-id', category: ToolCategory.VULNERABILITIES },
       category: ToolCategory.VULNERABILITIES,
       createdAt: new Date(),
