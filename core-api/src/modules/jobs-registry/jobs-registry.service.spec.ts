@@ -465,9 +465,6 @@ describe('JobsRegistryService', () => {
           workflow: true,
           jobs: {
             tool: true,
-            asset: { target: true },
-            assetService: true,
-            errorLogs: true,
           },
         },
       });
@@ -478,7 +475,6 @@ describe('JobsRegistryService', () => {
         createdAt: mockJobHistory.createdAt,
         updatedAt: mockJobHistory.updatedAt,
         tools: [{ name: 'test-tool' }],
-        jobs: mockJobs,
       });
     });
 

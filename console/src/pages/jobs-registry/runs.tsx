@@ -63,15 +63,24 @@ export default function Runs() {
       },
     });
 
+  // Fetch all jobs for pipeline indicators (without pagination)
+  const { data: allJobsData } = useJobsRegistryControllerGetManyJobs({
+    page: 1,
+    limit: 1000,
+    sortBy: 'createdAt',
+    sortOrder: 'ASC',
+    jobHistoryId: jobHistoryId || '',
+  });
+
   // Check if any jobs are still in progress (pending or in_progress)
   const hasActiveJobs = useMemo(() => {
-    const jobs = jobHistoryDetail?.jobs || [];
+    const jobs = allJobsData?.data || [];
     return jobs.some(
       (job) =>
         job.status === JobStatus.pending ||
         job.status === JobStatus.in_progress,
     );
-  }, [jobHistoryDetail?.jobs]);
+  }, [allJobsData?.data]);
 
   const {
     data: paginatedJobsData,
@@ -91,9 +100,9 @@ export default function Runs() {
   });
 
   // Memoize jobs grouped by tool ID for efficient lookups
-  // Uses full unpaginated list from jobHistoryDetail for correct pipeline indicators
+  // Uses all jobs for correct pipeline indicators
   const jobsByToolId = useMemo(() => {
-    const jobs = jobHistoryDetail?.jobs || [];
+    const jobs = allJobsData?.data || [];
     return jobs.reduce((acc, job) => {
       if (!job.tool) {
         return acc;
@@ -105,7 +114,7 @@ export default function Runs() {
       acc.get(toolId)!.push(job);
       return acc;
     }, new Map<string, Job[]>());
-  }, [jobHistoryDetail?.jobs]);
+  }, [allJobsData?.data]);
 
   const getTitle = (row: Job) => {
     const value = row?.assetService

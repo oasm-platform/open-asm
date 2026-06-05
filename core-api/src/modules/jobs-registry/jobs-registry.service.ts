@@ -939,11 +939,6 @@ export class JobsRegistryService {
         workflow: true,
         jobs: {
           tool: true,
-          asset: {
-            target: true,
-          },
-          assetService: true,
-          errorLogs: true,
         },
       },
     });
@@ -985,7 +980,6 @@ export class JobsRegistryService {
       id: historyId,
       createdAt,
       updatedAt,
-      jobs,
       workflow,
       jobHistoryName,
     } = jobHistory;
@@ -997,7 +991,6 @@ export class JobsRegistryService {
       createdAt,
       updatedAt,
       tools,
-      jobs: jobs || [],
     };
   }
 
