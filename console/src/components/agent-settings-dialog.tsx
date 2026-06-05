@@ -54,7 +54,7 @@ export function AgentSettingsDialog({
 }: AgentSettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="inset-0 w-full h-full max-w-none rounded-none translate-x-0 translate-y-0 sm:max-w-3xl sm:w-full sm:h-[80vh] sm:rounded-xl sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] flex flex-col gap-0 px-4 py-4 sm:p-0 overflow-hidden">
+      <DialogContent className="inset-0 w-full h-full max-w-none rounded-none translate-x-0 translate-y-0 sm:max-w-3xl sm:w-full sm:h-[80vh] sm:rounded-xl sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] flex flex-col gap-0 px-4 py-4 overflow-hidden">
         <DialogTitle className="sr-only">Agent Settings</DialogTitle>
 
         <Tabs
