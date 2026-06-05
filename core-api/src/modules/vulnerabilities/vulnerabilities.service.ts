@@ -107,6 +107,7 @@ export class VulnerabilitiesService {
       createdFrom,
       createdTo,
       tags,
+      targetId,
     } = query;
 
     const { sortBy } = query;
@@ -135,6 +136,10 @@ export class VulnerabilitiesService {
 
     if (targetIds) {
       queryBuilder.andWhere('targets.id IN (:...targetIds)', { targetIds });
+    }
+
+    if (targetId) {
+      queryBuilder.andWhere('targets.id = :targetId', { targetId });
     }
 
     // Add search query if provided

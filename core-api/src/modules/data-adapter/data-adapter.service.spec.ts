@@ -76,6 +76,7 @@ describe('DataAdapterService', () => {
           provide: IssuesService,
           useValue: {
             createIssue: jest.fn(),
+            findExistingOpenIssueBySource: jest.fn().mockResolvedValue(null),
           },
         },
         {
@@ -490,7 +491,10 @@ describe('DataAdapterService', () => {
         updatedAt: new Date(),
       },
       assetServiceId: null,
-      jobHistory: { id: 'history-id' },
+      jobHistory: {
+        id: 'history-id',
+        workflow: { workspace: { id: 'workspace-id' } },
+      },
       tool: { id: 'tool-id', category: ToolCategory.VULNERABILITIES },
       category: ToolCategory.VULNERABILITIES,
       createdAt: new Date(),
@@ -559,6 +563,159 @@ describe('DataAdapterService', () => {
       expect(mockQueryBuilder.orUpdate).toHaveBeenCalled();
       expect(mockQueryBuilder.returning).toHaveBeenCalledWith('*');
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
+    });
+
+    it('should not create duplicate issues for existing open issues', async () => {
+      const mockIssuesService = {
+        createIssue: jest.fn(),
+        findExistingOpenIssueBySource: jest.fn(),
+      };
+
+      const moduleWithMockIssues = await Test.createTestingModule({
+        providers: [
+          DataAdapterService,
+          {
+            provide: DataSource,
+            useValue: mockDataSource,
+          },
+          {
+            provide: WorkspacesService,
+            useValue: mockWorkspacesService,
+          },
+          {
+            provide: IssuesService,
+            useValue: mockIssuesService,
+          },
+          {
+            provide: StorageService,
+            useValue: {
+              uploadFile: jest.fn().mockReturnValue({ path: 'mock/path.png' }),
+              getFile: jest.fn(),
+              deleteFile: jest.fn(),
+              forwardImage: jest.fn(),
+              readJsonFile: jest.fn(),
+            },
+          },
+        ],
+      }).compile();
+
+      const serviceWithMock = moduleWithMockIssues.get<DataAdapterService>(
+        DataAdapterService,
+      );
+
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      const mockQueryBuilder = {
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: mockVulnerabilities,
+          identifiers: mockVulnerabilities.map((v) => ({ id: v.id })),
+        }),
+      };
+
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      // Mock that an open issue already exists for this vulnerability
+      mockIssuesService.findExistingOpenIssueBySource.mockResolvedValue({
+        id: 'existing-issue',
+      });
+
+      await serviceWithMock.vulnerabilities({
+        data: mockVulnerabilities,
+        job: mockJob,
+      });
+
+      // Should check for existing issue
+      expect(
+        mockIssuesService.findExistingOpenIssueBySource,
+      ).toHaveBeenCalled();
+      // Should NOT create a new issue since one already exists
+      expect(mockIssuesService.createIssue).not.toHaveBeenCalled();
+    });
+
+    it('should create issue when no existing open issue found', async () => {
+      const mockIssuesService = {
+        createIssue: jest.fn().mockResolvedValue({ id: 'new-issue' }),
+        findExistingOpenIssueBySource: jest.fn().mockResolvedValue(null),
+      };
+
+      const moduleWithMockIssues = await Test.createTestingModule({
+        providers: [
+          DataAdapterService,
+          {
+            provide: DataSource,
+            useValue: mockDataSource,
+          },
+          {
+            provide: WorkspacesService,
+            useValue: mockWorkspacesService,
+          },
+          {
+            provide: IssuesService,
+            useValue: mockIssuesService,
+          },
+          {
+            provide: StorageService,
+            useValue: {
+              uploadFile: jest.fn().mockReturnValue({ path: 'mock/path.png' }),
+              getFile: jest.fn(),
+              deleteFile: jest.fn(),
+              forwardImage: jest.fn(),
+              readJsonFile: jest.fn(),
+            },
+          },
+        ],
+      }).compile();
+
+      const serviceWithMock = moduleWithMockIssues.get<DataAdapterService>(
+        DataAdapterService,
+      );
+
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      const mockQueryBuilder = {
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: mockVulnerabilities,
+          identifiers: mockVulnerabilities.map((v) => ({ id: v.id })),
+        }),
+      };
+
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await serviceWithMock.vulnerabilities({
+        data: mockVulnerabilities,
+        job: mockJob,
+      });
+
+      // Should check for existing issue
+      expect(
+        mockIssuesService.findExistingOpenIssueBySource,
+      ).toHaveBeenCalled();
+      // Should create a new issue since none exists
+      expect(mockIssuesService.createIssue).toHaveBeenCalled();
     });
 
     it('should not insert vulnerabilities if data is empty', async () => {
