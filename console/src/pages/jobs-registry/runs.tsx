@@ -38,7 +38,7 @@ import {
   MoreHorizontal,
   X,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams({ strict: false });
@@ -64,22 +64,29 @@ export default function Runs() {
     });
 
   // Fetch all jobs for pipeline indicators (without pagination)
-  const { data: allJobsData } = useJobsRegistryControllerGetManyJobs({
+  const {
+    data: allJobsData,
+    error: allJobsError,
+  } = useJobsRegistryControllerGetManyJobs({
     page: 1,
-    limit: 1000,
+    limit: 100,
     sortBy: 'createdAt',
     sortOrder: 'ASC',
     jobHistoryId: jobHistoryId || '',
   });
 
   // Check if any jobs are still in progress (pending or in_progress)
+  // Always poll initially, stop when no active jobs remain
+  const hasActiveJobsRef = useRef(true);
   const hasActiveJobs = useMemo(() => {
     const jobs = allJobsData?.data || [];
-    return jobs.some(
+    const active = jobs.some(
       (job) =>
         job.status === JobStatus.pending ||
         job.status === JobStatus.in_progress,
     );
+    hasActiveJobsRef.current = active;
+    return active;
   }, [allJobsData?.data]);
 
   const {
@@ -428,6 +435,12 @@ export default function Runs() {
       {jobsError && (
         <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
           Failed to load jobs. Please try again.
+        </div>
+      )}
+
+      {allJobsError && (
+        <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
+          Failed to load pipeline status. Please try again.
         </div>
       )}
 
