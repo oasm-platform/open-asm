@@ -1,7 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 
-import { CodeBlock } from '@/components/common/code-block';
 import Page from '@/components/common/page';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
@@ -416,22 +415,42 @@ export default function Runs() {
         }}
       />
       <Dialog open={!!jobError} onOpenChange={() => setJobError(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[80vh] flex flex-col max-w-2xl">
           <DialogHeader>
             <DialogTitle>{jobError && getTitle(jobError)}</DialogTitle>
-            {jobError?.errorLogs.map((errorLog) => (
-              <div className="mb-1 flex flex-col border-b-2" key={errorLog.id}>
-                <CodeBlock
-                  language="Payload"
-                  value={String(errorLog.payload).replace(/\n$/, '')}
-                />
-                <CodeBlock
-                  language="Log Message"
-                  value={String(errorLog.logMessage).replace(/\n$/, '')}
-                />
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-2 -mr-2 space-y-3">
+            {jobError?.errorLogs.map((errorLog, index) => (
+              <div
+                className="rounded-lg border bg-muted/50 p-3"
+                key={errorLog.id}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Error {index + 1}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1">
+                      Payload
+                    </span>
+                    <pre className="text-sm font-mono bg-background rounded p-2 overflow-x-auto">
+                      {String(errorLog.payload).replace(/\n$/, '')}
+                    </pre>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1">
+                      Message
+                    </span>
+                    <pre className="text-sm font-mono bg-background rounded p-2 overflow-x-auto text-destructive">
+                      {String(errorLog.logMessage).replace(/\n$/, '')}
+                    </pre>
+                  </div>
+                </div>
               </div>
             ))}
-          </DialogHeader>
+          </div>
         </DialogContent>
       </Dialog>
     </Page>
