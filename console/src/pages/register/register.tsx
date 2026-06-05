@@ -1,6 +1,5 @@
 import AuthLayout from '@/components/common/layout/auth-layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -66,74 +65,80 @@ export default function Register() {
 
   return (
     <AuthLayout>
-      <div className="w-full lg:w-1/2 flex items-center justify-center bg-card p-6">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-2xl">
-              Create your first admin account
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-6"
+      <div className="flex w-full items-center justify-center bg-background px-6 py-12 lg:w-1/2">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="space-y-2 text-center lg:text-left">
+            <h1 className="text-balance text-2xl font-semibold tracking-tight">
+              Create your first admin
+            </h1>
+            <p className="text-pretty text-sm text-muted-foreground">
+              Set up the workspace administrator account.
+            </p>
+          </div>
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-5"
+            >
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="email@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                disabled={loading}
+                type="submit"
+                className="w-full"
+                size="lg"
               >
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="email@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button disabled={loading} type="submit" className="w-full">
-                  {loading && <Loader2Icon className="animate-spin" />}
-                  Sign Up
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+                {loading && <Loader2Icon className="animate-spin" />}
+                Create account
+              </Button>
+            </form>
+          </Form>
+        </div>
       </div>
     </AuthLayout>
   );

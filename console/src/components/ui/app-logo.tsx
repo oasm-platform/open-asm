@@ -19,13 +19,17 @@ export default function AppLogo({ type }: AppLogoProps) {
     },
   });
   return (
-    <Link to={'/'} className="flex h-13 justify-start items-center gap-2 shrink-0">
+    <Link to={'/'} className="flex h-13 items-center justify-start gap-2.5 shrink-0">
       <Logo
         logoPath={metadata?.logoPath as string}
-        width={type === 'small' ? 25 : 30}
-        height={type === 'small' ? 25 : 30}
+        width={type === 'small' ? 26 : 30}
+        height={type === 'small' ? 26 : 30}
       />
-      {showName && <b className="text-xl truncate">{metadata?.name || 'OASM'}</b>}
+      {showName && (
+        <span className="truncate text-[15px] font-semibold tracking-tight text-foreground">
+          {metadata?.name || 'OASM'}
+        </span>
+      )}
     </Link>
   );
 }

@@ -48,8 +48,10 @@ export function ThemeProvider({
     root.classList.add(activeTheme);
 
     // Update meta theme-color for mobile status bar
-    const themeColor = activeTheme === 'dark' ? '#0a0a0a' : '#ffffff';
-    let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    const themeColor = activeTheme === 'dark' ? '#0a1024' : '#fbfbfd';
+    let metaThemeColor = document.querySelector(
+      'meta[name="theme-color"]:not([media])',
+    );
 
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');

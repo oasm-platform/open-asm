@@ -18,11 +18,11 @@ interface VulnerabilityAsset {
 }
 
 const severityColors = {
-  info: 'bg-stone-500',
-  low: 'bg-yellow-500',
-  medium: 'bg-orange-500',
-  high: 'bg-red-500',
-  critical: 'bg-red-700',
+  info: 'bg-muted-foreground/40',
+  low: 'bg-chart-1',
+  medium: 'bg-chart-2',
+  high: 'bg-chart-3',
+  critical: 'bg-chart-5',
 };
 
 const severityOrder = ['info', 'low', 'medium', 'high', 'critical'] as const;

@@ -13,23 +13,23 @@ export function HeaderBar() {
   const { workspaces } = useWorkspaceSelector();
   const isHasWorkspace = workspaces?.length > 0;
   return (
-    <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
       {isHasWorkspace ? (
-        <div className="flex w-full items-center justify-between">
-          <div className="mr-auto flex gap-3 items-center">
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <SidebarTrigger className="max-md:scale-125" />
             {isMobile && <AppLogo type="small" />}
           </div>
-          <div className="w-full flex justify-center">
-            <SearchForm className="w-1/2" />
+          <div className="flex flex-1 justify-center">
+            <SearchForm className="w-full max-w-xl" />
           </div>
-          <div className="ml-auto flex gap-3 items-center">
+          <div className="flex items-center gap-1">
             <ThemeSwitch />
             <NotificationBell />
           </div>
         </div>
       ) : (
-        <div className="flex justify-end w-full">
+        <div className="flex w-full items-center justify-end gap-2">
           <AppLogo type="small" />
           <div className="ml-auto">
             <NavUser isOnlyAvatar dropdownSide="bottom" />

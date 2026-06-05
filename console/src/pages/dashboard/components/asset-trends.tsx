@@ -21,11 +21,11 @@ import { useStatisticControllerGetTimelineStatistics } from '@/services/apis/gen
 import { format } from 'date-fns';
 
 const chartConfig = {
-  assets: { label: 'Assets', color: '#8b5cf6' },
-  techs: { label: 'Technologies', color: '#3b82f6' },
-  ports: { label: 'Ports', color: '#14b8a6' },
-  services: { label: 'Services', color: '#f59e0b' },
-  targets: { label: 'Targets', color: '#f43f5e' },
+  assets: { label: 'Assets', color: 'var(--chart-2)' },
+  techs: { label: 'Technologies', color: 'var(--chart-1)' },
+  ports: { label: 'Ports', color: 'var(--chart-4)' },
+  services: { label: 'Services', color: 'var(--chart-3)' },
+  targets: { label: 'Targets', color: 'var(--chart-5)' },
 } satisfies ChartConfig;
 
 const metricsOrder = [
@@ -90,8 +90,8 @@ export function AssetTrends() {
             <CartesianGrid
               vertical={false}
               strokeDasharray="3 3"
-              stroke="#444"
-              opacity={0.3}
+              stroke="var(--border)"
+              opacity={0.5}
             />
 
             <XAxis
@@ -99,13 +99,13 @@ export function AssetTrends() {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tick={{ fill: '#888', fontSize: 12 }}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tick={{ fill: '#888', fontSize: 12 }}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
               tickFormatter={(value) =>
                 new Intl.NumberFormat('en-US', {
                   notation: 'compact',
@@ -114,7 +114,7 @@ export function AssetTrends() {
               }
             />
             <ChartTooltip
-              cursor={{ stroke: '#555' }}
+              cursor={{ stroke: 'var(--muted-foreground)' }}
               content={<ChartTooltipContent />}
             />
 
@@ -139,8 +139,8 @@ export function AssetTrends() {
           </LineChart>
         </ChartContainer>
 
-        <div className="flex items-center gap-6 mt-6 pt-4 border-t border-[#333] text-sm">
-          <span className="text-gray-500 text-xs">Current</span>
+        <div className="flex items-center gap-6 mt-6 pt-4 border-t border-border text-sm">
+          <span className="text-muted-foreground text-xs">Current</span>
           {metricsOrder.map((key) => {
             const { label, color } = chartConfig[key];
             const isVisible = visibleMetrics[key];

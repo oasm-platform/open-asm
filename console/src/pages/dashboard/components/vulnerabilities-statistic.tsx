@@ -15,15 +15,15 @@ export default function VulnerabilityStatistic() {
   const getSeverityColorClass = (severity: string) => {
     switch (severity) {
       case 'critical':
-        return 'text-red-500';
+        return 'text-[color:var(--chart-5)]';
       case 'high':
-        return 'text-orange-500';
+        return 'text-[color:var(--chart-3)]';
       case 'medium':
-        return 'text-yellow-500';
+        return 'text-[color:var(--chart-4)]';
       case 'low':
-        return 'text-blue-500';
+        return 'text-[color:var(--chart-1)]';
       case 'info':
-        return 'text-gray-500';
+        return 'text-muted-foreground';
       default:
         return '';
     }
@@ -74,7 +74,7 @@ export default function VulnerabilityStatistic() {
     if (!trend) return null;
     return (
       <div
-        className={`flex items-center text-sm ${trend.isIncreasing ? 'text-green-500' : trend.isDecreasing ? 'text-red-500' : 'text-gray-500'}`}
+        className={`flex items-center text-sm ${trend.isIncreasing ? 'text-success' : trend.isDecreasing ? 'text-destructive' : 'text-muted-foreground'}`}
       >
         {trend.isIncreasing ? (
           <TrendingUp className="h-4 w-4 mr-1" />

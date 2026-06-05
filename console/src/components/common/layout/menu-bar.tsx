@@ -160,7 +160,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <WorkspaceSwitcher />
         )}
       </SidebarHeader>
-      <SidebarContent className="gap-1 md:gap-3">
+      <SidebarContent className="gap-1 px-2 py-2 md:gap-4">
         {menu
           .filter(
             (item) =>
@@ -169,12 +169,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               (data?.user.role != null && item.roles.includes(data.user.role)),
           )
           .map((item) => (
-            <SidebarGroup key={item.title} className="py-0">
+            <SidebarGroup key={item.title} className="p-0">
               <SidebarGroupContent>
-                <SidebarGroupLabel className="font-bold text-md">
+                <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
                   {item.title}
                 </SidebarGroupLabel>
-                <SidebarMenu className="gap-0.5">
+                <SidebarMenu className="mt-1 gap-0.5">
                   {item.items.map((item) => {
                     // Ensure all URLs are absolute for comparison
                     const toUrl = item.url;
@@ -186,15 +186,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           asChild
                           isActive={isActive}
                           tooltip={item.title}
-                          className="hover:cursor-pointer"
+                          className="h-9 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--primary)_18%,transparent)]"
                         >
                           <Link
                             to={toUrl}
                             onClick={() => setOpenMobile(false)}
-                            className="flex items-center justify-start w-full h-full text-base"
+                            className="flex w-full items-center justify-start"
                           >
-                            {item.icon} {item.title}{' '}
-                            {item.isNew && <NewBadge />}
+                            {item.icon}{' '}
+                            <span className="truncate">{item.title}</span>
+                            {item.isNew && (
+                              <span className="ml-auto">
+                                <NewBadge />
+                              </span>
+                            )}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
