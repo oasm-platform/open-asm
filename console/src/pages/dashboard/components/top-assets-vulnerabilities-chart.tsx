@@ -1,4 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/services/apis/gen/queries';
@@ -128,6 +134,9 @@ const TopAssetsVulnerabilitiesTable = () => {
     <Card className="py-3 pt-6 h-full">
       <CardHeader>
         <CardTitle>Top assets with most vulnerabilities</CardTitle>
+        <CardDescription>
+          10 assets with the highest number of vulnerabilities
+        </CardDescription>
       </CardHeader>
       <CardContent className="p-4 py-0">
         <DataTable

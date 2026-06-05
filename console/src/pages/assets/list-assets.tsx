@@ -62,8 +62,8 @@ export function ListAssets() {
         ...prev,
         tab: value,
         page: 1,
-      })) as any,
-    }); // eslint-disable-line @typescript-eslint/no-explicit-any
+      })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    });
   };
 
   if (workspaces.length === 0) return <CreateWorkspace />;
