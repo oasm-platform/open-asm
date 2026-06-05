@@ -49,7 +49,7 @@ export default function AgentPromptInput({
 
   return (
     <div className={className}>
-      <PromptInput onSubmit={handleSubmit} className="w-full shadow-sm">
+      <PromptInput onSubmit={handleSubmit} className="w-full">
         <PromptInputBody>
           <PromptInputTextarea
             value={input}
