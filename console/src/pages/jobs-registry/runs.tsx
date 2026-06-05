@@ -38,7 +38,7 @@ import {
   MoreHorizontal,
   X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams({ strict: false });
@@ -99,22 +99,33 @@ export default function Runs() {
     },
   });
 
-  // Memoize jobs grouped by tool ID for efficient lookups
-  // Uses all jobs for correct pipeline indicators
+  // Memoize jobs grouped by tool ID for efficient lookups, with name-based fallback
   const jobsByToolId = useMemo(() => {
     const jobs = allJobsData?.data || [];
-    return jobs.reduce((acc, job) => {
-      if (!job.tool) {
-        return acc;
-      }
-      const toolId = job.tool.id;
-      if (!acc.has(toolId)) {
-        acc.set(toolId, []);
-      }
-      acc.get(toolId)!.push(job);
-      return acc;
-    }, new Map<string, Job[]>());
+    const byId = new Map<string, Job[]>();
+    const byName = new Map<string, Job[]>();
+    jobs.forEach((job) => {
+      if (!job.tool) return;
+      const id = job.tool.id;
+      if (!byId.has(id)) byId.set(id, []);
+      byId.get(id)!.push(job);
+      const name = job.tool.name.toLowerCase();
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name)!.push(job);
+    });
+    return { byId, byName };
   }, [allJobsData?.data]);
+
+  // Get jobs for a tool, matching by ID first then by name as fallback
+  const getJobsForTool = useCallback((toolId: string, toolName?: string): Job[] => {
+    if (!jobsByToolId) return [];
+    const byId = jobsByToolId.byId.get(toolId);
+    if (byId) return byId;
+    if (toolName) {
+      return jobsByToolId.byName.get(toolName.toLowerCase()) || [];
+    }
+    return [];
+  }, [jobsByToolId]);
 
   const getTitle = (row: Job) => {
     const value = row?.assetService
@@ -310,37 +321,33 @@ export default function Runs() {
       // Check if any previous tool in the workflow is still running or waiting
       for (let i = 0; i < toolIndex; i++) {
         const prevTool = tools[i];
-        // Check if prevTool exists before accessing its id
         if (!prevTool) {
           console.warn(`Previous tool is undefined at index: ${i}`);
           continue;
         }
-        const prevToolJobs = jobsByToolId.get(prevTool.id) || [];
+        const prevToolJobs = getJobsForTool(prevTool.id, prevTool.name);
 
         if (prevToolJobs.length > 0) {
           const hasPrevRunning = prevToolJobs.some(
             (job) => job.status === JobStatus.in_progress,
           );
-          if (hasPrevRunning) return 'pending'; // Changed from 'running' to 'pending'
+          if (hasPrevRunning) return 'pending';
 
           const allPrevCompleted = prevToolJobs.every(
             (job) => job.status === JobStatus.completed,
           );
-          if (!allPrevCompleted) return 'pending'; // Changed from 'running' to 'pending'
+          if (!allPrevCompleted) return 'pending';
         }
-        // If previous tool has no jobs or is completed, continue to check current tool
       }
 
       // Check current tool jobs
       const currentTool = tools[toolIndex];
-      // Check if currentTool exists before accessing its id
       if (!currentTool) {
         console.warn(`Current tool is undefined at index: ${toolIndex}`);
         return 'pending';
       }
-      const currentToolJobs = jobsByToolId.get(currentTool.id) || [];
+      const currentToolJobs = getJobsForTool(currentTool.id, currentTool.name);
 
-      // If current tool has no jobs yet, it's pending
       if (currentToolJobs.length === 0) return 'pending';
 
       const hasFailed = currentToolJobs.some(
@@ -363,10 +370,9 @@ export default function Runs() {
       );
       if (allPending) return 'pending';
 
-      // Mixed statuses - some pending, some running, some completed
       return 'running';
     };
-  }, [jobHistoryDetail?.tools, jobsByToolId]);
+  }, [jobHistoryDetail?.tools, getJobsForTool]);
 
   const navigate = useNavigate();
   return (
