@@ -46,7 +46,17 @@ cd worker && go test ./...
 
 Requirements: `go fmt` passes, `go vet` 0 issues, 100% tests pass.
 
-### 5. API Contract Sync
+### 5. Build Check
+
+```bash
+cd core-api && npm run build
+cd console && npm run build
+task worker:check
+```
+
+Requirements: all builds pass with 0 errors.
+
+### 6. API Contract Sync
 
 If API changes were made in core-api:
 
@@ -54,7 +64,7 @@ If API changes were made in core-api:
 task console:gen-api
 ```
 
-### 6. Commit Message
+### 7. Commit Message
 
 Follow Conventional Commits: `type(scope): description`
 
@@ -71,7 +81,7 @@ fix(console): resolve dashboard loading state
 chore(deps): update NestJS to v10
 ```
 
-### 7. Commit & Push
+### 8. Commit & Push
 
 ```bash
 git add <files>
@@ -81,7 +91,7 @@ git push origin <current-branch>
 
 For new branches: `git push -u origin <current-branch>`
 
-### 8. Completion Summary
+### 9. Completion Summary
 
 - Modified services and files
 - Test results: Core-API ✅ Console ✅ Worker ✅
