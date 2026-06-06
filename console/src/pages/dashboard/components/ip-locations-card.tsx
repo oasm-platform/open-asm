@@ -1,4 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTheme } from '@/components/ui/theme-provider';
 import type { GeoJsonObject, Feature } from 'geojson';
 import type { Layer, LatLngBoundsExpression } from 'leaflet';
@@ -122,36 +121,31 @@ export default function IpLocationsCard({
   }, [data]);
 
   const tileUrl = isDark
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    ? 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png';
+
+  const tileBgColor = isDark ? '#1c1c2e' : '#f1f3f4';
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <CardTitle>IP Locations</CardTitle>
-        <CardDescription>
-          {totalCountries} countries, {totalIps.toLocaleString()} total IPs
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="grid grid-cols-1 lg:grid-cols-3">
-          <div className="lg:col-span-2 relative min-h-[400px]">
-            <MapContainer
-              attributionControl={false}
-              center={[10, 0]}
-              zoom={1.4}
-              zoomControl={false}
-              scrollWheelZoom={false}
-              doubleClickZoom={false}
-              touchZoom={false}
-              boxZoom={false}
-              dragging={false}
-              worldCopyJump={false}
-              maxBounds={maxBounds}
-              maxBoundsVisually={false}
-              className="z-1"
-              style={{ height: '100%', width: '100%', minHeight: '400px' }}
-            >
+    <div className={`rounded-xl border ${isDark ? 'bg-card' : 'bg-white'}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-5">
+        <div className="lg:col-span-3 relative min-h-[420px]">
+          <MapContainer
+            attributionControl={false}
+            center={[10, 0]}
+            zoom={1.4}
+            zoomControl={false}
+            scrollWheelZoom={false}
+            doubleClickZoom={false}
+            touchZoom={false}
+            boxZoom={false}
+            dragging={false}
+            worldCopyJump={false}
+            maxBounds={maxBounds}
+            maxBoundsVisually={false}
+            className="z-1"
+            style={{ height: '100%', width: '100%', minHeight: '420px' }}
+          >
               <TileLayer
                 detectRetina={true}
                 crossOrigin
@@ -159,26 +153,25 @@ export default function IpLocationsCard({
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url={tileUrl}
               />
-              <GeoJSON
-                key={JSON.stringify({ data, selectedCountry })}
-                data={countriesData as GeoJsonObject}
-                style={geoJsonStyle}
-                onEachFeature={onEachFeature}
-              />
-            </MapContainer>
-            <IpLocationsLegend min={minIpCount} max={maxIpCount} />
-          </div>
-          <div className="lg:col-span-1 border-l">
-            <IpLocationsTable
-              data={data}
-              totalIps={totalIps}
-              totalCountries={totalCountries}
-              selectedCountry={selectedCountry}
-              onCountrySelect={onCountrySelect}
+            <GeoJSON
+              key={JSON.stringify({ data, selectedCountry })}
+              data={countriesData as GeoJsonObject}
+              style={geoJsonStyle}
+              onEachFeature={onEachFeature}
             />
-          </div>
+          </MapContainer>
+          <IpLocationsLegend min={minIpCount} max={maxIpCount} />
         </div>
-      </CardContent>
+        <div className="lg:col-span-2 border-l">
+          <IpLocationsTable
+            data={data}
+            totalIps={totalIps}
+            totalCountries={totalCountries}
+            selectedCountry={selectedCountry}
+            onCountrySelect={onCountrySelect}
+          />
+        </div>
+      </div>
       <style>{`
         .country-tooltip {
           background: white;
@@ -187,7 +180,12 @@ export default function IpLocationsCard({
           padding: 8px 12px;
           box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
+        .leaflet-container {
+          width: 100% !important;
+          height: 100% !important;
+          background-color: ${tileBgColor} !important;
+        }
       `}</style>
-    </Card>
+    </div>
   );
 }

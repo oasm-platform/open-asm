@@ -55,20 +55,27 @@ export default function IpLocationsTable({
     );
   };
 
+  const formatCount = (count: number) => {
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}K`;
+    }
+    return count.toString();
+  };
+
   return (
-    <div className="rounded-lg border bg-card">
-      <div className="p-4 border-b">
-        <h3 className="font-semibold">Locations</h3>
-        <p className="text-sm text-muted-foreground">
+    <div className="flex flex-col h-full">
+      <div className="p-4">
+        <h3 className="font-semibold text-base">Locations</h3>
+        <p className="text-sm text-muted-foreground mt-0.5">
           {totalCountries} countries, {totalIps.toLocaleString()} total IPs
         </p>
       </div>
-      <div className="overflow-auto max-h-[400px]">
+      <div className="flex-1 overflow-auto">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-muted/50">
-            <tr className="border-b">
+          <thead>
+            <tr className="border-b text-muted-foreground text-xs">
               <th
-                className="text-left p-3 font-medium cursor-pointer hover:bg-muted/50"
+                className="text-left px-4 py-2.5 font-medium cursor-pointer hover:text-foreground"
                 onClick={() => handleSort('country')}
               >
                 <div className="flex items-center gap-1">
@@ -77,15 +84,15 @@ export default function IpLocationsTable({
                 </div>
               </th>
               <th
-                className="text-left p-3 font-medium cursor-pointer hover:bg-muted/50"
+                className="text-left px-4 py-2.5 font-medium cursor-pointer hover:text-foreground"
                 onClick={() => handleSort('ipCount')}
               >
                 <div className="flex items-center gap-1">
-                  IPs
+                  IPs with open issues
                   <SortIcon field="ipCount" />
                 </div>
               </th>
-              <th className="text-right p-3 font-medium">Distribution</th>
+              <th className="text-right px-4 py-2.5 font-medium">Total IPs</th>
             </tr>
           </thead>
           <tbody>
@@ -105,40 +112,49 @@ export default function IpLocationsTable({
                   }
                 }}
               >
-                <td className="p-3">
-                  <div className="font-medium">{item.country}</div>
-                  <div className="text-xs text-muted-foreground">{item.countryCode}</div>
+                <td className="px-4 py-3">
+                  <span className="font-medium">{item.country}</span>
                 </td>
-                <td className="p-3">
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-primary/10 text-primary">
-                    {item.ipCount}
-                  </span>
-                </td>
-                <td className="p-3">
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all"
-                      style={{
-                        width: `${(item.ipCount / maxIpCount) * 100}%`,
-                      }}
-                    />
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                      {item.ipCount}
+                    </span>
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all"
+                        style={{
+                          width: `${(item.ipCount / maxIpCount) * 100}%`,
+                        }}
+                      />
+                    </div>
                   </div>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span className="text-sm text-muted-foreground font-medium">
+                    {formatCount(item.ipCount)}
+                  </span>
                 </td>
               </tr>
             ))}
           </tbody>
-          <tfoot className="sticky bottom-0 bg-muted/50">
+          <tfoot>
             <tr className="border-t font-medium">
-              <td className="p-3">Total</td>
-              <td className="p-3">
-                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-primary/10 text-primary">
-                  {totalIps.toLocaleString()}
-                </span>
-              </td>
-              <td className="p-3">
-                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary rounded-full w-full" />
+              <td className="px-4 py-3">Total</td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                    {totalIps.toLocaleString()}
+                  </span>
+                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full w-full" />
+                  </div>
                 </div>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <span className="text-sm text-muted-foreground font-medium">
+                  {formatCount(totalIps)}
+                </span>
               </td>
             </tr>
           </tfoot>
