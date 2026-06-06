@@ -5,10 +5,9 @@ import type { Layer } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useMemo, useState, useCallback } from 'react';
 import { GeoJSON, MapContainer, TileLayer } from 'react-leaflet';
-import { useNavigate } from '@tanstack/react-router';
 import type { IpLocationData } from '@/hooks/useIpLocationData';
 import IpLocationsLegend from './ip-locations-legend';
-import countriesData from '@/data/countries.geojson';
+import countriesData from '@/data/countries.json';
 
 interface IpLocationsMapProps {
   data: IpLocationData[];
@@ -29,9 +28,8 @@ export default function IpLocationsMap({
   data,
   totalIps: _totalIps,
   selectedCountry,
-  onCountrySelect: _onCountrySelect,
+  onCountrySelect,
 }: IpLocationsMapProps) {
-  const navigate = useNavigate();
   const { theme } = useTheme();
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
 
@@ -51,7 +49,7 @@ export default function IpLocationsMap({
 
   const geoJsonStyle = useCallback(
     (feature?: Feature) => {
-      const countryCode = feature?.properties?.['ISO3166-1-Alpha-2'];
+      const countryCode = feature?.properties?.['ISO_A2'];
       const ipData = countryIpMap.get(countryCode);
       const ipCount = ipData?.ipCount || 0;
       const isSelected = selectedCountry === countryCode;
@@ -70,8 +68,8 @@ export default function IpLocationsMap({
 
   const onEachFeature = useCallback(
     (feature: Feature, layer: Layer) => {
-      const countryCode = feature.properties?.['ISO3166-1-Alpha-2'];
-      const countryName = feature.properties?.name || 'Unknown';
+      const countryCode = feature.properties?.['ISO_A2'];
+      const countryName = feature.properties?.['NAME'] || 'Unknown';
       const ipData = countryIpMap.get(countryCode);
 
       const tooltipContent = `
@@ -92,16 +90,13 @@ export default function IpLocationsMap({
         mouseover: () => setHoveredCountry(countryCode),
         mouseout: () => setHoveredCountry(null),
         click: () => {
-          if (ipData) {
-            navigate({
-              to: '/assets',
-              search: { ipAddresses: ipData.countryCode },
-            });
+          if (onCountrySelect) {
+            onCountrySelect(countryCode);
           }
         },
       });
     },
-    [countryIpMap, navigate]
+    [countryIpMap, onCountrySelect]
   );
 
   const minIpCount = useMemo(() => {
