@@ -26,7 +26,7 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        'rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden my-4 w-full bg-zinc-50 dark:bg-zinc-950/50 shadow-sm',
+        'rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden w-full bg-zinc-50 dark:bg-zinc-950/50 shadow-sm',
         className,
       )}
       {...props}

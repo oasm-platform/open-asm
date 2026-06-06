@@ -615,11 +615,20 @@ export class JobsRegistryService {
       error: error.message,
       retryCount: job.retryCount + 1,
     });
-    await this.jobErrorLogRepo.save({
-      job,
-      logMessage: error.message,
-      payload: JSON.stringify(dto.data),
+
+    // Deduplicate error logs - only create new log if message differs from last error
+    const lastErrorLog = await this.jobErrorLogRepo.findOne({
+      where: { jobId: job.id },
+      order: { createdAt: 'DESC' },
     });
+
+    if (!lastErrorLog || lastErrorLog.logMessage !== error.message) {
+      await this.jobErrorLogRepo.save({
+        job,
+        logMessage: error.message,
+        payload: JSON.stringify(dto.data),
+      });
+    }
   }
 
   /**
@@ -930,11 +939,6 @@ export class JobsRegistryService {
         workflow: true,
         jobs: {
           tool: true,
-          asset: {
-            target: true,
-          },
-          assetService: true,
-          errorLogs: true,
         },
       },
     });
@@ -976,7 +980,6 @@ export class JobsRegistryService {
       id: historyId,
       createdAt,
       updatedAt,
-      jobs,
       workflow,
       jobHistoryName,
     } = jobHistory;
@@ -988,7 +991,6 @@ export class JobsRegistryService {
       createdAt,
       updatedAt,
       tools,
-      jobs: jobs || [],
     };
   }
 
