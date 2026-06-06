@@ -3,8 +3,7 @@ import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetAssetLocations } from '@/services/apis/gen/queries';
 import { useIpLocationData } from '@/hooks/useIpLocationData';
 import CreateWorkspace from '../workspaces/create-workspace';
-import IpLocationsMap from './components/ip-locations-map';
-import IpLocationsTable from './components/ip-locations-table';
+import IpLocationsCard from './components/ip-locations-card';
 import { AssetTrends } from './components/asset-trends';
 import IssuesTimeline from './components/issues-timeline';
 import Statistic from './components/statistic';
@@ -41,28 +40,22 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
             <IssuesTimeline />
             <AssetTrends />
+          </div>
+          <IpLocationsCard
+            data={ipLocationData}
+            totalIps={totalIps}
+            totalCountries={totalCountries}
+            selectedCountry={selectedCountry}
+            onCountrySelect={setSelectedCountry}
+          />
+          <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
             <TopAssetsVulnerabilitiesChart />
-            <div className="col-span-1 2xl:col-span-2">
-              <IpLocationsMap
-                data={ipLocationData}
-                totalIps={totalIps}
-                selectedCountry={selectedCountry}
-                onCountrySelect={setSelectedCountry}
-              />
-            </div>
           </div>
         </div>
         <div className="col-span-1 space-y-4 order-first 2xl:order-2">
           <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-1 gap-4">
             <VulnerabilityStatistic />
             <TlsStatistics />
-            <IpLocationsTable
-              data={ipLocationData}
-              totalIps={totalIps}
-              totalCountries={totalCountries}
-              selectedCountry={selectedCountry}
-              onCountrySelect={setSelectedCountry}
-            />
           </div>
         </div>
       </div>

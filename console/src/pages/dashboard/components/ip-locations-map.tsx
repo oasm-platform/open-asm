@@ -16,12 +16,17 @@ interface IpLocationsMapProps {
   onCountrySelect?: (countryCode: string | null) => void;
 }
 
-function getColor(ipCount: number, max: number): string {
-  if (max === 0) return '#dbeafe';
+function getColor(ipCount: number, max: number, theme: string): string {
+  if (ipCount === 0) return theme === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)';
   const ratio = ipCount / max;
-  if (ratio < 0.33) return '#dbeafe';
-  if (ratio < 0.66) return '#f97316';
-  return '#dc2626';
+  if (theme === 'dark') {
+    if (ratio < 0.33) return 'rgba(59, 130, 246, 0.5)';
+    if (ratio < 0.66) return 'rgba(99, 102, 241, 0.7)';
+    return 'rgba(139, 92, 246, 0.9)';
+  }
+  if (ratio < 0.33) return 'rgba(59, 130, 246, 0.4)';
+  if (ratio < 0.66) return 'rgba(99, 102, 241, 0.6)';
+  return 'rgba(139, 92, 246, 0.8)';
 }
 
 export default function IpLocationsMap({
@@ -56,14 +61,15 @@ export default function IpLocationsMap({
       const isHovered = hoveredCountry === countryCode;
 
       return {
-        fillColor: getColor(ipCount, maxIpCount),
+        fillColor: getColor(ipCount, maxIpCount, theme),
+        fill: true,
         weight: isSelected || isHovered ? 2 : 1,
         opacity: 1,
-        color: isSelected ? '#1e40af' : isHovered ? '#3b82f6' : '#94a3b8',
-        fillOpacity: ipCount > 0 ? 0.85 : 0.1,
+        color: isSelected ? '#6366f1' : isHovered ? '#818cf8' : theme === 'dark' ? '#374151' : '#94a3b8',
+        fillOpacity: 1,
       };
     },
-    [countryIpMap, maxIpCount, selectedCountry, hoveredCountry]
+    [countryIpMap, maxIpCount, selectedCountry, hoveredCountry, theme]
   );
 
   const onEachFeature = useCallback(
@@ -145,7 +151,7 @@ export default function IpLocationsMap({
         className="absolute inset-0 z-1 pointer-events-none"
         style={{
           background: theme === 'dark' ? '#1e3a5f' : '#3b5bdb',
-          opacity: theme === 'dark' ? 0.3 : 0.1,
+          opacity: theme === 'dark' ? 0.15 : 0.05,
           mixBlendMode: 'color',
         }}
       />

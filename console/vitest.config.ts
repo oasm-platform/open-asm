@@ -15,6 +15,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     pool: 'forks',
+    poolTimeout: 60000,
     dangerouslyIgnoreUnhandledErrors: true,
     coverage: {
       provider: 'v8',
