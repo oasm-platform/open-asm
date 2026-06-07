@@ -89,8 +89,8 @@ export default function VulnerabilityStatistic() {
   };
 
   return (
-    <Link to="/vulnerabilities">
-      <Card className="w-full hover:bg-accent/70 pt-3 cursor-pointer">
+    <Link to="/vulnerabilities" className="block h-full">
+      <Card className="w-full h-full hover:bg-accent/70 pt-3 cursor-pointer">
         <Score />
         <CardHeader className="flex justify-between items-center">
           <div className="flex items-center gap-2">

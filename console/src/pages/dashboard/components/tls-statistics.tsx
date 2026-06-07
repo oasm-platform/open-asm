@@ -31,7 +31,7 @@ const TlsStatistics = () => {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="h-full">
         <CardHeader>
           <CardTitle>TLS Statistics</CardTitle>
         </CardHeader>
@@ -42,7 +42,7 @@ const TlsStatistics = () => {
 
   if (error || !data) {
     return (
-      <Card>
+      <Card className="h-full">
         <CardHeader>
           <CardTitle>TLS Statistics</CardTitle>
         </CardHeader>
@@ -68,7 +68,7 @@ const TlsStatistics = () => {
   const total = items.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
         <CardTitle>TLS Statistics</CardTitle>
       </CardHeader>

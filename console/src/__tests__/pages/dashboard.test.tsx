@@ -34,6 +34,7 @@ vi.mock('react-leaflet', () => ({
     <div>{children}</div>
   ),
   Popup: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  GeoJSON: () => <div />,
 }));
 
 vi.mock('leaflet', () => ({
