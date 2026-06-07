@@ -1,16 +1,16 @@
 import Page from '@/components/common/page';
+import { useIpLocationData } from '@/hooks/useIpLocationData';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetAssetLocations } from '@/services/apis/gen/queries';
-import { useIpLocationData } from '@/hooks/useIpLocationData';
+import { useState } from 'react';
 import CreateWorkspace from '../workspaces/create-workspace';
-import IpLocationsCard from './components/ip-locations-card';
 import { AssetTrends } from './components/asset-trends';
+import IpLocationsCard from './components/ip-locations-card';
 import IssuesTimeline from './components/issues-timeline';
 import Statistic from './components/statistic';
 import TlsStatistics from './components/tls-statistics';
 import TopAssetsVulnerabilitiesChart from './components/top-assets-vulnerabilities-chart';
 import VulnerabilityStatistic from './components/vulnerabilities-statistic';
-import { useState } from 'react';
 
 export default function Dashboard() {
   const { workspaces, isLoading: workspacesLoading } = useWorkspaceSelector();
@@ -19,8 +19,11 @@ export default function Dashboard() {
   const { data: locations, isLoading: locationsLoading } =
     useStatisticControllerGetAssetLocations();
 
-  const { data: ipLocationData, totalIps, totalCountries } =
-    useIpLocationData({ locations, isLoading: locationsLoading });
+  const {
+    data: ipLocationData,
+    totalIps,
+    totalCountries,
+  } = useIpLocationData({ locations, isLoading: locationsLoading });
 
   if (workspacesLoading) return <Page title="Dashboard" />;
 
@@ -34,29 +37,41 @@ export default function Dashboard() {
 
   return (
     <Page title="Dashboard">
-      <div className="grid grid-cols-1 2xl:grid-cols-4 gap-4">
-        <div className="col-span-1 2xl:col-span-3 space-y-4 2xl:order-1">
-          <Statistic />
-          <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
-            <IssuesTimeline />
-            <AssetTrends />
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 2xl:grid-cols-4 gap-4">
+          <div className="col-span-1 2xl:col-span-3 order-2 2xl:order-none flex flex-col gap-4">
+            <div className="flex-1">
+              <Statistic />
+            </div>
+            <div className="flex-1">
+              <IpLocationsCard
+                data={ipLocationData}
+                totalIps={totalIps}
+                totalCountries={totalCountries}
+                selectedCountry={selectedCountry}
+                onCountrySelect={setSelectedCountry}
+              />
+            </div>
           </div>
-          <IpLocationsCard
-            data={ipLocationData}
-            totalIps={totalIps}
-            totalCountries={totalCountries}
-            selectedCountry={selectedCountry}
-            onCountrySelect={setSelectedCountry}
-          />
-          <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
-            <TopAssetsVulnerabilitiesChart />
+          <div className="col-span-1 order-1 2xl:order-none flex flex-col gap-4">
+            <div className="flex-1">
+              <VulnerabilityStatistic />
+            </div>
+            <div className="flex-1">
+              <TlsStatistics />
+            </div>
           </div>
         </div>
-        <div className="col-span-1 space-y-4 order-first 2xl:order-2">
-          <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-1 gap-4">
-            <VulnerabilityStatistic />
-            <TlsStatistics />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 2xl:grid-cols-6 gap-4">
+            <div className="2xl:col-span-4">
+              <AssetTrends />
+            </div>
+            <div className="2xl:col-span-2">
+              <TopAssetsVulnerabilitiesChart />
+            </div>
           </div>
+          <IssuesTimeline />
         </div>
       </div>
     </Page>

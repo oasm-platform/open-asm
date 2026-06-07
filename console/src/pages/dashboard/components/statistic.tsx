@@ -93,7 +93,7 @@ export default function Statistic() {
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 h-full">
       {statsCards.map((card, index) => (
         <Card
           key={index}

@@ -1,13 +1,13 @@
 import { useTheme } from '@/components/ui/theme-provider';
-import type { GeoJsonObject, Feature } from 'geojson';
-import type { Layer, LatLngBoundsExpression } from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { useMemo, useState, useCallback } from 'react';
-import { GeoJSON, MapContainer, TileLayer } from 'react-leaflet';
+import countriesData from '@/data/countries.json';
 import type { IpLocationData } from '@/hooks/useIpLocationData';
+import type { Feature, GeoJsonObject } from 'geojson';
+import type { Layer } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useCallback, useMemo, useState } from 'react';
+import { GeoJSON, MapContainer, TileLayer } from 'react-leaflet';
 import IpLocationsLegend from './ip-locations-legend';
 import IpLocationsTable from './ip-locations-table';
-import countriesData from '@/data/countries.json';
 
 interface IpLocationsCardProps {
   data: IpLocationData[];
@@ -18,7 +18,8 @@ interface IpLocationsCardProps {
 }
 
 function getColor(ipCount: number, max: number, isDark: boolean): string {
-  if (ipCount === 0) return isDark ? 'rgba(30, 58, 95, 0.15)' : 'rgba(219, 234, 254, 0.5)';
+  if (ipCount === 0)
+    return isDark ? 'rgba(30, 58, 95, 0.15)' : 'rgba(219, 234, 254, 0.5)';
   const ratio = ipCount / max;
   if (isDark) {
     if (ratio < 0.2) return 'rgba(96, 165, 250, 0.4)';
@@ -45,11 +46,6 @@ export default function IpLocationsCard({
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const isDark = theme === 'dark';
 
-  const maxBounds: LatLngBoundsExpression = useMemo(() => [
-    [-85, -180],
-    [85, 180],
-  ], []);
-
   const maxIpCount = useMemo(() => {
     return Math.max(...data.map((d) => d.ipCount), 1);
   }, [data]);
@@ -75,11 +71,17 @@ export default function IpLocationsCard({
         fill: true,
         weight: isSelected || isHovered ? 2 : 1,
         opacity: 1,
-        color: isSelected ? '#60a5fa' : isHovered ? '#93c5fd' : isDark ? '#1e3a5f' : '#cbd5e1',
+        color: isSelected
+          ? '#60a5fa'
+          : isHovered
+            ? '#93c5fd'
+            : isDark
+              ? '#1e3a5f'
+              : '#cbd5e1',
         fillOpacity: 1,
       };
     },
-    [countryIpMap, maxIpCount, selectedCountry, hoveredCountry, isDark]
+    [countryIpMap, maxIpCount, selectedCountry, hoveredCountry, isDark],
   );
 
   const onEachFeature = useCallback(
@@ -112,7 +114,7 @@ export default function IpLocationsCard({
         },
       });
     },
-    [countryIpMap, onCountrySelect]
+    [countryIpMap, onCountrySelect],
   );
 
   const minIpCount = useMemo(() => {
@@ -127,32 +129,30 @@ export default function IpLocationsCard({
   const tileBgColor = isDark ? '#1c1c2e' : '#f1f3f4';
 
   return (
-    <div className={`rounded-xl border ${isDark ? 'bg-card' : 'bg-white'}`}>
-      <div className="grid grid-cols-1 lg:grid-cols-5">
-        <div className="lg:col-span-3 relative min-h-[420px]">
+    <div className={`rounded-xl border h-full ${isDark ? 'bg-card' : 'bg-white'}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-4">
+        <div className="lg:col-span-3 relative overflow-hidden rounded-l-xl">
           <MapContainer
             attributionControl={false}
-            center={[10, 0]}
-            zoom={1.4}
-            zoomControl={false}
-            scrollWheelZoom={false}
-            doubleClickZoom={false}
-            touchZoom={false}
-            boxZoom={false}
-            dragging={false}
-            worldCopyJump={false}
-            maxBounds={maxBounds}
-            maxBoundsVisually={false}
+            center={[30, -10]}
+            zoom={2}
+            zoomControl={true}
+            scrollWheelZoom={true}
+            doubleClickZoom={true}
+            touchZoom={true}
+            boxZoom={true}
+            dragging={true}
+            worldCopyJump={true}
             className="z-1"
-            style={{ height: '100%', width: '100%', minHeight: '420px' }}
+            style={{ height: '100%', width: '100%', minHeight: '560px' }}
           >
-              <TileLayer
-                detectRetina={true}
-                crossOrigin
-                noWrap={true}
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url={tileUrl}
-              />
+            <TileLayer
+              detectRetina={true}
+              crossOrigin
+              noWrap={false}
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url={tileUrl}
+            />
             <GeoJSON
               key={JSON.stringify({ data, selectedCountry })}
               data={countriesData as GeoJsonObject}
@@ -162,7 +162,7 @@ export default function IpLocationsCard({
           </MapContainer>
           <IpLocationsLegend min={minIpCount} max={maxIpCount} />
         </div>
-        <div className="lg:col-span-2 border-l">
+        <div className="lg:col-span-1 border-l">
           <IpLocationsTable
             data={data}
             totalIps={totalIps}

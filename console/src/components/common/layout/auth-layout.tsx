@@ -1,5 +1,14 @@
 import AppLogo from '@/components/ui/app-logo';
-import { ArrowRight, Bug, Cpu, ScanSearch, ShieldCheck, Sparkles, Workflow, Zap } from 'lucide-react';
+import {
+  ArrowRight,
+  Bug,
+  Cpu,
+  ScanSearch,
+  ShieldCheck,
+  Sparkles,
+  Workflow,
+  Zap,
+} from 'lucide-react';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -9,12 +18,14 @@ const features = [
   {
     icon: ScanSearch,
     title: 'Discover',
-    description: 'and manage assets with auto-grouping and multi-workspace support',
+    description:
+      'and manage assets with auto-grouping and multi-workspace support',
   },
   {
     icon: Bug,
     title: 'Scan',
-    description: 'vulnerabilities and misconfigs with issue tracking and risk analysis',
+    description:
+      'vulnerabilities and misconfigs with issue tracking and risk analysis',
   },
   {
     icon: Cpu,
@@ -81,7 +92,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             <h2 className="text-balance text-3xl font-semibold leading-tight tracking-tight text-foreground">
               One platform for your entire
               <br />
-              <span className="text-primary">external attack surface</span>
+              <span className="text-primary">attack surface</span>
             </h2>
             <p className="max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
               Map assets, find vulnerabilities, and respond to issues — without
