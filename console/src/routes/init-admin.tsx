@@ -1,18 +1,13 @@
-import { createFileRoute, Navigate } from '@tanstack/react-router';
 import Register from '@/pages/register/register';
-import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
+import { getRootControllerGetMetadataQueryOptions } from '@/services/apis/gen/queries';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/init-admin')({
-  component: InitAdminPage,
+  component: Register,
+  beforeLoad: async ({ context }) => {
+    const { isInit } = await context.queryClient.fetchQuery(
+      getRootControllerGetMetadataQueryOptions(),
+    );
+    if (isInit) throw redirect({ to: '/' });
+  },
 });
-
-function InitAdminPage() {
-  const { data, isFetched } = useRootControllerGetMetadata();
-
-  if (!isFetched) return null;
-  if (data?.isInit) {
-    return <Navigate to="/" />;
-  }
-
-  return <Register />;
-}
