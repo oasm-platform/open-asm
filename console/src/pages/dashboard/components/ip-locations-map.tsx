@@ -141,7 +141,7 @@ export default function IpLocationsMap({
         />
         <GeoJSON
           key={JSON.stringify({ data, selectedCountry })}
-          data={countriesData as GeoJsonObject}
+          data={countriesData as unknown as GeoJsonObject}
           style={geoJsonStyle}
           onEachFeature={onEachFeature}
         />
