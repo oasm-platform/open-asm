@@ -7,7 +7,6 @@ export const Route = createFileRoute('/_authed')({
     const session = await context.queryClient
       .fetchQuery(sessionQueryOptions)
       .catch(() => null);
-    console.log(session);
     if (!session) {
       throw redirect({ to: '/login' });
     }
