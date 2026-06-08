@@ -5,9 +5,9 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 export const Route = createFileRoute('/init-admin')({
   component: Register,
   beforeLoad: async ({ context }) => {
-    const { isInit } = await context.queryClient.fetchQuery(
-      getRootControllerGetMetadataQueryOptions(),
-    );
-    if (isInit) throw redirect({ to: '/' });
+    const data = await context.queryClient
+      .ensureQueryData(getRootControllerGetMetadataQueryOptions())
+      .catch(() => null);
+    if (data?.isInit) throw redirect({ to: '/' });
   },
 });
