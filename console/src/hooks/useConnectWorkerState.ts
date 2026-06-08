@@ -9,10 +9,10 @@ export const useConnectWorkerState = createState<ConnectWorkerState>(
   'connectWorker',
   { isOpen: false, networkId: undefined },
   {
-    openDialog: (state, networkId?: string) => ({
+    openDialog: (state, networkId) => ({
       ...state,
       isOpen: true,
-      networkId: networkId as string | undefined,
+      networkId: typeof networkId === 'string' ? networkId : undefined,
     }),
     closeDialog: (state) => ({
       ...state,
