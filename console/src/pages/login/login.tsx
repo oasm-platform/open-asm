@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Route } from '@/routes/login';
-import { authClient, sessionQueryOptions } from '@/utils/authClient';
+import { authClient, SESSION_QUERY_KEY } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -45,10 +45,7 @@ export default function Login() {
       password: values.password,
       fetchOptions: {
         onSuccess: async () => {
-          await queryClient.fetchQuery({
-            ...sessionQueryOptions,
-            staleTime: 0,
-          });
+          queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
           await navigate({ to: redirectUrl || '/' });
         },
         onError: (ctx) => {
