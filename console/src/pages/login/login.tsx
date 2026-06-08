@@ -9,15 +9,15 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { authClient, SESSION_QUERY_KEY } from '@/utils/authClient';
+import { Route } from '@/routes/login';
+import { authClient, sessionQueryOptions } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Route } from '@/routes/login';
 import { z } from 'zod';
-import { useNavigate } from '@tanstack/react-router';
-import { useQueryClient } from '@tanstack/react-query';
 
 const formSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -44,8 +44,11 @@ export default function Login() {
       email: values.email,
       password: values.password,
       fetchOptions: {
-        onSuccess: async (ctx) => {
-          queryClient.setQueryData(SESSION_QUERY_KEY, ctx.data);
+        onSuccess: async () => {
+          await queryClient.fetchQuery({
+            ...sessionQueryOptions,
+            staleTime: 0,
+          });
           await navigate({ to: redirectUrl || '/' });
         },
         onError: (ctx) => {

@@ -5,8 +5,9 @@ import { sessionQueryOptions } from '@/utils/authClient';
 export const Route = createFileRoute('/_authed')({
   beforeLoad: async ({ context }) => {
     const session = await context.queryClient
-      .fetchQuery({ ...sessionQueryOptions, staleTime: 0 })
+      .ensureQueryData(sessionQueryOptions)
       .catch(() => null);
+
     if (!session) {
       throw redirect({ to: '/login' });
     }
