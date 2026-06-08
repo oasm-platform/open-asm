@@ -7,31 +7,33 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerGetWorkspaceApiKey,
   useWorkspacesControllerRotateApiKey,
 } from '@/services/apis/gen/queries';
-import { Copy, SquareTerminal } from 'lucide-react';
-import { useState } from 'react';
+import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
-import { ConfirmDialog } from './confirm-dialog';
-interface ConnectWorkerProps {
-  networkId?: string;
-}
-export function ConnectWorker({ networkId }: ConnectWorkerProps) {
+
+export function ConnectWorkerDialog() {
+  const {
+    state: { isOpen, networkId },
+    closeDialog,
+  } = useConnectWorkerState();
+
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
+
   const { data, refetch } = useWorkspacesControllerGetWorkspaceApiKey({
     query: {
       queryKey: [selectedWorkspaceId],
-      enabled: !!selectedWorkspaceId,
+      enabled: !!selectedWorkspaceId && isOpen,
     },
   });
-  const [open, setOpen] = useState(false);
 
   const rawCommand = import.meta.env.PROD
     ? `docker run -d --name open-asm-worker -e API_KEY=${data?.apiKey} -e API=${window.location.origin} -e MAX_JOBS=10 open-asm-worker:latest`
@@ -49,7 +51,6 @@ export function ConnectWorker({ networkId }: ConnectWorkerProps) {
     },
   });
 
-  // Temporary disable connect custom workspace worker in production mode
   if (import.meta.env.PROD) return null;
 
   const handleCopyCommand = async () => {
@@ -58,13 +59,7 @@ export function ConnectWorker({ networkId }: ConnectWorkerProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="secondary" className="gap-2">
-          <SquareTerminal className="shrink-0" />
-          <span className="hidden lg:inline">Connect worker</span>
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Connect worker</DialogTitle>
@@ -73,18 +68,6 @@ export function ConnectWorker({ networkId }: ConnectWorkerProps) {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          {/* <p>API Key:</p>
-                    <div className="relative bg-black text-white font-mono rounded-md p-4 text-sm">
-                        <pre className="whitespace-pre-wrap">{apiKey}</pre>
-                        <Button
-                            onClick={handleCopyApiKey}
-                            size="icon"
-                            variant="ghost"
-                            className="absolute top-2 right-2 text-white hover:text-gray-300"
-                        >
-                            <Copy size={16} />
-                        </Button>
-                    </div> */}
           <div className="relative bg-muted text-foreground font-mono rounded-md p-4 text-sm">
             <pre className="whitespace-pre-wrap break-all">{rawCommand}</pre>
             <Button
@@ -109,7 +92,7 @@ export function ConnectWorker({ networkId }: ConnectWorkerProps) {
             }
           />
           <DialogClose asChild>
-            <Button variant="outline" type="button">
+            <Button variant="outline" type="button" onClick={closeDialog}>
               Close
             </Button>
           </DialogClose>

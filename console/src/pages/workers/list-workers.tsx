@@ -2,7 +2,7 @@ import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
-import { ConnectWorker } from '@/components/ui/connect-worker';
+import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
 import Image from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
@@ -66,7 +66,7 @@ const ListWorkers = () => {
         <h3 className="m-4 text-lg font-medium text-muted-foreground">
           Pending connect workers...
         </h3>
-        <ConnectWorker />
+        <ConnectWorkerTrigger />
       </div>
     );
   }
@@ -76,7 +76,7 @@ const ListWorkers = () => {
       title="Workers"
       header={
         <div className="flex items-center justify-end gap-2">
-          {data.data.length && <ConnectWorker />}
+          {data.data.length && <ConnectWorkerTrigger />}
         </div>
       }
     >

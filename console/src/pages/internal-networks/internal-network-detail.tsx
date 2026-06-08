@@ -1,7 +1,7 @@
 import Page from '@/components/common/page';
 import { NetworkInterfacesTable } from '@/components/internal-networks/network-interfaces-table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConnectWorker } from '@/components/ui/connect-worker';
+import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
 import {
   useInternalNetworksControllerDeleteInternalNetwork,
   useInternalNetworksControllerGetInternalNetworkById,
@@ -92,7 +92,7 @@ export default function InternalNetworkDetail() {
           </CardContent>
         </Card>
 
-        <ConnectWorker networkId={network.id} />
+        <ConnectWorkerTrigger networkId={network.id} />
 
         <NetworkInterfacesTable networkId={network.id} />
       </div>
