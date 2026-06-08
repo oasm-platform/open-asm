@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
+  getRootControllerGetMetadataQueryKey,
   useRootControllerCreateFirstAdmin,
   type CreateFirstAdminDto,
 } from '@/services/apis/gen/queries';
@@ -19,6 +20,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from '@tanstack/react-router';
 import { z } from 'zod';
+import { useQueryClient } from '@tanstack/react-query';
 
 const formSchema = z
   .object({
@@ -45,6 +47,7 @@ export default function Register() {
 
   const { mutate } = useRootControllerCreateFirstAdmin();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -52,8 +55,11 @@ export default function Register() {
     mutate(
       { data: values as CreateFirstAdminDto },
       {
-        onSuccess: () => {
-          navigate({ to: '/login' });
+        onSuccess: async () => {
+          queryClient.removeQueries({
+            queryKey: getRootControllerGetMetadataQueryKey(),
+          });
+          await navigate({ to: '/login' });
         },
         onError: () => {
           form.setError('email', { message: 'Invalid email or password' });
