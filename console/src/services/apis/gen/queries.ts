@@ -806,6 +806,15 @@ export type GeoIp = {
   asname: string;
 };
 
+export type AssetLocationDto = {
+  /** ISO 3166-1 alpha-2 country code */
+  countryCode: string;
+  /** Full country name */
+  country: string;
+  /** Number of IP addresses in this country */
+  count: number;
+};
+
 export type GetIpAssetsDTO = {
   ip: string;
   assetCount: number;
@@ -15132,14 +15141,14 @@ export function useStatisticControllerGetTopTagsAssets<
 }
 
 /**
- * Retrieves the location of assets in a workspace.
- * @summary Get assets location
+ * Retrieves the top 10 countries by IP count for a workspace.
+ * @summary Get asset locations
  */
 export const statisticControllerGetAssetLocations = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GeoIp[]>(
+  return orvalClient<AssetLocationDto[]>(
     { url: `/api/statistic/asset-locations`, method: 'GET', signal },
     options,
   );
