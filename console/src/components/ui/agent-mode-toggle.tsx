@@ -9,6 +9,7 @@ import {
   SendMessageDtoAgentMode,
   useAgentsControllerGetAgentModes,
 } from '@/services/apis/gen/queries';
+import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { InfinityIcon, MonitorIcon } from 'lucide-react';
 import { memo } from 'react';
 import { toast } from 'sonner';
@@ -27,10 +28,16 @@ export const AgentModeSelect = memo(function AgentModeSelect({
 
   const workers = data?.workers ?? [];
 
+  const { openDialog } = useConnectWorkerState();
+
   const handleToggle = () => {
     const next = isAgent
       ? SendMessageDtoAgentMode.ask
       : SendMessageDtoAgentMode.agent;
+    if (next === SendMessageDtoAgentMode.agent && workers.length === 0) {
+      openDialog();
+      return;
+    }
     if (next === SendMessageDtoAgentMode.agent) {
       toast.success('Agent mode enabled');
     }
