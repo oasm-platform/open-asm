@@ -3,7 +3,6 @@ import { DataSource, MoreThanOrEqual } from 'typeorm';
 
 import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
 
-import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   DefaultWorkflow,
   EventTriggerType,
@@ -11,9 +10,9 @@ import {
   NotificationType,
 } from '@/common/enums/enum';
 import { GeoIp, GeoIpService } from '@/services/geo-ip/geo-ip.service';
+import { AssetLocationDto } from './dto/asset-location.dto';
 import { RedisService } from '@/services/redis/redis.service';
 import { OnEvent } from '@nestjs/event-emitter';
-import { AssetsService } from '../assets/assets.service';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
@@ -69,7 +68,6 @@ interface StatisticSnapshot {
 export class StatisticService {
   constructor(
     private readonly dataSource: DataSource,
-    private assetService: AssetsService,
     private geoIpService: GeoIpService,
     private redisService: RedisService,
     private workspacesService: WorkspacesService,
@@ -293,29 +291,86 @@ export class StatisticService {
   }
 
   /**
-   * Retrieves the location of assets in a workspace.
-   * @param workspaceId
-   * @returns
+   * Retrieves the top 10 countries by IP count for a workspace.
+   * Fetches all unique IPs, batches them to the geo IP service, then aggregates by country.
    */
-  async getAssetLocations(workspaceId: string): Promise<GeoIp[]> {
-    const assets = await this.assetService.getIpAssets(
-      {
-        page: 1,
-        limit: 1000,
-        sortBy: 'createdAt',
-        value: '',
-        sortOrder: SortOrder.DESC,
-      },
-      workspaceId,
-    );
-    const ips = assets.data.map((i) => i.ip);
-    if (ips.length === 0) {
+  async getAssetLocations(workspaceId: string): Promise<AssetLocationDto[]> {
+    const allIps = await this.getAllWorkspaceIps(workspaceId);
+    if (allIps.length === 0) {
       return [];
     }
 
-    const geoIps = await this.geoIpService.getGeoIp(ips);
+    const geoResults = await this.batchGeoIpLookup(allIps);
 
-    return geoIps.filter((i) => i.lat && i.lon);
+    return this.aggregateByCountry(geoResults);
+  }
+
+  /**
+   * Fetches all unique IP addresses for a workspace across all asset services.
+   */
+  private async getAllWorkspaceIps(workspaceId: string): Promise<string[]> {
+    const rawResults: { ip: string }[] = await this.dataSource.query(
+      `SELECT DISTINCT ipa."ip"
+       FROM "asset_services" assvc
+       INNER JOIN "assets" a ON a.id = assvc."assetId"
+       INNER JOIN "targets" t ON t.id = a."targetId"
+       INNER JOIN "workspace_targets" wt ON wt."targetId" = t.id
+       INNER JOIN "ip_assets_view" ipa ON ipa."assetId" = a.id
+       WHERE wt."workspaceId" = $1 AND ipa."ip" IS NOT NULL`,
+      [workspaceId],
+    );
+
+    return rawResults.map((r) => r.ip);
+  }
+
+  /**
+   * Batches IP addresses in groups of 100 and fetches geo IP data for each batch.
+   */
+  private async batchGeoIpLookup(ips: string[]): Promise<GeoIp[]> {
+    const batchSize = 100;
+    const allGeoIps: GeoIp[] = [];
+
+    for (let i = 0; i < ips.length; i += batchSize) {
+      const batch = ips.slice(i, i + batchSize);
+      const geoIps = await this.geoIpService.getGeoIp(batch);
+      allGeoIps.push(...geoIps);
+    }
+
+    return allGeoIps;
+  }
+
+  /**
+   * Aggregates geo IP results by country code, counts occurrences,
+   * sorts by count descending, and returns the top 10.
+   */
+  private aggregateByCountry(geoIps: GeoIp[]): AssetLocationDto[] {
+    const countryCountMap = new Map<
+      string,
+      { country: string; count: number }
+    >();
+
+    for (const geo of geoIps) {
+      if (!geo.countryCode) continue;
+
+      const existing = countryCountMap.get(geo.countryCode);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        countryCountMap.set(geo.countryCode, {
+          country: geo.country || 'Unknown',
+          count: 1,
+        });
+      }
+    }
+
+    return Array.from(countryCountMap.entries())
+      .map(([countryCode, data]) => ({
+        countryCode,
+        country: data.country,
+        count: data.count,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
   }
 
   /**

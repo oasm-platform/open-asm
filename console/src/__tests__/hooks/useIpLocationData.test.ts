@@ -1,63 +1,29 @@
 import { renderHook } from '@testing-library/react';
 import { useIpLocationData } from '@/hooks/useIpLocationData';
-import type { GeoIp } from '@/services/apis/gen/queries';
+import type { AssetLocationDto } from '@/services/apis/gen/queries';
 
 describe('useIpLocationData', () => {
-  const mockLocations: GeoIp[] = [
+  const mockLocations: AssetLocationDto[] = [
     {
-      query: '8.8.8.8',
-      status: 'success',
-      continent: 'North America',
-      continentCode: 'NA',
       country: 'United States',
       countryCode: 'US',
-      region: 'CA',
-      regionName: 'California',
-      city: 'Mountain View',
-      district: '',
-      zip: '94043',
-      lat: 37.386,
-      lon: -122.0838,
-      timezone: 'America/Los_Angeles',
-      offset: -28800,
-      currency: 'USD',
-      isp: 'Google LLC',
-      org: 'Google LLC',
-      as: 'AS15169 Google LLC',
-      asname: 'GOOGLE',
+      count: 5,
     },
     {
-      query: '1.1.1.1',
-      status: 'success',
-      continent: 'Oceania',
-      continentCode: 'OC',
       country: 'Australia',
       countryCode: 'AU',
-      region: 'QLD',
-      regionName: 'Queensland',
-      city: 'South Brisbane',
-      district: '',
-      zip: '4101',
-      lat: -27.476,
-      lon: 153.027,
-      timezone: 'Australia/Brisbane',
-      offset: 36000,
-      currency: 'AUD',
-      isp: 'Cloudflare, Inc',
-      org: 'APNIC Research and Development',
-      as: 'AS13335 Cloudflare, Inc',
-      asname: 'CLOUDFLARENET',
+      count: 3,
     },
   ];
 
-  it('should aggregate locations by country', () => {
+  it('should map locations correctly', () => {
     const { result } = renderHook(() =>
       useIpLocationData({ locations: mockLocations, isLoading: false })
     );
 
     expect(result.current.data).toHaveLength(2);
     expect(result.current.data[0].countryCode).toBe('US');
-    expect(result.current.data[0].ipCount).toBe(1);
+    expect(result.current.data[0].ipCount).toBe(5);
   });
 
   it('should calculate totals correctly', () => {
@@ -65,22 +31,8 @@ describe('useIpLocationData', () => {
       useIpLocationData({ locations: mockLocations, isLoading: false })
     );
 
-    expect(result.current.totalIps).toBe(2);
+    expect(result.current.totalIps).toBe(8);
     expect(result.current.totalCountries).toBe(2);
-  });
-
-  it('should sort by IP count descending', () => {
-    const duplicateLocations = [
-      ...mockLocations,
-      { ...mockLocations[0], query: '8.8.4.4' }, // Another US IP
-    ];
-
-    const { result } = renderHook(() =>
-      useIpLocationData({ locations: duplicateLocations, isLoading: false })
-    );
-
-    expect(result.current.data[0].countryCode).toBe('US');
-    expect(result.current.data[0].ipCount).toBe(2);
   });
 
   it('should return empty array when locations is undefined', () => {

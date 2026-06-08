@@ -2,7 +2,6 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { StatisticService } from './statistic.service';
 import { DataSource } from 'typeorm';
-import { AssetsService } from '../assets/assets.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -39,10 +38,6 @@ describe('StatisticService', () => {
     createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
   };
 
-  const mockAssetsService = {
-    getIpAssets: jest.fn(),
-  };
-
   const mockGeoIpService = {
     getGeoIp: jest.fn(),
   };
@@ -66,7 +61,6 @@ describe('StatisticService', () => {
       providers: [
         StatisticService,
         { provide: DataSource, useValue: mockDataSource },
-        { provide: AssetsService, useValue: mockAssetsService },
         { provide: GeoIpService, useValue: mockGeoIpService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: WorkspacesService, useValue: mockWorkspacesService },
