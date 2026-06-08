@@ -14,10 +14,10 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { authClient, SESSION_QUERY_KEY } from '@/utils/authClient';
+import { authClient } from '@/utils/authClient';
 import { useQueryClient } from '@tanstack/react-query';
-import { LogOut, Settings } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
+import { LogOut, Settings } from 'lucide-react';
 
 interface NavUserProps {
   isOnlyAvatar?: boolean;
@@ -36,10 +36,19 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
   }
 
   const handleLogout = async () => {
-    await signOut();
-    queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
-    queryClient.clear();
+    await signOut({
+      fetchOptions: {
+        onSuccess: async () => {
+          queryClient.clear();
+          await navigate({ to: '/login' });
+        },
+        onError: (ctx) => {
+          console.error('Logout failed:', ctx.error);
+        },
+      },
+    });
   };
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>

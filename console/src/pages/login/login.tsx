@@ -9,13 +9,15 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { authClient } from '@/utils/authClient';
+import { authClient, SESSION_QUERY_KEY } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Route } from '@/routes/login';
 import { z } from 'zod';
+import { useNavigate } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
 
 const formSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -33,13 +35,25 @@ export default function Login() {
   });
 
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
     const res = await authClient.signIn.email({
       email: values.email,
       password: values.password,
-      callbackURL: redirectUrl || '/',
+      fetchOptions: {
+        onSuccess: async (ctx) => {
+          queryClient.setQueryData(SESSION_QUERY_KEY, ctx.data);
+          await navigate({ to: redirectUrl || '/' });
+        },
+        onError: (ctx) => {
+          form.setError('password', {
+            message: ctx.error?.message || 'Invalid email or password',
+          });
+        },
+      },
     });
     if (res.error) {
       form.setError('password', {
@@ -62,10 +76,7 @@ export default function Login() {
             </p>
           </div>
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-5"
-            >
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <FormField
                 control={form.control}
                 name="email"
