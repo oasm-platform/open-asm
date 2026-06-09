@@ -260,6 +260,7 @@ export function useAgentChat({
   } = useChat({
     transport,
     id: conversationId || 'agent-new-chat',
+    experimental_throttle: 50,
     onError: (error) => {
       console.error('[Chat] Error:', error);
       setStreamError(error.message ?? 'An error occurred while streaming');
