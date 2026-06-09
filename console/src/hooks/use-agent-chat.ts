@@ -262,7 +262,14 @@ export function useAgentChat({
       if (data.type === 'data-todos-updated') {
         const payload = data.data as { todos: AgentTodoItem[] } | undefined;
         if (payload?.todos) {
-          setTodos(payload.todos);
+          // Use functional update to avoid stale closure issues
+          setTodos((prevTodos) => {
+            // Skip update if todos are the same (avoid infinite re-renders)
+            if (JSON.stringify(prevTodos) === JSON.stringify(payload.todos)) {
+              return prevTodos;
+            }
+            return payload.todos;
+          });
         }
       }
       if (data.type === 'data-remote-execute-output') {
@@ -284,7 +291,15 @@ export function useAgentChat({
   useEffect(() => {
     if (!conversationId || isLoadingHistory || isStreamingRef.current) return;
     if (savedMessages.length > 0) {
-      setMessages(savedMessages);
+      // Use functional update to compare and avoid unnecessary re-renders
+      setMessages((prev) => {
+        // Skip if messages are the same length and have same IDs
+        if (prev.length === savedMessages.length) {
+          const sameIds = prev.every((m, i) => m.id === savedMessages[i]?.id);
+          if (sameIds) return prev;
+        }
+        return savedMessages;
+      });
     }
   }, [conversationId, isLoadingHistory, savedMessages, setMessages]);
 
@@ -352,18 +367,31 @@ export function useAgentChat({
       return;
     }
 
+    // Use a flag to prevent setting state after unmount
+    let cancelled = false;
+
     orvalClient<ConversationResponseDto>({
       url: `/api/agents/conversations/${conversationId}`,
       method: 'GET',
     })
       .then((data) => {
-        if (data.todos) {
-          setTodos(data.todos as unknown as AgentTodoItem[]);
+        if (!cancelled && data.todos) {
+          setTodos((prev) => {
+            // Only update if different
+            if (JSON.stringify(prev) === JSON.stringify(data.todos)) {
+              return prev;
+            }
+            return data.todos as unknown as AgentTodoItem[];
+          });
         }
       })
       .catch(() => {
         // Silently fail - todos will be empty
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [conversationId]);
 
   // Auto-send pending message from landing page

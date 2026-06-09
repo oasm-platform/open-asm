@@ -79,7 +79,7 @@ export class AgentsCompletionsService {
   private readonly customToolSupportCache = new Map<string, boolean>();
   // Default context window (128k) - used for compaction threshold calculation
   private static readonly DEFAULT_CONTEXT_WINDOW = 128000;
-  private static readonly COMPACTION_THRESHOLD_RATIO = 0.7;
+  private static readonly COMPACTION_THRESHOLD_RATIO = 0.6;
 
   constructor(
     @InjectRepository(AgentLLMConfig)
@@ -392,7 +392,7 @@ export class AgentsCompletionsService {
         model,
         messages: [{ role: 'user', content: prompt }],
         tools,
-        stopWhen: stepCountIs(10),
+        stopWhen: stepCountIs(20),
         ...(() => {
           const opts = getReasoningProviderOptions(llmConfig.provider);
           return opts ? { providerOptions: opts } : {};
@@ -490,18 +490,21 @@ export class AgentsCompletionsService {
   }
 
   /**
-   * Fetches up to 20 most recent messages from the conversation, sorted chronologically.
-   * Used to build conversation context for the model.
+   * Fetches messages from the conversation for building context.
+   * When a summary exists, only recent messages are needed (old context is in summary).
    */
   private async getConversationHistory(
     conversationId: string,
+    hasSummary: boolean,
   ): Promise<AgentMessage[]> {
+    // If summary exists, only keep recent messages (old context is in summary)
+    const take = hasSummary ? 5 : 20;
     const messages = await this.messageRepository.find({
       where: { conversationId },
-      order: { createdAt: 'DESC' }, // Fetch newest first
-      take: 20,
+      order: { createdAt: 'DESC' },
+      take,
     });
-    return messages.reverse(); // Reverse to chronological order
+    return messages.reverse();
   }
 
   /**
@@ -952,10 +955,11 @@ export class AgentsCompletionsService {
       return { aiStream: emptyStream, conversationId, todosEmitter };
     }
 
-    // Determine max output tokens based on agent mode
+    // Determine max output tokens based on agent mode and LLM config
     // AGENT mode needs more tokens for multi-step tool execution
     const maxOutputTokens =
-      options.agentMode === AgentMode.AGENT ? 16384 : undefined;
+      llmConfig.maxOutputTokens ??
+      (options.agentMode === AgentMode.AGENT ? 32768 : undefined);
 
     // Invoke the AI SDK streamText with all callbacks
     const result = streamText({
@@ -964,7 +968,12 @@ export class AgentsCompletionsService {
       system: contextParts.join('\n\n'),
       messages: modelMessages,
       // Only include tools if available (models without tool support will error here)
-      ...(tools ? { tools, stopWhen: stepCountIs(10) } : {}),
+      ...(tools
+        ? {
+            tools,
+            stopWhen: stepCountIs(llmConfig.maxSteps ?? 20),
+          }
+        : {}),
       // Enable reasoning/thinking via provider-specific options
       ...(() => {
         const opts = getReasoningProviderOptions(llmConfig.provider);
@@ -982,7 +991,9 @@ export class AgentsCompletionsService {
       },
       // Handle errors (especially tool-calling errors)
       onError: ({ error }) => {
-        this.handleToolError(error, llmConfig);
+        // Log the error but don't throw — throwing in onError can crash the stream.
+        // Tool errors will be detected via toolResults in onFinish.
+        this.logger.error('[Agent] Stream error during execution', error);
       },
       // Pass abort signal so AI SDK can cancel the provider call
       abortSignal,
@@ -1138,7 +1149,7 @@ export class AgentsCompletionsService {
           return;
         }
         if (options.agentMode !== AgentMode.AGENT) {
-          this.autoCompleteStuckTodos(conversationId).catch((err) =>
+          await this.autoCompleteStuckTodos(conversationId).catch((err) =>
             this.logger.error('Error in autoCompleteStuckTodos', err),
           );
         }
@@ -1149,8 +1160,8 @@ export class AgentsCompletionsService {
         }
 
         // Asynchronously check and trigger compaction if needed
-        // Fire-and-forget: does not block the stream response
-        this.handlePostStreamCompaction(
+        // Await compaction to ensure summary is saved before continuation loop checks it
+        await this.handlePostStreamCompaction(
           conversationId,
           llmConfig,
           contextParts,
@@ -1283,14 +1294,19 @@ export class AgentsCompletionsService {
                 if (done || controllerClosed) break;
                 controller.enqueue(value);
               }
+
+              // Wait briefly for async onFinish operations (todo updates, DB writes) to settle
+              await new Promise((resolve) => setTimeout(resolve, 500));
             } catch (iterationError) {
               this.logger.error(
                 `[Continuation] Error in iteration ${iteration} for ${conversationId}`,
                 iterationError,
               );
-              // Break out of the loop but don't crash — the finally block
-              // will clean up, and autoCompleteStuckTodos runs below.
-              break;
+              // Don't break on non-fatal errors — try next iteration
+              // Only break if abort signal fired or controller is closed
+              if (abortSignal?.aborted || controllerClosed) break;
+              // For other errors, continue to next iteration
+              continue;
             }
 
             if (abortSignal?.aborted || controllerClosed) break;
@@ -1310,7 +1326,10 @@ export class AgentsCompletionsService {
 
             // Prepare next iteration context
             const updatedMessages =
-              await this.getConversationHistory(conversationId);
+              await this.getConversationHistory(
+                conversationId,
+                !!conversation?.summary,
+              );
             currentModelMessages =
               this.mapHistoryToModelMessages(updatedMessages);
 
@@ -1436,8 +1455,12 @@ export class AgentsCompletionsService {
     // Step 2: Save the user's message to DB
     await this.saveUserMessage(conversation.id, dto.question);
 
-    // Step 3: Fetch conversation history (up to 5 most recent messages)
-    const historyMessages = await this.getConversationHistory(conversation.id);
+    // Step 3: Fetch conversation history
+    // When summary exists, only recent messages needed (old context is in summary)
+    const historyMessages = await this.getConversationHistory(
+      conversation.id,
+      !!conversation.summary,
+    );
 
     // Step 4: Resolve the final LLM config with user overrides
     const llmConfig = await this.resolveLLMConfigWithOverrides(
@@ -1516,6 +1539,11 @@ export class AgentsCompletionsService {
         todosEmitter,
       ) as ToolSet),
       ...(loadSkillTool ? { load_skill: loadSkillTool } : {}),
+      // Add memory tools
+      ...(this.agentTool.getMemoryTools(
+        workspaceId,
+        conversation.id,
+      ) as ToolSet),
     };
 
     // Step 12: Build the combined stream with auto-continuation

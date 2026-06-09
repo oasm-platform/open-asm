@@ -19,6 +19,7 @@ import { WorkersService } from '@/modules/workers/workers.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { AgentMode } from '@/common/enums/enum';
+import { AgentsMemoriesService } from './agents.memories';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -65,6 +66,7 @@ export class AgentTool {
     private readonly remoteExecuteService: RemoteExecuteService,
     @InjectRepository(AgentConversation)
     private readonly conversationRepository: Repository<AgentConversation>,
+    private readonly agentsMemories: AgentsMemoriesService,
   ) {}
 
   get getAssetsTool(): (workspaceId: string) => any {
@@ -395,13 +397,117 @@ export class AgentTool {
         steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
       }),
       execute: async (params: { steps: string[] }) => {
-        const now = new Date().toISOString();
-        const todos: AgentTodoItem[] = params.steps.map((step) => ({
-          id: randomUUID(), content: step, status: 'pending' as const, updatedAt: now,
-        }));
-        await repo.update(conversationId, { todos });
-        if (emitter) emitter.emit('todos-updated', todos);
-        return { success: true, message: `Plan set with ${todos.length} steps.`, todos };
+        try {
+          // Log raw params for debugging
+          console.log('[formulate_plan] Raw params:', JSON.stringify(params, null, 2));
+
+          // Normalize steps: handle various formats AI might send
+          let normalizedSteps: string[] = [];
+
+          const rawSteps = params.steps as string[] | string;
+
+          const cleanStep = (s: string): string => {
+            let cleaned = s.trim();
+            // Remove surrounding quotes (single or double)
+            if (
+              (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+              (cleaned.startsWith("'") && cleaned.endsWith("'"))
+            ) {
+              cleaned = cleaned.slice(1, -1).trim();
+            }
+            // Remove escaped quotes
+            cleaned = cleaned.replace(/\\"/g, '"').replace(/\\'/g, "'");
+            // Remove extra whitespace but preserve intentional newlines
+            cleaned = cleaned.replace(/[ \t]+/g, ' ').trim();
+            return cleaned;
+          };
+
+          // Try to parse as JSON array first (in case AI sends JSON string)
+          let stepsArray: string[] = [];
+          
+          if (typeof rawSteps === 'string') {
+            // Try JSON parse
+            try {
+              const parsed = JSON.parse(rawSteps);
+              if (Array.isArray(parsed)) {
+                stepsArray = parsed.map((s) => String(s));
+                console.log('[formulate_plan] Parsed from JSON string');
+              } else {
+                // Single string - use as is
+                stepsArray = [rawSteps];
+              }
+            } catch {
+              // Not valid JSON, treat as plain string
+              stepsArray = [rawSteps];
+            }
+          } else if (Array.isArray(rawSteps)) {
+            // Check if it's a JSON string inside array (e.g., ["[\"step1\", \"step2\"]"])
+            if (rawSteps.length === 1 && typeof rawSteps[0] === 'string') {
+              const first = rawSteps[0];
+              try {
+                const parsed = JSON.parse(first);
+                if (Array.isArray(parsed)) {
+                  stepsArray = parsed.map((s) => String(s));
+                  console.log('[formulate_plan] Parsed from nested JSON string');
+                } else {
+                  stepsArray = rawSteps;
+                }
+              } catch {
+                stepsArray = rawSteps;
+              }
+            } else {
+              stepsArray = rawSteps;
+            }
+          }
+
+          console.log('[formulate_plan] Steps array:', stepsArray);
+
+          // Clean each step
+          for (const s of stepsArray) {
+            if (typeof s === 'string' && s.trim()) {
+              const cleaned = cleanStep(s);
+              if (!cleaned) continue;
+
+              // Split by newline in case AI puts all steps in one string
+              if (cleaned.includes('\n')) {
+                const lines = cleaned
+                  .split('\n')
+                  .map((l) => cleanStep(l))
+                  .filter((l) => l.length > 0);
+                normalizedSteps.push(...lines);
+              } else {
+                normalizedSteps.push(cleaned);
+              }
+            } else if (typeof s === 'object' && s !== null) {
+              normalizedSteps.push(JSON.stringify(s));
+            } else if (s !== null && s !== undefined) {
+              const cleaned = cleanStep(String(s));
+              if (cleaned) normalizedSteps.push(cleaned);
+            }
+          }
+
+          console.log('[formulate_plan] Normalized steps:', normalizedSteps);
+          console.log('[formulate_plan] Normalized count:', normalizedSteps.length);
+
+          if (normalizedSteps.length === 0) {
+            return { success: false, message: 'No valid steps provided.' };
+          }
+
+          const now = new Date().toISOString();
+          const todos: AgentTodoItem[] = normalizedSteps.map((step) => ({
+            id: randomUUID(), content: step, status: 'pending' as const, updatedAt: now,
+          }));
+
+          console.log('[formulate_plan] Final todos:', JSON.stringify(todos, null, 2));
+
+          await repo.update(conversationId, { todos });
+          if (emitter) emitter.emit('todos-updated', todos);
+          return { success: true, message: `Plan set with ${todos.length} steps.`, todos };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error('[formulate_plan] Error:', error);
+          return { success: false, message: `Failed to set plan: ${message}` };
+        }
       },
     };
 
@@ -412,18 +518,23 @@ export class AgentTool {
         status: z.enum(['pending', 'in_progress', 'completed', 'failed']).describe('New status'),
       }),
       execute: async (params: { id: string; status: AgentTodoItem['status'] }) => {
-        const conversation = await repo.findOne({ where: { id: conversationId } });
-        if (!conversation) return { success: false, message: 'Conversation not found' };
+        try {
+          const conversation = await repo.findOne({ where: { id: conversationId } });
+          if (!conversation) return { success: false, message: 'Conversation not found' };
 
-        const targetTodo = (conversation.todos ?? []).find((t) => t.id === params.id);
-        if (!targetTodo) return { success: false, message: `Todo "${params.id}" not found.` };
+          const targetTodo = (conversation.todos ?? []).find((t) => t.id === params.id);
+          if (!targetTodo) return { success: false, message: `Todo "${params.id}" not found.` };
 
-        const todos = (conversation.todos ?? []).map((t) =>
-          t.id === params.id ? { ...t, status: params.status, updatedAt: new Date().toISOString() } : t,
-        );
-        await repo.update(conversationId, { todos });
-        if (emitter) emitter.emit('todos-updated', todos);
-        return { success: true, message: `Updated "${targetTodo.content}" -> ${params.status}`, todo: todos.find((t) => t.id === params.id) };
+          const todos = (conversation.todos ?? []).map((t) =>
+            t.id === params.id ? { ...t, status: params.status, updatedAt: new Date().toISOString() } : t,
+          );
+          await repo.update(conversationId, { todos });
+          if (emitter) emitter.emit('todos-updated', todos);
+          return { success: true, message: `Updated "${targetTodo.content}" -> ${params.status}`, todo: todos.find((t) => t.id === params.id) };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to update step: ${message}` };
+        }
       },
     };
 
@@ -433,16 +544,21 @@ export class AgentTool {
         content: z.string().min(1).describe('Todo content'),
       }),
       execute: async (params: { content: string }) => {
-        const conversation = await repo.findOne({ where: { id: conversationId } });
-        if (!conversation) return { success: false, message: 'Conversation not found' };
+        try {
+          const conversation = await repo.findOne({ where: { id: conversationId } });
+          if (!conversation) return { success: false, message: 'Conversation not found' };
 
-        const now = new Date().toISOString();
-        const newTodo: AgentTodoItem = { id: randomUUID(), content: params.content, status: 'pending', updatedAt: now };
-        const todos = [...(conversation.todos ?? []), newTodo];
+          const now = new Date().toISOString();
+          const newTodo: AgentTodoItem = { id: randomUUID(), content: params.content, status: 'pending', updatedAt: now };
+          const todos = [...(conversation.todos ?? []), newTodo];
 
-        await repo.update(conversationId, { todos });
-        if (emitter) emitter.emit('todos-updated', todos);
-        return { success: true, message: `Added todo "${params.content}".`, todo: newTodo };
+          await repo.update(conversationId, { todos });
+          if (emitter) emitter.emit('todos-updated', todos);
+          return { success: true, message: `Added todo "${params.content}".`, todo: newTodo };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to add step: ${message}` };
+        }
       },
     };
 
@@ -450,9 +566,14 @@ export class AgentTool {
       description: 'Clear entire plan (irreversible). Then call formulate_plan to create a new one.',
       parameters: z.object({}),
       execute: async () => {
-        await repo.update(conversationId, { todos: [] });
-        if (emitter) emitter.emit('todos-updated', []);
-        return { success: true, message: 'Plan cleared.' };
+        try {
+          await repo.update(conversationId, { todos: [] });
+          if (emitter) emitter.emit('todos-updated', []);
+          return { success: true, message: 'Plan cleared.' };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to clear plan: ${message}` };
+        }
       },
     };
 
@@ -461,6 +582,169 @@ export class AgentTool {
       transition_step: tool(updateTodoStatusTool),
       append_step: tool(addTodoTool),
       scrap_plan: tool(clearPlanTool),
+    };
+  }
+
+  getMemoryTools(
+    workspaceId: string,
+    conversationId: string,
+  ): Record<string, ToolType> {
+    const memoriesService = this.agentsMemories;
+
+    const stmWriteTool: any = {
+      description:
+        'Save a key-value pair to short-term memory (conversation scope). ' +
+        'Use this to remember important findings during execution (e.g., discovered IPs, scan results, target info).',
+      parameters: z.object({
+        key: z
+          .string()
+          .min(1)
+          .describe(
+            'Memory key (e.g. "target_info", "open_ports", "scan_results")',
+          ),
+        value: z.string().min(1).describe('Memory value to store'),
+      }),
+      execute: async (params: { key: string; value: string }) => {
+        try {
+          await memoriesService.stmSet(
+            conversationId,
+            params.key,
+            params.value,
+          );
+          return {
+            success: true,
+            message: `Stored "${params.key}" in short-term memory.`,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to store memory: ${message}` };
+        }
+      },
+    };
+
+    const stmReadTool: any = {
+      description: 'Read a value from short-term memory by key.',
+      parameters: z.object({
+        key: z.string().describe('Memory key to read'),
+      }),
+      execute: async (params: { key: string }) => {
+        try {
+          const entry = await memoriesService.stmGet(
+            conversationId,
+            params.key,
+          );
+          if (!entry) {
+            return {
+              found: false,
+              message: `No memory found for key "${params.key}".`,
+            };
+          }
+          return {
+            found: true,
+            key: entry.key,
+            value: entry.value,
+            updatedAt: entry.updatedAt,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to read memory: ${message}` };
+        }
+      },
+    };
+
+    const stmListTool: any = {
+      description: 'List all short-term memory entries for this conversation.',
+      parameters: z.object({}),
+      execute: async () => {
+        try {
+          const entries = await memoriesService.stmGetAll(conversationId);
+          return {
+            count: entries.length,
+            entries: entries.map((e) => ({
+              key: e.key,
+              value: e.value,
+              updatedAt: e.updatedAt,
+            })),
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to list memories: ${message}` };
+        }
+      },
+    };
+
+    const ltmWriteTool: any = {
+      description:
+        'Save important information to long-term memory (workspace scope, persists across conversations). ' +
+        'Use this for persistent knowledge like target profiles, known vulnerabilities, organizational policies.',
+      parameters: z.object({
+        content: z
+          .string()
+          .min(1)
+          .describe('Content to store in long-term memory'),
+      }),
+      execute: async (params: { content: string }) => {
+        try {
+          await memoriesService.ltmSet(workspaceId, params.content);
+          return {
+            success: true,
+            message: 'Saved to long-term memory.',
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to save LTM: ${message}` };
+        }
+      },
+    };
+
+    const ltmAppendTool: any = {
+      description:
+        'Append information to existing long-term memory (keeps previous content).',
+      parameters: z.object({
+        content: z
+          .string()
+          .min(1)
+          .describe('Content to append to existing long-term memory'),
+      }),
+      execute: async (params: { content: string }) => {
+        try {
+          const existing = await memoriesService.ltmGet(workspaceId);
+          const newContent = existing.content
+            ? `${existing.content}\n\n${params.content}`
+            : params.content;
+          await memoriesService.ltmSet(workspaceId, newContent);
+          return {
+            success: true,
+            message: 'Appended to long-term memory.',
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to append LTM: ${message}` };
+        }
+      },
+    };
+
+    const ltmReadTool: any = {
+      description: 'Read the current long-term memory content.',
+      parameters: z.object({}),
+      execute: async () => {
+        try {
+          const record = await memoriesService.ltmGet(workspaceId);
+          return { content: record.content || '(empty)' };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to read LTM: ${message}` };
+        }
+      },
+    };
+
+    return {
+      stm_write: tool(stmWriteTool),
+      stm_read: tool(stmReadTool),
+      stm_list: tool(stmListTool),
+      ltm_write: tool(ltmWriteTool),
+      ltm_append: tool(ltmAppendTool),
+      ltm_read: tool(ltmReadTool),
     };
   }
 
