@@ -529,7 +529,6 @@ export const ChatConversation = memo(function ChatConversation({
   todos,
   remoteExecuteEvents,
 }: ChatConversationProps) {
-  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const isLoadingMoreRef = useRef(false);
   const onLoadMoreRef = useRef(onLoadMore);
   const hasMoreRef = useRef(hasMoreMessages);
@@ -607,12 +606,13 @@ export const ChatConversation = memo(function ChatConversation({
     prevMessageCountRef.current = messages.length;
   }, [messages]);
 
-  useEffect(() => {
-    const userMessages = messages.filter((m) => m.role === 'user');
-    if (userMessages.length > 0) {
-      const lastUser = userMessages[userMessages.length - 1];
-      setLastUserMessage(getTextContent(lastUser));
+  const lastUserMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        return getTextContent(messages[i]);
+      }
     }
+    return null;
   }, [messages]);
 
   const handleRetry = useCallback(() => {
