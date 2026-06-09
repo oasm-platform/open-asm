@@ -4,6 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -67,4 +68,22 @@ export class AgentLLMConfig extends BaseEntity {
   @IsUUID()
   @Column({ type: 'uuid' })
   createdBy: string;
+
+  @ApiProperty({
+    description: 'Max output tokens for agent mode',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Column({ type: 'int', nullable: true })
+  maxOutputTokens?: number;
+
+  @ApiProperty({
+    description: 'Max tool call steps per iteration',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Column({ type: 'int', nullable: true })
+  maxSteps?: number;
 }
