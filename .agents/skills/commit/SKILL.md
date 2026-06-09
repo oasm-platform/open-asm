@@ -33,6 +33,7 @@ Requirements: 0 errors, 0 warnings, 100% tests pass, 80%+ coverage.
 ```bash
 cd console && npm run lint
 cd console && npm run typecheck
+cd console && npm run test
 ```
 
 Requirements: 0 errors, 0 warnings.
@@ -75,6 +76,7 @@ Follow Conventional Commits: `type(scope): description`
 - Footer: reference issues with `Closes #` or `Fixes #`
 
 Examples:
+
 ```
 feat(core-api): add target service history endpoint
 fix(console): resolve dashboard loading state
