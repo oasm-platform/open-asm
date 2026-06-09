@@ -216,6 +216,40 @@ export function useAgentChat({
     return mapDbMessagesToUI(pages);
   }, [messagesData]);
 
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/agents/messages/stream',
+        headers: selectedWorkspaceId
+          ? { 'x-workspace-id': selectedWorkspaceId }
+          : {},
+        prepareSendMessagesRequest: ({ messages }) => {
+          const lastMessage = messages[messages.length - 1];
+          const textContent =
+            lastMessage?.parts
+              ?.filter((p) => p.type === 'text')
+              .map((p) => ('text' in p ? p.text : ''))
+              .join('') || '';
+
+          const modelInfo = selectedModelRef.current;
+          const convId = conversationId;
+
+          return {
+            body: {
+              question: textContent,
+              ...(convId && { conversationId: convId }),
+              ...(modelInfo && {
+                model: modelInfo.model,
+                provider: modelInfo.provider,
+              }),
+              agentMode: agentModeRef.current,
+            },
+          };
+        },
+      }),
+    [selectedWorkspaceId, conversationId],
+  );
+
   const {
     messages: chatMessages,
     status,
@@ -224,35 +258,7 @@ export function useAgentChat({
     regenerate,
     stop,
   } = useChat({
-    transport: new DefaultChatTransport({
-      api: '/api/agents/messages/stream',
-      headers: selectedWorkspaceId
-        ? { 'x-workspace-id': selectedWorkspaceId }
-        : {},
-      prepareSendMessagesRequest: ({ messages }) => {
-        const lastMessage = messages[messages.length - 1];
-        const textContent =
-          lastMessage?.parts
-            ?.filter((p) => p.type === 'text')
-            .map((p) => ('text' in p ? p.text : ''))
-            .join('') || '';
-
-        const modelInfo = selectedModelRef.current;
-        const convId = conversationId;
-
-        return {
-          body: {
-            question: textContent,
-            ...(convId && { conversationId: convId }),
-            ...(modelInfo && {
-              model: modelInfo.model,
-              provider: modelInfo.provider,
-            }),
-            agentMode: agentModeRef.current,
-          },
-        };
-      },
-    }),
+    transport,
     id: conversationId || 'agent-new-chat',
     onError: (error) => {
       console.error('[Chat] Error:', error);
@@ -287,12 +293,18 @@ export function useAgentChat({
 
   const isStreaming = status === 'submitted' || status === 'streaming';
 
+  // Keep setMessages in a ref to avoid re-triggering the history sync effect
+  const setMessagesRef = useRef(setMessages);
+  useEffect(() => {
+    setMessagesRef.current = setMessages;
+  }, [setMessages]);
+
   // Sync history whenever savedMessages changes but not while streaming
   useEffect(() => {
     if (!conversationId || isLoadingHistory || isStreamingRef.current) return;
     if (savedMessages.length > 0) {
       // Use functional update to compare and avoid unnecessary re-renders
-      setMessages((prev) => {
+      setMessagesRef.current((prev) => {
         // Skip if messages are the same length and have same IDs
         if (prev.length === savedMessages.length) {
           const sameIds = prev.every((m, i) => m.id === savedMessages[i]?.id);
@@ -301,7 +313,7 @@ export function useAgentChat({
         return savedMessages;
       });
     }
-  }, [conversationId, isLoadingHistory, savedMessages, setMessages]);
+  }, [conversationId, isLoadingHistory, savedMessages]);
 
   // Display chatMessages when available, otherwise fall back to savedMessages
   const messages: UIMessage[] =
@@ -394,6 +406,12 @@ export function useAgentChat({
     };
   }, [conversationId]);
 
+  // Keep handleSendMessage in a ref to avoid re-triggering the auto-send effect
+  const handleSendMessageRef = useRef(handleSendMessage);
+  useEffect(() => {
+    handleSendMessageRef.current = handleSendMessage;
+  }, [handleSendMessage]);
+
   // Auto-send pending message from landing page
   useEffect(() => {
     const state = location.state as {
@@ -411,14 +429,14 @@ export function useAgentChat({
         setAgentMode(state.agentMode);
         agentModeRef.current = state.agentMode;
       }
-      void handleSendMessage(state.pendingMessage);
+      void handleSendMessageRef.current(state.pendingMessage);
       void navigate({
         to: location.pathname as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic route path
         replace: true,
         state: undefined,
       });
     }
-  }, [location.state, navigate, location.pathname, handleSendMessage]);
+  }, [location.state, navigate, location.pathname]);
 
   return {
     messages,
