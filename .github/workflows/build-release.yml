@@ -51,7 +51,7 @@ jobs:
               EXT=".exe"
             fi
             OUTPUT="dist/oasm-worker-${GOOS}-${GOARCH}${EXT}"
-            GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -ldflags='-s -w' -o "$OUTPUT" ./cmd/app
+            GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -ldflags='-s -w' -o "$OUTPUT" ./cmd/cli
           done
 
           ls -la dist/
