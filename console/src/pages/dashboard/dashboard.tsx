@@ -19,11 +19,10 @@ export default function Dashboard() {
   const { data: locations, isLoading: locationsLoading } =
     useStatisticControllerGetAssetLocations();
 
-  const {
-    data: ipLocationData,
-    totalIps,
-    totalCountries,
-  } = useIpLocationData({ locations, isLoading: locationsLoading });
+  const { data: ipLocationData, totalIps } = useIpLocationData({
+    locations,
+    isLoading: locationsLoading,
+  });
 
   if (workspacesLoading) return <Page title="Dashboard" />;
 
@@ -39,7 +38,7 @@ export default function Dashboard() {
     <Page title="Dashboard">
       <div className="space-y-4">
         <div className="grid grid-cols-1 2xl:grid-cols-4 gap-4">
-          <div className="col-span-1 2xl:col-span-3 order-2 2xl:order-none flex flex-col gap-4">
+          <div className="col-span-1 2xl:col-span-3 order-2 2xl:order-0 flex flex-col gap-4">
             <div className="flex-1">
               <Statistic />
             </div>
@@ -47,13 +46,12 @@ export default function Dashboard() {
               <IpLocationsCard
                 data={ipLocationData}
                 totalIps={totalIps}
-                totalCountries={totalCountries}
                 selectedCountry={selectedCountry}
                 onCountrySelect={setSelectedCountry}
               />
             </div>
           </div>
-          <div className="col-span-1 order-1 2xl:order-none flex flex-col gap-4">
+          <div className="col-span-1 order-1 2xl:order-0 flex flex-col gap-4">
             <div className="flex-1">
               <VulnerabilityStatistic />
             </div>
