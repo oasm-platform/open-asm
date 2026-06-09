@@ -369,8 +369,7 @@ export class StatisticService {
         country: data.country,
         count: data.count,
       }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+      .sort((a, b) => b.count - a.count);
   }
 
   /**

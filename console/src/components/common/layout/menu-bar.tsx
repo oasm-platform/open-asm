@@ -152,7 +152,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props} collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-2">
           <AppLogo type="large" />
         </div>
         {(state === 'expanded' || (state === 'collapsed' && isMobile)) && (

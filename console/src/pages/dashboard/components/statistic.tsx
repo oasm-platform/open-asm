@@ -142,6 +142,7 @@ export default function Statistic() {
                 <AreaChart
                   data={chartData}
                   margin={{ top: 10, right: 0, left: 0, bottom: 5 }}
+                  style={{ pointerEvents: 'none' }}
                 >
                   <defs>
                     <linearGradient

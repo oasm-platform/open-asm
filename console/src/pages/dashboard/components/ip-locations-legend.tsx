@@ -23,7 +23,6 @@ export default function IpLocationsLegend({ min, max }: IpLocationsLegendProps) 
         />
         <span className="text-muted-foreground font-medium">{max}</span>
       </div>
-      <div className="text-[10px] text-muted-foreground mt-1 text-center">IPs with issues</div>
     </div>
   );
 }
