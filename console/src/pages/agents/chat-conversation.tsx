@@ -606,6 +606,15 @@ export const ChatConversation = memo(function ChatConversation({
     prevMessageCountRef.current = messages.length;
   }, [messages]);
 
+  const lastUserMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        return getTextContent(messages[i]);
+      }
+    }
+    return null;
+  }, [messages]);
+
   const handleRetry = useCallback(() => {
     onRetry?.();
   }, [onRetry]);

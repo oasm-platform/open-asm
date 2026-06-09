@@ -823,22 +823,29 @@ export const PromptInput = ({
     [files, add, remove, clearAttachments, openFileDialog]
   );
 
+  const refsAdd = useCallback(
+    (incoming: SourceDocumentUIPart[] | SourceDocumentUIPart) => {
+      const array = Array.isArray(incoming) ? incoming : [incoming];
+      setReferencedSources((prev) => [
+        ...prev,
+        ...array.map((s) => ({ ...s, id: nanoid() })),
+      ]);
+    },
+    [],
+  );
+
+  const refsRemove = useCallback((id: string) => {
+    setReferencedSources((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
   const refsCtx = useMemo<ReferencedSourcesContext>(
     () => ({
-      add: (incoming: SourceDocumentUIPart[] | SourceDocumentUIPart) => {
-        const array = Array.isArray(incoming) ? incoming : [incoming];
-        setReferencedSources((prev) => [
-          ...prev,
-          ...array.map((s) => ({ ...s, id: nanoid() })),
-        ]);
-      },
+      add: refsAdd,
       clear: clearReferencedSources,
-      remove: (id: string) => {
-        setReferencedSources((prev) => prev.filter((s) => s.id !== id));
-      },
+      remove: refsRemove,
       sources: referencedSources,
     }),
-    [referencedSources, clearReferencedSources]
+    [referencedSources, clearReferencedSources, refsAdd, refsRemove]
   );
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = useCallback(
