@@ -22,9 +22,10 @@ import { Shimmer } from '@/components/ai-elements/shimmer';
 import { Markdown } from '@/components/common/markdown';
 import type { ToolCallState } from '@/components/common/tool-call-display';
 import { ToolCallDisplay } from '@/components/common/tool-call-display';
-import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import type { TextUIPart, UIMessage } from 'ai';
+import { motion } from 'framer-motion';
 import {
   AlertCircle,
   CheckIcon,
@@ -33,7 +34,6 @@ import {
   ShieldAlert,
   X,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import {
   memo,
   useCallback,
@@ -197,8 +197,7 @@ const ChatMessage = memo(function ChatMessage({
   const lastPart = parts.at(-1);
 
   // Show "Thinking" shimmer when streaming starts but no parts yet
-  const showInitialThinking =
-    isStreamingActive && parts.length === 0;
+  const showInitialThinking = isStreamingActive && parts.length === 0;
 
   // Reasoning is actively streaming if the last part is a reasoning part
   const isReasoningStreaming =
@@ -215,7 +214,14 @@ const ChatMessage = memo(function ChatMessage({
   // but keep tool calls and text parts in their actual positions.
   type RenderItem =
     | { kind: 'reasoning'; text: string; isStreaming: boolean }
-    | { kind: 'tool'; toolCallId: string; toolName: string; state: string; input?: unknown; output?: unknown }
+    | {
+        kind: 'tool';
+        toolCallId: string;
+        toolName: string;
+        state: string;
+        input?: unknown;
+        output?: unknown;
+      }
     | { kind: 'text'; text: string }
     | { kind: 'generating' }
     | { kind: 'initial-thinking' };
@@ -226,14 +232,19 @@ const ChatMessage = memo(function ChatMessage({
   let pendingReasoning = '';
   const flushReasoning = (streaming: boolean) => {
     if (pendingReasoning.trim()) {
-      renderItems.push({ kind: 'reasoning', text: pendingReasoning, isStreaming: streaming });
+      renderItems.push({
+        kind: 'reasoning',
+        text: pendingReasoning,
+        isStreaming: streaming,
+      });
       pendingReasoning = '';
     }
   };
 
   for (const part of parts) {
     if (part.type === 'reasoning' && 'text' in part) {
-      pendingReasoning += (pendingReasoning ? '\n\n' : '') + (part as { text: string }).text;
+      pendingReasoning +=
+        (pendingReasoning ? '\n\n' : '') + (part as { text: string }).text;
     } else {
       // Flush any accumulated reasoning before non-reasoning part
       flushReasoning(false);
@@ -272,7 +283,9 @@ const ChatMessage = memo(function ChatMessage({
     }
   }
   // Flush any trailing reasoning
-  const lastReasoningPart = [...parts].reverse().find((p) => p.type === 'reasoning');
+  const lastReasoningPart = [...parts]
+    .reverse()
+    .find((p) => p.type === 'reasoning');
   const isTrailingReasoning =
     isReasoningStreaming && lastReasoningPart && pendingReasoning.trim();
   flushReasoning(!!isTrailingReasoning);
