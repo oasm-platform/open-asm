@@ -529,7 +529,6 @@ export const ChatConversation = memo(function ChatConversation({
   todos,
   remoteExecuteEvents,
 }: ChatConversationProps) {
-  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const isLoadingMoreRef = useRef(false);
   const onLoadMoreRef = useRef(onLoadMore);
   const hasMoreRef = useRef(hasMoreMessages);
@@ -607,17 +606,18 @@ export const ChatConversation = memo(function ChatConversation({
     prevMessageCountRef.current = messages.length;
   }, [messages]);
 
-  useEffect(() => {
-    const userMessages = messages.filter((m) => m.role === 'user');
-    if (userMessages.length > 0) {
-      const lastUser = userMessages[userMessages.length - 1];
-      setLastUserMessage(getTextContent(lastUser));
-    }
-  }, [messages]);
-
   const handleRetry = useCallback(() => {
     onRetry?.();
   }, [onRetry]);
+
+  // Compute last user message directly (no state needed - avoids infinite loop during streaming)
+  const lastUserMessage = useMemo(() => {
+    const userMessages = messages.filter((m) => m.role === 'user');
+    if (userMessages.length > 0) {
+      return getTextContent(userMessages[userMessages.length - 1]);
+    }
+    return null;
+  }, [messages]);
 
   // Check if there's a user message without a response yet
   const hasUnansweredMessage = useMemo(() => {
