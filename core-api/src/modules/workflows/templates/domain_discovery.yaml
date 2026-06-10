@@ -15,3 +15,6 @@ jobs:
 
   - name: Take Screenshot
     run: screenshot
+
+  - name: Vuls Scan
+    run: nuclei
