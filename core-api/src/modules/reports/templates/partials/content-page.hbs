@@ -1,0 +1,36 @@
+<div class="border-b-4 border-slate-800 pb-6 mb-6">
+  <div class="flex justify-between items-start">
+    <div>
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-8 h-8 bg-slate-800 rounded flex items-center justify-center">
+          <span class="text-white font-bold text-sm">{{systemNameChar}}</span>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 m-0">{{reportTitle}}</h1>
+        </div>
+      </div>
+      <p class="text-sm text-slate-500 m-0">Week {{week}}, {{year}} · Exported: {{exportedAt}}</p>
+    </div>
+    <div class="text-right">
+      <span class="bg-red-100 text-red-700 border border-red-300 text-sm px-3 py-1 rounded font-medium">
+        {{classification}}
+      </span>
+    </div>
+  </div>
+</div>
+
+{{> sections/weekly-metrics}}
+{{> sections/monthly-metrics}}
+{{> sections/vulnerability-trend}}
+{{> sections/new-discoveries}}
+{{> sections/new-vulnerabilities}}
+{{> sections/resolved-vulnerabilities}}
+{{> sections/vuln-by-target}}
+{{> sections/target-inventory}}
+
+<div class="border-t-2 border-slate-300 pt-4 mt-6">
+  <div class="flex justify-between text-xs text-slate-500">
+    <p class="m-0">© 2026 {{systemName}}. All Rights Reserved.</p>
+    <p class="m-0">Internal Confidential Document</p>
+  </div>
+</div>

@@ -1,0 +1,18 @@
+<header class="border-b-4 border-slate-800 pb-6 mb-6">
+  <div class="flex items-start justify-between">
+    <div>
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-8 h-8 bg-slate-800 rounded flex items-center justify-center">
+          <span class="text-white font-bold">{{systemNameChar}}</span>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-slate-900">{{reportTitle}}</h1>
+        </div>
+      </div>
+      <p class="text-sm text-slate-500">Week {{week}}, {{year}} · Exported: {{formattedDate}}</p>
+    </div>
+    <div class="text-right">
+      <span class="bg-red-100 text-red-700 border border-red-300 text-sm px-3 py-1 rounded font-medium">{{classification}}</span>
+    </div>
+  </div>
+</header>
