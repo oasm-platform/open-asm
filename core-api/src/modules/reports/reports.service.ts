@@ -268,7 +268,7 @@ export class ReportsService {
       const idx = report.path.indexOf('/');
       const bucket = report.path.slice(0, idx);
       const filePath = report.path.slice(idx + 1);
-      this.storageService.deleteFile(filePath, bucket);
+      await this.storageService.deleteFile(filePath, bucket);
     } catch {
       // File may not exist, ignore
     }
