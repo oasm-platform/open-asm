@@ -31,6 +31,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     chromium \
     libpcap0.8 \
+    curl \
+    iputils-ping \
+    dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create tool directory

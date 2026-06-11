@@ -39,6 +39,7 @@ import {
 } from '@/mcp/mcp.schema';
 import type { AgentTodoItem } from './agents.todo';
 import { AgentConversation } from './entities/agent-conversation.entity';
+import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 
 const webFetchSchema = z.object({
   url: z.string().url().describe('Target URL'),
@@ -66,6 +67,8 @@ export class AgentTool {
     private readonly remoteExecuteService: RemoteExecuteService,
     @InjectRepository(AgentConversation)
     private readonly conversationRepository: Repository<AgentConversation>,
+    @InjectRepository(AgentConversationTodo)
+    private readonly todoRepository: Repository<AgentConversationTodo>,
     private readonly agentsMemories: AgentsMemoriesService,
   ) {}
 
@@ -389,7 +392,105 @@ export class AgentTool {
     conversationId: string,
     emitter?: EventEmitter,
   ): Record<string, ToolType> {
-    const repo = this.conversationRepository;
+    const todoRepo = this.todoRepository;
+
+    /**
+     * Tries to parse a string as a JSON array with fallback strategies.
+     * Handles cases where LLM sends steps with invalid JSON escapes (e.g., \`)
+     * that cause JSON.parse to fail.
+     *
+     * Strategy:
+     * 1. Normal JSON.parse
+     * 2. Sanitize invalid escapes and retry
+     * 3. Regex extraction for ["...", "..."] patterns
+     */
+    const tryParseJsonArray = (str: string): string[] | null => {
+      // Strategy 1: Normal JSON.parse
+      try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed)) return parsed.map((s) => String(s));
+        return null;
+      } catch {
+        // Fall through
+      }
+
+      // Strategy 2: Sanitize invalid escapes and retry
+      // Common issue: LLM sends \` which is not valid JSON
+      try {
+        const sanitized = str.replace(/\\`/g, '`');
+        const parsed = JSON.parse(sanitized);
+        if (Array.isArray(parsed)) return parsed.map((s) => String(s));
+        return null;
+      } catch {
+        // Fall through
+      }
+
+      // Strategy 3: Regex extraction for ["...", "..."] pattern
+      const trimmed = str.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        const inner = trimmed.slice(1, -1);
+        const items: string[] = [];
+        let current = '';
+        let inQuote = false;
+        let escaped = false;
+
+        for (let i = 0; i < inner.length; i++) {
+          const ch = inner[i]!;
+          if (escaped) {
+            current += ch;
+            escaped = false;
+            continue;
+          }
+          if (ch === '\\') {
+            escaped = true;
+            current += ch;
+            continue;
+          }
+          if (ch === '"') {
+            inQuote = !inQuote;
+            continue;
+          }
+          if (ch === ',' && !inQuote) {
+            const trimmedItem = current.trim();
+            if (trimmedItem) items.push(trimmedItem);
+            current = '';
+            continue;
+          }
+          current += ch;
+        }
+        const lastItem = current.trim();
+        if (lastItem) items.push(lastItem);
+
+        if (items.length > 0) {
+          // Clean up escaped quotes in each item
+          return items.map((s) =>
+            s.replace(/^"|"$/g, '').replace(/\\"/g, '"').trim(),
+          );
+        }
+      }
+
+      return null;
+    };
+
+    const getAllTodos = async (): Promise<AgentTodoItem[]> => {
+      const entities = await todoRepo.find({
+        where: { conversationId },
+        order: { sortOrder: 'ASC' },
+      });
+      return entities.map((t) => ({
+        id: t.id,
+        content: t.content,
+        status: t.status,
+        updatedAt: t.updatedAt.toISOString(),
+      }));
+    };
+
+    const emitTodos = async (): Promise<void> => {
+      if (emitter) {
+        const todos = await getAllTodos();
+        emitter.emit('todos-updated', todos);
+      }
+    };
 
     const setPlanTool: any = {
       description: 'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
@@ -399,8 +500,10 @@ export class AgentTool {
       execute: async (params: { steps: string[] }) => {
         try {
           // Guard: reject if there are active (pending/in_progress) todos
-          const existingConversation = await repo.findOne({ where: { id: conversationId } });
-          const existingTodos = existingConversation?.todos ?? [];
+          const existingTodos = await todoRepo.find({
+            where: { conversationId },
+            order: { sortOrder: 'ASC' },
+          });
           const hasActiveTodos = existingTodos.some(
             (t) => t.status === 'pending' || t.status === 'in_progress',
           );
@@ -443,37 +546,23 @@ export class AgentTool {
             return cleaned;
           };
 
-          // Try to parse as JSON array first (in case AI sends JSON string)
           let stepsArray: string[] = [];
-          
+
           if (typeof rawSteps === 'string') {
-            // Try JSON parse
-            try {
-              const parsed = JSON.parse(rawSteps);
-              if (Array.isArray(parsed)) {
-                stepsArray = parsed.map((s) => String(s));
-                console.log('[formulate_plan] Parsed from JSON string');
-              } else {
-                // Single string - use as is
-                stepsArray = [rawSteps];
-              }
-            } catch {
-              // Not valid JSON, treat as plain string
+            const parsed = tryParseJsonArray(rawSteps);
+            if (parsed) {
+              stepsArray = parsed;
+              console.log('[formulate_plan] Parsed from JSON string');
+            } else {
               stepsArray = [rawSteps];
             }
           } else if (Array.isArray(rawSteps)) {
-            // Check if it's a JSON string inside array (e.g., ["[\"step1\", \"step2\"]"])
             if (rawSteps.length === 1 && typeof rawSteps[0] === 'string') {
-              const first = rawSteps[0];
-              try {
-                const parsed = JSON.parse(first);
-                if (Array.isArray(parsed)) {
-                  stepsArray = parsed.map((s) => String(s));
-                  console.log('[formulate_plan] Parsed from nested JSON string');
-                } else {
-                  stepsArray = rawSteps;
-                }
-              } catch {
+              const parsed = tryParseJsonArray(rawSteps[0]!);
+              if (parsed) {
+                stepsArray = parsed;
+                console.log('[formulate_plan] Parsed from nested JSON string');
+              } else {
                 stepsArray = rawSteps;
               }
             } else {
@@ -514,15 +603,23 @@ export class AgentTool {
             return { success: false, message: 'No valid steps provided.' };
           }
 
-          const now = new Date().toISOString();
-          const todos: AgentTodoItem[] = normalizedSteps.map((step) => ({
-            id: randomUUID(), content: step, status: 'pending' as const, updatedAt: now,
-          }));
+          await todoRepo.delete({ conversationId });
 
+          const now = new Date();
+          const entities = normalizedSteps.map((step, index) =>
+            todoRepo.create({
+              conversationId,
+              content: step,
+              status: 'pending' as const,
+              sortOrder: index,
+            }),
+          );
+          await todoRepo.save(entities);
+
+          const todos = await getAllTodos();
           console.log('[formulate_plan] Final todos:', JSON.stringify(todos, null, 2));
 
-          await repo.update(conversationId, { todos });
-          if (emitter) emitter.emit('todos-updated', todos);
+          await emitTodos();
           return { success: true, message: `Plan set with ${todos.length} steps.`, todos };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -533,25 +630,23 @@ export class AgentTool {
     };
 
     const updateTodoStatusTool: any = {
-      description: 'Update step status (pending/in_progress/completed/failed). Must call before moving to next step. Params: id (UUID), status.',
+      description: 'Update the status of a specific step in the execution plan. You MUST call this at two points: (1) BEFORE starting work on a step — call transition_step(id, "in_progress"), and (2) AFTER finishing work on a step — call transition_step(id, "completed") or transition_step(id, "failed"). ALWAYS transition the current step before moving to the next sequential step. NEVER skip steps. NEVER call this for a step that is not your current step. Params: id (UUID of the step), status (pending/in_progress/completed/failed).',
       parameters: z.object({
         id: z.string().uuid().describe('Todo item ID'),
         status: z.enum(['pending', 'in_progress', 'completed', 'failed']).describe('New status'),
       }),
       execute: async (params: { id: string; status: AgentTodoItem['status'] }) => {
         try {
-          const conversation = await repo.findOne({ where: { id: conversationId } });
-          if (!conversation) return { success: false, message: 'Conversation not found' };
-
-          const targetTodo = (conversation.todos ?? []).find((t) => t.id === params.id);
+          const targetTodo = await todoRepo.findOne({
+            where: { id: params.id, conversationId },
+          });
           if (!targetTodo) return { success: false, message: `Todo "${params.id}" not found.` };
 
-          const todos = (conversation.todos ?? []).map((t) =>
-            t.id === params.id ? { ...t, status: params.status, updatedAt: new Date().toISOString() } : t,
-          );
-          await repo.update(conversationId, { todos });
-          if (emitter) emitter.emit('todos-updated', todos);
-          return { success: true, message: `Updated "${targetTodo.content}" -> ${params.status}`, todo: todos.find((t) => t.id === params.id) };
+          targetTodo.status = params.status;
+          await todoRepo.save(targetTodo);
+
+          await emitTodos();
+          return { success: true, message: `Updated "${targetTodo.content}" -> ${params.status}`, todo: { id: targetTodo.id, content: targetTodo.content, status: targetTodo.status, updatedAt: targetTodo.updatedAt.toISOString() } };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return { success: false, message: `Failed to update step: ${message}` };
@@ -566,29 +661,38 @@ export class AgentTool {
       }),
       execute: async (params: { content: string }) => {
         try {
-          const conversation = await repo.findOne({ where: { id: conversationId } });
-          if (!conversation) return { success: false, message: 'Conversation not found' };
-
-          const existingTodos = conversation.todos ?? [];
+          const existingTodos = await todoRepo.find({
+            where: { conversationId },
+          });
           const hasActiveTodos = existingTodos.some(
             (t) => t.status === 'pending' || t.status === 'in_progress',
           );
 
           // Guard: warn but allow append during active plan (the LLM might genuinely need it)
-          // However, the description strongly discourages this
           if (hasActiveTodos) {
             console.log(
               `[append_step] WARNING: Adding step while ${existingTodos.filter((t) => t.status === 'pending' || t.status === 'in_progress').length} step(s) still active`,
             );
           }
 
-          const now = new Date().toISOString();
-          const newTodo: AgentTodoItem = { id: randomUUID(), content: params.content, status: 'pending', updatedAt: now };
-          const todos = [...existingTodos, newTodo];
+          const maxOrderResult = await todoRepo
+            .createQueryBuilder('todo')
+            .select('MAX(todo.sortOrder)', 'max')
+            .where('todo.conversationId = :id', { id: conversationId })
+            .getRawOne();
+          const nextSortOrder = (maxOrderResult?.max ?? -1) + 1;
 
-          await repo.update(conversationId, { todos });
-          if (emitter) emitter.emit('todos-updated', todos);
-          return { success: true, message: `Added todo "${params.content}".`, todo: newTodo };
+          const newEntity = todoRepo.create({
+            conversationId,
+            content: params.content,
+            status: 'pending',
+            sortOrder: nextSortOrder,
+          });
+          await todoRepo.save(newEntity);
+
+          const todos = await getAllTodos();
+          await emitTodos();
+          return { success: true, message: `Added todo "${params.content}".`, todo: { id: newEntity.id, content: newEntity.content, status: newEntity.status, updatedAt: newEntity.updatedAt.toISOString() } };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return { success: false, message: `Failed to add step: ${message}` };
@@ -601,8 +705,8 @@ export class AgentTool {
       parameters: z.object({}),
       execute: async () => {
         try {
-          await repo.update(conversationId, { todos: [] });
-          if (emitter) emitter.emit('todos-updated', []);
+          await todoRepo.delete({ conversationId });
+          await emitTodos();
           return { success: true, message: 'Plan cleared.' };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
