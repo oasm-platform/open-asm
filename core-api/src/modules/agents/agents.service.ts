@@ -398,6 +398,7 @@ export class AgentsService {
       id: conversation.id,
       llmConfigId: conversation.llmConfigId,
       title: conversation.title,
+      agentMode: conversation.agentMode,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       todos,
@@ -436,6 +437,7 @@ export class AgentsService {
         id: c.id,
         llmConfigId: c.llmConfigId,
         title: c.title,
+        agentMode: c.agentMode,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
       })),
@@ -465,6 +467,7 @@ export class AgentsService {
       id: saved.id,
       llmConfigId: saved.llmConfigId,
       title: saved.title,
+      agentMode: saved.agentMode,
       createdAt: saved.createdAt,
       updatedAt: saved.updatedAt,
     };

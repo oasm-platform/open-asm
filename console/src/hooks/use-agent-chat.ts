@@ -373,7 +373,7 @@ export function useAgentChat({
     setStreamError(null);
   }, []);
 
-  // Fetch initial todos for existing conversations
+  // Fetch initial todos and agentMode for existing conversations
   useEffect(() => {
     if (!conversationId) {
       setTodos([]);
@@ -396,6 +396,10 @@ export function useAgentChat({
             }
             return data.todos as unknown as AgentTodoItem[];
           });
+        }
+        if (!cancelled && data.agentMode) {
+          setAgentMode(data.agentMode);
+          agentModeRef.current = data.agentMode;
         }
       })
       .catch(() => {
