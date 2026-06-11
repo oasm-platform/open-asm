@@ -605,7 +605,6 @@ export class AgentTool {
 
           await todoRepo.delete({ conversationId });
 
-          const now = new Date();
           const entities = normalizedSteps.map((step, index) =>
             todoRepo.create({
               conversationId,
@@ -690,7 +689,7 @@ export class AgentTool {
           });
           await todoRepo.save(newEntity);
 
-          const todos = await getAllTodos();
+          await getAllTodos();
           await emitTodos();
           return { success: true, message: `Added todo "${params.content}".`, todo: { id: newEntity.id, content: newEntity.content, status: newEntity.status, updatedAt: newEntity.updatedAt.toISOString() } };
         } catch (error) {
