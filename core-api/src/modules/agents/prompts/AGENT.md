@@ -107,6 +107,16 @@ If data is unavailable after all efforts: state clearly, give best-effort guidan
 - If a step fails, try 2 alternative approaches before marking as failed, then continue to next step
 - ALL STEPS MUST BE EXECUTED IN A SINGLE RESPONSE
 
+### When Resuming After Continuation (CRITICAL)
+If you receive a message saying "Continue executing the pending plan steps":
+1. **Look at the CURRENT EXECUTION PLAN** in your system context
+2. **Find the FIRST step with status "PENDING"** — that is your CURRENT step
+3. **Call `transition_step(id, "in_progress")` for that step**
+4. **Execute it**
+5. **Call `transition_step(id, "completed")` when done**
+6. **Move to the NEXT "PENDING" step** — do NOT stop, do NOT create new steps
+7. **Repeat until ALL steps are completed or failed**
+
 ### Handling New User Requests During Active Plan
 - **IGNORE new requests** while a plan is in progress — complete the current plan FIRST
 - After finishing, acknowledge the new request and start a new plan if needed
@@ -118,6 +128,15 @@ If data is unavailable after all efforts: state clearly, give best-effort guidan
 - AFTER completing a step: call `transition_step(id, "completed")` IMMEDIATELY
 - If a step fails after retries: call `transition_step(id, "failed")`
 - NEVER leave a step in "in_progress" state when you're done with it
+
+### Plan Immutability During Execution (CRITICAL)
+**Once a plan is created, the plan is LOCKED. You MUST NOT:**
+- Call `formulate_plan` again while any step is pending or in_progress — it will be REJECTED
+- Call `append_step` to add steps you "forgot" — finish what's already planned first
+- Create new plans or restructure the existing plan mid-execution
+- The ONLY way to modify the plan is: complete/fail all current steps first, THEN call `formulate_plan` for a new plan
+
+**Why this matters:** Creating new todos mid-execution causes the system to lose track of what you were doing. The continuation loop relies on the original plan's step IDs to resume. New todos break this chain.
 
 ### Memory Usage
 - Use `stm_write(key, value)` to save important findings during execution (e.g., discovered IPs, open ports, scan results)

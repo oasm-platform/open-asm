@@ -1334,10 +1334,18 @@ export class AgentsCompletionsService {
               this.mapHistoryToModelMessages(updatedMessages);
 
             // Synthesized "continue" message (NOT saved to DB — memory only)
+            // Include specific pending step IDs to help LLM resume correctly
+            const pendingSteps = todos.filter(
+              (t) => t.status === 'pending' || t.status === 'in_progress',
+            );
+            const pendingList = pendingSteps
+              .map((t, i) => `${i + 1}. [${t.status.toUpperCase()}] ${t.content} (id: ${t.id})`)
+              .join('\n');
             currentModelMessages.push({
               role: 'user' as const,
               content:
-                'Continue executing the pending plan steps. Proceed immediately without asking for confirmation.',
+                `Continue executing the pending plan steps. Here are the remaining steps:\n${pendingList}\n\n` +
+                'Start with the FIRST pending step. Do NOT create new steps. Do NOT skip steps. Execute them in order until all are done.',
             });
 
             // Create a new assistant message in DB for the next iteration

@@ -392,12 +392,33 @@ export class AgentTool {
     const repo = this.conversationRepository;
 
     const setPlanTool: any = {
-      description: 'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos.',
+      description: 'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
       parameters: z.object({
         steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
       }),
       execute: async (params: { steps: string[] }) => {
         try {
+          // Guard: reject if there are active (pending/in_progress) todos
+          const existingConversation = await repo.findOne({ where: { id: conversationId } });
+          const existingTodos = existingConversation?.todos ?? [];
+          const hasActiveTodos = existingTodos.some(
+            (t) => t.status === 'pending' || t.status === 'in_progress',
+          );
+          if (hasActiveTodos) {
+            const activeSteps = existingTodos
+              .filter((t) => t.status === 'pending' || t.status === 'in_progress')
+              .map((t) => `  - [${t.status}] ${t.content}`)
+              .join('\n');
+            return {
+              success: false,
+              message:
+                `REJECTED: A plan is already in progress with ${existingTodos.filter((t) => t.status !== 'completed' && t.status !== 'failed').length} pending step(s).\n` +
+                `Active steps:\n${activeSteps}\n\n` +
+                'You MUST execute the existing steps first. Do NOT create a new plan while steps are pending. ' +
+                'Use transition_step(id, "in_progress") to start the first pending step.',
+            };
+          }
+
           // Log raw params for debugging
           console.log('[formulate_plan] Raw params:', JSON.stringify(params, null, 2));
 
@@ -539,7 +560,7 @@ export class AgentTool {
     };
 
     const addTodoTool: any = {
-      description: 'Append a new step to the plan. Params: content (string).',
+      description: 'Append a new step to the plan. Params: content (string). ONLY use when you genuinely discover a new requirement during execution that was not part of the original plan. Do NOT use to re-create steps you forgot to add earlier — finish the current step first.',
       parameters: z.object({
         content: z.string().min(1).describe('Todo content'),
       }),
@@ -548,9 +569,22 @@ export class AgentTool {
           const conversation = await repo.findOne({ where: { id: conversationId } });
           if (!conversation) return { success: false, message: 'Conversation not found' };
 
+          const existingTodos = conversation.todos ?? [];
+          const hasActiveTodos = existingTodos.some(
+            (t) => t.status === 'pending' || t.status === 'in_progress',
+          );
+
+          // Guard: warn but allow append during active plan (the LLM might genuinely need it)
+          // However, the description strongly discourages this
+          if (hasActiveTodos) {
+            console.log(
+              `[append_step] WARNING: Adding step while ${existingTodos.filter((t) => t.status === 'pending' || t.status === 'in_progress').length} step(s) still active`,
+            );
+          }
+
           const now = new Date().toISOString();
           const newTodo: AgentTodoItem = { id: randomUUID(), content: params.content, status: 'pending', updatedAt: now };
-          const todos = [...(conversation.todos ?? []), newTodo];
+          const todos = [...existingTodos, newTodo];
 
           await repo.update(conversationId, { todos });
           if (emitter) emitter.emit('todos-updated', todos);
