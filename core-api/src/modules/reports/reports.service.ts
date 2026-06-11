@@ -13,21 +13,32 @@ import { Report } from './entities/report.entity';
 import { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
 import { TargetType } from '@/modules/targets/entities/target.entity';
 import type { ReportData } from './types/report-data.type';
+import type { VulnerabilityReportData } from './types/vulnerability-report-data.type';
+import { VulnerabilityReportService } from './services/vulnerability-report.service';
 
 @Injectable()
 export class ReportsService {
   private readonly templatePath: string;
+  private readonly vulnerabilityTemplatePath: string;
   private handlebarsTemplate: ReturnType<typeof Handlebars.compile> | null =
+    null;
+  private vulnerabilityTemplate: ReturnType<typeof Handlebars.compile> | null =
     null;
 
   constructor(
     @InjectRepository(Report)
     private readonly reportRepo: Repository<Report>,
     private readonly storageService: StorageService,
+    private readonly vulnerabilityReportService: VulnerabilityReportService,
   ) {
     const srcDir = path.join(process.cwd(), 'src', 'modules', 'reports');
     this.templatePath = path.join(srcDir, 'templates', 'report.hbs');
-    this.compileTemplate();
+    this.vulnerabilityTemplatePath = path.join(
+      srcDir,
+      'templates',
+      'vulnerability-report.hbs',
+    );
+    this.compileTemplates();
   }
 
   async findById(id: string, workspaceId: string): Promise<Report> {
@@ -66,7 +77,7 @@ export class ReportsService {
     return getManyResponse({ query, data, total });
   }
 
-  private compileTemplate(): void {
+  private compileTemplates(): void {
     try {
       if (!fs.existsSync(this.templatePath)) {
         return;
@@ -218,7 +229,34 @@ export class ReportsService {
         return labels[status] || status;
       });
 
+      Handlebars.registerHelper('gt', (a: number, b: number) => {
+        return a > b;
+      });
+
+      Handlebars.registerHelper('sub', (a: number, b: number) => {
+        return a - b;
+      });
+
+      Handlebars.registerHelper('join', (arr: string[], separator: string) => {
+        if (!Array.isArray(arr)) return '';
+        return arr.join(separator);
+      });
+
       this.handlebarsTemplate = Handlebars.compile<ReportData>(templateContent);
+    } catch {
+      // ignore
+    }
+
+    try {
+      if (!fs.existsSync(this.vulnerabilityTemplatePath)) {
+        return;
+      }
+      const vulnTemplateContent = fs.readFileSync(
+        this.vulnerabilityTemplatePath,
+        'utf-8',
+      );
+      this.vulnerabilityTemplate =
+        Handlebars.compile<VulnerabilityReportData>(vulnTemplateContent);
     } catch {
       // ignore
     }
@@ -233,13 +271,33 @@ export class ReportsService {
     workspaceId: string,
     userId: string,
     type: 'SUMMARY' | 'VULNERABILITY' = 'SUMMARY',
+    options?: {
+      startDate?: Date;
+      endDate?: Date;
+      targetIds?: string[];
+    },
   ): Promise<{ filePath: string; fileName: string }> {
-    const data = this.getMockData();
-    const html = this.renderTemplate(data);
+    let html: string;
+    let data: ReportData | VulnerabilityReportData;
+
+    if (type === 'VULNERABILITY') {
+      data = await this.vulnerabilityReportService.getVulnerabilityReportData(
+        workspaceId,
+        options,
+      );
+      html = this.renderVulnerabilityTemplate(data);
+    } else {
+      data = this.getMockData();
+      html = this.renderTemplate(data);
+    }
 
     const pdfBuffer = await this.htmlToPdf(html);
 
-    const fileName = `report-${type.toLowerCase()}-${data.year}-W${data.weekPad}-${generateToken(5)}-${Date.now()}.pdf`;
+    const weekPad =
+      'weekPad' in data ? (data as VulnerabilityReportData).weekPad : String((data as ReportData).week).padStart(2, '0');
+    const year = data.year;
+
+    const fileName = `report-${type.toLowerCase()}-${year}-W${weekPad}-${generateToken(5)}-${Date.now()}.pdf`;
     const { path: uploadPath } =
       await this.storageService.uploadFile(fileName, pdfBuffer, 'reports');
 
@@ -259,6 +317,13 @@ export class ReportsService {
       throw new Error('Template not compiled');
     }
     return this.handlebarsTemplate(data);
+  }
+
+  private renderVulnerabilityTemplate(data: VulnerabilityReportData): string {
+    if (!this.vulnerabilityTemplate) {
+      throw new Error('Vulnerability template not compiled');
+    }
+    return this.vulnerabilityTemplate(data);
   }
 
   async deleteReport(id: string, workspaceId: string): Promise<void> {

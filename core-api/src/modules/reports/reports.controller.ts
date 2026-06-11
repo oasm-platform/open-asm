@@ -73,10 +73,17 @@ export class ReportsController {
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
   ): Promise<DefaultMessageResponseDto> {
+    const options = {
+      startDate: body.startDate ? new Date(body.startDate) : undefined,
+      endDate: body.endDate ? new Date(body.endDate) : undefined,
+      targetIds: body.targetIds,
+    };
+
     await this.reportsService.generateReport(
       workspaceId,
       userId,
       body.type,
+      options,
     );
 
     return { message: 'Report generated successfully' };

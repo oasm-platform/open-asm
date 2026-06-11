@@ -1,6 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
 
 const ReportType = { SUMMARY: 'SUMMARY', VULNERABILITY: 'VULNERABILITY' } as const;
 export type ReportType = (typeof ReportType)[keyof typeof ReportType];
@@ -30,6 +30,22 @@ export class GenerateReportBodyDto {
   @IsEnum(['SUMMARY', 'VULNERABILITY'])
   @IsOptional()
   type?: ReportType;
+
+  @ApiProperty({ required: false, description: 'Start date for vulnerability report filter' })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @ApiProperty({ required: false, description: 'End date for vulnerability report filter' })
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @ApiProperty({ required: false, description: 'Target IDs to filter vulnerabilities', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  targetIds?: string[];
 }
 
 export class GetManyReportsQueryDto extends GetManyBaseQueryParams {}
