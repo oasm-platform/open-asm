@@ -41,6 +41,7 @@ import {
 } from './dto/mcp-config.dto';
 import { MessageResponseDto, ToolCallResponseDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
+import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
@@ -65,6 +66,8 @@ export class AgentsService {
     private readonly mcpConfigRepository: Repository<AgentMCPConfig>,
     @InjectRepository(AgentMessageToolCall)
     private readonly toolCallRepository: Repository<AgentMessageToolCall>,
+    @InjectRepository(AgentConversationTodo)
+    private readonly todoRepository: Repository<AgentConversationTodo>,
     private readonly redisService: RedisService,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly httpService: HttpService,
@@ -380,13 +383,25 @@ export class AgentsService {
       throw new NotFoundException('Conversation not found');
     }
 
+    const todoEntities = await this.todoRepository.find({
+      where: { conversationId: id },
+      order: { sortOrder: 'ASC' },
+    });
+    const todos = todoEntities.map((t) => ({
+      id: t.id,
+      content: t.content,
+      status: t.status,
+      updatedAt: t.updatedAt.toISOString(),
+    }));
+
     return {
       id: conversation.id,
       llmConfigId: conversation.llmConfigId,
       title: conversation.title,
+      agentMode: conversation.agentMode,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
-      todos: conversation.todos ?? [],
+      todos,
       summary: conversation.summary,
     };
   }
@@ -422,6 +437,7 @@ export class AgentsService {
         id: c.id,
         llmConfigId: c.llmConfigId,
         title: c.title,
+        agentMode: c.agentMode,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
       })),
@@ -451,6 +467,7 @@ export class AgentsService {
       id: saved.id,
       llmConfigId: saved.llmConfigId,
       title: saved.title,
+      agentMode: saved.agentMode,
       createdAt: saved.createdAt,
       updatedAt: saved.updatedAt,
     };

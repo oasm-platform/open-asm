@@ -17,10 +17,22 @@ export function formatTodosToPrompt(todos: AgentTodoItem[]): string {
     return 'No specific plan has been set up yet.';
   }
 
+  const completedCount = todos.filter((t) => t.status === 'completed').length;
+  const failedCount = todos.filter((t) => t.status === 'failed').length;
+  const currentStep = todos.find(
+    (t) => t.status === 'pending' || t.status === 'in_progress',
+  );
+  const currentStepIndex = currentStep
+    ? todos.indexOf(currentStep)
+    : -1;
+
   const list = todos
     .map(
-      (t, index) =>
-        `${STATUS_SYMBOLS[t.status]} Step ${index + 1}: ${t.content} (${t.status.toUpperCase()})`,
+      (t, index) => {
+        const isCurrent = index === currentStepIndex;
+        const marker = isCurrent ? ' <<<< YOU ARE HERE' : '';
+        return `${STATUS_SYMBOLS[t.status]} Step ${index + 1}: ${t.content} (${t.status.toUpperCase()})${marker}`;
+      },
     )
     .join('\n');
 
@@ -28,35 +40,34 @@ export function formatTodosToPrompt(todos: AgentTodoItem[]): string {
     '',
     '# CURRENT EXECUTION PLAN:',
     '',
-    'You ARE CURRENTLY EXECUTING a plan consisting of the following steps. Strictly follow the sequence:',
+    `Progress: ${completedCount} completed, ${failedCount} failed, ${todos.length - completedCount - failedCount} remaining.`,
+    '',
+    'Steps (execute in STRICT sequential order — Step 1, then 2, then 3, etc.):',
     list,
     '',
-    '# STRICT EXECUTION RULES (MANDATORY):',
+    currentStep
+      ? `>>> CURRENT STEP: Step ${currentStepIndex + 1} — "${currentStep.content}" <<<`
+      : '>>> ALL STEPS COMPLETED <<<',
     '',
-    '1. Identify the FIRST step with status "PENDING" or "IN_PROGRESS" — that is your CURRENT step. Execute ONLY that step.',
-    '2. Before calling any action tool, call transition_step(id, "in_progress") to mark the current step.',
-    '3. Upon completing the step, call transition_step(id, "completed") IMMEDIATELY before moving to the next step.',
-    '4. If a step fails (tool error, no results), call transition_step(id, "failed") and retry with a different approach. Do NOT give up after a single failure — try at least 2 alternative methods.',
-    '5. After the current step is "completed" or "failed" after retries, advance to the NEXT "pending" step IMMEDIATELY. Do NOT end your response between steps.',
-    '6. Do NOT skip over "pending" steps. Execute them in order one by one.',
-    '7. Do NOT attempt to work on future steps before the current step is resolved.',
-    '8. ALL STEPS MUST BE EXECUTED IN A SINGLE RESPONSE. Do NOT stop mid-plan. Continue calling tools until every step is done.',
-    '9. Keep your analysis text SHORT during execution (1-2 sentences max per step). Save detailed analysis for the final step.',
-    '10. If you genuinely need user input (blocked on a decision), explain briefly and STOP. Otherwise, KEEP EXECUTING.',
+    '# STRICT SEQUENTIAL EXECUTION RULES (MANDATORY — violating these WILL cause wrong results):',
     '',
-    '# PLAN IMMUTABILITY (CRITICAL):',
+    'Rule 1 (ORDER): Execute steps in STRICT numerical order: Step 1 → Step 2 → Step 3 → ... NEVER skip ahead. NEVER jump to a later step. NEVER reorder steps.',
+    'Rule 2 (CURRENT): Your CURRENT step is the FIRST step with status "PENDING" or "IN_PROGRESS". Look at the plan above — find the "<<<< YOU ARE HERE" marker. That is your step. Execute ONLY that step.',
+    'Rule 3 (TRANSITION IN): Before doing ANY work on the current step, call transition_step(id, "in_progress") FIRST.',
+    'Rule 4 (TRANSITION OUT): After finishing the current step, call transition_step(id, "completed") IMMEDIATELY. Then move to the NEXT sequential step.',
+    'Rule 5 (NO SKIP): Do NOT skip to Step 3 when Step 2 is still "pending". Do NOT work on Step 5 when Step 4 is not yet "completed".',
+    'Rule 6 (SINGLE RESPONSE): Execute ALL steps in a SINGLE response. Do NOT stop mid-plan. Keep calling tools until every step is done.',
+    'Rule 7 (SHORT TEXT): Keep analysis text SHORT (1-2 sentences max per step). Save detailed analysis for the final step.',
+    'Rule 8 (RETRIES): If a step fails, retry up to 2 times with different approaches. Only mark "failed" after exhausting retries. Then advance to the NEXT step.',
+    'Rule 9 (NO PARALLEL): Do NOT call multiple tools for different steps in parallel. Complete one step fully before starting the next.',
+    '',
+    '# FORBIDDEN ACTIONS:',
     '',
     '- DO NOT call formulate_plan while this plan has pending/in_progress steps — it will be REJECTED.',
     '- DO NOT call append_step to add steps you "forgot" — execute what is listed above first.',
-    '- DO NOT create new todos or restructure the plan mid-execution.',
-    '- The plan is a contract: execute it as-is. Finish all steps, THEN plan anew if needed.',
-    '',
-    '# RETRY PROTOCOL:',
-    '',
-    '- If a tool call returns an error: analyze the error, adjust parameters, and retry immediately.',
-    '- If a tool call returns empty results: try a different approach (different parameters, different tool).',
-    '- Only mark a step as "failed" after exhausting all reasonable retry options.',
-    '- Do NOT declare the entire plan failed because one step failed — move on to the next step.',
+    '- DO NOT reorder steps based on what seems "easier" or "more important".',
+    '- DO NOT skip a step because you think it can be done later.',
+    '- DO NOT attempt Step N+1 before Step N is marked "completed" or "failed".',
     '',
   ].join('\n');
 }

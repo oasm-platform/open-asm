@@ -1,6 +1,7 @@
+import { AgentMode } from '@/common/enums/enum';
 import type { AgentTodoItem } from '../agents.todo';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateConversationDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -29,6 +30,10 @@ export class ConversationResponseDto {
 
   @ApiProperty({ required: false })
   title?: string;
+
+  @ApiProperty({ enum: AgentMode, example: AgentMode.ASK })
+  @IsEnum(AgentMode)
+  agentMode: AgentMode;
 
   @ApiProperty()
   createdAt: Date;

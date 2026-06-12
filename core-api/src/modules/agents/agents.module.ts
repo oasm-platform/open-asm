@@ -14,6 +14,7 @@ import { AgentTool } from './agents.tools';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsSkillsService } from './agents.skills';
 import { AgentConversation } from './entities/agent-conversation.entity';
+import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
@@ -28,6 +29,7 @@ import { HttpModule } from '@nestjs/axios';
     TypeOrmModule.forFeature([
       AgentLLMConfig,
       AgentConversation,
+      AgentConversationTodo,
       AgentMessage,
       AgentMessageToolCall,
       AgentWorkspaceMemory,

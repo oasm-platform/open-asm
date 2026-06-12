@@ -23,6 +23,7 @@ import { formatTodosToPrompt } from './agents.todo';
 import { AgentTool } from './agents.tools';
 import { SendMessageDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
+import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { AgentMessageToolCall } from './entities/tool-call.entity';
@@ -31,6 +32,7 @@ import {
   getLLMProviderConfig,
   getReasoningProviderOptions,
 } from './llm-provider-supported';
+import { ContextBudgetManager } from './shared/context-budget-manager';
 import { TokenCounter } from './shared/token-counter';
 
 export interface StreamMessageResult {
@@ -90,6 +92,8 @@ export class AgentsCompletionsService {
     private readonly messageRepository: Repository<AgentMessage>,
     @InjectRepository(AgentMessageToolCall)
     private readonly toolCallRepository: Repository<AgentMessageToolCall>,
+    @InjectRepository(AgentConversationTodo)
+    private readonly todoRepository: Repository<AgentConversationTodo>,
     private readonly agentTool: AgentTool,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly agentsMcpService: AgentsMcpService,
@@ -337,36 +341,20 @@ export class AgentsCompletionsService {
    */
   private async autoCompleteStuckTodos(conversationId: string): Promise<void> {
     try {
-      const conversation = await this.conversationRepository.findOne({
-        where: { id: conversationId },
-      });
-      if (!conversation) return;
-
-      const todos = conversation.todos ?? [];
-      let changed = false;
-
-      const updatedTodos = todos.map((t) => {
-        if (t.status === 'in_progress') {
-          changed = true;
-          return {
-            ...t,
-            status: 'completed' as const,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return t;
+      const stuckTodos = await this.todoRepository.find({
+        where: { conversationId, status: 'in_progress' as const },
       });
 
-      if (changed) {
-        await this.conversationRepository.update(
-          { id: conversationId },
-          { todos: updatedTodos },
-        );
-        this.logger.log(
-          `[AutoTodo] Auto-completed stuck in_progress todos for ${conversationId}`,
-        );
-        // Note: frontend will see updated todos on next poll/fetch
+      if (stuckTodos.length === 0) return;
+
+      for (const todo of stuckTodos) {
+        todo.status = 'completed';
       }
+      await this.todoRepository.save(stuckTodos);
+
+      this.logger.log(
+        `[AutoTodo] Auto-completed ${stuckTodos.length} stuck in_progress todos for ${conversationId}`,
+      );
     } catch (error) {
       this.logger.error('Failed to auto-complete stuck todos', error);
     }
@@ -563,6 +551,178 @@ export class AgentsCompletionsService {
   }
 
   /**
+   * Smart context pruning based on token budget.
+   * Instead of fixed message counts, dynamically selects how many messages to keep
+   * based on the model's context window and current token usage.
+   *
+   * @param messages - Full conversation history from DB
+   * @param contextParts - System context strings (prompts, memory, etc.)
+   * @param hasSummary - Whether a conversation summary exists
+   * @param contextWindow - Model's context window size
+   * @returns Pruned messages array fitting within budget
+   */
+  private pruneContextByBudget(
+    messages: AgentMessage[],
+    contextParts: string[],
+    hasSummary: boolean,
+    contextWindow: number,
+  ): AgentMessage[] {
+    if (messages.length === 0) return messages;
+
+    const modelMessages = this.mapHistoryToModelMessages(messages);
+    const strategy = ContextBudgetManager.getPruningStrategy(
+      contextParts,
+      modelMessages,
+      contextWindow,
+    );
+
+    this.logger.debug(
+      `[ContextPruning] maxMessages=${strategy.maxMessages}, ` +
+        `pruneToolDetails=${strategy.pruneToolDetails}, ` +
+        `totalMessages=${messages.length}`,
+    );
+
+    if (strategy.maxMessages >= messages.length && !strategy.pruneToolDetails) {
+      return messages;
+    }
+
+    let pruned = messages.slice(-strategy.maxMessages);
+
+    if (strategy.pruneToolDetails && pruned.length > 2) {
+      pruned = pruned.map((msg, index) => {
+        if (index >= pruned.length - 2) return msg;
+        if (msg.content.length > 2000) {
+          return {
+            ...msg,
+            content: msg.content.slice(0, 2000) + '\n[...truncated for context management]',
+          };
+        }
+        return msg;
+      });
+    }
+
+    return pruned;
+  }
+
+  /**
+   * Checks if context budget is exceeded before a continuation iteration.
+   * If exceeded, triggers compaction (summarization) to free up context space.
+   * This runs BEFORE each continuation iteration to prevent context overflow.
+   *
+   * @param conversationId - Current conversation ID
+   * @param llmConfig - LLM configuration for summarization
+   * @param contextParts - Current system context parts
+   * @param modelMessages - Current conversation history
+   * @returns true if compaction was triggered, false otherwise
+   */
+  private async checkAndCompactMidLoop(
+    conversationId: string,
+    llmConfig: AgentLLMConfig,
+    contextParts: string[],
+    modelMessages: Array<{ role: string; content: string }>,
+  ): Promise<boolean> {
+    try {
+      const contextWindow = this.getModelContextWindow(llmConfig);
+      const budgetCheck = ContextBudgetManager.checkBudget(
+        contextParts,
+        modelMessages,
+        contextWindow,
+      );
+
+      this.logger.debug(
+        `[MidLoopCompaction] conversation=${conversationId}, ` +
+          `tokens=${budgetCheck.totalTokens}/${budgetCheck.budget.availableForInput}, ` +
+          `needsCompaction=${budgetCheck.needsCompaction}`,
+      );
+
+      if (budgetCheck.needsCompaction) {
+        this.logger.log(
+          `[MidLoopCompaction] Triggering mid-loop compaction for ${conversationId} ` +
+            `(${budgetCheck.totalTokens} tokens >= ${budgetCheck.budget.compactionThreshold} threshold)`,
+        );
+        await this.compactConversation(conversationId, llmConfig);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      this.logger.warn(
+        `[MidLoopCompaction] Error checking budget, skipping compaction: ${error}`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Generates a comprehensive summary of the entire conversation after all
+   * continuation iterations complete. This provides a final overview of
+   * what was accomplished, key findings, and recommendations.
+   *
+   * @param conversationId - Current conversation ID
+   * @param llmConfig - LLM configuration for generation
+   */
+  private async generateEndOfConversationReport(
+    conversationId: string,
+    llmConfig: AgentLLMConfig,
+  ): Promise<void> {
+    try {
+      const messages = await this.messageRepository.find({
+        where: { conversationId },
+        order: { createdAt: 'ASC' },
+      });
+
+      if (messages.length < 2) {
+        return;
+      }
+
+      const conversationContent = messages
+        .map((msg) => `${msg.role}: ${msg.content}`)
+        .join('\n\n');
+
+      const prompt = this.getPrompt('SUMMARY_GENERATE.md', {
+        CONVERSATION_CONTENT: conversationContent,
+      });
+
+      const model = this.createLanguageModel(llmConfig);
+
+      const result = await generateText({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      let summaryText = '';
+      if (typeof result.content === 'string') {
+        summaryText = result.content;
+      } else if (Array.isArray(result.content)) {
+        const textPart = result.content.find(
+          (part: { type: string }) => part.type === 'text',
+        );
+        summaryText =
+          textPart && 'text' in textPart
+            ? (textPart as { text: string }).text
+            : '';
+      }
+
+      const cleanedSummary = summaryText.trim();
+
+      if (cleanedSummary) {
+        await this.conversationRepository.update(
+          { id: conversationId },
+          { summary: cleanedSummary },
+        );
+        this.logger.log(
+          `[EndOfConversation] Report generated for ${conversationId}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `[EndOfConversation] Failed to generate report for ${conversationId}`,
+        error,
+      );
+    }
+  }
+
+  /**
    * Creates and saves a placeholder message for the assistant (streaming).
    * Marked with status='streaming' so the frontend knows chunks are incoming.
    */
@@ -613,8 +773,16 @@ export class AgentsCompletionsService {
       this.agentsMemories.ltmFormatForPrompt(workspaceId),
     ]);
 
-    // Format the todo list as a prompt string
-    const todos = conversation.todos ?? [];
+    const todoEntities = await this.todoRepository.find({
+      where: { conversationId: conversation.id },
+      order: { sortOrder: 'ASC' },
+    });
+    const todos = todoEntities.map((t) => ({
+      id: t.id,
+      content: t.content,
+      status: t.status,
+      updatedAt: t.updatedAt.toISOString(),
+    }));
     const todosContext = formatTodosToPrompt(todos);
 
     // Inject conversation summary if available (from auto-compaction)
@@ -1000,10 +1168,9 @@ export class AgentsCompletionsService {
       // When streaming completes, persist accumulated text to DB
       // persist tool call data (for history rendering on page reload),
       // auto-complete stuck todos, and trigger compaction check
-      onFinish: async (event) => {
+      onFinish: (event) => {
         const isAborted = () => abortSignal?.aborted ?? false;
 
-        // Log finish stats for debugging
         this.logger.log(
           `[Agent] Stream ${conversationId} finished: ` +
             `finishReason=${event.finishReason}, ` +
@@ -1012,31 +1179,27 @@ export class AgentsCompletionsService {
             `agentMode=${options.agentMode ?? 'unknown'}`,
         );
 
-        // Helper to mark the message as aborted when cancellation happens mid-flight
-        const markAborted = async () => {
-          try {
-            await this.messageRepository.update(
+        // All DB writes + LLM calls below are fire-and-forget.
+        // Returning immediately lets the stream close and frees the frontend.
+
+        const markAborted = () => {
+          this.messageRepository
+            .update(
               { id: assistantMessageId },
               {
                 content: '',
-                metadata: {
-                  ...assistantMessageMetadata,
-                  status: 'aborted',
-                },
+                metadata: { ...assistantMessageMetadata, status: 'aborted' },
               },
-            );
-          } catch (err) {
-            this.logger.error('Error saving aborted message', err);
-          }
+            )
+            .catch((err) => this.logger.error('Error saving aborted message', err));
         };
 
-        // Skip persistence if request was already aborted before onFinish
         if (isAborted()) {
-          await markAborted();
+          markAborted();
           return;
         }
 
-        // Capture tool calls from all steps and persist to tool_calls table
+        // Persist tool calls for history rendering on page reload
         try {
           const toolCallEntities: AgentMessageToolCall[] = [];
           for (const step of event.steps) {
@@ -1059,73 +1222,66 @@ export class AgentsCompletionsService {
             }
           }
           if (toolCallEntities.length > 0) {
-            await this.toolCallRepository.save(toolCallEntities);
+            this.toolCallRepository
+              .save(toolCallEntities)
+              .catch((err) => this.logger.error('Error saving tool calls', err));
           }
         } catch (err) {
           this.logger.error('Error saving tool calls', err);
         }
 
         if (isAborted()) {
-          await markAborted();
+          markAborted();
           return;
         }
 
-          // Build the chronological parts array from event.steps.
-          // Each step may contain reasoning, tool calls, and text — they are
-          // assembled in the order they actually occurred so the frontend can
-          // render thought → tool call → text → thought → … correctly.
-          // Also fallback to accumulatedReasoning for providers that stream
-          // reasoning-delta chunks but don't populate step.reasoning.
-          try {
-            const parts: Record<string, unknown>[] = [];
-            let hasReasoningPart = false;
-            for (const step of event.steps) {
-              const stepReasoning =
-                typeof step.reasoning === 'string' ? step.reasoning : '';
-              if (stepReasoning.trim()) {
-                parts.push({ type: 'reasoning', text: stepReasoning.trim() });
-                hasReasoningPart = true;
-              }
-              for (const tc of step.toolCalls) {
-                const toolResult = step.toolResults?.find(
-                  (r) => r.toolCallId === tc.toolCallId,
-                );
-                parts.push({
-                  type: 'dynamic-tool',
-                  toolCallId: tc.toolCallId,
-                  toolName: tc.toolName,
-                  state: toolResult
-                    ? 'output-available'
-                    : 'input-available',
-                  input: tc.input,
-                  output: toolResult?.output ?? null,
-                });
-              }
-              const stepText =
-                typeof step.text === 'string' ? step.text : '';
-              if (stepText.trim()) {
-                parts.push({ type: 'text', text: stepText.trim() });
-              }
+        // Build parts array for frontend rendering
+        try {
+          const parts: Record<string, unknown>[] = [];
+          let hasReasoningPart = false;
+          for (const step of event.steps) {
+            const stepReasoning =
+              typeof step.reasoning === 'string' ? step.reasoning : '';
+            if (stepReasoning.trim()) {
+              parts.push({ type: 'reasoning', text: stepReasoning.trim() });
+              hasReasoningPart = true;
             }
-            // Fallback: if no reasoning from steps but we accumulated it during streaming
-            if (!hasReasoningPart && accumulatedReasoning.trim()) {
-              parts.unshift({
-                type: 'reasoning',
-                text: accumulatedReasoning.trim(),
+            for (const tc of step.toolCalls) {
+              const toolResult = step.toolResults?.find(
+                (r) => r.toolCallId === tc.toolCallId,
+              );
+              parts.push({
+                type: 'dynamic-tool',
+                toolCallId: tc.toolCallId,
+                toolName: tc.toolName,
+                state: toolResult ? 'output-available' : 'input-available',
+                input: tc.input,
+                output: toolResult?.output ?? null,
               });
             }
-            if (parts.length > 0) {
-            await this.messageRepository.update(
-              { id: assistantMessageId },
+            const stepText =
+              typeof step.text === 'string' ? step.text : '';
+            if (stepText.trim()) {
+              parts.push({ type: 'text', text: stepText.trim() });
+            }
+          }
+          if (!hasReasoningPart && accumulatedReasoning.trim()) {
+            parts.unshift({
+              type: 'reasoning',
+              text: accumulatedReasoning.trim(),
+            });
+          }
+          if (parts.length > 0) {
+            this.messageRepository
               // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-              { parts: parts as any },
-            );
+              .update({ id: assistantMessageId }, { parts: parts as any })
+              .catch((err) => this.logger.error('Error saving parts array', err));
           }
         } catch (err) {
           this.logger.error('Error saving parts array', err);
         }
 
-        await this.handleStreamFinish(
+        this.handleStreamFinish(
           assistantMessageId,
           conversationId,
           accumulatedText,
@@ -1134,34 +1290,13 @@ export class AgentsCompletionsService {
           assistantMessageMetadata,
         ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
 
-        if (isAborted()) {
-          await markAborted();
-          return;
-        }
-
-        // Auto-complete any todos the LLM left "in_progress" (safety net).
-        // Skip in AGENT mode — the continuation loop in createContinuationStream
-        // will call this AFTER all iterations complete, preventing a race condition
-        // where autoCompleteStuckTodos marks in_progress todos as completed before
-        // the continuation loop can detect them as still pending.
-        if (isAborted()) {
-          await markAborted();
-          return;
-        }
         if (options.agentMode !== AgentMode.AGENT) {
-          await this.autoCompleteStuckTodos(conversationId).catch((err) =>
+          this.autoCompleteStuckTodos(conversationId).catch((err) =>
             this.logger.error('Error in autoCompleteStuckTodos', err),
           );
         }
 
-        if (isAborted()) {
-          await markAborted();
-          return;
-        }
-
-        // Asynchronously check and trigger compaction if needed
-        // Await compaction to ensure summary is saved before continuation loop checks it
-        await this.handlePostStreamCompaction(
+        this.handlePostStreamCompaction(
           conversationId,
           llmConfig,
           contextParts,
@@ -1186,8 +1321,14 @@ export class AgentsCompletionsService {
    * Executes streamText in a loop, continuing automatically when there are
    * remaining pending steps. This prevents the model from stopping mid-plan.
    *
+   * The loop uses budget-based termination:
+   * - Continues while there are pending/in_progress todos AND context budget allows
+   * - Triggers mid-loop compaction when token budget is exceeded
+   * - Generates a comprehensive end-of-conversation report when done
+   * - Safety net of 50 iterations prevents infinite loops
+   *
    * Each iteration creates its own assistant message in DB.
-   * The stream stays open until all iterations complete or max iterations reached.
+   * The stream stays open until all iterations complete or budget exhausted.
    */
   private createContinuationStream(
     options: StreamTextOptions & {
@@ -1206,7 +1347,7 @@ export class AgentsCompletionsService {
       skillsContext,
     } = options;
 
-    const MAX_ITERATIONS = 5;
+    const MAX_SAFETY_ITERATIONS = 50; // Safety net — budget-based termination is primary
     const isAgentMode = agentMode === AgentMode.AGENT;
 
     let currentModelMessages = [...options.modelMessages];
@@ -1264,8 +1405,68 @@ export class AgentsCompletionsService {
         });
 
         try {
-          for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+          for (let iteration = 0; iteration < MAX_SAFETY_ITERATIONS; iteration++) {
             if (abortSignal?.aborted || controllerClosed) break;
+
+            // Mid-loop compaction: check budget before each iteration
+            if (isAgentMode && iteration > 0) {
+              const compacted = await this.checkAndCompactMidLoop(
+                conversationId,
+                llmConfig,
+                currentContextParts,
+                currentModelMessages,
+              );
+              if (compacted) {
+                // Re-fetch context after compaction
+                const postCompactConversation =
+                  await this.conversationRepository.findOne({
+                    where: { id: conversationId },
+                  });
+                if (postCompactConversation?.summary) {
+                  // Refresh context with updated summary
+                  const agentModeVal = agentMode || AgentMode.ASK;
+                  const modePrompt = this.getPrompt(
+                    `${agentModeVal.toUpperCase()}.md`,
+                  );
+                  const systemPrompt = this.getPrompt('SYSTEM.md');
+                  const now = new Date();
+                  const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
+                  const [stmCtx, ltmCtx] = await Promise.all([
+                    this.agentsMemories.stmFormatForPrompt(conversationId),
+                    this.agentsMemories.ltmFormatForPrompt(workspaceId),
+                  ]);
+                  const postCompactTodos = await this.todoRepository.find({
+                    where: { conversationId },
+                    order: { sortOrder: 'ASC' },
+                  });
+                  const todosCtx = formatTodosToPrompt(
+                    postCompactTodos.map((t) => ({
+                      id: t.id,
+                      content: t.content,
+                      status: t.status,
+                      updatedAt: t.updatedAt.toISOString(),
+                    })),
+                  );
+                  const summaryCtx = postCompactConversation.summary
+                    ? `[PREVIOUS CONVERSATION SUMMARY]:\n${postCompactConversation.summary}`
+                    : '';
+
+                  currentContextParts = [
+                    modePrompt,
+                    systemPrompt,
+                    summaryCtx,
+                    currentTimeContext,
+                    ltmCtx,
+                    stmCtx,
+                    todosCtx,
+                  ].filter(Boolean);
+
+                  if (skillsContext) {
+                    currentContextParts.push(skillsContext);
+                  }
+                }
+              }
+            }
 
             try {
               // Execute a single streamText iteration
@@ -1295,8 +1496,7 @@ export class AgentsCompletionsService {
                 controller.enqueue(value);
               }
 
-              // Wait briefly for async onFinish operations (todo updates, DB writes) to settle
-              await new Promise((resolve) => setTimeout(resolve, 500));
+
             } catch (iterationError) {
               this.logger.error(
                 `[Continuation] Error in iteration ${iteration} for ${conversationId}`,
@@ -1317,21 +1517,38 @@ export class AgentsCompletionsService {
             const conversation = await this.conversationRepository.findOne({
               where: { id: conversationId },
             });
-            const todos = conversation?.todos ?? [];
+
+            const todoEntities = await this.todoRepository.find({
+              where: { conversationId },
+              order: { sortOrder: 'ASC' },
+            });
+            const todos = todoEntities.map((t) => ({
+              id: t.id,
+              content: t.content,
+              status: t.status,
+              updatedAt: t.updatedAt.toISOString(),
+            }));
             const hasPending = todos.some(
               (t) => t.status === 'pending' || t.status === 'in_progress',
             );
 
             if (!hasPending) break;
 
-            // Prepare next iteration context
+            // Prepare next iteration context with smart pruning
+            const contextWindow = this.getModelContextWindow(llmConfig);
             const updatedMessages =
               await this.getConversationHistory(
                 conversationId,
                 !!conversation?.summary,
               );
+            const prunedMessages = this.pruneContextByBudget(
+              updatedMessages,
+              currentContextParts,
+              !!conversation?.summary,
+              contextWindow,
+            );
             currentModelMessages =
-              this.mapHistoryToModelMessages(updatedMessages);
+              this.mapHistoryToModelMessages(prunedMessages);
 
             // Synthesized "continue" message (NOT saved to DB — memory only)
             // Include specific pending step IDs to help LLM resume correctly
@@ -1374,9 +1591,17 @@ export class AgentsCompletionsService {
                 this.agentsMemories.stmFormatForPrompt(conversationId),
                 this.agentsMemories.ltmFormatForPrompt(workspaceId),
               ]);
-              const todosContext = formatTodosToPrompt(
-                updatedConversation.todos ?? [],
-              );
+              const updatedTodoEntities = await this.todoRepository.find({
+                where: { conversationId },
+                order: { sortOrder: 'ASC' },
+              });
+              const updatedTodos = updatedTodoEntities.map((t) => ({
+                id: t.id,
+                content: t.content,
+                status: t.status,
+                updatedAt: t.updatedAt.toISOString(),
+              }));
+              const todosContext = formatTodosToPrompt(updatedTodos);
               const summaryContext = updatedConversation.summary
                 ? `[PREVIOUS CONVERSATION SUMMARY]:\n${updatedConversation.summary}`
                 : '';
@@ -1416,6 +1641,17 @@ export class AgentsCompletionsService {
           if (isAgentMode && !abortSignal?.aborted) {
             this.autoCompleteStuckTodos(conversationId).catch((err) =>
               this.logger.error('Error in autoCompleteStuckTodos', err),
+            );
+
+            // Generate comprehensive end-of-conversation report
+            await this.generateEndOfConversationReport(
+              conversationId,
+              llmConfig,
+            ).catch((err) =>
+              this.logger.error(
+                'Error in generateEndOfConversationReport',
+                err,
+              ),
             );
           }
         }
