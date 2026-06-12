@@ -4,15 +4,16 @@ import { IsUUID } from 'class-validator';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 
+export type MCPServerTransport = 'sse' | 'streamable-http';
+
 export interface MCPServerConfig {
   url?: string;
+  transport?: MCPServerTransport;
   headers?: Record<string, string>;
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
   disabled?: boolean;
   allowed_tools?: string[] | null;
   timeout?: number;
+  sse_read_timeout?: number;
 }
 
 export interface MCPConfigJson {

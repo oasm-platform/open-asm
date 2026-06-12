@@ -1,13 +1,13 @@
 import LlmConnect from '@/components/llm-connect';
-import { MCPServersManager } from '@/components/mcp-servers-manager';
+import { MemoryManager } from '@/components/memory-manager';
 import { SkillsManager } from '@/components/skills-manager';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, KeyRound, Server } from 'lucide-react';
+import { BookOpen, Brain, KeyRound } from 'lucide-react';
 import { type ComponentType, type SVGProps } from 'react';
 
 interface TabConfig {
-  value: 'provider' | 'mcp' | 'skills';
+  value: 'provider' | 'skills' | 'memory';
   label: string;
   description: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
@@ -23,18 +23,18 @@ const tabs: TabConfig[] = [
     component: LlmConnect,
   },
   {
-    value: 'mcp',
-    label: 'MCP Servers',
-    description: 'Extend agent capabilities with external MCP servers',
-    icon: Server,
-    component: MCPServersManager,
-  },
-  {
     value: 'skills',
     label: 'Skills',
     description: 'Specialized instructions the agent can use to perform tasks',
     icon: BookOpen,
     component: SkillsManager,
+  },
+  {
+    value: 'memory',
+    label: 'Memory',
+    description: 'Long-term memory content used by the AI agent',
+    icon: Brain,
+    component: MemoryManager,
   },
 ];
 
@@ -44,7 +44,7 @@ const triggerClassName =
 interface AgentSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultTab?: 'provider' | 'mcp' | 'skills';
+  defaultTab?: 'provider' | 'skills' | 'memory';
 }
 
 export function AgentSettingsDialog({
