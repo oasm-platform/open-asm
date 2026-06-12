@@ -73,9 +73,8 @@ export function MemoryManager() {
   } = useWorkspaceState();
 
   const { data, isLoading, refetch, isFetching } =
-    useAgentsControllerGetWorkspaceMemory({
+    useAgentsControllerGetWorkspaceMemory(undefined, {
       query: {
-        queryKey: ['/api/agents/workspace-memory'],
         enabled: !!selectedWorkspaceId,
       },
     });
