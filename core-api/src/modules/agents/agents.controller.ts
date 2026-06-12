@@ -56,6 +56,7 @@ import {
   ToggleSkillDto,
   UpdateSkillDto,
 } from './dto/skill.dto';
+import { WorkspaceMemoryResponseDto } from './dto/workspace-memory.dto';
 
 @ApiTags('Agents')
 @Controller('agents')
@@ -507,6 +508,45 @@ export class AgentsController {
     @WorkspaceId() workspaceId: string,
   ): Promise<MCPServerPingResponseDto> {
     return this.agentsService.pingMCPServer(workspaceId, name);
+  }
+
+  // ==========================================
+  // Workspace Memory Endpoints
+  // ==========================================
+
+  @Get('workspace-memory')
+  @Doc({
+    summary: 'Get workspace memory',
+    description:
+      'Get long-term memory records for the workspace (paginated, per user)',
+    request: { getWorkspaceId: true },
+    response: { serialization: GetManyResponseDto(WorkspaceMemoryResponseDto) },
+  })
+  getWorkspaceMemory(
+    @Query() query: GetManyBaseQueryParams,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<GetManyBaseResponseDto<WorkspaceMemoryResponseDto>> {
+    return this.agentsService.getWorkspaceMemory(workspaceId, userId, query);
+  }
+
+  @Delete('workspace-memory/:id')
+  @Doc({
+    summary: 'Delete workspace memory',
+    description: 'Delete a long-term memory record by ID',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Memory record ID' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteWorkspaceMemory(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsService.deleteWorkspaceMemory(id, workspaceId, userId);
+    return { message: 'Memory deleted successfully' };
   }
 
   // ==========================================

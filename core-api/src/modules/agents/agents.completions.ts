@@ -757,6 +757,7 @@ export class AgentsCompletionsService {
     conversation: AgentConversation,
     workspaceId: string,
     agentMode: AgentMode,
+    userId?: string,
   ): Promise<string[]> {
     // Fetch prompt for the current mode (e.g. ASK.md, AGENT.md)
     const modePrompt = this.getPrompt(`${agentMode.toUpperCase()}.md`);
@@ -770,7 +771,7 @@ export class AgentsCompletionsService {
     // Fetch STM and LTM concurrently
     const [stmContext, ltmContext] = await Promise.all([
       this.agentsMemories.stmFormatForPrompt(conversation.id),
-      this.agentsMemories.ltmFormatForPrompt(workspaceId),
+      userId ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId) : Promise.resolve(''),
     ]);
 
     const todoEntities = await this.todoRepository.find({
@@ -1333,6 +1334,7 @@ export class AgentsCompletionsService {
   private createContinuationStream(
     options: StreamTextOptions & {
       workspaceId: string;
+      userId?: string;
       skillsContext?: string;
     },
   ): ReadableStream<UIMessageChunk> {
@@ -1344,6 +1346,7 @@ export class AgentsCompletionsService {
       abortSignal,
       agentMode,
       workspaceId,
+      userId,
       skillsContext,
     } = options;
 
@@ -1433,7 +1436,7 @@ export class AgentsCompletionsService {
                   const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
                   const [stmCtx, ltmCtx] = await Promise.all([
                     this.agentsMemories.stmFormatForPrompt(conversationId),
-                    this.agentsMemories.ltmFormatForPrompt(workspaceId),
+                    userId ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId) : Promise.resolve(''),
                   ]);
                   const postCompactTodos = await this.todoRepository.find({
                     where: { conversationId },
@@ -1589,7 +1592,7 @@ export class AgentsCompletionsService {
               const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
               const [stmContext, ltmContext] = await Promise.all([
                 this.agentsMemories.stmFormatForPrompt(conversationId),
-                this.agentsMemories.ltmFormatForPrompt(workspaceId),
+                userId ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId) : Promise.resolve(''),
               ]);
               const updatedTodoEntities = await this.todoRepository.find({
                 where: { conversationId },
@@ -1752,6 +1755,7 @@ export class AgentsCompletionsService {
       conversation,
       workspaceId,
       agentMode,
+      userId,
     );
 
     // Step 10.5: Add skills context and loadSkill tool
@@ -1786,6 +1790,7 @@ export class AgentsCompletionsService {
       // Add memory tools
       ...(this.agentTool.getMemoryTools(
         workspaceId,
+        userId,
         conversation.id,
       ) as ToolSet),
     };
@@ -1807,6 +1812,7 @@ export class AgentsCompletionsService {
       abortSignal,
       agentMode,
       workspaceId,
+      userId,
       skillsContext,
     });
 

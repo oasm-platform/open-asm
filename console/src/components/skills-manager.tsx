@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Markdown } from '@/components/common/markdown';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type {
@@ -27,6 +28,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   BookOpen,
+  ChevronDown,
   Loader2,
   Pencil,
   Plus,
@@ -194,6 +196,7 @@ function SkillRow({
 }) {
   const queryClient = useQueryClient();
   const isBuiltin = skill.isBuiltin;
+  const [expanded, setExpanded] = useState(false);
 
   const toggle = useAgentsControllerToggleSkill({
     mutation: {
@@ -225,31 +228,37 @@ function SkillRow({
   return (
     <div className="group relative rounded-xl border bg-card transition-all duration-200 hover:shadow-md hover:border-border/80 overflow-hidden">
       <div className="flex items-center gap-3 p-4">
-        <div className={cn(
-          'relative flex items-center justify-center size-10 rounded-xl shrink-0 transition-all duration-300',
-          'bg-primary/10 text-primary dark:bg-primary/5 dark:text-primary group-hover:bg-primary/20 dark:group-hover:bg-primary/10',
-        )}>
-          <BookOpen className="size-5" />
-        </div>
-
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold tracking-tight truncate">{skill.name}</p>
-            {isBuiltin && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">
-                System
-              </span>
-            )}
-            {!isBuiltin && !skill.isEnabled && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">
-                Disabled
-              </span>
-            )}
+        <button
+          type="button"
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          <div className="flex-1 min-w-0 space-y-0.5">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold tracking-tight truncate">{skill.name}</p>
+              {isBuiltin && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">
+                  System
+                </span>
+              )}
+              {!isBuiltin && !skill.isEnabled && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">
+                  Disabled
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground/70 truncate selection:bg-primary/10">
+              {skill.description}
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground/70 truncate selection:bg-primary/10">
-            {skill.description}
-          </p>
-        </div>
+
+          <ChevronDown
+            className={cn(
+              'size-4 text-muted-foreground transition-transform shrink-0',
+              expanded && 'rotate-180',
+            )}
+          />
+        </button>
 
         <div className="flex items-center gap-1 shrink-0">
           <div className="px-2 h-8 flex items-center">
@@ -292,6 +301,12 @@ function SkillRow({
           )}
         </div>
       </div>
+
+      {expanded && skill.content && (
+        <div className="border-t px-4 py-3 text-sm text-muted-foreground">
+          <Markdown content={skill.content} />
+        </div>
+      )}
     </div>
   );
 }

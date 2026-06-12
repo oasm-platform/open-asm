@@ -724,6 +724,7 @@ export class AgentTool {
 
   getMemoryTools(
     workspaceId: string,
+    userId: string,
     conversationId: string,
   ): Record<string, ToolType> {
     const memoriesService = this.agentsMemories;
@@ -822,7 +823,7 @@ export class AgentTool {
       }),
       execute: async (params: { content: string }) => {
         try {
-          await memoriesService.ltmSet(workspaceId, params.content);
+          await memoriesService.ltmSet(workspaceId, userId, params.content);
           return {
             success: true,
             message: 'Saved to long-term memory.',
@@ -845,11 +846,11 @@ export class AgentTool {
       }),
       execute: async (params: { content: string }) => {
         try {
-          const existing = await memoriesService.ltmGet(workspaceId);
+          const existing = await memoriesService.ltmGet(workspaceId, userId);
           const newContent = existing.content
             ? `${existing.content}\n\n${params.content}`
             : params.content;
-          await memoriesService.ltmSet(workspaceId, newContent);
+          await memoriesService.ltmSet(workspaceId, userId, newContent);
           return {
             success: true,
             message: 'Appended to long-term memory.',
@@ -866,7 +867,7 @@ export class AgentTool {
       parameters: z.object({}),
       execute: async () => {
         try {
-          const record = await memoriesService.ltmGet(workspaceId);
+          const record = await memoriesService.ltmGet(workspaceId, userId);
           return { content: record.content || '(empty)' };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
