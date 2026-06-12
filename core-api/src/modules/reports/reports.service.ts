@@ -90,6 +90,10 @@ export class ReportsService {
 
       Handlebars.registerHelper('toUpper', (str: string) => str.toUpperCase());
 
+      Handlebars.registerHelper('toLowerCase', (str: string) => str.toLowerCase());
+
+      Handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
+
       Handlebars.registerHelper('riskBg', (level: string) => {
         const colors: Record<string, string> = {
           critical: '#fef2f2',
