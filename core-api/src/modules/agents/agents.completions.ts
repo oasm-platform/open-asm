@@ -46,6 +46,8 @@ interface StreamCreationParams {
   conversationId: string;
   todosEmitter: EventEmitter;
   abortSignal?: AbortSignal;
+  /** Resolves when critical onFinish DB writes (tool calls, parts, message content) complete */
+  finishPromise: Promise<void>;
 }
 
 /** Parameters for building streamText call options */
@@ -326,7 +328,10 @@ export class AgentsCompletionsService {
             msg.metadata?.['status'] === 'completed',
         );
         if (hasCompletedAssistant) {
-          await this.generateTitle(conversationId, llmConfig);
+          // Fire-and-forget: title generation should not block stream closure
+          this.generateTitle(conversationId, llmConfig).catch((err) =>
+            this.logger.error('Error generating title', err),
+          );
         }
       }
     } catch (error) {
@@ -782,6 +787,7 @@ export class AgentsCompletionsService {
       id: t.id,
       content: t.content,
       status: t.status,
+      sortOrder: t.sortOrder,
       updatedAt: t.updatedAt.toISOString(),
     }));
     const todosContext = formatTodosToPrompt(todos);
@@ -1110,6 +1116,14 @@ export class AgentsCompletionsService {
     // Use the shared EventEmitter from caller to communicate todo events between tool calls and the stream
     const { todosEmitter } = options;
 
+    // Promise that resolves when critical onFinish DB writes complete.
+    // The continuation loop awaits this before reading DB for todo status,
+    // preventing stale-data reads when onFinish DB writes are still in-flight.
+    let resolveFinish: (() => void) | undefined;
+    const finishPromise = new Promise<void>((resolve) => {
+      resolveFinish = resolve;
+    });
+
     // Check if request was already aborted before starting the AI call
     if (abortSignal?.aborted) {
       this.logger.log(
@@ -1121,7 +1135,8 @@ export class AgentsCompletionsService {
           controller.close();
         },
       });
-      return { aiStream: emptyStream, conversationId, todosEmitter };
+      resolveFinish?.();
+      return { aiStream: emptyStream, conversationId, todosEmitter, finishPromise };
     }
 
     // Determine max output tokens based on agent mode and LLM config
@@ -1180,9 +1195,6 @@ export class AgentsCompletionsService {
             `agentMode=${options.agentMode ?? 'unknown'}`,
         );
 
-        // All DB writes + LLM calls below are fire-and-forget.
-        // Returning immediately lets the stream close and frees the frontend.
-
         const markAborted = () => {
           this.messageRepository
             .update(
@@ -1197,121 +1209,134 @@ export class AgentsCompletionsService {
 
         if (isAborted()) {
           markAborted();
+          resolveFinish?.();
           return;
         }
 
-        // Persist tool calls for history rendering on page reload
-        try {
-          const toolCallEntities: AgentMessageToolCall[] = [];
-          for (const step of event.steps) {
-            for (const toolCall of step.toolCalls) {
-              const toolResult = step.toolResults.find(
-                (r) => r.toolCallId === toolCall.toolCallId,
-              );
-              toolCallEntities.push(
-                this.toolCallRepository.create({
-                  messageId: assistantMessageId,
-                  conversationId,
-                  toolCallId: toolCall.toolCallId,
-                  toolName: toolCall.toolName,
-                  args: toolCall.input as Record<string, unknown>,
-                  result:
-                    (toolResult?.output as Record<string, unknown>) ?? null,
-                  isError: !toolResult,
-                }),
-              );
+        // Critical DB writes are awaited internally and resolve finishPromise
+        // when complete. Non-critical operations remain fire-and-forget.
+        (async () => {
+          // Persist tool calls for history rendering on page reload
+          try {
+            const toolCallEntities: AgentMessageToolCall[] = [];
+            for (const step of event.steps) {
+              for (const toolCall of step.toolCalls) {
+                const toolResult = step.toolResults.find(
+                  (r) => r.toolCallId === toolCall.toolCallId,
+                );
+                toolCallEntities.push(
+                  this.toolCallRepository.create({
+                    messageId: assistantMessageId,
+                    conversationId,
+                    toolCallId: toolCall.toolCallId,
+                    toolName: toolCall.toolName,
+                    args: toolCall.input as Record<string, unknown>,
+                    result:
+                      (toolResult?.output as Record<string, unknown>) ?? null,
+                    isError: !toolResult,
+                  }),
+                );
+              }
             }
-          }
-          if (toolCallEntities.length > 0) {
-            this.toolCallRepository
-              .save(toolCallEntities)
-              .catch((err) => this.logger.error('Error saving tool calls', err));
-          }
-        } catch (err) {
-          this.logger.error('Error saving tool calls', err);
-        }
-
-        if (isAborted()) {
-          markAborted();
-          return;
-        }
-
-        // Build parts array for frontend rendering
-        try {
-          const parts: Record<string, unknown>[] = [];
-          let hasReasoningPart = false;
-          for (const step of event.steps) {
-            const stepReasoning =
-              typeof step.reasoning === 'string' ? step.reasoning : '';
-            if (stepReasoning.trim()) {
-              parts.push({ type: 'reasoning', text: stepReasoning.trim() });
-              hasReasoningPart = true;
+            if (toolCallEntities.length > 0) {
+              await this.toolCallRepository.save(toolCallEntities);
             }
-            for (const tc of step.toolCalls) {
-              const toolResult = step.toolResults?.find(
-                (r) => r.toolCallId === tc.toolCallId,
-              );
-              parts.push({
-                type: 'dynamic-tool',
-                toolCallId: tc.toolCallId,
-                toolName: tc.toolName,
-                state: toolResult ? 'output-available' : 'input-available',
-                input: tc.input,
-                output: toolResult?.output ?? null,
+          } catch (err) {
+            this.logger.error('Error saving tool calls', err);
+          }
+
+          if (isAborted()) {
+            markAborted();
+            return;
+          }
+
+          // Build parts array for frontend rendering
+          try {
+            const parts: Record<string, unknown>[] = [];
+            let hasReasoningPart = false;
+            for (const step of event.steps) {
+              const stepReasoning =
+                typeof step.reasoning === 'string' ? step.reasoning : '';
+              if (stepReasoning.trim()) {
+                parts.push({ type: 'reasoning', text: stepReasoning.trim() });
+                hasReasoningPart = true;
+              }
+              for (const tc of step.toolCalls) {
+                const toolResult = step.toolResults?.find(
+                  (r) => r.toolCallId === tc.toolCallId,
+                );
+                parts.push({
+                  type: 'dynamic-tool',
+                  toolCallId: tc.toolCallId,
+                  toolName: tc.toolName,
+                  state: toolResult ? 'output-available' : 'input-available',
+                  input: tc.input,
+                  output: toolResult?.output ?? null,
+                });
+              }
+              const stepText =
+                typeof step.text === 'string' ? step.text : '';
+              if (stepText.trim()) {
+                parts.push({ type: 'text', text: stepText.trim() });
+              }
+            }
+            if (!hasReasoningPart && accumulatedReasoning.trim()) {
+              parts.unshift({
+                type: 'reasoning',
+                text: accumulatedReasoning.trim(),
               });
             }
-            const stepText =
-              typeof step.text === 'string' ? step.text : '';
-            if (stepText.trim()) {
-              parts.push({ type: 'text', text: stepText.trim() });
+            if (parts.length > 0) {
+              await this.messageRepository.update(
+                { id: assistantMessageId },
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+                { parts: parts as any },
+              );
             }
+          } catch (err) {
+            this.logger.error('Error saving parts array', err);
           }
-          if (!hasReasoningPart && accumulatedReasoning.trim()) {
-            parts.unshift({
-              type: 'reasoning',
-              text: accumulatedReasoning.trim(),
-            });
-          }
-          if (parts.length > 0) {
-            this.messageRepository
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-              .update({ id: assistantMessageId }, { parts: parts as any })
-              .catch((err) => this.logger.error('Error saving parts array', err));
-          }
-        } catch (err) {
-          this.logger.error('Error saving parts array', err);
-        }
 
-        this.handleStreamFinish(
-          assistantMessageId,
-          conversationId,
-          accumulatedText,
-          accumulatedReasoning,
-          llmConfig,
-          assistantMessageMetadata,
-        ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
+          // handleStreamFinish updates message content + status to 'completed'
+          await this.handleStreamFinish(
+            assistantMessageId,
+            conversationId,
+            accumulatedText,
+            accumulatedReasoning,
+            llmConfig,
+            assistantMessageMetadata,
+          ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
+        })()
+          .catch((err) =>
+            this.logger.error('Error in critical onFinish writes', err),
+          )
+          .finally(() => {
+            // Signal to the continuation loop that critical writes are done
+            resolveFinish?.();
 
-        if (options.agentMode !== AgentMode.AGENT) {
-          this.autoCompleteStuckTodos(conversationId).catch((err) =>
-            this.logger.error('Error in autoCompleteStuckTodos', err),
-          );
-        }
+            // Non-critical operations (fire-and-forget, do NOT block continuation)
+            if (options.agentMode !== AgentMode.AGENT) {
+              this.autoCompleteStuckTodos(conversationId).catch((err) =>
+                this.logger.error('Error in autoCompleteStuckTodos', err),
+              );
+            }
 
-        this.handlePostStreamCompaction(
-          conversationId,
-          llmConfig,
-          contextParts,
-          modelMessages,
-        ).catch((err) =>
-          this.logger.error('Error in post-stream compaction', err),
-        );
+            this.handlePostStreamCompaction(
+              conversationId,
+              llmConfig,
+              contextParts,
+              modelMessages,
+            ).catch((err) =>
+              this.logger.error('Error in post-stream compaction', err),
+            );
+          });
       },
     });
 
     // Convert the result stream to a UIMessageStream consumable by the frontend
     const aiStream = result.toUIMessageStream();
 
-    return { aiStream, conversationId, todosEmitter };
+    return { aiStream, conversationId, todosEmitter, finishPromise };
   }
 
   // ================================================================
@@ -1447,6 +1472,7 @@ export class AgentsCompletionsService {
                       id: t.id,
                       content: t.content,
                       status: t.status,
+                      sortOrder: t.sortOrder,
                       updatedAt: t.updatedAt.toISOString(),
                     })),
                   );
@@ -1473,7 +1499,7 @@ export class AgentsCompletionsService {
 
             try {
               // Execute a single streamText iteration
-              const { aiStream } = this.executeStreamText({
+              const { aiStream, finishPromise } = this.executeStreamText({
                 llmConfig,
                 model,
                 modelMessages: currentModelMessages,
@@ -1498,6 +1524,12 @@ export class AgentsCompletionsService {
                 if (done || controllerClosed) break;
                 controller.enqueue(value);
               }
+
+              // Wait for critical onFinish DB writes (tool calls, parts, message content)
+              // to complete before reading DB for todo status. Without this,
+              // the continuation loop reads stale data because onFinish DB writes
+              // are async and may not have committed yet when the reader drains.
+              await finishPromise;
 
 
             } catch (iterationError) {
@@ -1539,10 +1571,13 @@ export class AgentsCompletionsService {
 
             // Prepare next iteration context with smart pruning
             const contextWindow = this.getModelContextWindow(llmConfig);
+            // Always fetch up to 20 messages in continuation loop regardless
+            // of summary. hasSummary=true limits to 5 messages which loses
+            // tool call context from previous iteration.
             const updatedMessages =
               await this.getConversationHistory(
                 conversationId,
-                !!conversation?.summary,
+                false,
               );
             const prunedMessages = this.pruneContextByBudget(
               updatedMessages,
@@ -1602,6 +1637,7 @@ export class AgentsCompletionsService {
                 id: t.id,
                 content: t.content,
                 status: t.status,
+                sortOrder: t.sortOrder,
                 updatedAt: t.updatedAt.toISOString(),
               }));
               const todosContext = formatTodosToPrompt(updatedTodos);
@@ -1646,8 +1682,8 @@ export class AgentsCompletionsService {
               this.logger.error('Error in autoCompleteStuckTodos', err),
             );
 
-            // Generate comprehensive end-of-conversation report
-            await this.generateEndOfConversationReport(
+            // Fire-and-forget: report generation should not block stream closure
+            this.generateEndOfConversationReport(
               conversationId,
               llmConfig,
             ).catch((err) =>

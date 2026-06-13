@@ -2,6 +2,7 @@ export interface AgentTodoItem {
   id: string;
   content: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  sortOrder: number;
   updatedAt: string;
 }
 

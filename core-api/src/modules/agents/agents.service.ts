@@ -392,6 +392,7 @@ export class AgentsService {
       id: t.id,
       content: t.content,
       status: t.status,
+      sortOrder: t.sortOrder,
       updatedAt: t.updatedAt.toISOString(),
     }));
 

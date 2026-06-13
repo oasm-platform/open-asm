@@ -481,6 +481,7 @@ export class AgentTool {
         id: t.id,
         content: t.content,
         status: t.status,
+        sortOrder: t.sortOrder,
         updatedAt: t.updatedAt.toISOString(),
       }));
     };
@@ -641,11 +642,37 @@ export class AgentTool {
           });
           if (!targetTodo) return { success: false, message: `Todo "${params.id}" not found.` };
 
+          // Server-side ordering guard: enforce sequential execution
+          if (params.status === 'in_progress') {
+            // Only the first pending/in_progress step (by sortOrder) may be started
+            const allTodos = await todoRepo.find({
+              where: { conversationId },
+              order: { sortOrder: 'ASC' },
+            });
+            const currentStep = allTodos.find(
+              (t) => t.status === 'pending' || t.status === 'in_progress',
+            );
+            if (currentStep && currentStep.id !== targetTodo.id) {
+              return {
+                success: false,
+                message: `REJECTED: Cannot start "${targetTodo.content}" (sortOrder ${targetTodo.sortOrder}). You must complete the current step first: "${currentStep.content}" (sortOrder ${currentStep.sortOrder}). Execute steps in strict sequential order.`,
+              };
+            }
+          } else if (params.status === 'completed' || params.status === 'failed') {
+            // Can only complete/fail a step that is currently in_progress
+            if (targetTodo.status !== 'in_progress') {
+              return {
+                success: false,
+                message: `REJECTED: Cannot mark "${targetTodo.content}" as ${params.status}. It is currently "${targetTodo.status}". Call transition_step(id, "in_progress") before completing or failing a step.`,
+              };
+            }
+          }
+
           targetTodo.status = params.status;
           await todoRepo.save(targetTodo);
 
           await emitTodos();
-          return { success: true, message: `Updated "${targetTodo.content}" -> ${params.status}`, todo: { id: targetTodo.id, content: targetTodo.content, status: targetTodo.status, updatedAt: targetTodo.updatedAt.toISOString() } };
+          return { success: true, message: `Updated "${targetTodo.content}" -> ${params.status}`, todo: { id: targetTodo.id, content: targetTodo.content, status: targetTodo.status, sortOrder: targetTodo.sortOrder, updatedAt: targetTodo.updatedAt.toISOString() } };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return { success: false, message: `Failed to update step: ${message}` };
@@ -691,7 +718,7 @@ export class AgentTool {
 
           await getAllTodos();
           await emitTodos();
-          return { success: true, message: `Added todo "${params.content}".`, todo: { id: newEntity.id, content: newEntity.content, status: newEntity.status, updatedAt: newEntity.updatedAt.toISOString() } };
+          return { success: true, message: `Added todo "${params.content}".`, todo: { id: newEntity.id, content: newEntity.content, status: newEntity.status, sortOrder: newEntity.sortOrder, updatedAt: newEntity.updatedAt.toISOString() } };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return { success: false, message: `Failed to add step: ${message}` };
