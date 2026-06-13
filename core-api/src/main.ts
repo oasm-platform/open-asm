@@ -5,6 +5,7 @@ import type { MicroserviceOptions } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { apiReference } from '@scalar/nestjs-api-reference';
 import * as compression from 'compression';
 import * as cookieParser from 'cookie-parser';
 import 'dotenv/config';
@@ -81,7 +82,7 @@ async function bootstrap() {
     exclude: [`/${API_GLOBAL_PREFIX}/auth/{*path}`, '/'],
   });
 
-  // Show Swagger UI in development: http://localhost:6276/api/docs
+  // API docs at http://localhost:6276/api/docs (Scalar)
   const config = new DocumentBuilder()
     .setTitle(APP_NAME)
     .setDescription(
@@ -91,11 +92,13 @@ async function bootstrap() {
     .setExternalDoc('Authentication Docs', 'auth/docs')
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup(`${API_GLOBAL_PREFIX}/docs`, app, documentFactory, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  });
+  app.use(
+    `/${API_GLOBAL_PREFIX}/docs`,
+    apiReference({
+      content: documentFactory(),
+      darkMode: true,
+    }),
+  );
 
   const pathOutputOpenApi = '../.open-api/open-api.json';
 

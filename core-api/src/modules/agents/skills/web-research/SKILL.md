@@ -1,13 +1,13 @@
 ---
 name: web-research
-description: Perform advanced web research using search engines, CVE databases, and vendor advisories. Use when the user asks about CVEs, security news, vulnerabilities, patch releases, or any external security information.
+description: Perform web research using CVE databases, security advisories, and threat intelligence sources. Use when the user asks about CVEs, security news, vulnerabilities, patch releases, or any external security information not available in the workspace.
 ---
 
 # Web Research
 
 Use this skill when you need to find external security information that is not already in the OASM platform.
 
-## When to use this skill
+## When to Use
 
 - User asks about a specific CVE (e.g., "what is CVE-2024-1234?")
 - User asks about recent vulnerabilities or exploits
@@ -15,31 +15,65 @@ Use this skill when you need to find external security information that is not a
 - User asks about industry-specific threats or news
 - User needs context about a technology or software vulnerability
 
-## CVE Lookup
+## Core Tool: `retrieve_web_page`
 
-1. Fetch from: `https://raw.githubusercontent.com/trickest/cve/refs/heads/main/{YEAR}/CVE-{YEAR}-{NUMBER}.md`
-2. If not found, try NVD: `https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-{YEAR}-{NUMBER}`
-3. Extract: description, affected versions, severity (CVSS), and remediation
-4. Correlate with OASM assets — check if any assets run the affected software
-5. If you found matching assets, recommend scanning priority
+Use `retrieve_web_page` to fetch content from any public URL. It returns `statusCode` and `body`.
 
-## Web Search
+```
+retrieve_web_page({ url: "https://example.com/path" })
+```
 
-1. Use Brave Search: `https://search.brave.com/search?q={QUERY}&source=web`
-2. Use DuckDuckGo as fallback: `https://lite.duckduckgo.com/lite/?q={QUERY}`
-3. Use specific, targeted queries with year/version numbers
-4. For emerging threats, zero-days, or security concepts — search broad and narrow down
+Always use `retrieve_web_page` instead of trying to construct fetch requests manually. It handles User-Agent headers and error handling automatically.
 
-## Vendor Advisory Lookup
+## Workflow
 
-- For Microsoft: `https://msrc.microsoft.com/update-guide/vulnerability/CVE-{YEAR}-{NUMBER}`
-- For Apache: `https://lists.apache.org/thread/` search
-- For Linux distributions: check their security tracker pages
-- For npm/PyPI: check their security advisories database
+### 1. Identify What You Need
 
-## Deep Content Analysis
+Before fetching, know what information you're looking for:
+- CVE details → fetch from Trickest/NVD
+- Exploit PoC → fetch from GitHub/Exploit-DB
+- Vendor patches → fetch from vendor advisory pages
+- Threat news → fetch from security news sites
 
-- After fetching a URL, analyze thoroughly
-- Fetch linked references for comprehensive answers (max 3-5 recursive fetches)
-- Synthesize multiple sources into actionable insights
-- Always map findings back to OASM entities (assets, vulnerabilities, targets)
+### 2. Build the URL
+
+Pick the right source for the query:
+
+| Query Type | Source | URL Pattern |
+|---|---|---|
+| CVE details | Trickest CVE | `https://raw.githubusercontent.com/trickest/cve/refs/heads/main/{YEAR}/CVE-{YEAR}-{NUMBER}.md` |
+| CVE details (alt) | NVD API | `https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-{YEAR}-{NUMBER}` |
+| Microsoft CVE | MSRC | `https://msrc.microsoft.com/update-guide/vulnerability/CVE-{YEAR}-{NUMBER}` |
+| Exploit code | GitHub | `https://github.com/search?q={QUERY}+exploit&type=repositories` |
+| Exploit modules | Exploit-DB | `https://www.exploit-db.com/search?q={QUERY}` |
+| Metasploit modules | Rapid7 | `https://www.rapid7.com/db/modules/?q={QUERY}` |
+| Apache advisories | Apache Mailing Lists | `https://lists.apache.org/` |
+| Package vulnerabilities | npm | `https://www.npmjs.com/advisories` |
+| Package vulnerabilities | PyPI | `https://pypi.org/security/` |
+
+### 3. Fetch and Analyze
+
+1. Call `retrieve_web_page` with the constructed URL
+2. Parse the `body` content — extract relevant sections
+3. If the page has links to related content, fetch up to 3-5 linked pages for comprehensive analysis
+4. Synthesize findings from multiple sources
+
+### 4. Correlate with Workspace
+
+After gathering external intel, map findings back to the workspace:
+
+- Use `enumerate_assets` or `fingerprint_technologies` to check if affected software is in use
+- Use `discover_vulnerabilities` to see if the CVE is already tracked
+- Use `enumerate_open_issues` to check if someone is already investigating
+
+### 5. Save Important Findings
+
+- Use `stm_write` to store research results for the current conversation
+- Use `ltm_append` to persist critical threat intelligence
+
+## Query Tips
+
+- Include version numbers: "Apache 2.4.49 path traversal" not just "Apache vulnerability"
+- Include year for CVEs: "CVE-2024-1234" narrows results
+- Use specific terms: "Log4Shell RCE" not "Log4j issue"
+- For zero-days, search for the vendor advisory page directly

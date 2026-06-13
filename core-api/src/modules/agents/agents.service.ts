@@ -40,6 +40,7 @@ import {
   MCPServerResponseDto,
 } from './dto/mcp-config.dto';
 import { MessageResponseDto, ToolCallResponseDto } from './dto/message.dto';
+import { WorkspaceMemoryResponseDto } from './dto/workspace-memory.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
@@ -391,6 +392,7 @@ export class AgentsService {
       id: t.id,
       content: t.content,
       status: t.status,
+      sortOrder: t.sortOrder,
       updatedAt: t.updatedAt.toISOString(),
     }));
 
@@ -676,7 +678,9 @@ export class AgentsService {
     const existing = config.configJson.mcpServers[name] ?? {};
     config.configJson.mcpServers[name] = {
       disabled: false,
+      transport: 'sse',
       timeout: 60,
+      sse_read_timeout: 300,
       allowed_tools: null,
       ...existing,
       ...dto,
@@ -761,5 +765,43 @@ export class AgentsService {
     } catch {
       return { status: 'offline' };
     }
+  }
+
+  async getWorkspaceMemory(
+    workspaceId: string,
+    userId: string,
+    query?: GetManyBaseQueryParams,
+  ): Promise<GetManyBaseResponseDto<WorkspaceMemoryResponseDto>> {
+    const page = query?.page || 1;
+    const limit = query?.limit || 10;
+    const sortBy = query?.sortBy || 'createdAt';
+    const sortOrder = (query?.sortOrder || 'DESC') as 'ASC' | 'DESC';
+
+    const { data, total } = await this.agentsMemories.ltmGetAllPaginated(
+      workspaceId,
+      userId,
+      { page, limit, sortBy, sortOrder },
+    );
+
+    return getManyResponse({
+      query: { ...query, page, limit } as GetManyBaseQueryParams,
+      data: data.map((r) => ({
+        id: r.id,
+        workspaceId: r.workspaceId,
+        userId: r.userId,
+        content: r.content,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      })),
+      total,
+    });
+  }
+
+  async deleteWorkspaceMemory(
+    id: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.agentsMemories.ltmDeleteById(id, workspaceId, userId);
   }
 }

@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsNumber,
   IsObject,
   IsOptional,
@@ -16,26 +17,15 @@ export class MCPServerConfigDto {
   @IsString()
   url?: string;
 
+  @ApiPropertyOptional({ enum: ['sse', 'streamable-http'], example: 'sse', default: 'sse' })
+  @IsOptional()
+  @IsIn(['sse', 'streamable-http'])
+  transport?: 'sse' | 'streamable-http';
+
   @ApiPropertyOptional({ example: { 'api-key': 'sk-...' } })
   @IsOptional()
   @IsObject()
   headers?: Record<string, string>;
-
-  @ApiPropertyOptional({ example: 'npx' })
-  @IsOptional()
-  @IsString()
-  command?: string;
-
-  @ApiPropertyOptional({ example: ['-y', '@modelcontextprotocol/server-filesystem'] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  args?: string[];
-
-  @ApiPropertyOptional({ example: { PATH: '/usr/bin' } })
-  @IsOptional()
-  @IsObject()
-  env?: Record<string, string>;
 
   @ApiPropertyOptional({ example: false, default: false })
   @IsOptional()
@@ -54,6 +44,13 @@ export class MCPServerConfigDto {
   @Min(1)
   @Type(() => Number)
   timeout?: number;
+
+  @ApiPropertyOptional({ example: 300, default: 300, description: 'SSE read timeout in seconds' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  sse_read_timeout?: number;
 }
 
 export class MCPServerResponseDto extends MCPServerConfigDto {

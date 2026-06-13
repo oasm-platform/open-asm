@@ -11,6 +11,63 @@ import {
 import { orvalClient } from '@/services/apis/axios-client';
 import { useRemoteExecuteStream } from '@/hooks/use-remote-execute-stream';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+// ---------------------------------------------------------------------------
+// Auto-retry constants and helpers
+// ---------------------------------------------------------------------------
+
+const MAX_AUTO_RETRIES = 3;
+const BASE_RETRY_DELAY_MS = 1_000;
+
+/**
+ * Determines whether a streaming error is transient and worth retrying
+ * automatically. Permanent errors (auth, validation) should surface immediately.
+ */
+function isTransientError(error: Error): boolean {
+  const msg = (error.message ?? '').toLowerCase();
+
+  // Network-level failures
+  if (
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('load failed') ||
+    msg.includes('network request failed') ||
+    msg.includes('ERR_NETWORK') ||
+    msg.includes('ERR_CONNECTION')
+  ) {
+    return true;
+  }
+
+  // Abort from chunkMs timeout (stream stuck) — retryable
+  if (msg.includes('timeout') || msg.includes('aborted')) {
+    // Distinguish user-initiated abort (not retryable) from system abort (retryable).
+    // The user abort typically comes from the stop() action which has a specific message.
+    if (msg.includes('user') || msg.includes('stop')) return false;
+    return true;
+  }
+
+  // Server-side transient errors
+  if (
+    msg.includes('500') ||
+    msg.includes('502') ||
+    msg.includes('503') ||
+    msg.includes('504') ||
+    msg.includes('internal server error') ||
+    msg.includes('bad gateway') ||
+    msg.includes('service unavailable') ||
+    msg.includes('gateway timeout')
+  ) {
+    return true;
+  }
+
+  // Rate limiting
+  if (msg.includes('429') || msg.includes('rate limit')) {
+    return true;
+  }
+
+  return false;
+}
+
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
@@ -29,6 +86,10 @@ interface UseAgentChatReturn {
   isStreaming: boolean;
   isLoadingHistory: boolean;
   streamError: string | null;
+  isRetrying: boolean;
+  retryAttempt: number;
+  title: string | null;
+  createdAt: string | null;
   todos: AgentTodoItem[];
   selectedModel: SelectedModel | null;
   agentMode: string;
@@ -157,7 +218,14 @@ export function useAgentChat({
   const chatMessagesRef = useRef<UIMessage[]>([]);
   const isStreamingRef = useRef(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const retryCountRef = useRef(0);
+  const abortRetryRef = useRef<AbortController | null>(null);
+  const isUserStoppedRef = useRef(false);
   const [todos, setTodos] = useState<AgentTodoItem[]>([]);
+  const [title, setTitle] = useState<string | null>(null);
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
   const { data: providers } =
     useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
@@ -262,8 +330,22 @@ export function useAgentChat({
     id: conversationId || 'agent-new-chat',
     experimental_throttle: 50,
     onError: (error) => {
+      // Ignore errors from user-initiated stops — not a real error
+      if (isUserStoppedRef.current) {
+        isUserStoppedRef.current = false;
+        return;
+      }
+
       console.error('[Chat] Error:', error);
+      // Always set streamError so the auto-retry effect can evaluate it.
       setStreamError(error.message ?? 'An error occurred while streaming');
+
+      // For permanent errors or retries exhausted, reset retry state immediately.
+      if (!isTransientError(error) || retryCountRef.current >= MAX_AUTO_RETRIES) {
+        setIsRetrying(false);
+        retryCountRef.current = 0;
+        setRetryCount(0);
+      }
     },
     onData: (data: { type: string; data: unknown }) => {
       if (data.type === 'data-todos-updated') {
@@ -330,6 +412,11 @@ export function useAgentChat({
   const handleSendMessage = useCallback(
     async (content: string, options?: { agentMode?: string }) => {
       setStreamError(null);
+      // Cancel any pending auto-retry
+      retryCountRef.current = 0;
+      setRetryCount(0);
+      setIsRetrying(false);
+      isUserStoppedRef.current = false;
       if (options?.agentMode !== undefined) {
         agentModeRef.current = options.agentMode;
         setAgentMode(options.agentMode);
@@ -349,11 +436,16 @@ export function useAgentChat({
   const handleRetry = useCallback(async () => {
     if (lastAssistantIdx !== -1 && chatMessages.length > 0) {
       setStreamError(null);
+      retryCountRef.current = 0;
+      setRetryCount(0);
+      setIsRetrying(false);
+      isUserStoppedRef.current = false;
       await regenerate();
     }
   }, [lastAssistantIdx, chatMessages, regenerate]);
 
   const handleStop = useCallback(() => {
+    isUserStoppedRef.current = true;
     stop();
   }, [stop]);
 
@@ -371,7 +463,74 @@ export function useAgentChat({
 
   const handleDismissError = useCallback(() => {
     setStreamError(null);
+    retryCountRef.current = 0;
+    setRetryCount(0);
+    setIsRetrying(false);
   }, []);
+
+  // Auto-retry with exponential backoff for transient stream errors.
+  // When streamError is set and the error is retryable, wait with exponential
+  // backoff then call regenerate() to resend the last message.
+  useEffect(() => {
+    if (!streamError) return;
+    if (isStreaming) return;
+    if (lastAssistantIdx === -1) return;
+    if (retryCount >= MAX_AUTO_RETRIES) return;
+
+    // Check if this error is transient — only auto-retry those
+    const testError = new Error(streamError);
+    if (!isTransientError(testError)) return;
+
+    const backoffMs =
+      BASE_RETRY_DELAY_MS * Math.pow(2, retryCount) +
+      Math.random() * 500;
+
+    const controller = new AbortController();
+    abortRetryRef.current = controller;
+
+    const timer = setTimeout(async () => {
+      if (controller.signal.aborted) return;
+      console.log(
+        `[Chat] Auto-retry ${retryCount + 1}/${MAX_AUTO_RETRIES} after ${Math.round(backoffMs)}ms`,
+      );
+      setIsRetrying(true);
+      setStreamError(null);
+      retryCountRef.current = retryCount + 1;
+      setRetryCount((c) => c + 1);
+      try {
+        await regenerate();
+        // Stream succeeded — reset retry state
+        if (!controller.signal.aborted) {
+          retryCountRef.current = 0;
+          setRetryCount(0);
+          setIsRetrying(false);
+        }
+      } catch {
+        // onError will handle subsequent errors
+      }
+    }, backoffMs);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [
+    streamError,
+    isStreaming,
+    lastAssistantIdx,
+    retryCount,
+    regenerate,
+  ]);
+
+  // Reset retry count when stream starts successfully (only if NOT in auto-retry).
+  // During auto-retry, isRetrying is true so this won't interfere.
+  useEffect(() => {
+    if (isStreaming && !isRetrying) {
+      retryCountRef.current = 0;
+      setRetryCount(0);
+      setIsRetrying(false);
+    }
+  }, [isStreaming, isRetrying]);
 
   // Fetch initial todos and agentMode for existing conversations
   useEffect(() => {
@@ -396,6 +555,12 @@ export function useAgentChat({
             }
             return data.todos as unknown as AgentTodoItem[];
           });
+        }
+        if (!cancelled && data.title) {
+          setTitle(data.title);
+        }
+        if (!cancelled && data.createdAt) {
+          setCreatedAt(data.createdAt as string);
         }
         if (!cancelled && data.agentMode) {
           setAgentMode(data.agentMode);
@@ -448,7 +613,11 @@ export function useAgentChat({
     isStreaming,
     isLoadingHistory,
     streamError,
+    isRetrying,
+    retryAttempt: retryCount,
     todos,
+    title,
+    createdAt,
     selectedModel,
     agentMode,
     hasSentFirstMessage,
