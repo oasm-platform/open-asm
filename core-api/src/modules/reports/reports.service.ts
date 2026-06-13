@@ -10,7 +10,11 @@ import { getManyResponse } from '@/utils/getManyResponse';
 import { StorageService } from '@/modules/storage/storage.service';
 import { GetManyReportsQueryDto } from './dto/reports.dto';
 import { Report } from './entities/report.entity';
-import { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
+import {
+  Severity,
+  VulnerabilityAnalyzeStatus,
+  JobStatus,
+} from '@/common/enums/enum';
 import { TargetType } from '@/modules/targets/entities/target.entity';
 import type { ReportData } from './types/report-data.type';
 import type { VulnerabilityReportData } from './types/vulnerability-report-data.type';
@@ -21,10 +25,12 @@ import { SummaryReportService } from './services/summary-report.service';
 export class ReportsService {
   private readonly templatePath: string;
   private readonly vulnerabilityTemplatePath: string;
+  private readonly logoPath: string;
   private handlebarsTemplate: ReturnType<typeof Handlebars.compile> | null =
     null;
   private vulnerabilityTemplate: ReturnType<typeof Handlebars.compile> | null =
     null;
+  private logoBase64: string | null = null;
 
   constructor(
     @InjectRepository(Report)
@@ -40,6 +46,8 @@ export class ReportsService {
       'templates',
       'vulnerability-report.hbs',
     );
+    this.logoPath = path.join(process.cwd(), 'public', 'images', 'logo.png');
+    this.loadLogo();
     this.compileTemplates();
   }
 
@@ -67,7 +75,13 @@ export class ReportsService {
       });
     }
 
-    const allowedSortColumns = ['id', 'createdAt', 'updatedAt', 'fileName', 'userId'];
+    const allowedSortColumns = [
+      'id',
+      'createdAt',
+      'updatedAt',
+      'fileName',
+      'userId',
+    ];
     const sortColumn = allowedSortColumns.includes(sortBy)
       ? `report.${sortBy}`
       : 'report.createdAt';
@@ -77,6 +91,17 @@ export class ReportsService {
     const data = await qb.limit(limit).offset(offset).getMany();
 
     return getManyResponse({ query, data, total });
+  }
+
+  private loadLogo(): void {
+    try {
+      if (fs.existsSync(this.logoPath)) {
+        const logoBuffer = fs.readFileSync(this.logoPath);
+        this.logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+      }
+    } catch {
+      // ignore — logo is optional
+    }
   }
 
   private compileTemplates(): void {
@@ -92,9 +117,15 @@ export class ReportsService {
 
       Handlebars.registerHelper('toUpper', (str: string) => str.toUpperCase());
 
-      Handlebars.registerHelper('toLowerCase', (str: string) => str.toLowerCase());
+      Handlebars.registerHelper('toLowerCase', (str: string) =>
+        str.toLowerCase(),
+      );
 
       Handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
+
+      Handlebars.registerHelper('concat', (...args: unknown[]) => {
+        return args.slice(0, -1).join('');
+      });
 
       Handlebars.registerHelper('riskBg', (level: string) => {
         const colors: Record<string, string> = {
@@ -248,15 +279,31 @@ export class ReportsService {
         return arr.join(separator);
       });
 
-      Handlebars.registerHelper('formatDate', (dateStr: string | Date | null) => {
-        if (!dateStr) return '-';
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return '-';
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+      Handlebars.registerHelper('severityImpact', (severity: string) => {
+        const impacts: Record<string, string> = {
+          CRITICAL:
+            'This vulnerability poses an immediate and severe risk to the affected system. Successful exploitation could lead to complete system compromise, unauthorized access to sensitive data, or full control over the affected infrastructure.',
+          HIGH: 'This vulnerability presents a significant security risk. Exploitation could result in substantial data exposure, privilege escalation, or partial system compromise requiring immediate attention.',
+          MEDIUM:
+            'This vulnerability represents a moderate security concern. While exploitation may require specific conditions or combined attack vectors, it could lead to limited data access or system information disclosure.',
+          LOW: 'This vulnerability presents a lower-tier security risk. Exploitation typically requires favorable conditions and may result in limited impact to system confidentiality, integrity, or availability.',
+          INFO: 'This is an informational finding. It does not represent a direct security vulnerability but may provide useful context for security assessments.',
+        };
+        return impacts[severity] || impacts.LOW;
       });
+
+      Handlebars.registerHelper(
+        'formatDate',
+        (dateStr: string | Date | null) => {
+          if (!dateStr) return '-';
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return '-';
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        },
+      );
 
       this.handlebarsTemplate = Handlebars.compile<ReportData>(templateContent);
     } catch {
@@ -267,6 +314,29 @@ export class ReportsService {
       if (!fs.existsSync(this.vulnerabilityTemplatePath)) {
         return;
       }
+
+      const partialsDir = path.join(
+        process.cwd(),
+        'src',
+        'modules',
+        'reports',
+        'templates',
+        'partials',
+      );
+      if (fs.existsSync(partialsDir)) {
+        const partialFiles = fs.readdirSync(partialsDir);
+        for (const file of partialFiles) {
+          if (file.endsWith('.hbs')) {
+            const partialName = file.replace('.hbs', '');
+            const partialContent = fs.readFileSync(
+              path.join(partialsDir, file),
+              'utf-8',
+            );
+            Handlebars.registerPartial(partialName, partialContent);
+          }
+        }
+      }
+
       const vulnTemplateContent = fs.readFileSync(
         this.vulnerabilityTemplatePath,
         'utf-8',
@@ -313,12 +383,17 @@ export class ReportsService {
     const pdfBuffer = await this.htmlToPdf(html);
 
     const weekPad =
-      'weekPad' in data ? (data as VulnerabilityReportData).weekPad : String((data as ReportData).week).padStart(2, '0');
+      'weekPad' in data
+        ? (data as VulnerabilityReportData).weekPad
+        : String((data as ReportData).week).padStart(2, '0');
     const year = data.year;
 
     const fileName = `report-${type.toLowerCase()}-${year}-W${weekPad}-${generateToken(5)}-${Date.now()}.pdf`;
-    const { path: uploadPath } =
-      await this.storageService.uploadFile(fileName, pdfBuffer, 'reports');
+    const { path: uploadPath } = await this.storageService.uploadFile(
+      fileName,
+      pdfBuffer,
+      'reports',
+    );
 
     await this.reportRepo.save({
       workspace: { id: workspaceId },
@@ -335,14 +410,17 @@ export class ReportsService {
     if (!this.handlebarsTemplate) {
       throw new Error('Template not compiled');
     }
-    return this.handlebarsTemplate(data);
+    return this.handlebarsTemplate({ ...data, logoBase64: this.logoBase64 });
   }
 
   private renderVulnerabilityTemplate(data: VulnerabilityReportData): string {
     if (!this.vulnerabilityTemplate) {
       throw new Error('Vulnerability template not compiled');
     }
-    return this.vulnerabilityTemplate(data);
+    return this.vulnerabilityTemplate({
+      ...data,
+      logoBase64: this.logoBase64 ?? data.logoBase64,
+    });
   }
 
   async deleteReport(id: string, workspaceId: string): Promise<void> {
@@ -468,7 +546,7 @@ export class ReportsService {
         trend: 'decreasing',
       },
       newDiscoveries: {
-          domains: [
+        domains: [
           {
             identifier: 'api.example.com',
             discovered: '2026-05-08',
@@ -609,9 +687,24 @@ export class ReportsService {
         },
       ],
       riskDistribution: [
-        { level: Severity.CRITICAL, count: 3, percent: 2.4, color: 'bg-red-600' },
-        { level: Severity.HIGH, count: 12, percent: 9.8, color: 'bg-orange-500' },
-        { level: Severity.MEDIUM, count: 45, percent: 36.6, color: 'bg-yellow-500' },
+        {
+          level: Severity.CRITICAL,
+          count: 3,
+          percent: 2.4,
+          color: 'bg-red-600',
+        },
+        {
+          level: Severity.HIGH,
+          count: 12,
+          percent: 9.8,
+          color: 'bg-orange-500',
+        },
+        {
+          level: Severity.MEDIUM,
+          count: 45,
+          percent: 36.6,
+          color: 'bg-yellow-500',
+        },
         { level: Severity.LOW, count: 63, percent: 51.2, color: 'bg-blue-500' },
       ],
       targets: [

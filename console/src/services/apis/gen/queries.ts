@@ -1575,9 +1575,15 @@ export type SendMessageDto = {
   agentMode?: SendMessageDtoAgentMode;
 };
 
-export type MCPServerResponseDtoHeaders = { [key: string]: unknown };
+export type MCPServerResponseDtoTransport =
+  (typeof MCPServerResponseDtoTransport)[keyof typeof MCPServerResponseDtoTransport];
 
-export type MCPServerResponseDtoEnv = { [key: string]: unknown };
+export const MCPServerResponseDtoTransport = {
+  sse: 'sse',
+  'streamable-http': 'streamable-http',
+} as const;
+
+export type MCPServerResponseDtoHeaders = { [key: string]: unknown };
 
 /**
  * @nullable
@@ -1588,14 +1594,14 @@ export type MCPServerResponseDtoAllowedTools = {
 
 export type MCPServerResponseDto = {
   url?: string;
+  transport?: MCPServerResponseDtoTransport;
   headers?: MCPServerResponseDtoHeaders;
-  command?: string;
-  args?: string[];
-  env?: MCPServerResponseDtoEnv;
   disabled?: boolean;
   /** @nullable */
   allowed_tools?: MCPServerResponseDtoAllowedTools;
   timeout?: number;
+  /** SSE read timeout in seconds */
+  sse_read_timeout?: number;
   name: string;
 };
 
@@ -1603,9 +1609,15 @@ export type MCPConfigResponseDto = {
   servers: MCPServerResponseDto[];
 };
 
-export type MCPServerConfigDtoHeaders = { [key: string]: unknown };
+export type MCPServerConfigDtoTransport =
+  (typeof MCPServerConfigDtoTransport)[keyof typeof MCPServerConfigDtoTransport];
 
-export type MCPServerConfigDtoEnv = { [key: string]: unknown };
+export const MCPServerConfigDtoTransport = {
+  sse: 'sse',
+  'streamable-http': 'streamable-http',
+} as const;
+
+export type MCPServerConfigDtoHeaders = { [key: string]: unknown };
 
 /**
  * @nullable
@@ -1614,14 +1626,14 @@ export type MCPServerConfigDtoAllowedTools = { [key: string]: unknown } | null;
 
 export type MCPServerConfigDto = {
   url?: string;
+  transport?: MCPServerConfigDtoTransport;
   headers?: MCPServerConfigDtoHeaders;
-  command?: string;
-  args?: string[];
-  env?: MCPServerConfigDtoEnv;
   disabled?: boolean;
   /** @nullable */
   allowed_tools?: MCPServerConfigDtoAllowedTools;
   timeout?: number;
+  /** SSE read timeout in seconds */
+  sse_read_timeout?: number;
 };
 
 export type ToggleMCPServerDto = {
@@ -1641,6 +1653,24 @@ export type MCPServerPingResponseDto = {
   status: MCPServerPingResponseDtoStatus;
   /** Latency in ms */
   latency?: number;
+};
+
+export type WorkspaceMemoryResponseDto = {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GetManyWorkspaceMemoryResponseDtoDto = {
+  data: WorkspaceMemoryResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 };
 
 export type SkillResponseDto = {
@@ -2552,6 +2582,14 @@ export type AgentsControllerGetConversationsParams = {
 };
 
 export type AgentsControllerGetMessagesParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AgentsControllerGetWorkspaceMemoryParams = {
   search?: string;
   page?: number;
   limit?: number;
@@ -19927,6 +19965,456 @@ export function useAgentsControllerPingMCPServer<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Get long-term memory records for the workspace (paginated, per user)
+ * @summary Get workspace memory
+ */
+export const agentsControllerGetWorkspaceMemory = (
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyWorkspaceMemoryResponseDtoDto>(
+    { url: `/api/agents/workspace-memory`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetWorkspaceMemoryInfiniteQueryKey = (
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+) => {
+  return [
+    'infinite',
+    `/api/agents/workspace-memory`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAgentsControllerGetWorkspaceMemoryQueryKey = (
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+) => {
+  return [`/api/agents/workspace-memory`, ...(params ? [params] : [])] as const;
+};
+
+export const getAgentsControllerGetWorkspaceMemoryInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+    AgentsControllerGetWorkspaceMemoryParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetWorkspaceMemoryParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetWorkspaceMemoryInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+    QueryKey,
+    AgentsControllerGetWorkspaceMemoryParams['page']
+  > = ({ signal, pageParam }) =>
+    agentsControllerGetWorkspaceMemory(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+    TError,
+    TData,
+    QueryKey,
+    AgentsControllerGetWorkspaceMemoryParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetWorkspaceMemoryInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>
+>;
+export type AgentsControllerGetWorkspaceMemoryInfiniteQueryError = unknown;
+
+export function useAgentsControllerGetWorkspaceMemoryInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+    AgentsControllerGetWorkspaceMemoryParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AgentsControllerGetWorkspaceMemoryParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetWorkspaceMemoryParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetWorkspaceMemoryInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+    AgentsControllerGetWorkspaceMemoryParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetWorkspaceMemoryParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetWorkspaceMemoryInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+    AgentsControllerGetWorkspaceMemoryParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetWorkspaceMemoryParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace memory
+ */
+
+export function useAgentsControllerGetWorkspaceMemoryInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+    AgentsControllerGetWorkspaceMemoryParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetWorkspaceMemoryParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAgentsControllerGetWorkspaceMemoryInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getAgentsControllerGetWorkspaceMemoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetWorkspaceMemoryQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>
+  > = ({ signal }) =>
+    agentsControllerGetWorkspaceMemory(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetWorkspaceMemoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>
+>;
+export type AgentsControllerGetWorkspaceMemoryQueryError = unknown;
+
+export function useAgentsControllerGetWorkspaceMemory<
+  TData = Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+  TError = unknown,
+>(
+  params: undefined | AgentsControllerGetWorkspaceMemoryParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetWorkspaceMemory<
+  TData = Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetWorkspaceMemory<
+  TData = Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace memory
+ */
+
+export function useAgentsControllerGetWorkspaceMemory<
+  TData = Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetWorkspaceMemoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetWorkspaceMemory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetWorkspaceMemoryQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Delete a long-term memory record by ID
+ * @summary Delete workspace memory
+ */
+export const agentsControllerDeleteWorkspaceMemory = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/workspace-memory/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteWorkspaceMemoryMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteWorkspaceMemory>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteWorkspaceMemory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteWorkspaceMemory'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteWorkspaceMemory>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteWorkspaceMemory(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteWorkspaceMemoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteWorkspaceMemory>>
+>;
+
+export type AgentsControllerDeleteWorkspaceMemoryMutationError = unknown;
+
+/**
+ * @summary Delete workspace memory
+ */
+export const useAgentsControllerDeleteWorkspaceMemory = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteWorkspaceMemory>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteWorkspaceMemory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteWorkspaceMemoryMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Get all available skills (builtin + user) for the workspace

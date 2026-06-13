@@ -136,6 +136,7 @@ export interface ReportData {
   formattedDate: string;
   weekPad: string;
   systemNameChar: string;
+  logoBase64?: string;
   weekly: WeeklyStats;
   monthly: MonthlyStats;
   vulnerabilityTrends: VulnerabilityTrends;
