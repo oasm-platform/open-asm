@@ -4,6 +4,8 @@ import type { Repository } from 'typeorm';
 import { StorageService } from '@/modules/storage/storage.service';
 import { Report } from './entities/report.entity';
 import { ReportsService } from './reports.service';
+import { VulnerabilityReportService } from './services/vulnerability-report.service';
+import { SummaryReportService } from './services/summary-report.service';
 
 describe('ReportsService', () => {
   let service: ReportsService;
@@ -47,6 +49,18 @@ describe('ReportsService', () => {
           useValue: {
             uploadFile: jest.fn(),
             deleteFile: jest.fn(),
+          },
+        },
+        {
+          provide: VulnerabilityReportService,
+          useValue: {
+            getVulnerabilityReportData: jest.fn(),
+          },
+        },
+        {
+          provide: SummaryReportService,
+          useValue: {
+            getSummaryReportData: jest.fn(),
           },
         },
       ],

@@ -15,6 +15,7 @@ import { TargetType } from '@/modules/targets/entities/target.entity';
 import type { ReportData } from './types/report-data.type';
 import type { VulnerabilityReportData } from './types/vulnerability-report-data.type';
 import { VulnerabilityReportService } from './services/vulnerability-report.service';
+import { SummaryReportService } from './services/summary-report.service';
 
 @Injectable()
 export class ReportsService {
@@ -30,6 +31,7 @@ export class ReportsService {
     private readonly reportRepo: Repository<Report>,
     private readonly storageService: StorageService,
     private readonly vulnerabilityReportService: VulnerabilityReportService,
+    private readonly summaryReportService: SummaryReportService,
   ) {
     const srcDir = path.join(process.cwd(), 'src', 'modules', 'reports');
     this.templatePath = path.join(srcDir, 'templates', 'report.hbs');
@@ -291,7 +293,10 @@ export class ReportsService {
       );
       html = this.renderVulnerabilityTemplate(data);
     } else {
-      data = this.getMockData();
+      data = await this.summaryReportService.getSummaryReportData(
+        workspaceId,
+        options,
+      );
       html = this.renderTemplate(data);
     }
 
