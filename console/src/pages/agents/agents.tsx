@@ -10,6 +10,8 @@ export default function AgentsChatPage() {
     isStreaming,
     isLoadingHistory,
     streamError,
+    isRetrying,
+    retryAttempt,
     todos,
     selectedModel,
     agentMode,
@@ -39,6 +41,8 @@ export default function AgentsChatPage() {
         isStreaming={isStreaming}
         isLoadingMessages={isLoadingHistory}
         streamError={streamError}
+        isRetrying={isRetrying}
+        retryAttempt={retryAttempt}
         onDismissError={onDismissError}
         selectedConfigId={selectedModel?.configId ?? null}
         selectedModel={selectedModel?.model ?? null}

@@ -365,6 +365,50 @@ export class AgentsCompletionsService {
     }
   }
 
+  /**
+   * Resets any in_progress todos back to pending on stream error.
+   * This allows the user to retry and have the LLM re-attempt those steps
+   * instead of leaving them stuck in in_progress forever.
+   * Returns the refreshed todo list for emitting to the frontend.
+   */
+  private async resetTodosOnError(
+    conversationId: string,
+  ): Promise<AgentConversationTodo[]> {
+    try {
+      const inProgressTodos = await this.todoRepository.find({
+        where: { conversationId, status: 'in_progress' as const },
+      });
+
+      if (inProgressTodos.length === 0) {
+        return this.todoRepository.find({
+          where: { conversationId },
+          order: { sortOrder: 'ASC' },
+        });
+      }
+
+      for (const todo of inProgressTodos) {
+        todo.status = 'pending';
+      }
+      await this.todoRepository.save(inProgressTodos);
+
+      this.logger.log(
+        `[AutoTodo] Reset ${inProgressTodos.length} in_progress todos back to pending for ${conversationId}`,
+      );
+
+      // Return full updated list for emission
+      return this.todoRepository.find({
+        where: { conversationId },
+        order: { sortOrder: 'ASC' },
+      });
+    } catch (error) {
+      this.logger.error('Failed to reset todos on error', error);
+      return this.todoRepository.find({
+        where: { conversationId },
+        order: { sortOrder: 'ASC' },
+      });
+    }
+  }
+
   async vulAnalyze(
     vulnerabilityJson: string,
     workspaceId: string,
@@ -899,6 +943,17 @@ export class AgentsCompletionsService {
 
         todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
 
+        // Subscribe to stream-error events from the emitter (provider errors, etc.)
+        // This propagates detailed error messages from the AI provider to the frontend.
+        const onStreamError = (data: { message: string }) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'error',
+            error: data,
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('stream-error', onStreamError);
+
         // When abort signal fires, immediately cancel the reader and close the controller
         const onAbort = () => {
           if (controllerClosed) return;
@@ -930,6 +985,7 @@ export class AgentsCompletionsService {
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
           todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+          todosEmitter.off('stream-error', onStreamError);
           reader.releaseLock();
         }
 
@@ -1151,6 +1207,10 @@ export class AgentsCompletionsService {
       // System context passed via dedicated option (avoids prompt injection risk)
       system: contextParts.join('\n\n'),
       messages: modelMessages,
+      // Retry transient provider errors (429 rate-limit, 500/502/503 server errors)
+      maxRetries: 3,
+      // Detect stuck streams: abort if no chunk arrives within 30 seconds
+      timeout: { chunkMs: 30_000 },
       // Only include tools if available (models without tool support will error here)
       ...(tools
         ? {
@@ -1173,11 +1233,36 @@ export class AgentsCompletionsService {
           accumulatedReasoning += chunk.text;
         }
       },
-      // Handle errors (especially tool-calling errors)
+      // Handle errors from the AI provider (rate-limit, invalid key, etc.)
+      // Never throw here — throwing in onError can crash the stream.
+      // Instead, emit the error so it propagates to the frontend as a stream event.
       onError: ({ error }) => {
-        // Log the error but don't throw — throwing in onError can crash the stream.
-        // Tool errors will be detected via toolResults in onFinish.
         this.logger.error('[Agent] Stream error during execution', error);
+        // Extract the most informative message from the error
+        let errorMessage: string;
+        if (error instanceof Error) {
+          // Unwrap nested AI SDK errors (e.g., AI_RateLimitError wraps provider detail)
+          errorMessage = error.message;
+          const cause = (error as Error & { cause?: unknown }).cause;
+          if (cause instanceof Error && cause.message) {
+            errorMessage = `${error.message}: ${cause.message}`;
+          }
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else {
+          errorMessage = 'An unknown stream error occurred';
+        }
+        todosEmitter.emit('stream-error', { message: errorMessage });
+
+        // Reset in_progress todos back to pending so they can be retried.
+        // Fire-and-forget: don't block the error propagation.
+        this.resetTodosOnError(conversationId)
+          .then((updatedTodos) => {
+            todosEmitter.emit('todos-updated', updatedTodos);
+          })
+          .catch((err) =>
+            this.logger.error('Failed to reset todos on stream error', err),
+          );
       },
       // Pass abort signal so AI SDK can cancel the provider call
       abortSignal,
@@ -1426,6 +1511,16 @@ export class AgentsCompletionsService {
         };
         todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
 
+        // Subscribe to stream-error events (provider errors propagated to frontend)
+        const onStreamError = (data: { message: string }) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'error',
+            error: data,
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('stream-error', onStreamError);
+
         // Emit initial conversation-created event
         controller.enqueue({
           type: 'data-conversation-created',
@@ -1540,7 +1635,11 @@ export class AgentsCompletionsService {
               // Don't break on non-fatal errors — try next iteration
               // Only break if abort signal fired or controller is closed
               if (abortSignal?.aborted || controllerClosed) break;
-              // For other errors, continue to next iteration
+              // Reset in_progress todos back to pending so the next iteration
+              // can re-attempt them. Await to ensure DB is updated before
+              // the loop reads stale data.
+              const updatedTodos = await this.resetTodosOnError(conversationId);
+              todosEmitter.emit('todos-updated', updatedTodos);
               continue;
             }
 
@@ -1671,6 +1770,7 @@ export class AgentsCompletionsService {
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
           todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+          todosEmitter.off('stream-error', onStreamError);
 
           // Auto-complete stuck in_progress todos AFTER all continuation
           // iterations are done. This prevents the race condition where
