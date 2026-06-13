@@ -339,6 +339,15 @@ export class AgentsController {
       res.flushHeaders();
 
       // Headers are now committed — from this point on we can only write SSE events
+
+      // SSE keepalive heartbeat: emit comment every 15s to prevent
+      // proxy/load-balancer timeouts on long-running streams.
+      const keepaliveInterval = setInterval(() => {
+        if (!res.writableEnded) {
+          res.write(':keepalive\n\n');
+        }
+      }, 15_000);
+
       try {
         const reader = stream.getReader();
         while (true) {
@@ -364,13 +373,19 @@ export class AgentsController {
           return;
         }
         const message =
-          streamError instanceof Error ? streamError.message : 'Stream error';
+          streamError instanceof Error
+            ? streamError.message
+            : typeof streamError === 'string'
+              ? streamError
+              : 'Stream error';
         if (!res.writableEnded) {
           res.write(
             `data: ${JSON.stringify({ type: 'error', error: { message } })}\n\n`,
           );
           res.end();
         }
+      } finally {
+        clearInterval(keepaliveInterval);
       }
     } catch (error) {
       if (abortController.signal.aborted) {

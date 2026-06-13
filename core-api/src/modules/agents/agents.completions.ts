@@ -46,6 +46,8 @@ interface StreamCreationParams {
   conversationId: string;
   todosEmitter: EventEmitter;
   abortSignal?: AbortSignal;
+  /** Resolves when critical onFinish DB writes (tool calls, parts, message content) complete */
+  finishPromise: Promise<void>;
 }
 
 /** Parameters for building streamText call options */
@@ -326,7 +328,10 @@ export class AgentsCompletionsService {
             msg.metadata?.['status'] === 'completed',
         );
         if (hasCompletedAssistant) {
-          await this.generateTitle(conversationId, llmConfig);
+          // Fire-and-forget: title generation should not block stream closure
+          this.generateTitle(conversationId, llmConfig).catch((err) =>
+            this.logger.error('Error generating title', err),
+          );
         }
       }
     } catch (error) {
@@ -357,6 +362,50 @@ export class AgentsCompletionsService {
       );
     } catch (error) {
       this.logger.error('Failed to auto-complete stuck todos', error);
+    }
+  }
+
+  /**
+   * Resets any in_progress todos back to pending on stream error.
+   * This allows the user to retry and have the LLM re-attempt those steps
+   * instead of leaving them stuck in in_progress forever.
+   * Returns the refreshed todo list for emitting to the frontend.
+   */
+  private async resetTodosOnError(
+    conversationId: string,
+  ): Promise<AgentConversationTodo[]> {
+    try {
+      const inProgressTodos = await this.todoRepository.find({
+        where: { conversationId, status: 'in_progress' as const },
+      });
+
+      if (inProgressTodos.length === 0) {
+        return this.todoRepository.find({
+          where: { conversationId },
+          order: { sortOrder: 'ASC' },
+        });
+      }
+
+      for (const todo of inProgressTodos) {
+        todo.status = 'pending';
+      }
+      await this.todoRepository.save(inProgressTodos);
+
+      this.logger.log(
+        `[AutoTodo] Reset ${inProgressTodos.length} in_progress todos back to pending for ${conversationId}`,
+      );
+
+      // Return full updated list for emission
+      return this.todoRepository.find({
+        where: { conversationId },
+        order: { sortOrder: 'ASC' },
+      });
+    } catch (error) {
+      this.logger.error('Failed to reset todos on error', error);
+      return this.todoRepository.find({
+        where: { conversationId },
+        order: { sortOrder: 'ASC' },
+      });
     }
   }
 
@@ -782,6 +831,7 @@ export class AgentsCompletionsService {
       id: t.id,
       content: t.content,
       status: t.status,
+      sortOrder: t.sortOrder,
       updatedAt: t.updatedAt.toISOString(),
     }));
     const todosContext = formatTodosToPrompt(todos);
@@ -893,6 +943,17 @@ export class AgentsCompletionsService {
 
         todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
 
+        // Subscribe to stream-error events from the emitter (provider errors, etc.)
+        // This propagates detailed error messages from the AI provider to the frontend.
+        const onStreamError = (data: { message: string }) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'error',
+            error: data,
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('stream-error', onStreamError);
+
         // When abort signal fires, immediately cancel the reader and close the controller
         const onAbort = () => {
           if (controllerClosed) return;
@@ -924,6 +985,7 @@ export class AgentsCompletionsService {
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
           todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+          todosEmitter.off('stream-error', onStreamError);
           reader.releaseLock();
         }
 
@@ -1110,6 +1172,14 @@ export class AgentsCompletionsService {
     // Use the shared EventEmitter from caller to communicate todo events between tool calls and the stream
     const { todosEmitter } = options;
 
+    // Promise that resolves when critical onFinish DB writes complete.
+    // The continuation loop awaits this before reading DB for todo status,
+    // preventing stale-data reads when onFinish DB writes are still in-flight.
+    let resolveFinish: (() => void) | undefined;
+    const finishPromise = new Promise<void>((resolve) => {
+      resolveFinish = resolve;
+    });
+
     // Check if request was already aborted before starting the AI call
     if (abortSignal?.aborted) {
       this.logger.log(
@@ -1121,7 +1191,8 @@ export class AgentsCompletionsService {
           controller.close();
         },
       });
-      return { aiStream: emptyStream, conversationId, todosEmitter };
+      resolveFinish?.();
+      return { aiStream: emptyStream, conversationId, todosEmitter, finishPromise };
     }
 
     // Determine max output tokens based on agent mode and LLM config
@@ -1136,6 +1207,10 @@ export class AgentsCompletionsService {
       // System context passed via dedicated option (avoids prompt injection risk)
       system: contextParts.join('\n\n'),
       messages: modelMessages,
+      // Retry transient provider errors (429 rate-limit, 500/502/503 server errors)
+      maxRetries: 3,
+      // Detect stuck streams: abort if no chunk arrives within 30 seconds
+      timeout: { chunkMs: 30_000 },
       // Only include tools if available (models without tool support will error here)
       ...(tools
         ? {
@@ -1158,11 +1233,36 @@ export class AgentsCompletionsService {
           accumulatedReasoning += chunk.text;
         }
       },
-      // Handle errors (especially tool-calling errors)
+      // Handle errors from the AI provider (rate-limit, invalid key, etc.)
+      // Never throw here — throwing in onError can crash the stream.
+      // Instead, emit the error so it propagates to the frontend as a stream event.
       onError: ({ error }) => {
-        // Log the error but don't throw — throwing in onError can crash the stream.
-        // Tool errors will be detected via toolResults in onFinish.
         this.logger.error('[Agent] Stream error during execution', error);
+        // Extract the most informative message from the error
+        let errorMessage: string;
+        if (error instanceof Error) {
+          // Unwrap nested AI SDK errors (e.g., AI_RateLimitError wraps provider detail)
+          errorMessage = error.message;
+          const cause = (error as Error & { cause?: unknown }).cause;
+          if (cause instanceof Error && cause.message) {
+            errorMessage = `${error.message}: ${cause.message}`;
+          }
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else {
+          errorMessage = 'An unknown stream error occurred';
+        }
+        todosEmitter.emit('stream-error', { message: errorMessage });
+
+        // Reset in_progress todos back to pending so they can be retried.
+        // Fire-and-forget: don't block the error propagation.
+        this.resetTodosOnError(conversationId)
+          .then((updatedTodos) => {
+            todosEmitter.emit('todos-updated', updatedTodos);
+          })
+          .catch((err) =>
+            this.logger.error('Failed to reset todos on stream error', err),
+          );
       },
       // Pass abort signal so AI SDK can cancel the provider call
       abortSignal,
@@ -1180,9 +1280,6 @@ export class AgentsCompletionsService {
             `agentMode=${options.agentMode ?? 'unknown'}`,
         );
 
-        // All DB writes + LLM calls below are fire-and-forget.
-        // Returning immediately lets the stream close and frees the frontend.
-
         const markAborted = () => {
           this.messageRepository
             .update(
@@ -1197,121 +1294,134 @@ export class AgentsCompletionsService {
 
         if (isAborted()) {
           markAborted();
+          resolveFinish?.();
           return;
         }
 
-        // Persist tool calls for history rendering on page reload
-        try {
-          const toolCallEntities: AgentMessageToolCall[] = [];
-          for (const step of event.steps) {
-            for (const toolCall of step.toolCalls) {
-              const toolResult = step.toolResults.find(
-                (r) => r.toolCallId === toolCall.toolCallId,
-              );
-              toolCallEntities.push(
-                this.toolCallRepository.create({
-                  messageId: assistantMessageId,
-                  conversationId,
-                  toolCallId: toolCall.toolCallId,
-                  toolName: toolCall.toolName,
-                  args: toolCall.input as Record<string, unknown>,
-                  result:
-                    (toolResult?.output as Record<string, unknown>) ?? null,
-                  isError: !toolResult,
-                }),
-              );
+        // Critical DB writes are awaited internally and resolve finishPromise
+        // when complete. Non-critical operations remain fire-and-forget.
+        (async () => {
+          // Persist tool calls for history rendering on page reload
+          try {
+            const toolCallEntities: AgentMessageToolCall[] = [];
+            for (const step of event.steps) {
+              for (const toolCall of step.toolCalls) {
+                const toolResult = step.toolResults.find(
+                  (r) => r.toolCallId === toolCall.toolCallId,
+                );
+                toolCallEntities.push(
+                  this.toolCallRepository.create({
+                    messageId: assistantMessageId,
+                    conversationId,
+                    toolCallId: toolCall.toolCallId,
+                    toolName: toolCall.toolName,
+                    args: toolCall.input as Record<string, unknown>,
+                    result:
+                      (toolResult?.output as Record<string, unknown>) ?? null,
+                    isError: !toolResult,
+                  }),
+                );
+              }
             }
-          }
-          if (toolCallEntities.length > 0) {
-            this.toolCallRepository
-              .save(toolCallEntities)
-              .catch((err) => this.logger.error('Error saving tool calls', err));
-          }
-        } catch (err) {
-          this.logger.error('Error saving tool calls', err);
-        }
-
-        if (isAborted()) {
-          markAborted();
-          return;
-        }
-
-        // Build parts array for frontend rendering
-        try {
-          const parts: Record<string, unknown>[] = [];
-          let hasReasoningPart = false;
-          for (const step of event.steps) {
-            const stepReasoning =
-              typeof step.reasoning === 'string' ? step.reasoning : '';
-            if (stepReasoning.trim()) {
-              parts.push({ type: 'reasoning', text: stepReasoning.trim() });
-              hasReasoningPart = true;
+            if (toolCallEntities.length > 0) {
+              await this.toolCallRepository.save(toolCallEntities);
             }
-            for (const tc of step.toolCalls) {
-              const toolResult = step.toolResults?.find(
-                (r) => r.toolCallId === tc.toolCallId,
-              );
-              parts.push({
-                type: 'dynamic-tool',
-                toolCallId: tc.toolCallId,
-                toolName: tc.toolName,
-                state: toolResult ? 'output-available' : 'input-available',
-                input: tc.input,
-                output: toolResult?.output ?? null,
+          } catch (err) {
+            this.logger.error('Error saving tool calls', err);
+          }
+
+          if (isAborted()) {
+            markAborted();
+            return;
+          }
+
+          // Build parts array for frontend rendering
+          try {
+            const parts: Record<string, unknown>[] = [];
+            let hasReasoningPart = false;
+            for (const step of event.steps) {
+              const stepReasoning =
+                typeof step.reasoning === 'string' ? step.reasoning : '';
+              if (stepReasoning.trim()) {
+                parts.push({ type: 'reasoning', text: stepReasoning.trim() });
+                hasReasoningPart = true;
+              }
+              for (const tc of step.toolCalls) {
+                const toolResult = step.toolResults?.find(
+                  (r) => r.toolCallId === tc.toolCallId,
+                );
+                parts.push({
+                  type: 'dynamic-tool',
+                  toolCallId: tc.toolCallId,
+                  toolName: tc.toolName,
+                  state: toolResult ? 'output-available' : 'input-available',
+                  input: tc.input,
+                  output: toolResult?.output ?? null,
+                });
+              }
+              const stepText =
+                typeof step.text === 'string' ? step.text : '';
+              if (stepText.trim()) {
+                parts.push({ type: 'text', text: stepText.trim() });
+              }
+            }
+            if (!hasReasoningPart && accumulatedReasoning.trim()) {
+              parts.unshift({
+                type: 'reasoning',
+                text: accumulatedReasoning.trim(),
               });
             }
-            const stepText =
-              typeof step.text === 'string' ? step.text : '';
-            if (stepText.trim()) {
-              parts.push({ type: 'text', text: stepText.trim() });
+            if (parts.length > 0) {
+              await this.messageRepository.update(
+                { id: assistantMessageId },
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+                { parts: parts as any },
+              );
             }
+          } catch (err) {
+            this.logger.error('Error saving parts array', err);
           }
-          if (!hasReasoningPart && accumulatedReasoning.trim()) {
-            parts.unshift({
-              type: 'reasoning',
-              text: accumulatedReasoning.trim(),
-            });
-          }
-          if (parts.length > 0) {
-            this.messageRepository
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-              .update({ id: assistantMessageId }, { parts: parts as any })
-              .catch((err) => this.logger.error('Error saving parts array', err));
-          }
-        } catch (err) {
-          this.logger.error('Error saving parts array', err);
-        }
 
-        this.handleStreamFinish(
-          assistantMessageId,
-          conversationId,
-          accumulatedText,
-          accumulatedReasoning,
-          llmConfig,
-          assistantMessageMetadata,
-        ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
+          // handleStreamFinish updates message content + status to 'completed'
+          await this.handleStreamFinish(
+            assistantMessageId,
+            conversationId,
+            accumulatedText,
+            accumulatedReasoning,
+            llmConfig,
+            assistantMessageMetadata,
+          ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
+        })()
+          .catch((err) =>
+            this.logger.error('Error in critical onFinish writes', err),
+          )
+          .finally(() => {
+            // Signal to the continuation loop that critical writes are done
+            resolveFinish?.();
 
-        if (options.agentMode !== AgentMode.AGENT) {
-          this.autoCompleteStuckTodos(conversationId).catch((err) =>
-            this.logger.error('Error in autoCompleteStuckTodos', err),
-          );
-        }
+            // Non-critical operations (fire-and-forget, do NOT block continuation)
+            if (options.agentMode !== AgentMode.AGENT) {
+              this.autoCompleteStuckTodos(conversationId).catch((err) =>
+                this.logger.error('Error in autoCompleteStuckTodos', err),
+              );
+            }
 
-        this.handlePostStreamCompaction(
-          conversationId,
-          llmConfig,
-          contextParts,
-          modelMessages,
-        ).catch((err) =>
-          this.logger.error('Error in post-stream compaction', err),
-        );
+            this.handlePostStreamCompaction(
+              conversationId,
+              llmConfig,
+              contextParts,
+              modelMessages,
+            ).catch((err) =>
+              this.logger.error('Error in post-stream compaction', err),
+            );
+          });
       },
     });
 
     // Convert the result stream to a UIMessageStream consumable by the frontend
     const aiStream = result.toUIMessageStream();
 
-    return { aiStream, conversationId, todosEmitter };
+    return { aiStream, conversationId, todosEmitter, finishPromise };
   }
 
   // ================================================================
@@ -1401,6 +1511,16 @@ export class AgentsCompletionsService {
         };
         todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
 
+        // Subscribe to stream-error events (provider errors propagated to frontend)
+        const onStreamError = (data: { message: string }) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'error',
+            error: data,
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('stream-error', onStreamError);
+
         // Emit initial conversation-created event
         controller.enqueue({
           type: 'data-conversation-created',
@@ -1447,6 +1567,7 @@ export class AgentsCompletionsService {
                       id: t.id,
                       content: t.content,
                       status: t.status,
+                      sortOrder: t.sortOrder,
                       updatedAt: t.updatedAt.toISOString(),
                     })),
                   );
@@ -1473,7 +1594,7 @@ export class AgentsCompletionsService {
 
             try {
               // Execute a single streamText iteration
-              const { aiStream } = this.executeStreamText({
+              const { aiStream, finishPromise } = this.executeStreamText({
                 llmConfig,
                 model,
                 modelMessages: currentModelMessages,
@@ -1499,6 +1620,12 @@ export class AgentsCompletionsService {
                 controller.enqueue(value);
               }
 
+              // Wait for critical onFinish DB writes (tool calls, parts, message content)
+              // to complete before reading DB for todo status. Without this,
+              // the continuation loop reads stale data because onFinish DB writes
+              // are async and may not have committed yet when the reader drains.
+              await finishPromise;
+
 
             } catch (iterationError) {
               this.logger.error(
@@ -1508,7 +1635,11 @@ export class AgentsCompletionsService {
               // Don't break on non-fatal errors — try next iteration
               // Only break if abort signal fired or controller is closed
               if (abortSignal?.aborted || controllerClosed) break;
-              // For other errors, continue to next iteration
+              // Reset in_progress todos back to pending so the next iteration
+              // can re-attempt them. Await to ensure DB is updated before
+              // the loop reads stale data.
+              const updatedTodos = await this.resetTodosOnError(conversationId);
+              todosEmitter.emit('todos-updated', updatedTodos);
               continue;
             }
 
@@ -1539,10 +1670,13 @@ export class AgentsCompletionsService {
 
             // Prepare next iteration context with smart pruning
             const contextWindow = this.getModelContextWindow(llmConfig);
+            // Always fetch up to 20 messages in continuation loop regardless
+            // of summary. hasSummary=true limits to 5 messages which loses
+            // tool call context from previous iteration.
             const updatedMessages =
               await this.getConversationHistory(
                 conversationId,
-                !!conversation?.summary,
+                false,
               );
             const prunedMessages = this.pruneContextByBudget(
               updatedMessages,
@@ -1602,6 +1736,7 @@ export class AgentsCompletionsService {
                 id: t.id,
                 content: t.content,
                 status: t.status,
+                sortOrder: t.sortOrder,
                 updatedAt: t.updatedAt.toISOString(),
               }));
               const todosContext = formatTodosToPrompt(updatedTodos);
@@ -1635,6 +1770,7 @@ export class AgentsCompletionsService {
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
           todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+          todosEmitter.off('stream-error', onStreamError);
 
           // Auto-complete stuck in_progress todos AFTER all continuation
           // iterations are done. This prevents the race condition where
@@ -1646,8 +1782,8 @@ export class AgentsCompletionsService {
               this.logger.error('Error in autoCompleteStuckTodos', err),
             );
 
-            // Generate comprehensive end-of-conversation report
-            await this.generateEndOfConversationReport(
+            // Fire-and-forget: report generation should not block stream closure
+            this.generateEndOfConversationReport(
               conversationId,
               llmConfig,
             ).catch((err) =>

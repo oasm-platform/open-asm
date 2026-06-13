@@ -17,6 +17,7 @@ export interface AgentTodoItem {
   id: string;
   content: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  sortOrder: number;
   updatedAt: string;
 }
 
@@ -67,15 +68,16 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
 
   if (!todos || todos.length === 0) return null;
 
+  const sortedTodos = [...todos].sort((a, b) => a.sortOrder - b.sortOrder);
   const counts = {
-    pending: todos.filter((t) => t.status === 'pending').length,
-    in_progress: todos.filter((t) => t.status === 'in_progress').length,
-    completed: todos.filter((t) => t.status === 'completed').length,
-    failed: todos.filter((t) => t.status === 'failed').length,
+    pending: sortedTodos.filter((t) => t.status === 'pending').length,
+    in_progress: sortedTodos.filter((t) => t.status === 'in_progress').length,
+    completed: sortedTodos.filter((t) => t.status === 'completed').length,
+    failed: sortedTodos.filter((t) => t.status === 'failed').length,
   };
 
   const activeCount = counts.in_progress + counts.pending;
-  const currentTask = todos.find((t) => t.status === 'in_progress');
+  const currentTask = sortedTodos.find((t) => t.status === 'in_progress');
 
   return (
     <Collapsible
@@ -129,7 +131,7 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
       </CollapsibleTrigger>
       <CollapsibleContent>
         <ul className="space-y-1 px-3 pb-2">
-          {todos.map((todo) => (
+          {sortedTodos.map((todo) => (
             <li
               key={todo.id}
               className="group flex items-start gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/50"

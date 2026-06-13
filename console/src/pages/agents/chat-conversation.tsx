@@ -56,6 +56,8 @@ interface ChatConversationProps {
   isStreaming?: boolean;
   isLoadingMessages?: boolean;
   streamError?: string | null;
+  isRetrying?: boolean;
+  retryAttempt?: number;
   onDismissError?: () => void;
   selectedConfigId?: string | null;
   selectedModel?: string | null;
@@ -67,6 +69,8 @@ interface ChatConversationProps {
   agentMode?: string;
   onAgentModeChange?: (mode: string) => void;
   todos?: AgentTodoItem[];
+  showTodoAboveInput?: boolean;
+  selectedToolCallId?: string | null;
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
 }
 
@@ -320,21 +324,25 @@ const ChatMessage = memo(function ChatMessage({
                 );
               case 'tool':
                 return (
-                  <ToolCallDisplay
+                  <div
                     key={item.toolCallId}
-                    toolCall={{
-                      toolCallId: item.toolCallId,
-                      toolName: item.toolName,
-                      status: item.state as
-                        | 'pending'
-                        | 'executing'
-                        | 'completed'
-                        | 'error',
-                      input: item.input as Record<string, unknown> | undefined,
-                      output: item.output,
-                    }}
-                    streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
-                  />
+                    id={`tool-call-${item.toolCallId}`}
+                  >
+                    <ToolCallDisplay
+                      toolCall={{
+                        toolCallId: item.toolCallId,
+                        toolName: item.toolName,
+                        status: item.state as
+                          | 'pending'
+                          | 'executing'
+                          | 'completed'
+                          | 'error',
+                        input: item.input as Record<string, unknown> | undefined,
+                        output: item.output,
+                      }}
+                      streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
+                    />
+                  </div>
                 );
               case 'text':
                 return (
@@ -475,11 +483,48 @@ function StreamError({
   error,
   onRetry,
   onDismiss,
+  isRetrying,
+  retryAttempt,
 }: {
   error: string;
   onRetry?: () => void;
   onDismiss: () => void;
+  isRetrying?: boolean;
+  retryAttempt?: number;
 }) {
+  if (isRetrying) {
+    return (
+      <motion.div
+        className="mx-auto max-w-3xl w-full px-4"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="flex items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-sm">
+          <RefreshCcwIcon className="size-5 text-amber-500 shrink-0 animate-spin" />
+          <div className="flex-1">
+            <p className="font-medium text-amber-600 dark:text-amber-500">
+              Retrying… (attempt {retryAttempt ?? 1} of 3)
+            </p>
+            <p className="text-muted-foreground mt-1">
+              A transient error occurred. Reconnecting automatically.
+            </p>
+          </div>
+          {onDismiss && (
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="rounded-md p-1 hover:bg-accent transition-colors"
+              aria-label="Cancel retry"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       className="mx-auto max-w-3xl w-full px-4"
@@ -530,6 +575,8 @@ export const ChatConversation = memo(function ChatConversation({
   isStreaming = false,
   isLoadingMessages = false,
   streamError,
+  isRetrying = false,
+  retryAttempt = 0,
   onDismissError,
   selectedConfigId,
   selectedModel,
@@ -540,6 +587,8 @@ export const ChatConversation = memo(function ChatConversation({
   agentMode = 'false',
   onAgentModeChange,
   todos,
+  showTodoAboveInput = true,
+  selectedToolCallId,
   remoteExecuteEvents,
 }: ChatConversationProps) {
   const isLoadingMoreRef = useRef(false);
@@ -618,6 +667,15 @@ export const ChatConversation = memo(function ChatConversation({
     prevScrollHeightRef.current = container.scrollHeight;
     prevMessageCountRef.current = messages.length;
   }, [messages]);
+
+  // Scroll to tool call in conversation when selected from sidebar
+  useEffect(() => {
+    if (!selectedToolCallId) return;
+    const el = document.getElementById(`tool-call-${selectedToolCallId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedToolCallId]);
 
   const lastUserMessage = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -723,9 +781,11 @@ export const ChatConversation = memo(function ChatConversation({
             </>
           )}
 
-          {streamError && (
+          {(streamError || isRetrying) && (
             <StreamError
-              error={streamError}
+              error={streamError ?? ''}
+              isRetrying={isRetrying}
+              retryAttempt={retryAttempt}
               onRetry={lastUserMessage ? handleRetry : () => {}}
               onDismiss={onDismissError ?? (() => {})}
             />
@@ -736,7 +796,7 @@ export const ChatConversation = memo(function ChatConversation({
 
       <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col">
-          {todos && todos.length > 0 && (
+          {showTodoAboveInput && todos && todos.length > 0 && (
             <AgentTodoPanel
               todos={todos}
               className="rounded-b-none border-b-0 mx-2"
