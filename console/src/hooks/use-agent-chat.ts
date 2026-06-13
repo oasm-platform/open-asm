@@ -88,6 +88,8 @@ interface UseAgentChatReturn {
   streamError: string | null;
   isRetrying: boolean;
   retryAttempt: number;
+  title: string | null;
+  createdAt: string | null;
   todos: AgentTodoItem[];
   selectedModel: SelectedModel | null;
   agentMode: string;
@@ -222,6 +224,8 @@ export function useAgentChat({
   const abortRetryRef = useRef<AbortController | null>(null);
   const isUserStoppedRef = useRef(false);
   const [todos, setTodos] = useState<AgentTodoItem[]>([]);
+  const [title, setTitle] = useState<string | null>(null);
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
   const { data: providers } =
     useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
@@ -552,6 +556,12 @@ export function useAgentChat({
             return data.todos as unknown as AgentTodoItem[];
           });
         }
+        if (!cancelled && data.title) {
+          setTitle(data.title);
+        }
+        if (!cancelled && data.createdAt) {
+          setCreatedAt(data.createdAt as string);
+        }
         if (!cancelled && data.agentMode) {
           setAgentMode(data.agentMode);
           agentModeRef.current = data.agentMode;
@@ -606,6 +616,8 @@ export function useAgentChat({
     isRetrying,
     retryAttempt: retryCount,
     todos,
+    title,
+    createdAt,
     selectedModel,
     agentMode,
     hasSentFirstMessage,

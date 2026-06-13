@@ -69,6 +69,8 @@ interface ChatConversationProps {
   agentMode?: string;
   onAgentModeChange?: (mode: string) => void;
   todos?: AgentTodoItem[];
+  showTodoAboveInput?: boolean;
+  selectedToolCallId?: string | null;
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
 }
 
@@ -322,21 +324,25 @@ const ChatMessage = memo(function ChatMessage({
                 );
               case 'tool':
                 return (
-                  <ToolCallDisplay
+                  <div
                     key={item.toolCallId}
-                    toolCall={{
-                      toolCallId: item.toolCallId,
-                      toolName: item.toolName,
-                      status: item.state as
-                        | 'pending'
-                        | 'executing'
-                        | 'completed'
-                        | 'error',
-                      input: item.input as Record<string, unknown> | undefined,
-                      output: item.output,
-                    }}
-                    streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
-                  />
+                    id={`tool-call-${item.toolCallId}`}
+                  >
+                    <ToolCallDisplay
+                      toolCall={{
+                        toolCallId: item.toolCallId,
+                        toolName: item.toolName,
+                        status: item.state as
+                          | 'pending'
+                          | 'executing'
+                          | 'completed'
+                          | 'error',
+                        input: item.input as Record<string, unknown> | undefined,
+                        output: item.output,
+                      }}
+                      streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
+                    />
+                  </div>
                 );
               case 'text':
                 return (
@@ -581,6 +587,8 @@ export const ChatConversation = memo(function ChatConversation({
   agentMode = 'false',
   onAgentModeChange,
   todos,
+  showTodoAboveInput = true,
+  selectedToolCallId,
   remoteExecuteEvents,
 }: ChatConversationProps) {
   const isLoadingMoreRef = useRef(false);
@@ -659,6 +667,15 @@ export const ChatConversation = memo(function ChatConversation({
     prevScrollHeightRef.current = container.scrollHeight;
     prevMessageCountRef.current = messages.length;
   }, [messages]);
+
+  // Scroll to tool call in conversation when selected from sidebar
+  useEffect(() => {
+    if (!selectedToolCallId) return;
+    const el = document.getElementById(`tool-call-${selectedToolCallId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedToolCallId]);
 
   const lastUserMessage = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -779,7 +796,7 @@ export const ChatConversation = memo(function ChatConversation({
 
       <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col">
-          {todos && todos.length > 0 && (
+          {showTodoAboveInput && todos && todos.length > 0 && (
             <AgentTodoPanel
               todos={todos}
               className="rounded-b-none border-b-0 mx-2"
