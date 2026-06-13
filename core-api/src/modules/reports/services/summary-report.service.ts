@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
-import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
+import { StatisticService } from '@/modules/statistic/statistic.service';
 import { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
 import type { TargetType } from '@/modules/targets/entities/target.entity';
 import type { ReportData } from '../types/report-data.type';
@@ -18,14 +18,13 @@ export class SummaryReportService {
   constructor(
     @InjectRepository(Vulnerability)
     private readonly vulnRepo: Repository<Vulnerability>,
-    @InjectRepository(Asset)
-    private readonly assetRepo: Repository<Asset>,
     @InjectRepository(Target)
     private readonly targetRepo: Repository<Target>,
     @InjectRepository(AssetService)
     private readonly assetServiceRepo: Repository<AssetService>,
     @InjectRepository(AssetTag)
     private readonly assetTagRepo: Repository<AssetTag>,
+    private readonly statisticService: StatisticService,
   ) {}
 
   async getSummaryReportData(
@@ -78,26 +77,26 @@ export class SummaryReportService {
       newPorts,
       newTechnologies,
     ] = await Promise.all([
-      this.getTargetCount(workspaceId, options),
-      this.getTargetCount(workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.getTargetCount(workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
-      this.getAssetCount(workspaceId, options),
-      this.getAssetCount(workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.getAssetCount(workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
-      this.getServiceCount(workspaceId, options),
-      this.getServiceCount(workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.getServiceCount(workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
-      this.getVulnerabilityCount(workspaceId, options),
-      this.getVulnerabilityCount(workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.getVulnerabilityCount(workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
-      this.getSeverityCounts(workspaceId, options),
-      this.getSeverityCounts(workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.getSeverityCounts(workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.statisticService.getCountForWorkspace('targets', workspaceId, options),
+      this.statisticService.getCountForWorkspace('targets', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.statisticService.getCountForWorkspace('targets', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.statisticService.getCountForWorkspace('assets', workspaceId, options),
+      this.statisticService.getCountForWorkspace('assets', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.statisticService.getCountForWorkspace('assets', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.statisticService.getCountForWorkspace('services', workspaceId, options),
+      this.statisticService.getCountForWorkspace('services', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.statisticService.getCountForWorkspace('services', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.statisticService.getCountForWorkspace('vulnerabilities', workspaceId, options),
+      this.statisticService.getCountForWorkspace('vulnerabilities', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.statisticService.getCountForWorkspace('vulnerabilities', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.statisticService.getSeverityCounts(workspaceId, options),
+      this.statisticService.getSeverityCounts(workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.statisticService.getSeverityCounts(workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
       this.getNewVulnerabilityCount(workspaceId, weekStart, now),
       this.getNewVulnerabilityCount(workspaceId, monthStart, now),
       this.getResolvedVulnerabilityCount(workspaceId, weekStart, now),
       this.getResolvedVulnerabilityCount(workspaceId, monthStart, now),
-      this.getVulnerabilityTrends(workspaceId),
+      this.statisticService.getVulnerabilityTrends(workspaceId),
       this.getNewFindings(workspaceId, options),
       this.getResolvedFindings(workspaceId, options),
       this.getTargets(workspaceId, options),
@@ -115,9 +114,9 @@ export class SummaryReportService {
     const servicesChange = currentServices - lastWeekServices;
     const vulnsChange = currentVulns - lastWeekVulns;
 
-    const securityScore = this.calculateSecurityScore(severityCounts, currentAssets);
-    const lastWeekScore = this.calculateSecurityScore(lastWeekSeverityCounts, currentAssets);
-    const lastMonthScore = this.calculateSecurityScore(lastMonthSeverityCounts, currentAssets);
+    const securityScore = StatisticService.calculateSecurityScore(severityCounts, currentAssets);
+    const lastWeekScore = StatisticService.calculateSecurityScore(lastWeekSeverityCounts, currentAssets);
+    const lastMonthScore = StatisticService.calculateSecurityScore(lastMonthSeverityCounts, currentAssets);
     const scoreChange = securityScore - lastWeekScore;
 
     // Build risk distribution
@@ -217,148 +216,6 @@ export class SummaryReportService {
     };
   }
 
-  private async getTargetCount(
-    workspaceId: string,
-    options?: { startDate?: Date; endDate?: Date; targetIds?: string[] },
-  ): Promise<number> {
-    const qb = this.targetRepo
-      .createQueryBuilder('t')
-      .leftJoin('t.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
-      .where('workspace.id = :workspaceId', { workspaceId });
-
-    if (options?.startDate) {
-      qb.andWhere('t.createdAt >= :startDate', { startDate: options.startDate });
-    }
-    if (options?.endDate) {
-      qb.andWhere('t.createdAt <= :endDate', { endDate: options.endDate });
-    }
-    if (options?.targetIds?.length) {
-      qb.andWhere('t.id IN (:...targetIds)', { targetIds: options.targetIds });
-    }
-
-    return qb.getCount();
-  }
-
-  private async getAssetCount(
-    workspaceId: string,
-    options?: { startDate?: Date; endDate?: Date; targetIds?: string[] },
-  ): Promise<number> {
-    const qb = this.assetRepo
-      .createQueryBuilder('a')
-      .leftJoin('a.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
-      .where('workspace.id = :workspaceId', { workspaceId });
-
-    if (options?.startDate) {
-      qb.andWhere('a.createdAt >= :startDate', { startDate: options.startDate });
-    }
-    if (options?.endDate) {
-      qb.andWhere('a.createdAt <= :endDate', { endDate: options.endDate });
-    }
-    if (options?.targetIds?.length) {
-      qb.andWhere('target.id IN (:...targetIds)', { targetIds: options.targetIds });
-    }
-
-    return qb.getCount();
-  }
-
-  private async getServiceCount(
-    workspaceId: string,
-    options?: { startDate?: Date; endDate?: Date; targetIds?: string[] },
-  ): Promise<number> {
-    const qb = this.assetServiceRepo
-      .createQueryBuilder('as')
-      .leftJoin('as.asset', 'asset')
-      .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
-      .where('workspace.id = :workspaceId', { workspaceId });
-
-    if (options?.startDate) {
-      qb.andWhere('as.createdAt >= :startDate', { startDate: options.startDate });
-    }
-    if (options?.endDate) {
-      qb.andWhere('as.createdAt <= :endDate', { endDate: options.endDate });
-    }
-    if (options?.targetIds?.length) {
-      qb.andWhere('target.id IN (:...targetIds)', { targetIds: options.targetIds });
-    }
-
-    return qb.getCount();
-  }
-
-  private async getVulnerabilityCount(
-    workspaceId: string,
-    options?: { startDate?: Date; endDate?: Date; targetIds?: string[] },
-  ): Promise<number> {
-    const qb = this.vulnRepo
-      .createQueryBuilder('v')
-      .leftJoin('v.asset', 'asset')
-      .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
-      .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false });
-
-    if (options?.startDate) {
-      qb.andWhere('v.createdAt >= :startDate', { startDate: options.startDate });
-    }
-    if (options?.endDate) {
-      qb.andWhere('v.createdAt <= :endDate', { endDate: options.endDate });
-    }
-    if (options?.targetIds?.length) {
-      qb.andWhere('target.id IN (:...targetIds)', { targetIds: options.targetIds });
-    }
-
-    return qb.getCount();
-  }
-
-  private async getSeverityCounts(
-    workspaceId: string,
-    options?: { startDate?: Date; endDate?: Date; targetIds?: string[] },
-  ): Promise<Record<Severity, number>> {
-    const qb = this.vulnRepo
-      .createQueryBuilder('v')
-      .leftJoin('v.asset', 'asset')
-      .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
-      .select('v.severity', 'severity')
-      .addSelect('COUNT(*)', 'count')
-      .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false });
-
-    if (options?.startDate) {
-      qb.andWhere('v.createdAt >= :startDate', { startDate: options.startDate });
-    }
-    if (options?.endDate) {
-      qb.andWhere('v.createdAt <= :endDate', { endDate: options.endDate });
-    }
-    if (options?.targetIds?.length) {
-      qb.andWhere('target.id IN (:...targetIds)', { targetIds: options.targetIds });
-    }
-
-    const results = await qb
-      .groupBy('v.severity')
-      .getRawMany<{ severity: Severity; count: string }>();
-
-    const counts = {
-      [Severity.CRITICAL]: 0,
-      [Severity.HIGH]: 0,
-      [Severity.MEDIUM]: 0,
-      [Severity.LOW]: 0,
-      [Severity.INFO]: 0,
-    };
-
-    for (const result of results) {
-      counts[result.severity] = parseInt(result.count, 10);
-    }
-
-    return counts;
-  }
-
   private async getNewVulnerabilityCount(
     workspaceId: string,
     startDate: Date,
@@ -397,84 +254,6 @@ export class SummaryReportService {
       .getCount();
   }
 
-  private async getVulnerabilityTrends(workspaceId: string) {
-    const now = new Date();
-    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const [last7DaysData, last30DaysData] = await Promise.all([
-      this.getDailyVulnerabilityCounts(workspaceId, last7Days, now),
-      this.getDailyVulnerabilityCounts(workspaceId, last30Days, now),
-    ]);
-
-    const avgPerWeek =
-      last7DaysData.length > 0
-        ? last7DaysData.reduce((sum, d) => sum + d.count, 0) / 7
-        : 0;
-
-    // Calculate trend
-    const firstHalf = last30DaysData.slice(0, 15);
-    const secondHalf = last30DaysData.slice(15);
-    const firstAvg =
-      firstHalf.length > 0
-        ? firstHalf.reduce((sum, d) => sum + d.count, 0) / firstHalf.length
-        : 0;
-    const secondAvg =
-      secondHalf.length > 0
-        ? secondHalf.reduce((sum, d) => sum + d.count, 0) / secondHalf.length
-        : 0;
-
-    let trend: 'increasing' | 'decreasing' | 'stable' = 'stable';
-    if (secondAvg > firstAvg * 1.2) trend = 'increasing';
-    else if (secondAvg < firstAvg * 0.8) trend = 'decreasing';
-
-    return {
-      last7Days: last7DaysData.map((d) => d.count),
-      last30Days: last30DaysData.map((d) => d.count),
-      avgPerWeek: Math.round(avgPerWeek * 10) / 10,
-      trend,
-    };
-  }
-
-  private async getDailyVulnerabilityCounts(
-    workspaceId: string,
-    startDate: Date,
-    endDate: Date,
-  ) {
-    const qb = this.vulnRepo
-      .createQueryBuilder('v')
-      .leftJoin('v.asset', 'asset')
-      .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
-      .select("TO_CHAR(v.createdAt, 'YYYY-MM-DD')", 'date')
-      .addSelect('COUNT(*)', 'count')
-      .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('v.createdAt >= :startDate', { startDate })
-      .andWhere('v.createdAt <= :endDate', { endDate })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false })
-      .groupBy("TO_CHAR(v.createdAt, 'YYYY-MM-DD')")
-      .orderBy("TO_CHAR(v.createdAt, 'YYYY-MM-DD')", 'ASC');
-
-    const results = await qb.getRawMany<{ date: string; count: string }>();
-
-    // Fill in missing days with 0 counts
-    const dateMap = new Map(results.map((r) => [r.date, parseInt(r.count, 10)]));
-    const dates: { date: string; count: number }[] = [];
-
-    const current = new Date(startDate);
-    while (current <= endDate) {
-      const dateStr = current.toISOString().split('T')[0];
-      dates.push({
-        date: dateStr,
-        count: dateMap.get(dateStr) || 0,
-      });
-      current.setDate(current.getDate() + 1);
-    }
-
-    return dates;
-  }
-
   private async getNewFindings(
     workspaceId: string,
     options?: { startDate?: Date; endDate?: Date; targetIds?: string[] },
@@ -488,6 +267,7 @@ export class SummaryReportService {
       .leftJoin('wt.workspace', 'workspace')
       .where('workspace.id = :workspaceId', { workspaceId })
       .andWhere('v.isArchived = :isArchived', { isArchived: false })
+      .andWhere('v.severity != :info', { info: 'info' })
       .orderBy('v.createdAt', 'DESC')
       .limit(limit);
 
@@ -512,7 +292,7 @@ export class SummaryReportService {
       cvss: v.cvssScore ?? 0,
       asset: v.asset?.value || 'Unknown',
       category: v.tags?.[0] || 'General',
-      discovered: v.createdAt.toISOString().split('T')[0],
+      discovered: `${String(v.createdAt.getDate()).padStart(2, '0')}/${String(v.createdAt.getMonth() + 1).padStart(2, '0')}/${v.createdAt.getFullYear()}`,
       status: v.analyzeStatus,
     }));
   }
@@ -592,7 +372,7 @@ export class SummaryReportService {
         return {
           id: v.cveId?.[0] || v.fingerprint || v.id.substring(0, 8),
           title: v.name,
-          resolved: resolvedDate.toISOString().split('T')[0],
+          resolved: this.formatDate(resolvedDate),
           daysOpen,
         };
       });
@@ -660,7 +440,7 @@ export class SummaryReportService {
       riskLevel: this.getRiskLevel(parseInt(t.vulnCount, 10)),
       provider: 'OpenASM',
       lastScan: t.t_lastDiscoveredAt
-        ? t.t_lastDiscoveredAt.toISOString().split('T')[0]
+        ? this.formatDate(t.t_lastDiscoveredAt)
         : 'Never',
     }));
   }
@@ -781,7 +561,7 @@ export class SummaryReportService {
 
     return results.map((r) => ({
       identifier: r.identifier,
-      discovered: r.discovered.toISOString().split('T')[0],
+      discovered: this.formatDate(r.discovered),
       provider: 'OpenASM',
       riskLevel: this.getRiskLevel(parseInt(r.vulnCount, 10)),
     }));
@@ -814,7 +594,7 @@ export class SummaryReportService {
 
     return results.map((r) => ({
       identifier: r.identifier,
-      discovered: r.discovered.toISOString().split('T')[0],
+      discovered: this.formatDate(r.discovered),
       provider: 'OpenASM',
       riskLevel: this.getRiskLevel(parseInt(r.vulnCount, 10)),
     }));
@@ -831,7 +611,7 @@ export class SummaryReportService {
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspaceTargets', 'wt')
       .leftJoin('wt.workspace', 'workspace')
-      .leftJoin('asset.vulnerabilities', 'v')
+      .leftJoin('asset.vulnerabilities', 'v', 'v.ports @> ARRAY["as".port::text]')
       .select('as.port', 'port')
       .addSelect('as.value', 'service')
       .addSelect('as.createdAt', 'discovered')
@@ -858,7 +638,7 @@ export class SummaryReportService {
     return results.map((r) => ({
       port: r.port,
       service: r.service,
-      discovered: r.discovered.toISOString().split('T')[0],
+      discovered: this.formatDate(r.discovered),
       target: r.targetValue,
       riskLevel: this.getRiskLevel(parseInt(r.vulnCount, 10)),
     }));
@@ -892,39 +672,17 @@ export class SummaryReportService {
 
     return results.map((r) => ({
       name: r.name,
-      discovered: r.discovered.toISOString().split('T')[0],
+      discovered: this.formatDate(r.discovered),
       target: r.targetValue,
       category: 'Technology',
     }));
   }
 
-  private calculateSecurityScore(
-    severityCounts: Record<Severity, number>,
-    totalAssets: number,
-  ): number {
-    const critical = severityCounts[Severity.CRITICAL] || 0;
-    const high = severityCounts[Severity.HIGH] || 0;
-    const medium = severityCounts[Severity.MEDIUM] || 0;
-    const low = severityCounts[Severity.LOW] || 0;
-    const info = severityCounts[Severity.INFO] || 0;
-
-    if (totalAssets <= 0) return 10;
-
-    const alpha = 0.3; // asset weight
-    const beta = 0.7; // vuln weight
-
-    const vulRisk = critical * 5 + high * 3 + medium * 2 + low * 1 + info * 0.5;
-    const Rvuln = Math.min(10, vulRisk / totalAssets);
-    const Rasset = Math.min(10, totalAssets / 100);
-
-    if (vulRisk === 0) return 10;
-
-    const totalScore = Math.max(0, 10 - (alpha * Rasset + beta * Rvuln));
-    const finalScore = Math.round(totalScore * 10) / 10;
-
-    return Math.round(finalScore) === finalScore
-      ? Math.round(finalScore)
-      : finalScore;
+  private formatDate(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   }
 
   private getRiskLevel(vulnCount: number): RiskLevel {
