@@ -1,12 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import {
-  Download,
-  FileText,
-  Plus,
-  Trash2,
-} from 'lucide-react';
+import { Download, FileText, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -33,7 +28,8 @@ import {
 import type { ReportResponseDto } from '@/services/apis/gen/queries';
 import {
   useReportsControllerDeleteReport,
-  useReportsControllerGenerateReport,
+  useReportsControllerGenerateSummaryReport,
+  useReportsControllerGenerateVulnerabilityReport,
   useReportsControllerGetMany,
 } from '@/services/apis/gen/queries';
 import CreateWorkspace from '../workspaces/create-workspace';
@@ -79,18 +75,30 @@ export default function Reports() {
     },
   );
 
-  const generateMutation = useReportsControllerGenerateReport({
+  const onGenerateSuccess = () => {
+    setGenerateOpen(false);
+    toast.success('Report generated successfully');
+    refetch();
+  };
+
+  const generateSummaryMutation = useReportsControllerGenerateSummaryReport({
     mutation: {
-      onSuccess: () => {
-        setGenerateOpen(false);
-        toast.success('Report generated successfully');
-        refetch();
-      },
+      onSuccess: onGenerateSuccess,
       onError: () => {
         toast.error('Failed to generate report');
       },
     },
   });
+
+  const generateVulnerabilityMutation =
+    useReportsControllerGenerateVulnerabilityReport({
+      mutation: {
+        onSuccess: onGenerateSuccess,
+        onError: () => {
+          toast.error('Failed to generate report');
+        },
+      },
+    });
 
   const deleteMutation = useReportsControllerDeleteReport({
     mutation: {
@@ -202,7 +210,10 @@ export default function Reports() {
             size="sm"
             className="bg-white"
             onClick={() => setGenerateOpen(true)}
-            disabled={generateMutation.isPending}
+            disabled={
+              generateSummaryMutation.isPending ||
+              generateVulnerabilityMutation.isPending
+            }
           >
             <Plus className="h-4 w-4 mr-2" />
             Generate Report
@@ -237,19 +248,26 @@ export default function Reports() {
             </RadioGroup>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setGenerateOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setGenerateOpen(false)}>
               Cancel
             </Button>
             <Button
-              onClick={() =>
-                generateMutation.mutate({ data: { type: reportType } })
+              onClick={() => {
+                if (reportType === 'SUMMARY') {
+                  generateSummaryMutation.mutate({ data: {} });
+                } else {
+                  generateVulnerabilityMutation.mutate({ data: {} });
+                }
+              }}
+              disabled={
+                generateSummaryMutation.isPending ||
+                generateVulnerabilityMutation.isPending
               }
-              disabled={generateMutation.isPending}
             >
-              {generateMutation.isPending ? 'Generating...' : 'Generate'}
+              {generateSummaryMutation.isPending ||
+              generateVulnerabilityMutation.isPending
+                ? 'Generating...'
+                : 'Generate'}
             </Button>
           </DialogFooter>
         </DialogContent>

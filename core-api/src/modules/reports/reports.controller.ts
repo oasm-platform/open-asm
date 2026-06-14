@@ -16,7 +16,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import {
-  GenerateReportBodyDto,
+  GenerateSummaryReportBodyDto,
+  GenerateVulnerabilityReportBodyDto,
   GetManyReportsQueryDto,
   ReportResponseDto,
 } from './dto/reports.dto';
@@ -58,8 +59,8 @@ export class ReportsController {
   }
 
   @Doc({
-    summary: 'Generate PDF report',
-    description: 'Generates a PDF report with mock data.',
+    summary: 'Generate summary report',
+    description: 'Generates a summary PDF report with mock data.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -67,9 +68,9 @@ export class ReportsController {
       getWorkspaceId: true,
     },
   })
-  @Post('generate')
-  async generateReport(
-    @Body() body: GenerateReportBodyDto,
+  @Post('generate/summary')
+  async generateSummaryReport(
+    @Body() body: GenerateSummaryReportBodyDto,
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
   ): Promise<DefaultMessageResponseDto> {
@@ -82,11 +83,43 @@ export class ReportsController {
     await this.reportsService.generateReport(
       workspaceId,
       userId,
-      body.type,
+      'SUMMARY',
       options,
     );
 
-    return { message: 'Report generated successfully' };
+    return { message: 'Summary report generated successfully' };
+  }
+
+  @Doc({
+    summary: 'Generate vulnerability report',
+    description: 'Generates a vulnerability PDF report with mock data.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('generate/vulnerability')
+  async generateVulnerabilityReport(
+    @Body() body: GenerateVulnerabilityReportBodyDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const options = {
+      startDate: body.startDate ? new Date(body.startDate) : undefined,
+      endDate: body.endDate ? new Date(body.endDate) : undefined,
+      targetIds: body.targetIds,
+    };
+
+    await this.reportsService.generateReport(
+      workspaceId,
+      userId,
+      'VULNERABILITY',
+      options,
+    );
+
+    return { message: 'Vulnerability report generated successfully' };
   }
 
   @Doc({
