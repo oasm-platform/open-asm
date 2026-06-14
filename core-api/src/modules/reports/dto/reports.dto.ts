@@ -36,14 +36,14 @@ export class GenerateSummaryReportBodyDto {
   @IsString()
   endDate?: string;
 
-  @ApiProperty({ required: false, description: 'Target IDs to include in summary', type: [String] })
+  @ApiProperty({ required: false, description: 'Target IDs to filter summary data', type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   targetIds?: string[];
 }
 
-export class GenerateVulnerabilityReportBodyDto {
+export class GenerateVulReportBodyDto {
   @ApiProperty({ required: false, description: 'Start date for vulnerability report filter' })
   @IsOptional()
   @IsString()
@@ -59,6 +59,17 @@ export class GenerateVulnerabilityReportBodyDto {
   @IsArray()
   @IsString({ each: true })
   targetIds?: string[];
+
+  @ApiProperty({ required: false, description: 'Vulnerability IDs to include in report', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  vulnIds?: string[];
+
+  @ApiProperty({ required: false, description: 'Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO)', enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] })
+  @IsOptional()
+  @IsEnum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'])
+  minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 }
 
 export class GetManyReportsQueryDto extends GetManyBaseQueryParams {}

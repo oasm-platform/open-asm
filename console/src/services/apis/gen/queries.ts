@@ -2187,17 +2187,35 @@ export type GenerateSummaryReportBodyDto = {
   startDate?: string;
   /** End date for summary report filter */
   endDate?: string;
-  /** Target IDs to include in summary */
+  /** Target IDs to filter summary data */
   targetIds?: string[];
 };
 
-export type GenerateVulnerabilityReportBodyDto = {
+/**
+ * Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO)
+ */
+export type GenerateVulReportBodyDtoMinSeverity =
+  (typeof GenerateVulReportBodyDtoMinSeverity)[keyof typeof GenerateVulReportBodyDtoMinSeverity];
+
+export const GenerateVulReportBodyDtoMinSeverity = {
+  CRITICAL: 'CRITICAL',
+  HIGH: 'HIGH',
+  MEDIUM: 'MEDIUM',
+  LOW: 'LOW',
+  INFO: 'INFO',
+} as const;
+
+export type GenerateVulReportBodyDto = {
   /** Start date for vulnerability report filter */
   startDate?: string;
   /** End date for vulnerability report filter */
   endDate?: string;
   /** Target IDs to filter vulnerabilities */
   targetIds?: string[];
+  /** Vulnerability IDs to include in report */
+  vulnIds?: string[];
+  /** Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO) */
+  minSeverity?: GenerateVulReportBodyDtoMinSeverity;
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
@@ -30760,8 +30778,8 @@ export function useReportsControllerTestRender<
 }
 
 /**
- * Generates a summary PDF report with mock data.
- * @summary Generate summary report
+ * Generates a summary (Attack Surface Discovery) PDF report.
+ * @summary Generate summary PDF report
  */
 export const reportsControllerGenerateSummaryReport = (
   generateSummaryReportBodyDto: GenerateSummaryReportBodyDto,
@@ -30826,7 +30844,7 @@ export type ReportsControllerGenerateSummaryReportMutationBody =
 export type ReportsControllerGenerateSummaryReportMutationError = unknown;
 
 /**
- * @summary Generate summary report
+ * @summary Generate summary PDF report
  */
 export const useReportsControllerGenerateSummaryReport = <
   TError = unknown,
@@ -30855,44 +30873,70 @@ export const useReportsControllerGenerateSummaryReport = <
 };
 
 /**
- * Generates a vulnerability PDF report with mock data.
- * @summary Generate vulnerability report
+ * Generates a vulnerability assessment PDF report.
+ * @summary Generate vulnerability PDF report
  */
-export const reportsControllerGenerateVulnerabilityReport = (
-  generateVulnerabilityReportBodyDto: GenerateVulnerabilityReportBodyDto,
+export const reportsControllerGenerateVulReport = (
+  generateVulReportBodyDto: GenerateVulReportBodyDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<DefaultMessageResponseDto>(
     {
+<<<<<<< HEAD
       url: `/api/reports/generate/vulnerability`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       data: generateVulnerabilityReportBodyDto,
+=======
+      url: `/api/reports/generate/vul`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: generateVulReportBodyDto,
+>>>>>>> c0b261df (feat(report): update report)
       signal,
     },
     options,
   );
 };
 
+<<<<<<< HEAD
 export const getReportsControllerGenerateVulnerabilityReportMutationOptions = <
+=======
+export const getReportsControllerGenerateVulReportMutationOptions = <
+>>>>>>> c0b261df (feat(report): update report)
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
+<<<<<<< HEAD
     Awaited<ReturnType<typeof reportsControllerGenerateVulnerabilityReport>>,
     TError,
     { data: GenerateVulnerabilityReportBodyDto },
+=======
+    Awaited<ReturnType<typeof reportsControllerGenerateVulReport>>,
+    TError,
+    { data: GenerateVulReportBodyDto },
+>>>>>>> c0b261df (feat(report): update report)
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
+<<<<<<< HEAD
   Awaited<ReturnType<typeof reportsControllerGenerateVulnerabilityReport>>,
   TError,
   { data: GenerateVulnerabilityReportBodyDto },
   TContext
 > => {
   const mutationKey = ['reportsControllerGenerateVulnerabilityReport'];
+=======
+  Awaited<ReturnType<typeof reportsControllerGenerateVulReport>>,
+  TError,
+  { data: GenerateVulReportBodyDto },
+  TContext
+> => {
+  const mutationKey = ['reportsControllerGenerateVulReport'];
+>>>>>>> c0b261df (feat(report): update report)
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -30902,17 +30946,27 @@ export const getReportsControllerGenerateVulnerabilityReportMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
+<<<<<<< HEAD
     Awaited<ReturnType<typeof reportsControllerGenerateVulnerabilityReport>>,
     { data: GenerateVulnerabilityReportBodyDto }
   > = (props) => {
     const { data } = props ?? {};
 
     return reportsControllerGenerateVulnerabilityReport(data, requestOptions);
+=======
+    Awaited<ReturnType<typeof reportsControllerGenerateVulReport>>,
+    { data: GenerateVulReportBodyDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reportsControllerGenerateVulReport(data, requestOptions);
+>>>>>>> c0b261df (feat(report): update report)
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
+<<<<<<< HEAD
 export type ReportsControllerGenerateVulnerabilityReportMutationResult =
   NonNullable<
     Awaited<ReturnType<typeof reportsControllerGenerateVulnerabilityReport>>
@@ -30925,20 +30979,40 @@ export type ReportsControllerGenerateVulnerabilityReportMutationError = unknown;
  * @summary Generate vulnerability report
  */
 export const useReportsControllerGenerateVulnerabilityReport = <
+=======
+export type ReportsControllerGenerateVulReportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerGenerateVulReport>>
+>;
+export type ReportsControllerGenerateVulReportMutationBody =
+  GenerateVulReportBodyDto;
+export type ReportsControllerGenerateVulReportMutationError = unknown;
+
+/**
+ * @summary Generate vulnerability PDF report
+ */
+export const useReportsControllerGenerateVulReport = <
+>>>>>>> c0b261df (feat(report): update report)
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
+<<<<<<< HEAD
       Awaited<ReturnType<typeof reportsControllerGenerateVulnerabilityReport>>,
       TError,
       { data: GenerateVulnerabilityReportBodyDto },
+=======
+      Awaited<ReturnType<typeof reportsControllerGenerateVulReport>>,
+      TError,
+      { data: GenerateVulReportBodyDto },
+>>>>>>> c0b261df (feat(report): update report)
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
+<<<<<<< HEAD
   Awaited<ReturnType<typeof reportsControllerGenerateVulnerabilityReport>>,
   TError,
   { data: GenerateVulnerabilityReportBodyDto },
@@ -30946,6 +31020,15 @@ export const useReportsControllerGenerateVulnerabilityReport = <
 > => {
   return useMutation(
     getReportsControllerGenerateVulnerabilityReportMutationOptions(options),
+=======
+  Awaited<ReturnType<typeof reportsControllerGenerateVulReport>>,
+  TError,
+  { data: GenerateVulReportBodyDto },
+  TContext
+> => {
+  return useMutation(
+    getReportsControllerGenerateVulReportMutationOptions(options),
+>>>>>>> c0b261df (feat(report): update report)
     queryClient,
   );
 };

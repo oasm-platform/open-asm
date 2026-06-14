@@ -17,7 +17,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import {
   GenerateSummaryReportBodyDto,
-  GenerateVulnerabilityReportBodyDto,
+  GenerateVulReportBodyDto,
   GetManyReportsQueryDto,
   ReportResponseDto,
 } from './dto/reports.dto';
@@ -59,8 +59,8 @@ export class ReportsController {
   }
 
   @Doc({
-    summary: 'Generate summary report',
-    description: 'Generates a summary PDF report with mock data.',
+    summary: 'Generate summary PDF report',
+    description: 'Generates a summary (Attack Surface Discovery) PDF report.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -91,8 +91,8 @@ export class ReportsController {
   }
 
   @Doc({
-    summary: 'Generate vulnerability report',
-    description: 'Generates a vulnerability PDF report with mock data.',
+    summary: 'Generate vulnerability PDF report',
+    description: 'Generates a vulnerability assessment PDF report.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -100,9 +100,9 @@ export class ReportsController {
       getWorkspaceId: true,
     },
   })
-  @Post('generate/vulnerability')
-  async generateVulnerabilityReport(
-    @Body() body: GenerateVulnerabilityReportBodyDto,
+  @Post('generate/vul')
+  async generateVulReport(
+    @Body() body: GenerateVulReportBodyDto,
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
   ): Promise<DefaultMessageResponseDto> {
@@ -110,6 +110,8 @@ export class ReportsController {
       startDate: body.startDate ? new Date(body.startDate) : undefined,
       endDate: body.endDate ? new Date(body.endDate) : undefined,
       targetIds: body.targetIds,
+      vulnIds: body.vulnIds,
+      minSeverity: body.minSeverity,
     };
 
     await this.reportsService.generateReport(

@@ -358,6 +358,8 @@ export class ReportsService {
       startDate?: Date;
       endDate?: Date;
       targetIds?: string[];
+      vulnIds?: string[];
+      minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
     },
   ): Promise<{ filePath: string; fileName: string }> {
     let html: string;
