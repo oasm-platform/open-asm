@@ -79,8 +79,6 @@ export class AgentsCompletionsService {
   private readonly toolCapableModelsCache = new Map<string, Set<string>>();
   private toolCapableCacheExpiry = 0;
   private static readonly TOOL_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-  // Cache for custom/Ollama model tool support: key = `${baseURL}:${model}`, value = boolean
-  private readonly customToolSupportCache = new Map<string, boolean>();
   // Default context window (128k) - used for compaction threshold calculation
   private static readonly DEFAULT_CONTEXT_WINDOW = 128000;
   private static readonly COMPACTION_THRESHOLD_RATIO = 0.6;
@@ -102,7 +100,6 @@ export class AgentsCompletionsService {
     private readonly agentsSkillsService: AgentsSkillsService,
   ) {
     this.loadAllPrompts();
-    console.log('AgentsCompletionsService initialized');
   }
 
   /**
@@ -865,146 +862,6 @@ export class AgentsCompletionsService {
    * - Throws a user-friendly error message
    * For other errors, re-throws the original error.
    */
-  private handleToolError(error: unknown, llmConfig: AgentLLMConfig): never {
-    const message = error instanceof Error ? error.message : String(error);
-
-    // Check if the error message matches known tool-calling error patterns
-    const toolErrorPatterns = [
-      'tool use',
-      'tool_choice',
-      'No endpoints found that support tool',
-      'does not support tools',
-      'tool_calls',
-      'tools is not supported',
-    ];
-
-    const isToolError = toolErrorPatterns.some((pattern) =>
-      message.includes(pattern),
-    );
-
-    if (isToolError) {
-      // Cache negative result for CUSTOM provider to prevent re-requesting
-      if (llmConfig.provider === LLMProvider.CUSTOM && llmConfig.apiUrl) {
-        this.customToolSupportCache.set(
-          `${llmConfig.apiUrl}:${llmConfig.model}`,
-          false,
-        );
-      }
-      throw new Error(
-        `The selected model "${llmConfig.model}" does not support tool calling. ` +
-          'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
-      );
-    }
-
-    throw error;
-  }
-
-  /**
-   * Creates a merged ReadableStream that combines:
-   * 1. A `conversation-created` metadata chunk at the start of the stream
-   * 2. Chunks from the AI stream (text-delta, tool-call, ...)
-   * 3. Asynchronous `todos-updated` chunks (emitted by the EventEmitter)
-   */
-  private createMergedStream(
-    params: StreamCreationParams,
-  ): ReadableStream<UIMessageChunk> {
-    const { aiStream, conversationId, todosEmitter, abortSignal } = params;
-
-    let controllerClosed = false;
-
-    return new ReadableStream<UIMessageChunk>({
-      async start(controller) {
-        // Emit initial chunk to notify the frontend that the conversation was created
-        controller.enqueue({
-          type: 'data-conversation-created',
-          data: { conversationId },
-        });
-
-        // Get a reader for the AI stream to forward text/tool-call chunks
-        const reader = aiStream.getReader();
-
-        // Subscribe to todos-updated events from the emitter
-        const onTodosUpdated = (updatedTodos: AgentTodoItem[]) => {
-          controller.enqueue({
-            type: 'data-todos-updated',
-            data: { todos: updatedTodos },
-          } as unknown as UIMessageChunk);
-        };
-
-        todosEmitter.on('todos-updated', onTodosUpdated);
-
-        // Subscribe to remote-execute-output events from the emitter
-        const onRemoteExecuteOutput = (data: {
-          toolCallId: string;
-          type: number;
-          data: string;
-          exitCode: number;
-        }) => {
-          controller.enqueue({
-            type: 'data-remote-execute-output',
-            data,
-          } as unknown as UIMessageChunk);
-        };
-
-        todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
-
-        // Subscribe to stream-error events from the emitter (provider errors, etc.)
-        // This propagates detailed error messages from the AI provider to the frontend.
-        const onStreamError = (data: { message: string }) => {
-          if (controllerClosed) return;
-          controller.enqueue({
-            type: 'error',
-            error: data,
-          } as unknown as UIMessageChunk);
-        };
-        todosEmitter.on('stream-error', onStreamError);
-
-        // When abort signal fires, immediately cancel the reader and close the controller
-        const onAbort = () => {
-          if (controllerClosed) return;
-          controllerClosed = true;
-          reader.cancel().catch(() => {});
-          try {
-            controller.close();
-          } catch {
-            // Controller might already be in an error state
-          }
-        };
-
-        if (abortSignal) {
-          abortSignal.addEventListener('abort', onAbort, { once: true });
-        }
-
-        try {
-          // Read chunks from the AI stream one by one
-          while (true) {
-            if (abortSignal?.aborted || controllerClosed) break;
-
-            const { done, value } = await reader.read();
-            if (done || controllerClosed) break;
-            controller.enqueue(value);
-          }
-        } finally {
-          if (abortSignal) {
-            abortSignal.removeEventListener('abort', onAbort);
-          }
-          todosEmitter.off('todos-updated', onTodosUpdated);
-          todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
-          todosEmitter.off('stream-error', onStreamError);
-          reader.releaseLock();
-        }
-
-        if (!controllerClosed) {
-          try {
-            controller.close();
-          } catch {
-            // Stream might already be in an errored state
-          }
-        }
-      },
-    });
-  }
-
   /**
    * Retrieves the effective context window for a given LLM config.
    * Priority: contextWindow column (user override) > default (128k).
