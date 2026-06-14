@@ -1,0 +1,853 @@
+<html lang='en'>
+  <head>
+    <meta charset='UTF-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <title>{{reportTitle}}</title>
+    <script src='https://cdn.tailwindcss.com'></script>
+    <script>
+      tailwind.config = { theme: { extend: { colors: { slate: { 50: '#f8fafc',
+      100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500:
+      '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a',
+      } } } } }
+    </script>
+    <style>
+      @page:first {
+        margin: 0;
+      }
+      @page {
+        size: A4;
+        margin: 20mm;
+      }
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        font-size: 10px;
+      }
+
+      /* Page break controls */
+      .page-break {
+        page-break-after: always;
+      }
+      .avoid-break {
+        page-break-inside: avoid;
+      }
+
+      /* Section header - avoid orphan */
+      .section-header {
+        page-break-after: avoid;
+      }
+      section {
+        widows: 3;
+        orphans: 3;
+      }
+
+      /* Table rows */
+      table {
+        page-break-inside: auto;
+      }
+      tr {
+        page-break-inside: avoid;
+      }
+      thead {
+        display: table-header-group;
+      }
+      tfoot {
+        display: table-footer-group;
+      }
+
+      /* Cover page - fills exactly one A4 page */
+      .cover-page {
+        height: 297mm;
+        page-break-after: always;
+      }
+    </style>
+  </head>
+  <body class='bg-white'>
+    <!-- Cover Page -->
+    {{> cover-page coverTitle="Attack Surface<br />Discovery Report" coverDescription="Comprehensive security analysis of your external attack surface, including vulnerability assessment, asset discovery, and risk evaluation." docRefPrefix="OASM-RPT" dateLabel="Date Exported"}}
+    <!-- Content wrapper -->
+    <div class='px-4 py-2'>
+      <!-- Section 01: Weekly Performance Metrics -->
+      <section class='mb-3 avoid-break'>
+        <h2
+          class='text-base font-bold mb-2 flex items-center gap-2 text-slate-900 section-header'
+        >
+          <span class='text-slate-800'>01</span>
+          Weekly Performance Metrics
+        </h2>
+        <div class='grid grid-cols-4 gap-2 mb-3'>
+          <div class='bg-slate-50 rounded-lg p-3 border border-slate-200'>
+            <div class='flex items-center justify-between mb-1'>
+              <span
+                class='text-[10px] font-medium text-slate-500 uppercase tracking-wide'
+              >Targets</span>
+            </div>
+            <div class='flex items-end justify-between'>
+              <p
+                class='text-2xl font-bold text-slate-900'
+              >{{weekly.totalTargets}}</p>
+              <div class='flex items-center gap-0.5 text-[9px] text-green-600'>
+                <span>+{{weekly.targetsChange}}
+                  ({{weekly.targetsChangePercent}}%)</span>
+              </div>
+            </div>
+          </div>
+          <div class='bg-slate-50 rounded-lg p-3 border border-slate-200'>
+            <div class='flex items-center justify-between mb-1'>
+              <span
+                class='text-[10px] font-medium text-slate-500 uppercase tracking-wide'
+              >Assets</span>
+            </div>
+            <div class='flex items-end justify-between'>
+              <p
+                class='text-2xl font-bold text-slate-900'
+              >{{weekly.totalAssets}}</p>
+              <div class='flex items-center gap-0.5 text-[9px] text-green-600'>
+                <span>+{{weekly.assetsChange}}
+                  ({{weekly.assetsChangePercent}}%)</span>
+              </div>
+            </div>
+          </div>
+          <div class='bg-slate-50 rounded-lg p-3 border border-slate-200'>
+            <div class='flex items-center justify-between mb-1'>
+              <span
+                class='text-[10px] font-medium text-slate-500 uppercase tracking-wide'
+              >Services</span>
+            </div>
+            <div class='flex items-end justify-between'>
+              <p
+                class='text-2xl font-bold text-slate-900'
+              >{{weekly.totalServices}}</p>
+              <div class='flex items-center gap-0.5 text-[9px] text-red-600'>
+                <span>{{weekly.servicesChange}}
+                  ({{weekly.servicesChangePercent}}%)</span>
+              </div>
+            </div>
+          </div>
+          <div class='bg-slate-50 rounded-lg p-3 border border-slate-200'>
+            <div class='flex items-center justify-between mb-1'>
+              <span
+                class='text-[10px] font-medium text-slate-500 uppercase tracking-wide'
+              >Security Score</span>
+            </div>
+            <div class='flex items-end justify-between'>
+              <p
+                class='text-2xl font-bold text-slate-900'
+              >{{weekly.securityScore}}</p>
+              <div class='flex items-center gap-0.5 text-[9px] text-green-600'>
+                <span>+{{weekly.scoreChange}}
+                  ({{weekly.scoreChangePercent}}%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class='grid grid-cols-6 gap-2 mb-3'>
+          <div
+            class='bg-slate-50 p-2 rounded border border-slate-200 text-center'
+          >
+            <p class='text-[10px] text-slate-500'>Total Vulns</p>
+            <p
+              class='text-lg font-bold text-slate-900'
+            >{{weekly.activeVulns}}</p>
+          </div>
+          <div class='bg-red-50 p-2 rounded border border-red-200 text-center'>
+            <p class='text-[10px] text-red-600'>Critical</p>
+            <p
+              class='text-lg font-bold text-red-600'
+            >{{weekly.criticalVulns}}</p>
+          </div>
+          <div
+            class='bg-orange-50 p-2 rounded border border-orange-200 text-center'
+          >
+            <p class='text-[10px] text-orange-600'>High</p>
+            <p
+              class='text-lg font-bold text-orange-600'
+            >{{weekly.highVulns}}</p>
+          </div>
+          <div
+            class='bg-yellow-50 p-2 rounded border border-yellow-200 text-center'
+          >
+            <p class='text-[10px] text-yellow-600'>Medium</p>
+            <p
+              class='text-lg font-bold text-yellow-600'
+            >{{weekly.mediumVulns}}</p>
+          </div>
+          <div
+            class='bg-blue-50 p-2 rounded border border-blue-200 text-center'
+          >
+            <p class='text-[10px] text-blue-600'>Low</p>
+            <p class='text-lg font-bold text-blue-600'>{{weekly.lowVulns}}</p>
+          </div>
+          <div
+            class='bg-slate-50 p-2 rounded border border-slate-200 text-center'
+          >
+            <p class='text-[10px] text-slate-500'>Info</p>
+            <p class='text-lg font-bold text-slate-600'>{{weekly.infoVulns}}</p>
+          </div>
+        </div>
+        <div class='flex gap-4 text-xs text-slate-600 bg-slate-50 p-2 rounded'>
+          <span class='flex items-center gap-1'><strong
+            >{{weekly.newVulns}}</strong>
+            new vulnerabilities</span>
+          <span class='flex items-center gap-1'><strong
+            >{{weekly.resolvedVulns}}</strong>
+            resolved</span>
+        </div>
+      </section>
+
+      <!-- Section 02: Monthly Performance Summary -->
+      <section class='mb-3 avoid-break'>
+        <h2
+          class='text-base font-bold mb-2 flex items-center gap-2 text-slate-900'
+        >
+          <span class='text-slate-800'>02</span>
+          Monthly Performance Summary
+        </h2>
+        <div class='grid grid-cols-4 gap-2 mb-3'>
+          <div class='bg-slate-50 rounded-lg p-3 border border-slate-200'>
+            <div class='flex items-center justify-between mb-1'>
+              <span
+                class='text-[10px] font-medium text-slate-500 uppercase tracking-wide'
+              >Targets</span>
+            </div>
+            <div class='flex items-end justify-between'>
+              <p
+                class='text-2xl font-bold text-slate-900'
+              >{{monthly.totalTargets}}</p>
+              <div class='flex items-center gap-0.5 text-[9px] text-green-600'>
+                <span>+{{monthly.targetsChange}}
+                  ({{monthly.targetsChangePercent}}%)</span>
+              </div>
+            </div>
+          </div>
+          <div class='bg-slate-50 rounded-lg p-3 border border-slate-200'>
+            <div class='flex items-center justify-between mb-1'>
+              <span
+                class='text-[10px] font-medium text-slate-500 uppercase tracking-wide'
+              >Assets</span>
+            </div>
+            <div class='flex items-end justify-between'>
+              <p
+                class='text-2xl font-bold text-slate-900'
+              >{{monthly.totalAssets}}</p>
+              <div class='flex items-center gap-0.5 text-[9px] text-green-600'>
+                <span>+{{monthly.assetsChange}}
+                  ({{monthly.assetsChangePercent}}%)</span>
+              </div>
+            </div>
+          </div>
+          <div class='bg-slate-50 rounded-lg p-3 border border-slate-200'>
+            <div class='flex items-center justify-between mb-1'>
+              <span
+                class='text-[10px] font-medium text-slate-500 uppercase tracking-wide'
+              >Services</span>
+            </div>
+            <div class='flex items-end justify-between'>
+              <p
+                class='text-2xl font-bold text-slate-900'
+              >{{monthly.totalServices}}</p>
+              <div class='flex items-center gap-0.5 text-[9px] text-red-600'>
+                <span>{{monthly.servicesChange}}
+                  ({{monthly.servicesChangePercent}}%)</span>
+              </div>
+            </div>
+          </div>
+          <div class='bg-slate-50 rounded-lg p-3 border border-slate-200'>
+            <div class='flex items-center justify-between mb-1'>
+              <span
+                class='text-[10px] font-medium text-slate-500 uppercase tracking-wide'
+              >Security Score</span>
+            </div>
+            <div class='flex items-end justify-between'>
+              <p
+                class='text-2xl font-bold text-slate-900'
+              >{{monthly.securityScore}}</p>
+              <div class='flex items-center gap-0.5 text-[9px] text-green-600'>
+                <span>+{{monthly.scoreChange}}
+                  ({{monthly.scoreChangePercent}}%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class='grid grid-cols-6 gap-2 mb-3'>
+          <div
+            class='bg-slate-50 p-2 rounded border border-slate-200 text-center'
+          >
+            <p class='text-[10px] text-slate-500'>Total Vulns</p>
+            <p
+              class='text-lg font-bold text-slate-900'
+            >{{monthly.activeVulns}}</p>
+          </div>
+          <div class='bg-red-50 p-2 rounded border border-red-200 text-center'>
+            <p class='text-[10px] text-red-600'>Critical</p>
+            <p
+              class='text-lg font-bold text-red-600'
+            >{{monthly.criticalVulns}}</p>
+          </div>
+          <div
+            class='bg-orange-50 p-2 rounded border border-orange-200 text-center'
+          >
+            <p class='text-[10px] text-orange-600'>High</p>
+            <p
+              class='text-lg font-bold text-orange-600'
+            >{{monthly.highVulns}}</p>
+          </div>
+          <div
+            class='bg-yellow-50 p-2 rounded border border-yellow-200 text-center'
+          >
+            <p class='text-[10px] text-yellow-600'>Medium</p>
+            <p
+              class='text-lg font-bold text-yellow-600'
+            >{{monthly.mediumVulns}}</p>
+          </div>
+          <div
+            class='bg-blue-50 p-2 rounded border border-blue-200 text-center'
+          >
+            <p class='text-[10px] text-blue-600'>Low</p>
+            <p class='text-lg font-bold text-blue-600'>{{monthly.lowVulns}}</p>
+          </div>
+          <div
+            class='bg-slate-50 p-2 rounded border border-slate-200 text-center'
+          >
+            <p class='text-[10px] text-slate-500'>Info</p>
+            <p
+              class='text-lg font-bold text-slate-600'
+            >{{monthly.infoVulns}}</p>
+          </div>
+        </div>
+        <div class='flex gap-4 text-xs text-slate-600 bg-slate-50 p-2 rounded'>
+          <span class='flex items-center gap-1'><strong
+            >{{monthly.newVulns}}</strong>
+            new this month</span>
+          <span class='flex items-center gap-1'><strong
+            >{{monthly.resolvedVulns}}</strong>
+            resolved this month</span>
+          <span class='flex items-center gap-1'><strong
+            >{{monthly.scansCompleted}}</strong>
+            scans completed</span>
+        </div>
+      </section>
+
+      <!-- Section 03: Vulnerability Trend -->
+      <section class='mb-3 avoid-break'>
+        <h2
+          class='text-base font-bold mb-2 flex items-center gap-2 text-slate-900'
+        >
+          <span class='text-slate-800'>03</span>
+          Vulnerability Trend (Last 30 Days)
+        </h2>
+        <div class='grid grid-cols-2 gap-4'>
+          <div class='bg-slate-50 p-3 rounded border border-slate-200'>
+            <div class='flex items-center justify-between mb-2'>
+              <span class='text-xs font-medium text-slate-600'>Daily
+                Vulnerabilities</span>
+              <span class='text-xs text-green-600 flex items-center gap-1'>↓
+                Decreasing trend</span>
+            </div>
+            <div class='flex items-end gap-0.5 h-16'>
+              {{#each vulnerabilityTrends.last30Days}}
+                <div
+                  class='flex-1 bg-slate-700 rounded-t'
+                  style='height: {{percentage this 55}}%; min-height: 4px;'
+                ></div>
+              {{/each}}
+            </div>
+            <div class='flex justify-between text-[10px] text-slate-400 mt-1'>
+              <span>30 days ago</span>
+              <span>Today</span>
+            </div>
+          </div>
+          <div class='bg-slate-50 p-3 rounded border border-slate-200'>
+            <div class='text-xs font-medium text-slate-600 mb-2'>Risk
+              Distribution</div>
+            <div class='space-y-1'>
+              {{#each riskDistribution}}
+                <div class='flex items-center gap-2'>
+                  <span class='text-[10px] w-16 text-slate-600'>{{toUpper
+                      level
+                    }}</span>
+                  <div
+                    class='flex-1 h-2 bg-slate-200 rounded-full overflow-hidden'
+                  >
+                    <div
+                      class='h-full {{color}} rounded-full'
+                      style='width: {{percent}}%;'
+                    ></div>
+                  </div>
+                  <span
+                    class='text-[10px] font-medium text-slate-700 w-8'
+                  >{{count}}</span>
+                </div>
+              {{/each}}
+            </div>
+            <div class='text-[10px] text-slate-500 mt-2'>Avg:
+              {{vulnerabilityTrends.avgPerWeek}}
+              vulns/week</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 04: Newly Discovered Assets -->
+      <section class='mb-3'>
+        <h2
+          class='text-base font-bold mb-2 flex items-center gap-2 text-slate-900'
+        >
+          <span class='text-slate-800'>04</span>
+          Newly Discovered Assets
+        </h2>
+        <div class='space-y-4'>
+          {{#if newDiscoveries.domains.length}}
+          <div>
+            <p class='text-[10px] font-semibold text-slate-600 mb-1'>New Domains</p>
+            <div class='overflow-x-auto'>
+              <table class='w-full text-[10px] border-collapse'>
+                <thead>
+                  <tr class='bg-slate-100 border-b border-slate-300'>
+                    <th
+                      class='text-left py-1 px-2 font-semibold text-slate-700'
+                    >Domain</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Discovered</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Provider</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Risk</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#each newDiscoveries.domains}}
+                    <tr class='border-b border-slate-200'>
+                      <td
+                        class='py-1 px-2 font-mono text-slate-900'
+                      >{{identifier}}</td>
+                      <td
+                        class='py-1 px-1 text-center text-slate-600'
+                      >{{discovered}}</td>
+                      <td
+                        class='py-1 px-1 text-center text-slate-600'
+                      >{{provider}}</td>
+                      <td class='py-1 px-1 text-center'>
+                        <span
+                          class='text-[10px] px-1.5 py-0.5 rounded
+                            {{riskBadgeClass riskLevel}}'
+                        >{{toUpper riskLevel}}</span>
+                      </td>
+                    </tr>
+                  {{/each}}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {{/if}}
+
+          {{#if newDiscoveries.ipAddresses.length}}
+          <div>
+            <p class='text-[10px] font-semibold text-slate-600 mb-1'>New IP
+              Addresses</p>
+            <div class='overflow-x-auto'>
+              <table class='w-full text-[10px] border-collapse'>
+                <thead>
+                  <tr class='bg-slate-100 border-b border-slate-300'>
+                    <th
+                      class='text-left py-1 px-2 font-semibold text-slate-700'
+                    >IP Address</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Discovered</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Provider</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Risk</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#each newDiscoveries.ipAddresses}}
+                    <tr class='border-b border-slate-200'>
+                      <td
+                        class='py-1 px-2 font-mono text-slate-900'
+                      >{{identifier}}</td>
+                      <td
+                        class='py-1 px-1 text-center text-slate-600'
+                      >{{discovered}}</td>
+                      <td
+                        class='py-1 px-1 text-center text-slate-600'
+                      >{{provider}}</td>
+                      <td class='py-1 px-1 text-center'>
+                        <span
+                          class='text-[10px] px-1.5 py-0.5 rounded
+                            {{riskBadgeClass riskLevel}}'
+                        >{{toUpper riskLevel}}</span>
+                      </td>
+                    </tr>
+                  {{/each}}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {{/if}}
+
+          {{#if newDiscoveries.ports.length}}
+          <div>
+            <p class='text-[10px] font-semibold text-slate-600 mb-1'>New Open
+              Ports</p>
+            <div class='overflow-x-auto'>
+              <table class='w-full text-[10px] border-collapse'>
+                <thead>
+                  <tr class='bg-slate-100 border-b border-slate-300'>
+                    <th
+                      class='text-left py-1 px-2 font-semibold text-slate-700'
+                    >Port</th>
+                    <th
+                      class='text-left py-1 px-2 font-semibold text-slate-700'
+                    >Service</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Discovered</th>
+                    <th
+                      class='text-left py-1 px-2 font-semibold text-slate-700'
+                    >Target</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Risk</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#each newDiscoveries.ports}}
+                    <tr class='border-b border-slate-200'>
+                      <td
+                        class='py-1 px-2 font-mono text-slate-900'
+                      >{{port}}</td>
+                      <td class='py-1 px-2 text-slate-700'>{{service}}</td>
+                      <td
+                        class='py-1 px-1 text-center text-slate-600'
+                      >{{discovered}}</td>
+                      <td
+                        class='py-1 px-2 font-mono text-slate-600'
+                      >{{target}}</td>
+                      <td class='py-1 px-1 text-center'>
+                        <span
+                          class='text-[10px] px-1.5 py-0.5 rounded
+                            {{riskBadgeClass riskLevel}}'
+                        >{{toUpper riskLevel}}</span>
+                      </td>
+                    </tr>
+                  {{/each}}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {{/if}}
+
+          {{#if newDiscoveries.technologies.length}}
+          <div>
+            <p class='text-[10px] font-semibold text-slate-600 mb-1'>New
+              Technologies Detected</p>
+            <div class='overflow-x-auto'>
+              <table class='w-full text-[10px] border-collapse'>
+                <thead>
+                  <tr class='bg-slate-100 border-b border-slate-300'>
+                    <th
+                      class='text-left py-1 px-2 font-semibold text-slate-700'
+                    >Technology</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Category</th>
+                    <th
+                      class='text-center py-1 px-1 font-semibold text-slate-700'
+                    >Discovered</th>
+                    <th
+                      class='text-left py-1 px-2 font-semibold text-slate-700'
+                    >Target</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#each newDiscoveries.technologies}}
+                    <tr class='border-b border-slate-200'>
+                      <td
+                        class='py-1 px-2 font-medium text-slate-900'
+                      >{{name}}</td>
+                      <td
+                        class='py-1 px-1 text-center text-slate-600'
+                      >{{category}}</td>
+                      <td
+                        class='py-1 px-1 text-center text-slate-600'
+                      >{{discovered}}</td>
+                      <td
+                        class='py-1 px-2 font-mono text-slate-600'
+                      >{{target}}</td>
+                    </tr>
+                  {{/each}}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {{/if}}
+        </div>
+      </section>
+
+      <!-- Section 05: New Vulnerabilities Discovered -->
+      <section class='mb-3'>
+        <h2
+          class='text-base font-bold mb-2 flex items-center gap-2 text-slate-900'
+        >
+          <span class='text-slate-800'>05</span>
+          New Vulnerabilities Discovered
+        </h2>
+        <div class='overflow-x-auto'>
+        <table class='w-full text-[10px] border-collapse' style='table-layout: fixed; width: 100%;'>
+          <colgroup>
+            <col style='width: 16%;'>
+            <col style='width: 26%;'>
+            <col style='width: 12%;'>
+            <col style='width: 10%;'>
+            <col style='width: 20%;'>
+            <col style='width: 16%;'>
+          </colgroup>
+          <thead>
+            <tr class='bg-slate-100 border-b border-slate-300'>
+              <th class='text-left py-1.5 px-2 font-semibold text-slate-700'>CVE
+                / ID</th>
+              <th
+                class='text-left py-1.5 px-2 font-semibold text-slate-700'
+              >Vulnerability</th>
+              <th
+                class='text-center py-1.5 px-1 font-semibold text-slate-700'
+              >Severity</th>
+              <th
+                class='text-center py-1.5 px-1 font-semibold text-slate-700'
+              >CVSS</th>
+              <th
+                class='text-left py-1.5 px-2 font-semibold text-slate-700'
+              >Affected Asset</th>
+              <th
+                class='text-center py-1.5 px-1 font-semibold text-slate-700'
+              >Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each newFindings}}
+              <tr class='border-b border-slate-200'>
+                <td class='py-1.5 px-2 font-mono text-slate-600 truncate max-w-0' title='{{id}}'>{{id}}</td>
+                <td class='py-1.5 px-2 text-slate-900 truncate max-w-0' title='{{title}}'>{{title}}</td>
+                <td class='py-1.5 px-1 text-center'>
+                  <span
+                    class='text-[10px] px-1.5 py-0.5 rounded border
+                      {{severityClass severity}}'
+                  >{{toUpper severity}}</span>
+                </td>
+                <td
+                  class='py-1.5 px-1 text-center font-mono text-slate-600'
+                >{{cvss}}</td>
+                <td class='py-1.5 px-2 font-mono text-slate-600 truncate max-w-0' title='{{asset}}'>{{asset}}</td>
+                <td class='py-1.5 px-1 text-center'>
+                  <span
+                    class='text-[10px] px-1.5 py-0.5 rounded border
+                      {{statusClass status}}'
+                  >{{statusLabel status}}</span>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+        </div>
+      </section>
+
+      <!-- Section 06: Recently Resolved -->
+      <section class='mb-3'>
+        <h2
+          class='text-base font-bold mb-2 flex items-center gap-2 text-slate-900'
+        >
+          <span class='text-slate-800'>06</span>
+          Recently Resolved
+        </h2>
+        <div class='overflow-x-auto'>
+        <table class='w-full text-[10px] border-collapse' style='table-layout: fixed; width: 100%;'>
+          <colgroup>
+            <col style='width: 20%;'>
+            <col style='width: 45%;'>
+            <col style='width: 18%;'>
+            <col style='width: 17%;'>
+          </colgroup>
+          <thead>
+            <tr class='bg-slate-100 border-b border-slate-300'>
+              <th class='text-left py-1.5 px-2 font-semibold text-slate-700'>CVE
+                / ID</th>
+              <th
+                class='text-left py-1.5 px-2 font-semibold text-slate-700'
+              >Vulnerability</th>
+              <th
+                class='text-center py-1.5 px-2 font-semibold text-slate-700'
+              >Resolved</th>
+              <th
+                class='text-center py-1.5 px-2 font-semibold text-slate-700'
+              >Days Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each resolvedFindings}}
+              <tr class='border-b border-slate-200'>
+                <td class='py-1.5 px-2 font-mono text-slate-600 truncate max-w-0' title='{{id}}'>{{id}}</td>
+                <td class='py-1.5 px-2 text-slate-900 truncate max-w-0' title='{{title}}'>{{title}}</td>
+                <td
+                  class='py-1.5 px-2 text-center text-slate-600'
+                >{{resolved}}</td>
+                <td class='py-1.5 px-2 text-center'>
+                  <span
+                    class='bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px]'
+                  >{{daysOpen}}d</span>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+        </div>
+      </section>
+
+      <!-- Section 07: Vulnerability by Target -->
+      <section class='mb-3'>
+        <h2
+          class='text-base font-bold mb-2 flex items-center gap-2 text-slate-900'
+        >
+          <span class='text-slate-800'>07</span>
+          Vulnerability by Target
+        </h2>
+        <table class='w-full text-[10px] border-collapse'>
+          <thead>
+            <tr class='bg-slate-100 border-b border-slate-300'>
+              <th
+                class='text-left py-1.5 px-2 font-semibold text-slate-700'
+              >Target</th>
+              <th
+                class='text-center py-1.5 px-1 font-semibold text-slate-700'
+              >Type</th>
+              <th
+                class='text-center py-1.5 px-1 font-semibold text-red-600'
+              >Critical</th>
+              <th
+                class='text-center py-1.5 px-1 font-semibold text-orange-600'
+              >High</th>
+              <th
+                class='text-center py-1.5 px-1 font-semibold text-yellow-600'
+              >Medium</th>
+              <th
+                class='text-center py-1.5 px-1 font-semibold text-blue-600'
+              >Low</th>
+              <th
+                class='text-center py-1.5 px-1 font-semibold text-slate-700'
+              >Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each vulnerabilityByTarget}}
+              <tr class='border-b border-slate-200'>
+                <td
+                  class='py-1.5 px-2 font-medium text-slate-900 font-mono'
+                >{{target}}</td>
+                <td class='py-1.5 px-1 text-center text-slate-600'>{{type}}</td>
+                <td
+                  class='py-1.5 px-1 text-center font-mono text-red-600'
+                >{{critical}}</td>
+                <td
+                  class='py-1.5 px-1 text-center font-mono text-orange-600'
+                >{{high}}</td>
+                <td
+                  class='py-1.5 px-1 text-center font-mono text-yellow-600'
+                >{{medium}}</td>
+                <td
+                  class='py-1.5 px-1 text-center font-mono text-blue-600'
+                >{{low}}</td>
+                <td
+                  class='py-1.5 px-1 text-center font-bold text-slate-900'
+                >{{total}}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Section 08: Detailed Target Inventory -->
+      <section class='mb-2'>
+        <h2
+          class='text-base font-bold mb-2 flex items-center gap-2 text-slate-900'
+        >
+          <span class='text-slate-800'>08</span>
+          Detailed Target Inventory
+        </h2>
+        <div class='overflow-x-auto'>
+          <table class='w-full text-[10px] border-collapse'>
+            <thead>
+              <tr class='bg-slate-100 border-b-2 border-slate-300'>
+                <th
+                  class='text-left py-1.5 px-2 font-semibold text-slate-700'
+                >Target Identifier</th>
+                <th
+                  class='text-center py-1.5 px-1 font-semibold text-slate-700'
+                >Status</th>
+                <th
+                  class='text-center py-1.5 px-1 font-semibold text-slate-700'
+                >Risk</th>
+                <th
+                  class='text-center py-1.5 px-1 font-semibold text-slate-700'
+                >Provider</th>
+                <th
+                  class='text-right py-1.5 px-1 font-semibold text-slate-700'
+                >Last Scan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each targets}}
+                <tr class='border-b border-slate-200'>
+                  <td
+                    class='py-1.5 px-2 font-mono text-slate-900'
+                  >{{identifier}}</td>
+                  <td class='py-1.5 px-1 text-center'>
+                    <span
+                      class='text-[10px] px-1.5 py-0.5 rounded border
+                        {{statusClass status}}'
+                    >{{statusLabel status}}</span>
+                  </td>
+                  <td class='py-1.5 px-1 text-center'>
+                    <span
+                      class='text-[10px] px-1.5 py-0.5 rounded
+                        {{riskTextClass riskLevel}}'
+                    >{{toUpper riskLevel}}</span>
+                  </td>
+                  <td
+                    class='py-1.5 px-1 text-center text-slate-600'
+                  >{{provider}}</td>
+                  <td
+                    class='py-1.5 px-1 text-right text-slate-600'
+                  >{{lastScan}}</td>
+                </tr>
+              {{/each}}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Footer -->
+        <div class='border-t-2 border-slate-300 pt-4 mt-6 avoid-break'>
+          <div class='flex flex-col gap-2'>
+            <div class='text-xs font-bold text-slate-800'>Open Attack Surface Management</div>
+            <p class='text-[10px] text-slate-500'>Open-source platform for cybersecurity Attack Surface Management (OASM).</p>
+            <div class='flex flex-col gap-1 text-[10px]'>
+              <div class='flex gap-2'>
+                <span class='text-slate-800 font-bold w-12'>Linkedin</span>
+                <span class='text-slate-700 font-medium'>https://www.linkedin.com/company/oasm-platform</span>
+              </div>
+              <div class='flex gap-2'>
+                <span class='text-slate-800 font-bold w-12'>Github</span>
+                <span class='text-slate-700 font-medium'>https://github.com/oasm-platform</span>
+              </div>
+            </div>
+            <p class='text-[10px] text-slate-400'>© 2026 Open Attack Surface Management. All Rights Reserved.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

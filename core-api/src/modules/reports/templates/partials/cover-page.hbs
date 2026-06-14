@@ -1,0 +1,80 @@
+<div class='cover-page flex flex-col border-b border-slate-300'>
+  <div class='shrink-0 pt-3'>
+    <div class='px-10 pt-8'>
+      <div class='flex items-center gap-3'>
+        {{#if logoBase64}}
+          <img src='{{logoBase64}}' alt='logo' class='w-7 h-7 rounded-lg' />
+        {{else}}
+          <div class='w-7 h-7 bg-slate-900 rounded-lg flex items-center justify-center'>
+            <span class='text-white font-bold text-xs'>{{systemNameChar}}</span>
+          </div>
+        {{/if}}
+        <span
+          class='text-sm font-semibold text-slate-700 uppercase tracking-widest'
+        >{{systemName}}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class='flex-1 flex flex-col justify-center px-10'>
+    <div class='space-y-12'>
+      <div class='space-y-2'>
+        <p
+          class='text-sm text-slate-500 uppercase tracking-[0.2em] font-medium'
+        >Security Assessment Report</p>
+        <div class='w-16 h-0.5 bg-slate-800'></div>
+      </div>
+
+      <div class='space-y-4'>
+        <h1
+          class='text-5xl font-bold tracking-tight text-slate-900 leading-tight'
+        >
+          {{{coverTitle}}}
+        </h1>
+        <p class='text-lg text-slate-500 max-w-xl leading-relaxed'>
+          {{{coverDescription}}}
+        </p>
+      </div>
+
+      <div class='grid grid-cols-2 gap-x-12 gap-y-3 max-w-lg'>
+        <div>
+          <p
+            class='text-[10px] text-slate-400 uppercase tracking-wider'
+          >Reporting Period</p>
+          <p class='text-sm font-medium text-slate-800'>Week
+            {{week}},
+            {{year}}</p>
+        </div>
+        <div>
+          <p
+            class='text-[10px] text-slate-400 uppercase tracking-wider'
+          >Classification</p>
+          <p class='text-sm font-medium text-red-600'>{{classification}}</p>
+        </div>
+        <div>
+          <p
+            class='text-[10px] text-slate-400 uppercase tracking-wider'
+          >{{#if dateLabel}}{{dateLabel}}{{else}}Date Generated{{/if}}</p>
+          <p
+            class='text-sm font-medium text-slate-800'
+          >{{formattedDate}}</p>
+        </div>
+        <div>
+          <p
+            class='text-[10px] text-slate-400 uppercase tracking-wider'
+          >Document Reference</p>
+          <p
+            class='text-sm font-medium text-slate-800 font-mono'
+          >{{docRefPrefix}}-{{year}}-{{weekPad}}-001</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class='shrink-0 border-t border-slate-200 px-10 py-6'>
+    <div class='flex items-center justify-between text-xs text-slate-400'>
+      <p>© 2026 {{systemName}}. All Rights Reserved.</p>
+      <p class='text-red-500 font-medium'>{{classification}}</p>
+    </div>
+  </div>
+</div>

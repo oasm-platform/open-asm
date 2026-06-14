@@ -1,0 +1,201 @@
+<div class='vuln-entry avoid-break' style='border-bottom: 2px solid #cbd5e1; padding: 12px 0; margin-bottom: 12px;'>
+
+  {{!-- ========== VULNERABILITY HEADER ========== --}}
+  <div class='flex items-start gap-3 mb-3'>
+    <span class='shrink-0 inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide sev-{{toLowerCase severity}}'>{{severity}}</span>
+    <div class='flex-1 min-w-0'>
+      <h3 class='text-sm font-bold text-slate-900 leading-snug'>{{name}}</h3>
+      <div class='flex items-center gap-3 text-[10px] text-slate-500 mt-1'>
+        <span class='font-semibold'>CVSS {{cvssScore}}</span>
+        {{#if cvssMetric}}
+        <span class='text-slate-300'>|</span>
+        <span>{{cvssMetric}}</span>
+        {{/if}}
+        {{#if epssScore}}
+        <span class='text-slate-300'>|</span>
+        <span>EPSS {{epssScore}}%</span>
+        {{/if}}
+        {{#if vprScore}}
+        <span class='text-slate-300'>|</span>
+        <span>VPR {{vprScore}}</span>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+
+  {{!-- ========== RISK SUMMARY ========== --}}
+  <div class='mb-3'>
+    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Risk Summary</h4>
+    <div class='flex flex-wrap gap-x-6 gap-y-1 text-[10px]'>
+      <div>
+        <span class='text-slate-500'>Severity:</span>
+        <span class='font-semibold text-slate-800'>{{severity}}</span>
+      </div>
+      <div>
+        <span class='text-slate-500'>CVSS Score:</span>
+        <span class='font-semibold text-slate-800'>{{cvssScore}} / 10</span>
+      </div>
+      {{#if epssScore}}
+      <div>
+        <span class='text-slate-500'>EPSS Score:</span>
+        <span class='font-semibold text-slate-800'>{{epssScore}}%</span>
+      </div>
+      {{/if}}
+      {{#if vprScore}}
+      <div>
+        <span class='text-slate-500'>VPR Score:</span>
+        <span class='font-semibold text-slate-800'>{{vprScore}}</span>
+      </div>
+      {{/if}}
+    </div>
+  </div>
+
+  {{!-- ========== VULNERABILITY DETAILS ========== --}}
+  <div class='mb-3'>
+    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Vulnerability Details</h4>
+    <div class='grid grid-cols-2 gap-x-6 gap-y-1 text-[10px]'>
+      <div>
+        <span class='text-slate-500'>Asset:</span>
+        <span class='font-semibold text-slate-800'>{{asset}}</span>
+      </div>
+      <div>
+        <span class='text-slate-500'>Tool:</span>
+        <span class='font-semibold text-slate-800'>{{tool}}</span>
+      </div>
+      {{#if ipAddress}}
+      <div>
+        <span class='text-slate-500'>IP Address:</span>
+        <span class='font-mono text-slate-800'>{{ipAddress}}</span>
+      </div>
+      {{/if}}
+      {{#if host}}
+      <div>
+        <span class='text-slate-500'>Host:</span>
+        <span class='font-mono text-slate-800'>{{host}}</span>
+      </div>
+      {{/if}}
+      {{#if affectedUrl}}
+      <div class='col-span-2'>
+        <span class='text-slate-500'>URL:</span>
+        <span class='font-mono text-slate-700 break-all'>{{affectedUrl}}</span>
+      </div>
+      {{/if}}
+      {{#if ports.length}}
+      <div>
+        <span class='text-slate-500'>Ports:</span>
+        <span class='font-mono text-slate-800'>{{join ports ', '}}</span>
+      </div>
+      {{/if}}
+    </div>
+
+    {{!-- Identifiers --}}
+    {{#if cveId.length}}
+    <div class='mt-2 flex flex-wrap gap-1.5'>
+      {{#each cveId}}
+      <span class='inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold sev-critical'>CVE-{{this}}</span>
+      {{/each}}
+      {{#if cweId.length}}
+      {{#each cweId}}
+      <span class='inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold sev-high'>CWE-{{this}}</span>
+      {{/each}}
+      {{/if}}
+      {{#if bidId.length}}
+      {{#each bidId}}
+      <span class='inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold sev-medium'>BID-{{this}}</span>
+      {{/each}}
+      {{/if}}
+    </div>
+    {{/if}}
+
+    {{!-- Tags --}}
+    {{#if tags.length}}
+    <div class='mt-2 flex flex-wrap gap-1.5'>
+      {{#each tags}}
+      <span class='inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-100 text-slate-600'>{{this}}</span>
+      {{/each}}
+    </div>
+    {{/if}}
+  </div>
+
+  {{!-- ========== DESCRIPTION ========== --}}
+  {{#if description}}
+  <div class='mb-3'>
+    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Description</h4>
+    <p class='text-[10px] text-slate-700 leading-relaxed'>{{description}}</p>
+  </div>
+  {{/if}}
+
+  {{!-- ========== IMPACT AND SEVERITY ========== --}}
+  <div class='mb-3'>
+    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Impact and Severity</h4>
+    <div class='text-[10px] text-slate-700'>
+      <p class='mb-1'>
+        <span class='font-semibold'>Severity Level:</span> {{severity}} (CVSS {{cvssScore}}/10)
+      </p>
+      <p>{{severityImpact severity}}</p>
+    </div>
+  </div>
+
+  {{!-- ========== EXPLOITATION ========== --}}
+  {{#if analyzeResult}}
+  <div class='mb-3'>
+    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Exploitation</h4>
+    <div class='text-[10px] text-slate-700 leading-relaxed'>{{analyzeResult}}</div>
+  </div>
+  {{/if}}
+
+  {{!-- ========== REMEDIATION ========== --}}
+  {{#if solution}}
+  <div class='mb-3'>
+    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Remediation</h4>
+    <div class='text-[10px] text-slate-700 leading-relaxed bg-slate-50 p-2 rounded' style='border: 1px solid #e2e8f0;'>
+      {{solution}}
+    </div>
+  </div>
+  {{/if}}
+
+  {{!-- ========== REFERENCES ========== --}}
+  {{#if references.length}}
+  <div class='mb-3'>
+    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>References</h4>
+    <div class='flex flex-col gap-0.5'>
+      {{#each references}}
+      <div class='text-[9px] text-slate-600 break-all font-mono'>{{this}}</div>
+      {{/each}}
+    </div>
+  </div>
+  {{/if}}
+
+  {{!-- ========== STEPS TO PRODUCE ========== --}}
+  {{#if affectedUrl}}
+  <div class='mb-2'>
+    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Steps to Produce</h4>
+    <ol class='text-[10px] text-slate-700 leading-relaxed list-decimal pl-4'>
+      <li class='mb-0.5'>Identify the target: <span class='font-mono font-semibold'>{{#if ipAddress}}{{ipAddress}}{{/if}}{{#if host}} ({{host}}){{/if}}</span></li>
+      {{#if affectedUrl}}
+      <li class='mb-0.5'>Navigate to: <span class='font-mono'>{{affectedUrl}}</span></li>
+      {{/if}}
+      {{#if ports.length}}
+      <li class='mb-0.5'>Ensure ports are accessible: <span class='font-mono'>{{join ports ', '}}</span></li>
+      {{/if}}
+      <li class='mb-0.5'>Utilize <span class='font-semibold'>{{tool}}</span> to perform vulnerability assessment.</li>
+      <li>Verify the vulnerability by checking for <span class='font-semibold'>{{name}}</span> indicators.</li>
+    </ol>
+  </div>
+  {{/if}}
+
+  {{!-- ========== TIMELINE ========== --}}
+  <div class='flex items-center gap-4 text-[9px] text-slate-400 pt-2' style='border-top: 1px solid #f1f5f9;'>
+    <span>Discovered: <span class='text-slate-600 font-medium'>{{formatDate createdAt}}</span></span>
+    {{#if firstDetectedDate}}
+    <span>First Seen: <span class='text-slate-600 font-medium'>{{formatDate firstDetectedDate}}</span></span>
+    {{/if}}
+    {{#if lastSeenDate}}
+    <span>Last Seen: <span class='text-slate-600 font-medium'>{{formatDate lastSeenDate}}</span></span>
+    {{/if}}
+    {{#if publicationDate}}
+    <span>Published: <span class='text-slate-600 font-medium'>{{formatDate publicationDate}}</span></span>
+    {{/if}}
+  </div>
+
+</div>

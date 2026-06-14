@@ -27,6 +27,7 @@ export class StorageService implements OnModuleInit {
     'nuclei-templates',
     'job-results',
     'cached-static',
+    'reports',
     'default',
   ];
 

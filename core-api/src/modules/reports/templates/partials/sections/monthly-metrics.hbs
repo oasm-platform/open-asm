@@ -1,0 +1,82 @@
+<section class="mb-6 avoid-break">
+  <div class="flex items-center gap-3 mb-4">
+    <span class="text-[11px] font-semibold text-slate-400 tracking-wider">02</span>
+    <h2 class="text-base font-bold text-slate-900 m-0">Monthly Performance Summary</h2>
+  </div>
+  
+  <!-- Primary metrics -->
+  <div class="grid grid-cols-4 gap-3 mb-4">
+    <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
+      <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Targets</span>
+      <div class="flex items-end justify-between">
+        <p class="text-2xl font-bold text-slate-900 m-0">{{monthly.totalTargets}}</p>
+        <span class="text-[10px] font-medium text-emerald-600">+{{monthly.targetsChange}} ({{monthly.targetsChangePercent}}%)</span>
+      </div>
+    </div>
+    <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
+      <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Assets</span>
+      <div class="flex items-end justify-between">
+        <p class="text-2xl font-bold text-slate-900 m-0">{{monthly.totalAssets}}</p>
+        <span class="text-[10px] font-medium text-emerald-600">+{{monthly.assetsChange}} ({{monthly.assetsChangePercent}}%)</span>
+      </div>
+    </div>
+    <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
+      <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Services</span>
+      <div class="flex items-end justify-between">
+        <p class="text-2xl font-bold text-slate-900 m-0">{{monthly.totalServices}}</p>
+        <span class="text-[10px] font-medium text-rose-600">{{monthly.servicesChange}} ({{monthly.servicesChangePercent}}%)</span>
+      </div>
+    </div>
+    <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
+      <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Security Score</span>
+      <div class="flex items-end justify-between">
+        <p class="text-2xl font-bold text-slate-900 m-0">{{monthly.securityScore}}</p>
+        <span class="text-[10px] font-medium text-emerald-600">+{{monthly.scoreChange}} ({{monthly.scoreChangePercent}}%)</span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Severity breakdown -->
+  <div class="grid grid-cols-6 gap-2 mb-4">
+    <div class="bg-slate-100/80 p-3 rounded-lg text-center">
+      <p class="text-[10px] text-slate-500 m-0 mb-1">Total Vulns</p>
+      <p class="text-lg font-bold text-slate-900 m-0">{{monthly.activeVulns}}</p>
+    </div>
+    <div class="bg-red-50 p-3 rounded-lg text-center border border-red-100">
+      <p class="text-[10px] text-red-500 m-0 mb-1">Critical</p>
+      <p class="text-lg font-bold text-red-600 m-0">{{monthly.criticalVulns}}</p>
+    </div>
+    <div class="bg-orange-50 p-3 rounded-lg text-center border border-orange-100">
+      <p class="text-[10px] text-orange-500 m-0 mb-1">High</p>
+      <p class="text-lg font-bold text-orange-600 m-0">{{monthly.highVulns}}</p>
+    </div>
+    <div class="bg-amber-50 p-3 rounded-lg text-center border border-amber-100">
+      <p class="text-[10px] text-amber-600 m-0 mb-1">Medium</p>
+      <p class="text-lg font-bold text-amber-600 m-0">{{monthly.mediumVulns}}</p>
+    </div>
+    <div class="bg-sky-50 p-3 rounded-lg text-center border border-sky-100">
+      <p class="text-[10px] text-sky-600 m-0 mb-1">Low</p>
+      <p class="text-lg font-bold text-sky-600 m-0">{{monthly.lowVulns}}</p>
+    </div>
+    <div class="bg-slate-100/80 p-3 rounded-lg text-center">
+      <p class="text-[10px] text-slate-500 m-0 mb-1">Info</p>
+      <p class="text-lg font-bold text-slate-500 m-0">{{monthly.infoVulns}}</p>
+    </div>
+  </div>
+  
+  <!-- Summary bar -->
+  <div class="flex gap-6 text-xs text-slate-600 bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-100">
+    <span class="flex items-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+      <strong>{{monthly.newVulns}}</strong> new this month
+    </span>
+    <span class="flex items-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+      <strong>{{monthly.resolvedVulns}}</strong> resolved this month
+    </span>
+    <span class="flex items-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+      <strong>{{monthly.scansCompleted}}</strong> scans completed
+    </span>
+  </div>
+</section>
