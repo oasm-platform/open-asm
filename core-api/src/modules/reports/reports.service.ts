@@ -39,10 +39,10 @@ export class ReportsService {
     private readonly vulnerabilityReportService: VulnerabilityReportService,
     private readonly summaryReportService: SummaryReportService,
   ) {
-    const srcDir = path.join(process.cwd(), 'src', 'modules', 'reports');
-    this.templatePath = path.join(srcDir, 'templates', 'report.hbs');
+    // __dirname resolves to src/modules/reports in dev, dist/modules/reports in production
+    this.templatePath = path.join(__dirname, 'templates', 'report.hbs');
     this.vulnerabilityTemplatePath = path.join(
-      srcDir,
+      __dirname,
       'templates',
       'vulnerability-report.hbs',
     );
@@ -316,10 +316,7 @@ export class ReportsService {
       }
 
       const partialsDir = path.join(
-        process.cwd(),
-        'src',
-        'modules',
-        'reports',
+        __dirname,
         'templates',
         'partials',
       );
@@ -441,6 +438,7 @@ export class ReportsService {
   private async htmlToPdf(html: string): Promise<Buffer> {
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 

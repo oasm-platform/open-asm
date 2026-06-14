@@ -102,6 +102,7 @@ export class AgentsCompletionsService {
     private readonly agentsSkillsService: AgentsSkillsService,
   ) {
     this.loadAllPrompts();
+    console.log('AgentsCompletionsService initialized');
   }
 
   /**
@@ -643,7 +644,9 @@ export class AgentsCompletionsService {
         if (msg.content.length > 2000) {
           return {
             ...msg,
-            content: msg.content.slice(0, 2000) + '\n[...truncated for context management]',
+            content:
+              msg.content.slice(0, 2000) +
+              '\n[...truncated for context management]',
           };
         }
         return msg;
@@ -820,7 +823,9 @@ export class AgentsCompletionsService {
     // Fetch STM and LTM concurrently
     const [stmContext, ltmContext] = await Promise.all([
       this.agentsMemories.stmFormatForPrompt(conversation.id),
-      userId ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId) : Promise.resolve(''),
+      userId
+        ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId)
+        : Promise.resolve(''),
     ]);
 
     const todoEntities = await this.todoRepository.find({
@@ -1192,7 +1197,12 @@ export class AgentsCompletionsService {
         },
       });
       resolveFinish?.();
-      return { aiStream: emptyStream, conversationId, todosEmitter, finishPromise };
+      return {
+        aiStream: emptyStream,
+        conversationId,
+        todosEmitter,
+        finishPromise,
+      };
     }
 
     // Determine max output tokens based on agent mode and LLM config
@@ -1289,7 +1299,9 @@ export class AgentsCompletionsService {
                 metadata: { ...assistantMessageMetadata, status: 'aborted' },
               },
             )
-            .catch((err) => this.logger.error('Error saving aborted message', err));
+            .catch((err) =>
+              this.logger.error('Error saving aborted message', err),
+            );
         };
 
         if (isAborted()) {
@@ -1359,8 +1371,7 @@ export class AgentsCompletionsService {
                   output: toolResult?.output ?? null,
                 });
               }
-              const stepText =
-                typeof step.text === 'string' ? step.text : '';
+              const stepText = typeof step.text === 'string' ? step.text : '';
               if (stepText.trim()) {
                 parts.push({ type: 'text', text: stepText.trim() });
               }
@@ -1390,7 +1401,9 @@ export class AgentsCompletionsService {
             accumulatedReasoning,
             llmConfig,
             assistantMessageMetadata,
-          ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
+          ).catch((err) =>
+            this.logger.error('Error in handleStreamFinish', err),
+          );
         })()
           .catch((err) =>
             this.logger.error('Error in critical onFinish writes', err),
@@ -1528,7 +1541,11 @@ export class AgentsCompletionsService {
         });
 
         try {
-          for (let iteration = 0; iteration < MAX_SAFETY_ITERATIONS; iteration++) {
+          for (
+            let iteration = 0;
+            iteration < MAX_SAFETY_ITERATIONS;
+            iteration++
+          ) {
             if (abortSignal?.aborted || controllerClosed) break;
 
             // Mid-loop compaction: check budget before each iteration
@@ -1556,7 +1573,12 @@ export class AgentsCompletionsService {
                   const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
                   const [stmCtx, ltmCtx] = await Promise.all([
                     this.agentsMemories.stmFormatForPrompt(conversationId),
-                    userId ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId) : Promise.resolve(''),
+                    userId
+                      ? this.agentsMemories.ltmFormatForPrompt(
+                          workspaceId,
+                          userId,
+                        )
+                      : Promise.resolve(''),
                   ]);
                   const postCompactTodos = await this.todoRepository.find({
                     where: { conversationId },
@@ -1625,8 +1647,6 @@ export class AgentsCompletionsService {
               // the continuation loop reads stale data because onFinish DB writes
               // are async and may not have committed yet when the reader drains.
               await finishPromise;
-
-
             } catch (iterationError) {
               this.logger.error(
                 `[Continuation] Error in iteration ${iteration} for ${conversationId}`,
@@ -1673,11 +1693,10 @@ export class AgentsCompletionsService {
             // Always fetch up to 20 messages in continuation loop regardless
             // of summary. hasSummary=true limits to 5 messages which loses
             // tool call context from previous iteration.
-            const updatedMessages =
-              await this.getConversationHistory(
-                conversationId,
-                false,
-              );
+            const updatedMessages = await this.getConversationHistory(
+              conversationId,
+              false,
+            );
             const prunedMessages = this.pruneContextByBudget(
               updatedMessages,
               currentContextParts,
@@ -1693,7 +1712,10 @@ export class AgentsCompletionsService {
               (t) => t.status === 'pending' || t.status === 'in_progress',
             );
             const pendingList = pendingSteps
-              .map((t, i) => `${i + 1}. [${t.status.toUpperCase()}] ${t.content} (id: ${t.id})`)
+              .map(
+                (t, i) =>
+                  `${i + 1}. [${t.status.toUpperCase()}] ${t.content} (id: ${t.id})`,
+              )
               .join('\n');
             currentModelMessages.push({
               role: 'user' as const,
@@ -1726,7 +1748,9 @@ export class AgentsCompletionsService {
               const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
               const [stmContext, ltmContext] = await Promise.all([
                 this.agentsMemories.stmFormatForPrompt(conversationId),
-                userId ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId) : Promise.resolve(''),
+                userId
+                  ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId)
+                  : Promise.resolve(''),
               ]);
               const updatedTodoEntities = await this.todoRepository.find({
                 where: { conversationId },
