@@ -104,15 +104,11 @@ export class AgentsMemoriesService {
   }
 
   /**
-   * Returns the LTM record for the user in a workspace, creates an empty one if not exists.
+   * Returns the LTM record for the user in a workspace, or null if none exists.
+   * Does NOT auto-create empty records — callers must use ltmSet to create.
    */
-  async ltmGet(workspaceId: string, userId: string): Promise<AgentWorkspaceMemory> {
-    let record = await this.ltmRepository.findOne({ where: { workspaceId, userId } });
-    if (!record) {
-      record = this.ltmRepository.create({ workspaceId, userId, content: '' });
-      record = await this.ltmRepository.save(record);
-    }
-    return record;
+  async ltmGet(workspaceId: string, userId: string): Promise<AgentWorkspaceMemory | null> {
+    return this.ltmRepository.findOne({ where: { workspaceId, userId } });
   }
 
   async ltmGetAll(workspaceId: string, userId: string): Promise<AgentWorkspaceMemory[]> {
@@ -146,12 +142,17 @@ export class AgentsMemoriesService {
 
   /**
    * Overwrites the LTM content for the user in a workspace.
+   * Rejects empty or whitespace-only content to prevent noise records.
    */
   async ltmSet(
     workspaceId: string,
     userId: string,
     content: string,
   ): Promise<AgentWorkspaceMemory> {
+    if (!content?.trim()) {
+      throw new Error('Cannot save empty content to long-term memory');
+    }
+
     let record = await this.ltmRepository.findOne({ where: { workspaceId, userId } });
     if (!record) {
       record = this.ltmRepository.create({ workspaceId, userId, content });
