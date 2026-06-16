@@ -125,16 +125,6 @@ export default function Reports() {
     },
   });
 
-  const generateVulnerabilityMutation =
-    useReportsControllerGenerateVulnerabilityReport({
-      mutation: {
-        onSuccess: onGenerateSuccess,
-        onError: () => {
-          toast.error('Failed to generate report');
-        },
-      },
-    });
-
   const deleteMutation = useReportsControllerDeleteReport({
     mutation: {
       onSuccess: () => {
@@ -352,28 +342,6 @@ export default function Reports() {
             )}
           </div>
           <DialogFooter>
-<<<<<<< HEAD
-            <Button variant="outline" onClick={() => setGenerateOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (reportType === 'SUMMARY') {
-                  generateSummaryMutation.mutate({ data: {} });
-                } else {
-                  generateVulnerabilityMutation.mutate({ data: {} });
-                }
-              }}
-              disabled={
-                generateSummaryMutation.isPending ||
-                generateVulnerabilityMutation.isPending
-              }
-            >
-              {generateSummaryMutation.isPending ||
-              generateVulnerabilityMutation.isPending
-                ? 'Generating...'
-                : 'Generate'}
-=======
             <Button
               variant="outline"
               onClick={() => {
@@ -385,7 +353,6 @@ export default function Reports() {
             </Button>
             <Button onClick={handleGenerate} disabled={isPending}>
               {isPending ? 'Generating...' : 'Generate'}
->>>>>>> c0b261df (feat(report): update report)
             </Button>
           </DialogFooter>
         </DialogContent>

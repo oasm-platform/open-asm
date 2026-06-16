@@ -1,8 +1,11 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsEnum } from 'class-validator';
 
-const ReportType = { SUMMARY: 'SUMMARY', VULNERABILITY: 'VULNERABILITY' } as const;
+const ReportType = {
+  SUMMARY: 'SUMMARY',
+  VULNERABILITY: 'VULNERABILITY',
+} as const;
 export type ReportType = (typeof ReportType)[keyof typeof ReportType];
 
 export class ReportResponseDto {
@@ -26,17 +29,27 @@ export class ReportResponseDto {
 }
 
 export class GenerateSummaryReportBodyDto {
-  @ApiProperty({ required: false, description: 'Start date for summary report filter' })
+  @ApiProperty({
+    required: false,
+    description: 'Start date for summary report filter',
+  })
   @IsOptional()
   @IsString()
   startDate?: string;
 
-  @ApiProperty({ required: false, description: 'End date for summary report filter' })
+  @ApiProperty({
+    required: false,
+    description: 'End date for summary report filter',
+  })
   @IsOptional()
   @IsString()
   endDate?: string;
 
-  @ApiProperty({ required: false, description: 'Target IDs to filter summary data', type: [String] })
+  @ApiProperty({
+    required: false,
+    description: 'Target IDs to filter summary data',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -44,29 +57,47 @@ export class GenerateSummaryReportBodyDto {
 }
 
 export class GenerateVulReportBodyDto {
-  @ApiProperty({ required: false, description: 'Start date for vulnerability report filter' })
+  @ApiProperty({
+    required: false,
+    description: 'Start date for vulnerability report filter',
+  })
   @IsOptional()
   @IsString()
   startDate?: string;
 
-  @ApiProperty({ required: false, description: 'End date for vulnerability report filter' })
+  @ApiProperty({
+    required: false,
+    description: 'End date for vulnerability report filter',
+  })
   @IsOptional()
   @IsString()
   endDate?: string;
 
-  @ApiProperty({ required: false, description: 'Target IDs to filter vulnerabilities', type: [String] })
+  @ApiProperty({
+    required: false,
+    description: 'Target IDs to filter vulnerabilities',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   targetIds?: string[];
 
-  @ApiProperty({ required: false, description: 'Vulnerability IDs to include in report', type: [String] })
+  @ApiProperty({
+    required: false,
+    description: 'Vulnerability IDs to include in report',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   vulnIds?: string[];
 
-  @ApiProperty({ required: false, description: 'Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO)', enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] })
+  @ApiProperty({
+    required: false,
+    description: 'Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO)',
+    enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'],
+  })
   @IsOptional()
   @IsEnum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'])
   minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
