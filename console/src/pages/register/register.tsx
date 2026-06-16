@@ -64,9 +64,11 @@ export default function Register() {
         onError: () => {
           form.setError('email', { message: 'Invalid email or password' });
         },
+        onSettled: () => {
+          setLoading(false);
+        },
       },
     );
-    setLoading(false);
   }
 
   return (

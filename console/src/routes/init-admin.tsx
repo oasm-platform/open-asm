@@ -8,6 +8,6 @@ export const Route = createFileRoute('/init-admin')({
     const data = await context.queryClient
       .ensureQueryData(getRootControllerGetMetadataQueryOptions())
       .catch(() => null);
-    if (data?.isInit) throw redirect({ to: '/' });
+    if (data?.isInit) throw redirect({ to: '/login' });
   },
 });

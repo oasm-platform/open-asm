@@ -874,7 +874,7 @@ export class AgentTool {
       execute: async (params: { content: string }) => {
         try {
           const existing = await memoriesService.ltmGet(workspaceId, userId);
-          const newContent = existing.content
+          const newContent = existing?.content
             ? `${existing.content}\n\n${params.content}`
             : params.content;
           await memoriesService.ltmSet(workspaceId, userId, newContent);
@@ -895,7 +895,7 @@ export class AgentTool {
       execute: async () => {
         try {
           const record = await memoriesService.ltmGet(workspaceId, userId);
-          return { content: record.content || '(empty)' };
+          return { content: record?.content || '(empty)' };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return { success: false, message: `Failed to read LTM: ${message}` };
