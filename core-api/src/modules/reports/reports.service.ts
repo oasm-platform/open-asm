@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import Handlebars from 'handlebars';
 import * as path from 'path';
 import * as puppeteer from 'puppeteer';
+import { PDFDocument } from 'pdf-lib';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { generateToken } from '@/utils/genToken';
@@ -451,12 +452,88 @@ export class ReportsService {
       });
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const pdf = await page.pdf({
-        format: 'A4',
+      const logoSrc = this.logoBase64 || '';
+
+      const headerTemplate = `
+        <div style="width: 100%; padding: 8px 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; font-family: Arial, Helvetica, sans-serif;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${logoSrc ? `<img src="${logoSrc}" alt="Logo" style="height: 28px; width: auto;" />` : '<div style="width: 28px; height: 28px; background: #dc2626; border-radius: 5px; display: flex; align-items: center; justify-content: center;"><span style="color: white; font-weight: bold; font-size: 13px;">O</span></div>'}
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 8px; color: #64748b;">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span style="color: #dc2626;">&#9679;</span>
+              <span>https://oasm.dev</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span style="color: #dc2626;">&#11088;</span>
+              <span>github: oasm</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span style="color: #dc2626;">&#128279;</span>
+              <span>linkedin: oasm</span>
+            </div>
+          </div>
+        </div>`;
+
+      const footerTemplate = `
+        <div style="width: 100%; padding: 6px 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; font-family: Arial, Helvetica, sans-serif; font-size: 8px; color: #64748b;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 14px; height: 14px; background: #dc2626; border-radius: 3px; display: flex; align-items: center; justify-content: center;">
+              <span style="color: white; font-weight: bold; font-size: 7px;">&#9650;</span>
+            </div>
+            <span style="font-weight: 600; color: #334155;">OASM Team</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="color: #94a3b8;">Strictly Confidential</span>
+            <span style="color: #94a3b8;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+          </div>
+        </div>`;
+
+      const commonOptions = {
+        format: 'A4' as const,
         printBackground: true,
+      };
+
+      const page1Buffer = await page.pdf({
+        ...commonOptions,
+        displayHeaderFooter: false,
+        pageRanges: '1',
+        margin: {
+          top: '0mm',
+          bottom: '0mm',
+          left: '0mm',
+          right: '0mm',
+        },
       });
 
-      return Buffer.from(pdf);
+      const remainingPagesBuffer = await page.pdf({
+        ...commonOptions,
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        pageRanges: '2-',
+        margin: {
+          top: '40px',
+          bottom: '40px',
+          left: '0mm',
+          right: '0mm',
+        },
+      });
+
+      const coverDoc = await PDFDocument.load(page1Buffer);
+      const mainDoc = await PDFDocument.load(remainingPagesBuffer);
+      const mergedPdf = await PDFDocument.create();
+
+      const [coverPage] = await mergedPdf.copyPages(coverDoc, [0]);
+      mergedPdf.addPage(coverPage);
+
+      for (let i = 0; i < mainDoc.getPageCount(); i++) {
+        const [mainPage] = await mergedPdf.copyPages(mainDoc, [i]);
+        mergedPdf.addPage(mainPage);
+      }
+
+      const mergedBuffer = await mergedPdf.save();
+      return Buffer.from(mergedBuffer);
     } finally {
       await browser.close();
     }
