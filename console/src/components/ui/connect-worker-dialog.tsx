@@ -9,14 +9,34 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerGetWorkspaceApiKey,
   useWorkspacesControllerRotateApiKey,
 } from '@/services/apis/gen/queries';
-import { Copy } from 'lucide-react';
+import {
+  Code,
+  Copy,
+  Monitor,
+  Package,
+  Server,
+  type LucideIcon,
+} from 'lucide-react';
 import { toast } from 'sonner';
+
+const workerTabs: {
+  value: string;
+  label: string;
+  icon: LucideIcon;
+  env?: 'dev' | 'prod';
+}[] = [
+  { value: 'devmode', label: 'DevMode', icon: Code, env: 'dev' },
+  { value: 'docker', label: 'Docker', icon: Package, env: 'prod' },
+  { value: 'windows', label: 'Windows', icon: Monitor, env: 'prod' },
+  { value: 'linux', label: 'Linux', icon: Server, env: 'prod' },
+];
 
 export function ConnectWorkerDialog() {
   const {
@@ -35,9 +55,25 @@ export function ConnectWorkerDialog() {
     },
   });
 
-  const rawCommand = import.meta.env.PROD
-    ? `docker run -d --name open-asm-worker -e API_KEY=${data?.apiKey} -e API=${window.location.origin} -e MAX_JOBS=10 open-asm-worker:latest`
-    : `task worker:dev replicas=1 maxJobs=10 apiKey=${data?.apiKey} ${networkId ? `network=${networkId}` : ''}`;
+  const apiKey = data?.apiKey ?? '';
+  const networkFlag = networkId ? ` network=${networkId}` : '';
+  const networkFlagPowerShell = networkId ? ` -Network "${networkId}"` : '';
+  const networkFlagBash = networkId ? ` --network "${networkId}"` : '';
+
+  const getCommand = (value: string): string => {
+    switch (value) {
+      case 'devmode':
+        return `task worker:dev replicas=1 maxJobs=10 apiKey=${apiKey}${networkFlag}`;
+      case 'docker':
+        return `docker run -d --name open-asm-worker -e WORKER_API_KEY=${apiKey} -e WORKER_GRPC_HOST=localhost -e WORKER_GRPC_PORT=16276 -e WORKER_MAX_CONCURRENCY=10 open-asm-worker:latest`;
+      case 'windows':
+        return `irm https://raw.githubusercontent.com/oasm-platform/open-asm/main/worker/scripts/install.ps1 -OutFile "$env:TEMP\\install.ps1"; & "$env:TEMP\\install.ps1" -ApiKey "${apiKey}"${networkFlagPowerShell} -Run`;
+      case 'linux':
+        return `curl -fsSL https://raw.githubusercontent.com/oasm-platform/open-asm/main/worker/scripts/install.sh | bash -s -- --api-key "${apiKey}"${networkFlagBash} --run`;
+      default:
+        return '';
+    }
+  };
 
   const { mutate } = useWorkspacesControllerRotateApiKey({
     mutation: {
@@ -51,12 +87,15 @@ export function ConnectWorkerDialog() {
     },
   });
 
-  if (import.meta.env.PROD) return null;
-
-  const handleCopyCommand = async () => {
-    await navigator.clipboard.writeText(rawCommand);
+  const handleCopyCommand = async (command: string) => {
+    await navigator.clipboard.writeText(command);
     toast.success('Command copied to clipboard');
   };
+
+  const isDev = import.meta.env.DEV;
+  const visibleTabs = workerTabs.filter(
+    (tab) => !tab.env || (tab.env === 'dev' ? isDev : !isDev),
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
@@ -64,22 +103,36 @@ export function ConnectWorkerDialog() {
         <DialogHeader>
           <DialogTitle>Connect worker</DialogTitle>
           <DialogDescription>
-            Copy and paste the following code and API key into your worker:
+            Select your environment and copy the command to connect a worker:
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="relative bg-muted text-foreground font-mono rounded-md p-4 text-sm">
-            <pre className="whitespace-pre-wrap break-all">{rawCommand}</pre>
-            <Button
-              onClick={handleCopyCommand}
-              size="icon"
-              variant="ghost"
-              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
-            >
-              <Copy size={16} />
-            </Button>
-          </div>
-        </div>
+        <Tabs defaultValue={visibleTabs[0]?.value} className="space-y-4">
+          <TabsList className="w-full">
+            {visibleTabs.map(({ value, label, icon: Icon }) => (
+              <TabsTrigger key={value} value={value} className="flex-1 gap-1.5">
+                <Icon size={14} />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {visibleTabs.map(({ value }) => (
+            <TabsContent key={value} value={value}>
+              <div className="relative bg-muted text-foreground font-mono rounded-md p-4 text-sm">
+                <pre className="whitespace-pre-wrap break-all">
+                  {getCommand(value)}
+                </pre>
+                <Button
+                  onClick={() => handleCopyCommand(getCommand(value))}
+                  size="icon"
+                  variant="ghost"
+                  className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
+                >
+                  <Copy size={16} />
+                </Button>
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
         <DialogFooter className="!flex-row !flex-nowrap justify-between items-center gap-2">
           <ConfirmDialog
             title="Rotate API key"
