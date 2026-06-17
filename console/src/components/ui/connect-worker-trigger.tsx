@@ -14,8 +14,6 @@ export function ConnectWorkerTrigger({
 }: ConnectWorkerTriggerProps) {
   const { openDialog } = useConnectWorkerState();
 
-  if (import.meta.env.PROD) return null;
-
   return (
     <Button
       variant="secondary"
