@@ -2,10 +2,10 @@
 
   {{!-- ========== VULNERABILITY HEADER ========== --}}
   <div class='flex items-start gap-3 mb-3'>
-    <span class='shrink-0 inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide sev-{{toLowerCase severity}}'>{{severity}}</span>
+    <span class='shrink-0 inline-flex items-center px-2 py-1 rounded text-[12px] font-bold uppercase tracking-wide sev-{{toLowerCase severity}}'>{{severity}}</span>
     <div class='flex-1 min-w-0'>
       <h3 class='text-sm font-bold text-slate-900 leading-snug'>{{name}}</h3>
-      <div class='flex items-center gap-3 text-[10px] text-slate-500 mt-1'>
+      <div class='flex items-center gap-3 text-[12px] text-slate-500 mt-1'>
         <span class='font-semibold'>CVSS {{cvssScore}}</span>
         {{#if cvssMetric}}
         <span class='text-slate-300'>|</span>
@@ -25,8 +25,8 @@
 
   {{!-- ========== RISK SUMMARY ========== --}}
   <div class='mb-3'>
-    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Risk Summary</h4>
-    <div class='flex flex-wrap gap-x-6 gap-y-1 text-[10px]'>
+    <h4 class='text-[13px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Risk Summary</h4>
+    <div class='flex flex-wrap gap-x-6 gap-y-1 text-[12px]'>
       <div>
         <span class='text-slate-500'>Severity:</span>
         <span class='font-semibold text-slate-800'>{{severity}}</span>
@@ -52,8 +52,8 @@
 
   {{!-- ========== VULNERABILITY DETAILS ========== --}}
   <div class='mb-3'>
-    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Vulnerability Details</h4>
-    <div class='grid grid-cols-2 gap-x-6 gap-y-1 text-[10px]'>
+    <h4 class='text-[13px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Vulnerability Details</h4>
+    <div class='grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]'>
       <div>
         <span class='text-slate-500'>Asset:</span>
         <span class='font-semibold text-slate-800'>{{asset}}</span>
@@ -92,16 +92,16 @@
     {{#if cveId.length}}
     <div class='mt-2 flex flex-wrap gap-1.5'>
       {{#each cveId}}
-      <span class='inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold sev-critical'>CVE-{{this}}</span>
+      <span class='inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold sev-critical'>CVE-{{this}}</span>
       {{/each}}
       {{#if cweId.length}}
       {{#each cweId}}
-      <span class='inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold sev-high'>CWE-{{this}}</span>
+      <span class='inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold sev-high'>CWE-{{this}}</span>
       {{/each}}
       {{/if}}
       {{#if bidId.length}}
       {{#each bidId}}
-      <span class='inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold sev-medium'>BID-{{this}}</span>
+      <span class='inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-semibold sev-medium'>BID-{{this}}</span>
       {{/each}}
       {{/if}}
     </div>
@@ -111,7 +111,7 @@
     {{#if tags.length}}
     <div class='mt-2 flex flex-wrap gap-1.5'>
       {{#each tags}}
-      <span class='inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-100 text-slate-600'>{{this}}</span>
+      <span class='inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600'>{{this}}</span>
       {{/each}}
     </div>
     {{/if}}
@@ -120,15 +120,15 @@
   {{!-- ========== DESCRIPTION ========== --}}
   {{#if description}}
   <div class='mb-3'>
-    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Description</h4>
-    <p class='text-[10px] text-slate-700 leading-relaxed'>{{description}}</p>
+    <h4 class='text-[13px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Description</h4>
+    <p class='text-[12px] text-slate-700 leading-relaxed'>{{description}}</p>
   </div>
   {{/if}}
 
   {{!-- ========== IMPACT AND SEVERITY ========== --}}
   <div class='mb-3'>
-    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Impact and Severity</h4>
-    <div class='text-[10px] text-slate-700'>
+    <h4 class='text-[13px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Impact and Severity</h4>
+    <div class='text-[12px] text-slate-700'>
       <p class='mb-1'>
         <span class='font-semibold'>Severity Level:</span> {{severity}} (CVSS {{cvssScore}}/10)
       </p>
@@ -139,16 +139,16 @@
   {{!-- ========== EXPLOITATION ========== --}}
   {{#if analyzeResult}}
   <div class='mb-3'>
-    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Exploitation</h4>
-    <div class='text-[10px] text-slate-700 leading-relaxed'>{{analyzeResult}}</div>
+    <h4 class='text-[13px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Exploitation</h4>
+    <div class='text-[12px] text-slate-700 leading-relaxed'>{{analyzeResult}}</div>
   </div>
   {{/if}}
 
   {{!-- ========== REMEDIATION ========== --}}
   {{#if solution}}
   <div class='mb-3'>
-    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Remediation</h4>
-    <div class='text-[10px] text-slate-700 leading-relaxed bg-slate-50 p-2 rounded' style='border: 1px solid #e2e8f0;'>
+    <h4 class='text-[13px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Remediation</h4>
+    <div class='text-[12px] text-slate-700 leading-relaxed bg-slate-50 p-2 rounded' style='border: 1px solid #e2e8f0;'>
       {{solution}}
     </div>
   </div>
@@ -157,10 +157,10 @@
   {{!-- ========== REFERENCES ========== --}}
   {{#if references.length}}
   <div class='mb-3'>
-    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>References</h4>
+    <h4 class='text-[13px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>References</h4>
     <div class='flex flex-col gap-0.5'>
       {{#each references}}
-      <div class='text-[9px] text-slate-600 break-all font-mono'>{{this}}</div>
+      <div class='text-[11px] text-slate-600 break-all font-mono'>{{this}}</div>
       {{/each}}
     </div>
   </div>
@@ -169,8 +169,8 @@
   {{!-- ========== STEPS TO PRODUCE ========== --}}
   {{#if affectedUrl}}
   <div class='mb-2'>
-    <h4 class='text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Steps to Produce</h4>
-    <ol class='text-[10px] text-slate-700 leading-relaxed list-decimal pl-4'>
+    <h4 class='text-[13px] font-bold text-slate-700 uppercase tracking-wide mb-1.5' style='border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;'>Steps to Produce</h4>
+    <ol class='text-[12px] text-slate-700 leading-relaxed list-decimal pl-4'>
       <li class='mb-0.5'>Identify the target: <span class='font-mono font-semibold'>{{#if ipAddress}}{{ipAddress}}{{/if}}{{#if host}} ({{host}}){{/if}}</span></li>
       {{#if affectedUrl}}
       <li class='mb-0.5'>Navigate to: <span class='font-mono'>{{affectedUrl}}</span></li>
@@ -185,7 +185,7 @@
   {{/if}}
 
   {{!-- ========== TIMELINE ========== --}}
-  <div class='flex items-center gap-4 text-[9px] text-slate-400 pt-2' style='border-top: 1px solid #f1f5f9;'>
+  <div class='flex items-center gap-4 text-[11px] text-slate-400 pt-2' style='border-top: 1px solid #f1f5f9;'>
     <span>Discovered: <span class='text-slate-600 font-medium'>{{formatDate createdAt}}</span></span>
     {{#if firstDetectedDate}}
     <span>First Seen: <span class='text-slate-600 font-medium'>{{formatDate firstDetectedDate}}</span></span>

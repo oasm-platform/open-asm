@@ -11,10 +11,8 @@ import {
   Param,
   Post,
   Query,
-  Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
 import {
   GenerateSummaryReportBodyDto,
   GenerateVulReportBodyDto,
@@ -44,18 +42,6 @@ export class ReportsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.reportsService.getMany(query, workspaceId);
-  }
-
-  @Doc({
-    summary: 'Test render HTML',
-    description: 'Renders HTML template with mock data for debugging.',
-  })
-  @Get('test')
-  testRender(@Res() res: Response): void {
-    const html = this.reportsService.renderHtmlOnly();
-
-    res.setHeader('Content-Type', 'text/html');
-    res.send(html);
   }
 
   @Doc({

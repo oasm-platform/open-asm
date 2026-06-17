@@ -11,12 +11,6 @@ import { getManyResponse } from '@/utils/getManyResponse';
 import { StorageService } from '@/modules/storage/storage.service';
 import { GetManyReportsQueryDto } from './dto/reports.dto';
 import { Report } from './entities/report.entity';
-import {
-  Severity,
-  VulnerabilityAnalyzeStatus,
-  JobStatus,
-} from '@/common/enums/enum';
-import { TargetType } from '@/modules/targets/entities/target.entity';
 import type { ReportData } from './types/report-data.type';
 import type { VulnerabilityReportData } from './types/vulnerability-report-data.type';
 import { VulnerabilityReportService } from './services/vulnerability-report.service';
@@ -346,11 +340,6 @@ export class ReportsService {
     }
   }
 
-  renderHtmlOnly(): string {
-    const data = this.getMockData();
-    return this.renderTemplate(data);
-  }
-
   async generateReport(
     workspaceId: string,
     userId: string,
@@ -459,24 +448,20 @@ export class ReportsService {
           <div style="display: flex; align-items: center; gap: 8px;">
             ${logoSrc ? `<img src="${logoSrc}" alt="Logo" style="height: 28px; width: auto;" />` : '<div style="width: 28px; height: 28px; background: #dc2626; border-radius: 5px; display: flex; align-items: center; justify-content: center;"><span style="color: white; font-weight: bold; font-size: 13px;">O</span></div>'}
           </div>
-          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 8px; color: #64748b;">
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 12px; color: #64748b;">
             <div style="display: flex; align-items: center; gap: 4px;">
               <span style="color: #dc2626;">&#9679;</span>
-              <span>https://oasm.dev</span>
+              <span>https://github.com/oasm-platform/open-asm</span>
             </div>
             <div style="display: flex; align-items: center; gap: 4px;">
               <span style="color: #dc2626;">&#11088;</span>
-              <span>github: oasm</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <span style="color: #dc2626;">&#128279;</span>
-              <span>linkedin: oasm</span>
+              <span>https://www.linkedin.com/company/oasm-platform</span>
             </div>
           </div>
         </div>`;
 
       const footerTemplate = `
-        <div style="width: 100%; padding: 6px 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; font-family: Arial, Helvetica, sans-serif; font-size: 8px; color: #64748b;">
+        <div style="width: 100%; padding: 6px 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #64748b;">
           <div style="display: flex; align-items: center; gap: 6px;">
             <div style="width: 14px; height: 14px; background: #dc2626; border-radius: 3px; display: flex; align-items: center; justify-content: center;">
               <span style="color: white; font-weight: bold; font-size: 7px;">&#9650;</span>
@@ -539,345 +524,4 @@ export class ReportsService {
     }
   }
 
-  private getMockData(): ReportData {
-    const now = new Date();
-    const week = 19;
-    const year = 2026;
-
-    return {
-      reportTitle: 'Attack Surface Discovery Report',
-      week,
-      year,
-      exportedAt: now.toISOString(),
-      classification: 'Strictly Confidential',
-      systemName: 'Open Attack Surface Management',
-      formattedDate: now.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      weekPad: String(week).padStart(2, '0'),
-      systemNameChar: 'O',
-      weekly: {
-        totalTargets: 1452,
-        targetsChange: 12,
-        targetsChangePercent: 0.8,
-        totalAssets: 3450,
-        assetsChange: 45,
-        assetsChangePercent: 1.3,
-        totalServices: 892,
-        servicesChange: -23,
-        servicesChangePercent: -2.5,
-        securityScore: 8.2,
-        scoreChange: 0.3,
-        scoreChangePercent: 3.8,
-        activeVulns: 28,
-        vulnsChange: -8,
-        vulnsChangePercent: -22.2,
-        criticalVulns: 3,
-        criticalChange: -2,
-        criticalChangePercent: -40,
-        highVulns: 12,
-        mediumVulns: 8,
-        lowVulns: 5,
-        infoVulns: 0,
-        newVulns: 5,
-        resolvedVulns: 13,
-      },
-      monthly: {
-        totalTargets: 1452,
-        targetsChange: 45,
-        targetsChangePercent: 3.2,
-        totalAssets: 3450,
-        assetsChange: 120,
-        assetsChangePercent: 3.6,
-        totalServices: 892,
-        servicesChange: -56,
-        servicesChangePercent: -5.9,
-        securityScore: 8.2,
-        scoreChange: 0.6,
-        scoreChangePercent: 7.9,
-        activeVulns: 28,
-        vulnsChange: -15,
-        vulnsChangePercent: -34.9,
-        criticalVulns: 3,
-        criticalChange: -5,
-        criticalChangePercent: -62.5,
-        highVulns: 12,
-        mediumVulns: 8,
-        lowVulns: 5,
-        infoVulns: 0,
-        newVulns: 18,
-        resolvedVulns: 33,
-        scansCompleted: 12,
-      },
-      vulnerabilityTrends: {
-        last7Days: [38, 22, 45, 18, 31, 27, 14],
-        last30Days: [
-          12, 8, 42, 15, 35, 50, 22, 6, 18, 45, 11, 30, 48, 9, 24, 38, 5, 20,
-          52, 14, 28, 44, 7, 33, 16, 40, 10, 25, 36, 13,
-        ],
-        avgPerWeek: 24,
-        trend: 'decreasing',
-      },
-      newDiscoveries: {
-        domains: [
-          {
-            identifier: 'api.example.com',
-            discovered: '2026-05-08',
-            provider: 'AWS CloudFront',
-            riskLevel: Severity.MEDIUM,
-          },
-          {
-            identifier: 'staging.example.com',
-            discovered: '2026-05-07',
-            provider: 'AWS CloudFront',
-            riskLevel: Severity.LOW,
-          },
-          {
-            identifier: 'test-portal.example.com',
-            discovered: '2026-05-06',
-            provider: 'Azure CDN',
-            riskLevel: Severity.LOW,
-          },
-        ],
-        ipAddresses: [
-          {
-            identifier: '10.0.1.50',
-            discovered: '2026-05-09',
-            provider: 'AWS EC2',
-            riskLevel: Severity.LOW,
-          },
-          {
-            identifier: '10.0.1.51',
-            discovered: '2026-05-08',
-            provider: 'AWS EC2',
-            riskLevel: Severity.MEDIUM,
-          },
-          {
-            identifier: '172.16.0.25',
-            discovered: '2026-05-07',
-            provider: 'On-Premise',
-            riskLevel: Severity.CRITICAL,
-          },
-        ],
-        ports: [
-          {
-            port: 3306,
-            service: 'MySQL',
-            discovered: '2026-05-09',
-            target: '10.0.1.50',
-            riskLevel: Severity.HIGH,
-          },
-          {
-            port: 6379,
-            service: 'Redis',
-            discovered: '2026-05-08',
-            target: '10.0.1.51',
-            riskLevel: Severity.HIGH,
-          },
-          {
-            port: 5432,
-            service: 'PostgreSQL',
-            discovered: '2026-05-07',
-            target: '10.0.1.52',
-            riskLevel: Severity.MEDIUM,
-          },
-        ],
-        technologies: [
-          {
-            name: 'Nginx 1.18',
-            discovered: '2026-05-07',
-            target: 'api.example.com',
-            category: 'Web Server',
-          },
-          {
-            name: 'Node.js 18.0',
-            discovered: '2026-05-06',
-            target: 'api.example.com',
-            category: 'Runtime',
-          },
-        ],
-      },
-      newFindings: [
-        {
-          id: 'VULN-001',
-          title: 'Remote Code Execution in Apache Struts',
-          severity: Severity.CRITICAL,
-          cvss: 9.8,
-          asset: 'api-v2.example.com',
-          category: 'Web Application',
-          discovered: '2026-05-09',
-          status: VulnerabilityAnalyzeStatus.NOT_ANALYZED,
-        },
-        {
-          id: 'VULN-002',
-          title: 'SQL Injection in Legacy API',
-          severity: Severity.HIGH,
-          cvss: 8.2,
-          asset: 'api.example.com/v1',
-          category: 'API',
-          discovered: '2026-05-08',
-          status: VulnerabilityAnalyzeStatus.RUNNING,
-        },
-        {
-          id: 'VULN-003',
-          title: 'Cross-Site Scripting in Admin Panel',
-          severity: Severity.MEDIUM,
-          cvss: 6.1,
-          asset: 'admin.example.com',
-          category: 'Web Application',
-          discovered: '2026-05-07',
-          status: VulnerabilityAnalyzeStatus.NOT_ANALYZED,
-        },
-        {
-          id: 'VULN-004',
-          title: 'Exposed Docker Socket',
-          severity: Severity.CRITICAL,
-          cvss: 9.1,
-          asset: '10.50.12.44',
-          category: 'Infrastructure',
-          discovered: '2026-05-06',
-          status: VulnerabilityAnalyzeStatus.RUNNING,
-        },
-      ],
-      resolvedFindings: [
-        {
-          id: 'VULN-101',
-          title: 'Outdated OpenSSL Library',
-          resolved: '2026-05-10',
-          daysOpen: 14,
-        },
-        {
-          id: 'VULN-102',
-          title: 'Exposed Prometheus Metrics',
-          resolved: '2026-05-09',
-          daysOpen: 7,
-        },
-        {
-          id: 'VULN-103',
-          title: 'Insecure Cookie Settings',
-          resolved: '2026-05-08',
-          daysOpen: 21,
-        },
-      ],
-      riskDistribution: [
-        {
-          level: Severity.CRITICAL,
-          count: 3,
-          percent: 2.4,
-          color: 'bg-red-600',
-        },
-        {
-          level: Severity.HIGH,
-          count: 12,
-          percent: 9.8,
-          color: 'bg-orange-500',
-        },
-        {
-          level: Severity.MEDIUM,
-          count: 45,
-          percent: 36.6,
-          color: 'bg-yellow-500',
-        },
-        { level: Severity.LOW, count: 63, percent: 51.2, color: 'bg-blue-500' },
-      ],
-      targets: [
-        {
-          id: 'TARGET-001',
-          identifier: 'example.com',
-          type: TargetType.DOMAIN,
-          status: JobStatus.COMPLETED,
-          riskLevel: Severity.LOW,
-          provider: 'Cloudflare',
-          lastScan: '1h ago',
-        },
-        {
-          id: 'TARGET-002',
-          identifier: 'auth.example.com',
-          type: TargetType.DOMAIN,
-          status: JobStatus.COMPLETED,
-          riskLevel: Severity.MEDIUM,
-          provider: 'AWS CloudFront',
-          lastScan: '45m ago',
-        },
-        {
-          id: 'TARGET-003',
-          identifier: '34.211.90.12',
-          type: TargetType.IP,
-          status: JobStatus.COMPLETED,
-          riskLevel: Severity.LOW,
-          provider: 'AWS EC2',
-          lastScan: '3h ago',
-        },
-        {
-          id: 'TARGET-004',
-          identifier: '192.168.1.0/24',
-          type: TargetType.CIDR,
-          status: JobStatus.IN_PROGRESS,
-          riskLevel: Severity.MEDIUM,
-          provider: 'Internal Network',
-          lastScan: '12h ago',
-        },
-        {
-          id: 'TARGET-005',
-          identifier: 'api.example.com',
-          type: TargetType.DOMAIN,
-          status: JobStatus.COMPLETED,
-          riskLevel: Severity.HIGH,
-          provider: 'AWS Lambda',
-          lastScan: '30m ago',
-        },
-        {
-          id: 'TARGET-006',
-          identifier: '10.50.12.44',
-          type: TargetType.IP,
-          status: VulnerabilityAnalyzeStatus.FAILED,
-          riskLevel: Severity.CRITICAL,
-          provider: 'On-Premise',
-          lastScan: '15m ago',
-        },
-      ],
-      vulnerabilityByTarget: [
-        {
-          target: 'api.example.com',
-          type: TargetType.DOMAIN,
-          critical: 3,
-          high: 5,
-          medium: 8,
-          low: 4,
-          total: 20,
-        },
-        {
-          target: 'auth.example.com',
-          type: TargetType.DOMAIN,
-          critical: 2,
-          high: 4,
-          medium: 6,
-          low: 3,
-          total: 15,
-        },
-        {
-          target: '10.50.12.44',
-          type: TargetType.IP,
-          critical: 2,
-          high: 3,
-          medium: 4,
-          low: 2,
-          total: 11,
-        },
-        {
-          target: 'admin.example.com',
-          type: TargetType.DOMAIN,
-          critical: 1,
-          high: 3,
-          medium: 5,
-          low: 2,
-          total: 11,
-        },
-      ],
-    };
-  }
 }

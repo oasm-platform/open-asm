@@ -1,37 +1,37 @@
 <section class="mb-6 avoid-break">
   <div class="flex items-center gap-3 mb-4">
-    <span class="text-[11px] font-semibold text-slate-400 tracking-wider">01</span>
+    <span class="text-[13px] font-semibold text-slate-400 tracking-wider">01</span>
     <h2 class="text-base font-bold text-slate-900 m-0">Weekly Performance Metrics</h2>
   </div>
   
   <!-- Primary metrics -->
   <div class="grid grid-cols-4 gap-3 mb-4">
     <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
-      <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Targets</span>
+      <span class="text-[12px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Targets</span>
       <div class="flex items-end justify-between">
         <p class="text-2xl font-bold text-slate-900 m-0">{{weekly.totalTargets}}</p>
-        <span class="text-[10px] font-medium text-emerald-600">+{{weekly.targetsChange}} ({{weekly.targetsChangePercent}}%)</span>
+        <span class="text-[12px] font-medium text-emerald-600">+{{weekly.targetsChange}} ({{weekly.targetsChangePercent}}%)</span>
       </div>
     </div>
     <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
-      <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Assets</span>
+      <span class="text-[12px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Assets</span>
       <div class="flex items-end justify-between">
         <p class="text-2xl font-bold text-slate-900 m-0">{{weekly.totalAssets}}</p>
-        <span class="text-[10px] font-medium text-emerald-600">+{{weekly.assetsChange}} ({{weekly.assetsChangePercent}}%)</span>
+        <span class="text-[12px] font-medium text-emerald-600">+{{weekly.assetsChange}} ({{weekly.assetsChangePercent}}%)</span>
       </div>
     </div>
     <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
-      <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Services</span>
+      <span class="text-[12px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Services</span>
       <div class="flex items-end justify-between">
         <p class="text-2xl font-bold text-slate-900 m-0">{{weekly.totalServices}}</p>
-        <span class="text-[10px] font-medium text-rose-600">{{weekly.servicesChange}} ({{weekly.servicesChangePercent}}%)</span>
+        <span class="text-[12px] font-medium text-rose-600">{{weekly.servicesChange}} ({{weekly.servicesChangePercent}}%)</span>
       </div>
     </div>
     <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
-      <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Security Score</span>
+      <span class="text-[12px] font-medium text-slate-400 uppercase tracking-wider block mb-2">Security Score</span>
       <div class="flex items-end justify-between">
         <p class="text-2xl font-bold text-slate-900 m-0">{{weekly.securityScore}}</p>
-        <span class="text-[10px] font-medium text-emerald-600">+{{weekly.scoreChange}} ({{weekly.scoreChangePercent}}%)</span>
+        <span class="text-[12px] font-medium text-emerald-600">+{{weekly.scoreChange}} ({{weekly.scoreChangePercent}}%)</span>
       </div>
     </div>
   </div>
@@ -39,27 +39,27 @@
   <!-- Severity breakdown -->
   <div class="grid grid-cols-6 gap-2 mb-4">
     <div class="bg-slate-100/80 p-3 rounded-lg text-center">
-      <p class="text-[10px] text-slate-500 m-0 mb-1">Total Vulns</p>
+      <p class="text-[12px] text-slate-500 m-0 mb-1">Total Vulns</p>
       <p class="text-lg font-bold text-slate-900 m-0">{{weekly.activeVulns}}</p>
     </div>
     <div class="bg-red-50 p-3 rounded-lg text-center border border-red-100">
-      <p class="text-[10px] text-red-500 m-0 mb-1">Critical</p>
+      <p class="text-[12px] text-red-500 m-0 mb-1">Critical</p>
       <p class="text-lg font-bold text-red-600 m-0">{{weekly.criticalVulns}}</p>
     </div>
     <div class="bg-orange-50 p-3 rounded-lg text-center border border-orange-100">
-      <p class="text-[10px] text-orange-500 m-0 mb-1">High</p>
+      <p class="text-[12px] text-orange-500 m-0 mb-1">High</p>
       <p class="text-lg font-bold text-orange-600 m-0">{{weekly.highVulns}}</p>
     </div>
     <div class="bg-amber-50 p-3 rounded-lg text-center border border-amber-100">
-      <p class="text-[10px] text-amber-600 m-0 mb-1">Medium</p>
+      <p class="text-[12px] text-amber-600 m-0 mb-1">Medium</p>
       <p class="text-lg font-bold text-amber-600 m-0">{{weekly.mediumVulns}}</p>
     </div>
     <div class="bg-sky-50 p-3 rounded-lg text-center border border-sky-100">
-      <p class="text-[10px] text-sky-600 m-0 mb-1">Low</p>
+      <p class="text-[12px] text-sky-600 m-0 mb-1">Low</p>
       <p class="text-lg font-bold text-sky-600 m-0">{{weekly.lowVulns}}</p>
     </div>
     <div class="bg-slate-100/80 p-3 rounded-lg text-center">
-      <p class="text-[10px] text-slate-500 m-0 mb-1">Info</p>
+      <p class="text-[12px] text-slate-500 m-0 mb-1">Info</p>
       <p class="text-lg font-bold text-slate-500 m-0">{{weekly.infoVulns}}</p>
     </div>
   </div>

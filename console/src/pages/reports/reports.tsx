@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Download, FileText, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { type DateRange } from 'react-day-picker';
 import { toast } from 'sonner';
 
 import Page from '@/components/common/page';
@@ -58,10 +59,7 @@ type ReportType = 'SUMMARY' | 'VULNERABILITY';
 export default function Reports() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [reportType, setReportType] = useState<ReportType>('SUMMARY');
-  const [dateRange, setDateRange] = useState<{
-    from?: Date;
-    to?: Date;
-  }>();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [minSeverity, setMinSeverity] = useState<string>('');
 
   const { workspaces, isLoading: wsLoading } = useWorkspaceSelector();

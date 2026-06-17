@@ -1,9 +1,9 @@
 <div class='p-2' style='border: 1px solid {{#if critical}}#fecaca{{else}}#e2e8f0{{/if}};'>
-  <p class='text-[10px] font-medium {{#if critical}}text-red-600{{else}}text-slate-500{{/if}} uppercase tracking-wide mb-1'>{{label}}</p>
+  <p class='text-[12px] font-medium {{#if critical}}text-red-600{{else}}text-slate-500{{/if}} uppercase tracking-wide mb-1'>{{label}}</p>
   <div class='flex items-end justify-between'>
     <p class='text-xl font-bold {{#if critical}}text-red-600{{else}}text-slate-900{{/if}}'>{{value}}</p>
     {{#if subtext}}
-    <p class='text-[9px] {{#if critical}}text-red-500{{else}}text-slate-500{{/if}}'>{{subtext}}</p>
+    <p class='text-[11px] {{#if critical}}text-red-500{{else}}text-slate-500{{/if}}'>{{subtext}}</p>
     {{/if}}
   </div>
 </div>
