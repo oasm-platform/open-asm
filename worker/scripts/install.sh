@@ -14,7 +14,6 @@ set -euo pipefail
 #
 # Requirements:
 #   - curl or wget
-#   - jq (optional, for better JSON parsing)
 #   - 64-bit Linux or macOS (amd64 or arm64)
 # ============================================================
 
@@ -23,6 +22,8 @@ DEFAULT_INSTALL_DIR="$HOME/.oasm-worker"
 DEFAULT_GRPC_HOST="localhost"
 DEFAULT_GRPC_PORT=16276
 DEFAULT_MAX_CONCURRENCY=10
+DOWNLOAD_TIMEOUT=300
+DOWNLOAD_RETRY=3
 
 # ============================================================
 # Colors & Helpers
@@ -205,34 +206,122 @@ check_dependencies() {
 # ============================================================
 # HTTP Helpers
 # ============================================================
+# api_get: fetch GitHub API with proper headers (returns body only)
+api_get() {
+    local url="$1"
+
+    if [[ "$HAS_CURL" == true ]]; then
+        curl -sL --connect-timeout 30 --max-time 60 \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "User-Agent: oasm-installer/1.0" \
+            "$url"
+    elif [[ "$HAS_WGET" == true ]]; then
+        wget -q --timeout=60 \
+            --header="Accept: application/vnd.github.v3+json" \
+            --header="User-Agent: oasm-installer/1.0" \
+            -O- "$url"
+    fi
+}
+
+# http_get: simple GET (no auth headers, for binary downloads)
 http_get() {
     local url="$1"
     local output="${2:-}"
 
     if [[ "$HAS_CURL" == true ]]; then
         if [[ -n "$output" ]]; then
-            curl -sL -o "$output" "$url"
+            curl -sL --connect-timeout 30 --max-time 120 -o "$output" "$url"
         else
-            curl -sL "$url"
+            curl -sL --connect-timeout 30 --max-time 120 "$url"
         fi
     elif [[ "$HAS_WGET" == true ]]; then
         if [[ -n "$output" ]]; then
-            wget -q -O "$output" "$url"
+            wget -q --timeout=120 -O "$output" "$url"
         else
-            wget -qO- "$url"
+            wget -q --timeout=120 -O- "$url"
         fi
     fi
 }
 
 # ============================================================
+# Download File with Progress + Retry
+# ============================================================
+download_file() {
+    local url="$1"
+    local output="$2"
+    local attempt=1
+
+    while [[ $attempt -le $DOWNLOAD_RETRY ]]; do
+        info "  Attempt ${attempt}/${DOWNLOAD_RETRY}..." >&2
+
+        if [[ "$HAS_CURL" == true ]]; then
+            if curl -L --progress-bar \
+                --connect-timeout 30 \
+                --max-time "$DOWNLOAD_TIMEOUT" \
+                --retry 2 \
+                -o "$output" \
+                "$url" 1>/dev/null; then
+                return 0
+            fi
+        elif [[ "$HAS_WGET" == true ]]; then
+            if wget --progress=bar:force:noscroll \
+                --timeout=30 \
+                --tries=2 \
+                -O "$output" \
+                "$url" >/dev/null; then
+                return 0
+            fi
+        fi
+
+        warn "  Download failed on attempt ${attempt}." >&2
+        rm -f "$output"
+        attempt=$((attempt + 1))
+
+        if [[ $attempt -le $DOWNLOAD_RETRY ]]; then
+            gray "  Retrying in 3 seconds..." >&2
+            sleep 3
+        fi
+    done
+
+    error "Download failed after ${DOWNLOAD_RETRY} attempts."
+    return 1
+}
+
+# ============================================================
 # GitHub API: Get Latest Release
+# Try /releases/latest first, fall back to /releases if 404
 # ============================================================
 get_latest_release() {
-    local api_url="https://api.github.com/repos/${REPOSITORY}/releases/latest"
-    local response
+    local latest_url="https://api.github.com/repos/${REPOSITORY}/releases/latest"
+    local list_url="https://api.github.com/repos/${REPOSITORY}/releases"
+    local response http_code
 
-    response=$(http_get "$api_url") || {
-        error "Failed to fetch latest release from GitHub"
+    # Try /releases/latest first (like install.ps1)
+    if [[ "$HAS_CURL" == true ]]; then
+        http_code=$(curl -sL --connect-timeout 30 --max-time 60 \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "User-Agent: oasm-installer/1.0" \
+            -w '%{http_code}' \
+            -o /tmp/oasm_release.json \
+            "$latest_url") || true
+        response=$(cat /tmp/oasm_release.json 2>/dev/null || echo "")
+        rm -f /tmp/oasm_release.json
+    else
+        response=$(api_get "$latest_url") || true
+        http_code="200"
+    fi
+
+    # If /releases/latest returns 200 and has tag_name, use it
+    if [[ "$http_code" == "200" ]] && echo "$response" | grep -q '"tag_name"'; then
+        echo "$response"
+        return 0
+    fi
+
+    # Fallback: get list of releases and use first one
+    gray "  /releases/latest returned ${http_code}, trying /releases..."
+    response=$(api_get "$list_url") || {
+        error "Failed to connect to GitHub API"
+        error "Check your internet connection."
         exit 1
     }
 
@@ -241,31 +330,36 @@ get_latest_release() {
         exit 1
     fi
 
+    # Check for error responses
+    local msg
+    msg=$(echo "$response" | grep -o '"message"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || true)
+    if [[ -n "$msg" ]]; then
+        error "GitHub API error: $msg"
+        error "Check: https://github.com/${REPOSITORY}/releases"
+        exit 1
+    fi
+
     echo "$response"
 }
 
 # ============================================================
-# Parse Release JSON
+# Parse Release JSON (works with or without jq)
 # ============================================================
-parse_release() {
+parse_tag_name() {
     local json="$1"
-    local field="$2"
-
     if [[ "$HAS_JQ" == true ]]; then
-        echo "$json" | jq -r "$field"
+        echo "$json" | jq -r '.tag_name // .[0].tag_name // empty' 2>/dev/null || echo ""
     else
-        # Fallback: basic grep/sed parsing (limited)
-        case "$field" in
-            ".tag_name")
-                echo "$json" | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4
-                ;;
-            ".published_at")
-                echo "$json" | grep -o '"published_at":"[^"]*"' | head -1 | cut -d'"' -f4
-                ;;
-            *)
-                echo ""
-                ;;
-        esac
+        echo "$json" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo ""
+    fi
+}
+
+parse_published_at() {
+    local json="$1"
+    if [[ "$HAS_JQ" == true ]]; then
+        echo "$json" | jq -r '.published_at // .[0].published_at // empty' 2>/dev/null || echo ""
+    else
+        echo "$json" | grep -o '"published_at"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"published_at"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo ""
     fi
 }
 
@@ -279,35 +373,44 @@ find_binary_asset() {
     local asset_size=0
 
     if [[ "$HAS_JQ" == true ]]; then
-        # Use jq for reliable parsing
-        local assets
-        assets=$(echo "$json" | jq -c '.assets[]')
+        # Try single object first, then array
+        download_url=$(echo "$json" | jq -r --arg name "$binary_name" '
+            (.assets // [])[0] as $first_check |
+            if ($first_check | type) == "array" then
+                [.[] | .assets[]? | select(.name == $name) | .browser_download_url][0] // ""
+            else
+                [.assets[]? | select(.name == $name) | .browser_download_url][0] // ""
+            end
+        ' 2>/dev/null || echo "")
         
-        while IFS= read -r asset; do
-            local name
-            name=$(echo "$asset" | jq -r '.name')
-            if [[ "$name" == "$binary_name" ]]; then
-                download_url=$(echo "$asset" | jq -r '.browser_download_url')
-                asset_size=$(echo "$asset" | jq -r '.size')
-                break
-            fi
-        done <<< "$assets"
+        if [[ -z "$download_url" ]]; then
+            # Simpler approach: flatten all assets
+            download_url=$(echo "$json" | jq -r --arg name "$binary_name" '
+                [.. | .assets? // empty | .[] | select(.name == $name) | .browser_download_url][0] // ""
+            ' 2>/dev/null || echo "")
+        fi
+
+        asset_size=$(echo "$json" | jq -r --arg name "$binary_name" '
+            [.. | .assets? // empty | .[] | select(.name == $name) | .size][0] // 0
+        ' 2>/dev/null || echo "0")
     else
-        # Fallback: grep-based parsing
-        # Look for the binary name in assets
-        local asset_section
-        asset_section=$(echo "$json" | grep -o "\"name\":\"${binary_name}\"[^}]*")
+        # grep fallback: GitHub download URLs contain the filename
+        download_url=$(echo "$json" | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*"' \
+            | grep "$binary_name" \
+            | head -1 \
+            | sed 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
         
-        if [[ -n "$asset_section" ]]; then
-            download_url=$(echo "$asset_section" | grep -o '"browser_download_url":"[^"]*"' | cut -d'"' -f4)
-            asset_size=$(echo "$asset_section" | grep -o '"size":[0-9]*' | cut -d: -f2)
+        if [[ -n "$download_url" ]]; then
+            asset_size=$(echo "$json" | grep -o '"size"[[:space:]]*:[[:space:]]*[0-9]*' \
+                | head -1 \
+                | grep -o '[0-9]*$' || true)
         fi
     fi
 
     if [[ -z "$download_url" ]]; then
         error "Binary '$binary_name' not found in latest release."
         error "Available assets can be found at:"
-        error "  https://github.com/${REPOSITORY}/releases/latest"
+        error "  https://github.com/${REPOSITORY}/releases"
         exit 1
     fi
 
@@ -329,11 +432,11 @@ install_binary() {
 
     local dest_path="${install_dir}/${binary_name}"
 
-    info "  Downloading ${binary_name}..."
+    info "  Downloading ${binary_name}..." >&2
 
-    # Download with progress
-    http_get "$download_url" "$dest_path" || {
-        error "Failed to download binary"
+    # Download with progress + retry
+    download_file "$download_url" "$dest_path" || {
+        error "Failed to download binary after ${DOWNLOAD_RETRY} attempts"
         exit 1
     }
 
@@ -354,17 +457,17 @@ install_binary() {
 
     # Size check (warning only)
     if [[ "$expected_size" -gt 0 && "$file_size" -ne "$expected_size" ]]; then
-        warn "  Warning: File size ($file_size) differs from expected ($expected_size)"
+        warn "  Warning: File size ($file_size) differs from expected ($expected_size)" >&2
     fi
 
     local size_mb
     size_mb=$(echo "scale=2; $file_size / 1048576" | bc 2>/dev/null || echo "unknown")
-    success "  Downloaded: ${size_mb} MB"
+    success "  Downloaded: ${size_mb} MB" >&2
 
     # Set executable permission
     chmod +x "$dest_path" || {
-        warn "  Warning: Could not set executable permission."
-        warn "  Run manually: chmod +x $dest_path"
+        warn "  Warning: Could not set executable permission." >&2
+        warn "  Run manually: chmod +x $dest_path" >&2
     }
 
     echo "$dest_path"
@@ -452,8 +555,8 @@ main() {
     release_json=$(get_latest_release)
     
     local version published_at
-    version=$(parse_release "$release_json" ".tag_name")
-    published_at=$(parse_release "$release_json" ".published_at")
+    version=$(parse_tag_name "$release_json")
+    published_at=$(parse_published_at "$release_json")
     
     gray "  Version   : ${version}"
     gray "  Published : ${published_at}"
