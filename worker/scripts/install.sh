@@ -23,6 +23,8 @@ DEFAULT_INSTALL_DIR="$HOME/.oasm-worker"
 DEFAULT_GRPC_HOST="localhost"
 DEFAULT_GRPC_PORT=16276
 DEFAULT_MAX_CONCURRENCY=10
+DOWNLOAD_TIMEOUT=300
+DOWNLOAD_RETRY=3
 
 # ============================================================
 # Colors & Helpers
@@ -211,17 +213,61 @@ http_get() {
 
     if [[ "$HAS_CURL" == true ]]; then
         if [[ -n "$output" ]]; then
-            curl -sL -o "$output" "$url"
+            curl -sL --connect-timeout 30 --max-time 60 -o "$output" "$url"
         else
-            curl -sL "$url"
+            curl -sL --connect-timeout 30 --max-time 60 "$url"
         fi
     elif [[ "$HAS_WGET" == true ]]; then
         if [[ -n "$output" ]]; then
-            wget -q -O "$output" "$url"
+            wget -q --timeout=60 -O "$output" "$url"
         else
-            wget -qO- "$url"
+            wget -q --timeout=60 -O- "$url"
         fi
     fi
+}
+
+# ============================================================
+# Download File with Progress + Retry
+# ============================================================
+download_file() {
+    local url="$1"
+    local output="$2"
+    local attempt=1
+
+    while [[ $attempt -le $DOWNLOAD_RETRY ]]; do
+        info "  Attempt ${attempt}/${DOWNLOAD_RETRY}..."
+
+        if [[ "$HAS_CURL" == true ]]; then
+            if curl -L --progress-bar \
+                --connect-timeout 30 \
+                --max-time "$DOWNLOAD_TIMEOUT" \
+                --retry 2 \
+                -o "$output" \
+                "$url"; then
+                return 0
+            fi
+        elif [[ "$HAS_WGET" == true ]]; then
+            if wget --progress=bar:force:noscroll \
+                --timeout=30 \
+                --tries=2 \
+                -O "$output" \
+                "$url"; then
+                return 0
+            fi
+        fi
+
+        warn "  Download failed on attempt ${attempt}."
+        rm -f "$output"
+        attempt=$((attempt + 1))
+
+        if [[ $attempt -le $DOWNLOAD_RETRY ]]; then
+            gray "  Retrying in 3 seconds..."
+            sleep 3
+        fi
+    done
+
+    error "Download failed after ${DOWNLOAD_RETRY} attempts."
+    return 1
 }
 
 # ============================================================
@@ -331,9 +377,9 @@ install_binary() {
 
     info "  Downloading ${binary_name}..."
 
-    # Download with progress
-    http_get "$download_url" "$dest_path" || {
-        error "Failed to download binary"
+    # Download with progress + retry
+    download_file "$download_url" "$dest_path" || {
+        error "Failed to download binary after ${DOWNLOAD_RETRY} attempts"
         exit 1
     }
 
