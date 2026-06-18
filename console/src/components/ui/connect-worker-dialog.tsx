@@ -49,13 +49,14 @@ export function ConnectWorkerDialog() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
 
-  const { data, refetch, isLoading } = useWorkspacesControllerGetWorkspaceApiKey({
-    query: {
-      queryKey: ['workspaceApiKey', selectedWorkspaceId],
-      enabled: !!selectedWorkspaceId && isOpen,
-      staleTime: 0,
-    },
-  });
+  const { data, refetch, isLoading } =
+    useWorkspacesControllerGetWorkspaceApiKey({
+      query: {
+        queryKey: ['workspaceApiKey', selectedWorkspaceId],
+        enabled: !!selectedWorkspaceId && isOpen,
+        staleTime: 0,
+      },
+    });
 
   useEffect(() => {
     if (isOpen && selectedWorkspaceId) {
@@ -65,6 +66,9 @@ export function ConnectWorkerDialog() {
 
   const apiKey = data?.apiKey ?? '';
   const isApiKeyReady = !isLoading && !!apiKey;
+  const grpcHost = window.location.hostname || 'localhost';
+  const grpcFlagPowerShell = ` -GrpcHost "${grpcHost}"`;
+  const grpcFlagBash = ` --grpc-host "${grpcHost}"`;
   const networkFlag = networkId ? ` network=${networkId}` : '';
   const networkFlagPowerShell = networkId ? ` -Network "${networkId}"` : '';
   const networkFlagBash = networkId ? ` --network "${networkId}"` : '';
@@ -75,11 +79,11 @@ export function ConnectWorkerDialog() {
       case 'devmode':
         return `task worker:dev replicas=1 maxJobs=10 apiKey=${apiKey}${networkFlag}`;
       case 'docker':
-        return `docker run -d --name open-asm-worker -e WORKER_API_KEY=${apiKey} -e WORKER_GRPC_HOST=localhost -e WORKER_GRPC_PORT=16276 -e WORKER_MAX_CONCURRENCY=10 open-asm-worker:latest`;
+        return `docker run -d --name open-asm-worker -e WORKER_API_KEY=${apiKey} -e WORKER_GRPC_HOST=${grpcHost} -e WORKER_GRPC_PORT=16276 -e WORKER_MAX_CONCURRENCY=10 open-asm-worker:latest`;
       case 'windows':
-        return `irm https://raw.githubusercontent.com/oasm-platform/open-asm/main/worker/scripts/install.ps1 -OutFile "$env:TEMP\\install.ps1"; & "$env:TEMP\\install.ps1" -ApiKey "${apiKey}"${networkFlagPowerShell} -Run`;
+        return `irm https://raw.githubusercontent.com/oasm-platform/open-asm/main/worker/scripts/install.ps1 -OutFile "$env:TEMP\\install.ps1"; & "$env:TEMP\\install.ps1" -ApiKey "${apiKey}"${grpcFlagPowerShell}${networkFlagPowerShell} -Run`;
       case 'linux':
-        return `curl -fsSL https://raw.githubusercontent.com/oasm-platform/open-asm/main/worker/scripts/install.sh | bash -s -- --api-key "${apiKey}"${networkFlagBash} --run`;
+        return `curl -fsSL https://raw.githubusercontent.com/oasm-platform/open-asm/main/worker/scripts/install.sh | bash -s -- --api-key "${apiKey}"${grpcFlagBash}${networkFlagBash} --run`;
       default:
         return '';
     }
