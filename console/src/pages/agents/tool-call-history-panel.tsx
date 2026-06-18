@@ -143,12 +143,7 @@ export const ToolCallHistoryPanel = memo(function ToolCallHistoryPanel({
   }, [toolCalls.length]);
 
   if (toolCalls.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
-        <Terminal className="size-5" />
-        <span>No tool calls yet</span>
-      </div>
-    );
+    return null;
   }
 
   return (
