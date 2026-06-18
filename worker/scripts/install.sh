@@ -213,15 +213,15 @@ http_get() {
 
     if [[ "$HAS_CURL" == true ]]; then
         if [[ -n "$output" ]]; then
-            curl -sL --connect-timeout 30 --max-time 60 -o "$output" "$url"
+            curl -sL --connect-timeout 30 --max-time 120 -o "$output" "$url"
         else
-            curl -sL --connect-timeout 30 --max-time 60 "$url"
+            curl -sL --connect-timeout 30 --max-time 120 "$url"
         fi
     elif [[ "$HAS_WGET" == true ]]; then
         if [[ -n "$output" ]]; then
-            wget -q --timeout=60 -O "$output" "$url"
+            wget -q --timeout=120 -O "$output" "$url"
         else
-            wget -q --timeout=60 -O- "$url"
+            wget -q --timeout=120 -O- "$url"
         fi
     fi
 }
@@ -243,7 +243,7 @@ download_file() {
                 --max-time "$DOWNLOAD_TIMEOUT" \
                 --retry 2 \
                 -o "$output" \
-                "$url"; then
+                "$url" 2>&1; then
                 return 0
             fi
         elif [[ "$HAS_WGET" == true ]]; then
@@ -251,7 +251,7 @@ download_file() {
                 --timeout=30 \
                 --tries=2 \
                 -O "$output" \
-                "$url"; then
+                "$url" 2>&1; then
                 return 0
             fi
         fi
@@ -278,12 +278,22 @@ get_latest_release() {
     local response
 
     response=$(http_get "$api_url") || {
-        error "Failed to fetch latest release from GitHub"
+        error "Failed to connect to GitHub API"
+        error "Check your internet connection."
         exit 1
     }
 
     if [[ -z "$response" ]]; then
         error "Empty response from GitHub API"
+        exit 1
+    fi
+
+    # Check for common error responses
+    local msg
+    msg=$(echo "$response" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+    if [[ -n "$msg" ]]; then
+        error "GitHub API error: $msg"
+        error "Check: https://github.com/${REPOSITORY}/releases"
         exit 1
     fi
 
@@ -298,15 +308,14 @@ parse_release() {
     local field="$2"
 
     if [[ "$HAS_JQ" == true ]]; then
-        echo "$json" | jq -r "$field"
+        echo "$json" | jq -r "$field" 2>/dev/null || echo ""
     else
-        # Fallback: basic grep/sed parsing (limited)
         case "$field" in
             ".tag_name")
-                echo "$json" | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4
+                echo "$json" | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4 || echo ""
                 ;;
             ".published_at")
-                echo "$json" | grep -o '"published_at":"[^"]*"' | head -1 | cut -d'"' -f4
+                echo "$json" | grep -o '"published_at":"[^"]*"' | head -1 | cut -d'"' -f4 || echo ""
                 ;;
             *)
                 echo ""
@@ -342,11 +351,11 @@ find_binary_asset() {
         # Fallback: grep-based parsing
         # Look for the binary name in assets
         local asset_section
-        asset_section=$(echo "$json" | grep -o "\"name\":\"${binary_name}\"[^}]*")
+        asset_section=$(echo "$json" | grep -o "\"name\":\"${binary_name}\"[^}]*" || true)
         
         if [[ -n "$asset_section" ]]; then
-            download_url=$(echo "$asset_section" | grep -o '"browser_download_url":"[^"]*"' | cut -d'"' -f4)
-            asset_size=$(echo "$asset_section" | grep -o '"size":[0-9]*' | cut -d: -f2)
+            download_url=$(echo "$asset_section" | grep -o '"browser_download_url":"[^"]*"' | cut -d'"' -f4 || true)
+            asset_size=$(echo "$asset_section" | grep -o '"size":[0-9]*' | cut -d: -f2 || true)
         fi
     fi
 
