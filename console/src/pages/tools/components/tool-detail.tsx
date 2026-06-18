@@ -102,7 +102,7 @@ export default function ToolDetail() {
                   </div>
                   <div className="flex-shrink-0 flex-col md:flex-row flex md:items-center gap-2">
                     <div className="flex gap-2">
-                      <ToolApiKeyDialog tool={tool} />
+                      {!tool.isBuiltIn && <ToolApiKeyDialog tool={tool} />}
                       <ToolInstallButton
                         tool={tool}
                         workspaceId={selectedWorkspaceId || ''}

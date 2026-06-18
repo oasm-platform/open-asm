@@ -168,7 +168,8 @@ export class WorkersService {
   public async getWorkers(
     query: GetManyWorkersDto,
   ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
-    const { page, limit, sortOrder, workspaceId, enabledAgentMode } = query;
+    const { page, limit, sortOrder, workspaceId, enabledAgentMode, scope } =
+      query;
     let { sortBy } = query;
     if (!sortBy) {
       sortBy = '"createdAt"';
@@ -191,8 +192,31 @@ export class WorkersService {
       });
     }
 
-    // Add workspace filter if workspaceId is provided, or if worker has cloud scope
-    if (workspaceId) {
+    // Add explicit scope filter if provided
+    if (scope) {
+      queryBuilder.andWhere('w."scope" = :scopeFilter', {
+        scopeFilter: scope,
+      });
+
+      // If filtering by workspace scope, also filter by workspaceId
+      if (scope === 'workspace' && workspaceId) {
+        queryBuilder.andWhere('w."workspaceId" = :workspaceId', {
+          workspaceId,
+        });
+
+        // For PROVIDER type workers, ensure they have a corresponding workspace_tool record
+        queryBuilder.andWhere(
+          `(w.type != '${WorkerType.PROVIDER}' OR EXISTS (
+            SELECT 1 FROM workspace_tools wt
+            WHERE wt."workspaceId" = :workspaceId
+            AND wt."toolId" = w."toolId"
+            AND wt."isEnabled" = true
+          ))`,
+          { workspaceId },
+        );
+      }
+    } else if (workspaceId) {
+      // Legacy behavior: no explicit scope filter, but workspaceId provided
       queryBuilder.andWhere(
         '(w."workspaceId" = :workspaceId OR w."scope" = :cloudScope)',
         {
