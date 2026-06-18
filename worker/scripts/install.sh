@@ -14,7 +14,6 @@ set -euo pipefail
 #
 # Requirements:
 #   - curl or wget
-#   - jq (optional, for better JSON parsing)
 #   - 64-bit Linux or macOS (amd64 or arm64)
 # ============================================================
 
@@ -207,6 +206,24 @@ check_dependencies() {
 # ============================================================
 # HTTP Helpers
 # ============================================================
+# api_get: fetch GitHub API with proper headers (returns body only)
+api_get() {
+    local url="$1"
+
+    if [[ "$HAS_CURL" == true ]]; then
+        curl -sL --connect-timeout 30 --max-time 60 \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "User-Agent: oasm-installer/1.0" \
+            "$url"
+    elif [[ "$HAS_WGET" == true ]]; then
+        wget -q --timeout=60 \
+            --header="Accept: application/vnd.github.v3+json" \
+            --header="User-Agent: oasm-installer/1.0" \
+            -O- "$url"
+    fi
+}
+
+# http_get: simple GET (no auth headers, for binary downloads)
 http_get() {
     local url="$1"
     local output="${2:-}"
@@ -272,12 +289,37 @@ download_file() {
 
 # ============================================================
 # GitHub API: Get Latest Release
+# Try /releases/latest first, fall back to /releases if 404
 # ============================================================
 get_latest_release() {
-    local api_url="https://api.github.com/repos/${REPOSITORY}/releases"
-    local response
+    local latest_url="https://api.github.com/repos/${REPOSITORY}/releases/latest"
+    local list_url="https://api.github.com/repos/${REPOSITORY}/releases"
+    local response http_code
 
-    response=$(http_get "$api_url") || {
+    # Try /releases/latest first (like install.ps1)
+    if [[ "$HAS_CURL" == true ]]; then
+        http_code=$(curl -sL --connect-timeout 30 --max-time 60 \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "User-Agent: oasm-installer/1.0" \
+            -w '%{http_code}' \
+            -o /tmp/oasm_release.json \
+            "$latest_url") || true
+        response=$(cat /tmp/oasm_release.json 2>/dev/null || echo "")
+        rm -f /tmp/oasm_release.json
+    else
+        response=$(api_get "$latest_url") || true
+        http_code="200"
+    fi
+
+    # If /releases/latest returns 200 and has tag_name, use it
+    if [[ "$http_code" == "200" ]] && echo "$response" | grep -q '"tag_name"'; then
+        echo "$response"
+        return 0
+    fi
+
+    # Fallback: get list of releases and use first one
+    gray "  /releases/latest returned ${http_code}, trying /releases..."
+    response=$(api_get "$list_url") || {
         error "Failed to connect to GitHub API"
         error "Check your internet connection."
         exit 1
@@ -288,7 +330,7 @@ get_latest_release() {
         exit 1
     fi
 
-    # Check for common error responses
+    # Check for error responses
     local msg
     msg=$(echo "$response" | grep -o '"message"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || true)
     if [[ -n "$msg" ]]; then
@@ -301,26 +343,23 @@ get_latest_release() {
 }
 
 # ============================================================
-# Parse Release JSON
+# Parse Release JSON (works with or without jq)
 # ============================================================
-parse_release() {
+parse_tag_name() {
     local json="$1"
-    local field="$2"
-
     if [[ "$HAS_JQ" == true ]]; then
-        echo "$json" | jq -r "$field" 2>/dev/null || echo ""
+        echo "$json" | jq -r '.tag_name // .[0].tag_name // empty' 2>/dev/null || echo ""
     else
-        case "$field" in
-            ".tag_name")
-                echo "$json" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || echo ""
-                ;;
-            ".published_at")
-                echo "$json" | grep -o '"published_at"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || echo ""
-                ;;
-            *)
-                echo ""
-                ;;
-        esac
+        echo "$json" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo ""
+    fi
+}
+
+parse_published_at() {
+    local json="$1"
+    if [[ "$HAS_JQ" == true ]]; then
+        echo "$json" | jq -r '.published_at // .[0].published_at // empty' 2>/dev/null || echo ""
+    else
+        echo "$json" | grep -o '"published_at"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"published_at"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo ""
     fi
 }
 
@@ -334,35 +373,37 @@ find_binary_asset() {
     local asset_size=0
 
     if [[ "$HAS_JQ" == true ]]; then
-        # Use jq - handle both single object and array
-        local assets
-        assets=$(echo "$json" | jq -c '.assets[]? // empty' 2>/dev/null || echo "")
-        if [[ -z "$assets" ]]; then
-            assets=$(echo "$json" | jq -c '.[0].assets[]? // empty' 2>/dev/null || echo "")
-        fi
+        # Try single object first, then array
+        download_url=$(echo "$json" | jq -r --arg name "$binary_name" '
+            (.assets // [])[0] as $first_check |
+            if ($first_check | type) == "array" then
+                [.[] | .assets[]? | select(.name == $name) | .browser_download_url][0] // ""
+            else
+                [.assets[]? | select(.name == $name) | .browser_download_url][0] // ""
+            end
+        ' 2>/dev/null || echo "")
         
-        while IFS= read -r asset; do
-            local name
-            name=$(echo "$asset" | jq -r '.name')
-            if [[ "$name" == "$binary_name" ]]; then
-                download_url=$(echo "$asset" | jq -r '.browser_download_url')
-                asset_size=$(echo "$asset" | jq -r '.size')
-                break
-            fi
-        done <<< "$assets"
+        if [[ -z "$download_url" ]]; then
+            # Simpler approach: flatten all assets
+            download_url=$(echo "$json" | jq -r --arg name "$binary_name" '
+                [.. | .assets? // empty | .[] | select(.name == $name) | .browser_download_url][0] // ""
+            ' 2>/dev/null || echo "")
+        fi
+
+        asset_size=$(echo "$json" | jq -r --arg name "$binary_name" '
+            [.. | .assets? // empty | .[] | select(.name == $name) | .size][0] // 0
+        ' 2>/dev/null || echo "0")
     else
-        # Fallback: grep the entire JSON for the binary name
-        # GitHub download URLs contain the filename, so match by name in URL
-        download_url=$(echo "$json" | grep -o '"browser_download_url":"[^"]*"' \
+        # grep fallback: GitHub download URLs contain the filename
+        download_url=$(echo "$json" | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*"' \
             | grep "$binary_name" \
             | head -1 \
-            | cut -d'"' -f4 || true)
+            | sed 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
         
         if [[ -n "$download_url" ]]; then
-            asset_size=$(echo "$json" | grep -o "\"name\":\"${binary_name}\"" -A5 \
-                | grep -o '"size":[0-9]*' \
+            asset_size=$(echo "$json" | grep -o '"size"[[:space:]]*:[[:space:]]*[0-9]*' \
                 | head -1 \
-                | cut -d: -f2 || true)
+                | grep -o '[0-9]*$' || true)
         fi
     fi
 
@@ -514,8 +555,8 @@ main() {
     release_json=$(get_latest_release)
     
     local version published_at
-    version=$(parse_release "$release_json" ".tag_name")
-    published_at=$(parse_release "$release_json" ".published_at")
+    version=$(parse_tag_name "$release_json")
+    published_at=$(parse_published_at "$release_json")
     
     gray "  Version   : ${version}"
     gray "  Published : ${published_at}"
