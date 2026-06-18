@@ -25,3 +25,4 @@ dist-ssr
 
 # Playwright auth state
 e2e/.auth/
+.vite/*

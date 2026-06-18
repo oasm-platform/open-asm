@@ -672,7 +672,30 @@ export const ChatConversation = memo(function ChatConversation({
   useEffect(() => {
     if (!selectedToolCallId) return;
     const el = document.getElementById(`tool-call-${selectedToolCallId}`);
-    if (el) {
+    if (!el) return;
+
+    let scrollContainer: HTMLElement | null = el.parentElement;
+    while (scrollContainer) {
+      const style = getComputedStyle(scrollContainer);
+      if (style.overflowY === 'auto' || style.overflowY === 'scroll') break;
+      scrollContainer = scrollContainer.parentElement;
+    }
+
+    if (scrollContainer) {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const elementRect = el.getBoundingClientRect();
+      const relativeTop =
+        elementRect.top - containerRect.top + scrollContainer.scrollTop;
+      const targetScrollTop =
+        relativeTop -
+        scrollContainer.clientHeight / 2 +
+        el.offsetHeight / 2;
+
+      scrollContainer.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'smooth',
+      });
+    } else {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [selectedToolCallId]);

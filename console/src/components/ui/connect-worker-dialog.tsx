@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -48,19 +49,28 @@ export function ConnectWorkerDialog() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
 
-  const { data, refetch } = useWorkspacesControllerGetWorkspaceApiKey({
+  const { data, refetch, isLoading } = useWorkspacesControllerGetWorkspaceApiKey({
     query: {
-      queryKey: [selectedWorkspaceId],
+      queryKey: ['workspaceApiKey', selectedWorkspaceId],
       enabled: !!selectedWorkspaceId && isOpen,
+      staleTime: 0,
     },
   });
 
+  useEffect(() => {
+    if (isOpen && selectedWorkspaceId) {
+      refetch();
+    }
+  }, [isOpen, selectedWorkspaceId, refetch]);
+
   const apiKey = data?.apiKey ?? '';
+  const isApiKeyReady = !isLoading && !!apiKey;
   const networkFlag = networkId ? ` network=${networkId}` : '';
   const networkFlagPowerShell = networkId ? ` -Network "${networkId}"` : '';
   const networkFlagBash = networkId ? ` --network "${networkId}"` : '';
 
   const getCommand = (value: string): string => {
+    if (!isApiKeyReady) return 'Loading...';
     switch (value) {
       case 'devmode':
         return `task worker:dev replicas=1 maxJobs=10 apiKey=${apiKey}${networkFlag}`;
@@ -125,6 +135,7 @@ export function ConnectWorkerDialog() {
                   onClick={() => handleCopyCommand(getCommand(value))}
                   size="icon"
                   variant="ghost"
+                  disabled={!isApiKeyReady}
                   className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
                 >
                   <Copy size={16} />

@@ -59,7 +59,7 @@ export const menu: NavGroup[] = [
         url: '/',
       },
       {
-        title: 'Agents',
+        title: 'New Chat',
         icon: <Sparkles />,
         url: '/agents',
       },

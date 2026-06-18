@@ -73,24 +73,28 @@ export default function AgentsChatPage() {
 
   return (
     <div
-      className="-m-4 flex flex-col lg:flex-row overflow-hidden"
+      className="-m-4 md:-m-6 flex flex-col lg:flex-row overflow-hidden"
       style={{ height: 'calc(100vh - 4rem)' }}
     >
       {/* Left sidebar: Todo — large screens only */}
       <div className="hidden lg:flex lg:w-72 shrink-0 flex-col overflow-y-auto p-3">
-        {title && (
-          <div className="mb-2 p-1">
-            <span className="block text-sm font-medium truncate max-w-full" title={title}>
-              {title}
-            </span>
-            {createdAt && (
-              <span className="block text-xs text-muted-foreground mt-1">
-                {dayjs(createdAt).fromNow()}
-              </span>
+        {todos && todos.length > 0 && (
+          <>
+            {title && (
+              <div className="mb-2 p-1">
+                <span className="block text-sm font-medium truncate max-w-full" title={title}>
+                  {title}
+                </span>
+                {createdAt && (
+                  <span className="block text-xs text-muted-foreground mt-1">
+                    {dayjs(createdAt).fromNow()}
+                  </span>
+                )}
+              </div>
             )}
-          </div>
+            <AgentTodoPanel todos={todos} />
+          </>
         )}
-        {todos && todos.length > 0 && <AgentTodoPanel todos={todos} />}
       </div>
 
       {/* Center: Chat conversation */}
