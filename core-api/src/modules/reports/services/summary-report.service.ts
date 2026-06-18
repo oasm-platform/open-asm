@@ -128,6 +128,23 @@ export class SummaryReportService {
       { level: Severity.LOW as const, count: severityCounts[Severity.LOW] || 0, percent: totalVulns > 0 ? ((severityCounts[Severity.LOW] || 0) / totalVulns) * 100 : 0, color: 'bg-blue-500' },
     ];
 
+    // Build date range string if options provided
+    let dateRange: string | undefined;
+    let dateRangeLabel: string | undefined;
+    if (options?.startDate || options?.endDate) {
+      const formatDate = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      if (options.startDate && options.endDate) {
+        dateRange = `${formatDate(options.startDate)} - ${formatDate(options.endDate)}`;
+        dateRangeLabel = 'Date Range';
+      } else if (options.startDate) {
+        dateRange = `From ${formatDate(options.startDate)}`;
+        dateRangeLabel = 'Start Date';
+      } else if (options.endDate) {
+        dateRange = `Until ${formatDate(options.endDate)}`;
+        dateRangeLabel = 'End Date';
+      }
+    }
+
     return {
       reportTitle: 'Attack Surface Discovery Report',
       week,
@@ -144,6 +161,8 @@ export class SummaryReportService {
       }),
       weekPad: String(week).padStart(2, '0'),
       systemNameChar: 'O',
+      dateRange,
+      dateRangeLabel,
       weekly: {
         totalTargets: currentTargets,
         targetsChange,

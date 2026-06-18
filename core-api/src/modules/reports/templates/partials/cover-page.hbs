@@ -40,16 +40,8 @@
         <div>
           <p
             class='text-[12px] text-slate-400 uppercase tracking-wider'
-          >Reporting Period</p>
-          <p class='text-sm font-medium text-slate-800'>Week
-            {{week}},
-            {{year}}</p>
-        </div>
-        <div>
-          <p
-            class='text-[12px] text-slate-400 uppercase tracking-wider'
-          >Classification</p>
-          <p class='text-sm font-medium text-red-600'>{{classification}}</p>
+          >{{#if dateRangeLabel}}{{dateRangeLabel}}{{else}}Reporting Period{{/if}}</p>
+          <p class='text-sm font-medium text-slate-800'>{{#if dateRange}}{{dateRange}}{{else}}Week {{week}}, {{year}}{{/if}}</p>
         </div>
         <div>
           <p
@@ -59,14 +51,6 @@
             class='text-sm font-medium text-slate-800'
           >{{formattedDate}}</p>
         </div>
-        <div>
-          <p
-            class='text-[12px] text-slate-400 uppercase tracking-wider'
-          >Document Reference</p>
-          <p
-            class='text-sm font-medium text-slate-800 font-mono'
-          >{{docRefPrefix}}-{{year}}-{{weekPad}}-001</p>
-        </div>
       </div>
     </div>
   </div>
@@ -74,7 +58,6 @@
   <div class='shrink-0 border-t border-slate-200 px-10 py-6'>
     <div class='flex items-center justify-between text-xs text-slate-400'>
       <p>© 2026 {{systemName}}. All Rights Reserved.</p>
-      <p class='text-red-500 font-medium'>{{classification}}</p>
     </div>
   </div>
 </div>
