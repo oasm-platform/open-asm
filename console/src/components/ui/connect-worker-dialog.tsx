@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
   DialogClose,
@@ -9,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -17,14 +16,8 @@ import {
   useWorkspacesControllerGetWorkspaceApiKey,
   useWorkspacesControllerRotateApiKey,
 } from '@/services/apis/gen/queries';
-import {
-  Code,
-  Copy,
-  Monitor,
-  Package,
-  Server,
-  type LucideIcon,
-} from 'lucide-react';
+import { Code, Copy, Monitor, Server, type LucideIcon } from 'lucide-react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 const workerTabs: {
@@ -34,7 +27,7 @@ const workerTabs: {
   env?: 'dev' | 'prod';
 }[] = [
   { value: 'devmode', label: 'DevMode', icon: Code, env: 'dev' },
-  { value: 'docker', label: 'Docker', icon: Package, env: 'prod' },
+  // { value: 'docker', label: 'Docker', icon: Package, env: 'prod' },
   { value: 'windows', label: 'Windows', icon: Monitor, env: 'prod' },
   { value: 'linux', label: 'Linux', icon: Server, env: 'prod' },
 ];
@@ -81,7 +74,7 @@ export function ConnectWorkerDialog() {
       case 'docker':
         return `docker run -d --name open-asm-worker -e WORKER_API_KEY=${apiKey} -e WORKER_GRPC_HOST=${grpcHost} -e WORKER_GRPC_PORT=16276 -e WORKER_MAX_CONCURRENCY=10 open-asm-worker:latest`;
       case 'windows':
-        return `irm https://raw.githubusercontent.com/oasm-platform/open-asm/main/worker/scripts/install.ps1 -OutFile "$env:TEMP\\install.ps1"; & "$env:TEMP\\install.ps1" -ApiKey "${apiKey}"${grpcFlagPowerShell}${networkFlagPowerShell} -Run`;
+        return `powershell irm https://raw.githubusercontent.com/oasm-platform/open-asm/main/worker/scripts/install.ps1 -OutFile "$env:TEMP\\install.ps1"; & "$env:TEMP\\install.ps1" -ApiKey "${apiKey}"${grpcFlagPowerShell}${networkFlagPowerShell} -Run`;
       case 'linux':
         return `curl -fsSL https://raw.githubusercontent.com/oasm-platform/open-asm/main/worker/scripts/install.sh | bash -s -- --api-key "${apiKey}"${grpcFlagBash}${networkFlagBash} --run`;
       default:
