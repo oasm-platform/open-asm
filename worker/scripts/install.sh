@@ -274,7 +274,7 @@ download_file() {
 # GitHub API: Get Latest Release
 # ============================================================
 get_latest_release() {
-    local api_url="https://api.github.com/repos/${REPOSITORY}/releases/latest"
+    local api_url="https://api.github.com/repos/${REPOSITORY}/releases"
     local response
 
     response=$(http_get "$api_url") || {
@@ -290,7 +290,7 @@ get_latest_release() {
 
     # Check for common error responses
     local msg
-    msg=$(echo "$response" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+    msg=$(echo "$response" | grep -o '"message"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || true)
     if [[ -n "$msg" ]]; then
         error "GitHub API error: $msg"
         error "Check: https://github.com/${REPOSITORY}/releases"
@@ -312,10 +312,10 @@ parse_release() {
     else
         case "$field" in
             ".tag_name")
-                echo "$json" | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4 || echo ""
+                echo "$json" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || echo ""
                 ;;
             ".published_at")
-                echo "$json" | grep -o '"published_at":"[^"]*"' | head -1 | cut -d'"' -f4 || echo ""
+                echo "$json" | grep -o '"published_at"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || echo ""
                 ;;
             *)
                 echo ""
@@ -334,9 +334,12 @@ find_binary_asset() {
     local asset_size=0
 
     if [[ "$HAS_JQ" == true ]]; then
-        # Use jq for reliable parsing
+        # Use jq - handle both single object and array
         local assets
-        assets=$(echo "$json" | jq -c '.assets[]')
+        assets=$(echo "$json" | jq -c '.assets[]? // empty' 2>/dev/null || echo "")
+        if [[ -z "$assets" ]]; then
+            assets=$(echo "$json" | jq -c '.[0].assets[]? // empty' 2>/dev/null || echo "")
+        fi
         
         while IFS= read -r asset; do
             local name
@@ -348,21 +351,25 @@ find_binary_asset() {
             fi
         done <<< "$assets"
     else
-        # Fallback: grep-based parsing
-        # Look for the binary name in assets
-        local asset_section
-        asset_section=$(echo "$json" | grep -o "\"name\":\"${binary_name}\"[^}]*" || true)
+        # Fallback: grep the entire JSON for the binary name
+        # GitHub download URLs contain the filename, so match by name in URL
+        download_url=$(echo "$json" | grep -o '"browser_download_url":"[^"]*"' \
+            | grep "$binary_name" \
+            | head -1 \
+            | cut -d'"' -f4 || true)
         
-        if [[ -n "$asset_section" ]]; then
-            download_url=$(echo "$asset_section" | grep -o '"browser_download_url":"[^"]*"' | cut -d'"' -f4 || true)
-            asset_size=$(echo "$asset_section" | grep -o '"size":[0-9]*' | cut -d: -f2 || true)
+        if [[ -n "$download_url" ]]; then
+            asset_size=$(echo "$json" | grep -o "\"name\":\"${binary_name}\"" -A5 \
+                | grep -o '"size":[0-9]*' \
+                | head -1 \
+                | cut -d: -f2 || true)
         fi
     fi
 
     if [[ -z "$download_url" ]]; then
         error "Binary '$binary_name' not found in latest release."
         error "Available assets can be found at:"
-        error "  https://github.com/${REPOSITORY}/releases/latest"
+        error "  https://github.com/${REPOSITORY}/releases"
         exit 1
     fi
 
