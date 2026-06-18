@@ -65,12 +65,13 @@ message ConnectInternalNetworkResponse {
   string message = 1;
 }
 
-message BuiltinToolRegistryRequest {}
+message BuiltinToolRegistryRequest {
+  string os = 1;    // worker sends: runtime.GOOS (e.g., "linux")
+  string arch = 2;  // worker sends: runtime.GOARCH (e.g., "arm64")
+}
 
 message BuiltinToolRegistryResponse {
-  repeated string linux = 1;
-  repeated string windows = 2;
-  repeated string macos = 3;
+  repeated string tool_paths = 1;
 }
 
 message RemoteExecuteSubscribeRequest {}

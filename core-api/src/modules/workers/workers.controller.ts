@@ -223,33 +223,21 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'BuiltinToolRegistry')
-  async grpcBuiltinToolRegistry(): Promise<{
-    linux: string[];
-    windows: string[];
-    macos: string[];
-  }> {
-    const archivedPath = join(process.cwd(), 'public/archived');
+  async grpcBuiltinToolRegistry(request: {
+    os: string;
+    arch: string;
+  }): Promise<{ toolPaths: string[] }> {
+    const platform = `${request.os.toLowerCase()}_${request.arch.toLowerCase()}`;
+    const platformPath = join(process.cwd(), 'public/archived', platform);
 
-    const getFiles = async (dir: string): Promise<string[]> => {
-      try {
-        const files = await readdir(dir);
-        return files;
-      } catch {
-        return [];
-      }
-    };
-
-    const [linux, windows, macos] = await Promise.all([
-      getFiles(join(archivedPath, 'linux')),
-      getFiles(join(archivedPath, 'windows')),
-      getFiles(join(archivedPath, 'macos')),
-    ]);
-
-    return {
-      linux: linux.map((f) => `static/archived/linux/${f}`),
-      windows: windows.map((f) => `static/archived/windows/${f}`),
-      macos: macos.map((f) => `static/archived/macos/${f}`),
-    };
+    try {
+      const files = await readdir(platformPath);
+      return {
+        toolPaths: files.map((file) => `static/archived/${platform}/${file}`),
+      };
+    } catch {
+      return { toolPaths: [] };
+    }
   }
 
   @UseGuards(GrpcWorkerTokenGuard)
