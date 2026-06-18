@@ -179,23 +179,23 @@ export interface ConnectInternalNetworkResponse {
  * @generated from protobuf message workers.BuiltinToolRegistryRequest
  */
 export interface BuiltinToolRegistryRequest {
+    /**
+     * @generated from protobuf field: string os = 1
+     */
+    os: string; // worker sends: runtime.GOOS (e.g., "linux")
+    /**
+     * @generated from protobuf field: string arch = 2
+     */
+    arch: string; // worker sends: runtime.GOARCH (e.g., "arm64")
 }
 /**
  * @generated from protobuf message workers.BuiltinToolRegistryResponse
  */
 export interface BuiltinToolRegistryResponse {
     /**
-     * @generated from protobuf field: repeated string linux = 1
+     * @generated from protobuf field: repeated string tool_paths = 1
      */
-    linux: string[];
-    /**
-     * @generated from protobuf field: repeated string windows = 2
-     */
-    windows: string[];
-    /**
-     * @generated from protobuf field: repeated string macos = 3
-     */
-    macos: string[];
+    toolPaths: string[];
 }
 /**
  * @generated from protobuf message workers.RemoteExecuteSubscribeRequest
@@ -981,10 +981,15 @@ export const ConnectInternalNetworkResponse = new ConnectInternalNetworkResponse
 // @generated message type with reflection information, may provide speed optimized methods
 class BuiltinToolRegistryRequest$Type extends MessageType<BuiltinToolRegistryRequest> {
     constructor() {
-        super("workers.BuiltinToolRegistryRequest", []);
+        super("workers.BuiltinToolRegistryRequest", [
+            { no: 1, name: "os", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "arch", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
     }
     create(value?: PartialMessage<BuiltinToolRegistryRequest>): BuiltinToolRegistryRequest {
         const message = globalThis.Object.create((this.messagePrototype!));
+        message.os = "";
+        message.arch = "";
         if (value !== undefined)
             reflectionMergePartial<BuiltinToolRegistryRequest>(this, message, value);
         return message;
@@ -994,6 +999,12 @@ class BuiltinToolRegistryRequest$Type extends MessageType<BuiltinToolRegistryReq
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
+                case /* string os */ 1:
+                    message.os = reader.string();
+                    break;
+                case /* string arch */ 2:
+                    message.arch = reader.string();
+                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -1006,6 +1017,12 @@ class BuiltinToolRegistryRequest$Type extends MessageType<BuiltinToolRegistryReq
         return message;
     }
     internalBinaryWrite(message: BuiltinToolRegistryRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string os = 1; */
+        if (message.os !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.os);
+        /* string arch = 2; */
+        if (message.arch !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.arch);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -1020,16 +1037,12 @@ export const BuiltinToolRegistryRequest = new BuiltinToolRegistryRequest$Type();
 class BuiltinToolRegistryResponse$Type extends MessageType<BuiltinToolRegistryResponse> {
     constructor() {
         super("workers.BuiltinToolRegistryResponse", [
-            { no: 1, name: "linux", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "windows", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "macos", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ }
+            { no: 1, name: "tool_paths", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ }
         ]);
     }
     create(value?: PartialMessage<BuiltinToolRegistryResponse>): BuiltinToolRegistryResponse {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.linux = [];
-        message.windows = [];
-        message.macos = [];
+        message.toolPaths = [];
         if (value !== undefined)
             reflectionMergePartial<BuiltinToolRegistryResponse>(this, message, value);
         return message;
@@ -1039,14 +1052,8 @@ class BuiltinToolRegistryResponse$Type extends MessageType<BuiltinToolRegistryRe
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* repeated string linux */ 1:
-                    message.linux.push(reader.string());
-                    break;
-                case /* repeated string windows */ 2:
-                    message.windows.push(reader.string());
-                    break;
-                case /* repeated string macos */ 3:
-                    message.macos.push(reader.string());
+                case /* repeated string tool_paths */ 1:
+                    message.toolPaths.push(reader.string());
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -1060,15 +1067,9 @@ class BuiltinToolRegistryResponse$Type extends MessageType<BuiltinToolRegistryRe
         return message;
     }
     internalBinaryWrite(message: BuiltinToolRegistryResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* repeated string linux = 1; */
-        for (let i = 0; i < message.linux.length; i++)
-            writer.tag(1, WireType.LengthDelimited).string(message.linux[i]);
-        /* repeated string windows = 2; */
-        for (let i = 0; i < message.windows.length; i++)
-            writer.tag(2, WireType.LengthDelimited).string(message.windows[i]);
-        /* repeated string macos = 3; */
-        for (let i = 0; i < message.macos.length; i++)
-            writer.tag(3, WireType.LengthDelimited).string(message.macos[i]);
+        /* repeated string tool_paths = 1; */
+        for (let i = 0; i < message.toolPaths.length; i++)
+            writer.tag(1, WireType.LengthDelimited).string(message.toolPaths[i]);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
