@@ -252,7 +252,7 @@ download_file() {
     local attempt=1
 
     while [[ $attempt -le $DOWNLOAD_RETRY ]]; do
-        info "  Attempt ${attempt}/${DOWNLOAD_RETRY}..."
+        info "  Attempt ${attempt}/${DOWNLOAD_RETRY}..." >&2
 
         if [[ "$HAS_CURL" == true ]]; then
             if curl -L --progress-bar \
@@ -260,7 +260,7 @@ download_file() {
                 --max-time "$DOWNLOAD_TIMEOUT" \
                 --retry 2 \
                 -o "$output" \
-                "$url" 2>&1; then
+                "$url" 1>/dev/null; then
                 return 0
             fi
         elif [[ "$HAS_WGET" == true ]]; then
@@ -268,17 +268,17 @@ download_file() {
                 --timeout=30 \
                 --tries=2 \
                 -O "$output" \
-                "$url" 2>&1; then
+                "$url" >/dev/null; then
                 return 0
             fi
         fi
 
-        warn "  Download failed on attempt ${attempt}."
+        warn "  Download failed on attempt ${attempt}." >&2
         rm -f "$output"
         attempt=$((attempt + 1))
 
         if [[ $attempt -le $DOWNLOAD_RETRY ]]; then
-            gray "  Retrying in 3 seconds..."
+            gray "  Retrying in 3 seconds..." >&2
             sleep 3
         fi
     done
@@ -432,7 +432,7 @@ install_binary() {
 
     local dest_path="${install_dir}/${binary_name}"
 
-    info "  Downloading ${binary_name}..."
+    info "  Downloading ${binary_name}..." >&2
 
     # Download with progress + retry
     download_file "$download_url" "$dest_path" || {
@@ -457,17 +457,17 @@ install_binary() {
 
     # Size check (warning only)
     if [[ "$expected_size" -gt 0 && "$file_size" -ne "$expected_size" ]]; then
-        warn "  Warning: File size ($file_size) differs from expected ($expected_size)"
+        warn "  Warning: File size ($file_size) differs from expected ($expected_size)" >&2
     fi
 
     local size_mb
     size_mb=$(echo "scale=2; $file_size / 1048576" | bc 2>/dev/null || echo "unknown")
-    success "  Downloaded: ${size_mb} MB"
+    success "  Downloaded: ${size_mb} MB" >&2
 
     # Set executable permission
     chmod +x "$dest_path" || {
-        warn "  Warning: Could not set executable permission."
-        warn "  Run manually: chmod +x $dest_path"
+        warn "  Warning: Could not set executable permission." >&2
+        warn "  Run manually: chmod +x $dest_path" >&2
     }
 
     echo "$dest_path"
