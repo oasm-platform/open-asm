@@ -304,7 +304,7 @@ const ChatMessage = memo(function ChatMessage({
   return (
     <Message from={message.role}>
       <MessageContent expandable={message.role === 'user'}>
-        <div className="flex flex-col w-full gap-3">
+        <div className="flex flex-col w-full gap-1.5">
           {renderItems.map((item, i) => {
             switch (item.kind) {
               case 'reasoning':
