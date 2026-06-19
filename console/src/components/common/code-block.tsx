@@ -52,8 +52,8 @@ export function CodeBlock({
           )}
         </button>
       </div>
-      <div className="relative p-0 overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-200 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:hover:[&::-webkit-scrollbar-thumb]:bg-zinc-600 transition-colors">
-        <pre className="p-4 text-sm font-mono leading-relaxed text-zinc-800 dark:text-zinc-200 whitespace-pre">
+      <div className="relative p-0">
+        <pre className="p-4 text-sm font-mono leading-relaxed text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap break-all">
           {value}
         </pre>
       </div>

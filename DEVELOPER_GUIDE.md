@@ -13,6 +13,7 @@ This guide provides detailed instructions for setting up your local development 
   - [Workers](#workers)
   - [All Services with Task](#all-services-with-task)
 - [Database Setup](#database-setup)
+- [Database Migration](#database-migration)
 - [Development Conventions](#development-conventions)
   - [Code Style](#code-style)
   - [Testing](#testing)
@@ -24,10 +25,10 @@ This guide provides detailed instructions for setting up your local development 
 Before you begin, ensure you have the following installed:
 
 - **Task (taskfile)** - [Installation Guide](https://taskfile.dev/#/installation)
-- **Node.js v18+** - [Installation Guide](https://nodejs.org/en/download/package-manager)
-- **Rust (latest)** - [Installation Guide](https://www.rust-lang.org/tools/install)
-- **PostgreSQL v12+**
-- **Docker & Docker Compose (optional but recommended for database)**
+- **Node.js v22+** - [Installation Guide](https://nodejs.org/en/download/package-manager)
+- **Go 1.26+** - [Installation Guide](https://go.dev/doc/install)
+- **PostgreSQL v17+** (with pgvector extension)
+- **Docker & Docker Compose** (recommended for database and full stack)
 
 ## Project Structure
 
@@ -36,18 +37,21 @@ The project is organized into several key directories:
 ```
 open-asm/
 ├── core-api/           # NestJS API server
-│   ├── src/               # Source code
-│   ├── example.env        # Environment template
+│   ├── src/            # Source code
+│   ├── example.env     # Environment template
 │   └── package.json
 ├── console/            # React web interface
-│   ├── src/               # React components
-│   ├── public/            # Static assets
+│   ├── src/            # React components
+│   ├── public/         # Static assets
 │   └── package.json
-├── worker/           # Rust-based workers
-│   ├── src/               # Source code
-│   ├── Cargo.toml         # Rust package manifest
-│   └── .env.example       # Environment template
-├── .open-api/           # Auto-generated API docs
+├── worker/             # Go-based scanning workers
+│   ├── cmd/            # CLI and App entry points
+│   ├── internal/       # Business logic
+│   ├── scripts/        # Install scripts (install.ps1, install.sh)
+│   ├── go.mod          # Go module definition
+│   └── .example.env    # Environment template
+├── grpc-client/        # Generated gRPC stubs (Go + TypeScript)
+├── .open-api/          # Auto-generated API docs
 ├── docker-compose.yml  # Container orchestration
 ├── taskfile.yml        # Task automation
 └── README.md           # Documentation
@@ -65,31 +69,84 @@ This command will:
 
 - Copy example environment files (`.env`) for `core-api`, `console`, and `worker`.
 - Install project dependencies using `npm` (managed by the task for each workspace).
-- Start a PostgreSQL Docker container named `open-asm-postgres` (requires Docker).
+- Install Go dependencies for the worker.
+- Install worker security tools (nuclei, subfinder, httpx, naabu, dnsx) into `worker/oasm-tools/`.
 
 After running `task init`, you can start all services using `task dev` or run them individually as described below.
 
+## Running Services
+
 ### All Services with Task
 
-To start all services (API, Console) simultaneously, use the task command from the root directory:
+To start the API and Console development servers simultaneously:
 
 ```bash
 task dev
 ```
 
-### Run workers locally
+This starts:
+- Core API at `http://localhost:6276`
+- Console at `http://localhost:5173` (Vite dev server)
 
-To run workers locally, use the task command from the root directory:
+### Core API
+
+```bash
+task api:dev
+```
+
+Or directly:
+
+```bash
+cd core-api && npm run start:dev
+```
+
+The API runs on port `6276` with gRPC server on port `16276`.
+
+### Console (Web Interface)
+
+```bash
+task console:dev
+```
+
+Or directly:
+
+```bash
+cd console && npm run dev
+```
+
+### Workers
+
+To run workers locally in CLI mode:
 
 ```bash
 task worker:dev
 ```
 
+With custom parameters:
+
+```bash
+task worker:dev replicas=3 maxJobs=10 apiKey=<your-api-key> network=<target-network>
+```
+
+To run workers in app mode (env-driven):
+
+```bash
+task worker:dev-app
+```
+
 ## Database Setup
 
-The `task init` command automatically starts a PostgreSQL container using Docker. The database connection details are configured in `core-api/.env`.
+The `task init` command does not automatically start a PostgreSQL container. You can either:
 
-If you prefer to use your own PostgreSQL instance, update the `core-api/.env` file accordingly.
+1. Use Docker Compose to start PostgreSQL:
+
+   ```bash
+   docker compose up postgres -d
+   ```
+
+2. Use your own PostgreSQL instance and update `core-api/.env` accordingly.
+
+The database uses PostgreSQL 17 with the pgvector extension for vector operations.
 
 ## Database Migration
 
@@ -171,27 +228,76 @@ The `--rm` flag ensures the container is removed after it stops.
 
 ### Code Style
 
-- **Core API (NestJS):** Uses ESLint and Prettier for code formatting and linting. Currently, you need to run `npm run lint` and `npm run format` directly from the `core-api` directory. Consider creating a task to wrap these commands for convenience.
-- **Console (React):** Uses ESLint and Prettier. Currently, you need to run `npm run lint` directly from the `console` directory. Consider creating a task to wrap this command for convenience.
-- **Workers (Rust):** Follows standard Rust conventions. Use `cargo` for building and running.
+- **Core API (NestJS):** Uses ESLint and Prettier for code formatting and linting.
+  ```bash
+  task api:lint
+  ```
+- **Console (React):** Uses ESLint and Prettier.
+  ```bash
+  task console:lint
+  ```
+- **Workers (Go):** Uses `go fmt` and `go vet`.
+  ```bash
+  task worker:format
+  task worker:lint
+  ```
 
 ### Testing
 
-- **Core API:** Uses Jest for testing. Currently, you need to run the following commands directly from the `core-api` directory:
-  - Run unit tests: `npm run test`
-  - Run tests in watch mode: `npm run test:watch`
-  - Run end-to-end tests: `npm run test:e2e`
-    Consider creating tasks to wrap these commands for convenience.
+- **Core API:** Uses Jest for testing.
+  ```bash
+  task api:test           # Unit tests
+  cd core-api && npm run test:watch    # Watch mode
+  cd core-api && npm run test:e2e      # End-to-end tests
+  ```
+
+- **Console:** Uses Vitest for unit tests and Playwright for e2e tests.
+  ```bash
+  task console:test       # Unit tests
+  cd console && npm run e2e           # E2E tests
+  ```
+
+- **Workers:** Uses Go testing.
+  ```bash
+  task worker:test
+  ```
+
+### API Client Generation
+
+After making changes to the API contract, regenerate the console API client:
+
+```bash
+task gen-api
+```
+
+This uses orval to generate TanStack Query hooks from the OpenAPI spec.
+
+### gRPC Stub Generation
+
+After modifying proto files, regenerate gRPC stubs:
+
+```bash
+task proto
+```
+
+This generates Go and TypeScript stubs into `grpc-client/`.
 
 ## Using Docker Compose
 
-To run the entire stack, including the database, using Docker Compose:
+To run the entire stack using Docker Compose:
 
 ```bash
 task docker-compose
 ```
 
-This command uses `docker-compose.yml` to orchestrate containers.
+This starts:
+- Console (port 3000)
+- Core API (port 6276, gRPC port 16276)
+- 3 Worker instances
+- PostgreSQL with pgvector (port 5432)
+- Redis (port 6379)
+- Geo-IP proxy (port 4360)
+- Rustfs S3 storage (port 9000)
 
 ## Contributing
 
@@ -199,7 +305,10 @@ We welcome contributions! Please follow these steps:
 
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feature/amazing-feature`.
-3. Make your changes and commit them: `git commit -m 'Add amazing feature'`.
+3. Make your changes and commit them following [Conventional Commits](https://www.conventionalcommits.org/):
+   ```bash
+   git commit -m 'feat(scope): add amazing feature'
+   ```
 4. Push to the branch: `git push origin feature/amazing-feature`.
 5. Open a Pull Request.
 

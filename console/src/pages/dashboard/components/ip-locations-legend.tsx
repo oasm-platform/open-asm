@@ -6,8 +6,8 @@ interface IpLocationsLegendProps {
 }
 
 export default function IpLocationsLegend({ min, max }: IpLocationsLegendProps) {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   return (
     <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 bg-background/95 backdrop-blur-sm rounded-lg px-3 py-2 border shadow-sm">
