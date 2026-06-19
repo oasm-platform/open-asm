@@ -9,11 +9,12 @@ import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.
 import { Target } from '@/modules/targets/entities/target.entity';
 import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { StatisticModule } from '@/modules/statistic/statistic.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Report, Vulnerability, Target, AssetService, AssetTag]),
+    TypeOrmModule.forFeature([Report, Vulnerability, Target, AssetService, AssetTag, Workspace]),
     StatisticModule,
   ],
   controllers: [ReportsController],

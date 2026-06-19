@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
 import type { TargetType } from '@/modules/targets/entities/target.entity';
@@ -24,6 +25,8 @@ export class SummaryReportService {
     private readonly assetServiceRepo: Repository<AssetService>,
     @InjectRepository(AssetTag)
     private readonly assetTagRepo: Repository<AssetTag>,
+    @InjectRepository(Workspace)
+    private readonly workspaceRepo: Repository<Workspace>,
     private readonly statisticService: StatisticService,
   ) {}
 
@@ -38,6 +41,12 @@ export class SummaryReportService {
     const now = new Date();
     const week = this.getWeekNumber(now);
     const year = now.getFullYear();
+
+    // Fetch workspace name
+    const workspace = await this.workspaceRepo.findOne({ where: { id: workspaceId } });
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
 
     // Calculate date ranges for weekly and monthly comparisons
     const weekStart = this.getWeekStart(now);
@@ -152,6 +161,7 @@ export class SummaryReportService {
       exportedAt: now.toISOString(),
       classification: 'Strictly Confidential',
       systemName: 'Open Attack Surface Management',
+      workspaceName: workspace.name,
       formattedDate: now.toLocaleDateString('en-GB', {
         day: '2-digit',
         month: 'long',

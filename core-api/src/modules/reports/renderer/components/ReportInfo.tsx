@@ -6,6 +6,7 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 32,
     fontFamily: 'Inter',
+    wrap: false,
   },
   title: {
     fontSize: 10,

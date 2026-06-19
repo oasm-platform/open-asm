@@ -133,6 +133,7 @@ export interface ReportData {
   exportedAt: string;
   classification: string;
   systemName: string;
+  workspaceName: string;
   formattedDate: string;
   weekPad: string;
   systemNameChar: string;

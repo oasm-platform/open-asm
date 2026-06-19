@@ -796,6 +796,7 @@ export const SummaryReportDocument: React.FC<SummaryReportDocumentProps> = ({
         logoBase64={data.logoBase64}
         systemNameChar={data.systemNameChar}
         systemName={data.systemName}
+        workspaceName={data.workspaceName}
         classification={data.classification}
         formattedDate={data.formattedDate}
       />

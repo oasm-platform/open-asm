@@ -110,6 +110,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: 'Inter',
   },
+  metaRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: 48,
+    marginTop: 16,
+  },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -144,6 +150,7 @@ interface CoverPageProps {
   logoBase64?: string;
   systemNameChar?: string;
   systemName?: string;
+  workspaceName?: string;
   classification?: string;
   formattedDate?: string;
 }
@@ -155,6 +162,7 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   logoBase64,
   systemNameChar,
   systemName,
+  workspaceName,
   classification,
   formattedDate,
 }) => {
@@ -199,6 +207,15 @@ export const CoverPage: React.FC<CoverPageProps> = ({
             </Text>
           </View>
         </View>
+
+        {workspaceName && (
+          <View style={styles.metaRow}>
+            <View>
+              <Text style={styles.metaLabel}>Workspace</Text>
+              <Text style={[styles.metaValue, { color: slate[800] }]}>{workspaceName}</Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Bottom bar */}

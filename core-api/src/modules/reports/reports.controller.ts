@@ -66,7 +66,7 @@ export class ReportsController {
     res.end(buffer);
   }
 
-  @Get('preview/vul')
+  @Get('preview/vulnerability')
   async previewVulReport(
     @Query() query: PreviewVulQueryDto,
     @WorkspaceId() workspaceId: string,
@@ -128,7 +128,7 @@ export class ReportsController {
       getWorkspaceId: true,
     },
   })
-  @Post('generate/vul')
+  @Post('generate/vulnerability')
   async generateVulReport(
     @Body() body: GenerateVulReportBodyDto,
     @WorkspaceId() workspaceId: string,
