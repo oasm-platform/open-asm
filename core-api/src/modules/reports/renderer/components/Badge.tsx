@@ -4,10 +4,10 @@ import { severityBadgeStyle, riskBadgeStyle, statusBadgeStyle, statusLabel, toUp
 
 const base = StyleSheet.create({
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    fontSize: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
+    fontSize: 7,
     fontWeight: '600',
     borderWidth: 1,
     fontFamily: 'Inter',
@@ -37,7 +37,7 @@ export const SeverityBadge: React.FC<SeverityBadgeProps> = ({ severity, label })
   return (
     <Badge
       label={label || toUpper(severity)}
-      style={{ backgroundColor: s.backgroundColor, color: s.color, borderColor: s.borderColor }}
+      style={{ color: s.color, borderWidth: 0, backgroundColor: 'transparent' }}
     />
   );
 };
@@ -53,7 +53,7 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ level, label }) => {
   return (
     <Badge
       label={label || toUpper(level)}
-      style={{ backgroundColor: s.backgroundColor, color: s.color, borderWidth: 0 }}
+      style={{ color: s.color, borderWidth: 0, backgroundColor: 'transparent' }}
     />
   );
 };

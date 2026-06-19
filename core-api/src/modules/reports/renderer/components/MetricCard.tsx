@@ -4,7 +4,7 @@ import { slate } from '../theme';
 
 const styles = StyleSheet.create({
   container: {
-    padding: 8,
+    padding: 10,
     borderWidth: 1,
     borderColor: slate[200],
     flex: 1,
@@ -12,13 +12,14 @@ const styles = StyleSheet.create({
   },
   containerCritical: {
     borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
   },
   label: {
-    fontSize: 8,
-    fontWeight: '500',
+    fontSize: 7,
+    fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
   labelText: {
     color: slate[500],
@@ -33,8 +34,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   value: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 1,
   },
   valueText: {
     color: slate[900],
@@ -42,45 +44,92 @@ const styles = StyleSheet.create({
   valueCritical: {
     color: '#dc2626',
   },
-  subtext: {
-    fontSize: 8,
+  changeContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 4,
   },
-  subtextText: {
-    color: slate[500],
+  changeText: {
+    fontSize: 7,
+    fontWeight: '600',
+    fontFamily: 'Inter',
   },
-  subtextCritical: {
-    color: '#ef4444',
+  changePositive: {
+    color: '#16a34a',
+  },
+  changeNegative: {
+    color: '#dc2626',
+  },
+  changeNeutral: {
+    color: slate[400],
   },
 });
 
 interface MetricCardProps {
   label: string;
   value: string | number;
-  subtext?: string;
   critical?: boolean;
+  subtext?: string;
+  /** Change delta, e.g. "+8" or "-3" — shown with arrow */
+  change?: number;
+  /** If true, an increase is good (green). If false, increase is bad (red). */
+  increaseIsPositive?: boolean;
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
   label,
   value,
-  subtext,
   critical,
-}) => (
-  <View
-    style={{ ...styles.container, ...(critical ? styles.containerCritical : {}) }}
-  >
-    <Text style={[styles.label, critical ? styles.labelCritical : styles.labelText]}>
-      {label}
-    </Text>
-    <View style={styles.valueRow}>
-      <Text style={[styles.value, critical ? styles.valueCritical : styles.valueText]}>
-        {value}
+  subtext,
+  change,
+  increaseIsPositive = true,
+}) => {
+  const hasChange = change !== undefined && change !== 0;
+  const arrow = change !== undefined && change > 0 ? '\u2191' : change !== undefined && change < 0 ? '\u2193' : '';
+  const absChange = change !== undefined ? Math.abs(change) : 0;
+
+  // Determine color: if change is 0 or undefined → neutral
+  // Otherwise check if positive change aligns with increaseIsPositive
+  const changePositive = change !== undefined && change > 0;
+  const changeNegative = change !== undefined && change < 0;
+  const isGoodChange = changePositive && increaseIsPositive;
+  const isBadChange = (changePositive && !increaseIsPositive) || (changeNegative && increaseIsPositive);
+
+  return (
+    <View
+      style={{ ...styles.container, ...(critical ? styles.containerCritical : {}) }}
+    >
+      <Text style={[styles.label, critical ? styles.labelCritical : styles.labelText]}>
+        {label}
       </Text>
-      {subtext && (
-        <Text style={[styles.subtext, critical ? styles.subtextCritical : styles.subtextText]}>
-          {subtext}
+      <View style={styles.valueRow}>
+        <Text style={[styles.value, critical ? styles.valueCritical : styles.valueText]}>
+          {value}
         </Text>
+        {subtext && (
+          <Text style={{ fontSize: 7, color: slate[500], fontFamily: 'Inter' }}>
+            {subtext}
+          </Text>
+        )}
+      </View>
+      {hasChange && (
+        <View style={styles.changeContainer}>
+          <Text
+            style={[
+              styles.changeText,
+              isGoodChange
+                ? styles.changePositive
+                : isBadChange
+                  ? styles.changeNegative
+                  : styles.changeNeutral,
+            ]}
+          >
+            {arrow} {absChange} vs last week
+          </Text>
+        </View>
       )}
     </View>
-  </View>
-);
+  );
+};

@@ -5,9 +5,6 @@ import { slate } from '../theme';
 const styles = StyleSheet.create({
   container: {
     marginTop: 32,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: slate[200],
     fontFamily: 'Inter',
   },
   title: {

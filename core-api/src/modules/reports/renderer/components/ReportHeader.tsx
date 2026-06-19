@@ -26,12 +26,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   logo: {
-    height: 18,
-    width: 18,
+    height: 24,
+    width: 24,
   },
   logoFallback: {
-    width: 18,
-    height: 18,
+    width: 24,
+    height: 24,
     borderRadius: 3,
     backgroundColor: '#dc2626',
     display: 'flex',
@@ -40,14 +40,16 @@ const styles = StyleSheet.create({
   },
   logoFallbackText: {
     color: '#ffffff',
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: 'bold',
     fontFamily: 'Inter',
   },
   reportTitle: {
     fontSize: 9,
-    color: slate[400],
+    fontWeight: '600',
+    color: slate[500],
     fontFamily: 'Inter',
+    lineHeight: 1,
   },
 });
 

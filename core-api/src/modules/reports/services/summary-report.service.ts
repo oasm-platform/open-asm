@@ -122,10 +122,10 @@ export class SummaryReportService {
     // Build risk distribution
     const totalVulns = Object.values(severityCounts).reduce((sum, count) => sum + count, 0);
     const riskDistribution = [
-      { level: Severity.CRITICAL as const, count: severityCounts[Severity.CRITICAL] || 0, percent: totalVulns > 0 ? ((severityCounts[Severity.CRITICAL] || 0) / totalVulns) * 100 : 0, color: 'bg-red-600' },
-      { level: Severity.HIGH as const, count: severityCounts[Severity.HIGH] || 0, percent: totalVulns > 0 ? ((severityCounts[Severity.HIGH] || 0) / totalVulns) * 100 : 0, color: 'bg-orange-500' },
-      { level: Severity.MEDIUM as const, count: severityCounts[Severity.MEDIUM] || 0, percent: totalVulns > 0 ? ((severityCounts[Severity.MEDIUM] || 0) / totalVulns) * 100 : 0, color: 'bg-yellow-500' },
-      { level: Severity.LOW as const, count: severityCounts[Severity.LOW] || 0, percent: totalVulns > 0 ? ((severityCounts[Severity.LOW] || 0) / totalVulns) * 100 : 0, color: 'bg-blue-500' },
+      { level: Severity.CRITICAL as const, count: severityCounts[Severity.CRITICAL] || 0, percent: totalVulns > 0 ? ((severityCounts[Severity.CRITICAL] || 0) / totalVulns) * 100 : 0, color: '#dc2626' },
+      { level: Severity.HIGH as const, count: severityCounts[Severity.HIGH] || 0, percent: totalVulns > 0 ? ((severityCounts[Severity.HIGH] || 0) / totalVulns) * 100 : 0, color: '#f97316' },
+      { level: Severity.MEDIUM as const, count: severityCounts[Severity.MEDIUM] || 0, percent: totalVulns > 0 ? ((severityCounts[Severity.MEDIUM] || 0) / totalVulns) * 100 : 0, color: '#eab308' },
+      { level: Severity.LOW as const, count: severityCounts[Severity.LOW] || 0, percent: totalVulns > 0 ? ((severityCounts[Severity.LOW] || 0) / totalVulns) * 100 : 0, color: '#3b82f6' },
     ];
 
     // Build date range string if options provided

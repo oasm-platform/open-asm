@@ -10,16 +10,21 @@ const styles = StyleSheet.create({
     right: 0,
     width: '100%',
     paddingHorizontal: 56,
-    paddingVertical: 8,
+    paddingVertical: 10,
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     borderTopWidth: 1,
     borderTopColor: slate[200],
     fontFamily: 'Inter',
     fontSize: 8,
     color: slate[400],
+  },
+  classification: {
+    fontSize: 8,
+    color: '#dc2626',
+    fontFamily: 'Inter',
   },
 });
 
@@ -28,10 +33,14 @@ interface ReportFooterProps {
   classification?: string;
 }
 
-export const ReportFooter: React.FC<ReportFooterProps> = () => (
+export const ReportFooter: React.FC<ReportFooterProps> = ({
+  systemName,
+  classification,
+}) => (
   <View style={styles.footer} fixed>
     <Text>
       <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
     </Text>
+    <Text style={styles.classification}>{classification}</Text>
   </View>
 );
