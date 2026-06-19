@@ -102,8 +102,8 @@ export class SummaryReportService {
       this.getTargets(workspaceId, options),
       this.getVulnerabilityByTarget(workspaceId, options),
       this.getScanCount(workspaceId, monthStart, now),
-      this.getNewDomains(workspaceId, weekStart, now),
-      this.getNewIpAddresses(workspaceId, weekStart, now),
+      this.getNewTargetsByType(workspaceId, 'DOMAIN', weekStart, now),
+      this.getNewTargetsByType(workspaceId, 'IP', weekStart, now),
       this.getNewPorts(workspaceId, weekStart, now),
       this.getNewTechnologies(workspaceId, weekStart, now),
     ]);
@@ -553,8 +553,9 @@ export class SummaryReportService {
     return result?.count ? parseInt(result.count, 10) : 0;
   }
 
-  private async getNewDomains(
+  private async getNewTargetsByType(
     workspaceId: string,
+    type: string,
     startDate: Date,
     endDate: Date,
   ) {
@@ -568,40 +569,7 @@ export class SummaryReportService {
       .addSelect('t.createdAt', 'discovered')
       .addSelect('COUNT(v.id)', 'vulnCount')
       .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('t.type = :type', { type: 'DOMAIN' })
-      .andWhere('t.createdAt >= :startDate', { startDate })
-      .andWhere('t.createdAt <= :endDate', { endDate })
-      .groupBy('t.id')
-      .addGroupBy('t.value')
-      .addGroupBy('t.createdAt')
-      .orderBy('t.createdAt', 'DESC')
-      .limit(10)
-      .getRawMany<{ identifier: string; discovered: Date; vulnCount: string }>();
-
-    return results.map((r) => ({
-      identifier: r.identifier,
-      discovered: this.formatDate(r.discovered),
-      provider: 'OpenASM',
-      riskLevel: this.getRiskLevel(parseInt(r.vulnCount, 10)),
-    }));
-  }
-
-  private async getNewIpAddresses(
-    workspaceId: string,
-    startDate: Date,
-    endDate: Date,
-  ) {
-    const results = await this.targetRepo
-      .createQueryBuilder('t')
-      .leftJoin('t.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
-      .leftJoin('t.assets', 'asset')
-      .leftJoin('asset.vulnerabilities', 'v')
-      .select('t.value', 'identifier')
-      .addSelect('t.createdAt', 'discovered')
-      .addSelect('COUNT(v.id)', 'vulnCount')
-      .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('t.type = :type', { type: 'IP' })
+      .andWhere('t.type = :type', { type })
       .andWhere('t.createdAt >= :startDate', { startDate })
       .andWhere('t.createdAt <= :endDate', { endDate })
       .groupBy('t.id')

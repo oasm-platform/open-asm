@@ -11,12 +11,16 @@ import {
   Param,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import {
   GenerateSummaryReportBodyDto,
   GenerateVulReportBodyDto,
   GetManyReportsQueryDto,
+  PreviewSummaryQueryDto,
+  PreviewVulQueryDto,
   ReportResponseDto,
 } from './dto/reports.dto';
 import { ReportsService } from './reports.service';
@@ -42,6 +46,44 @@ export class ReportsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.reportsService.getMany(query, workspaceId);
+  }
+
+  @Get('preview/summary')
+  async previewSummaryReport(
+    @Query() query: PreviewSummaryQueryDto,
+    @WorkspaceId() workspaceId: string,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.reportsService.previewSummaryReport(workspaceId, {
+      startDate: query.startDate,
+      endDate: query.endDate,
+      targetIds: query.targetIds,
+    });
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="preview-summary-report.pdf"',
+    });
+    res.end(buffer);
+  }
+
+  @Get('preview/vul')
+  async previewVulReport(
+    @Query() query: PreviewVulQueryDto,
+    @WorkspaceId() workspaceId: string,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.reportsService.previewVulnerabilityReport(workspaceId, {
+      startDate: query.startDate,
+      endDate: query.endDate,
+      targetIds: query.targetIds,
+      vulnIds: query.vulnIds,
+      minSeverity: query.minSeverity,
+    });
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="preview-vulnerability-report.pdf"',
+    });
+    res.end(buffer);
   }
 
   @Doc({

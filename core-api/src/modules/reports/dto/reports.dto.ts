@@ -103,4 +103,51 @@ export class GenerateVulReportBodyDto {
   minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 }
 
+export class PreviewSummaryQueryDto {
+  @ApiProperty({ required: false, description: 'Start date for filter' })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @ApiProperty({ required: false, description: 'End date for filter' })
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @ApiProperty({ required: false, description: 'Target IDs to filter', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  targetIds?: string[];
+}
+
+export class PreviewVulQueryDto {
+  @ApiProperty({ required: false, description: 'Start date for filter' })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @ApiProperty({ required: false, description: 'End date for filter' })
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @ApiProperty({ required: false, description: 'Target IDs to filter', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  targetIds?: string[];
+
+  @ApiProperty({ required: false, description: 'Vulnerability IDs to include', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  vulnIds?: string[];
+
+  @ApiProperty({ required: false, description: 'Minimum severity level', enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] })
+  @IsOptional()
+  @IsEnum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'])
+  minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+}
+
 export class GetManyReportsQueryDto extends GetManyBaseQueryParams {}

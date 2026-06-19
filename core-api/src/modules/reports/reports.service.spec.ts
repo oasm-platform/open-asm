@@ -7,6 +7,10 @@ import { ReportsService } from './reports.service';
 import { VulnerabilityReportService } from './services/vulnerability-report.service';
 import { SummaryReportService } from './services/summary-report.service';
 
+jest.mock('./renderer/pdf-renderer', () => ({
+  renderReportPdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
+}));
+
 describe('ReportsService', () => {
   let service: ReportsService;
   let reportRepository: Repository<Report>;
