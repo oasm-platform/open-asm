@@ -39,8 +39,8 @@ export default function IpLocationsCard({
   selectedCountry,
   onCountrySelect,
 }: IpLocationsCardProps) {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const chartRef = useRef<ReactEChartsCore>(null);
 
   useEffect(() => {

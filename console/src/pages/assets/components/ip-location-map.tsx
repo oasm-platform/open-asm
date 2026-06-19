@@ -9,8 +9,8 @@ interface IpLocationMapProps {
 }
 
 export default function IpLocationMap({ geoIp }: IpLocationMapProps) {
-  const { theme } = useTheme();
-  const mapTheme = theme === 'dark' ? 'dark_all' : 'light_all';
+  const { resolvedTheme } = useTheme();
+  const mapTheme = resolvedTheme === 'dark' ? 'dark_all' : 'light_all';
 
   const hasLocation =
     geoIp?.lat != null &&
@@ -52,8 +52,8 @@ export default function IpLocationMap({ geoIp }: IpLocationMapProps) {
       <div
         className="absolute inset-0 z-1 pointer-events-none"
         style={{
-          background: theme === 'dark' ? '#1e3a5f' : '#3b5bdb',
-          opacity: theme === 'dark' ? 0.3 : 0.1,
+          background: resolvedTheme === 'dark' ? '#1e3a5f' : '#3b5bdb',
+          opacity: resolvedTheme === 'dark' ? 0.3 : 0.1,
           mixBlendMode: 'color',
         }}
       />
