@@ -12,6 +12,7 @@ import { SectionHeader } from '../components/SectionHeader';
 import { MetricCard } from '../components/MetricCard';
 import { SeverityDistribution } from '../components/SeverityDistribution';
 import { SeverityBadge, RiskBadge } from '../components/Badge';
+import { BarChart } from '../components/BarChart';
 
 // Ensure fonts are registered
 import '../fonts';
@@ -266,7 +267,6 @@ const SeverityOverview: React.FC<{ data: ReportData }> = ({ data }) => (
 /** Section 03: Vulnerability Trend (Last 30 Days) */
 const VulnerabilityTrend: React.FC<{ data: ReportData }> = ({ data }) => {
   const trends = data.vulnerabilityTrends;
-  const maxVal = Math.max(...trends.last30Days, 1);
 
   return (
     <View style={styles.section}>
@@ -275,24 +275,7 @@ const VulnerabilityTrend: React.FC<{ data: ReportData }> = ({ data }) => {
         {/* Daily bar chart */}
         <View style={[styles.panel, { flex: 1 }]}>
           <Text style={[styles.panelTitle, { marginBottom: 8 }]}>Daily Vulnerabilities</Text>
-          <View style={styles.barRow}>
-            {trends.last30Days.map((val, i) => {
-              const heightPct = (val / maxVal) * 100;
-              return (
-                <View
-                  key={i}
-                  style={[
-                    styles.bar,
-                    { height: `${Math.max(heightPct, 5)}%`, minHeight: 4 },
-                  ]}
-                />
-              );
-            })}
-          </View>
-          <View style={styles.barLabel}>
-            <Text>30 days ago</Text>
-            <Text>Today</Text>
-          </View>
+          <BarChart data={trends.last30Days} showLabels />
         </View>
 
         {/* Risk distribution */}

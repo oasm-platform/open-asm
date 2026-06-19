@@ -10,6 +10,7 @@ import { SectionHeader } from '../components/SectionHeader';
 import { MetricCard } from '../components/MetricCard';
 import { SeverityDistribution } from '../components/SeverityDistribution';
 import { VulnItem } from '../components/VulnItem';
+import { BarChart } from '../components/BarChart';
 
 // Ensure fonts are registered
 import '../fonts';
@@ -142,16 +143,35 @@ const styles = StyleSheet.create({
 
 // ============ Section Components ============
 
-const ExecutiveSummary: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => {
+const ExecutiveSummary: React.FC<{ data: VulnerabilityReportData }> = ({
+  data,
+}) => {
   const s = data.summary;
   return (
     <View style={styles.section}>
       <SectionHeader number="01" title="Executive Summary" />
       <View style={[styles.row, { marginBottom: 8 }]}>
-        <MetricCard label="Total Vulnerabilities" value={s.totalVulnerabilities} subtext={`Active: ${s.activeCount}`} />
-        <MetricCard label="Avg CVSS Score" value={s.avgCvssScore} subtext="/ 10" />
-        <MetricCard label="Critical Findings" value={s.criticalCount} subtext="Immediate action" critical />
-        <MetricCard label="Dismissed" value={s.dismissedCount} subtext="Review pending" />
+        <MetricCard
+          label="Vulnerabilities"
+          value={s.totalVulnerabilities}
+          subtext={`Active: ${s.activeCount}`}
+        />
+        <MetricCard
+          label="Avg CVSS Score"
+          value={s.avgCvssScore}
+          subtext="/ 10"
+        />
+        <MetricCard
+          label="Critical Findings"
+          value={s.criticalCount}
+          subtext="Immediate action"
+          critical
+        />
+        <MetricCard
+          label="Dismissed"
+          value={s.dismissedCount}
+          subtext="Review pending"
+        />
       </View>
       <SeverityDistribution severityDistribution={data.severityDistribution} />
     </View>
@@ -172,36 +192,123 @@ const TopAssets: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => {
       {data.topAssets.length === 0 ? (
         <Text style={styles.noData}>No data</Text>
       ) : (
-      <View style={styles.table}>
-        <View style={styles.tableHeader}>
-          <Text style={[styles.th, { width: '30%' }]}>Asset</Text>
-          <Text style={[styles.th, { width: '14%', textAlign: 'center' as const }]}>Critical</Text>
-          <Text style={[styles.th, { width: '14%', textAlign: 'center' as const }]}>High</Text>
-          <Text style={[styles.th, { width: '14%', textAlign: 'center' as const }]}>Medium</Text>
-          <Text style={[styles.th, { width: '14%', textAlign: 'center' as const }]}>Low</Text>
-          <Text style={[styles.th, { width: '14%', textAlign: 'center' as const }]}>Total</Text>
-        </View>
-        {data.topAssets.map((a, i) => (
-          <View key={i} style={styles.tableRow}>
-            <Text style={[styles.td, { width: '30%', fontWeight: '500' }]}>{a.asset}</Text>
-            <Text style={[styles.td, { width: '14%', textAlign: 'center', ...getValColor('critical', a.critical), fontWeight: '600' }]}>
-              {a.critical || '-'}
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.th, { width: '30%' }]}>Asset</Text>
+            <Text
+              style={[
+                styles.th,
+                { width: '14%', textAlign: 'center' as const },
+              ]}
+            >
+              Critical
             </Text>
-            <Text style={[styles.td, { width: '14%', textAlign: 'center', ...getValColor('high', a.high), fontWeight: '600' }]}>
-              {a.high || '-'}
+            <Text
+              style={[
+                styles.th,
+                { width: '14%', textAlign: 'center' as const },
+              ]}
+            >
+              High
             </Text>
-            <Text style={[styles.td, { width: '14%', textAlign: 'center', ...getValColor('medium', a.medium), fontWeight: '600' }]}>
-              {a.medium || '-'}
+            <Text
+              style={[
+                styles.th,
+                { width: '14%', textAlign: 'center' as const },
+              ]}
+            >
+              Medium
             </Text>
-            <Text style={[styles.td, { width: '14%', textAlign: 'center', ...getValColor('low', a.low), fontWeight: '600' }]}>
-              {a.low || '-'}
+            <Text
+              style={[
+                styles.th,
+                { width: '14%', textAlign: 'center' as const },
+              ]}
+            >
+              Low
             </Text>
-            <Text style={[styles.td, { width: '14%', textAlign: 'center', fontWeight: '700', color: slate[900] }]}>
-              {a.total}
+            <Text
+              style={[
+                styles.th,
+                { width: '14%', textAlign: 'center' as const },
+              ]}
+            >
+              Total
             </Text>
           </View>
-        ))}
-      </View>
+          {data.topAssets.map((a, i) => (
+            <View key={i} style={styles.tableRow}>
+              <Text style={[styles.td, { width: '30%', fontWeight: '500' }]}>
+                {a.asset}
+              </Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '14%',
+                    textAlign: 'center',
+                    ...getValColor('critical', a.critical),
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                {a.critical || '-'}
+              </Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '14%',
+                    textAlign: 'center',
+                    ...getValColor('high', a.high),
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                {a.high || '-'}
+              </Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '14%',
+                    textAlign: 'center',
+                    ...getValColor('medium', a.medium),
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                {a.medium || '-'}
+              </Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '14%',
+                    textAlign: 'center',
+                    ...getValColor('low', a.low),
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                {a.low || '-'}
+              </Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '14%',
+                    textAlign: 'center',
+                    fontWeight: '700',
+                    color: slate[900],
+                  },
+                ]}
+              >
+                {a.total}
+              </Text>
+            </View>
+          ))}
+        </View>
       )}
     </View>
   );
@@ -216,31 +323,12 @@ const VulnTrends: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => {
         {/* Last 7 days */}
         <View style={[styles.panel, { flex: 1 }]}>
           <Text style={styles.panelTitle}>Last 7 Days</Text>
-          <View style={styles.barRow}>
-            {t.last7Days.map((val, i) => {
-              const h = (val / 50) * 100;
-              return (
-                <View key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <View style={{ width: '100%', height: `${h}%`, backgroundColor: slate[600] }} />
-                  <Text style={styles.barLabel}>{i}</Text>
-                </View>
-              );
-            })}
-          </View>
+          <BarChart data={t.last7Days} showLabels labelStart="0" labelEnd="6" />
         </View>
         {/* Last 30 days */}
         <View style={[styles.panel, { flex: 1 }]}>
           <Text style={styles.panelTitle}>Last 30 Days</Text>
-          <View style={styles.barRow}>
-            {t.last30Days.map((val, i) => {
-              const h = (val / 60) * 100;
-              return (
-                <View key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <View style={{ width: '100%', height: `${h}%`, backgroundColor: slate[600] }} />
-                </View>
-              );
-            })}
-          </View>
+          <BarChart data={t.last30Days} showLabels />
         </View>
       </View>
       {/* Stats row */}
@@ -251,7 +339,9 @@ const VulnTrends: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => {
         </View>
         <View style={[styles.statCard, { flex: 1 }]}>
           <Text style={styles.statLabel}>Trend</Text>
-          <Text style={[styles.statValue, { textTransform: 'capitalize' }]}>{t.trend}</Text>
+          <Text style={[styles.statValue, { textTransform: 'capitalize' }]}>
+            {t.trend}
+          </Text>
         </View>
         <View style={[styles.statCard, { flex: 1 }]}>
           <Text style={styles.statLabel}>Analyzed</Text>
@@ -262,7 +352,9 @@ const VulnTrends: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => {
   );
 };
 
-const TargetAnalysis: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => {
+const TargetAnalysis: React.FC<{ data: VulnerabilityReportData }> = ({
+  data,
+}) => {
   const getValColor = (level: string, val: number) => {
     if (!val) return styles.textSlate300;
     const key = level.toLowerCase() as keyof typeof severityStyles;
@@ -276,44 +368,133 @@ const TargetAnalysis: React.FC<{ data: VulnerabilityReportData }> = ({ data }) =
       {data.targetStats.length === 0 ? (
         <Text style={styles.noData}>No data</Text>
       ) : (
-      <View style={styles.table}>
-        <View style={styles.tableHeader}>
-          <Text style={[styles.th, { width: '25%' }]}>Target</Text>
-          <Text style={[styles.th, { width: '15%' }]}>Type</Text>
-          <Text style={[styles.th, { width: '12%', textAlign: 'center' as const }]}>Critical</Text>
-          <Text style={[styles.th, { width: '12%', textAlign: 'center' as const }]}>High</Text>
-          <Text style={[styles.th, { width: '12%', textAlign: 'center' as const }]}>Medium</Text>
-          <Text style={[styles.th, { width: '12%', textAlign: 'center' as const }]}>Low</Text>
-          <Text style={[styles.th, { width: '12%', textAlign: 'center' as const }]}>Total</Text>
-        </View>
-        {data.targetStats.map((t, i) => (
-          <View key={i} style={styles.tableRow}>
-            <Text style={[styles.td, { width: '25%', fontWeight: '500' }]}>{t.target}</Text>
-            <Text style={[styles.td, { width: '15%' }]}>{t.type}</Text>
-            <Text style={[styles.td, { width: '12%', textAlign: 'center', ...getValColor('critical', t.critical), fontWeight: '600' }]}>
-              {t.critical || '-'}
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.th, { width: '25%' }]}>Target</Text>
+            <Text style={[styles.th, { width: '15%' }]}>Type</Text>
+            <Text
+              style={[
+                styles.th,
+                { width: '12%', textAlign: 'center' as const },
+              ]}
+            >
+              Critical
             </Text>
-            <Text style={[styles.td, { width: '12%', textAlign: 'center', ...getValColor('high', t.high), fontWeight: '600' }]}>
-              {t.high || '-'}
+            <Text
+              style={[
+                styles.th,
+                { width: '12%', textAlign: 'center' as const },
+              ]}
+            >
+              High
             </Text>
-            <Text style={[styles.td, { width: '12%', textAlign: 'center', ...getValColor('medium', t.medium), fontWeight: '600' }]}>
-              {t.medium || '-'}
+            <Text
+              style={[
+                styles.th,
+                { width: '12%', textAlign: 'center' as const },
+              ]}
+            >
+              Medium
             </Text>
-            <Text style={[styles.td, { width: '12%', textAlign: 'center', ...getValColor('low', t.low), fontWeight: '600' }]}>
-              {t.low || '-'}
+            <Text
+              style={[
+                styles.th,
+                { width: '12%', textAlign: 'center' as const },
+              ]}
+            >
+              Low
             </Text>
-            <Text style={[styles.td, { width: '12%', textAlign: 'center', fontWeight: '700', color: slate[900] }]}>
-              {t.total}
+            <Text
+              style={[
+                styles.th,
+                { width: '12%', textAlign: 'center' as const },
+              ]}
+            >
+              Total
             </Text>
           </View>
-        ))}
-      </View>
+          {data.targetStats.map((t, i) => (
+            <View key={i} style={styles.tableRow}>
+              <Text style={[styles.td, { width: '25%', fontWeight: '500' }]}>
+                {t.target}
+              </Text>
+              <Text style={[styles.td, { width: '15%' }]}>{t.type}</Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '12%',
+                    textAlign: 'center',
+                    ...getValColor('critical', t.critical),
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                {t.critical || '-'}
+              </Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '12%',
+                    textAlign: 'center',
+                    ...getValColor('high', t.high),
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                {t.high || '-'}
+              </Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '12%',
+                    textAlign: 'center',
+                    ...getValColor('medium', t.medium),
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                {t.medium || '-'}
+              </Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '12%',
+                    textAlign: 'center',
+                    ...getValColor('low', t.low),
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                {t.low || '-'}
+              </Text>
+              <Text
+                style={[
+                  styles.td,
+                  {
+                    width: '12%',
+                    textAlign: 'center',
+                    fontWeight: '700',
+                    color: slate[900],
+                  },
+                ]}
+              >
+                {t.total}
+              </Text>
+            </View>
+          ))}
+        </View>
       )}
     </View>
   );
 };
 
-const AllVulnerabilities: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => (
+const AllVulnerabilities: React.FC<{ data: VulnerabilityReportData }> = ({
+  data,
+}) => (
   <View style={styles.section}>
     <SectionHeader number="05" title="All Vulnerabilities" />
     {data.allVulnerabilities.length > 0 ? (
@@ -336,7 +517,6 @@ const AllVulnerabilities: React.FC<{ data: VulnerabilityReportData }> = ({ data 
             cveId={vuln.cveId}
             cweId={vuln.cweId}
             bidId={vuln.bidId}
-            tags={vuln.tags}
             description={vuln.description}
             solution={vuln.solution}
             references={vuln.references}
@@ -359,11 +539,10 @@ interface VulnReportDocumentProps {
   data: VulnerabilityReportData;
 }
 
-export const VulnReportDocument: React.FC<VulnReportDocumentProps> = ({ data }) => (
-  <Document
-    title={data.reportTitle}
-    author="Open Attack Surface Management"
-  >
+export const VulnReportDocument: React.FC<VulnReportDocumentProps> = ({
+  data,
+}) => (
+  <Document title={data.reportTitle} author="Open Attack Surface Management">
     {/* Cover page — no header/footer */}
     <CoverPage
       coverTitle="Vulnerability Assessment Report"
@@ -379,8 +558,14 @@ export const VulnReportDocument: React.FC<VulnReportDocumentProps> = ({ data }) 
 
     {/* Content pages with header/footer */}
     <Page size="A4" style={styles.contentPage}>
-      <ReportHeader logoBase64={data.logoBase64} />
-      <ReportFooter systemName={data.systemName} classification={data.classification} />
+      <ReportHeader
+        logoBase64={data.logoBase64}
+        reportTitle={data.reportTitle}
+      />
+      <ReportFooter
+        systemName={data.systemName}
+        classification={data.classification}
+      />
 
       <ExecutiveSummary data={data} />
       <TopAssets data={data} />

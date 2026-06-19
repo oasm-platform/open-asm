@@ -41,7 +41,7 @@ export class ReportsService {
   }
 
   async getMany(query: GetManyReportsQueryDto, workspaceId: string) {
-    const { limit, page, sortBy, sortOrder, search } = query;
+    const { limit, page, sortBy, sortOrder, search, type } = query;
     const offset = (page - 1) * limit;
 
     const qb = this.reportRepo
@@ -52,6 +52,10 @@ export class ReportsService {
       qb.andWhere('report.fileName ILIKE :search', {
         search: `%${search}%`,
       });
+    }
+
+    if (type) {
+      qb.andWhere('report.type = :type', { type });
     }
 
     const allowedSortColumns = [
@@ -116,13 +120,7 @@ export class ReportsService {
 
     const pdfBuffer = await renderReportPdf(type, enrichedData);
 
-    const weekPad =
-      'weekPad' in data
-        ? (data as VulnerabilityReportData).weekPad
-        : String((data as ReportData).week).padStart(2, '0');
-    const year = data.year;
-
-    const fileName = `report-${type.toLowerCase()}-${year}-W${weekPad}-${generateToken(5)}-${Date.now()}.pdf`;
+    const fileName = `report-${type.toLowerCase()}-${generateToken(8)}-${Date.now()}.pdf`;
     const { path: uploadPath } = await this.storageService.uploadFile(
       fileName,
       pdfBuffer,

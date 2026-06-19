@@ -150,4 +150,13 @@ export class PreviewVulQueryDto {
   minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 }
 
-export class GetManyReportsQueryDto extends GetManyBaseQueryParams {}
+export class GetManyReportsQueryDto extends GetManyBaseQueryParams {
+  @ApiProperty({
+    required: false,
+    enum: ['SUMMARY', 'VULNERABILITY'],
+    description: 'Filter by report type',
+  })
+  @IsOptional()
+  @IsEnum(ReportType)
+  type?: ReportType;
+}

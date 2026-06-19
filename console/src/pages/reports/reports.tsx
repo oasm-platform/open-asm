@@ -1,13 +1,12 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Download, FileText, Plus, Trash2 } from 'lucide-react';
+import { Download, FileText, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { type DateRange } from 'react-day-picker';
 import { toast } from 'sonner';
 
 import Page from '@/components/common/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
@@ -30,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   useWorkspaceSelector,
@@ -46,6 +46,8 @@ import CreateWorkspace from '../workspaces/create-workspace';
 
 dayjs.extend(relativeTime);
 
+type TabValue = 'all' | 'SUMMARY' | 'VULNERABILITY' | 'templates';
+
 const SEVERITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical', color: 'text-red-500' },
   { value: 'HIGH', label: 'High', color: 'text-orange-500' },
@@ -61,6 +63,7 @@ export default function Reports() {
   const [reportType, setReportType] = useState<ReportType>('SUMMARY');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [minSeverity, setMinSeverity] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<TabValue>('all');
 
   const { workspaces, isLoading: wsLoading } = useWorkspaceSelector();
   const {
@@ -79,6 +82,10 @@ export default function Reports() {
       sortBy,
       sortOrder,
       search: filter,
+      type:
+        activeTab === 'SUMMARY' || activeTab === 'VULNERABILITY'
+          ? activeTab
+          : undefined,
     },
     {
       query: {
@@ -90,6 +97,7 @@ export default function Reports() {
           sortBy,
           sortOrder,
           filter,
+          activeTab,
         ],
       },
     },
@@ -186,22 +194,6 @@ export default function Reports() {
       ),
     },
     {
-      accessorKey: 'type',
-      header: 'Type',
-      cell: ({ row }) => {
-        const type = row.getValue('type') as string;
-        const colors: Record<string, string> = {
-          SUMMARY: 'border-blue-500 text-blue-500',
-          VULNERABILITY: 'border-orange-500 text-orange-500',
-        };
-        return (
-          <Badge variant="outline" className={colors[type]}>
-            {type}
-          </Badge>
-        );
-      },
-    },
-    {
       accessorKey: 'createdAt',
       header: 'Created',
       cell: ({ row }) => {
@@ -254,20 +246,7 @@ export default function Reports() {
   return (
     <Page
       title="Reports"
-      action={
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white"
-            onClick={() => setGenerateOpen(true)}
-            disabled={isPending}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Generate Report
-          </Button>
-        </div>
-      }
+      action={null}
     >
       <Dialog
         open={generateOpen}
@@ -295,13 +274,19 @@ export default function Reports() {
               >
                 <div className="flex items-center space-x-2 mb-2">
                   <RadioGroupItem value="SUMMARY" id="summary" />
-                  <Label htmlFor="summary" className="font-medium cursor-pointer">
+                  <Label
+                    htmlFor="summary"
+                    className="font-medium cursor-pointer"
+                  >
                     Summary Report
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="VULNERABILITY" id="vulnerability" />
-                  <Label htmlFor="vulnerability" className="font-medium cursor-pointer">
+                  <Label
+                    htmlFor="vulnerability"
+                    className="font-medium cursor-pointer"
+                  >
                     Vulnerability Report
                   </Label>
                 </div>
@@ -321,10 +306,7 @@ export default function Reports() {
                 <Label className="text-sm font-medium mb-2 block">
                   Minimum Severity
                 </Label>
-                <Select
-                  value={minSeverity}
-                  onValueChange={setMinSeverity}
-                >
+                <Select value={minSeverity} onValueChange={setMinSeverity}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="All severities" />
                   </SelectTrigger>
@@ -360,24 +342,170 @@ export default function Reports() {
       ) : !data && !isLoading ? (
         <DataTableError message="Failed to load reports." onRetry={refetch} />
       ) : (
-        <DataTable
-          data={reports}
-          columns={columns}
-          isLoading={isLoading}
-          page={page}
-          pageSize={pageSize}
-          sortBy={sortBy}
-          sortOrder={sortOrder}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          onSortChange={(col, order) => {
-            setParams({ sortBy: col, sortOrder: order });
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => {
+            setActiveTab(v as TabValue);
+            setPage(1);
           }}
-          filterColumnKey="fileName"
-          filterValue={filter}
-          onFilterChange={setFilter}
-          totalItems={total}
-        />
+        >
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="SUMMARY">Summary</TabsTrigger>
+            <TabsTrigger value="VULNERABILITY">Vulnerability</TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+          </TabsList>
+          <TabsContent value="all">
+            <DataTable
+              data={reports}
+              columns={columns}
+              isLoading={isLoading}
+              page={page}
+              pageSize={pageSize}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              onSortChange={(col, order) => {
+                setParams({ sortBy: col, sortOrder: order });
+              }}
+              filterColumnKey="fileName"
+              filterValue={filter}
+              onFilterChange={setFilter}
+              totalItems={total}
+            />
+          </TabsContent>
+          <TabsContent value="SUMMARY">
+            <DataTable
+              data={reports}
+              columns={columns}
+              isLoading={isLoading}
+              page={page}
+              pageSize={pageSize}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              onSortChange={(col, order) => {
+                setParams({ sortBy: col, sortOrder: order });
+              }}
+              filterColumnKey="fileName"
+              filterValue={filter}
+              onFilterChange={setFilter}
+              totalItems={total}
+            />
+          </TabsContent>
+          <TabsContent value="VULNERABILITY">
+            <DataTable
+              data={reports}
+              columns={columns}
+              isLoading={isLoading}
+              page={page}
+              pageSize={pageSize}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              onSortChange={(col, order) => {
+                setParams({ sortBy: col, sortOrder: order });
+              }}
+              filterColumnKey="fileName"
+              filterValue={filter}
+              onFilterChange={setFilter}
+              totalItems={total}
+            />
+          </TabsContent>
+          <TabsContent value="templates">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 mt-4">
+              {/* Summary Report Template */}
+              <div
+                role="button"
+                tabIndex={0}
+                className="group rounded-xl border bg-card overflow-hidden transition-shadow hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => {
+                  setReportType('SUMMARY');
+                  setGenerateOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setReportType('SUMMARY');
+                    setGenerateOpen(true);
+                  }
+                }}
+              >
+                <div className="aspect-[3/4] bg-muted p-3 flex items-center justify-center">
+                  <div className="w-full rounded-lg bg-card shadow-sm border p-2 space-y-1.5">
+                    <div className="h-1.5 w-12 bg-muted rounded" />
+                    <div className="flex items-end gap-0.5 h-8">
+                      <div className="flex-1 bg-blue-400 rounded-t" style={{ height: '60%' }} />
+                      <div className="flex-1 bg-blue-300 rounded-t" style={{ height: '80%' }} />
+                      <div className="flex-1 bg-blue-500 rounded-t" style={{ height: '45%' }} />
+                      <div className="flex-1 bg-blue-300 rounded-t" style={{ height: '90%' }} />
+                      <div className="flex-1 bg-blue-400 rounded-t" style={{ height: '70%' }} />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="h-1 w-full bg-muted rounded" />
+                      <div className="h-1 w-2/3 bg-muted rounded" />
+                    </div>
+                  </div>
+                </div>
+                <div className="px-3 py-2">
+                  <p className="font-semibold text-xs leading-tight">Summary Report</p>
+                </div>
+              </div>
+
+              {/* Vulnerability Report Template */}
+              <div
+                role="button"
+                tabIndex={0}
+                className="group rounded-xl border bg-card overflow-hidden transition-shadow hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => {
+                  setReportType('VULNERABILITY');
+                  setGenerateOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setReportType('VULNERABILITY');
+                    setGenerateOpen(true);
+                  }
+                }}
+              >
+                <div className="aspect-[3/4] bg-muted p-3 flex items-center justify-center">
+                  <div className="w-full rounded-lg bg-card shadow-sm border p-2 space-y-1.5">
+                    <div className="h-1.5 w-14 bg-muted rounded" />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1">
+                        <div className="w-1 h-1 rounded-full bg-red-400" />
+                        <div className="h-1 flex-1 bg-muted rounded" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-1 h-1 rounded-full bg-orange-400" />
+                        <div className="h-1 flex-1 bg-muted rounded" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-1 h-1 rounded-full bg-yellow-400" />
+                        <div className="h-1 flex-1 bg-muted rounded" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-1 h-1 rounded-full bg-blue-400" />
+                        <div className="h-1 flex-1 bg-muted rounded" />
+                      </div>
+                    </div>
+                    <div className="space-y-0.5 pt-0.5">
+                      <div className="h-1 w-full bg-muted rounded" />
+                      <div className="h-1 w-3/4 bg-muted rounded" />
+                    </div>
+                  </div>
+                </div>
+                <div className="px-3 py-2">
+                  <p className="font-semibold text-xs leading-tight">Vulnerability Report</p>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       )}
     </Page>
   );

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from '@react-pdf/renderer';
-import { slate, severityStyles } from '../theme';
+import { slate } from '../theme';
 import { join, formatDate, severityImpact } from '../helpers';
 import { SeverityBadge } from './Badge';
 
@@ -66,31 +66,6 @@ const styles = StyleSheet.create({
     borderBottomColor: slate[200],
     fontFamily: 'Inter',
   },
-  // Risk summary
-  riskRow: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: 24,
-    fontSize: 8,
-    marginBottom: 12,
-    flexWrap: 'wrap',
-  },
-  riskItem: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: 4,
-  },
-  riskLabel: {
-    color: slate[500],
-    fontFamily: 'Inter',
-    fontSize: 8,
-  },
-  riskValue: {
-    fontWeight: '600',
-    color: slate[800],
-    fontFamily: 'Inter',
-    fontSize: 8,
-  },
   // Details grid
   detailsGrid: {
     display: 'flex',
@@ -130,39 +105,18 @@ const styles = StyleSheet.create({
     color: slate[800],
     fontSize: 8,
   },
-  // Identifier badges
+  // Identifier badges (plain text, no background)
   idBadges: {
     display: 'flex',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
     marginTop: 8,
   },
   idBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
     fontSize: 7,
     fontFamily: 'JetBrains Mono',
     fontWeight: '600',
-  },
-  // Tags
-  tagsRow: {
-    display: 'flex',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 8,
-  },
-  tag: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    fontSize: 7,
-    fontWeight: '500',
-    backgroundColor: slate[100],
-    color: slate[600],
-    fontFamily: 'Inter',
   },
   // Description
   description: {
@@ -267,7 +221,6 @@ interface VulnItemProps {
   cveId?: string[];
   cweId?: string[];
   bidId?: string[];
-  tags?: string[];
   description?: string;
   analyzeResult?: string;
   solution?: string;
@@ -294,7 +247,6 @@ export const VulnItem: React.FC<VulnItemProps> = ({
   cveId,
   cweId,
   bidId,
-  tags,
   description,
   analyzeResult,
   solution,
@@ -332,33 +284,6 @@ export const VulnItem: React.FC<VulnItemProps> = ({
               </>
             )}
           </View>
-        </View>
-      </View>
-
-      {/* Risk Summary */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Risk Summary</Text>
-        <View style={styles.riskRow}>
-          <View style={styles.riskItem}>
-            <Text style={styles.riskLabel}>Severity:</Text>
-            <Text style={styles.riskValue}>{severity}</Text>
-          </View>
-          <View style={styles.riskItem}>
-            <Text style={styles.riskLabel}>CVSS Score:</Text>
-            <Text style={styles.riskValue}>{cvssScore} / 10</Text>
-          </View>
-          {epssScore !== null && epssScore !== undefined && (
-            <View style={styles.riskItem}>
-              <Text style={styles.riskLabel}>EPSS Score:</Text>
-              <Text style={styles.riskValue}>{epssScore}%</Text>
-            </View>
-          )}
-          {vprScore !== null && vprScore !== undefined && (
-            <View style={styles.riskItem}>
-              <Text style={styles.riskLabel}>VPR Score:</Text>
-              <Text style={styles.riskValue}>{vprScore}</Text>
-            </View>
-          )}
         </View>
       </View>
 
@@ -406,10 +331,7 @@ export const VulnItem: React.FC<VulnItemProps> = ({
             {cveId.map((id) => (
               <Text
                 key={`cve-${id}`}
-                style={[
-                  styles.idBadge,
-                  { backgroundColor: severityStyles.critical.background, color: severityStyles.critical.text },
-                ]}
+                style={[styles.idBadge, { color: slate[700] }]}
               >
                 CVE-{id}
               </Text>
@@ -418,10 +340,7 @@ export const VulnItem: React.FC<VulnItemProps> = ({
               cweId.map((id) => (
                 <Text
                   key={`cwe-${id}`}
-                  style={[
-                    styles.idBadge,
-                    { backgroundColor: severityStyles.high.background, color: severityStyles.high.text },
-                  ]}
+                  style={[styles.idBadge, { color: slate[700] }]}
                 >
                   CWE-{id}
                 </Text>
@@ -430,25 +349,11 @@ export const VulnItem: React.FC<VulnItemProps> = ({
               bidId.map((id) => (
                 <Text
                   key={`bid-${id}`}
-                  style={[
-                    styles.idBadge,
-                    { backgroundColor: severityStyles.medium.background, color: severityStyles.medium.text },
-                  ]}
+                  style={[styles.idBadge, { color: slate[700] }]}
                 >
                   BID-{id}
                 </Text>
               ))}
-          </View>
-        )}
-
-        {/* Tags */}
-        {tags && tags.length > 0 && (
-          <View style={styles.tagsRow}>
-            {tags.map((tag) => (
-              <Text key={tag} style={styles.tag}>
-                {tag}
-              </Text>
-            ))}
           </View>
         )}
       </View>
