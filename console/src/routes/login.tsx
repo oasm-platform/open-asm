@@ -12,11 +12,18 @@ export const Route = createFileRoute('/login')({
   validateSearch: loginSearchSchema,
   component: Login,
   beforeLoad: async ({ context }) => {
-    const metadata = await context.queryClient
-      .ensureQueryData(getRootControllerGetMetadataQueryOptions())
-      .catch(() => null);
+    let metadata;
+    try {
+      metadata = await context.queryClient.ensureQueryData(
+        getRootControllerGetMetadataQueryOptions(),
+      );
+    } catch {
+      throw new Error(
+        'Unable to connect to the server. Please check your connection and try again.',
+      );
+    }
 
-    if (!metadata?.isInit) {
+    if (metadata && !metadata.isInit) {
       throw redirect({ to: '/init-admin' });
     }
 
