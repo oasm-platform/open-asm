@@ -130,18 +130,13 @@ const styles = StyleSheet.create({
   textSlate900: { color: slate[900] },
   // Section
   section: {
-    marginBottom: 8,
+    marginBottom: 24,
   },
   noData: {
     fontSize: 9,
     color: slate[500],
     textAlign: 'center',
     paddingVertical: 32,
-  },
-  badgeCell: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
 
@@ -174,6 +169,9 @@ const TopAssets: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => {
   return (
     <View style={styles.section}>
       <SectionHeader number="02" title="Top Assets by Vulnerabilities" />
+      {data.topAssets.length === 0 ? (
+        <Text style={styles.noData}>No data</Text>
+      ) : (
       <View style={styles.table}>
         <View style={styles.tableHeader}>
           <Text style={[styles.th, { width: '30%' }]}>Asset</Text>
@@ -204,6 +202,7 @@ const TopAssets: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => {
           </View>
         ))}
       </View>
+      )}
     </View>
   );
 };
@@ -274,6 +273,9 @@ const TargetAnalysis: React.FC<{ data: VulnerabilityReportData }> = ({ data }) =
   return (
     <View style={styles.section}>
       <SectionHeader number="04" title="Target Vulnerability Analysis" />
+      {data.targetStats.length === 0 ? (
+        <Text style={styles.noData}>No data</Text>
+      ) : (
       <View style={styles.table}>
         <View style={styles.tableHeader}>
           <Text style={[styles.th, { width: '25%' }]}>Target</Text>
@@ -306,6 +308,7 @@ const TargetAnalysis: React.FC<{ data: VulnerabilityReportData }> = ({ data }) =
           </View>
         ))}
       </View>
+      )}
     </View>
   );
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from '@react-pdf/renderer';
 import { slate, severityStyles } from '../theme';
 import { join, formatDate, severityImpact } from '../helpers';
+import { SeverityBadge } from './Badge';
 
 const styles = StyleSheet.create({
   container: {
@@ -277,11 +278,6 @@ interface VulnItemProps {
   publicationDate?: string | null;
 }
 
-const getSeverityStyle = (severity: string) => {
-  const key = severity.toLowerCase() as keyof typeof severityStyles;
-  return severityStyles[key] || severityStyles.low;
-};
-
 export const VulnItem: React.FC<VulnItemProps> = ({
   severity,
   name,
@@ -308,20 +304,11 @@ export const VulnItem: React.FC<VulnItemProps> = ({
   lastSeenDate,
   publicationDate,
 }) => {
-  const sevStyle = getSeverityStyle(severity);
-
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text
-          style={[
-            styles.severityBadge,
-            { backgroundColor: sevStyle.background, color: sevStyle.text, borderWidth: 1, borderColor: sevStyle.border },
-          ]}
-        >
-          {severity}
-        </Text>
+        <SeverityBadge severity={severity} />
         <View style={styles.headerContent}>
           <Text style={styles.vulnName}>{name}</Text>
           <View style={styles.scoresRow}>

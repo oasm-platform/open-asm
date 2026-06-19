@@ -15,9 +15,9 @@ const styles = StyleSheet.create({
     break: 'avoid',
   },
   number: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    color: slate[400],
+    color: slate[800],
     fontFamily: 'Inter',
   },
   title: {
