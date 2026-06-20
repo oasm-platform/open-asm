@@ -31,16 +31,6 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  col4: {
-    flex: 1,
-  },
-  col2: {
-    flex: 1,
-  },
-  col3: {
-    flex: 1,
-  },
-  // Tables
   table: {
     width: '100%',
   },
@@ -71,7 +61,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     color: slate[800],
   },
-  // Panels
   panel: {
     padding: 8,
     borderWidth: 1,
@@ -84,25 +73,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontFamily: 'Inter',
   },
-  // Bar charts
-  barRow: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 4,
-    height: 80,
-  },
-  bar: {
-    flex: 1,
-    backgroundColor: slate[600],
-  },
-  barLabel: {
-    fontSize: 7,
-    color: slate[500],
-    fontFamily: 'Inter',
-    marginTop: 2,
-  },
-  // Stat cards
   statCard: {
     padding: 8,
     borderWidth: 1,
@@ -122,14 +92,8 @@ const styles = StyleSheet.create({
     color: slate[900],
     fontFamily: 'Inter',
   },
-  // Severity colors
-  textCritical: { color: '#dc2626' },
-  textHigh: { color: '#ea580c' },
-  textMedium: { color: '#d97706' },
-  textLow: { color: '#2563eb' },
   textSlate300: { color: slate[300] },
   textSlate900: { color: slate[900] },
-  // Section
   section: {
     marginBottom: 24,
   },
@@ -320,18 +284,15 @@ const VulnTrends: React.FC<{ data: VulnerabilityReportData }> = ({ data }) => {
     <View style={styles.section}>
       <SectionHeader number="03" title="Vulnerability Trends" />
       <View style={[styles.row, { marginBottom: 12 }]}>
-        {/* Last 7 days */}
         <View style={[styles.panel, { flex: 1 }]}>
           <Text style={styles.panelTitle}>Last 7 Days</Text>
           <BarChart data={t.last7Days} showLabels labelStart="0" labelEnd="6" />
         </View>
-        {/* Last 30 days */}
         <View style={[styles.panel, { flex: 1 }]}>
           <Text style={styles.panelTitle}>Last 30 Days</Text>
           <BarChart data={t.last30Days} showLabels />
         </View>
       </View>
-      {/* Stats row */}
       <View style={styles.row}>
         <View style={[styles.statCard, { flex: 1 }]}>
           <Text style={styles.statLabel}>Avg per Week</Text>
@@ -492,48 +453,7 @@ const TargetAnalysis: React.FC<{ data: VulnerabilityReportData }> = ({
   );
 };
 
-const AllVulnerabilities: React.FC<{ data: VulnerabilityReportData }> = ({
-  data,
-}) => (
-  <View style={styles.section}>
-    <SectionHeader number="05" title="All Vulnerabilities" />
-    {data.allVulnerabilities.length > 0 ? (
-      <View>
-        {data.allVulnerabilities.map((vuln) => (
-          <VulnItem
-            key={vuln.id}
-            severity={vuln.severity}
-            name={vuln.name}
-            cvssScore={vuln.cvssScore}
-            cvssMetric={vuln.cvssMetric}
-            epssScore={vuln.epssScore}
-            vprScore={vuln.vprScore}
-            asset={vuln.asset}
-            tool={vuln.tool}
-            ipAddress={vuln.ipAddress}
-            host={vuln.host}
-            affectedUrl={vuln.affectedUrl}
-            ports={vuln.ports}
-            cveId={vuln.cveId}
-            cweId={vuln.cweId}
-            bidId={vuln.bidId}
-            description={vuln.description}
-            solution={vuln.solution}
-            references={vuln.references}
-            createdAt={vuln.createdAt}
-            firstDetectedDate={vuln.firstDetectedDate}
-            lastSeenDate={vuln.lastSeenDate}
-            publicationDate={vuln.publicationDate}
-          />
-        ))}
-      </View>
-    ) : (
-      <Text style={styles.noData}>No vulnerabilities found</Text>
-    )}
-  </View>
-);
-
-// ============ Main Document ============
+// ============ Main Document ======================================
 
 interface VulnReportDocumentProps {
   data: VulnerabilityReportData;
@@ -556,7 +476,7 @@ export const VulnReportDocument: React.FC<VulnReportDocumentProps> = ({
       formattedDate={data.formattedDate}
     />
 
-    {/* Content pages with header/footer */}
+    {/* Section 01: Executive Summary */}
     <Page size="A4" style={styles.contentPage}>
       <ReportHeader
         logoBase64={data.logoBase64}
@@ -566,13 +486,112 @@ export const VulnReportDocument: React.FC<VulnReportDocumentProps> = ({
         systemName={data.systemName}
         classification={data.classification}
       />
-
       <ExecutiveSummary data={data} />
-      <TopAssets data={data} />
-      <VulnTrends data={data} />
-      <TargetAnalysis data={data} />
-      <AllVulnerabilities data={data} />
+    </Page>
 
+    {/* Section 02: Top Assets */}
+    <Page size="A4" style={styles.contentPage}>
+      <ReportHeader
+        logoBase64={data.logoBase64}
+        reportTitle={data.reportTitle}
+      />
+      <ReportFooter
+        systemName={data.systemName}
+        classification={data.classification}
+      />
+      <TopAssets data={data} />
+    </Page>
+
+    {/* Section 03: Vulnerability Trends */}
+    <Page size="A4" style={styles.contentPage}>
+      <ReportHeader
+        logoBase64={data.logoBase64}
+        reportTitle={data.reportTitle}
+      />
+      <ReportFooter
+        systemName={data.systemName}
+        classification={data.classification}
+      />
+      <VulnTrends data={data} />
+    </Page>
+
+    {/* Section 04: Target Analysis */}
+    <Page size="A4" style={styles.contentPage}>
+      <ReportHeader
+        logoBase64={data.logoBase64}
+        reportTitle={data.reportTitle}
+      />
+      <ReportFooter
+        systemName={data.systemName}
+        classification={data.classification}
+      />
+      <TargetAnalysis data={data} />
+    </Page>
+
+    {/* Each vulnerability gets its own fresh page */}
+    {data.allVulnerabilities.map((vuln, i) => (
+      <Page key={vuln.id} size="A4" style={styles.contentPage}>
+        <ReportHeader
+          logoBase64={data.logoBase64}
+          reportTitle={data.reportTitle}
+        />
+        <ReportFooter
+          systemName={data.systemName}
+          classification={data.classification}
+        />
+        {i === 0 && <SectionHeader number="05" title="All Vulnerabilities" />}
+        <VulnItem
+          severity={vuln.severity}
+          name={vuln.name}
+          cvssScore={vuln.cvssScore}
+          cvssMetric={vuln.cvssMetric}
+          epssScore={vuln.epssScore}
+          vprScore={vuln.vprScore}
+          asset={vuln.asset}
+          tool={vuln.tool}
+          ipAddress={vuln.ipAddress}
+          host={vuln.host}
+          affectedUrl={vuln.affectedUrl}
+          ports={vuln.ports}
+          cveId={vuln.cveId}
+          cweId={vuln.cweId}
+          bidId={vuln.bidId}
+          description={vuln.description}
+          solution={vuln.solution}
+          references={vuln.references}
+          createdAt={vuln.createdAt}
+          firstDetectedDate={vuln.firstDetectedDate}
+          lastSeenDate={vuln.lastSeenDate}
+          publicationDate={vuln.publicationDate}
+        />
+      </Page>
+    ))}
+
+    {data.allVulnerabilities.length === 0 && (
+      <Page size="A4" style={styles.contentPage}>
+        <ReportHeader
+          logoBase64={data.logoBase64}
+          reportTitle={data.reportTitle}
+        />
+        <ReportFooter
+          systemName={data.systemName}
+          classification={data.classification}
+        />
+        <SectionHeader number="05" title="All Vulnerabilities" />
+        <Text style={styles.noData}>No vulnerabilities found</Text>
+      </Page>
+    )}
+
+    {/* Report info on final page */}
+    <Page size="A4" style={styles.contentPage}>
+      <ReportHeader
+        logoBase64={data.logoBase64}
+        reportTitle={data.reportTitle}
+      />
+      <ReportFooter
+        systemName={data.systemName}
+        classification={data.classification}
+      />
       <ReportInfo />
     </Page>
   </Document>

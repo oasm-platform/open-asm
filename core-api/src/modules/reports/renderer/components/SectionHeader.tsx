@@ -10,6 +10,9 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 14,
     break: 'avoid',
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: slate[200],
   },
   number: {
     fontSize: 10,

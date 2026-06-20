@@ -6,11 +6,7 @@ import { SeverityBadge } from './Badge';
 
 const styles = StyleSheet.create({
   container: {
-    borderBottomWidth: 2,
-    borderBottomColor: slate[300],
     paddingVertical: 12,
-    marginBottom: 12,
-    break: 'avoid',
     fontFamily: 'Inter',
   },
   // Header
@@ -394,18 +390,6 @@ export const VulnItem: React.FC<VulnItemProps> = ({
         </View>
       )}
 
-      {/* References */}
-      {references && references.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>References</Text>
-          {references.map((ref) => (
-            <Text key={ref} style={styles.refItem}>
-              {ref}
-            </Text>
-          ))}
-        </View>
-      )}
-
       {/* Steps to Produce */}
       {affectedUrl && (
         <View style={styles.section}>
@@ -439,6 +423,18 @@ export const VulnItem: React.FC<VulnItemProps> = ({
               checking for <Text style={styles.stepTool}>{name}</Text> indicators.
             </Text>
           </View>
+        </View>
+      )}
+
+      {/* References */}
+      {references && references.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>References</Text>
+          {references.map((ref) => (
+            <Text key={ref} style={styles.refItem}>
+              {ref}
+            </Text>
+          ))}
         </View>
       )}
 
