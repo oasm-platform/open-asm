@@ -79,8 +79,6 @@ export class AgentsCompletionsService {
   private readonly toolCapableModelsCache = new Map<string, Set<string>>();
   private toolCapableCacheExpiry = 0;
   private static readonly TOOL_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-  // Cache for custom/Ollama model tool support: key = `${baseURL}:${model}`, value = boolean
-  private readonly customToolSupportCache = new Map<string, boolean>();
   // Default context window (128k) - used for compaction threshold calculation
   private static readonly DEFAULT_CONTEXT_WINDOW = 128000;
   private static readonly COMPACTION_THRESHOLD_RATIO = 0.6;
@@ -643,7 +641,9 @@ export class AgentsCompletionsService {
         if (msg.content.length > 2000) {
           return {
             ...msg,
-            content: msg.content.slice(0, 2000) + '\n[...truncated for context management]',
+            content:
+              msg.content.slice(0, 2000) +
+              '\n[...truncated for context management]',
           };
         }
         return msg;
@@ -820,7 +820,9 @@ export class AgentsCompletionsService {
     // Fetch STM and LTM concurrently
     const [stmContext, ltmContext] = await Promise.all([
       this.agentsMemories.stmFormatForPrompt(conversation.id),
-      userId ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId) : Promise.resolve(''),
+      userId
+        ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId)
+        : Promise.resolve(''),
     ]);
 
     const todoEntities = await this.todoRepository.find({
@@ -860,146 +862,6 @@ export class AgentsCompletionsService {
    * - Throws a user-friendly error message
    * For other errors, re-throws the original error.
    */
-  private handleToolError(error: unknown, llmConfig: AgentLLMConfig): never {
-    const message = error instanceof Error ? error.message : String(error);
-
-    // Check if the error message matches known tool-calling error patterns
-    const toolErrorPatterns = [
-      'tool use',
-      'tool_choice',
-      'No endpoints found that support tool',
-      'does not support tools',
-      'tool_calls',
-      'tools is not supported',
-    ];
-
-    const isToolError = toolErrorPatterns.some((pattern) =>
-      message.includes(pattern),
-    );
-
-    if (isToolError) {
-      // Cache negative result for CUSTOM provider to prevent re-requesting
-      if (llmConfig.provider === LLMProvider.CUSTOM && llmConfig.apiUrl) {
-        this.customToolSupportCache.set(
-          `${llmConfig.apiUrl}:${llmConfig.model}`,
-          false,
-        );
-      }
-      throw new Error(
-        `The selected model "${llmConfig.model}" does not support tool calling. ` +
-          'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
-      );
-    }
-
-    throw error;
-  }
-
-  /**
-   * Creates a merged ReadableStream that combines:
-   * 1. A `conversation-created` metadata chunk at the start of the stream
-   * 2. Chunks from the AI stream (text-delta, tool-call, ...)
-   * 3. Asynchronous `todos-updated` chunks (emitted by the EventEmitter)
-   */
-  private createMergedStream(
-    params: StreamCreationParams,
-  ): ReadableStream<UIMessageChunk> {
-    const { aiStream, conversationId, todosEmitter, abortSignal } = params;
-
-    let controllerClosed = false;
-
-    return new ReadableStream<UIMessageChunk>({
-      async start(controller) {
-        // Emit initial chunk to notify the frontend that the conversation was created
-        controller.enqueue({
-          type: 'data-conversation-created',
-          data: { conversationId },
-        });
-
-        // Get a reader for the AI stream to forward text/tool-call chunks
-        const reader = aiStream.getReader();
-
-        // Subscribe to todos-updated events from the emitter
-        const onTodosUpdated = (updatedTodos: AgentTodoItem[]) => {
-          controller.enqueue({
-            type: 'data-todos-updated',
-            data: { todos: updatedTodos },
-          } as unknown as UIMessageChunk);
-        };
-
-        todosEmitter.on('todos-updated', onTodosUpdated);
-
-        // Subscribe to remote-execute-output events from the emitter
-        const onRemoteExecuteOutput = (data: {
-          toolCallId: string;
-          type: number;
-          data: string;
-          exitCode: number;
-        }) => {
-          controller.enqueue({
-            type: 'data-remote-execute-output',
-            data,
-          } as unknown as UIMessageChunk);
-        };
-
-        todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
-
-        // Subscribe to stream-error events from the emitter (provider errors, etc.)
-        // This propagates detailed error messages from the AI provider to the frontend.
-        const onStreamError = (data: { message: string }) => {
-          if (controllerClosed) return;
-          controller.enqueue({
-            type: 'error',
-            error: data,
-          } as unknown as UIMessageChunk);
-        };
-        todosEmitter.on('stream-error', onStreamError);
-
-        // When abort signal fires, immediately cancel the reader and close the controller
-        const onAbort = () => {
-          if (controllerClosed) return;
-          controllerClosed = true;
-          reader.cancel().catch(() => {});
-          try {
-            controller.close();
-          } catch {
-            // Controller might already be in an error state
-          }
-        };
-
-        if (abortSignal) {
-          abortSignal.addEventListener('abort', onAbort, { once: true });
-        }
-
-        try {
-          // Read chunks from the AI stream one by one
-          while (true) {
-            if (abortSignal?.aborted || controllerClosed) break;
-
-            const { done, value } = await reader.read();
-            if (done || controllerClosed) break;
-            controller.enqueue(value);
-          }
-        } finally {
-          if (abortSignal) {
-            abortSignal.removeEventListener('abort', onAbort);
-          }
-          todosEmitter.off('todos-updated', onTodosUpdated);
-          todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
-          todosEmitter.off('stream-error', onStreamError);
-          reader.releaseLock();
-        }
-
-        if (!controllerClosed) {
-          try {
-            controller.close();
-          } catch {
-            // Stream might already be in an errored state
-          }
-        }
-      },
-    });
-  }
-
   /**
    * Retrieves the effective context window for a given LLM config.
    * Priority: contextWindow column (user override) > default (128k).
@@ -1192,7 +1054,12 @@ export class AgentsCompletionsService {
         },
       });
       resolveFinish?.();
-      return { aiStream: emptyStream, conversationId, todosEmitter, finishPromise };
+      return {
+        aiStream: emptyStream,
+        conversationId,
+        todosEmitter,
+        finishPromise,
+      };
     }
 
     // Determine max output tokens based on agent mode and LLM config
@@ -1289,7 +1156,9 @@ export class AgentsCompletionsService {
                 metadata: { ...assistantMessageMetadata, status: 'aborted' },
               },
             )
-            .catch((err) => this.logger.error('Error saving aborted message', err));
+            .catch((err) =>
+              this.logger.error('Error saving aborted message', err),
+            );
         };
 
         if (isAborted()) {
@@ -1359,8 +1228,7 @@ export class AgentsCompletionsService {
                   output: toolResult?.output ?? null,
                 });
               }
-              const stepText =
-                typeof step.text === 'string' ? step.text : '';
+              const stepText = typeof step.text === 'string' ? step.text : '';
               if (stepText.trim()) {
                 parts.push({ type: 'text', text: stepText.trim() });
               }
@@ -1390,7 +1258,9 @@ export class AgentsCompletionsService {
             accumulatedReasoning,
             llmConfig,
             assistantMessageMetadata,
-          ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
+          ).catch((err) =>
+            this.logger.error('Error in handleStreamFinish', err),
+          );
         })()
           .catch((err) =>
             this.logger.error('Error in critical onFinish writes', err),
@@ -1528,7 +1398,11 @@ export class AgentsCompletionsService {
         });
 
         try {
-          for (let iteration = 0; iteration < MAX_SAFETY_ITERATIONS; iteration++) {
+          for (
+            let iteration = 0;
+            iteration < MAX_SAFETY_ITERATIONS;
+            iteration++
+          ) {
             if (abortSignal?.aborted || controllerClosed) break;
 
             // Mid-loop compaction: check budget before each iteration
@@ -1556,7 +1430,12 @@ export class AgentsCompletionsService {
                   const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
                   const [stmCtx, ltmCtx] = await Promise.all([
                     this.agentsMemories.stmFormatForPrompt(conversationId),
-                    userId ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId) : Promise.resolve(''),
+                    userId
+                      ? this.agentsMemories.ltmFormatForPrompt(
+                          workspaceId,
+                          userId,
+                        )
+                      : Promise.resolve(''),
                   ]);
                   const postCompactTodos = await this.todoRepository.find({
                     where: { conversationId },
@@ -1625,8 +1504,6 @@ export class AgentsCompletionsService {
               // the continuation loop reads stale data because onFinish DB writes
               // are async and may not have committed yet when the reader drains.
               await finishPromise;
-
-
             } catch (iterationError) {
               this.logger.error(
                 `[Continuation] Error in iteration ${iteration} for ${conversationId}`,
@@ -1673,11 +1550,10 @@ export class AgentsCompletionsService {
             // Always fetch up to 20 messages in continuation loop regardless
             // of summary. hasSummary=true limits to 5 messages which loses
             // tool call context from previous iteration.
-            const updatedMessages =
-              await this.getConversationHistory(
-                conversationId,
-                false,
-              );
+            const updatedMessages = await this.getConversationHistory(
+              conversationId,
+              false,
+            );
             const prunedMessages = this.pruneContextByBudget(
               updatedMessages,
               currentContextParts,
@@ -1693,7 +1569,10 @@ export class AgentsCompletionsService {
               (t) => t.status === 'pending' || t.status === 'in_progress',
             );
             const pendingList = pendingSteps
-              .map((t, i) => `${i + 1}. [${t.status.toUpperCase()}] ${t.content} (id: ${t.id})`)
+              .map(
+                (t, i) =>
+                  `${i + 1}. [${t.status.toUpperCase()}] ${t.content} (id: ${t.id})`,
+              )
               .join('\n');
             currentModelMessages.push({
               role: 'user' as const,
@@ -1726,7 +1605,9 @@ export class AgentsCompletionsService {
               const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
               const [stmContext, ltmContext] = await Promise.all([
                 this.agentsMemories.stmFormatForPrompt(conversationId),
-                userId ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId) : Promise.resolve(''),
+                userId
+                  ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId)
+                  : Promise.resolve(''),
               ]);
               const updatedTodoEntities = await this.todoRepository.find({
                 where: { conversationId },

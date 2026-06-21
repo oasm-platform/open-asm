@@ -9,8 +9,8 @@
       "**/*.yaml",
       "**/*.yml",
       "**/*.proto",
-      "**/*.hbs",
       "**/*.md",
+      "**/*.ttf",
       "src/modules/agents/skills/**/*.md"
     ]
   }
