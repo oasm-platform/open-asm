@@ -133,8 +133,7 @@ export class AssetsService {
       .leftJoinAndSelect('asset.ipAssets', 'ipAssets')
       .leftJoin('asset_service.statusCodeAssets', 'statusCodeAssets')
       .leftJoin('asset_service.tlsAssets', 'tlsAssets')
-      .where('asset_service."isErrorPage" = false')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+      .where('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       })
       .andWhere(

@@ -228,7 +228,6 @@ export class StatisticService {
       .innerJoin('asset.target', 'target')
       .innerJoin('target.workspaceTargets', 'workspaceTarget')
       .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
-      // .andWhere('asset."isErrorPage" = false')
       .groupBy('asset_tag.tag')
       .orderBy('count', 'DESC')
       .limit(10)
@@ -275,7 +274,6 @@ export class StatisticService {
       .innerJoin('target.workspaceTargets', 'workspaceTarget')
       .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
       .andWhere('dismissal.vulnerabilityId IS NULL')
-      // .andWhere('asset."isErrorPage" = false')
       .groupBy('asset.id, asset.value')
       .orderBy('total', 'DESC')
       .limit(10)
@@ -504,7 +502,6 @@ export class StatisticService {
         'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
       .where('1=1')
-      .andWhere('assetService.isErrorPage = false')
       .andWhere('latest_http.tech IS NOT NULL');
 
     if (workspaceIds?.length) {
@@ -535,7 +532,6 @@ export class StatisticService {
 
   /**
    * Retrieves the count of AssetService entities for each workspace.
-   * Only includes services where isErrorPage = false.
    * @param workspaceIds An array of workspace IDs.
    * @returns An array of objects containing the workspaceId and service count.
    */
@@ -550,8 +546,7 @@ export class StatisticService {
       .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspaceTargets', 'wt')
-      .where('1=1')
-      .andWhere('"assetService"."isErrorPage" = false');
+      .where('1=1');
 
     if (workspaceIds?.length) {
       subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
@@ -596,8 +591,7 @@ export class StatisticService {
       .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspaceTargets', 'wt')
-      .where('1=1')
-      .andWhere('"assetService"."isErrorPage" = false');
+      .where('1=1');
 
     if (workspaceIds?.length) {
       subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
