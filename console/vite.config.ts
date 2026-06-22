@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
       ...(mode === 'development' ? [devtools()] : []),
       tanstackRouter({
         target: 'react',
-        autoCodeSplitting: false,
+        autoCodeSplitting: true,
       }),
       react(),
       tailwindcss(),
@@ -70,6 +70,7 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 5173,
       allowedHosts: true,
+      origin: env.VITE_ORIGIN || undefined,
       proxy: {
         '/api': {
           target: env.VITE_API_URL,

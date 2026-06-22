@@ -106,14 +106,15 @@ function AppRouter() {
   const { data: session, isPending } = useSession();
   const prevSessionRef = React.useRef(session);
 
+  // Reset 401 guard immediately when a fresh session arrives (render phase)
+  // to avoid race window where a query 401 fires before the effect runs.
+  if (session && !prevSessionRef.current) {
+    isHandling401 = false;
+  }
+
   useEffect(() => {
     const prevSession = prevSessionRef.current;
     prevSessionRef.current = session;
-
-    // Reset 401 guard when a fresh session arrives.
-    if (session && !prevSession) {
-      isHandling401 = false;
-    }
 
     // Session just became null (e.g. logout) — navigate directly to
     // /login instead of letting _authed re-render and flash through
