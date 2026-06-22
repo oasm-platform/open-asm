@@ -20,7 +20,7 @@ function AuthedLayout() {
   const { workspaces, isLoading: isWorkspaceLoading } = useWorkspaceSelector();
   const { pathname } = useLocation();
 
-  if (isWorkspaceLoading) return <AuthedPending />;
+  if (isWorkspaceLoading) return <LoadingScreen />;
 
   const isWorkspacesRoute = pathname.startsWith('/workspaces');
   if (!isWorkspacesRoute && (!workspaces || workspaces.length === 0)) {
