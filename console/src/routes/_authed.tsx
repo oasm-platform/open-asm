@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-router';
+import { createFileRoute, Navigate, Outlet, redirect, useLocation } from '@tanstack/react-router';
 import ProtectedLayout from '@/components/common/layout/protect-layout';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { Spinner } from '@/components/ui/spinner';
@@ -34,12 +34,7 @@ function AuthedLayout() {
 
   const isWorkspacesRoute = pathname.startsWith('/workspaces');
   if (!isWorkspacesRoute && (!workspaces || workspaces.length === 0)) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <Logo width={48} height={48} />
-        <Spinner className="size-6" />
-      </div>
-    );
+    return <Navigate to="/workspaces/create" replace />;
   }
 
   return (

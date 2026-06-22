@@ -113,10 +113,8 @@ function AppRouter() {
   );
 }
 
-const rootElement = document.getElementById('root')!;
-if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement);
-  root.render(
+function App() {
+  return (
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <MetadataProvider>
@@ -128,6 +126,10 @@ if (!rootElement.innerHTML) {
           </ThemeProvider>
         </MetadataProvider>
       </QueryClientProvider>
-    </StrictMode>,
+    </StrictMode>
   );
 }
+
+const rootElement = document.getElementById('root')!;
+const root = ReactDOM.createRoot(rootElement);
+root.render(<App />);
