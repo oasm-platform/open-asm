@@ -64,7 +64,7 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider defaultTheme="dark" storageKey="theme">
+        <ThemeProvider defaultTheme="system" storageKey="theme">
           <RouterProvider router={router} />
         </ThemeProvider>
       </QueryClientProvider>

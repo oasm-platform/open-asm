@@ -127,7 +127,7 @@ function App() {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <MetadataProvider>
-          <ThemeProvider defaultTheme="dark" storageKey="theme">
+          <ThemeProvider defaultTheme="system" storageKey="theme">
             <TooltipProvider>
               <AppRouter />
               <Toaster position="bottom-center" />
