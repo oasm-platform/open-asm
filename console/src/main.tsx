@@ -23,6 +23,9 @@ import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
 import { SESSION_QUERY_KEY, useSession } from './utils/authClient';
 
+// Deduplicate 401 handling — multiple queries may fail at once during logout.
+let isHandling401 = false;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -53,13 +56,13 @@ const queryClient = new QueryClient({
     onError: (error) => {
       if (error instanceof AxiosError) {
         if (error.response?.status === 401) {
+          if (isHandling401) return;
+          isHandling401 = true;
+
           toast.error('Session expired!');
           queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
-          const currentPath = router.history.location.pathname;
-          if (currentPath !== '/login') {
-            const redirect = `${router.history.location.href}`;
-            router.navigate({ to: '/login', search: { redirect } });
-          }
+          const redirect = `${router.history.location.href}`;
+          router.navigate({ to: '/login', search: { redirect } });
         }
       }
     },
@@ -101,15 +104,35 @@ function MetadataProvider({ children }: { children: React.ReactNode }) {
 
 function AppRouter() {
   const { data: session, isPending } = useSession();
+  const prevSessionRef = React.useRef(session);
 
   useEffect(() => {
+    const prevSession = prevSessionRef.current;
+    prevSessionRef.current = session;
+
+    // Reset 401 guard when a fresh session arrives.
+    if (session && !prevSession) {
+      isHandling401 = false;
+    }
+
+    // Session just became null (e.g. logout) — navigate directly to
+    // /login instead of letting _authed re-render and flash through
+    // /workspaces/create first.
+    if (prevSession && !session) {
+      const currentPath = router.history.location.pathname;
+      if (currentPath !== '/login') {
+        router.navigate({
+          to: '/login',
+          search: { redirect: router.history.location.href },
+        });
+      }
+      return;
+    }
+
     router.invalidate();
   }, [session]);
 
   // Wait for session to load before rendering the router.
-  // better-auth returns isPending (not isLoading) — using the wrong
-  // prop means this guard never fires and _authed sees session=null,
-  // briefly redirecting to /login on page refresh.
   if (isPending) {
     return <LoadingScreen />;
   }
