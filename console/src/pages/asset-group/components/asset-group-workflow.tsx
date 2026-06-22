@@ -327,9 +327,11 @@ export default function AssetGroupWorkflow({
               groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule
             }
             onChange={(value: UpdateTargetDtoScanSchedule) => {
+              const workflowId = groupWorkflows?.data[0]?.id;
+              if (!workflowId) return;
               updateAssetGroupWorkflowMutation(
                 {
-                  id: groupWorkflows?.data[0]?.id as string,
+                  id: workflowId,
                   data: {
                     schedule: value,
                   },

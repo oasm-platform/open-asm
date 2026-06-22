@@ -73,7 +73,7 @@ export default function Workspaces() {
                   </CardContent>
                 </Card>
               ))
-            : data?.data.map((workspace: WorkspaceResponseDto) => {
+            : (data?.data ?? []).map((workspace: WorkspaceResponseDto) => {
                 const isOwner =
                   workspace.role === WorkspaceResponseDtoRole.owner;
                 return (

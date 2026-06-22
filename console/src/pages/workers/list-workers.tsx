@@ -61,7 +61,12 @@ const ListWorkers = () => {
         scope: 'workspace',
         workspaceId: selectedWorkspaceId,
       } as WorkersControllerGetWorkersParams,
-      QueryOptions,
+      {
+        query: {
+          ...QueryOptions.query,
+          enabled: !!selectedWorkspaceId,
+        },
+      },
     );
 
   const data = activeTab === 'global' ? globalData : workspaceData;
@@ -209,7 +214,7 @@ const ListWorkers = () => {
                         className="rounded-full"
                         height={30}
                         width={30}
-                        url={`${tool.logoUrl}`}
+                        url={tool.logoUrl}
                       />
                     </Button>
                   ))}

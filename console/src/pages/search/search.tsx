@@ -79,12 +79,19 @@ export default function Search() {
   } = useWorkspaceState();
   const navigate = useNavigate();
 
-  const { data, isFetching } = useSearchControllerSearchAssetsTargets({
-    value: searchQuery,
-    workspaceId: selectedWorkspaceId,
-    page: page,
-    isSaveHistory: true,
-  });
+  const { data, isFetching } = useSearchControllerSearchAssetsTargets(
+    {
+      value: searchQuery,
+      workspaceId: selectedWorkspaceId,
+      page: page,
+      isSaveHistory: true,
+    },
+    {
+      query: {
+        enabled: !!selectedWorkspaceId && !!searchQuery,
+      },
+    },
+  );
 
   if (isFetching) {
     return (

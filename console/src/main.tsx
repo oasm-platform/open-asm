@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
 import { RouterProvider } from '@tanstack/react-router';
-import React, { StrictMode } from 'react';
+import React, { StrictMode, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from './components/ui/theme-provider';
 import { TooltipProvider } from './components/ui/tooltip';
@@ -16,34 +16,30 @@ import {
   getRootControllerGetMetadataQueryKey,
   useRootControllerGetMetadata,
 } from './services/apis/gen/queries';
-// Styles
 import './styles/index.css';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
-import { SESSION_QUERY_KEY } from './utils/authClient';
+import { SESSION_QUERY_KEY, useSession } from './utils/authClient';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
         if (import.meta.env.DEV) console.log({ failureCount, error });
-
         if (failureCount >= 0 && import.meta.env.DEV) return false;
         if (failureCount > 3 && import.meta.env.PROD) return false;
-
         return !(
           error instanceof AxiosError &&
           [401, 403].includes(error.response?.status ?? 0)
         );
       },
       refetchOnWindowFocus: import.meta.env.PROD,
-      staleTime: 10 * 1000, // 10s
+      staleTime: 10 * 1000,
     },
     mutations: {
       onError: (error) => {
         handleServerError(error);
-
         if (error instanceof AxiosError) {
           if (error.response?.status === 304) {
             toast.error('Content not modified!');
@@ -59,25 +55,11 @@ const queryClient = new QueryClient({
           toast.error('Session expired!');
           queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
           const currentPath = router.history.location.pathname;
-
           if (currentPath !== '/login') {
-            toast.error('Session expired!');
             const redirect = `${router.history.location.href}`;
             router.navigate({ to: '/login', search: { redirect } });
           }
         }
-        // if (error.response?.status === 500) {
-        //   toast.error('Internal Server Error!');
-        //   // Only navigate to error page in production to avoid disrupting HMR in development
-        //   if (import.meta.env.PROD) {
-        //     router.navigate({ to: '/500' });
-        //   }
-        // }
-        // if (error.response?.status === 403) {
-        //   if (import.meta.env.PROD) {
-        //     router.navigate({ to: '/403' });
-        //   }
-        // }
       }
     },
   }),
@@ -94,6 +76,7 @@ persistQueryClient({
   maxAge: 1000 * 60 * 5,
   dehydrateOptions: {
     shouldDehydrateQuery: (query) => {
+      if (query.state.status === 'pending') return false;
       const queryKey = JSON.stringify(query.queryKey);
       const sessionKey = JSON.stringify(SESSION_QUERY_KEY);
       return queryKey !== sessionKey;
@@ -103,22 +86,31 @@ persistQueryClient({
 
 function useMetadataTitle() {
   const { data: metadata } = useRootControllerGetMetadata({
-    query: {
-      queryKey: getRootControllerGetMetadataQueryKey(),
-    },
+    query: { queryKey: getRootControllerGetMetadataQueryKey() },
   });
-
-  React.useEffect(() => {
-    if (metadata?.name) {
-      document.title = metadata.name;
-    }
+  useEffect(() => {
+    if (metadata?.name) document.title = metadata.name;
   }, [metadata]);
 }
 
 function MetadataProvider({ children }: { children: React.ReactNode }) {
   useMetadataTitle();
-
   return <>{children}</>;
+}
+
+function AppRouter() {
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    router.invalidate();
+  }, [session]);
+
+  return (
+    <RouterProvider
+      router={router}
+      context={{ queryClient, session: session ?? null }}
+    />
+  );
 }
 
 const rootElement = document.getElementById('root')!;
@@ -130,22 +122,8 @@ if (!rootElement.innerHTML) {
         <MetadataProvider>
           <ThemeProvider defaultTheme="dark" storageKey="theme">
             <TooltipProvider>
-              <RouterProvider router={router} context={{ queryClient }} />
+              <AppRouter />
               <Toaster position="bottom-center" />
-              {/* {import.meta.env.DEV && (
-                <TanStackDevtools
-                  plugins={[
-                    {
-                      name: 'TanStack Query',
-                      render: <ReactQueryDevtoolsPanel client={queryClient} />,
-                    },
-                    {
-                      name: 'TanStack Router',
-                      render: <TanStackRouterDevtoolsPanel router={router} />,
-                    },
-                  ]}
-                />
-              )} */}
             </TooltipProvider>
           </ThemeProvider>
         </MetadataProvider>

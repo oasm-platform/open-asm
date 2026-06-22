@@ -33,7 +33,7 @@ const JobsTimeline = () => {
     });
 
     // Group by jobHistoryId first, then by target
-    const groupedByJobHistory = data?.data.reduce((acc: Record<string, Record<string, TimelineItemWithJobHistory[]>>, item) => {
+    const groupedByJobHistory = data?.data?.reduce((acc: Record<string, Record<string, TimelineItemWithJobHistory[]>>, item) => {
         const jobHistoryId = item.jobHistoryId || 'unknown';
         if (!acc[jobHistoryId]) {
             acc[jobHistoryId] = {};
@@ -125,7 +125,7 @@ const JobsTimeline = () => {
                             </div>
                         ))}
 
-                        {data?.data.length === 0 && !isLoading && (
+                        {data?.data?.length === 0 && !isLoading && (
                             <div className="text-center py-4 text-muted-foreground">
                                 No jobs found
                             </div>

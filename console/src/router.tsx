@@ -3,9 +3,11 @@ import { routeTree } from './routeTree.gen';
 import type { QueryClient } from '@tanstack/react-query';
 import { Spinner } from '@/components/ui/spinner';
 import Logo from '@/components/ui/logo';
+import type { User } from '@/utils/authClient';
 
 export interface RouterContext {
   queryClient: QueryClient;
+  session: User | null;
 }
 
 function DefaultPending() {
@@ -33,7 +35,7 @@ const router = createRouter({
   defaultPreloadStaleTime: 5 * 60 * 1000,
   defaultPendingComponent: DefaultPending,
   defaultErrorComponent: DefaultErrorComponent,
-  context: { queryClient: undefined! },
+  context: { queryClient: undefined!, session: null },
 });
 
 declare module '@tanstack/react-router' {
