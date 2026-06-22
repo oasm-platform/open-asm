@@ -10,6 +10,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import React, { StrictMode, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from './components/ui/theme-provider';
+import { LoadingScreen } from '@/components/ui/loading-screen';
 import { TooltipProvider } from './components/ui/tooltip';
 import { router } from './router';
 import {
@@ -99,11 +100,19 @@ function MetadataProvider({ children }: { children: React.ReactNode }) {
 }
 
 function AppRouter() {
-  const { data: session } = useSession();
+  const { data: session, isPending } = useSession();
 
   useEffect(() => {
     router.invalidate();
   }, [session]);
+
+  // Wait for session to load before rendering the router.
+  // better-auth returns isPending (not isLoading) — using the wrong
+  // prop means this guard never fires and _authed sees session=null,
+  // briefly redirecting to /login on page refresh.
+  if (isPending) {
+    return <LoadingScreen />;
+  }
 
   return (
     <RouterProvider

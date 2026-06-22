@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
       ...(mode === 'development' ? [devtools()] : []),
       tanstackRouter({
         target: 'react',
-        autoCodeSplitting: true,
+        autoCodeSplitting: false,
       }),
       react(),
       tailwindcss(),
