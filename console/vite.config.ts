@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         includeAssets: ['radar.svg', 'icon-192.svg'],
         manifest: {
           id: '/',
@@ -51,9 +51,9 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
           swDest: 'sw.js',
-          maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
+          maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         },
       }),
     ],

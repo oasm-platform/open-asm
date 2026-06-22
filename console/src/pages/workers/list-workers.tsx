@@ -10,7 +10,7 @@ import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
 import type { WorkersControllerGetWorkersParams } from '@/services/apis/gen/queries';
-import { useSearch } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Loader2Icon, Server } from 'lucide-react';
@@ -40,10 +40,9 @@ const ListWorkers = () => {
     ? (search.tab as TabValue)
     : 'global';
 
+  const navigate = useNavigate();
   const setActiveTab = (tab: TabValue) => {
-    const params = new URLSearchParams(window.location.search);
-    params.set('tab', tab);
-    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+    navigate({ search: { ...search, tab }, replace: true });
   };
 
   const { data: globalData, isLoading: isGlobalLoading } =

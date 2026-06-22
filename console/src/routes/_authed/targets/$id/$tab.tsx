@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import DetailTarget from '@/pages/targets/detail-target';
-import { RequireWorkspace } from '@/components/common/require-workspace';
 
 const targetDetailSearchSchema = z.object({
   animation: z.string().optional(),
@@ -30,8 +29,6 @@ const targetDetailSearchSchema = z.object({
 export const Route = createFileRoute('/_authed/targets/$id/$tab')({
   validateSearch: targetDetailSearchSchema,
   component: () => (
-    <RequireWorkspace>
       <DetailTarget />
-    </RequireWorkspace>
   ),
 });

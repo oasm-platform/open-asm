@@ -10,8 +10,7 @@ import {
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import { Bug, Loader2 } from 'lucide-react';
-import { useNavigate, useParams } from '@tanstack/react-router';
-import { Route } from '@/routes/_authed/targets/$id/$tab';
+import { getRouteApi, useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import AssetProvider from '../assets/context/asset-context';
 import { ListAssets } from '../assets/list-assets';
@@ -26,9 +25,11 @@ const TABS = [
   { value: 'vulnerabilities', label: 'Vulnerabilities' },
 ];
 
+const routeApi = getRouteApi('/_authed/targets/$id/$tab');
+
 export function DetailTarget() {
   const { id, tab } = useParams({ from: '/_authed/targets/$id/$tab' });
-  const { animation } = Route.useSearch();
+  const { animation } = routeApi.useSearch();
   const navigate = useNavigate({ from: '/targets/$id/$tab' });
 
   const {

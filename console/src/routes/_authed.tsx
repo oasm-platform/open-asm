@@ -1,6 +1,12 @@
-import { createFileRoute, redirect, Outlet } from '@tanstack/react-router';
+import {
+  createFileRoute,
+  Navigate,
+  Outlet,
+  useLocation,
+} from '@tanstack/react-router';
 import ProtectedLayout from '@/components/common/layout/protect-layout';
-import { sessionQueryOptions } from '@/utils/authClient';
+import { useSession } from '@/utils/authClient';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { Spinner } from '@/components/ui/spinner';
 import Logo from '@/components/ui/logo';
 
@@ -14,22 +20,26 @@ function AuthedPending() {
 }
 
 export const Route = createFileRoute('/_authed')({
-  beforeLoad: async ({ context }) => {
-    const session = await context.queryClient
-      .ensureQueryData(sessionQueryOptions)
-      .catch((err) => {
-        console.log('Session fetch error:', err);
-        return null;
-      });
-
-    if (!session) {
-      throw redirect({ to: '/login' });
-    }
-  },
   pendingComponent: AuthedPending,
-  component: () => (
+  component: AuthedLayout,
+});
+
+function AuthedLayout() {
+  const { data: session, isLoading: isSessionLoading } = useSession();
+  const { workspaces, isLoading: isWorkspaceLoading } = useWorkspaceSelector();
+  const { pathname } = useLocation();
+
+  if (isSessionLoading || isWorkspaceLoading) return <AuthedPending />;
+  if (!session) return <Navigate to="/login" />;
+
+  const isWorkspacesRoute = pathname.startsWith('/workspaces');
+  if (!isWorkspacesRoute && (!workspaces || workspaces.length === 0)) {
+    return <Navigate to="/workspaces/create" />;
+  }
+
+  return (
     <ProtectedLayout>
       <Outlet />
     </ProtectedLayout>
-  ),
-});
+  );
+}

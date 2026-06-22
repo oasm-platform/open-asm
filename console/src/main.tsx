@@ -91,7 +91,7 @@ const localStoragePersister = createSyncStoragePersister({
 persistQueryClient({
   queryClient,
   persister: localStoragePersister,
-  maxAge: 1000 * 60 * 24,
+  maxAge: 1000 * 60 * 5,
   dehydrateOptions: {
     shouldDehydrateQuery: (query) => {
       const queryKey = JSON.stringify(query.queryKey);

@@ -22,8 +22,7 @@ import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { GetManyTargetResponseDto } from '@/services/apis/gen/queries';
 import { Target } from 'lucide-react';
-import { useNavigate } from '@tanstack/react-router';
-import { Route } from '@/routes/_authed/targets/index';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { TargetTypeFilter } from './components/target-type-filter';
 import { ScopeFilter } from './components/scope-filter';
@@ -119,12 +118,14 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   },
 ];
 
+const routeApi = getRouteApi('/_authed/targets/');
+
 export function ListTargets() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const navigate = useNavigate({ from: '/targets/' });
-  const search = Route.useSearch();
+  const search = routeApi.useSearch();
 
   // Initialize type filter from URL params
   const urlType = search.type as TargetType | undefined;
