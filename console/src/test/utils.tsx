@@ -52,7 +52,7 @@ export function renderWithProviders(
   const router = createRouter({
     routeTree,
     history,
-    context: { queryClient },
+    context: { queryClient, session: null },
     defaultPendingMinMs: 0,
     defaultPreloadStaleTime: 0,
   });

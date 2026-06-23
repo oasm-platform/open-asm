@@ -42,7 +42,7 @@ const ListWorkers = () => {
 
   const navigate = useNavigate();
   const setActiveTab = (tab: TabValue) => {
-    navigate({ search: { ...search, tab }, replace: true });
+    navigate({ search: { ...search, tab } as Record<string, unknown>, replace: true });
   };
 
   const { data: globalData, isLoading: isGlobalLoading } =

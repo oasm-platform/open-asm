@@ -141,7 +141,7 @@ function AppRouter() {
   return (
     <RouterProvider
       router={router}
-      context={{ queryClient, session: session ?? null }}
+      context={{ queryClient, session: session?.user ?? null }}
     />
   );
 }
