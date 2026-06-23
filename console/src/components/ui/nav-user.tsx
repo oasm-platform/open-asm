@@ -39,8 +39,11 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
     await signOut({
       fetchOptions: {
         onSuccess: async () => {
-          queryClient.clear();
+          // Navigate first so _authed unmounts before we wipe the cache.
+          // This prevents the workspace selector from refetching with an
+          // empty session and briefly flashing /workspaces/create.
           await navigate({ to: '/login' });
+          queryClient.clear();
         },
         onError: (ctx) => {
           console.error('Logout failed:', ctx.error);

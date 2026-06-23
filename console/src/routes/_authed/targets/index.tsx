@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import Targets from '@/pages/targets/targets';
-import { RequireWorkspace } from '@/components/common/require-workspace';
 
 const targetsSearchSchema = z.object({
   page: z.number().default(1),
@@ -17,8 +16,6 @@ const targetsSearchSchema = z.object({
 export const Route = createFileRoute('/_authed/targets/')({
   validateSearch: targetsSearchSchema,
   component: () => (
-    <RequireWorkspace>
       <Targets />
-    </RequireWorkspace>
   ),
 });

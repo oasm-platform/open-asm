@@ -7,7 +7,10 @@ import Targets from '@/pages/targets/targets';
 
 describe('Targets Page', () => {
   it('renders targets table with data', async () => {
-    renderWithProviders(<Targets />);
+    renderWithProviders(<Targets />, {
+      routePath: '/_authed/targets/',
+      initialEntries: ['/_authed/targets/'],
+    });
 
     await waitFor(() => {
       expect(screen.getByText('example.com')).toBeInTheDocument();
@@ -33,7 +36,10 @@ describe('Targets Page', () => {
       }),
     );
 
-    renderWithProviders(<Targets />);
+    renderWithProviders(<Targets />, {
+      routePath: '/_authed/targets/',
+      initialEntries: ['/_authed/targets/'],
+    });
 
     await waitFor(() => {
       expect(screen.getByText('No data')).toBeInTheDocument();
@@ -42,7 +48,10 @@ describe('Targets Page', () => {
 
   it('handles search/filter', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Targets />);
+    renderWithProviders(<Targets />, {
+      routePath: '/_authed/targets/',
+      initialEntries: ['/_authed/targets/'],
+    });
 
     await waitFor(() => {
       expect(screen.getByText('example.com')).toBeInTheDocument();

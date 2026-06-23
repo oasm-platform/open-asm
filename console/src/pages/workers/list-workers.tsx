@@ -10,7 +10,7 @@ import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
 import type { WorkersControllerGetWorkersParams } from '@/services/apis/gen/queries';
-import { useSearch } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Loader2Icon, Server } from 'lucide-react';
@@ -40,10 +40,10 @@ const ListWorkers = () => {
     ? (search.tab as TabValue)
     : 'global';
 
+  const navigate = useNavigate();
   const setActiveTab = (tab: TabValue) => {
-    const params = new URLSearchParams(window.location.search);
-    params.set('tab', tab);
-    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    navigate({ search: { ...search, tab } as any, replace: true });
   };
 
   const { data: globalData, isLoading: isGlobalLoading } =
@@ -62,7 +62,12 @@ const ListWorkers = () => {
         scope: 'workspace',
         workspaceId: selectedWorkspaceId,
       } as WorkersControllerGetWorkersParams,
-      QueryOptions,
+      {
+        query: {
+          ...QueryOptions.query,
+          enabled: !!selectedWorkspaceId,
+        },
+      },
     );
 
   const data = activeTab === 'global' ? globalData : workspaceData;
@@ -210,7 +215,7 @@ const ListWorkers = () => {
                         className="rounded-full"
                         height={30}
                         width={30}
-                        url={`${tool.logoUrl}`}
+                        url={tool.logoUrl}
                       />
                     </Button>
                   ))}

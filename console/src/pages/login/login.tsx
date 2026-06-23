@@ -9,11 +9,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Route } from '@/routes/login';
-import { authClient, SESSION_QUERY_KEY } from '@/utils/authClient';
+import { authClient } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -24,8 +22,10 @@ const formSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+const routeApi = getRouteApi('/login');
+
 export default function Login() {
-  const { redirect: redirectUrl } = Route.useSearch();
+  const { redirect: redirectUrl } = routeApi.useSearch();
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -36,7 +36,6 @@ export default function Login() {
 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
@@ -45,8 +44,7 @@ export default function Login() {
       password: values.password,
       fetchOptions: {
         onSuccess: async () => {
-          queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
-          await navigate({ to: redirectUrl || '/' });
+          await navigate({ to: redirectUrl || '/', replace: true });
         },
         onError: (ctx) => {
           form.setError('password', {

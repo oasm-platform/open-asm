@@ -15,8 +15,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
-import { Route } from '@/routes/_authed/agents/index';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
 
@@ -57,9 +56,11 @@ const ALL_QUICK_SUGGESTIONS = [
   'What services are running with excessive permissions?',
 ];
 
+const routeApi = getRouteApi('/_authed/agents/');
+
 export default function AgentsLandingPage() {
   const navigate = useNavigate();
-  const { text: queryText } = Route.useSearch();
+  const { text: queryText } = routeApi.useSearch();
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
     provider: string;

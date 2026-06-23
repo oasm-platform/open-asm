@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
-import { RequireWorkspace } from '@/components/common/require-workspace';
 
 const vulnerabilitiesSearchSchema = z.object({
   page: z.number().default(1),
@@ -20,8 +19,6 @@ const vulnerabilitiesSearchSchema = z.object({
 export const Route = createFileRoute('/_authed/vulnerabilities/')({
   validateSearch: vulnerabilitiesSearchSchema,
   component: () => (
-    <RequireWorkspace>
       <Vulnerabilities />
-    </RequireWorkspace>
   ),
 });

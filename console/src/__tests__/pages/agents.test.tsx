@@ -57,7 +57,10 @@ describe('Agents Page', () => {
       data: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
     } as ReturnType<typeof useAgentsControllerGetLLMConfigs>);
 
-    renderWithProviders(<AgentsLandingPage />);
+    renderWithProviders(<AgentsLandingPage />, {
+      routePath: '/_authed/agents/',
+      initialEntries: ['/_authed/agents/'],
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId('typewriter-text')).toBeInTheDocument();
@@ -73,7 +76,10 @@ describe('Agents Page', () => {
       data: [],
     } as ReturnType<typeof useAgentsControllerGetLLMConfigs>);
 
-    renderWithProviders(<AgentsLandingPage />);
+    renderWithProviders(<AgentsLandingPage />, {
+      routePath: '/_authed/agents/',
+      initialEntries: ['/_authed/agents/'],
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Connect an AI Provider')).toBeInTheDocument();
@@ -98,7 +104,10 @@ describe('Agents Page', () => {
       },
     } as ReturnType<typeof useAgentsControllerGetConversations>);
 
-    renderWithProviders(<AgentsLandingPage />);
+    renderWithProviders(<AgentsLandingPage />, {
+      routePath: '/_authed/agents/',
+      initialEntries: ['/_authed/agents/'],
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Recent conversations')).toBeInTheDocument();

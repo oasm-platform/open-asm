@@ -17,8 +17,7 @@ import {
   TargetIcon,
 } from 'lucide-react';
 import * as React from 'react';
-import { useNavigate } from '@tanstack/react-router';
-import { Route } from '@/routes/_authed/search';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 
 interface SearchItem {
   id: string;
@@ -70,20 +69,29 @@ function SearchResultSection({
   );
 }
 
+const routeApi = getRouteApi('/_authed/search');
+
 export default function Search() {
-  const { query: searchQuery } = Route.useSearch();
+  const { query: searchQuery } = routeApi.useSearch();
   const [page, setPage] = React.useState(1);
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const navigate = useNavigate();
 
-  const { data, isFetching } = useSearchControllerSearchAssetsTargets({
-    value: searchQuery,
-    workspaceId: selectedWorkspaceId,
-    page: page,
-    isSaveHistory: true,
-  });
+  const { data, isFetching } = useSearchControllerSearchAssetsTargets(
+    {
+      value: searchQuery,
+      workspaceId: selectedWorkspaceId,
+      page: page,
+      isSaveHistory: true,
+    },
+    {
+      query: {
+        enabled: !!selectedWorkspaceId && !!searchQuery,
+      },
+    },
+  );
 
   if (isFetching) {
     return (

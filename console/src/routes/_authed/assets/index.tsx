@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import Assets from '@/pages/assets/assets';
-import { RequireWorkspace } from '@/components/common/require-workspace';
 
 const assetsSearchSchema = z.object({
   tab: z.string().default('service'),
@@ -23,8 +22,6 @@ const assetsSearchSchema = z.object({
 export const Route = createFileRoute('/_authed/assets/')({
   validateSearch: assetsSearchSchema,
   component: () => (
-    <RequireWorkspace>
       <Assets />
-    </RequireWorkspace>
   ),
 });

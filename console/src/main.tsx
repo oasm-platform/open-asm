@@ -7,43 +7,43 @@ import {
 } from '@tanstack/react-query';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
 import { RouterProvider } from '@tanstack/react-router';
-import React, { StrictMode } from 'react';
+import React, { StrictMode, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from './components/ui/theme-provider';
+import { LoadingScreen } from '@/components/ui/loading-screen';
 import { TooltipProvider } from './components/ui/tooltip';
 import { router } from './router';
 import {
   getRootControllerGetMetadataQueryKey,
   useRootControllerGetMetadata,
 } from './services/apis/gen/queries';
-// Styles
 import './styles/index.css';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
-import { SESSION_QUERY_KEY } from './utils/authClient';
+import { SESSION_QUERY_KEY, useSession, type User } from './utils/authClient';
+
+// Deduplicate 401 handling — multiple queries may fail at once during logout.
+let isHandling401 = false;
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
         if (import.meta.env.DEV) console.log({ failureCount, error });
-
         if (failureCount >= 0 && import.meta.env.DEV) return false;
         if (failureCount > 3 && import.meta.env.PROD) return false;
-
         return !(
           error instanceof AxiosError &&
           [401, 403].includes(error.response?.status ?? 0)
         );
       },
       refetchOnWindowFocus: import.meta.env.PROD,
-      staleTime: 10 * 1000, // 10s
+      staleTime: 10 * 1000,
     },
     mutations: {
       onError: (error) => {
         handleServerError(error);
-
         if (error instanceof AxiosError) {
           if (error.response?.status === 304) {
             toast.error('Content not modified!');
@@ -56,28 +56,14 @@ const queryClient = new QueryClient({
     onError: (error) => {
       if (error instanceof AxiosError) {
         if (error.response?.status === 401) {
+          if (isHandling401) return;
+          isHandling401 = true;
+
           toast.error('Session expired!');
           queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
-          const currentPath = router.history.location.pathname;
-
-          if (currentPath !== '/login') {
-            toast.error('Session expired!');
-            const redirect = `${router.history.location.href}`;
-            router.navigate({ to: '/login', search: { redirect } });
-          }
+          const redirect = `${router.history.location.href}`;
+          router.navigate({ to: '/login', search: { redirect } });
         }
-        // if (error.response?.status === 500) {
-        //   toast.error('Internal Server Error!');
-        //   // Only navigate to error page in production to avoid disrupting HMR in development
-        //   if (import.meta.env.PROD) {
-        //     router.navigate({ to: '/500' });
-        //   }
-        // }
-        // if (error.response?.status === 403) {
-        //   if (import.meta.env.PROD) {
-        //     router.navigate({ to: '/403' });
-        //   }
-        // }
       }
     },
   }),
@@ -91,9 +77,10 @@ const localStoragePersister = createSyncStoragePersister({
 persistQueryClient({
   queryClient,
   persister: localStoragePersister,
-  maxAge: 1000 * 60 * 24,
+  maxAge: 1000 * 60 * 5,
   dehydrateOptions: {
     shouldDehydrateQuery: (query) => {
+      if (query.state.status === 'pending') return false;
       const queryKey = JSON.stringify(query.queryKey);
       const sessionKey = JSON.stringify(SESSION_QUERY_KEY);
       return queryKey !== sessionKey;
@@ -103,53 +90,79 @@ persistQueryClient({
 
 function useMetadataTitle() {
   const { data: metadata } = useRootControllerGetMetadata({
-    query: {
-      queryKey: getRootControllerGetMetadataQueryKey(),
-    },
+    query: { queryKey: getRootControllerGetMetadataQueryKey() },
   });
-
-  React.useEffect(() => {
-    if (metadata?.name) {
-      document.title = metadata.name;
-    }
+  useEffect(() => {
+    if (metadata?.name) document.title = metadata.name;
   }, [metadata]);
 }
 
 function MetadataProvider({ children }: { children: React.ReactNode }) {
   useMetadataTitle();
-
   return <>{children}</>;
 }
 
-const rootElement = document.getElementById('root')!;
-if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement);
-  root.render(
+function AppRouter() {
+  const { data: session, isPending } = useSession();
+  const prevSessionRef = React.useRef(session);
+
+  // Reset 401 guard immediately when a fresh session arrives (render phase)
+  // to avoid race window where a query 401 fires before the effect runs.
+  if (session && !prevSessionRef.current) {
+    isHandling401 = false;
+  }
+
+  useEffect(() => {
+    const prevSession = prevSessionRef.current;
+    prevSessionRef.current = session;
+
+    // Session just became null (e.g. logout) — navigate directly to
+    // /login instead of letting _authed re-render and flash through
+    // /workspaces/create first.
+    if (prevSession && !session) {
+      const currentPath = router.history.location.pathname;
+      if (currentPath !== '/login') {
+        router.navigate({
+          to: '/login',
+          search: { redirect: router.history.location.href },
+        });
+      }
+      return;
+    }
+
+    router.invalidate();
+  }, [session]);
+
+  // Wait for session to load before rendering the router.
+  if (isPending) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <RouterProvider
+      router={router}
+      context={{ queryClient, session: (session?.user as User | null) ?? null }}
+    />
+  );
+}
+
+function App() {
+  return (
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <MetadataProvider>
-          <ThemeProvider defaultTheme="dark" storageKey="theme">
+          <ThemeProvider defaultTheme="system" storageKey="theme">
             <TooltipProvider>
-              <RouterProvider router={router} context={{ queryClient }} />
+              <AppRouter />
               <Toaster position="bottom-center" />
-              {/* {import.meta.env.DEV && (
-                <TanStackDevtools
-                  plugins={[
-                    {
-                      name: 'TanStack Query',
-                      render: <ReactQueryDevtoolsPanel client={queryClient} />,
-                    },
-                    {
-                      name: 'TanStack Router',
-                      render: <TanStackRouterDevtoolsPanel router={router} />,
-                    },
-                  ]}
-                />
-              )} */}
             </TooltipProvider>
           </ThemeProvider>
         </MetadataProvider>
       </QueryClientProvider>
-    </StrictMode>,
+    </StrictMode>
   );
 }
+
+const rootElement = document.getElementById('root')!;
+const root = ReactDOM.createRoot(rootElement);
+root.render(<App />);

@@ -13,14 +13,15 @@ const Marketplace = () => {
     {
       query: {
         queryKey: [selectedWorkspaceId],
+        enabled: !!selectedWorkspaceId,
       },
     },
   );
   return (
     <div>
       <ToolsList
-        data={data?.data}
-        isLoading={isLoading}
+        data={data?.data ?? []}
+        isLoading={isLoading || !selectedWorkspaceId}
         icon={<LayoutGrid className="w-6 h-6" />}
         title="Marketplace"
         renderButton={(tool) => (

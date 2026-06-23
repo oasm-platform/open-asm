@@ -24,35 +24,38 @@ export function renderWithProviders(
   options: {
     initialEntries?: string[];
     queryClient?: QueryClient;
+    routePath?: string;
   } = {}
 ) {
   const {
-    initialEntries = ['/'],
     queryClient = createTestQueryClient(),
+    routePath = '/',
   } = options;
+
+  const initialEntries = options.initialEntries ?? [routePath];
 
   const rootRoute = createRootRoute();
 
-  // Create a test index route that renders the component under test
-  const indexRoute = createRoute({
+  // Create a test route that renders the component under test
+  const testRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '/',
+    path: routePath,
     component: () => <div data-testid="test-wrapper">{ui}</div>,
   });
 
-  // Create a catch-all splat route for non-root paths
+  // Create a catch-all splat route for non-matching paths (e.g. nested routes)
   const splatRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '$',
     component: () => <div data-testid="test-wrapper">{ui}</div>,
   });
 
-  const routeTree = rootRoute.addChildren([indexRoute, splatRoute]);
+  const routeTree = rootRoute.addChildren([testRoute, splatRoute]);
   const history = createMemoryHistory({ initialEntries });
   const router = createRouter({
     routeTree,
     history,
-    context: { queryClient },
+    context: { queryClient, session: null },
     defaultPendingMinMs: 0,
     defaultPreloadStaleTime: 0,
   });
@@ -64,7 +67,7 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider defaultTheme="dark" storageKey="theme">
+        <ThemeProvider defaultTheme="system" storageKey="theme">
           <RouterProvider router={router} />
         </ThemeProvider>
       </QueryClientProvider>

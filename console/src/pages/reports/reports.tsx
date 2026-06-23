@@ -244,10 +244,7 @@ export default function Reports() {
   if (wsLoading) return null;
 
   return (
-    <Page
-      title="Reports"
-      action={null}
-    >
+    <Page title="Reports" action={null}>
       <Dialog
         open={generateOpen}
         onOpenChange={(open) => {
@@ -438,11 +435,26 @@ export default function Reports() {
                   <div className="w-full rounded-lg bg-card shadow-sm border p-2 space-y-1.5">
                     <div className="h-1.5 w-12 bg-muted rounded" />
                     <div className="flex items-end gap-0.5 h-8">
-                      <div className="flex-1 bg-blue-400 rounded-t" style={{ height: '60%' }} />
-                      <div className="flex-1 bg-blue-300 rounded-t" style={{ height: '80%' }} />
-                      <div className="flex-1 bg-blue-500 rounded-t" style={{ height: '45%' }} />
-                      <div className="flex-1 bg-blue-300 rounded-t" style={{ height: '90%' }} />
-                      <div className="flex-1 bg-blue-400 rounded-t" style={{ height: '70%' }} />
+                      <div
+                        className="flex-1 bg-blue-400 rounded-t"
+                        style={{ height: '60%' }}
+                      />
+                      <div
+                        className="flex-1 bg-blue-300 rounded-t"
+                        style={{ height: '80%' }}
+                      />
+                      <div
+                        className="flex-1 bg-blue-500 rounded-t"
+                        style={{ height: '45%' }}
+                      />
+                      <div
+                        className="flex-1 bg-blue-300 rounded-t"
+                        style={{ height: '90%' }}
+                      />
+                      <div
+                        className="flex-1 bg-blue-400 rounded-t"
+                        style={{ height: '70%' }}
+                      />
                     </div>
                     <div className="space-y-0.5">
                       <div className="h-1 w-full bg-muted rounded" />
@@ -451,7 +463,9 @@ export default function Reports() {
                   </div>
                 </div>
                 <div className="px-3 py-2">
-                  <p className="font-semibold text-xs leading-tight">Summary Report</p>
+                  <p className="font-semibold text-xs leading-tight">
+                    Summary Report
+                  </p>
                 </div>
               </div>
 
@@ -500,7 +514,9 @@ export default function Reports() {
                   </div>
                 </div>
                 <div className="px-3 py-2">
-                  <p className="font-semibold text-xs leading-tight">Vulnerability Report</p>
+                  <p className="font-semibold text-xs leading-tight">
+                    Vulnerability Report
+                  </p>
                 </div>
               </div>
             </div>
