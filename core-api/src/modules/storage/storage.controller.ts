@@ -6,6 +6,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -194,6 +195,61 @@ export class StorageController {
   }
 
   @Public()
+  @Get(':bucket/:path/download')
+  @ApiOperation({ summary: 'Download a file with time-limited token' })
+  @ApiParam({ name: 'bucket', type: String, required: true })
+  @ApiParam({ name: 'path', type: String, required: true })
+  @ApiQuery({ name: 'token', type: String, required: true, description: 'Time-limited download token' })
+  @ApiResponse({
+    status: 200,
+    description: 'File downloaded successfully',
+    content: {
+      'application/octet-stream': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async downloadFile(
+    @Param('bucket') bucket: string,
+    @Param('path') path: string,
+    @Query('token') token: string,
+    @Res({ passthrough: true })
+    res: { set: (headers: Record<string, string>) => void },
+  ): Promise<StreamableFile> {
+    if (!token) {
+      throw new BadRequestException('Download token is required');
+    }
+
+    // Verify token and extract bucket/path from it (not from URL params)
+    const verified = this.storageService.verifyDownloadToken(token);
+
+    // Token-embedded values take precedence over URL params
+    const cleanPath = verified.filePath;
+    const fileBucket = verified.bucket;
+
+    const file = await this.storageService.getFile(cleanPath, fileBucket);
+
+    const extension = cleanPath.split('.').pop()?.toLowerCase();
+    if (extension) {
+      const mimeType = this.getMimeType(extension);
+      if (mimeType) {
+        res.set({
+          'Content-Type': mimeType,
+          'Content-Disposition': `attachment; filename="${cleanPath.split('/').pop()}"`,
+          'Cache-Control': 'no-store',
+        });
+      }
+    }
+
+    return file;
+  }
+
+  @Public()
   @Get(':bucket/:path')
   @ApiOperation({ summary: 'Get a file from storage (public)' })
   @ApiParam({ name: 'bucket', type: String, required: true })
@@ -222,6 +278,10 @@ export class StorageController {
   ): Promise<StreamableFile> {
     if (!path) {
       throw new NotFoundException('File path is required');
+    }
+
+    if (this.storageService.isPrivateBucket(bucket)) {
+      throw new ForbiddenException('Access denied');
     }
 
     const cleanPath = path.replace(/^\/+/, '');
