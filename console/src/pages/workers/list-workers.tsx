@@ -42,7 +42,8 @@ const ListWorkers = () => {
 
   const navigate = useNavigate();
   const setActiveTab = (tab: TabValue) => {
-    navigate({ search: { ...search, tab } as Record<string, unknown>, replace: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    navigate({ search: { ...search, tab } as any, replace: true });
   };
 
   const { data: globalData, isLoading: isGlobalLoading } =

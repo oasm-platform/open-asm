@@ -21,7 +21,7 @@ import './styles/index.css';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
-import { SESSION_QUERY_KEY, useSession } from './utils/authClient';
+import { SESSION_QUERY_KEY, useSession, type User } from './utils/authClient';
 
 // Deduplicate 401 handling — multiple queries may fail at once during logout.
 let isHandling401 = false;
@@ -141,7 +141,7 @@ function AppRouter() {
   return (
     <RouterProvider
       router={router}
-      context={{ queryClient, session: session?.user ?? null }}
+      context={{ queryClient, session: (session?.user as User | null) ?? null }}
     />
   );
 }
