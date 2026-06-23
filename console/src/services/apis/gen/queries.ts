@@ -2171,6 +2171,8 @@ export type ReportResponseDto = {
   fileName: string;
   type: ReportResponseDtoType;
   createdAt: string;
+  /** Presigned download URL (expires in 15 minutes) */
+  downloadUrl: string;
 };
 
 export type GetManyReportResponseDtoDto = {
@@ -2825,6 +2827,13 @@ export type StorageControllerUploadFile200 = {
   path?: string;
   bucket?: string;
   fullPath?: string;
+};
+
+export type StorageControllerDownloadFileParams = {
+  /**
+   * Time-limited download token
+   */
+  token: string;
 };
 
 export type StorageControllerForwardImageParams = {
@@ -31499,6 +31508,208 @@ export const useStorageControllerUploadFile = <
     queryClient,
   );
 };
+
+/**
+ * @summary Download a file with time-limited token
+ */
+export const storageControllerDownloadFile = (
+  bucket: string,
+  path: string,
+  params: StorageControllerDownloadFileParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Blob>(
+    {
+      url: `/api/storage/${bucket}/${path}/download`,
+      method: 'GET',
+      params,
+      responseType: 'blob',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerDownloadFileQueryKey = (
+  bucket: string,
+  path: string,
+  params?: StorageControllerDownloadFileParams,
+) => {
+  return [
+    `/api/storage/${bucket}/${path}/download`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getStorageControllerDownloadFileQueryOptions = <
+  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  params: StorageControllerDownloadFileParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getStorageControllerDownloadFileQueryKey(bucket, path, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerDownloadFile>>
+  > = ({ signal }) =>
+    storageControllerDownloadFile(bucket, path, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      bucket !== null &&
+      bucket !== undefined &&
+      path !== null &&
+      path !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerDownloadFileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerDownloadFile>>
+>;
+export type StorageControllerDownloadFileQueryError = void;
+
+export function useStorageControllerDownloadFile<
+  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  params: StorageControllerDownloadFileParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerDownloadFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerDownloadFile<
+  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  params: StorageControllerDownloadFileParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerDownloadFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerDownloadFile<
+  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  params: StorageControllerDownloadFileParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Download a file with time-limited token
+ */
+
+export function useStorageControllerDownloadFile<
+  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  params: StorageControllerDownloadFileParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerDownloadFileQueryOptions(
+    bucket,
+    path,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get a file from storage (public)

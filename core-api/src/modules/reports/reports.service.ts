@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { generateToken } from '@/utils/genToken';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { StorageService } from '@/modules/storage/storage.service';
@@ -71,7 +72,16 @@ export class ReportsService {
     qb.orderBy(sortColumn, sortOrder);
 
     const total = await qb.getCount();
-    const data = await qb.limit(limit).offset(offset).getMany();
+    const reports = await qb.limit(limit).offset(offset).getMany();
+
+    const data = reports.map((report) => {
+      const idx = report.path.indexOf('/');
+      const bucket = report.path.slice(0, idx);
+      const filePath = report.path.slice(idx + 1);
+      const token = this.storageService.generateDownloadToken(filePath, bucket);
+      const downloadUrl = `${STORAGE_BASE_PATH}/${bucket}/${encodeURIComponent(filePath)}/download?token=${token}`;
+      return { ...report, downloadUrl };
+    });
 
     return getManyResponse({ query, data, total });
   }
@@ -120,7 +130,7 @@ export class ReportsService {
 
     const pdfBuffer = await renderReportPdf(type, enrichedData);
 
-    const fileName = `report-${type.toLowerCase()}-${generateToken(8)}-${Date.now()}.pdf`;
+    const fileName = `report-${type.toLowerCase()}-${generateToken(24)}-${Date.now()}.pdf`;
     const { path: uploadPath } = await this.storageService.uploadFile(
       fileName,
       pdfBuffer,
