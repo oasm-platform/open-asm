@@ -19,43 +19,47 @@ export default defineConfig(({ mode }) => {
       }),
       react(),
       tailwindcss(),
-      VitePWA({
-        registerType: 'prompt',
-        includeAssets: ['radar.svg', 'icon-192.svg'],
-        manifest: {
-          id: '/',
-          name: 'OpenASM - AI Agent Management Platform',
-          short_name: 'OpenASM',
-          description:
-            'AI agent management and automation platform with MCP integration',
-          scope: '/',
-          start_url: '/',
-          lang: 'en',
-          theme_color: '#3b5bdb',
-          background_color: '#fbfbfd',
-          display: 'standalone',
-          orientation: 'portrait-primary',
-          icons: [
-            {
-              src: 'icon-192.svg',
-              sizes: '192x192',
-              type: 'image/svg+xml',
-              purpose: 'any',
-            },
-            {
-              src: 'icon-192.svg',
-              sizes: '512x512',
-              type: 'image/svg+xml',
-              purpose: 'maskable',
-            },
-          ],
-        },
-        workbox: {
-          globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
-          swDest: 'sw.js',
-          maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        },
-      }),
+      ...(mode === 'production'
+        ? [
+            VitePWA({
+              registerType: 'prompt',
+              includeAssets: ['radar.svg', 'icon-192.svg'],
+              manifest: {
+                id: '/',
+                name: 'OpenASM - AI Agent Management Platform',
+                short_name: 'OpenASM',
+                description:
+                  'AI agent management and automation platform with MCP integration',
+                scope: '/',
+                start_url: '/',
+                lang: 'en',
+                theme_color: '#3b5bdb',
+                background_color: '#fbfbfd',
+                display: 'standalone',
+                orientation: 'portrait-primary',
+                icons: [
+                  {
+                    src: 'icon-192.svg',
+                    sizes: '192x192',
+                    type: 'image/svg+xml',
+                    purpose: 'any',
+                  },
+                  {
+                    src: 'icon-192.svg',
+                    sizes: '512x512',
+                    type: 'image/svg+xml',
+                    purpose: 'maskable',
+                  },
+                ],
+              },
+              workbox: {
+                globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+                swDest: 'sw.js',
+                maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
+              },
+            }),
+          ]
+        : []),
     ],
     resolve: {
       alias: {
