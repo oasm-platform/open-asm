@@ -199,7 +199,12 @@ export class StorageController {
   @ApiOperation({ summary: 'Download a file with time-limited token' })
   @ApiParam({ name: 'bucket', type: String, required: true })
   @ApiParam({ name: 'path', type: String, required: true })
-  @ApiQuery({ name: 'token', type: String, required: true, description: 'Time-limited download token' })
+  @ApiQuery({
+    name: 'token',
+    type: String,
+    required: true,
+    description: 'Time-limited download token',
+  })
   @ApiResponse({
     status: 200,
     description: 'File downloaded successfully',
@@ -299,72 +304,6 @@ export class StorageController {
     }
 
     return file;
-  }
-
-  @Public()
-  @Get('forward')
-  @ApiOperation({ summary: 'Forward an image from a URL' })
-  @ApiQuery({
-    name: 'url',
-    type: String,
-    required: true,
-    description: 'The URL of the image to forward',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Image forwarded successfully',
-    content: {
-      'image/*': {
-        schema: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - URL is required or invalid',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Image not found at the provided URL',
-  })
-  async forwardImage(
-    @Query('url') url: string,
-    @Res({ passthrough: true })
-    res: { set: (headers: Record<string, string>) => void },
-  ): Promise<StreamableFile> {
-    // Validate URL
-    if (!url) {
-      throw new BadRequestException('URL query parameter is required');
-    }
-
-    try {
-      const { buffer, contentType } =
-        await this.storageService.forwardImage(url);
-
-      // Set the content type header
-      res.set({
-        'Content-Type': contentType,
-        'Cache-Control': `max-age=${CACHE_STATIC_RESOURCE}, no-transform`,
-      });
-
-      // Return the image as a StreamableFile
-      return new StreamableFile(buffer);
-    } catch (error) {
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      }
-
-      // Handle network errors or other unexpected errors
-      throw new BadRequestException(
-        'Failed to fetch image from the provided URL',
-      );
-    }
   }
 
   private getMimeType(extension?: string): string | undefined {
