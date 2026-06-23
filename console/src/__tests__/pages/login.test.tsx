@@ -32,7 +32,10 @@ describe('Login Page', () => {
   });
 
   it('renders login form with email and password fields', async () => {
-    renderWithProviders(<Login />);
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+    });
 
     expect(await screen.findByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
@@ -43,7 +46,10 @@ describe('Login Page', () => {
 
   it('shows validation error for invalid email', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Login />);
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+    });
 
     await screen.findByLabelText(/email/i);
     await user.type(screen.getByLabelText(/email/i), 'not-an-email');
@@ -57,7 +63,10 @@ describe('Login Page', () => {
 
   it('shows validation error for short password', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Login />);
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+    });
 
     await screen.findByLabelText(/email/i);
     await user.type(screen.getByLabelText(/email/i), 'test@example.com');
@@ -77,7 +86,10 @@ describe('Login Page', () => {
     });
 
     const user = userEvent.setup();
-    renderWithProviders(<Login />);
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+    });
 
     await screen.findByLabelText(/email/i);
     await user.type(screen.getByLabelText(/email/i), 'test@example.com');
@@ -98,7 +110,10 @@ describe('Login Page', () => {
     );
 
     const user = userEvent.setup();
-    renderWithProviders(<Login />);
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+    });
 
     await screen.findByLabelText(/email/i);
     await user.type(screen.getByLabelText(/email/i), 'test@example.com');
