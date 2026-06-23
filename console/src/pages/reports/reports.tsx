@@ -171,7 +171,7 @@ export default function Reports() {
   };
 
   const handleDownload = (report: ReportResponseDto) => {
-    window.open(`/api/storage/${report.path}`, '_blank');
+    window.open(report.downloadUrl, '_blank');
   };
 
   const handleDelete = (report: ReportResponseDto) => {

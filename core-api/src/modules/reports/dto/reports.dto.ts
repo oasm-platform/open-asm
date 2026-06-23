@@ -26,6 +26,9 @@ export class ReportResponseDto {
 
   @ApiProperty()
   createdAt: Date;
+
+  @ApiProperty({ description: 'Presigned download URL (expires in 15 minutes)' })
+  downloadUrl: string;
 }
 
 export class GenerateSummaryReportBodyDto {
