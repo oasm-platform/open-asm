@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron"
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/launcher"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	"github.com/oasm-platform/open-asm/grpc-client/go/workers"
 )
@@ -68,23 +66,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 		return
 	}
 
-	jobLog.Info("Initializing headless browser...")
-	l := launcher.New().Leakless(false).Headless(true)
-
-	if _, err := os.Stat("/usr/bin/chromium"); err == nil {
-		jobLog.Verbose("Using system chromium at /usr/bin/chromium")
-		l = l.Bin("/usr/bin/chromium")
-	} else if _, err := os.Stat("/usr/bin/chromium-browser"); err == nil {
-		jobLog.Verbose("Using system chromium at /usr/bin/chromium-browser")
-		l = l.Bin("/usr/bin/chromium-browser")
-	} else if _, err := os.Stat("/usr/bin/google-chrome"); err == nil {
-		jobLog.Verbose("Using system chromium at /usr/bin/google-chrome")
-		l = l.Bin("/usr/bin/google-chrome")
-	} else {
-		jobLog.Verbose("No system chromium found, go-rod will download Chrome automatically")
-	}
-
-	browser := rod.New().ControlURL(l.MustLaunch()).MustConnect()
+	jobLog.Info("Initializing browser session...")
 
 	workspaceRoot, err := filepath.Abs(cfg.WorkspaceRoot)
 	if err != nil {
@@ -131,7 +113,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 		case semaphore <- struct{}{}:
 			wg.Go(func() {
 				defer func() { <-semaphore }()
-				processJob(currentCtx, client, browser, toolPath)
+				processJob(currentCtx, client, toolPath)
 			})
 		default:
 		}
@@ -179,6 +161,16 @@ func Start(ctx context.Context, cfg *config.Config) {
 						stateMu.Unlock()
 						continue
 					}
+
+					// Initialize browser after tools are downloaded
+					initSession := NewBrowserSession("init", toolPath)
+					if err := initSession.ensureAgentBrowserChrome(); err != nil {
+						sysLog.ErrorE("Failed to setup agent-browser", err)
+						_ = initSession.Close()
+						stateMu.Unlock()
+						continue
+					}
+					_ = initSession.Close()
 
 					go startRemoteExecuteHandler(sessionCtx, client, workspaceRoot, toolPath)
 
@@ -234,13 +226,6 @@ func Start(ctx context.Context, cfg *config.Config) {
 		sessionCancel()
 	}
 	stateMu.Unlock()
-
-	if err := browser.Close(); err != nil {
-		shutLog.Warning("Browser close warning: %v", err)
-	}
-	l.Kill()
-	l.Cleanup()
-	shutLog.Success("Browser killed safely")
 
 	workerCancel()
 	shutLog.Success("Worker shut down safely")

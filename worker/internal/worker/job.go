@@ -8,14 +8,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/go-rod/rod"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	"github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
 )
 
 var jobLogGlobal = oasm.NewLogger("Worker.Job")
 
-func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string) {
+func processJob(ctx context.Context, client *oasm.Client, toolPath string) {
 	job, err := client.JobsNext(ctx)
 	if err != nil {
 		jobLogGlobal.ErrorE("Failed to pull job", err)
@@ -49,26 +48,30 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		url := strings.TrimSpace(after)
 		jobLogGlobal.Debug("[%s] Capturing screenshot: %s", job.Id, url)
 
-		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
+		jobBrowser := NewBrowserSession("screenshot-"+job.Id, toolPath)
+		base64Image, err := TakeScreenshotBase64(ctx, jobBrowser, url)
+		_ = jobBrowser.Close()
 		if err != nil {
 			jobLogGlobal.Warning("[%s] Screenshot capture failed: %v", job.Id, err)
-		}
-		resultData := struct {
-			Screenshot string `json:"screenshot"`
-			URL        string `json:"url"`
-		}{
-			Screenshot: base64Image,
-			URL:        formatURL(url),
-		}
-
-		if jsonBytes, err := json.Marshal(resultData); err != nil {
-			jobLogGlobal.ErrorE(fmt.Sprintf("[%s] JSON marshal failed", job.Id), err)
-			payload = oasm.NewErrorResult(fmt.Sprintf("JSON error: %v", err))
+			payload = oasm.NewErrorResult(fmt.Sprintf("Screenshot failed: %v", err))
 		} else {
-			jsonStr := string(jsonBytes)
-			payload = &jobs_registry.DataPayloadResult{
-				Error: false,
-				Raw:   &jsonStr,
+			resultData := struct {
+				Screenshot string `json:"screenshot"`
+				URL        string `json:"url"`
+			}{
+				Screenshot: base64Image,
+				URL:        url,
+			}
+
+			if jsonBytes, err := json.Marshal(resultData); err != nil {
+				jobLogGlobal.ErrorE(fmt.Sprintf("[%s] JSON marshal failed", job.Id), err)
+				payload = oasm.NewErrorResult(fmt.Sprintf("JSON error: %v", err))
+			} else {
+				jsonStr := string(jsonBytes)
+				payload = &jobs_registry.DataPayloadResult{
+					Error: false,
+					Raw:   &jsonStr,
+				}
 			}
 		}
 	} else {
