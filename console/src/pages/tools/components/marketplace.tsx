@@ -8,15 +8,7 @@ const Marketplace = () => {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
-  const { data, isLoading } = useToolsControllerGetManyTools(
-    {},
-    {
-      query: {
-        queryKey: [selectedWorkspaceId],
-        enabled: !!selectedWorkspaceId,
-      },
-    },
-  );
+  const { data, isLoading } = useToolsControllerGetManyTools();
   return (
     <div>
       <ToolsList

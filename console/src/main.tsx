@@ -25,6 +25,10 @@ import { SESSION_QUERY_KEY, useSession, type User } from './utils/authClient';
 
 // Deduplicate 401 handling — multiple queries may fail at once during logout.
 let isHandling401 = false;
+// Guard: skip 401 redirect until the first session fetch completes.
+// Prevents restored queries (from persistQueryClient) from triggering a
+// navigate to /login before the session is established.
+let sessionLoaded = false;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,7 +60,7 @@ const queryClient = new QueryClient({
     onError: (error) => {
       if (error instanceof AxiosError) {
         if (error.response?.status === 401) {
-          if (isHandling401) return;
+          if (isHandling401 || !sessionLoaded) return;
           isHandling401 = true;
 
           toast.error('Session expired!');
@@ -130,13 +134,22 @@ function AppRouter() {
       return;
     }
 
-    router.invalidate();
+    // Only invalidate on session refresh/switch (valid → valid).
+    // Skip on first load (null → valid) — RouterProvider already resolved
+    // routes with the correct context, and invalidate() can cause a brief
+    // stale-context re-resolution that flashes /login.
+    if (prevSession) {
+      router.invalidate();
+    }
   }, [session]);
 
   // Wait for session to load before rendering the router.
   if (isPending) {
     return <LoadingScreen />;
   }
+
+  // Mark session as loaded so QueryCache.onError can safely redirect on 401.
+  sessionLoaded = true;
 
   return (
     <RouterProvider
