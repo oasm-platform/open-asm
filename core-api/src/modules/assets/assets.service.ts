@@ -11,7 +11,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { Brackets, DataSource, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Target } from '../targets/entities/target.entity';
 
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
@@ -135,14 +135,7 @@ export class AssetsService {
       .leftJoin('asset_service.tlsAssets', 'tlsAssets')
       .where('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
-      })
-      .andWhere(
-        new Brackets((qb) => {
-          qb.where('"statusCodeAssets"."statusCode" IS NULL').orWhere(
-            '"statusCodeAssets"."statusCode" != 0',
-          );
-        }),
-      );
+      });
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
