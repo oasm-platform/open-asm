@@ -109,9 +109,6 @@ func (b *BrowserSession) TakeScreenshot(ctx context.Context, url string, opts Sc
 	defer idleCancel()
 	_ = b.run(idleCtx, "wait", "--load", "networkidle")
 
-	// Wait for rendering to complete
-	time.Sleep(3 * time.Second)
-
 	// Screenshot with --json to get file path
 	output, err := b.runOutput(ctx, "screenshot", "--json", "-")
 	if err != nil {

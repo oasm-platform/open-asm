@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -46,23 +45,15 @@ func TakeScreenshotBase64(ctx context.Context, browser *BrowserSession, rawURL s
 		Width:     1920,
 		Height:    1080,
 		UserAgent: getRandomUserAgent(),
-		Headers: map[string]string{
-			"Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-			"Upgrade-Insecure-Requests": "1",
-			"Sec-Fetch-Dest":            "document",
-			"Sec-Fetch-Mode":            "navigate",
-			"Sec-Fetch-Site":            "none",
-			"Sec-Fetch-User":            "?1",
-		},
-		Quality: 80,
+		Quality:   80,
 	}
 
 	base64Image, err := browser.TakeScreenshot(ctx, url, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "timeout") {
-			return "", fmt.Errorf("timeout loading page %s", url)
+			screenshotLog.Error("timeout loading page %s", url)
 		}
-		return "", fmt.Errorf("failed to load page %s: %w", url, err)
+		screenshotLog.Error("failed to load page %s", url)
 	}
 
 	screenshotLog.Debug("Screenshot captured successfully: %s", url)
