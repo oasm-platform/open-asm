@@ -37,8 +37,8 @@ export default function Dashboard() {
   return (
     <Page title="Dashboard">
       <div className="space-y-4">
-        <div className="grid grid-cols-1 2xl:grid-cols-4 gap-4">
-          <div className="col-span-1 2xl:col-span-3 order-2 2xl:order-0 flex flex-col gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+          <div className="col-span-1 xl:col-span-3 order-2 xl:order-0 flex flex-col gap-4">
             <div className="flex-1">
               <Statistic />
             </div>
@@ -51,7 +51,7 @@ export default function Dashboard() {
               />
             </div>
           </div>
-          <div className="col-span-1 order-1 2xl:order-0 flex flex-col gap-4">
+          <div className="col-span-1 order-1 xl:order-0 flex flex-col gap-4">
             <div className="flex-1">
               <VulnerabilityStatistic />
             </div>
@@ -61,11 +61,11 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="space-y-4">
-          <div className="grid grid-cols-1 2xl:grid-cols-6 gap-4">
-            <div className="2xl:col-span-4">
+          <div className="grid grid-cols-1 xl:grid-cols-6 gap-4">
+            <div className="xl:col-span-4">
               <AssetTrends />
             </div>
-            <div className="2xl:col-span-2">
+            <div className="xl:col-span-2">
               <TopAssetsVulnerabilitiesChart />
             </div>
           </div>
