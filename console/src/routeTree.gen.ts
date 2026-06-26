@@ -20,7 +20,6 @@ import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
 import { Route as AuthedWorkersRouteImport } from './routes/_authed/workers'
 import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
 import { Route as AuthedReportsRouteImport } from './routes/_authed/reports'
-import { Route as AuthedNotificationsRouteImport } from './routes/_authed/notifications'
 import { Route as AuthedWorkspacesIndexRouteImport } from './routes/_authed/workspaces/index'
 import { Route as AuthedVulnerabilitiesIndexRouteImport } from './routes/_authed/vulnerabilities/index'
 import { Route as AuthedToolsIndexRouteImport } from './routes/_authed/tools/index'
@@ -108,11 +107,6 @@ const AuthedSearchRoute = AuthedSearchRouteImport.update({
 const AuthedReportsRoute = AuthedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedNotificationsRoute = AuthedNotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedWorkspacesIndexRoute = AuthedWorkspacesIndexRouteImport.update({
@@ -300,7 +294,6 @@ export interface FileRoutesByFullPath {
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
-  '/notifications': typeof AuthedNotificationsRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
   '/workers': typeof AuthedWorkersRoute
@@ -345,7 +338,6 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
-  '/notifications': typeof AuthedNotificationsRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
   '/workers': typeof AuthedWorkersRoute
@@ -394,7 +386,6 @@ export interface FileRoutesById {
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
-  '/_authed/notifications': typeof AuthedNotificationsRoute
   '/_authed/reports': typeof AuthedReportsRoute
   '/_authed/search': typeof AuthedSearchRoute
   '/_authed/workers': typeof AuthedWorkersRoute
@@ -444,7 +435,6 @@ export interface FileRouteTypes {
     | '/init-admin'
     | '/login'
     | '/settings'
-    | '/notifications'
     | '/reports'
     | '/search'
     | '/workers'
@@ -489,7 +479,6 @@ export interface FileRouteTypes {
     | '/$'
     | '/init-admin'
     | '/login'
-    | '/notifications'
     | '/reports'
     | '/search'
     | '/workers'
@@ -537,7 +526,6 @@ export interface FileRouteTypes {
     | '/init-admin'
     | '/login'
     | '/settings'
-    | '/_authed/notifications'
     | '/_authed/reports'
     | '/_authed/search'
     | '/_authed/workers'
@@ -665,13 +653,6 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof AuthedReportsRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/notifications': {
-      id: '/_authed/notifications'
-      path: '/notifications'
-      fullPath: '/notifications'
-      preLoaderRoute: typeof AuthedNotificationsRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/workspaces/': {
@@ -916,7 +897,6 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedRouteChildren {
-  AuthedNotificationsRoute: typeof AuthedNotificationsRoute
   AuthedReportsRoute: typeof AuthedReportsRoute
   AuthedSearchRoute: typeof AuthedSearchRoute
   AuthedWorkersRoute: typeof AuthedWorkersRoute
@@ -958,7 +938,6 @@ interface AuthedRouteChildren {
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
-  AuthedNotificationsRoute: AuthedNotificationsRoute,
   AuthedReportsRoute: AuthedReportsRoute,
   AuthedSearchRoute: AuthedSearchRoute,
   AuthedWorkersRoute: AuthedWorkersRoute,
