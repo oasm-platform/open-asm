@@ -375,7 +375,6 @@ export class StatisticService {
 
   /**
    * Retrieves the count of assets for each workspace.
-   * Only includes assets that are not error pages.
    * @param workspaceIds An array of workspace IDs.
    * @returns An array of objects containing the workspaceId and asset count.
    */

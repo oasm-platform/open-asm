@@ -237,7 +237,7 @@ export class TargetsService implements OnModuleInit {
         'targets.value as value',
         'targets.type as type',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
-        `COALESCE(COUNT(DISTINCT CASE WHEN "assetService"."isErrorPage" = false THEN "assetService"."id" END), 0) AS "totalAssetServices"`,
+        `COALESCE(COUNT(DISTINCT "assetService"."id"), 0) AS "totalAssetServices"`,
         'targets.scanSchedule as "scanSchedule"',
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -482,7 +482,7 @@ export class TargetsService implements OnModuleInit {
         'targets.reScanCount as "reScanCount"',
         'targets.scanSchedule as "scanSchedule"',
         'targets.internalNetworkId as "internalNetworkId"',
-        `CAST(COUNT(DISTINCT CASE WHEN "assetService"."isErrorPage" = false THEN "assetService"."id" END) AS INTEGER) AS "totalAssetServices"`,
+        `CAST(COUNT(DISTINCT "assetService"."id") AS INTEGER) AS "totalAssetServices"`,
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
