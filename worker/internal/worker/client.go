@@ -94,6 +94,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 		sessionCtx       context.Context
 		sessionCancel    context.CancelFunc
 		schedulerStarted bool
+		pool             *BrowserPool
 	)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
@@ -103,9 +104,10 @@ func Start(ctx context.Context, cfg *config.Config) {
 	_, err = scheduler.Every(1).Second().Do(func() {
 		stateMu.Lock()
 		currentCtx := sessionCtx
+		currentPool := pool
 		stateMu.Unlock()
 
-		if currentCtx == nil || currentCtx.Err() != nil {
+		if currentCtx == nil || currentCtx.Err() != nil || currentPool == nil {
 			return
 		}
 
@@ -113,7 +115,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 		case semaphore <- struct{}{}:
 			wg.Go(func() {
 				defer func() { <-semaphore }()
-				processJob(currentCtx, client, toolPath)
+				processJob(currentCtx, client, currentPool, toolPath)
 			})
 		default:
 		}
@@ -162,15 +164,15 @@ func Start(ctx context.Context, cfg *config.Config) {
 						continue
 					}
 
-					// Initialize browser after tools are downloaded
-					initSession := NewBrowserSession("init", toolPath)
-					if err := initSession.ensureAgentBrowserChrome(); err != nil {
-						sysLog.ErrorE("Failed to setup agent-browser", err)
-						_ = initSession.Close()
+					// Initialize browser pool (single Chrome process, tab-per-job)
+					pool = NewBrowserPool(toolPath)
+					if err := pool.Init(); err != nil {
+						sysLog.ErrorE("Failed to setup browser pool", err)
+						_ = pool.Close()
+						pool = nil
 						stateMu.Unlock()
 						continue
 					}
-					_ = initSession.Close()
 
 					go startRemoteExecuteHandler(sessionCtx, client, workspaceRoot, toolPath)
 
@@ -181,6 +183,10 @@ func Start(ctx context.Context, cfg *config.Config) {
 					}
 				} else {
 					sysLog.Warning("Worker disconnected from core. Suspending job poller and streams...")
+					if pool != nil {
+						_ = pool.Close()
+						pool = nil
+					}
 					sessionCtx = nil
 					sessionCancel = nil
 				}
@@ -222,6 +228,9 @@ func Start(ctx context.Context, cfg *config.Config) {
 	shutLog.Info("All jobs completed. Cancelling session contexts...")
 
 	stateMu.Lock()
+	if pool != nil {
+		_ = pool.Close()
+	}
 	if sessionCancel != nil {
 		sessionCancel()
 	}

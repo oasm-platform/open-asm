@@ -16,10 +16,9 @@ import (
 
 var browserLog = oasm.NewLogger("Worker.Browser")
 
-// BrowserSession manages agent-browser CLI sessions
+// BrowserSession manages agent-browser CLI invocations.
 type BrowserSession struct {
-	sessionID string
-	toolPath  string
+	toolPath string
 }
 
 // ScreenshotResult represents output from agent-browser screenshot --json
@@ -41,10 +40,9 @@ type ScreenshotOpts struct {
 }
 
 // NewBrowserSession creates a new agent-browser session
-func NewBrowserSession(sessionID, toolPath string) *BrowserSession {
+func NewBrowserSession(toolPath string) *BrowserSession {
 	return &BrowserSession{
-		sessionID: sessionID,
-		toolPath:  toolPath,
+		toolPath: toolPath,
 	}
 }
 
@@ -67,16 +65,9 @@ func (b *BrowserSession) ensureAgentBrowserChrome() error {
 	return nil
 }
 
-// TakeScreenshot captures a screenshot via agent-browser CLI
+// TakeScreenshot captures a screenshot via agent-browser CLI.
+// All commands batched into a single shell call.
 func (b *BrowserSession) TakeScreenshot(ctx context.Context, url string, opts ScreenshotOpts) (string, error) {
-	// Set viewport
-	if err := b.run(ctx, "set", "viewport",
-		fmt.Sprintf("%d", opts.Width),
-		fmt.Sprintf("%d", opts.Height)); err != nil {
-		return "", fmt.Errorf("set viewport: %w", err)
-	}
-
-	// Set headers (including User-Agent)
 	headers := make(map[string]string)
 	for k, v := range opts.Headers {
 		headers[k] = v
@@ -85,38 +76,28 @@ func (b *BrowserSession) TakeScreenshot(ctx context.Context, url string, opts Sc
 		headers["User-Agent"] = opts.UserAgent
 	}
 	headersJSON, _ := json.Marshal(headers)
-	if err := b.run(ctx, "set", "headers", string(headersJSON)); err != nil {
-		return "", fmt.Errorf("set headers: %w", err)
-	}
+	escapedHeaders := strings.ReplaceAll(string(headersJSON), "'", "'\\''")
 
-	// Open URL
-	if err := b.run(ctx, "open", url); err != nil {
-		return "", fmt.Errorf("open url: %w", err)
-	}
+	bin := b.binaryPath()
+	batch := fmt.Sprintf(
+		"%s set viewport %d %d && %s set headers '%s' && %s open %s && %s wait --load networkidle && %s screenshot --json -",
+		bin, opts.Width, opts.Height,
+		bin, escapedHeaders,
+		bin, url,
+		bin,
+		bin,
+	)
 
-	// Wait for all resources (CSS, JS, images) to load
-	waitCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	waitCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	if err := b.run(waitCtx, "wait", "--load", "load"); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("timeout loading page %s", url)
-		}
-		return "", fmt.Errorf("wait load: %w", err)
-	}
-
-	// Wait for network idle (no pending requests)
-	idleCtx, idleCancel := context.WithTimeout(ctx, 15*time.Second)
-	defer idleCancel()
-	_ = b.run(idleCtx, "wait", "--load", "networkidle")
-
-	// Screenshot with --json to get file path
-	output, err := b.runOutput(ctx, "screenshot", "--json", "-")
+	output, err := runShellOutput(waitCtx, batch)
 	if err != nil {
-		return "", fmt.Errorf("screenshot: %w", err)
+		return "", fmt.Errorf("screenshot batch: %w", err)
 	}
 
 	var result ScreenshotResult
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
+	jsonStr := extractJSON(output)
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
 		return "", fmt.Errorf("parse screenshot output: %w", err)
 	}
 
@@ -138,52 +119,34 @@ func (b *BrowserSession) Close() error {
 	return b.run(context.Background(), "close")
 }
 
-// run executes an agent-browser command with retry on transient errors
+// runShellOutput executes a shell command and returns stdout.
+func runShellOutput(ctx context.Context, cmdStr string) (string, error) {
+	cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
+	output, err := cmd.Output()
+	return string(output), err
+}
+
+// run executes an agent-browser command
 func (b *BrowserSession) run(ctx context.Context, args ...string) error {
-	binaryPath := getAgentBrowserPath(b.toolPath)
-	fullArgs := append([]string{"--session", b.sessionID}, args...)
-	const maxRetries = 3
-	for attempt := range maxRetries {
-		cmd := exec.CommandContext(ctx, binaryPath, fullArgs...)
-		output, err := cmd.CombinedOutput()
-		if err == nil {
-			return nil
-		}
-		out := string(output)
-		if attempt < maxRetries-1 && isTransientError(out) {
-			time.Sleep(time.Duration(attempt+1) * 500 * time.Millisecond)
-			continue
-		}
-		return fmt.Errorf("%s: %w (output: %s)", args[0], err, out)
+	cmd := exec.CommandContext(ctx, b.binaryPath(), args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %w (output: %s)", args[0], err, string(output))
 	}
 	return nil
 }
 
-// runOutput executes an agent-browser command and returns output
-func (b *BrowserSession) runOutput(ctx context.Context, args ...string) (string, error) {
-	binaryPath := getAgentBrowserPath(b.toolPath)
-	fullArgs := append([]string{"--session", b.sessionID}, args...)
-	const maxRetries = 3
-	for attempt := range maxRetries {
-		cmd := exec.CommandContext(ctx, binaryPath, fullArgs...)
-		output, err := cmd.Output()
-		if err == nil {
-			return string(output), nil
-		}
-		out := string(output)
-		if attempt < maxRetries-1 && isTransientError(out) {
-			time.Sleep(time.Duration(attempt+1) * 500 * time.Millisecond)
-			continue
-		}
-		return "", fmt.Errorf("%s: %w (output: %s)", args[0], err, out)
+// extractJSON finds the first { ... } JSON object in mixed stdout output.
+func extractJSON(output string) string {
+	if idx := strings.IndexByte(output, '{'); idx >= 0 {
+		return output[idx:]
 	}
-	return "", nil
+	return output
 }
 
-// isTransientError checks if the error is a transient daemon-busy error
-func isTransientError(output string) bool {
-	return strings.Contains(output, "Resource temporarily unavailable") ||
-		strings.Contains(output, "daemon may be busy")
+// binaryPath returns the agent-browser binary path.
+func (b *BrowserSession) binaryPath() string {
+	return getAgentBrowserPath(b.toolPath)
 }
 
 // getAgentBrowserPath returns the path to agent-browser binary in toolPath

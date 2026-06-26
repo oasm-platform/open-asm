@@ -37,7 +37,7 @@ func formatURL(target string) string {
 	return "http://" + target
 }
 
-func TakeScreenshotBase64(ctx context.Context, browser *BrowserSession, rawURL string) (string, error) {
+func TakeScreenshotBase64(ctx context.Context, pool *BrowserPool, rawURL string) (string, error) {
 	url := formatURL(rawURL)
 	screenshotLog.Verbose("Preparing browser context for: %s", url)
 
@@ -48,14 +48,15 @@ func TakeScreenshotBase64(ctx context.Context, browser *BrowserSession, rawURL s
 		Quality:   80,
 	}
 
-	base64Image, err := browser.TakeScreenshot(ctx, url, opts)
+	base64Image, err := pool.TakeScreenshot(ctx, url, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "timeout") {
 			screenshotLog.Error("timeout loading page %s", url)
+		} else {
+			screenshotLog.Error("failed to load page %s", url)
 		}
-		screenshotLog.Error("failed to load page %s", url)
 	}
 
-	screenshotLog.Debug("Screenshot captured successfully: %s", url)
+	screenshotLog.Debug("Screenshot captured: %s", url)
 	return base64Image, nil
 }

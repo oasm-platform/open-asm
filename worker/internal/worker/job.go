@@ -14,7 +14,7 @@ import (
 
 var jobLogGlobal = oasm.NewLogger("Worker.Job")
 
-func processJob(ctx context.Context, client *oasm.Client, toolPath string) {
+func processJob(ctx context.Context, client *oasm.Client, pool *BrowserPool, toolPath string) {
 	job, err := client.JobsNext(ctx)
 	if err != nil {
 		jobLogGlobal.ErrorE("Failed to pull job", err)
@@ -48,9 +48,7 @@ func processJob(ctx context.Context, client *oasm.Client, toolPath string) {
 		url := strings.TrimSpace(after)
 		jobLogGlobal.Debug("[%s] Capturing screenshot: %s", job.Id, url)
 
-		jobBrowser := NewBrowserSession("screenshot-"+job.Id, toolPath)
-		base64Image, err := TakeScreenshotBase64(ctx, jobBrowser, url)
-		_ = jobBrowser.Close()
+		base64Image, err := TakeScreenshotBase64(ctx, pool, url)
 		if err != nil {
 			jobLogGlobal.Warning("[%s] Screenshot capture failed: %v", job.Id, err)
 			payload = oasm.NewErrorResult(fmt.Sprintf("Screenshot failed: %v", err))
