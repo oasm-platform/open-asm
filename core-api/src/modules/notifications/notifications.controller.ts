@@ -2,6 +2,7 @@ import { UserContextPayload } from '@/common/interfaces/app.interface';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -99,5 +100,18 @@ export class NotificationsController {
   @Patch(':id/read')
   markAsRead(@Param('id') id: string, @UserContext() user: UserContextPayload) {
     return this.notificationsService.markAsRead(id, user.id);
+  }
+
+  @Doc({
+    summary: 'Delete a notification',
+    description:
+      'Delete a notification recipient record for the current user. The notification itself is preserved for other recipients.',
+  })
+  @Delete(':id')
+  deleteNotification(
+    @Param('id') id: string,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.notificationsService.deleteNotification(id, user.id);
   }
 }
