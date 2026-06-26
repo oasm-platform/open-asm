@@ -1,7 +1,6 @@
 import { createRouter } from '@tanstack/react-router';
 import { routeTree } from './routeTree.gen';
 import type { QueryClient } from '@tanstack/react-query';
-import { LoadingScreen } from '@/components/ui/loading-screen';
 import Logo from '@/components/ui/logo';
 import type { User } from '@/utils/authClient';
 
@@ -25,7 +24,7 @@ const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 5 * 60 * 1000,
-  defaultPendingComponent: LoadingScreen,
+
   defaultErrorComponent: DefaultErrorComponent,
   context: { queryClient: undefined!, session: null },
 });
