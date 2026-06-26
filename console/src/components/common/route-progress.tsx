@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from '@tanstack/react-router';
+import { router } from '@/router';
 import '@/styles/route-progress.css';
 
 export function RouteProgress() {
-  const router = useRouter();
   const [isActive, setIsActive] = useState(false);
 
   useEffect(() => {
@@ -18,7 +17,7 @@ export function RouteProgress() {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = router.subscribe('onLoad', () => {
@@ -26,7 +25,7 @@ export function RouteProgress() {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
 
   return (
     <div
