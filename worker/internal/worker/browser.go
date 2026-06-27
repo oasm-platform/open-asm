@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -69,9 +70,7 @@ func (b *BrowserSession) ensureAgentBrowserChrome() error {
 // All commands batched into a single shell call.
 func (b *BrowserSession) TakeScreenshot(ctx context.Context, url string, opts ScreenshotOpts) (string, error) {
 	headers := make(map[string]string)
-	for k, v := range opts.Headers {
-		headers[k] = v
-	}
+	maps.Copy(headers, opts.Headers)
 	if opts.UserAgent != "" {
 		headers["User-Agent"] = opts.UserAgent
 	}
