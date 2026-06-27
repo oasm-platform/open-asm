@@ -13,7 +13,6 @@ export const Route = createFileRoute('/_authed')({
       });
     }
   },
-  pendingComponent: LoadingScreen,
   component: AuthedLayout,
 });
 

@@ -109,4 +109,8 @@ export class NotificationsService {
       { status: NotificationStatus.READ },
     );
   }
+
+  async deleteNotification(id: string, userId: string) {
+    return this.notificationRecipientRepo.delete({ id, userId });
+  }
 }

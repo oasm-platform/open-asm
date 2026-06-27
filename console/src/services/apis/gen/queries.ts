@@ -2836,13 +2836,6 @@ export type StorageControllerDownloadFileParams = {
   token: string;
 };
 
-export type StorageControllerForwardImageParams = {
-  /**
-   * The URL of the image to forward
-   */
-  url: string;
-};
-
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
@@ -31901,174 +31894,90 @@ export function useStorageControllerGetFile<
 }
 
 /**
- * @summary Forward an image from a URL
+ * Delete a notification recipient record for the current user. The notification itself is preserved for other recipients.
+ * @summary Delete a notification
  */
-export const storageControllerForwardImage = (
-  params: StorageControllerForwardImageParams,
+export const notificationsControllerDeleteNotification = (
+  id: string,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<Blob>(
-    {
-      url: `/api/storage/forward`,
-      method: 'GET',
-      params,
-      responseType: 'blob',
-      signal,
-    },
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/notifications/${id}`, method: 'DELETE', signal },
     options,
   );
 };
 
-export const getStorageControllerForwardImageQueryKey = (
-  params?: StorageControllerForwardImageParams,
-) => {
-  return [`/api/storage/forward`, ...(params ? [params] : [])] as const;
-};
-
-export const getStorageControllerForwardImageQueryOptions = <
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
->(
-  params: StorageControllerForwardImageParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStorageControllerForwardImageQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>
-  > = ({ signal }) =>
-    storageControllerForwardImage(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+export const getNotificationsControllerDeleteNotificationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
     TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerDeleteNotification'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return notificationsControllerDeleteNotification(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
 };
 
-export type StorageControllerForwardImageQueryResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerForwardImage>>
->;
-export type StorageControllerForwardImageQueryError = void;
+export type NotificationsControllerDeleteNotificationMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>
+  >;
 
-export function useStorageControllerForwardImage<
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
->(
-  params: StorageControllerForwardImageParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerForwardImage<
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
->(
-  params: StorageControllerForwardImageParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerForwardImage<
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
->(
-  params: StorageControllerForwardImageParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type NotificationsControllerDeleteNotificationMutationError = unknown;
+
 /**
- * @summary Forward an image from a URL
+ * @summary Delete a notification
  */
-
-export function useStorageControllerForwardImage<
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
+export const useNotificationsControllerDeleteNotification = <
+  TError = unknown,
+  TContext = unknown,
 >(
-  params: StorageControllerForwardImageParams,
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getStorageControllerForwardImageQueryOptions(
-    params,
-    options,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerDeleteNotificationMutationOptions(options),
+    queryClient,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
+};

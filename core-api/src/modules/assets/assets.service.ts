@@ -682,16 +682,9 @@ export class AssetsService {
         '"statusCodeAssets"."statusCode"',
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
-      .groupBy('"statusCodeAssets"."statusCode"');
-
-    if (query.value) {
-      queryBuilder.andWhere(
-        '"statusCodeAssets"."statusCode"::text ILIKE :value',
-        {
-          value: `%${query.value}%`,
-        },
-      );
-    }
+      .groupBy('"statusCodeAssets"."statusCode"')
+      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
+      .andWhere('"statusCodeAssets"."statusCode" != 0');
 
     if (query.value) {
       queryBuilder.andWhere(
