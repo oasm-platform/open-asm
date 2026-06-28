@@ -50,11 +50,7 @@ func TakeScreenshotBase64(ctx context.Context, pool *BrowserPool, rawURL string)
 
 	base64Image, err := pool.TakeScreenshot(ctx, url, opts)
 	if err != nil {
-		if strings.Contains(err.Error(), "timeout") {
-			screenshotLog.Error("timeout loading page %s", url)
-		} else {
-			screenshotLog.Error("failed to load page %s", url)
-		}
+		screenshotLog.Error("Failed to load page %s. Error: %s", url, err)
 	}
 
 	screenshotLog.Debug("Screenshot captured: %s", url)
