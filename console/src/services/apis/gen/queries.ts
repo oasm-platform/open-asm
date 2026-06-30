@@ -938,6 +938,16 @@ export type GetManyGetTlsResponseDtoDto = {
   pageCount: number;
 };
 
+export type GenerateServiceTagsResponseDto = {
+  /** The generated tags for the service */
+  tags: string[];
+};
+
+export type GenerateServiceTagsDto = {
+  /** The ID of the asset service to generate tags for */
+  assetServiceId: string;
+};
+
 export type UpdateAssetDto = {
   /** @nullable */
   tags: string[] | null;
@@ -2834,13 +2844,6 @@ export type StorageControllerDownloadFileParams = {
    * Time-limited download token
    */
   token: string;
-};
-
-export type StorageControllerForwardImageParams = {
-  /**
-   * The URL of the image to forward
-   */
-  url: string;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -11266,6 +11269,101 @@ export function useAssetsControllerGetTlsAssets<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Analyzes the service data (HTTP responses, tech stack, TLS, etc.) using AI and generates descriptive tags. Replaces existing tags with AI-generated ones.
+ * @summary Generate AI tags for a service
+ */
+export const assetsControllerGenerateServiceTags = (
+  generateServiceTagsDto: GenerateServiceTagsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GenerateServiceTagsResponseDto>(
+    {
+      url: `/api/assets/service/tag/generate`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: generateServiceTagsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetsControllerGenerateServiceTagsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+    TError,
+    { data: GenerateServiceTagsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+  TError,
+  { data: GenerateServiceTagsDto },
+  TContext
+> => {
+  const mutationKey = ['assetsControllerGenerateServiceTags'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+    { data: GenerateServiceTagsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assetsControllerGenerateServiceTags(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetsControllerGenerateServiceTagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>
+>;
+export type AssetsControllerGenerateServiceTagsMutationBody =
+  GenerateServiceTagsDto;
+export type AssetsControllerGenerateServiceTagsMutationError = unknown;
+
+/**
+ * @summary Generate AI tags for a service
+ */
+export const useAssetsControllerGenerateServiceTags = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+      TError,
+      { data: GenerateServiceTagsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+  TError,
+  { data: GenerateServiceTagsDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetsControllerGenerateServiceTagsMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Retrieves a single asset by its ID.
@@ -22071,6 +22169,95 @@ export const useNotificationsControllerMarkAsRead = <
 };
 
 /**
+ * Delete a notification recipient record for the current user. The notification itself is preserved for other recipients.
+ * @summary Delete a notification
+ */
+export const notificationsControllerDeleteNotification = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/notifications/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getNotificationsControllerDeleteNotificationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerDeleteNotification'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return notificationsControllerDeleteNotification(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type NotificationsControllerDeleteNotificationMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>
+  >;
+
+export type NotificationsControllerDeleteNotificationMutationError = unknown;
+
+/**
+ * @summary Delete a notification
+ */
+export const useNotificationsControllerDeleteNotification = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerDeleteNotificationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Publishes a command to the remote-execute channel via Redis pub/sub. The command is enriched with an id (nanoid) and sessionId (uuid) before publishing.
  * @summary Run a remote command
  */
@@ -31889,179 +32076,6 @@ export function useStorageControllerGetFile<
   const queryOptions = getStorageControllerGetFileQueryOptions(
     bucket,
     path,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * @summary Forward an image from a URL
- */
-export const storageControllerForwardImage = (
-  params: StorageControllerForwardImageParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<Blob>(
-    {
-      url: `/api/storage/forward`,
-      method: 'GET',
-      params,
-      responseType: 'blob',
-      signal,
-    },
-    options,
-  );
-};
-
-export const getStorageControllerForwardImageQueryKey = (
-  params?: StorageControllerForwardImageParams,
-) => {
-  return [`/api/storage/forward`, ...(params ? [params] : [])] as const;
-};
-
-export const getStorageControllerForwardImageQueryOptions = <
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
->(
-  params: StorageControllerForwardImageParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStorageControllerForwardImageQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>
-  > = ({ signal }) =>
-    storageControllerForwardImage(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StorageControllerForwardImageQueryResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerForwardImage>>
->;
-export type StorageControllerForwardImageQueryError = void;
-
-export function useStorageControllerForwardImage<
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
->(
-  params: StorageControllerForwardImageParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerForwardImage<
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
->(
-  params: StorageControllerForwardImageParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerForwardImage<
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
->(
-  params: StorageControllerForwardImageParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Forward an image from a URL
- */
-
-export function useStorageControllerForwardImage<
-  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
-  TError = void,
->(
-  params: StorageControllerForwardImageParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerForwardImage>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getStorageControllerForwardImageQueryOptions(
-    params,
     options,
   );
 

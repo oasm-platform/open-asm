@@ -64,6 +64,7 @@ interface StatisticFilter {
 interface StatisticSnapshot {
   hosts: number;
   ports: number;
+  services: number;
   techs: number;
 }
 
@@ -523,6 +524,54 @@ export class StatisticService {
       .createQueryBuilder()
       .select('sq."workspaceId"', 'workspaceId')
       .addSelect('COUNT(DISTINCT sq.tech)', 'count') // Count distinct technologies
+      .from(`(${subQuery.getQuery()})`, 'sq')
+      .setParameters(subQuery.getParameters())
+      .groupBy('sq."workspaceId"')
+      .getRawMany<{ workspaceId: string; count: string }>();
+  }
+
+  /**
+   * Retrieves the count of unique hosts (distinct asset.value) for each workspace.
+   * Counts only hosts that have at least one AssetService, matching the frontend
+   * host-assets-tab counting logic.
+   */
+  async getHostCounts(filter: StatisticFilter) {
+    const { workspaceIds, targetId, startDate, endDate } = filter;
+    const subQuery = this.dataSource
+      .createQueryBuilder()
+      .select('wt.workspaceId', 'workspaceId')
+      .addSelect('asset.value', 'host')
+      .from(AssetService, 'assetService')
+      .innerJoin('assetService.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .innerJoin('target.workspaceTargets', 'wt')
+      .where('1=1')
+      .andWhere('asset.value IS NOT NULL');
+
+    if (workspaceIds?.length) {
+      subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
+        workspaceIds,
+      });
+    }
+    if (targetId) {
+      subQuery.andWhere('target.id = :targetId', { targetId });
+    }
+    if (startDate) {
+      subQuery.andWhere('"assetService"."createdAt" >= :startDate', {
+        startDate,
+      });
+    }
+    if (endDate) {
+      subQuery.andWhere('"assetService"."createdAt" <= :endDate', {
+        endDate,
+      });
+    }
+
+    // Main query to count distinct hosts (asset.value) for each workspaceId
+    return this.dataSource
+      .createQueryBuilder()
+      .select('sq."workspaceId"', 'workspaceId')
+      .addSelect('COUNT(DISTINCT sq.host)', 'count')
       .from(`(${subQuery.getQuery()})`, 'sq')
       .setParameters(subQuery.getParameters())
       .groupBy('sq."workspaceId"')
@@ -1217,11 +1266,14 @@ export class StatisticService {
   async takeSnapshotStatisticTarget(
     targetId: string,
   ): Promise<StatisticSnapshot> {
-    const [hosts, ports, techs] = await Promise.all([
-      this.getAssetCounts({ targetId }).then((res) =>
+    const [hosts, ports, services, techs] = await Promise.all([
+      this.getHostCounts({ targetId }).then((res) =>
         res.length > 0 ? Number(res[0].count) : 0,
       ),
       this.getPortCounts({ targetId }).then((res) =>
+        res.length > 0 ? Number(res[0].count) : 0,
+      ),
+      this.getServiceCounts({ targetId }).then((res) =>
         res.length > 0 ? Number(res[0].count) : 0,
       ),
       this.getTechCounts({ targetId }).then((res) =>
@@ -1229,7 +1281,7 @@ export class StatisticService {
       ),
     ]);
 
-    return { hosts, ports, techs };
+    return { hosts, ports, services, techs };
   }
 
   @OnEvent(EventTriggerType.WORKFLOW_START)
@@ -1300,6 +1352,7 @@ export class StatisticService {
             metadata: {
               hosts: String(diffs.hosts ?? 0),
               ports: String(diffs.ports ?? 0),
+              services: String(diffs.services ?? 0),
               tech: String(diffs.techs ?? 0),
               targetValue: job.asset.target.value,
               targetId: job.asset.target.id,

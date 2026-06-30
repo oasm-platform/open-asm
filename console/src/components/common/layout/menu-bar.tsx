@@ -190,12 +190,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         : location.pathname === toUrl ||
                           location.pathname.startsWith(toUrl + '/');
                     return (
-                      <SidebarMenuItem key={item.title}>
+                      <SidebarMenuItem key={item.title} className="relative">
                         <SidebarMenuButton
                           asChild
                           isActive={isActive}
                           tooltip={item.title}
-                          className="h-9 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--primary)_18%,transparent)]"
+                          className="group h-9 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1/2 data-[active=true]:before:h-5 data-[active=true]:before:w-[3px] data-[active=true]:before:-translate-y-1/2 data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary"
                         >
                           <Link
                             to={toUrl}
