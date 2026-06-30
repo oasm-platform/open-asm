@@ -938,6 +938,16 @@ export type GetManyGetTlsResponseDtoDto = {
   pageCount: number;
 };
 
+export type GenerateServiceTagsResponseDto = {
+  /** The generated tags for the service */
+  tags: string[];
+};
+
+export type GenerateServiceTagsDto = {
+  /** The ID of the asset service to generate tags for */
+  assetServiceId: string;
+};
+
 export type UpdateAssetDto = {
   /** @nullable */
   tags: string[] | null;
@@ -11259,6 +11269,101 @@ export function useAssetsControllerGetTlsAssets<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Analyzes the service data (HTTP responses, tech stack, TLS, etc.) using AI and generates descriptive tags. Replaces existing tags with AI-generated ones.
+ * @summary Generate AI tags for a service
+ */
+export const assetsControllerGenerateServiceTags = (
+  generateServiceTagsDto: GenerateServiceTagsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GenerateServiceTagsResponseDto>(
+    {
+      url: `/api/assets/service/tag/generate`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: generateServiceTagsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetsControllerGenerateServiceTagsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+    TError,
+    { data: GenerateServiceTagsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+  TError,
+  { data: GenerateServiceTagsDto },
+  TContext
+> => {
+  const mutationKey = ['assetsControllerGenerateServiceTags'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+    { data: GenerateServiceTagsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assetsControllerGenerateServiceTags(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetsControllerGenerateServiceTagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>
+>;
+export type AssetsControllerGenerateServiceTagsMutationBody =
+  GenerateServiceTagsDto;
+export type AssetsControllerGenerateServiceTagsMutationError = unknown;
+
+/**
+ * @summary Generate AI tags for a service
+ */
+export const useAssetsControllerGenerateServiceTags = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+      TError,
+      { data: GenerateServiceTagsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetsControllerGenerateServiceTags>>,
+  TError,
+  { data: GenerateServiceTagsDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetsControllerGenerateServiceTagsMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Retrieves a single asset by its ID.
@@ -22064,6 +22169,95 @@ export const useNotificationsControllerMarkAsRead = <
 };
 
 /**
+ * Delete a notification recipient record for the current user. The notification itself is preserved for other recipients.
+ * @summary Delete a notification
+ */
+export const notificationsControllerDeleteNotification = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/notifications/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getNotificationsControllerDeleteNotificationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerDeleteNotification'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return notificationsControllerDeleteNotification(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type NotificationsControllerDeleteNotificationMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>
+  >;
+
+export type NotificationsControllerDeleteNotificationMutationError = unknown;
+
+/**
+ * @summary Delete a notification
+ */
+export const useNotificationsControllerDeleteNotification = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerDeleteNotificationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Publishes a command to the remote-execute channel via Redis pub/sub. The command is enriched with an id (nanoid) and sessionId (uuid) before publishing.
  * @summary Run a remote command
  */
@@ -31892,92 +32086,3 @@ export function useStorageControllerGetFile<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
-
-/**
- * Delete a notification recipient record for the current user. The notification itself is preserved for other recipients.
- * @summary Delete a notification
- */
-export const notificationsControllerDeleteNotification = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    { url: `/api/notifications/${id}`, method: 'DELETE', signal },
-    options,
-  );
-};
-
-export const getNotificationsControllerDeleteNotificationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
-    TError,
-    { id: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['notificationsControllerDeleteNotification'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
-
-    return notificationsControllerDeleteNotification(id, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type NotificationsControllerDeleteNotificationMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>
-  >;
-
-export type NotificationsControllerDeleteNotificationMutationError = unknown;
-
-/**
- * @summary Delete a notification
- */
-export const useNotificationsControllerDeleteNotification = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
-      TError,
-      { id: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof notificationsControllerDeleteNotification>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  return useMutation(
-    getNotificationsControllerDeleteNotificationMutationOptions(options),
-    queryClient,
-  );
-};
