@@ -165,7 +165,7 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(result) }],
           };
-        } catch (error) {
+        } catch {
           return {
             content: [{ type: 'text' as const, text: 'Error: Internal error' }],
             isError: true,
