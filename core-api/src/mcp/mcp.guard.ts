@@ -3,12 +3,10 @@ import { ApiKeyType } from '@/common/enums/enum';
 import { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import { ApiKeysService } from '@/modules/apikeys/apikeys.service';
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 
 @Injectable()
 export class McpGuard implements CanActivate {
-  private readonly logger = new Logger(McpGuard.name);
-
   constructor(private readonly apiKeyService: ApiKeysService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -28,7 +26,6 @@ export class McpGuard implements CanActivate {
       request.workspaceId = keyEntity.ref;
       return true;
     } catch (error) {
-      this.logger.warn(`MCP auth failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       if (error instanceof UnauthorizedException) throw error;
       throw new UnauthorizedException('Invalid workspace API key');
     }

@@ -1,7 +1,7 @@
 import { API_GLOBAL_PREFIX } from '@/common/constants/app.constants';
 import { AgentMode } from '@/common/enums/enum';
 import { AgentTool } from '@/modules/agents/agents.tools';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import type { Request, Response } from 'express';
@@ -33,7 +33,6 @@ function schemaToShape(schema: z.ZodTypeAny): Record<string, unknown> {
 
 @Injectable()
 export class McpService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(McpService.name);
   private readonly sessions = new Map<string, McpSession>();
 
   private static readonly SESSION_TTL = 30 * 60 * 1000;
@@ -61,7 +60,6 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
     const now = Date.now();
     for (const [id, session] of this.sessions.entries()) {
       if (now - session.createdAt > McpService.SESSION_TTL) {
-        this.logger.log(`Evicting stale session ${id}`);
         this.sessions.delete(id);
       }
     }
@@ -93,7 +91,6 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
           }
         }
         if (oldestId) {
-          this.logger.warn(`Evicting oldest session ${oldestId} to stay under capacity`);
           this.sessions.delete(oldestId);
         }
       }
@@ -107,13 +104,10 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
     });
 
     transport.onclose = () => {
-      this.logger.log(`MCP session ${transport.sessionId} closed`);
       this.sessions.delete(transport.sessionId);
     };
 
-    transport.onerror = (error) => {
-      this.logger.error(`MCP session ${transport.sessionId} error: ${error.message}`);
-    };
+    transport.onerror = () => {};
 
     await server.connect(transport);
   }
@@ -152,9 +146,8 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
     for (const [name, toolInstance] of Object.entries(allTools)) {
       try {
         this.registerToolOnServer(server, name, toolInstance as AiToolLike);
-        this.logger.debug(`Registered MCP tool: ${name}`);
-      } catch (error) {
-        this.logger.error(`Failed to register MCP tool ${name}: ${error}`);
+      } catch {
+        // skip
       }
     }
   }
@@ -173,15 +166,14 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
             content: [{ type: 'text' as const, text: JSON.stringify(result) }],
           };
         } catch (error) {
-          this.logger.error(`Tool execution error: ${error instanceof Error ? error.message : String(error)}`);
           return {
             content: [{ type: 'text' as const, text: 'Error: Internal error' }],
             isError: true,
           };
         }
       });
-    } catch (error) {
-      this.logger.error(`Failed to register tool ${name}: ${error}`);
+    } catch {
+      // skip
     }
   }
 }

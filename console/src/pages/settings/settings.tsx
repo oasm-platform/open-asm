@@ -1,9 +1,10 @@
 import { useSession } from '@/utils/authClient';
-import { useEffect, useMemo, type JSX } from 'react';
 import { useNavigate, useParams } from '@tanstack/react-router';
+import { useEffect, useMemo, type JSX } from 'react';
 import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import GetAboutProject from './components/get-about-project';
+import McpConnect from './components/mcp-connect';
 import Preferences from './components/preferences';
 import SecuritySettings from './components/security-settings';
 import WorkspaceSettings from './components/workspace-settings';
@@ -87,21 +88,21 @@ export const settingsTabGroups: SettingsTabGroup[] = [
     ],
   },
   // // Group: Integration
-  // {
-  //   name: 'Integration',
-  //   tabs: [
-  //     {
-  //       id: 'mcp',
-  //       label: 'MCP Connect',
-  //       path: '/settings/mcp',
-  //       content: {
-  //         title: 'MCP Connect',
-  //         description: 'Connect to OASM server via MCP protocol',
-  //       },
-  //       component: <McpConnect />,
-  //     },
-  //   ],
-  // },
+  {
+    name: 'Integration',
+    tabs: [
+      {
+        id: 'mcp',
+        label: 'MCP Connect',
+        path: '/settings/mcp',
+        content: {
+          title: 'MCP Connect',
+          description: 'Connect to OASM server via MCP protocol',
+        },
+        component: <McpConnect />,
+      },
+    ],
+  },
   // Group: System
   {
     name: 'System',
@@ -171,7 +172,7 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
     visibleTabs.find((t) => t.id === currentTab) || visibleTabs[0];
 
   return (
-    <div className="mx-auto w-full sm:w-3/4 xl:w-1/3">
+    <div className="mx-auto w-full sm:w-3/4 xl:w-1/2">
       {activeTab && (
         <div className="space-y-4">
           <div className="flex items-center flex-row justify-between">
