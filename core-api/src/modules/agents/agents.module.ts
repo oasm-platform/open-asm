@@ -55,6 +55,7 @@ import { HttpModule } from '@nestjs/axios';
   ],
   exports: [
     AgentsService,
+    AgentTool,
     AgentsCompletionsService,
     AgentsMemoriesService,
     AgentsMcpService,
