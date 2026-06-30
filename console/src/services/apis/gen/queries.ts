@@ -1725,9 +1725,9 @@ export type NotificationResponseDto = {
   id: string;
   status: NotificationResponseDtoStatus;
   createdAt: string;
-  updatedAt: string;
   message: string;
   url: string;
+  workspaceId?: string;
 };
 
 export type GetManyNotificationResponseDtoDto = {
@@ -32086,3 +32086,225 @@ export function useStorageControllerGetFile<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+export const mcpControllerHandleSSE = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>({ url: `/api/mcp`, method: 'GET', signal }, options);
+};
+
+export const getMcpControllerHandleSSEQueryKey = () => {
+  return [`/api/mcp`] as const;
+};
+
+export const getMcpControllerHandleSSEQueryOptions = <
+  TData = Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getMcpControllerHandleSSEQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof mcpControllerHandleSSE>>
+  > = ({ signal }) => mcpControllerHandleSSE(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type McpControllerHandleSSEQueryResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerHandleSSE>>
+>;
+export type McpControllerHandleSSEQueryError = unknown;
+
+export function useMcpControllerHandleSSE<
+  TData = Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerHandleSSE>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerHandleSSE<
+  TData = Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerHandleSSE>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerHandleSSE<
+  TData = Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useMcpControllerHandleSSE<
+  TData = Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerHandleSSE>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getMcpControllerHandleSSEQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const mcpControllerHandleMessage = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>(
+    { url: `/api/mcp/message`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getMcpControllerHandleMessageMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof mcpControllerHandleMessage>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof mcpControllerHandleMessage>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['mcpControllerHandleMessage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof mcpControllerHandleMessage>>,
+    void
+  > = () => {
+    return mcpControllerHandleMessage(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type McpControllerHandleMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerHandleMessage>>
+>;
+
+export type McpControllerHandleMessageMutationError = unknown;
+
+export const useMcpControllerHandleMessage = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof mcpControllerHandleMessage>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof mcpControllerHandleMessage>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getMcpControllerHandleMessageMutationOptions(options),
+    queryClient,
+  );
+};
