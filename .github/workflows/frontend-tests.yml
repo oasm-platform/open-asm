@@ -2,10 +2,10 @@ name: Frontend Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths: ['console/**']
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths: ['console/**']
 
 permissions:
@@ -16,10 +16,10 @@ jobs:
     name: Unit & Integration Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
