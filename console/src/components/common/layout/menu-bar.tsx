@@ -123,7 +123,6 @@ export const menu: NavGroup[] = [
         title: 'Reports',
         icon: <FileChartPie />,
         url: '/reports',
-        isNew: true,
       },
     ],
   },
