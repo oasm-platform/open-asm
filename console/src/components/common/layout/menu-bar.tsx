@@ -20,7 +20,6 @@ import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
 import { useSession } from '@/utils/authClient';
 import {
   Bug,
-  CircleDot,
   CirclePlay,
   CloudCheck,
   Cpu,
@@ -114,11 +113,11 @@ export const menu: NavGroup[] = [
         icon: <Bug />,
         url: '/vulnerabilities',
       },
-      {
-        title: 'Issues',
-        icon: <CircleDot />,
-        url: '/issues',
-      },
+      // {
+      //   title: 'Issues',
+      //   icon: <CircleDot />,
+      //   url: '/issues',
+      // },
       {
         title: 'Reports',
         icon: <FileChartPie />,

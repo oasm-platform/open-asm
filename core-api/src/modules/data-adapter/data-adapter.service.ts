@@ -1,4 +1,3 @@
-import { BOT_ID } from '@/common/constants/app.constants';
 import { ScreenshotPayload } from '@/common/interfaces/app.interface';
 import { JobDataResultType } from '@/common/types/app.types';
 import { Injectable, Logger } from '@nestjs/common';
@@ -6,11 +5,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { DataSource, InsertResult } from 'typeorm';
-import {
-  IssueSourceType,
-  Severity,
-  ToolCategory,
-} from '../../common/enums/enum';
+import { Severity, ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
@@ -288,38 +283,38 @@ export class DataAdapterService {
           return;
         }
 
-        const vulnsWithoutExistingIssue = await Promise.all(
-          vulsForAlert.map(async (v) => {
-            const existing =
-              await this.issuesService.findExistingOpenIssueBySource(
-                v.id,
-                IssueSourceType.VULNERABILITY,
-                workspaceId,
-              );
-            return existing ? null : v;
-          }),
-        );
+        // const vulnsWithoutExistingIssue = await Promise.all(
+        //   vulsForAlert.map(async (v) => {
+        //     const existing =
+        //       await this.issuesService.findExistingOpenIssueBySource(
+        //         v.id,
+        //         IssueSourceType.VULNERABILITY,
+        //         workspaceId,
+        //       );
+        //     return existing ? null : v;
+        //   }),
+        // );
 
-        const newVulsForAlert = vulnsWithoutExistingIssue.filter(
-          (v): v is Vulnerability => v !== null,
-        );
+        // const newVulsForAlert = vulnsWithoutExistingIssue.filter(
+        //   (v): v is Vulnerability => v !== null,
+        // );
 
-        if (newVulsForAlert.length > 0) {
-          await Promise.all(
-            newVulsForAlert.map((v) =>
-              this.issuesService.createIssue(
-                {
-                  title: `[${v.severity.charAt(0).toUpperCase() + v.severity.slice(1).toLowerCase()}] ${v.name}`,
-                  description: v.description,
-                  sourceId: v.id,
-                  sourceType: IssueSourceType.VULNERABILITY,
-                },
-                workspaceId,
-                BOT_ID,
-              ),
-            ),
-          );
-        }
+        // if (newVulsForAlert.length > 0) {
+        //   await Promise.all(
+        //     newVulsForAlert.map((v) =>
+        //       this.issuesService.createIssue(
+        //         {
+        //           title: `[${v.severity.charAt(0).toUpperCase() + v.severity.slice(1).toLowerCase()}] ${v.name}`,
+        //           description: v.description,
+        //           sourceId: v.id,
+        //           sourceType: IssueSourceType.VULNERABILITY,
+        //         },
+        //         workspaceId,
+        //         BOT_ID,
+        //       ),
+        //     ),
+        //   );
+        // }
       }
     });
   }
