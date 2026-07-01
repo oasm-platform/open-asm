@@ -132,51 +132,53 @@ export default function Statistic() {
               )}
             </div>
 
-            <div className="h-[60px] w-full mt-4">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-                initialDimension={{ width: 320, height: 60 }}
-                minHeight={60}
-              >
-                <AreaChart
-                  data={chartData}
-                  margin={{ top: 10, right: 0, left: 0, bottom: 5 }}
-                  style={{ pointerEvents: 'none' }}
+            {chartData.length >= 2 && (
+              <div className="h-[60px] w-full mt-4">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  initialDimension={{ width: 320, height: 60 }}
+                  minHeight={60}
                 >
-                  <defs>
-                    <linearGradient
-                      id={`gradient-${index}`}
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="0%"
-                        stopColor="var(--chart-1)"
-                        stopOpacity={0.3}
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor="var(--chart-1)"
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <Area
-                    type="basis"
-                    dataKey={card.field}
-                    stroke="var(--chart-1)"
-                    fill={`url(#gradient-${index})`}
-                    strokeWidth={2}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    isAnimationActive={true}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+                  <AreaChart
+                    data={chartData}
+                    margin={{ top: 10, right: 0, left: 0, bottom: 5 }}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id={`gradient-${index}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor="var(--chart-1)"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor="var(--chart-1)"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <Area
+                      type="basis"
+                      dataKey={card.field}
+                      stroke="var(--chart-1)"
+                      fill={`url(#gradient-${index})`}
+                      strokeWidth={2}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      isAnimationActive={true}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}

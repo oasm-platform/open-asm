@@ -123,7 +123,6 @@ export const menu: NavGroup[] = [
         title: 'Reports',
         icon: <FileChartPie />,
         url: '/reports',
-        isNew: true,
       },
     ],
   },
@@ -159,14 +158,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props} collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center justify-between px-2">
+        <div className="flex items-center justify-between">
           <AppLogo type="large" />
         </div>
         {(state === 'expanded' || (state === 'collapsed' && isMobile)) && (
           <WorkspaceSwitcher />
         )}
       </SidebarHeader>
-      <SidebarContent className="gap-1 px-2 py-2 md:gap-4">
+      <SidebarContent className="gap-1 px-2 py-2 md:gap-2">
         {menu
           .filter(
             (item) =>
