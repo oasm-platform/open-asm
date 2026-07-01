@@ -1,0 +1,36 @@
+{
+  "categories": [
+    {
+      "title": "🚀 Features",
+      "labels": ["feat"]
+    },
+    {
+      "title": "🐛 Bug Fixes",
+      "labels": ["fix", "hot-fix"]
+    },
+    {
+      "title": "🔧 Improvements",
+      "labels": ["refactor", "perf"]
+    },
+    {
+      "title": "📚 Documentation & Testing",
+      "labels": ["docs", "test"]
+    },
+    {
+      "title": "🛠️ Maintenance",
+      "labels": ["chore", "style", "ci"]
+    }
+  ],
+  "template": "${{CATEGORIZED_COUNT}}",
+  "pr_template": "- ${{COMMITS}}",
+  "empty_template": "",
+  "max_tags_to_show": 10,
+  "label_extractor": [
+    {
+      "pattern": "^(\\w+)(\\([^)]+\\))?:\\s*(.*)",
+      "target": "$1",
+      "flags": "gm"
+    }
+  ],
+  "tag_pattern": "^v[0-9].*"
+}

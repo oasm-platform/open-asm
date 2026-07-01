@@ -4,9 +4,17 @@ on:
   push:
     branches:
       - '**'
+    paths:
+      - 'core-api/**'
+      - 'package*.json'
+      - 'tsconfig*.json'
   pull_request:
     branches:
       - '**'
+    paths:
+      - 'core-api/**'
+      - 'package*.json'
+      - 'tsconfig*.json'
 
 jobs:
   test:
