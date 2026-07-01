@@ -12,11 +12,11 @@ export class NotificationResponseDto {
   createdAt: Date;
 
   @ApiProperty()
-  updatedAt: Date;
-
-  @ApiProperty()
   message: string;
 
   @ApiProperty()
   url: string;
+
+  @ApiProperty({ required: false })
+  workspaceId?: string;
 }

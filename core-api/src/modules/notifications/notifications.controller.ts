@@ -16,7 +16,7 @@ import { NotificationsService } from './notifications.service';
 import { I18nLang } from 'nestjs-i18n';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { CreateNotificationDto } from './dto/create-notification.dto';
-import { UserContext } from '@/common/decorators/app.decorator';
+import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { NotificationResponseDto } from './dto/notification.dto';
@@ -35,14 +35,23 @@ export class NotificationsController {
     response: {
       serialization: GetManyResponseDto(NotificationResponseDto),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get()
   async getNotifications(
     @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
     @Query() query: GetManyBaseQueryParams,
     @I18nLang() lang: string,
   ) {
-    return this.notificationsService.getNotifications(user.id, query, lang);
+    return this.notificationsService.getNotifications(
+      user.id,
+      workspaceId,
+      query,
+      lang,
+    );
   }
 
   @Doc({

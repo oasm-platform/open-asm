@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await */
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { tool } from 'ai';
 import { randomUUID } from 'node:crypto';
+import * as dns from 'node:dns/promises';
 import { EventEmitter } from 'node:events';
 import { Repository } from 'typeorm';
 import { z } from 'zod';
@@ -19,7 +20,6 @@ import { WorkersService } from '@/modules/workers/workers.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { AgentMode } from '@/common/enums/enum';
-import { AgentsMemoriesService } from './agents.memories';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -37,9 +37,10 @@ import {
   listToolsSchema,
   listWorkersSchema,
 } from '@/mcp/mcp.schema';
+import { AgentsMemoriesService } from './agents.memories';
 import type { AgentTodoItem } from './agents.todo';
-import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
+import { AgentConversation } from './entities/agent-conversation.entity';
 
 const webFetchSchema = z.object({
   url: z.string().url().describe('Target URL'),
@@ -48,8 +49,24 @@ const webFetchSchema = z.object({
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolType = any;
 
+function isPrivateIp(ip: string): boolean {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(isNaN)) return false;
+  const [a, b] = parts;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a === 0) return true;
+  return false;
+}
+
 @Injectable()
 export class AgentTool {
+  private readonly logger = new Logger(AgentTool.name);
+
   constructor(
     private readonly assetsService: AssetsService,
     private readonly targetsService: TargetsService,
@@ -81,10 +98,19 @@ export class AgentTool {
         execute: async (params: z.infer<typeof getAssetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.assetsService.getManyAsssetServices(
-            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, value },
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              value,
+            },
             workspaceId,
           );
-          return { ...response, data: response.data.map((i) => ({ id: i.id, value: i.value })) };
+          return {
+            ...response,
+            data: response.data.map((i) => ({ id: i.id, value: i.value })),
+          };
         },
       };
       return tool(toolConfig);
@@ -100,10 +126,23 @@ export class AgentTool {
         execute: async (params: z.infer<typeof getVulnerabilitiesSchema>) => {
           const { page, limit, q } = params;
           const response = await this.vulnerabilitiesService.getVulnerabilities(
-            { limit: limit ?? 100, page: page ?? 1, q, sortBy: 'createdAt', sortOrder: SortOrder.DESC },
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              q,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+            },
             workspaceId,
           );
-          return { ...response, data: response.data.map((i) => ({ id: i.id, name: i.name, severity: i.severity })) };
+          return {
+            ...response,
+            data: response.data.map((i) => ({
+              id: i.id,
+              name: i.name,
+              severity: i.severity,
+            })),
+          };
         },
       };
       return tool(toolConfig);
@@ -119,10 +158,19 @@ export class AgentTool {
         execute: async (params: z.infer<typeof getTargetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.targetsService.getTargetsInWorkspace(
-            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, value },
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              value,
+            },
             workspaceId,
           );
-          return { ...response, data: response.data.map((i) => ({ id: i.id, value: i.value })) };
+          return {
+            ...response,
+            data: response.data.map((i) => ({ id: i.id, value: i.value })),
+          };
         },
       };
       return tool(toolConfig);
@@ -134,8 +182,9 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Return security dashboard summary: asset/vulnerability counts, severity breakdown, security score. No params.',
-        parameters: getStatisticOutPutSchema,
-        execute: async () => this.statisticService.getStatistics({ workspaceId }),
+        parameters: z.object({}),
+        execute: async () =>
+          this.statisticService.getStatistics({ workspaceId }),
       };
       return tool(toolConfig);
     };
@@ -164,7 +213,14 @@ export class AgentTool {
         execute: async (params: z.infer<typeof listAssetsInTargetSchema>) => {
           const { targetId, limit, page, value } = params;
           return this.assetsService.getManyAsssetServices(
-            { limit: limit ?? 100, page: page ?? 1, targetIds: [targetId], value, sortBy: 'createdAt', sortOrder: SortOrder.DESC },
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              targetIds: [targetId],
+              value,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+            },
             workspaceId,
           );
         },
@@ -176,11 +232,15 @@ export class AgentTool {
   get detailVulnTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description: 'Get full vulnerability report with CVSS, PoC, remediation steps. Params: vulnId.',
+        description:
+          'Get full vulnerability report with CVSS, PoC, remediation steps. Params: vulnId.',
         parameters: detailVulnSchema,
         execute: async (params: z.infer<typeof detailVulnSchema>) => {
           const vulnId: string = (params.vulnId ?? params.id) as string;
-          return this.vulnerabilitiesService.getVulnerability(vulnId, workspaceId);
+          return this.vulnerabilitiesService.getVulnerability(
+            vulnId,
+            workspaceId,
+          );
         },
       };
       return tool(toolConfig);
@@ -196,7 +256,13 @@ export class AgentTool {
         execute: async (params: z.infer<typeof getPortsSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getPortAssets(
-            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, value },
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              value,
+            },
             workspaceId,
           );
         },
@@ -214,7 +280,13 @@ export class AgentTool {
         execute: async (params: z.infer<typeof getTechnologiesSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getTechnologyAssets(
-            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, value },
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              value,
+            },
             workspaceId,
           );
         },
@@ -232,7 +304,13 @@ export class AgentTool {
         execute: async (params: z.infer<typeof getTlsSchema>) => {
           const { page, limit, search } = params;
           return this.assetsService.getManyTls(
-            { limit: limit ?? 100, page: page ?? 1, sortBy: 'not_after', sortOrder: SortOrder.ASC, search },
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'not_after',
+              sortOrder: SortOrder.ASC,
+              search,
+            },
             workspaceId,
           );
         },
@@ -244,18 +322,32 @@ export class AgentTool {
   get webFetchTool(): (workspaceId: string) => any {
     return (_workspaceId: string) => {
       const toolConfig: any = {
-        description: 'HTTP GET to any public URL. Returns statusCode + body. Params: url.',
+        description:
+          'HTTP GET to any public URL. Returns statusCode + body. Params: url.',
         parameters: webFetchSchema,
         execute: async (params: z.infer<typeof webFetchSchema>) => {
-          const { url } = params;
+          const { url: rawUrl } = params;
           try {
-            const response = await fetch(url, {
+            const parsedUrl = new URL(rawUrl);
+            if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+              return { error: 'Only http and https protocols are allowed', url: rawUrl };
+            }
+            const addresses = await dns.resolve4(parsedUrl.hostname);
+            for (const ip of addresses) {
+              if (isPrivateIp(ip)) {
+                return { error: 'Request blocked: target address is not publicly accessible', url: rawUrl };
+              }
+            }
+            const response = await fetch(rawUrl, {
               method: 'GET',
               headers: { 'User-Agent': 'OASM-Security-Agent/1.0' },
             });
             return { statusCode: response.status, body: await response.text() };
           } catch (error) {
-            return { error: error instanceof Error ? error.message : 'Unknown error', url };
+            return {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              url: rawUrl,
+            };
           }
         },
       };
@@ -272,12 +364,24 @@ export class AgentTool {
         execute: async (params: z.infer<typeof listIssuesSchema>) => {
           const { page, limit, search, status } = params;
           const response = await this.issuesService.getMany(
-            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, search, status: status as any },
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              search,
+              status: status as any,
+            },
             workspaceId,
           );
           return {
             ...response,
-            data: response.data.map((i) => ({ id: i.id, title: i.title, status: i.status, tags: i.tags })),
+            data: response.data.map((i) => ({
+              id: i.id,
+              title: i.title,
+              status: i.status,
+              tags: i.tags,
+            })),
           };
         },
       };
@@ -302,14 +406,22 @@ export class AgentTool {
   get listToolsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description: 'List installed security tools/scanners. Params: page, limit, q (search filter).',
+        description:
+          'List installed security tools/scanners. Params: page, limit, q (search filter).',
         parameters: listToolsSchema,
         execute: async (params: z.infer<typeof listToolsSchema>) => {
           const { page, limit, q } = params;
           const response = await this.toolsService.getManyTools({
-            limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, search: q,
+            limit: limit ?? 100,
+            page: page ?? 1,
+            sortBy: 'createdAt',
+            sortOrder: SortOrder.DESC,
+            search: q,
           });
-          return { ...response, data: response.data.map((i) => ({ id: i.id, name: i.name })) };
+          return {
+            ...response,
+            data: response.data.map((i) => ({ id: i.id, name: i.name })),
+          };
         },
       };
       return tool(toolConfig);
@@ -319,15 +431,24 @@ export class AgentTool {
   get listWorkersTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description: 'List connected worker nodes. Params: page, limit, q (search query).',
+        description:
+          'List connected worker nodes. Params: page, limit, q (search query).',
         parameters: listWorkersSchema,
         execute: async (params: z.infer<typeof listWorkersSchema>) => {
           const { page, limit, q } = params;
           const response = await this.workersService.getWorkers({
-            limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, search: q,
-            workspaceId, enabledAgentMode: true,
+            limit: limit ?? 100,
+            page: page ?? 1,
+            sortBy: 'createdAt',
+            sortOrder: SortOrder.DESC,
+            search: q,
+            workspaceId,
+            enabledAgentMode: true,
           });
-          return { ...response, data: response.data.map((i) => ({ id: i.id, name: i.name })) };
+          return {
+            ...response,
+            data: response.data.map((i) => ({ id: i.id, name: i.name })),
+          };
         },
       };
       return tool(toolConfig);
@@ -343,17 +464,28 @@ export class AgentTool {
         execute: async (params: z.infer<typeof listJobsSchema>) => {
           const { page, limit, jobHistoryId, jobStatus } = params;
           const response = await this.jobsRegistryService.getManyJobs({
-            limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC,
-            jobHistoryId, jobStatus,
+            limit: limit ?? 100,
+            page: page ?? 1,
+            sortBy: 'createdAt',
+            sortOrder: SortOrder.DESC,
+            jobHistoryId,
+            jobStatus,
           });
-          return { ...response, data: response.data.map((i) => ({ id: i.id, status: i.status })) };
+          return {
+            ...response,
+            data: response.data.map((i) => ({ id: i.id, status: i.status })),
+          };
         },
       };
       return tool(toolConfig);
     };
   }
 
-  remoteExecuteTool(workspaceId: string, conversationId: string, emitter?: EventEmitter): ToolType {
+  remoteExecuteTool(
+    workspaceId: string,
+    conversationId: string,
+    emitter?: EventEmitter,
+  ): ToolType {
     const toolConfig: any = {
       description: [
         'Execute arbitrary shell commands on remote worker nodes (nmap, curl, dig, etc.).',
@@ -494,7 +626,8 @@ export class AgentTool {
     };
 
     const setPlanTool: any = {
-      description: 'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
+      description:
+        'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
       parameters: z.object({
         steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
       }),
@@ -510,7 +643,9 @@ export class AgentTool {
           );
           if (hasActiveTodos) {
             const activeSteps = existingTodos
-              .filter((t) => t.status === 'pending' || t.status === 'in_progress')
+              .filter(
+                (t) => t.status === 'pending' || t.status === 'in_progress',
+              )
               .map((t) => `  - [${t.status}] ${t.content}`)
               .join('\n');
             return {
@@ -524,7 +659,7 @@ export class AgentTool {
           }
 
           // Log raw params for debugging
-          console.log('[formulate_plan] Raw params:', JSON.stringify(params, null, 2));
+          this.logger.log('[formulate_plan] Raw params: ' + JSON.stringify(params, null, 2));
 
           // Normalize steps: handle various formats AI might send
           let normalizedSteps: string[] = [];
@@ -553,7 +688,7 @@ export class AgentTool {
             const parsed = tryParseJsonArray(rawSteps);
             if (parsed) {
               stepsArray = parsed;
-              console.log('[formulate_plan] Parsed from JSON string');
+              this.logger.log('[formulate_plan] Parsed from JSON string');
             } else {
               stepsArray = [rawSteps];
             }
@@ -562,7 +697,7 @@ export class AgentTool {
               const parsed = tryParseJsonArray(rawSteps[0]!);
               if (parsed) {
                 stepsArray = parsed;
-                console.log('[formulate_plan] Parsed from nested JSON string');
+                this.logger.log('[formulate_plan] Parsed from nested JSON string');
               } else {
                 stepsArray = rawSteps;
               }
@@ -571,7 +706,7 @@ export class AgentTool {
             }
           }
 
-          console.log('[formulate_plan] Steps array:', stepsArray);
+          this.logger.log('[formulate_plan] Steps array: ' + JSON.stringify(stepsArray));
 
           // Clean each step
           for (const s of stepsArray) {
@@ -597,8 +732,8 @@ export class AgentTool {
             }
           }
 
-          console.log('[formulate_plan] Normalized steps:', normalizedSteps);
-          console.log('[formulate_plan] Normalized count:', normalizedSteps.length);
+          this.logger.log('[formulate_plan] Normalized steps: ' + JSON.stringify(normalizedSteps));
+          this.logger.log('[formulate_plan] Normalized count: ' + normalizedSteps.length);
 
           if (normalizedSteps.length === 0) {
             return { success: false, message: 'No valid steps provided.' };
@@ -617,30 +752,45 @@ export class AgentTool {
           await todoRepo.save(entities);
 
           const todos = await getAllTodos();
-          console.log('[formulate_plan] Final todos:', JSON.stringify(todos, null, 2));
+          this.logger.log('[formulate_plan] Final todos: ' + JSON.stringify(todos, null, 2));
 
           await emitTodos();
-          return { success: true, message: `Plan set with ${todos.length} steps.`, todos };
+          return {
+            success: true,
+            message: `Plan set with ${todos.length} steps.`,
+            todos,
+          };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          console.error('[formulate_plan] Error:', error);
+          const message =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error('[formulate_plan] Error: ' + (error instanceof Error ? error.message : String(error)));
           return { success: false, message: `Failed to set plan: ${message}` };
         }
       },
     };
 
     const updateTodoStatusTool: any = {
-      description: 'Update the status of a specific step in the execution plan. You MUST call this at two points: (1) BEFORE starting work on a step — call transition_step(id, "in_progress"), and (2) AFTER finishing work on a step — call transition_step(id, "completed") or transition_step(id, "failed"). ALWAYS transition the current step before moving to the next sequential step. NEVER skip steps. NEVER call this for a step that is not your current step. Params: id (UUID of the step), status (pending/in_progress/completed/failed).',
+      description:
+        'Update the status of a specific step in the execution plan. You MUST call this at two points: (1) BEFORE starting work on a step — call transition_step(id, "in_progress"), and (2) AFTER finishing work on a step — call transition_step(id, "completed") or transition_step(id, "failed"). ALWAYS transition the current step before moving to the next sequential step. NEVER skip steps. NEVER call this for a step that is not your current step. Params: id (UUID of the step), status (pending/in_progress/completed/failed).',
       parameters: z.object({
         id: z.string().uuid().describe('Todo item ID'),
-        status: z.enum(['pending', 'in_progress', 'completed', 'failed']).describe('New status'),
+        status: z
+          .enum(['pending', 'in_progress', 'completed', 'failed'])
+          .describe('New status'),
       }),
-      execute: async (params: { id: string; status: AgentTodoItem['status'] }) => {
+      execute: async (params: {
+        id: string;
+        status: AgentTodoItem['status'];
+      }) => {
         try {
           const targetTodo = await todoRepo.findOne({
             where: { id: params.id, conversationId },
           });
-          if (!targetTodo) return { success: false, message: `Todo "${params.id}" not found.` };
+          if (!targetTodo)
+            return {
+              success: false,
+              message: `Todo "${params.id}" not found.`,
+            };
 
           // Server-side ordering guard: enforce sequential execution
           if (params.status === 'in_progress') {
@@ -658,7 +808,10 @@ export class AgentTool {
                 message: `REJECTED: Cannot start "${targetTodo.content}" (sortOrder ${targetTodo.sortOrder}). You must complete the current step first: "${currentStep.content}" (sortOrder ${currentStep.sortOrder}). Execute steps in strict sequential order.`,
               };
             }
-          } else if (params.status === 'completed' || params.status === 'failed') {
+          } else if (
+            params.status === 'completed' ||
+            params.status === 'failed'
+          ) {
             // Can only complete/fail a step that is currently in_progress
             if (targetTodo.status !== 'in_progress') {
               return {
@@ -672,16 +825,31 @@ export class AgentTool {
           await todoRepo.save(targetTodo);
 
           await emitTodos();
-          return { success: true, message: `Updated "${targetTodo.content}" -> ${params.status}`, todo: { id: targetTodo.id, content: targetTodo.content, status: targetTodo.status, sortOrder: targetTodo.sortOrder, updatedAt: targetTodo.updatedAt.toISOString() } };
+          return {
+            success: true,
+            message: `Updated "${targetTodo.content}" -> ${params.status}`,
+            todo: {
+              id: targetTodo.id,
+              content: targetTodo.content,
+              status: targetTodo.status,
+              sortOrder: targetTodo.sortOrder,
+              updatedAt: targetTodo.updatedAt.toISOString(),
+            },
+          };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { success: false, message: `Failed to update step: ${message}` };
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to update step: ${message}`,
+          };
         }
       },
     };
 
     const addTodoTool: any = {
-      description: 'Append a new step to the plan. Params: content (string). ONLY use when you genuinely discover a new requirement during execution that was not part of the original plan. Do NOT use to re-create steps you forgot to add earlier — finish the current step first.',
+      description:
+        'Append a new step to the plan. Params: content (string). ONLY use when you genuinely discover a new requirement during execution that was not part of the original plan. Do NOT use to re-create steps you forgot to add earlier — finish the current step first.',
       parameters: z.object({
         content: z.string().min(1).describe('Todo content'),
       }),
@@ -696,8 +864,8 @@ export class AgentTool {
 
           // Guard: warn but allow append during active plan (the LLM might genuinely need it)
           if (hasActiveTodos) {
-            console.log(
-              `[append_step] WARNING: Adding step while ${existingTodos.filter((t) => t.status === 'pending' || t.status === 'in_progress').length} step(s) still active`,
+            this.logger.warn(
+              `[append_step] Adding step while ${existingTodos.filter((t) => t.status === 'pending' || t.status === 'in_progress').length} step(s) still active`,
             );
           }
 
@@ -718,16 +886,28 @@ export class AgentTool {
 
           await getAllTodos();
           await emitTodos();
-          return { success: true, message: `Added todo "${params.content}".`, todo: { id: newEntity.id, content: newEntity.content, status: newEntity.status, sortOrder: newEntity.sortOrder, updatedAt: newEntity.updatedAt.toISOString() } };
+          return {
+            success: true,
+            message: `Added todo "${params.content}".`,
+            todo: {
+              id: newEntity.id,
+              content: newEntity.content,
+              status: newEntity.status,
+              sortOrder: newEntity.sortOrder,
+              updatedAt: newEntity.updatedAt.toISOString(),
+            },
+          };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           return { success: false, message: `Failed to add step: ${message}` };
         }
       },
     };
 
     const clearPlanTool: any = {
-      description: 'Clear entire plan (irreversible). Then call formulate_plan to create a new one.',
+      description:
+        'Clear entire plan (irreversible). Then call formulate_plan to create a new one.',
       parameters: z.object({}),
       execute: async () => {
         try {
@@ -735,8 +915,12 @@ export class AgentTool {
           await emitTodos();
           return { success: true, message: 'Plan cleared.' };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { success: false, message: `Failed to clear plan: ${message}` };
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to clear plan: ${message}`,
+          };
         }
       },
     };
@@ -781,8 +965,12 @@ export class AgentTool {
             message: `Stored "${params.key}" in short-term memory.`,
           };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { success: false, message: `Failed to store memory: ${message}` };
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to store memory: ${message}`,
+          };
         }
       },
     };
@@ -811,8 +999,12 @@ export class AgentTool {
             updatedAt: entry.updatedAt,
           };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { success: false, message: `Failed to read memory: ${message}` };
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to read memory: ${message}`,
+          };
         }
       },
     };
@@ -832,8 +1024,12 @@ export class AgentTool {
             })),
           };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { success: false, message: `Failed to list memories: ${message}` };
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to list memories: ${message}`,
+          };
         }
       },
     };
@@ -856,7 +1052,8 @@ export class AgentTool {
             message: 'Saved to long-term memory.',
           };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           return { success: false, message: `Failed to save LTM: ${message}` };
         }
       },
@@ -883,8 +1080,12 @@ export class AgentTool {
             message: 'Appended to long-term memory.',
           };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { success: false, message: `Failed to append LTM: ${message}` };
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to append LTM: ${message}`,
+          };
         }
       },
     };
@@ -897,7 +1098,8 @@ export class AgentTool {
           const record = await memoriesService.ltmGet(workspaceId, userId);
           return { content: record?.content || '(empty)' };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           return { success: false, message: `Failed to read LTM: ${message}` };
         }
       },
@@ -918,31 +1120,108 @@ export class AgentTool {
     agentMode: AgentMode,
     emitter?: EventEmitter,
     conversationId?: string,
+    mcpOnly = false,
   ): Record<string, ToolType> {
     const { AGENT, ASK } = AgentMode;
-    const tools: Record<string, { method: ToolType; permissions: AgentMode[] }> = {
-      enumerate_assets: { method: this.getAssetsTool(workspaceId), permissions: [AGENT, ASK] },
-      discover_vulnerabilities: { method: this.getVulnerabilitiesTool(workspaceId), permissions: [AGENT, ASK] },
-      retrieve_targets: { method: this.getTargetsTool(workspaceId), permissions: [AGENT, ASK] },
-      gather_statistics: { method: this.getStatisticsTool(workspaceId), permissions: [AGENT, ASK] },
-      inspect_asset: { method: this.detailAssetTool(workspaceId), permissions: [AGENT, ASK] },
-      examine_target_assets: { method: this.listAssetsInTargetTool(workspaceId), permissions: [AGENT, ASK] },
-      investigate_vulnerability: { method: this.detailVulnTool(workspaceId), permissions: [AGENT, ASK] },
-      list_network_ports: { method: this.getPortsTool(workspaceId), permissions: [AGENT, ASK] },
-      fingerprint_technologies: { method: this.getTechnologiesTool(workspaceId), permissions: [AGENT, ASK] },
-      verify_tls_settings: { method: this.getTlsTool(workspaceId), permissions: [AGENT, ASK] },
-      retrieve_web_page: { method: this.webFetchTool(workspaceId), permissions: [AGENT, ASK] },
-      enumerate_open_issues: { method: this.listIssuesTool(workspaceId), permissions: [AGENT, ASK] },
-      inspect_issue: { method: this.detailIssueTool(workspaceId), permissions: [AGENT, ASK] },
-      display_available_tools: { method: this.listToolsTool(workspaceId), permissions: [AGENT, ASK] },
-      list_active_workers: { method: this.listWorkersTool(workspaceId), permissions: [AGENT, ASK] },
-      review_jobs: { method: this.listJobsTool(workspaceId), permissions: [AGENT, ASK] },
-      execute_remote_command: { method: this.remoteExecuteTool(workspaceId, conversationId ?? '', emitter), permissions: [AGENT] },
+    const tools: Record<
+      string,
+      { method: ToolType; permissions: AgentMode[]; mcp: boolean }
+    > = {
+      enumerate_assets: {
+        method: this.getAssetsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      discover_vulnerabilities: {
+        method: this.getVulnerabilitiesTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      retrieve_targets: {
+        method: this.getTargetsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      gather_statistics: {
+        method: this.getStatisticsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      inspect_asset: {
+        method: this.detailAssetTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      examine_target_assets: {
+        method: this.listAssetsInTargetTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      investigate_vulnerability: {
+        method: this.detailVulnTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      list_network_ports: {
+        method: this.getPortsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      fingerprint_technologies: {
+        method: this.getTechnologiesTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      verify_tls_settings: {
+        method: this.getTlsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      retrieve_web_page: {
+        method: this.webFetchTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      enumerate_open_issues: {
+        method: this.listIssuesTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      inspect_issue: {
+        method: this.detailIssueTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      display_available_tools: {
+        method: this.listToolsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: false,
+      },
+      list_active_workers: {
+        method: this.listWorkersTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      review_jobs: {
+        method: this.listJobsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      execute_remote_command: {
+        method: this.remoteExecuteTool(
+          workspaceId,
+          conversationId ?? '',
+          emitter,
+        ),
+        permissions: [AGENT],
+        mcp: false,
+      },
     };
 
     return Object.fromEntries(
       Object.entries(tools)
         .filter(([, config]) => config.permissions.includes(agentMode))
+        .filter(([, config]) => (mcpOnly ? config.mcp : true))
         .map(([key, config]) => [key, config.method]),
     ) as Record<string, ToolType>;
   }

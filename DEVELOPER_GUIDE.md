@@ -299,6 +299,58 @@ This starts:
 - Geo-IP proxy (port 4360)
 - Rustfs S3 storage (port 9000)
 
+## Local CI Testing
+
+Before pushing changes, you can run GitHub Actions workflows locally using [act](https://github.com/nektos/act) to catch issues early.
+
+### Prerequisites
+
+- Docker Desktop must be installed and running
+- Install act:
+  ```bash
+  # Linux/macOS
+  curl -fsSL https://raw.githubusercontent.com/nektos/act/master/install.sh | bash
+
+  # Windows (Git Bash)
+  curl -fsSL https://raw.githubusercontent.com/nektos/act/master/install.sh | bash
+  mv act_Windows_x86_64.zip /tmp/act/act.exe
+  ```
+
+### Usage
+
+```bash
+# List available workflows
+bash .github/scripts/test-local.sh
+
+# Run a specific workflow
+bash .github/scripts/test-local.sh check-lint
+bash .github/scripts/test-local.sh worker-ci
+
+# Validate all workflows (dry-run)
+bash .github/scripts/test-local.sh --all
+
+# Custom act binary path
+ACT_BIN=act bash .github/scripts/test-local.sh check-lint
+```
+
+### Local Test Equivalents
+
+Some workflows can be tested faster by running the commands directly:
+
+| CI Workflow | Local Command |
+|---|---|
+| `check-lint.yml` | `task lint` |
+| `check-test.yml` | `task api:test` |
+| `check-build.yml` | `task build` (requires Docker) |
+| `frontend-tests.yml` | `cd console && npm run test:run` |
+| `worker-ci.yml` | `task worker:lint && task worker:check` |
+
+### Notes
+
+- Workflows using `docker/build-push-action` with multi-platform builds (`build-release.yml`, `build-nightly.yml`) cannot be fully tested locally — they require QEMU and native CI runners.
+- `dorny/paths-filter` may not detect file changes correctly in shallow clones. Use `--full-history` or test specific jobs.
+- Docker layer caching (`type=gha`) is not available locally, but builds will still work.
+
 ## Contributing
 
 We welcome contributions! Please follow these steps:
@@ -309,7 +361,8 @@ We welcome contributions! Please follow these steps:
    ```bash
    git commit -m 'feat(scope): add amazing feature'
    ```
-4. Push to the branch: `git push origin feature/amazing-feature`.
-5. Open a Pull Request.
+4. Test CI workflows locally: `bash .github/scripts/test-local.sh <workflow>`
+5. Push to the branch: `git push origin feature/amazing-feature`.
+6. Open a Pull Request.
 
 Please ensure your code adheres to the project's coding standards and passes all tests before submitting a PR.

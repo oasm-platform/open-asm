@@ -1,0 +1,71 @@
+name: Worker CI
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'worker/**'
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - 'worker/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    name: Check formatting
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+      - name: Check go fmt
+        run: |
+          unformatted=$(go fmt ./...)
+          if [ -n "$unformatted" ]; then
+            echo "Unformatted files:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+  vet:
+    name: Run go vet
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+      - run: go vet ./...
+
+  build:
+    name: Build binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [cli, app]
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+      - name: Build ${{ matrix.target }}
+        run: go build -o /dev/null ./cmd/${{ matrix.target }}

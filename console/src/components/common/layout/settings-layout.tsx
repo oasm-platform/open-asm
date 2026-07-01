@@ -2,9 +2,9 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { filterTabGroups, settingsTabGroups } from '@/pages/settings/settings';
 import { useSession } from '@/utils/authClient';
+import { Link, useLocation } from '@tanstack/react-router';
 import { ArrowLeft, Menu } from 'lucide-react';
 import type { JSX, ReactNode } from 'react';
-import { Link, useLocation } from '@tanstack/react-router';
 
 interface SettingsLayoutProps {
   children: ReactNode;

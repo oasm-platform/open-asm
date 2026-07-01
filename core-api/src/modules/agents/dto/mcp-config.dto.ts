@@ -22,7 +22,7 @@ export class MCPServerConfigDto {
   @IsIn(['sse', 'streamable-http'])
   transport?: 'sse' | 'streamable-http';
 
-  @ApiPropertyOptional({ example: { 'api-key': 'sk-...' } })
+  @ApiPropertyOptional({ example: { 'x-oasm-api-key': 'sk-...' } })
   @IsOptional()
   @IsObject()
   headers?: Record<string, string>;

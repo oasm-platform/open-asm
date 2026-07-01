@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerDeleteWorkspace,
   type Workspace,
@@ -16,6 +17,7 @@ const DeleteWorkspace = (props: DeleteWorkspaceProps) => {
 
   const { workspace } = props;
   const { mutate } = useWorkspacesControllerDeleteWorkspace();
+  const { refetch } = useWorkspaceSelector();
   const handleDelete = () => {
     mutate(
       {
@@ -24,7 +26,8 @@ const DeleteWorkspace = (props: DeleteWorkspaceProps) => {
       {
         onSuccess: () => {
           toast.success('Workspace deleted');
-          queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] });
+          refetch();
         },
         onError: () => {
           toast.error('Failed to delete workspace');

@@ -16,6 +16,7 @@ import { DatabaseModule } from './database/database.module';
 import { CombineModule } from './modules/combine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { StorageModule } from './modules/storage/storage.module';
+import { McpServerModule } from './mcp/mcp.module';
 import { ServicesModule } from './services/services.module';
 
 @Module({
@@ -53,7 +54,7 @@ import { ServicesModule } from './services/services.module';
     NotificationsModule,
     StorageModule,
     ServicesModule,
-    // McpServerModule,
+    McpServerModule,
   ],
 })
 export class AppModule {}
