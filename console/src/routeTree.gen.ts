@@ -35,6 +35,7 @@ import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vu
 import { Route as AuthedToolsIdRouteImport } from './routes/_authed/tools/$id'
 import { Route as AuthedTargetsStartDiscoveryRouteImport } from './routes/_authed/targets/start-discovery'
 import { Route as AuthedProvidersCreateRouteImport } from './routes/_authed/providers/create'
+import { Route as AuthedIssuesCreateRouteImport } from './routes/_authed/issues/create'
 import { Route as AuthedIssuesIdRouteImport } from './routes/_authed/issues/$id'
 import { Route as AuthedInternalNetworksCreateRouteImport } from './routes/_authed/internal-networks/create'
 import { Route as AuthedInternalNetworksIdRouteImport } from './routes/_authed/internal-networks/$id'
@@ -185,6 +186,11 @@ const AuthedProvidersCreateRoute = AuthedProvidersCreateRouteImport.update({
   path: '/providers/create',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedIssuesCreateRoute = AuthedIssuesCreateRouteImport.update({
+  id: '/issues/create',
+  path: '/issues/create',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedIssuesIdRoute = AuthedIssuesIdRouteImport.update({
   id: '/issues/$id',
   path: '/issues/$id',
@@ -294,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
   '/issues/$id': typeof AuthedIssuesIdRoute
+  '/issues/create': typeof AuthedIssuesCreateRoute
   '/providers/create': typeof AuthedProvidersCreateRoute
   '/targets/start-discovery': typeof AuthedTargetsStartDiscoveryRoute
   '/tools/$id': typeof AuthedToolsIdRoute
@@ -337,6 +344,7 @@ export interface FileRoutesByTo {
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
   '/issues/$id': typeof AuthedIssuesIdRoute
+  '/issues/create': typeof AuthedIssuesCreateRoute
   '/providers/create': typeof AuthedProvidersCreateRoute
   '/targets/start-discovery': typeof AuthedTargetsStartDiscoveryRoute
   '/tools/$id': typeof AuthedToolsIdRoute
@@ -383,6 +391,7 @@ export interface FileRoutesById {
   '/_authed/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/_authed/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
   '/_authed/issues/$id': typeof AuthedIssuesIdRoute
+  '/_authed/issues/create': typeof AuthedIssuesCreateRoute
   '/_authed/providers/create': typeof AuthedProvidersCreateRoute
   '/_authed/targets/start-discovery': typeof AuthedTargetsStartDiscoveryRoute
   '/_authed/tools/$id': typeof AuthedToolsIdRoute
@@ -429,6 +438,7 @@ export interface FileRouteTypes {
     | '/internal-networks/$id'
     | '/internal-networks/create'
     | '/issues/$id'
+    | '/issues/create'
     | '/providers/create'
     | '/targets/start-discovery'
     | '/tools/$id'
@@ -472,6 +482,7 @@ export interface FileRouteTypes {
     | '/internal-networks/$id'
     | '/internal-networks/create'
     | '/issues/$id'
+    | '/issues/create'
     | '/providers/create'
     | '/targets/start-discovery'
     | '/tools/$id'
@@ -517,6 +528,7 @@ export interface FileRouteTypes {
     | '/_authed/internal-networks/$id'
     | '/_authed/internal-networks/create'
     | '/_authed/issues/$id'
+    | '/_authed/issues/create'
     | '/_authed/providers/create'
     | '/_authed/targets/start-discovery'
     | '/_authed/tools/$id'
@@ -736,6 +748,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProvidersCreateRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/issues/create': {
+      id: '/_authed/issues/create'
+      path: '/issues/create'
+      fullPath: '/issues/create'
+      preLoaderRoute: typeof AuthedIssuesCreateRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/issues/$id': {
       id: '/_authed/issues/$id'
       path: '/issues/$id'
@@ -870,6 +889,7 @@ interface AuthedRouteChildren {
   AuthedInternalNetworksIdRoute: typeof AuthedInternalNetworksIdRoute
   AuthedInternalNetworksCreateRoute: typeof AuthedInternalNetworksCreateRoute
   AuthedIssuesIdRoute: typeof AuthedIssuesIdRoute
+  AuthedIssuesCreateRoute: typeof AuthedIssuesCreateRoute
   AuthedProvidersCreateRoute: typeof AuthedProvidersCreateRoute
   AuthedTargetsStartDiscoveryRoute: typeof AuthedTargetsStartDiscoveryRoute
   AuthedToolsIdRoute: typeof AuthedToolsIdRoute
@@ -909,6 +929,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedInternalNetworksIdRoute: AuthedInternalNetworksIdRoute,
   AuthedInternalNetworksCreateRoute: AuthedInternalNetworksCreateRoute,
   AuthedIssuesIdRoute: AuthedIssuesIdRoute,
+  AuthedIssuesCreateRoute: AuthedIssuesCreateRoute,
   AuthedProvidersCreateRoute: AuthedProvidersCreateRoute,
   AuthedTargetsStartDiscoveryRoute: AuthedTargetsStartDiscoveryRoute,
   AuthedToolsIdRoute: AuthedToolsIdRoute,
