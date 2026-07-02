@@ -1,3 +1,4 @@
+import type { WrapperType } from '@/common/types/app.types';
 import { AgentConversation } from '@/modules/agents/entities/agent-conversation.entity';
 import {
   forwardRef,
@@ -39,7 +40,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
 
   constructor(
     @Inject(forwardRef(() => WorkersService))
-    private readonly workersService: WorkersService,
+    private readonly workersService: WrapperType<WorkersService>,
     @InjectRepository(AgentConversation)
     private readonly conversationRepo: Repository<AgentConversation>,
   ) {}

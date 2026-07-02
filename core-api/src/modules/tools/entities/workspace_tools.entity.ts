@@ -1,6 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { Tool } from './tools.entity';
 
 @Entity('workspace_tools')
@@ -9,13 +9,13 @@ import { Tool } from './tools.entity';
 export class WorkspaceTool extends BaseEntity {
   @ManyToOne(() => Tool, (tool) => tool.workspaceTools)
   @JoinColumn({ name: 'toolId' })
-  tool: Tool;
+  tool: Relation<Tool>;
 
   @ManyToOne(() => Workspace, (workspace) => workspace.workspaceTools, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @Column({ default: true })
   isEnabled: boolean;

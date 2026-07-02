@@ -4,7 +4,7 @@ import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, Index, ManyToOne, OneToMany, Unique } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany, Relation, Unique } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 import { IpAssetsView } from './ip-assets.entity';
 
@@ -25,7 +25,7 @@ export class Asset extends BaseEntity {
   @ManyToOne(() => Target, (target) => target.assets, {
     onDelete: 'CASCADE',
   })
-  target: Target;
+  target: Relation<Target>;
 
   @ApiProperty()
   @Column({ default: false })
@@ -34,7 +34,7 @@ export class Asset extends BaseEntity {
   @OneToMany(() => Job, (job) => job.asset, {
     onDelete: 'CASCADE',
   })
-  jobs?: Job[];
+  jobs?: Relation<Job[]>;
 
   @ApiProperty()
   @Column({ type: 'json', nullable: true })
@@ -43,20 +43,20 @@ export class Asset extends BaseEntity {
   @OneToMany(() => AssetService, (assetService) => assetService.asset, {
     onDelete: 'CASCADE',
   })
-  assetServices?: AssetService[];
+  assetServices?: Relation<AssetService[]>;
 
   @OneToMany(() => Vulnerability, (vulnerability) => vulnerability.asset, {
     onDelete: 'CASCADE',
   })
-  vulnerabilities?: Vulnerability[];
+  vulnerabilities?: Relation<Vulnerability[]>;
 
   @OneToMany(() => AssetGroupAsset, (aga) => aga.asset, {
     onDelete: 'CASCADE',
   })
-  assetGroupAssets?: AssetGroupAsset[];
+  assetGroupAssets?: Relation<AssetGroupAsset[]>;
 
   @OneToMany(() => IpAssetsView, (ipAssets) => ipAssets.asset)
-  ipAssets?: IpAssetsView[];
+  ipAssets?: Relation<IpAssetsView[]>;
 
   @ApiProperty()
   @Column({ default: true })

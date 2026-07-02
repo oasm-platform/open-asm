@@ -1,7 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { WorkspaceRole } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
-import { Column, Entity, Index, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, Relation } from 'typeorm';
 import { Workspace } from './workspace.entity';
 
 @Entity('workspace_members')
@@ -12,13 +12,13 @@ export class WorkspaceMembers extends BaseEntity {
     cascade: true,
     onDelete: 'CASCADE',
   })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @ManyToOne(() => User, (user) => user.workspaceMembers, {
     cascade: true,
     onDelete: 'CASCADE',
   })
-  user: User;
+  user: Relation<User>;
 
   @Column({ type: 'enum', enum: WorkspaceRole, default: WorkspaceRole.OWNER })
   role: WorkspaceRole;

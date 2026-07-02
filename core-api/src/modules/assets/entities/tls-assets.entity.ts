@@ -1,4 +1,4 @@
-import { JoinColumn, ManyToOne, ViewColumn, ViewEntity } from 'typeorm';
+import { JoinColumn, ManyToOne, Relation, ViewColumn, ViewEntity } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 
 /**
@@ -68,5 +68,5 @@ export class TlsAssetsView {
 
   @ManyToOne(() => AssetService, (assetService) => assetService.tlsAssets)
   @JoinColumn({ name: 'assetServiceId' })
-  assetService: AssetService;
+  assetService: Relation<AssetService>;
 }
