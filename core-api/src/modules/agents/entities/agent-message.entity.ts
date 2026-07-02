@@ -8,7 +8,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, Relation } from 'typeorm';
 import { MessageRole, MessageType } from '../enums/agent.enums';
 import { AgentConversation } from './agent-conversation.entity';
 import { AgentMessageToolCall } from './tool-call.entity';
@@ -62,11 +62,11 @@ export class AgentMessage extends BaseEntity {
   @OneToMany(() => AgentMessageToolCall, (tc) => tc.message, {
     cascade: true,
   })
-  toolCalls?: AgentMessageToolCall[];
+  toolCalls?: Relation<AgentMessageToolCall[]>;
 
   @ManyToOne(() => AgentConversation, (conversation) => conversation.messages, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'conversationId' })
-  conversation: AgentConversation;
+  conversation: Relation<AgentConversation>;
 }

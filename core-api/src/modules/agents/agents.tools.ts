@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await */
+import type { WrapperType } from '@/common/types/app.types';
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { tool } from 'ai';
@@ -71,16 +72,16 @@ export class AgentTool {
     private readonly assetsService: AssetsService,
     private readonly targetsService: TargetsService,
     @Inject(forwardRef(() => VulnerabilitiesService))
-    private readonly vulnerabilitiesService: VulnerabilitiesService,
+    private readonly vulnerabilitiesService: WrapperType<VulnerabilitiesService>,
     private readonly statisticService: StatisticService,
     @Inject(forwardRef(() => IssuesService))
-    private readonly issuesService: IssuesService,
+    private readonly issuesService: WrapperType<IssuesService>,
     @Inject(forwardRef(() => ToolsService))
-    private readonly toolsService: ToolsService,
+    private readonly toolsService: WrapperType<ToolsService>,
     @Inject(forwardRef(() => WorkersService))
-    private readonly workersService: WorkersService,
+    private readonly workersService: WrapperType<WorkersService>,
     @Inject(forwardRef(() => JobsRegistryService))
-    private readonly jobsRegistryService: JobsRegistryService,
+    private readonly jobsRegistryService: WrapperType<JobsRegistryService>,
     private readonly remoteExecuteService: RemoteExecuteService,
     @InjectRepository(AgentConversation)
     private readonly conversationRepository: Repository<AgentConversation>,

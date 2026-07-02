@@ -1,5 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { Column, Entity, Index, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, Relation } from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('accounts')
@@ -13,7 +13,7 @@ export class Account extends BaseEntity {
   providerId: string;
 
   @ManyToOne(() => User, (user) => user.accounts, { onDelete: 'CASCADE' })
-  user: User;
+  user: Relation<User>;
 
   @Column('text', { nullable: true })
   accessToken?: string;

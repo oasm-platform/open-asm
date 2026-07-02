@@ -1,6 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, Index, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, Relation } from 'typeorm';
 import { Job } from './job.entity';
 
 @Entity()
@@ -16,5 +16,5 @@ export class JobErrorLog extends BaseEntity {
   @Column({ nullable: true })
   jobId: string;
   @ManyToOne(() => Job, (job) => job.errorLogs, { onDelete: 'CASCADE' })
-  job: Job;
+  job: Relation<Job>;
 }
