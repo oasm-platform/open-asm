@@ -1258,9 +1258,61 @@ export class StatisticService {
   async calculateAndStoreStatistics() {
     const workspaceIds = await this.getWorkspaceIds();
     const statistics = await this.calculateStatistics(workspaceIds);
-    if (statistics.length > 0) {
-      await this.saveStatistics(statistics);
+    if (statistics.length === 0) return;
+
+    const toSave = await this.filterChangedStatistics(statistics);
+    if (toSave.length > 0) {
+      await this.saveStatistics(toSave);
     }
+  }
+
+  /**
+   * Filters statistics, keeping only those where at least one numeric field
+   * differs from the latest saved record for that workspace.
+   * If no previous record exists, the statistic is always kept.
+   * Uses DISTINCT ON for a single-query lookup per workspace — efficient
+   * even with thousands of workspaces.
+   */
+  private async filterChangedStatistics(
+    statistics: Statistic[],
+  ): Promise<Statistic[]> {
+    const repo = this.dataSource.getRepository(Statistic);
+    const workspaceIds = statistics.map((s) => s.workspace.id);
+
+    if (workspaceIds.length === 0) return [];
+
+    const latestRecords = await repo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.workspace', 'workspace')
+      .distinctOn(['s.workspaceId'])
+      .where('s.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .orderBy('s.workspaceId', 'ASC')
+      .addOrderBy('s.createdAt', 'DESC')
+      .getMany();
+
+    const latestMap = new Map(
+      latestRecords.map((r) => [r.workspace.id, r]),
+    );
+
+    return statistics.filter((stat) => {
+      const latest = latestMap.get(stat.workspace.id);
+      if (!latest) return true;
+
+      return (
+        latest.assets !== stat.assets ||
+        latest.targets !== stat.targets ||
+        latest.vuls !== stat.vuls ||
+        latest.criticalVuls !== stat.criticalVuls ||
+        latest.highVuls !== stat.highVuls ||
+        latest.mediumVuls !== stat.mediumVuls ||
+        latest.lowVuls !== stat.lowVuls ||
+        latest.infoVuls !== stat.infoVuls ||
+        latest.techs !== stat.techs ||
+        latest.ports !== stat.ports ||
+        latest.services !== stat.services ||
+        Number(latest.score) !== Number(stat.score)
+      );
+    });
   }
 
   async takeSnapshotStatisticTarget(
