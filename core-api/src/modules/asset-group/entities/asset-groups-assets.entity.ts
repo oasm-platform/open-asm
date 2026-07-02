@@ -1,6 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { Asset } from '@/modules/assets/entities/assets.entity';
-import { Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { AssetGroup } from './asset-groups.entity';
 
 @Entity('assets_group_assets')
@@ -11,11 +11,11 @@ export class AssetGroupAsset extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'assetGroupId' })
-  assetGroup: AssetGroup;
+  assetGroup: Relation<AssetGroup>;
 
   @ManyToOne(() => Asset, (asset) => asset.id, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'assetId' })
-  asset: Asset;
+  asset: Relation<Asset>;
 }

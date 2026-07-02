@@ -1,6 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
-import { Entity, Index, ManyToOne, Unique } from 'typeorm';
+import { Entity, Index, ManyToOne, Relation, Unique } from 'typeorm';
 import { Target } from './target.entity';
 
 @Entity('workspace_targets')
@@ -11,11 +11,11 @@ export class WorkspaceTarget extends BaseEntity {
     cascade: true,
     onDelete: 'CASCADE',
   })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @ManyToOne(() => Target, (target) => target.workspaceTargets, {
     cascade: true,
     onDelete: 'CASCADE',
   })
-  target: Target;
+  target: Relation<Target>;
 }

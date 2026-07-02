@@ -1,6 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, Index, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, Relation } from 'typeorm';
 import { Workspace } from '../../workspaces/entities/workspace.entity';
 
 @Entity('workspace_statistics')
@@ -72,5 +72,5 @@ export class Statistic extends BaseEntity {
   @ManyToOne(() => Workspace, (workspace) => workspace.statistics, {
     onDelete: 'CASCADE',
   })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 }

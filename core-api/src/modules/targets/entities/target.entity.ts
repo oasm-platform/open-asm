@@ -6,7 +6,7 @@ import { Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, Relation } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
 
 /**
@@ -80,10 +80,10 @@ export class Target extends BaseEntity {
   reScanCount: number;
 
   @OneToMany(() => WorkspaceTarget, (workspaceTarget) => workspaceTarget.target)
-  workspaceTargets: WorkspaceTarget[];
+  workspaceTargets: Relation<WorkspaceTarget[]>;
 
   @OneToMany(() => Asset, (asset) => asset.target)
-  assets: Asset[];
+  assets: Relation<Asset[]>;
 
   @ApiProperty()
   totalAssetServices: number;
@@ -114,5 +114,5 @@ export class Target extends BaseEntity {
     { onDelete: 'CASCADE' },
   )
   @JoinColumn({ name: 'internalNetworkId' })
-  internalNetwork: InternalNetwork;
+  internalNetwork: Relation<InternalNetwork>;
 }

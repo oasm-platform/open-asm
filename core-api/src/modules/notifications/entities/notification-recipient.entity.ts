@@ -1,7 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { NotificationStatus } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { Notification } from './notification.entity';
 
 @Entity('notification_recipients')
@@ -13,14 +13,14 @@ export class NotificationRecipient extends BaseEntity {
 
   @ManyToOne(() => Notification, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'notificationId' })
-  notification: Notification;
+  notification: Relation<Notification>;
 
   @Column({ type: 'uuid' })
   userId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user: Relation<User>;
 
   @Column({
     type: 'enum',
