@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
@@ -12,27 +12,26 @@ import { StatisticService } from './statistic.service';
  * the daily aggregation across multiple replicas.
  */
 @Injectable()
-export class StatisticCronService implements OnModuleInit {
+export class StatisticCronService {
+  private readonly logger = new Logger(StatisticCronService.name);
+
   constructor(
     private readonly statisticService: StatisticService,
     private readonly redisLockService: RedisLockService,
   ) {}
 
-  async onModuleInit() {
-    // await this.handleCron();
-  }
-
   /**
    * Handles the cron task to calculate and store statistics.
    * Runs daily at midnight (00:00).
-   * Wrapped in a Redis distributed lock (1h TTL) so only one backend
+   * Wrapped in a Redis distributed lock (10min TTL) so only one backend
    * instance executes the aggregation even with multiple replicas.
+   * Returns early if another instance already holds the lock.
    */
   @Cron('0 0 * * *')
   async handleCron() {
     await this.redisLockService.withLock(
       'cron:statistic-daily',
-      3_600_000,
+      600_000,
       async () => {
         await this.statisticService.calculateAndStoreStatistics();
       },

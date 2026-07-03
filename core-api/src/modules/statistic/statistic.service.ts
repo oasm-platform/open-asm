@@ -1283,7 +1283,8 @@ export class StatisticService {
 
     const latestRecords = await repo
       .createQueryBuilder('s')
-      .leftJoinAndSelect('s.workspace', 'workspace')
+      .leftJoin('s.workspace', 'workspace')
+      .addSelect(['workspace.id'])
       .distinctOn(['s.workspaceId'])
       .where('s.workspaceId IN (:...workspaceIds)', { workspaceIds })
       .orderBy('s.workspaceId', 'ASC')
@@ -1373,9 +1374,15 @@ export class StatisticService {
     ) {
       const redisKey = `snapshot:${job.jobHistory.workflow.filePath}:${job.asset.target.id}`;
 
-      const beforeSnapshot = await this.redisService
-        .get(redisKey)
-        .then((res) => JSON.parse(res || '{}') as StatisticSnapshot);
+      let beforeSnapshot: StatisticSnapshot = { hosts: 0, ports: 0, services: 0, techs: 0 };
+      try {
+        const raw = await this.redisService.get(redisKey);
+        if (raw) {
+          beforeSnapshot = JSON.parse(raw) as StatisticSnapshot;
+        }
+      } catch {
+        // Corrupted or missing snapshot data — proceed with empty baseline
+      }
       await this.redisService.del(redisKey);
       const afterSnapshot = await this.takeSnapshotStatisticTarget(job.asset.target.id);
 
@@ -1392,9 +1399,11 @@ export class StatisticService {
         job.id,
       );
 
+      if (members.length === 0) return;
+
       if (Object.keys(diffs).length > 0) {
         const recipientIds = members.map((m) => m.user.id);
-        const workspaceId = members[0]?.workspace.id;
+        const workspaceId = members[0].workspace.id;
 
         if (recipientIds.length > 0) {
           await this.notificationsService.createNotification({
