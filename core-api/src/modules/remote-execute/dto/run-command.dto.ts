@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUUID } from 'class-validator';
+import { IsString, IsUUID, MinLength } from 'class-validator';
 
 export class RunCommandDto {
   @ApiProperty({
@@ -7,6 +7,7 @@ export class RunCommandDto {
     example: 'nmap -sV 10.0.0.1',
   })
   @IsString()
+  @MinLength(1)
   command: string;
 
   @ApiProperty({

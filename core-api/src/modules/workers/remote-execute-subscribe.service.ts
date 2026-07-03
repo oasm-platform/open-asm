@@ -178,6 +178,16 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       return null;
     }
 
+    // Push command FIRST — ensures the worker subject is still alive
+    // before updating the conversation record (TOCTOU race prevention).
+    const result = this.pushCommand(workerId, sessionId, command);
+    if (!result) {
+      this.logger.warn(
+        `[StickyWorker] Worker ${workerId} became unavailable before command could be pushed`,
+      );
+      return null;
+    }
+
     if (conversation) {
       await this.conversationRepo
         .createQueryBuilder()
@@ -193,7 +203,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     this.logger.log(
       `[StickyWorker] Assigned worker ${workerId} to conversation ${conversationId}`,
     );
-    return this.pushCommand(workerId, sessionId, command);
+    return result;
   }
 
   removeSession(sessionId: string): void {
