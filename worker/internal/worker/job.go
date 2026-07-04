@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
@@ -15,7 +16,7 @@ import (
 
 var jobLogGlobal = oasm.NewLogger("Worker.Job")
 
-func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string) {
+func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string, events chan<- TuiEvent) {
 	job, err := client.JobsNext(ctx)
 	if err != nil {
 		jobLogGlobal.ErrorE("Failed to pull job", err)
@@ -25,6 +26,17 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		return
 	}
 
+	startTime := time.Now()
+	cmdStr := job.GetCommand()
+
+	Emit(events, TuiEvent{
+		Type:       EventJobStarted,
+		JobID:      job.Id,
+		Command:    cmdStr,
+		AssetID:    job.GetAsset().GetId(),
+		AssetValue: job.GetAsset().GetValue(),
+	})
+
 	activeJobsMu.Lock()
 	activeJobs[job.Id] = struct{}{}
 	activeJobsMu.Unlock()
@@ -33,11 +45,23 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		activeJobsMu.Lock()
 		delete(activeJobs, job.Id)
 		activeJobsMu.Unlock()
+		Emit(events, TuiEvent{
+			Type:     EventJobCompleted,
+			JobID:    job.Id,
+			Success:  true,
+			Duration: time.Since(startTime),
+		})
 	}()
 
-	cmdStr := job.GetCommand()
 	if cmdStr == "" {
 		jobLogGlobal.Warning("[%s] Empty command", job.Id)
+		Emit(events, TuiEvent{
+			Type:     EventJobCompleted,
+			JobID:    job.Id,
+			Success:  false,
+			ErrorMsg: "No command provided by Core",
+			Duration: time.Since(startTime),
+		})
 		_ = client.JobsResult(ctx, job.Id, oasm.NewErrorResult("No command provided by Core"))
 		return
 	}
@@ -87,6 +111,18 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		}
 
 		outStr := string(output)
+		if outStr != "" {
+			for _, line := range strings.Split(outStr, "\n") {
+				if line != "" {
+					Emit(events, TuiEvent{
+						Type:         EventJobOutput,
+						JobID:        job.Id,
+						OutputLine:   line,
+						OutputStream: "stdout",
+					})
+				}
+			}
+		}
 		payload = &jobs_registry.DataPayloadResult{
 			Error: false,
 			Raw:   &outStr,

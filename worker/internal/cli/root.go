@@ -41,7 +41,8 @@ func App() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	worker.Start(ctx, cfg)
+	events := make(chan worker.TuiEvent, 100)
+	worker.Start(ctx, cfg, events)
 	return nil
 }
 

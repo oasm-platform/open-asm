@@ -68,7 +68,7 @@ func (s *sessionSandbox) close() error {
 	return os.RemoveAll(s.rootPath)
 }
 
-func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspaceRoot string, toolPath string) {
+func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent) {
 	log := oasm.NewLogger("RemoteExec")
 
 	for {
@@ -97,6 +97,12 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 
 		log.Success("Connected to remote execute stream (worker: %s)", client.WorkerID())
 
+		Emit(events, TuiEvent{
+			Type:    EventActivity,
+			Message: "Remote execute stream connected",
+			ActivityLevel: "info",
+		})
+
 		activeSessions := make(map[string]*sessionSandbox)
 		var sessionsMu sync.Mutex
 
@@ -115,6 +121,11 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 
 			activeSessions[sessionID] = sb
 			log.Info("Created session sandbox: %s -> %s", sessionID, sb.rootPath)
+			Emit(events, TuiEvent{
+				Type:    EventActivity,
+				Message: fmt.Sprintf("Session sandbox: %s", sessionID),
+				ActivityLevel: "info",
+			})
 			return sb, nil
 		}
 

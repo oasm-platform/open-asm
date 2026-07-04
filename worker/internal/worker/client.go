@@ -52,7 +52,7 @@ func connectInternalNetwork(client *oasm.Client, network string) error {
 	return nil
 }
 
-func Start(ctx context.Context, cfg *config.Config) {
+func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	sysLog := oasm.NewLogger("System")
 	jobLog := oasm.NewLogger("Jobs")
 	netLog := oasm.NewLogger("Network")
@@ -65,6 +65,11 @@ func Start(ctx context.Context, cfg *config.Config) {
 	)
 	if err != nil {
 		sysLog.ErrorE("Failed to create OASM client", err)
+		Emit(events, TuiEvent{
+			Type:    EventError,
+			Source:  "System",
+			Message: fmt.Sprintf("Failed to create OASM client: %v", err),
+		})
 		return
 	}
 
@@ -127,12 +132,12 @@ func Start(ctx context.Context, cfg *config.Config) {
 			return
 		}
 
-		select {
-		case semaphore <- struct{}{}:
-			wg.Go(func() {
-				defer func() { <-semaphore }()
-				processJob(currentCtx, client, browser, toolPath)
-			})
+			select {
+			case semaphore <- struct{}{}:
+				wg.Go(func() {
+					defer func() { <-semaphore }()
+					processJob(currentCtx, client, browser, toolPath, events)
+				})
 		default:
 		}
 	})
@@ -165,6 +170,13 @@ func Start(ctx context.Context, cfg *config.Config) {
 					sysLog.Success("Worker connected/reconnected. Initializing sub-systems...")
 					sessionCtx, sessionCancel = context.WithCancel(ctx)
 
+					Emit(events, TuiEvent{
+						Type:     EventConnected,
+						WorkerID: client.WorkerID(),
+						Host:     cfg.GrpcHost,
+						Port:     cfg.GrpcPort,
+					})
+
 					if cfg.Network != "" {
 						if err := connectInternalNetwork(client, cfg.Network); err != nil {
 							netLog.ErrorE("Failed to connect internal network", err)
@@ -176,11 +188,16 @@ func Start(ctx context.Context, cfg *config.Config) {
 
 					if err := client.WorkerDownloadTools(sessionCtx); err != nil {
 						sysLog.ErrorE("Download tools failed", err)
+						Emit(events, TuiEvent{
+							Type:    EventError,
+							Source:  "System",
+							Message: fmt.Sprintf("Download tools failed: %v", err),
+						})
 						stateMu.Unlock()
 						continue
 					}
 
-					go startRemoteExecuteHandler(sessionCtx, client, workspaceRoot, toolPath)
+					go startRemoteExecuteHandler(sessionCtx, client, workspaceRoot, toolPath, events)
 
 					if !schedulerStarted {
 						scheduler.StartAsync()
@@ -191,6 +208,11 @@ func Start(ctx context.Context, cfg *config.Config) {
 					sysLog.Warning("Worker disconnected from core. Suspending job poller and streams...")
 					sessionCtx = nil
 					sessionCancel = nil
+
+					Emit(events, TuiEvent{
+						Type:             EventDisconnected,
+						DisconnectReason: "Connection lost",
+					})
 				}
 				stateMu.Unlock()
 			}
@@ -214,6 +236,12 @@ func Start(ctx context.Context, cfg *config.Config) {
 					jobLog.Verbose("Jobs running: %d/%d", running, cfg.MaxConcurrency)
 					lastLogged = running
 				}
+
+				Emit(events, TuiEvent{
+					Type:           EventMetrics,
+					ActiveJobs:     running,
+					MaxConcurrency: cfg.MaxConcurrency,
+				})
 			case <-ctx.Done():
 				return
 			}
