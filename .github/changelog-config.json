@@ -21,9 +21,9 @@
       "labels": ["chore", "style", "ci"]
     }
   ],
-  "template": "${{CATEGORIZED_COUNT}}",
-  "pr_template": "- ${{COMMITS}}",
-  "empty_template": "",
+  "template": "# What's Changed\n\n${{CHANGELOG}}",
+  "pr_template": "- ${{TITLE}} (#${{NUMBER}})",
+  "empty_template": "- No changes in this release",
   "max_tags_to_show": 10,
   "label_extractor": [
     {
