@@ -145,13 +145,7 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 	}
 }
 
-// Stubs — replaced in Tasks 4-8
-type headerModel struct{}
-
-func newHeaderModel() headerModel                    { return headerModel{} }
-func (h *headerModel) update(msg tea.Msg)            {}
-func (h headerModel) View(width int) string          { return "" }
-
+// Stubs — replaced in Tasks 5-8
 type jobsModel struct{ table interface{} }
 
 func newJobsModel() jobsModel                        { return jobsModel{} }
