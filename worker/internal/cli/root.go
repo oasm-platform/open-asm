@@ -29,6 +29,12 @@ func App() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Suppress oasm-sdk-go internal logging — it writes to stdout
+	if f, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0); err == nil {
+		os.Stdout = f
+		os.Stderr = f
+	}
+
 	events := make(chan worker.TuiEvent, 100)
 	go worker.Start(ctx, cfg, events)
 

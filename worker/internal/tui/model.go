@@ -19,15 +19,6 @@ const (
 	focusEvents
 )
 
-const (
-	minWidth  = 80
-	minHeight = 20
-	headerH   = 4 // line1 + detail + 2 border lines
-	statusBarH = 1
-	jobsH      = 12 // fixed height for jobs table
-	bordersH   = 4  // top/bot borders for header + jobs sections
-)
-
 type Model struct {
 	cfg    *config.Config
 	events <-chan worker.TuiEvent
@@ -84,9 +75,7 @@ func NewModel(cfg *config.Config, events <-chan worker.TuiEvent) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
-		waitForEvent(m.events),
-	)
+	return tea.Batch(waitForEvent(m.events))
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -96,9 +85,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		if msg.Width < minWidth || msg.Height < minHeight {
-			return m, nil
-		}
 		m.resize()
 		return m, nil
 
@@ -118,9 +104,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focus == focusJobs {
 				cmd := m.jobsTable.update(msg)
 				cmds = append(cmds, cmd)
-				selectedID := m.jobsTable.selectedID()
-				if selectedID != m.outputVP.selectedID {
-					m.outputVP.setSelected(selectedID)
+				if id := m.jobsTable.selectedID(); id != m.outputVP.selectedID {
+					m.outputVP.setSelected(id)
 				}
 				return m, tea.Batch(cmds...)
 			}
@@ -128,28 +113,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focus == focusJobs {
 				cmd := m.jobsTable.update(msg)
 				cmds = append(cmds, cmd)
-				selectedID := m.jobsTable.selectedID()
-				if selectedID != m.outputVP.selectedID {
-					m.outputVP.setSelected(selectedID)
+				if id := m.jobsTable.selectedID(); id != m.outputVP.selectedID {
+					m.outputVP.setSelected(id)
 				}
 				return m, tea.Batch(cmds...)
 			}
 		}
 
-		// Delegate to focused component
 		if m.focus == focusJobs {
-			cmd := m.jobsTable.update(msg)
-			cmds = append(cmds, cmd)
+			cmds = append(cmds, m.jobsTable.update(msg))
 		} else if m.focus == focusOutput {
-			cmd := m.outputVP.update(msg)
-			cmds = append(cmds, cmd)
+			cmds = append(cmds, m.outputVP.update(msg))
 		} else if m.focus == focusEvents {
-			cmd := m.eventsList.update(msg)
-			cmds = append(cmds, cmd)
+			cmds = append(cmds, m.eventsList.update(msg))
 		}
 	}
 
-	// Handle worker events
 	switch msg := msg.(type) {
 	case connectMsg:
 		m.headerComp.update(msg)
@@ -179,11 +158,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case jobCompletedMsg:
 		m.jobsTable.handleJobCompleted(msg)
 		m.headerComp.update(metricsMsg{activeJobs: len(m.jobsTable.jobs), maxConcurrency: m.maxConcurrency})
-		status := "completed"
 		level := "success"
+		status := "completed"
 		if !msg.success {
-			status = "failed"
 			level = "error"
+			status = "failed"
 		}
 		m.eventsList.addEvent(activityEntry{
 			text:      fmt.Sprintf("Job %s %s", msg.id[:min(len(msg.id), 8)], status),
@@ -193,11 +172,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case jobOutputMsg:
 		m.outputVP.appendLine(msg.id, msg.line)
 	case activityMsg:
-		m.eventsList.addEvent(activityEntry{
-			text:      msg.text,
-			level:     msg.level,
-			timestamp: msg.timestamp,
-		})
+		m.eventsList.addEvent(activityEntry{text: msg.text, level: msg.level, timestamp: msg.timestamp})
 	case errorMsg:
 		m.eventsList.addEvent(activityEntry{
 			text:      fmt.Sprintf("[%s] %s", msg.source, msg.message),
@@ -208,9 +183,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.headerComp.update(msg)
 	}
 
-	// Schedule next event read
 	cmds = append(cmds, waitForEvent(m.events))
-
 	return m, tea.Batch(cmds...)
 }
 
@@ -219,96 +192,80 @@ func (m *Model) resize() {
 		return
 	}
 
-	// Bottom section: output + events side by side
-	bottomH := m.height - headerH - jobsH - statusBarH - bordersH
-	if bottomH < 4 {
-		bottomH = 4
+	// Layout: header(2) + gap(1) + jobs(10) + gap(1) + bottom(rest) + statusbar(1)
+	// Total borders: 4 horizontal lines between sections
+	headerLines := 2
+	gapLines := 1
+	jobsLines := 10
+	statusBarLines := 1
+	bottomLines := m.height - headerLines - gapLines*2 - jobsLines - statusBarLines
+	if bottomLines < 4 {
+		bottomLines = 4
 	}
 
-	// 60/40 split for output/events
-	eventsW := m.width * 40 / 100
+	eventsW := m.width * 35 / 100
 	outputW := m.width - eventsW
 
-	// Account for padding in panelStyle (Padding(0, 1) = 1 char each side)
-	outputInnerW := outputW - 2
-	eventsInnerW := eventsW - 2
-
-	m.jobsTable.table.SetHeight(jobsH - 2) // -2 for title line + padding
-	m.jobsTable.table.SetWidth(m.width - 4) // -4 for borders + padding
-	m.outputVP.setDimensions(outputInnerW, bottomH-2)
-	m.eventsList.setDimensions(eventsInnerW, bottomH-2)
+	m.jobsTable.table.SetHeight(jobsLines - 2)
+	m.jobsTable.table.SetWidth(m.width - 4)
+	m.outputVP.setDimensions(outputW-2, bottomLines-2)
+	m.eventsList.setDimensions(eventsW-2, bottomLines-2)
 }
 
 func (m Model) View() tea.View {
-	if m.width == 0 {
+	if m.width == 0 || m.height == 0 {
 		return tea.NewView("Initializing...")
 	}
-	if m.width < minWidth || m.height < minHeight {
-		return tea.NewView(lipgloss.NewStyle().Foreground(ColorWarning).Render(
-			fmt.Sprintf("Terminal too small (%dx%d). Minimum: %dx%d", m.width, m.height, minWidth, minHeight),
-		))
+	if m.width < 80 || m.height < 20 {
+		return tea.NewView(fmt.Sprintf("Terminal too small (%dx%d). Need 80x20.", m.width, m.height))
 	}
 
-	// Recalculate dimensions to stay in sync
-	bottomH := m.height - headerH - jobsH - statusBarH - bordersH
-	if bottomH < 4 {
-		bottomH = 4
+	// Recalculate
+	headerLines := 2
+	gapLines := 1
+	jobsLines := 10
+	statusBarLines := 1
+	bottomLines := m.height - headerLines - gapLines*2 - jobsLines - statusBarLines
+	if bottomLines < 4 {
+		bottomLines = 4
 	}
-	eventsW := m.width * 40 / 100
+
+	eventsW := m.width * 35 / 100
 	outputW := m.width - eventsW
-	outputInnerW := outputW - 2
-	eventsInnerW := eventsW - 2
 
-	// Update viewport dimensions in case resize wasn't called
-	m.outputVP.setDimensions(outputInnerW, bottomH-2)
-	m.eventsList.setDimensions(eventsInnerW, bottomH-2)
+	m.outputVP.setDimensions(outputW-2, bottomLines-2)
+	m.eventsList.setDimensions(eventsW-2, bottomLines-2)
 
-	// === Header section ===
-	headerContent := m.headerComp.View(m.width - 4)
-	header := lipgloss.NewStyle().
-		Width(m.width).
-		Height(headerH).
-		BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(true).
-		BorderForeground(ColorPrimary).
-		Padding(0, 1).
-		Render(headerContent)
+	// Style for bordered panels
+	bordered := func(content string, w, h int) string {
+		return lipgloss.NewStyle().
+			Width(w).
+			Height(h).
+			Border(lipgloss.NormalBorder()).
+			Render(content)
+	}
 
-	// === Jobs table section ===
-	jobsContent := m.jobsTable.View(m.width - 4)
-	jobs := lipgloss.NewStyle().
-		Width(m.width).
-		Height(jobsH).
-		BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(true).
-		BorderForeground(ColorSubtle).
-		Padding(0, 1).
-		Render(jobsContent)
+	// === Header (2 lines) ===
+	header := bordered(m.headerComp.View(m.width-4), m.width, headerLines)
 
-	// === Bottom section: output + events side by side ===
-	outputContent := m.outputVP.View()
-	output := lipgloss.NewStyle().
-		Width(outputW).
-		Height(bottomH).
-		BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(true).
-		BorderForeground(ColorSubtle).
-		Padding(0, 1).
-		Render(outputContent)
+	// === Jobs table (10 lines) ===
+	jobs := bordered(m.jobsTable.View(m.width-4), m.width, jobsLines)
 
-	eventsContent := m.eventsList.View()
-	events := lipgloss.NewStyle().
-		Width(eventsW).
-		Height(bottomH).
-		BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(true).
-		BorderForeground(ColorSubtle).
-		Padding(0, 1).
-		Render(eventsContent)
-
+	// === Bottom: output + events side by side ===
+	output := bordered(m.outputVP.View(), outputW, bottomLines)
+	events := bordered(m.eventsList.View(), eventsW, bottomLines)
 	bottom := lipgloss.JoinHorizontal(lipgloss.Top, output, events)
 
 	// === Status bar ===
 	statusBar := m.statusBar.View(m.width)
 
 	// === Assemble ===
-	return tea.NewView(strings.Join([]string{header, jobs, bottom, statusBar}, "\n"))
+	return tea.NewView(strings.Join([]string{
+		header,
+		jobs,
+		bottom,
+		statusBar,
+	}, "\n"))
 }
 
 func waitForEvent(events <-chan worker.TuiEvent) tea.Cmd {
@@ -324,57 +281,21 @@ func waitForEvent(events <-chan worker.TuiEvent) tea.Cmd {
 func eventToMsg(event worker.TuiEvent) tea.Msg {
 	switch event.Type {
 	case worker.EventConnected:
-		return connectMsg{
-			workerID:    event.WorkerID,
-			host:        event.Host,
-			port:        event.Port,
-			connectedAt: event.Timestamp,
-		}
+		return connectMsg{workerID: event.WorkerID, host: event.Host, port: event.Port, connectedAt: event.Timestamp}
 	case worker.EventDisconnected:
-		return disconnectMsg{
-			reason:    event.DisconnectReason,
-			timestamp: event.Timestamp,
-		}
+		return disconnectMsg{reason: event.DisconnectReason, timestamp: event.Timestamp}
 	case worker.EventJobStarted:
-		return jobStartedMsg{
-			id:        event.JobID,
-			command:   event.Command,
-			assetID:   event.AssetID,
-			assetVal:  event.AssetValue,
-			startedAt: event.Timestamp,
-		}
+		return jobStartedMsg{id: event.JobID, command: event.Command, assetID: event.AssetID, assetVal: event.AssetValue, startedAt: event.Timestamp}
 	case worker.EventJobCompleted:
-		return jobCompletedMsg{
-			id:          event.JobID,
-			success:     event.Success,
-			duration:    event.Duration,
-			errorMsg:    event.ErrorMsg,
-			completedAt: event.Timestamp,
-		}
+		return jobCompletedMsg{id: event.JobID, success: event.Success, duration: event.Duration, errorMsg: event.ErrorMsg, completedAt: event.Timestamp}
 	case worker.EventJobOutput:
-		return jobOutputMsg{
-			id:     event.JobID,
-			line:   event.OutputLine,
-			stream: event.OutputStream,
-		}
+		return jobOutputMsg{id: event.JobID, line: event.OutputLine, stream: event.OutputStream}
 	case worker.EventActivity:
-		return activityMsg{
-			text:      event.Message,
-			level:     event.ActivityLevel,
-			timestamp: event.Timestamp,
-		}
+		return activityMsg{text: event.Message, level: event.ActivityLevel, timestamp: event.Timestamp}
 	case worker.EventError:
-		return errorMsg{
-			source:    event.Source,
-			message:   event.Message,
-			timestamp: event.Timestamp,
-		}
+		return errorMsg{source: event.Source, message: event.Message, timestamp: event.Timestamp}
 	case worker.EventMetrics:
-		return metricsMsg{
-			activeJobs:     event.ActiveJobs,
-			maxConcurrency: event.MaxConcurrency,
-		}
-	default:
-		return nil
+		return metricsMsg{activeJobs: event.ActiveJobs, maxConcurrency: event.MaxConcurrency}
 	}
+	return nil
 }

@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/bubbletea/v2"
@@ -68,16 +67,7 @@ func (o *outputModel) setDimensions(width, height int) {
 
 func (o outputModel) View() string {
 	if o.selectedID == "" {
-		empty := lipgloss.NewStyle().
-			Foreground(ColorMuted).
-			Render("Select a job to view output")
-		return empty
+		return lipgloss.NewStyle().Foreground(ColorMuted).Render("Select a job to view output")
 	}
-
-	idShort := o.selectedID
-	if len(idShort) > 8 {
-		idShort = idShort[:8]
-	}
-	title := headerTitleStyle.Render(fmt.Sprintf("Output: %s", idShort))
-	return lipgloss.JoinVertical(lipgloss.Left, title, o.viewport.View())
+	return o.viewport.View()
 }

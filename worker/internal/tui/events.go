@@ -81,6 +81,5 @@ func (e *eventsModel) setDimensions(width, height int) {
 }
 
 func (e eventsModel) View() string {
-	title := headerTitleStyle.Render("Events")
-	return lipgloss.JoinVertical(lipgloss.Left, title, e.viewport.View())
+	return e.viewport.View()
 }

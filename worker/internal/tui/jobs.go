@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"time"
 
 	"charm.land/bubbletea/v2"
@@ -98,12 +97,10 @@ func (j jobsModel) selectedID() string {
 }
 
 func (j jobsModel) View(width int) string {
-	title := headerTitleStyle.Render(fmt.Sprintf("Active Jobs (%d slots)", len(j.jobs)))
 	if len(j.jobs) == 0 {
-		empty := lipgloss.NewStyle().Foreground(ColorMuted).Render("No active jobs")
-		return lipgloss.JoinVertical(lipgloss.Left, title, empty)
+		return lipgloss.NewStyle().Foreground(ColorMuted).Render("No active jobs")
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, title, j.table.View())
+	return j.table.View()
 }
 
 func truncate(s string, maxLen int) string {
