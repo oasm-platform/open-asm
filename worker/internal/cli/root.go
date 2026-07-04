@@ -30,7 +30,6 @@ func App() error {
 	defer stop()
 
 	events := make(chan worker.TuiEvent, 100)
-
 	go worker.Start(ctx, cfg, events)
 
 	m := tui.NewModel(cfg, events)

@@ -53,10 +53,8 @@ func connectInternalNetwork(client *oasm.Client, network string) error {
 }
 
 func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
-	sysLog := oasm.NewLogger("System")
-	jobLog := oasm.NewLogger("Jobs")
-	netLog := oasm.NewLogger("Network")
-	shutLog := oasm.NewLogger("Shutdown")
+	log := NewTuiLogger(events, "System")
+	screenshotLog = NewTuiLogger(events, "Screenshot")
 
 	client, err := oasm.NewClient(
 		oasm.WithApiKey(cfg.ApiKey),
@@ -64,47 +62,42 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		oasm.WithToolPath(cfg.ToolPath),
 	)
 	if err != nil {
-		sysLog.ErrorE("Failed to create OASM client", err)
-		Emit(events, TuiEvent{
-			Type:    EventError,
-			Source:  "System",
-			Message: fmt.Sprintf("Failed to create OASM client: %v", err),
-		})
+		log.ErrorE("Failed to create OASM client", err)
 		return
 	}
 
-	jobLog.Info("Initializing headless browser...")
+	log.Info("Initializing headless browser...")
 	l := launcher.New().Leakless(false).Headless(true)
 
 	if _, err := os.Stat("/usr/bin/chromium"); err == nil {
-		jobLog.Verbose("Using system chromium at /usr/bin/chromium")
+		log.Verbose("Using system chromium at /usr/bin/chromium")
 		l = l.Bin("/usr/bin/chromium")
 	} else if _, err := os.Stat("/usr/bin/chromium-browser"); err == nil {
-		jobLog.Verbose("Using system chromium at /usr/bin/chromium-browser")
+		log.Verbose("Using system chromium at /usr/bin/chromium-browser")
 		l = l.Bin("/usr/bin/chromium-browser")
 	} else if _, err := os.Stat("/usr/bin/google-chrome"); err == nil {
-		jobLog.Verbose("Using system chromium at /usr/bin/google-chrome")
+		log.Verbose("Using system chromium at /usr/bin/google-chrome")
 		l = l.Bin("/usr/bin/google-chrome")
 	} else {
-		jobLog.Verbose("No system chromium found, go-rod will download Chrome automatically")
+		log.Verbose("No system chromium found, go-rod will download Chrome automatically")
 	}
 
 	browser := rod.New().ControlURL(l.MustLaunch()).MustConnect()
 
 	workspaceRoot, err := filepath.Abs(cfg.WorkspaceRoot)
 	if err != nil {
-		sysLog.ErrorE("Failed to resolve workspace root", err)
+		log.ErrorE("Failed to resolve workspace root", err)
 		return
 	}
 
 	if err := os.MkdirAll(workspaceRoot, 0o755); err != nil {
-		sysLog.ErrorE("Failed to create workspace root", err)
+		log.ErrorE("Failed to create workspace root", err)
 		return
 	}
 
 	toolPath, err := filepath.Abs(cfg.ToolPath)
 	if err != nil {
-		sysLog.ErrorE("Failed to resolve tool path", err)
+		log.ErrorE("Failed to resolve tool path", err)
 		return
 	}
 
@@ -132,17 +125,17 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			return
 		}
 
-			select {
-			case semaphore <- struct{}{}:
-				wg.Go(func() {
-					defer func() { <-semaphore }()
-					processJob(currentCtx, client, browser, toolPath, events)
-				})
+		select {
+		case semaphore <- struct{}{}:
+			wg.Go(func() {
+				defer func() { <-semaphore }()
+				processJob(currentCtx, client, browser, toolPath, events)
+			})
 		default:
 		}
 	})
 	if err != nil {
-		sysLog.ErrorE("Failed to schedule job", err)
+		log.ErrorE("Failed to schedule job", err)
 		return
 	}
 
@@ -167,7 +160,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 				}
 
 				if isConnected {
-					sysLog.Success("Worker connected/reconnected. Initializing sub-systems...")
+					log.Success("Worker connected/reconnected")
 					sessionCtx, sessionCancel = context.WithCancel(ctx)
 
 					Emit(events, TuiEvent{
@@ -179,20 +172,15 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 					if cfg.Network != "" {
 						if err := connectInternalNetwork(client, cfg.Network); err != nil {
-							netLog.ErrorE("Failed to connect internal network", err)
+							log.ErrorE("Failed to connect internal network", err)
 							stateMu.Unlock()
 							continue
 						}
-						netLog.Success("Connected to internal network: %s", cfg.Network)
+						log.Success("Connected to internal network: %s", cfg.Network)
 					}
 
 					if err := client.WorkerDownloadTools(sessionCtx); err != nil {
-						sysLog.ErrorE("Download tools failed", err)
-						Emit(events, TuiEvent{
-							Type:    EventError,
-							Source:  "System",
-							Message: fmt.Sprintf("Download tools failed: %v", err),
-						})
+						log.ErrorE("Download tools failed", err)
 						stateMu.Unlock()
 						continue
 					}
@@ -201,11 +189,11 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 					if !schedulerStarted {
 						scheduler.StartAsync()
-						jobLog.Success("Gocron poller started (Max Concurrency: %d)", cfg.MaxConcurrency)
+						log.Success("Job poller started (concurrency: %d)", cfg.MaxConcurrency)
 						schedulerStarted = true
 					}
 				} else {
-					sysLog.Warning("Worker disconnected from core. Suspending job poller and streams...")
+					log.Warning("Disconnected from core, suspending...")
 					sessionCtx = nil
 					sessionCancel = nil
 
@@ -233,7 +221,6 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 				activeJobsMu.RUnlock()
 
 				if running != lastLogged {
-					jobLog.Verbose("Jobs running: %d/%d", running, cfg.MaxConcurrency)
 					lastLogged = running
 				}
 
@@ -249,13 +236,13 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	}()
 
 	<-ctx.Done()
-	shutLog.Info("Signal received. Stopping scheduler...")
+	log.Info("Signal received, stopping...")
 
 	scheduler.Stop()
-	shutLog.Info("Scheduler stopped. Waiting for running jobs to finish...")
+	log.Info("Scheduler stopped, waiting for jobs...")
 
 	wg.Wait()
-	shutLog.Info("All jobs completed. Cancelling session contexts...")
+	log.Info("All jobs finished")
 
 	stateMu.Lock()
 	if sessionCancel != nil {
@@ -264,12 +251,11 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	stateMu.Unlock()
 
 	if err := browser.Close(); err != nil {
-		shutLog.Warning("Browser close warning: %v", err)
+		log.Warning("Browser close: %v", err)
 	}
 	l.Kill()
 	l.Cleanup()
-	shutLog.Success("Browser killed safely")
+	log.Success("Shutdown complete")
 
 	workerCancel()
-	shutLog.Success("Worker shut down safely")
 }

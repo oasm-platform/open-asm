@@ -14,12 +14,10 @@ import (
 	"github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
 )
 
-var jobLogGlobal = oasm.NewLogger("Worker.Job")
-
 func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string, events chan<- TuiEvent) {
 	job, err := client.JobsNext(ctx)
 	if err != nil {
-		jobLogGlobal.ErrorE("Failed to pull job", err)
+		NewTuiLogger(events, "Jobs").ErrorE("Failed to pull job", err)
 		return
 	}
 	if job == nil || job.Id == "" {
@@ -54,7 +52,6 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 	}()
 
 	if cmdStr == "" {
-		jobLogGlobal.Warning("[%s] Empty command", job.Id)
 		Emit(events, TuiEvent{
 			Type:     EventJobCompleted,
 			JobID:    job.Id,
@@ -66,16 +63,19 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		return
 	}
 
-	jobLogGlobal.Info("[%s] Executing: %s", job.Id, cmdStr)
 	var payload *jobs_registry.DataPayloadResult
 
 	if after, ok := strings.CutPrefix(cmdStr, "screenshot "); ok {
 		url := strings.TrimSpace(after)
-		jobLogGlobal.Debug("[%s] Capturing screenshot: %s", job.Id, url)
 
 		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
 		if err != nil {
-			jobLogGlobal.Warning("[%s] Screenshot capture failed: %v", job.Id, err)
+			Emit(events, TuiEvent{
+				Type:    EventActivity,
+				Source:  "Jobs",
+				ActivityLevel: "warning",
+				Message: fmt.Sprintf("Screenshot failed: %v", err),
+			})
 		}
 		resultData := struct {
 			Screenshot string `json:"screenshot"`
@@ -86,7 +86,6 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		}
 
 		if jsonBytes, err := json.Marshal(resultData); err != nil {
-			jobLogGlobal.ErrorE(fmt.Sprintf("[%s] JSON marshal failed", job.Id), err)
 			payload = oasm.NewErrorResult(fmt.Sprintf("JSON error: %v", err))
 		} else {
 			jsonStr := string(jsonBytes)
@@ -107,7 +106,13 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			jobLogGlobal.Verbose("[%s] Process exited with error: %v", job.Id, err)
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  false,
+				ErrorMsg: err.Error(),
+				Duration: time.Since(startTime),
+			})
 		}
 
 		outStr := string(output)
@@ -130,9 +135,11 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 	}
 
 	if err := client.JobsResult(ctx, job.Id, payload); err != nil {
-		jobLogGlobal.ErrorE(fmt.Sprintf("[%s] Failed to submit result", job.Id), err)
+		Emit(events, TuiEvent{
+			Type:    EventError,
+			Source:  "Jobs",
+			Message: fmt.Sprintf("Failed to submit result for %s: %v", job.Id, err),
+		})
 		return
 	}
-
-	jobLogGlobal.Success("[%s] Completed", job.Id)
 }

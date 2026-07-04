@@ -69,12 +69,12 @@ func (s *sessionSandbox) close() error {
 }
 
 func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent) {
-	log := oasm.NewLogger("RemoteExec")
+	log := NewTuiLogger(events, "RemoteExec")
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info("Remote execute handler shutting down...")
+			log.Info("Remote execute handler shutting down")
 			return
 		default:
 		}
@@ -83,7 +83,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 
 		handler, err := client.RemoteExecuteSubscribe(ctx)
 		if err != nil {
-			log.ErrorE("Failed to subscribe to remote execute, retrying in 5s...", err)
+			log.ErrorE("Failed to subscribe, retrying in 5s", err)
 
 			timer := time.NewTimer(5 * time.Second)
 			select {
@@ -95,13 +95,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 			}
 		}
 
-		log.Success("Connected to remote execute stream (worker: %s)", client.WorkerID())
-
-		Emit(events, TuiEvent{
-			Type:    EventActivity,
-			Message: "Remote execute stream connected",
-			ActivityLevel: "info",
-		})
+		log.Success("Remote execute stream connected (worker: %s)", client.WorkerID())
 
 		activeSessions := make(map[string]*sessionSandbox)
 		var sessionsMu sync.Mutex
@@ -120,24 +114,19 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 			}
 
 			activeSessions[sessionID] = sb
-			log.Info("Created session sandbox: %s -> %s", sessionID, sb.rootPath)
-			Emit(events, TuiEvent{
-				Type:    EventActivity,
-				Message: fmt.Sprintf("Session sandbox: %s", sessionID),
-				ActivityLevel: "info",
-			})
+			log.Info("Session sandbox: %s -> %s", sessionID, sb.rootPath)
 			return sb, nil
 		}
 
 		for {
 			resp, err := handler.Next(ctx)
 			if err != nil {
-				log.ErrorE("Failed to receive remote execute event, reconnecting...", err)
+				log.ErrorE("Remote execute event error, reconnecting", err)
 				break
 			}
 
 			if resp == nil {
-				log.Info("Remote execute stream closed, reconnecting...")
+				log.Info("Remote execute stream closed, reconnecting")
 				break
 			}
 
@@ -150,7 +139,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 				command := resp.Command
 
 				if sessionID == "" || command == "" {
-					log.Warning("Received command with empty session or command field")
+					log.Warning("Empty session or command field")
 					_ = handler.SendError(ctx, "empty session or command")
 					continue
 				}
@@ -162,7 +151,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 					continue
 				}
 
-				go executeRemoteCommand(ctx, handler, sessionID, command, sb, log, toolPath)
+				go executeRemoteCommand(ctx, handler, sessionID, command, sb, events, toolPath)
 
 			default:
 				log.Warning("Unknown remote execute event type: %v", resp.Type)
@@ -184,8 +173,9 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 	}
 }
 
-func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, sessionID string, command string, sandbox *sessionSandbox, log *oasm.LoggerType, toolPath string) {
-	log.Info("Executing command in session %s: %s", sessionID, command)
+func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, sessionID string, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
+	log := NewTuiLogger(events, "RemoteExec")
+	log.Info("Executing in session %s: %s", sessionID, command)
 
 	wrappedCmd := fmt.Sprintf("(%s) 2>&1", command)
 	cmd := exec.CommandContext(ctx, "sh", "-c", wrappedCmd)
@@ -233,7 +223,7 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 			return
 		}
 	} else {
-		log.Success("Command completed successfully: %s", command)
+		log.Success("Command completed: %s", command)
 	}
 
 	_ = handler.SendExit(ctx, exitCode)

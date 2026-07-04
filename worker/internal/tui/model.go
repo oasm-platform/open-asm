@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"oasm-worker/internal/config"
 	"oasm-worker/internal/worker"
+	"strings"
 	"time"
 
 	"charm.land/bubbletea/v2"
@@ -16,6 +17,15 @@ const (
 	focusJobs focusTarget = iota
 	focusOutput
 	focusEvents
+)
+
+const (
+	minWidth  = 80
+	minHeight = 20
+	headerH   = 4 // line1 + detail + 2 border lines
+	statusBarH = 1
+	jobsH      = 12 // fixed height for jobs table
+	bordersH   = 4  // top/bot borders for header + jobs sections
 )
 
 type Model struct {
@@ -86,7 +96,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		if msg.Width < 80 || msg.Height < 24 {
+		if msg.Width < minWidth || msg.Height < minHeight {
 			return m, nil
 		}
 		m.resize()
@@ -209,54 +219,96 @@ func (m *Model) resize() {
 		return
 	}
 
-	headerH := 3
-	statusBarH := 1
-	remaining := m.height - headerH - statusBarH - 4
+	// Bottom section: output + events side by side
+	bottomH := m.height - headerH - jobsH - statusBarH - bordersH
+	if bottomH < 4 {
+		bottomH = 4
+	}
 
-	jobsH := remaining * 40 / 100
-	bottomH := remaining - jobsH
-
+	// 60/40 split for output/events
 	eventsW := m.width * 40 / 100
-	outputW := m.width - eventsW - 4
+	outputW := m.width - eventsW
 
-	m.jobsTable.table.SetHeight(jobsH)
-	m.jobsTable.table.SetWidth(m.width - 4)
-	m.outputVP.setDimensions(outputW, bottomH)
-	m.eventsList.setDimensions(eventsW, bottomH)
+	// Account for padding in panelStyle (Padding(0, 1) = 1 char each side)
+	outputInnerW := outputW - 2
+	eventsInnerW := eventsW - 2
+
+	m.jobsTable.table.SetHeight(jobsH - 2) // -2 for title line + padding
+	m.jobsTable.table.SetWidth(m.width - 4) // -4 for borders + padding
+	m.outputVP.setDimensions(outputInnerW, bottomH-2)
+	m.eventsList.setDimensions(eventsInnerW, bottomH-2)
 }
 
 func (m Model) View() tea.View {
 	if m.width == 0 {
 		return tea.NewView("Initializing...")
 	}
-	if m.width < 80 || m.height < 24 {
+	if m.width < minWidth || m.height < minHeight {
 		return tea.NewView(lipgloss.NewStyle().Foreground(ColorWarning).Render(
-			fmt.Sprintf("Terminal too small (%dx%d). Minimum: 80x24", m.width, m.height),
+			fmt.Sprintf("Terminal too small (%dx%d). Minimum: %dx%d", m.width, m.height, minWidth, minHeight),
 		))
 	}
 
-	header := m.headerComp.View(m.width - 4)
-	jobs := m.jobsTable.View(m.width - 4)
-
-	output := m.outputVP.View()
-	events := m.eventsList.View()
-
+	// Recalculate dimensions to stay in sync
+	bottomH := m.height - headerH - jobsH - statusBarH - bordersH
+	if bottomH < 4 {
+		bottomH = 4
+	}
 	eventsW := m.width * 40 / 100
-	outputW := m.width - eventsW - 4
+	outputW := m.width - eventsW
+	outputInnerW := outputW - 2
+	eventsInnerW := eventsW - 2
 
-	bottom := lipgloss.JoinHorizontal(lipgloss.Top,
-		panelStyle.Width(outputW).BorderTop(true).BorderLeft(true).BorderRight(false).BorderBottom(true).Render(output),
-		panelStyle.Width(eventsW).BorderTop(true).BorderLeft(false).BorderRight(true).BorderBottom(true).Render(events),
-	)
+	// Update viewport dimensions in case resize wasn't called
+	m.outputVP.setDimensions(outputInnerW, bottomH-2)
+	m.eventsList.setDimensions(eventsInnerW, bottomH-2)
 
+	// === Header section ===
+	headerContent := m.headerComp.View(m.width - 4)
+	header := lipgloss.NewStyle().
+		Width(m.width).
+		Height(headerH).
+		BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(true).
+		BorderForeground(ColorPrimary).
+		Padding(0, 1).
+		Render(headerContent)
+
+	// === Jobs table section ===
+	jobsContent := m.jobsTable.View(m.width - 4)
+	jobs := lipgloss.NewStyle().
+		Width(m.width).
+		Height(jobsH).
+		BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(true).
+		BorderForeground(ColorSubtle).
+		Padding(0, 1).
+		Render(jobsContent)
+
+	// === Bottom section: output + events side by side ===
+	outputContent := m.outputVP.View()
+	output := lipgloss.NewStyle().
+		Width(outputW).
+		Height(bottomH).
+		BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(true).
+		BorderForeground(ColorSubtle).
+		Padding(0, 1).
+		Render(outputContent)
+
+	eventsContent := m.eventsList.View()
+	events := lipgloss.NewStyle().
+		Width(eventsW).
+		Height(bottomH).
+		BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(true).
+		BorderForeground(ColorSubtle).
+		Padding(0, 1).
+		Render(eventsContent)
+
+	bottom := lipgloss.JoinHorizontal(lipgloss.Top, output, events)
+
+	// === Status bar ===
 	statusBar := m.statusBar.View(m.width)
 
-	return tea.NewView(lipgloss.JoinVertical(lipgloss.Left,
-		panelStyle.Width(m.width).BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(false).BorderForeground(ColorPrimary).Render(header),
-		panelStyle.Width(m.width).BorderTop(true).BorderLeft(true).BorderRight(true).BorderBottom(false).Render(jobs),
-		bottom,
-		statusBar,
-	))
+	// === Assemble ===
+	return tea.NewView(strings.Join([]string{header, jobs, bottom, statusBar}, "\n"))
 }
 
 func waitForEvent(events <-chan worker.TuiEvent) tea.Cmd {
@@ -326,5 +378,3 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 		return nil
 	}
 }
-
-

@@ -1,6 +1,9 @@
 package worker
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type TuiEventType int
 
@@ -59,4 +62,55 @@ func Emit(events chan<- TuiEvent, event TuiEvent) {
 	case events <- event:
 	default:
 	}
+}
+
+// TuiLogger routes log messages to the TUI events feed.
+type TuiLogger struct {
+	events chan<- TuiEvent
+	source string
+}
+
+func NewTuiLogger(events chan<- TuiEvent, source string) *TuiLogger {
+	return &TuiLogger{events: events, source: source}
+}
+
+func (l *TuiLogger) Info(msg string, args ...any) {
+	l.emit("info", msg, args...)
+}
+
+func (l *TuiLogger) Success(msg string, args ...any) {
+	l.emit("success", msg, args...)
+}
+
+func (l *TuiLogger) Warning(msg string, args ...any) {
+	l.emit("warning", msg, args...)
+}
+
+func (l *TuiLogger) Error(msg string, args ...any) {
+	l.emit("error", msg, args...)
+}
+
+func (l *TuiLogger) ErrorE(msg string, err error) {
+	l.emit("error", "%s: %v", msg, err)
+}
+
+func (l *TuiLogger) Verbose(msg string, args ...any) {
+	l.emit("info", msg, args...)
+}
+
+func (l *TuiLogger) Debug(msg string, args ...any) {
+	l.emit("info", msg, args...)
+}
+
+func (l *TuiLogger) emit(level, msg string, args ...any) {
+	formatted := msg
+	if len(args) > 0 {
+		formatted = fmt.Sprintf(msg, args...)
+	}
+	Emit(l.events, TuiEvent{
+		Type:          EventActivity,
+		Source:        l.source,
+		ActivityLevel: level,
+		Message:       formatted,
+	})
 }
