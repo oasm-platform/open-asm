@@ -5,27 +5,18 @@ import (
 	"context"
 	"fmt"
 	"oasm-worker/internal/config"
+	"oasm-worker/internal/tui"
 	"oasm-worker/internal/worker"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/common-nighthawk/go-figure"
-	"github.com/fatih/color"
-	"github.com/oasm-platform/oasm-sdk-go/oasm"
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-func printBanner() {
-	green := color.New(color.FgHiCyan).SprintFunc()
-	myFigure := figure.NewFigure("OASM Agent", "slant", true)
-	fmt.Print(green(myFigure.String()))
-}
-
 func App() error {
-	printBanner()
-
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("fail to load config: %v", err)
@@ -35,14 +26,19 @@ func App() error {
 		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
 	}
 
-	oasm.NewLogger("CLI").Verbose("Config loaded | MaxConcurrency: %d | Host: %s:%d | Network: %s",
-		cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort, cfg.Network)
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	events := make(chan worker.TuiEvent, 100)
-	worker.Start(ctx, cfg, events)
+
+	go worker.Start(ctx, cfg, events)
+
+	m := tui.NewModel(cfg, events)
+	p := tea.NewProgram(m)
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("TUI error: %v", err)
+	}
+
 	return nil
 }
 
