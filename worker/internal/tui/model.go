@@ -145,16 +145,7 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 	}
 }
 
-// Stubs — replaced in Tasks 6-8
-type outputModel struct{}
-
-func newOutputModel() outputModel                    { return outputModel{} }
-func (o *outputModel) update(msg tea.Msg) tea.Cmd    { return nil }
-func (o *outputModel) setSelected(id string)         {}
-func (o *outputModel) appendLine(id, line string)    {}
-func (o *outputModel) setDimensions(w, h int)        {}
-func (o outputModel) View() string                   { return "" }
-
+// Stubs — replaced in Tasks 7-8
 type eventsModel struct{}
 
 func newEventsModel() eventsModel                    { return eventsModel{} }
