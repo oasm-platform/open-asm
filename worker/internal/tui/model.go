@@ -145,9 +145,4 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 	}
 }
 
-// Stubs — replaced in Task 8
-type statusBarModel struct{ focus focusTarget }
 
-func newStatusBarModel() statusBarModel              { return statusBarModel{} }
-func (s *statusBarModel) setFocus(f focusTarget)     { s.focus = f }
-func (s statusBarModel) View(width int) string       { return "" }
