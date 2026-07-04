@@ -29,17 +29,20 @@ func App() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Suppress oasm-sdk-go internal logging — it writes to stdout
-	if f, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0); err == nil {
-		os.Stdout = f
-		os.Stderr = f
+	// Save real stdout for Bubbletea, redirect os.Stdout to /dev/null
+	// so oasm-sdk-go internal logs don't interfere with TUI rendering
+	realStdout := os.Stdout
+	if devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0); err == nil {
+		os.Stdout = devNull
+		os.Stderr = devNull
 	}
 
 	events := make(chan worker.TuiEvent, 100)
 	go worker.Start(ctx, cfg, events)
 
+	// TUI renders to the real stdout, SDK logs go to /dev/null
 	m := tui.NewModel(cfg, events)
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithOutput(realStdout))
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("TUI error: %v", err)
 	}
