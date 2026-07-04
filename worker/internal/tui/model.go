@@ -145,15 +145,7 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 	}
 }
 
-// Stubs — replaced in Tasks 7-8
-type eventsModel struct{}
-
-func newEventsModel() eventsModel                    { return eventsModel{} }
-func (e *eventsModel) update(msg tea.Msg) tea.Cmd    { return nil }
-func (e *eventsModel) addEvent(entry activityEntry)  {}
-func (e *eventsModel) setDimensions(w, h int)        {}
-func (e eventsModel) View() string                   { return "" }
-
+// Stubs — replaced in Task 8
 type statusBarModel struct{ focus focusTarget }
 
 func newStatusBarModel() statusBarModel              { return statusBarModel{} }
