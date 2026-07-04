@@ -145,16 +145,7 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 	}
 }
 
-// Stubs — replaced in Tasks 5-8
-type jobsModel struct{ table interface{} }
-
-func newJobsModel() jobsModel                        { return jobsModel{} }
-func (j *jobsModel) update(msg tea.Msg) tea.Cmd      { return nil }
-func (j *jobsModel) handleJobStarted(msg jobStartedMsg)  {}
-func (j *jobsModel) handleJobCompleted(msg jobCompletedMsg) {}
-func (j jobsModel) selectedID() string               { return "" }
-func (j jobsModel) View(width int) string            { return "" }
-
+// Stubs — replaced in Tasks 6-8
 type outputModel struct{}
 
 func newOutputModel() outputModel                    { return outputModel{} }
