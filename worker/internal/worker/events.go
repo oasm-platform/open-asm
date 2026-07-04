@@ -21,22 +21,22 @@ type TuiEvent struct {
 	Source    string // source component (e.g., "RemoteExec", "Jobs")
 
 	// Connected
-	WorkerID  string
-	Host      string
-	Port      int
+	WorkerID string
+	Host     string
+	Port     int
 
 	// Disconnected
 	DisconnectReason string
 
 	// Job events
-	JobID       string
-	Command     string
-	AssetID     string
-	AssetValue  string
-	Success     bool
-	Duration    time.Duration
-	ErrorMsg    string
-	OutputLine  string
+	JobID        string
+	Command      string
+	AssetID      string
+	AssetValue   string
+	Success      bool
+	Duration     time.Duration
+	ErrorMsg     string
+	OutputLine   string
 	OutputStream string // "stdout" or "stderr"
 
 	// Activity / Error
