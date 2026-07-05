@@ -14,7 +14,7 @@ import type { Target } from '@/services/apis/gen/queries';
 import {
   JobStatus,
   UpdateTargetDtoScanSchedule,
-  useTargetsControllerDeleteTargetFromWorkspace,
+  useTargetsControllerDeleteTarget,
   useTargetsControllerReScanTarget,
   useTargetsControllerUpdateTarget,
 } from '@/services/apis/gen/queries';
@@ -45,19 +45,26 @@ const SettingTarget = ({
   ); // Default to target's scan schedule or weekly if not set
   const [isRediscovering, setIsRediscovering] = useState(false);
 
-  // Mutation hook to delete a target from the workspace
-  const { mutate: deleteTarget } =
-    useTargetsControllerDeleteTargetFromWorkspace({
-      mutation: {
-        onSuccess: () => {
-          queryClient.refetchQueries({
-            queryKey: ['targets'],
-          });
-          setIsDeleting(false);
-        },
-        onError: () => setIsDeleting(false),
+  // Mutation hook to permanently delete a target
+  const { mutate: deleteTarget } = useTargetsControllerDeleteTarget({
+    mutation: {
+      onSuccess: () => {
+        toast.success('Target deleted successfully');
+        queryClient.refetchQueries({
+          queryKey: ['targets'],
+        });
+        setIsDeleting(false);
+        window.history.back();
       },
-    });
+      onError: (err) => {
+        const axiosErr = err as AxiosError<{ message: string }>;
+        toast.error(
+          axiosErr.response?.data.message ?? 'Failed to delete target',
+        );
+        setIsDeleting(false);
+      },
+    },
+  });
 
   // Mutation hook to rediscover/re-scan a target
   const { mutate: rediscoverTarget } = useTargetsControllerReScanTarget({
@@ -208,7 +215,6 @@ const SettingTarget = ({
                   id: target.id,
                   workspaceId: selectedWorkspaceId ?? '',
                 });
-                window.history.back();
               }}
               typeToConfirm={target.value}
               trigger={

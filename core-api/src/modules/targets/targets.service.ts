@@ -530,15 +530,16 @@ if (scope !== undefined) {
   }
 
   /**
-   * Deletes a target from a workspace, but only if the requesting user is the owner of the workspace.
+   * Permanently deletes a target and all its associated data (assets, vulnerabilities, jobs).
+   * The target must belong to the specified workspace, and the requesting user must be the owner.
    *
    * @param id - The ID of the target to be deleted.
-   * @param workspaceId - The ID of the workspace from which the target will be deleted.
+   * @param workspaceId - The ID of the workspace that the target belongs to.
    * @param userContext - The user's context data, which includes the user's ID.
    * @throws NotFoundException if the target is not found in the workspace.
    * @returns A response indicating the target was successfully deleted.
    */
-  public async deleteTargetFromWorkspace(
+  public async deleteTarget(
     id: string,
     workspaceId: string,
     userContext: UserContextPayload,

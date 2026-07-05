@@ -262,25 +262,16 @@ export class WorkspacesService implements OnModuleInit {
   ): Promise<{ deletedTargetIds: string[] }> {
     const result = await this.repo.manager.transaction(
       async (transactionalEntityManager) => {
-        const targets = await transactionalEntityManager
-          .getRepository(Target)
-          .createQueryBuilder('target')
-          .where('target.workspaceId = :workspaceId', { workspaceId })
-          .select(['target.id'])
-          .getMany();
-
-        const targetIds = targets.map((t) => t.id);
-
-        if (targetIds.length === 0) {
-          return { deletedTargetIds: [] };
-        }
-
-        await transactionalEntityManager
+        const result = await transactionalEntityManager
           .getRepository(Target)
           .createQueryBuilder()
           .delete()
           .where('"workspaceId" = :workspaceId', { workspaceId })
+          .returning('id')
           .execute();
+
+        const raw = result.raw as { id: string }[] | undefined;
+        const targetIds = (raw ?? []).map((r) => r.id);
 
         return { deletedTargetIds: targetIds };
       },
