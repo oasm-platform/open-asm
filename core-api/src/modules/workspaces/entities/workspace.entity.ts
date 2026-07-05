@@ -2,7 +2,6 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Statistic } from '@/modules/statistic/entities/statistic.entity';
-import { WorkspaceTarget } from '@/modules/targets/entities/workspace-target.entity';
 import { Template } from '@/modules/templates/entities/templates.entity';
 import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
@@ -50,13 +49,6 @@ export class Workspace extends BaseEntity {
     (workspaceMembers) => workspaceMembers.workspace,
   )
   workspaceMembers: Relation<WorkspaceMembers[]>;
-
-  @OneToMany(
-    () => WorkspaceTarget,
-    (workspaceTarget) => workspaceTarget.workspace,
-    { onDelete: 'CASCADE' },
-  )
-  workspaceTargets: Relation<WorkspaceTarget[]>;
 
   @OneToMany(() => WorkspaceTool, (workspaceTool) => workspaceTool.workspace)
   workspaceTools: Relation<WorkspaceTool[]>;
