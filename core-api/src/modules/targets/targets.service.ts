@@ -24,15 +24,12 @@ import {
   UpdateTargetDto,
 } from './dto/targets.dto';
 import { Target, TargetType } from './entities/target.entity';
-import { WorkspaceTarget } from './entities/workspace-target.entity';
 
 @Injectable()
 export class TargetsService implements OnModuleInit {
   constructor(
     @InjectRepository(Target)
     private readonly repo: Repository<Target>,
-    @InjectRepository(WorkspaceTarget)
-    private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private readonly workspacesService: WorkspacesService,
     public assetService: AssetsService,
     private eventEmitter: EventEmitter2,
@@ -224,14 +221,13 @@ export class TargetsService implements OnModuleInit {
   public async getTargetById(id: string, workspaceId: string): Promise<Target> {
     const result = (await this.repo
       .createQueryBuilder('targets')
-      .leftJoin('targets.workspaceTargets', 'workspaceTarget')
-      .leftJoin('workspaceTarget.workspace', 'workspace')
+      .leftJoin('targets.workspace', 'workspace')
       .leftJoin('workspace.workspaceMembers', 'workspaceMember')
       .leftJoin('targets.assets', 'asset')
       .leftJoin('asset.assetServices', 'assetService')
       .leftJoin('asset.jobs', 'job')
       .where('targets.id = :id', { id })
-      .andWhere('workspace.id = :workspaceId', { workspaceId })
+      .andWhere('targets.workspaceId = :workspaceId', { workspaceId })
       .select([
         'targets.id as id',
         'targets.value as value',
@@ -288,11 +284,10 @@ export class TargetsService implements OnModuleInit {
     const result = await this.repo.manager.transaction(
       async (transactionalEntityManager) => {
         // Query all existing workspace targets for the given values in one query
-        const existingWorkspaceTargets = await transactionalEntityManager
-          .getRepository(WorkspaceTarget)
-          .createQueryBuilder('wt')
-          .innerJoin('wt.target', 'target')
-          .where('wt.workspace = :workspaceId', { workspaceId })
+        const existingTargets = await transactionalEntityManager
+          .getRepository(Target)
+          .createQueryBuilder('target')
+          .where('target.workspaceId = :workspaceId', { workspaceId })
           .andWhere('target.value IN (:...values)', { values: targetValues })
           .select([
             'target.value AS value',
@@ -301,7 +296,7 @@ export class TargetsService implements OnModuleInit {
           .getRawMany<{ value: string; internalNetworkId: string | null }>();
 
         const existingTargetsMap = new Map<string, Set<string | null>>();
-        existingWorkspaceTargets.forEach((et) => {
+        existingTargets.forEach((et) => {
           if (!existingTargetsMap.has(et.value)) {
             existingTargetsMap.set(et.value, new Set());
           }
@@ -358,6 +353,7 @@ export class TargetsService implements OnModuleInit {
               value: t.value,
               type: t.type || TargetType.DOMAIN,
               internalNetworkId: internalNetworkId,
+              workspaceId: workspaceId,
             })),
           )
           .execute();
@@ -369,16 +365,6 @@ export class TargetsService implements OnModuleInit {
         const createdTargetEntities = await transactionalEntityManager
           .getRepository(Target)
           .findByIds(targetIds);
-
-        // Create workspace target associations in batch
-        const workspaceTargetValues = createdTargetEntities.map((target) => ({
-          workspace: { id: workspaceId },
-          target: { id: target.id },
-        }));
-
-        await transactionalEntityManager
-          .getRepository(WorkspaceTarget)
-          .save(workspaceTargetValues);
 
         // Create primary assets for all new targets using batch UPSERT
         const assetValues: Array<{
@@ -467,13 +453,12 @@ export class TargetsService implements OnModuleInit {
 
     const queryBuilder = this.repo
       .createQueryBuilder('targets')
-      .innerJoin('targets.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('targets.workspace', 'workspace')
       .innerJoin('workspace.workspaceMembers', 'workspaceMember')
       .leftJoin('targets.assets', 'asset')
       .leftJoin('asset.assetServices', 'assetService')
       .leftJoin('asset.jobs', 'job')
-      .where('workspace.id = :workspaceId', { workspaceId })
+      .where('targets.workspaceId = :workspaceId', { workspaceId })
       .select([
         'targets.id as id',
         'targets.value as value',
@@ -563,21 +548,13 @@ if (scope !== undefined) {
       userContext,
     );
 
-    const workspaceTarget = await this.workspaceTargetRepository.findOneBy({
-      target: { id },
-      workspace: { id: workspaceId },
-    });
+    const target = await this.repo.findOneBy({ id, workspaceId });
 
-    await this.repo.delete(id);
-
-    if (!workspaceTarget) {
+    if (!target) {
       throw new NotFoundException('Target not found in workspace');
     }
 
-    await this.workspaceTargetRepository.delete({
-      target: { id },
-      workspace: { id: workspaceId },
-    });
+    await this.repo.delete(id);
 
     return { message: 'Target deleted successfully' };
   }
@@ -688,9 +665,7 @@ if (scope !== undefined) {
   > {
     const targets = await this.repo
       .createQueryBuilder('targets')
-      .innerJoin('targets.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
-      .where('workspace.id = :workspaceId', { workspaceId })
+      .where('targets.workspaceId = :workspaceId', { workspaceId })
       .select([
         'targets.value as value',
         'targets.type as type',
