@@ -97,10 +97,7 @@ export class JobsRegistryService {
     }
 
     if (workspaceId) {
-      qb.innerJoin('target.workspaceTargets', 'workspaceTarget').andWhere(
-        'workspaceTarget.workspaceId = :workspaceId',
-        { workspaceId },
-      );
+      qb.andWhere('target.workspaceId = :workspaceId', { workspaceId });
     }
 
     qb.take(query.limit)
@@ -302,9 +299,7 @@ export class JobsRegistryService {
     if (workspaceId) {
       assetsQueryBuilder
         .innerJoin('assets.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
-        .andWhere('workspace.id = :workspaceId', { workspaceId });
+        .andWhere('target.workspaceId = :workspaceId', { workspaceId });
     }
 
     return await assetsQueryBuilder.getMany();
@@ -346,9 +341,7 @@ export class JobsRegistryService {
     if (workspaceId) {
       assetServicesQueryBuilder
         .innerJoin('asset.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
-        .andWhere('workspace.id = :workspaceId', { workspaceId });
+        .andWhere('target.workspaceId = :workspaceId', { workspaceId });
     }
 
     return await assetServicesQueryBuilder.getMany();
@@ -409,11 +402,10 @@ export class JobsRegistryService {
         .orderBy('jobs.priority', 'DESC')
         .addOrderBy('jobs.createdAt', 'ASC');
 
-      // [OPT-3] Only join workspaceTargets/workspaces when actually needed
+      // [OPT-3] Only join workspace when actually needed
       if (isBuiltInTools && worker.scope !== WorkerScope.CLOUD) {
         queryBuilder
-          .leftJoin('target.workspaceTargets', 'workspace_targets')
-          .leftJoin('workspace_targets.workspace', 'workspaces');
+          .leftJoin('target.workspace', 'workspaces');
       }
 
       if (isBuiltInTools) {
@@ -664,8 +656,7 @@ export class JobsRegistryService {
         join assets on jobs."assetId" = assets.id
         join tools on jobs."toolId" = tools.id
         join targets on assets."targetId" = targets.id
-        join "workspace_targets" on targets."id" = "workspace_targets"."targetId"
-        where "workspace_targets"."workspaceId" = $1
+        where targets."workspaceId" = $1
         order by jobs."createdAt" desc
       ),
       grouped_with_id as (
@@ -869,8 +860,7 @@ export class JobsRegistryService {
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('jTarget.workspace', 'workspace')
       .leftJoin('jobHistory.workflow', 'workflow')
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([
@@ -907,8 +897,7 @@ export class JobsRegistryService {
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('jTarget.workspace', 'workspace')
       .where('workspace.id = :workspaceId', { workspaceId })
       .getCount();
 
@@ -953,8 +942,7 @@ export class JobsRegistryService {
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('jTarget.workspace', 'workspace')
       .where('jobHistory.id = :id', { id })
       .andWhere('workspace.id = :workspaceId', { workspaceId })
       .getExists();
@@ -1010,8 +998,7 @@ export class JobsRegistryService {
         .createQueryBuilder('job')
         .innerJoin('job.asset', 'asset')
         .innerJoin('asset.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
+        .innerJoin('target.workspace', 'workspace')
         .where('job.id = :jobId', { jobId })
         .andWhere('workspace.id = :workspaceId', { workspaceId })
         .getOne();
