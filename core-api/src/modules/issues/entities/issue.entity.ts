@@ -3,7 +3,7 @@ import { IssueSourceType, IssueStatus } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, Relation } from 'typeorm';
 import { IssueComment } from './issue-comment.entity';
 
 @Entity('issues')
@@ -58,12 +58,12 @@ export class Issue extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @ApiProperty({ type: () => User })
   @ManyToOne(() => User)
   @JoinColumn({ name: 'createdById' })
-  createdBy: User;
+  createdBy: Relation<User>;
 
   @Column({ nullable: true })
   createdById: string;

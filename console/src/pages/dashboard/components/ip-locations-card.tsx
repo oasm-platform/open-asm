@@ -206,16 +206,18 @@ export default function IpLocationsCard({
           />
           {/* <IpLocationsLegend min={minIpCount} max={maxIpCount} /> */}
         </div>
-        <div
-          className={`lg:col-span-1 rounded-xl p-2 self-center ${isDark ? 'bg-card' : 'bg-white'}`}
-        >
-          <IpLocationsTable
-            data={data}
-            totalIps={totalIps}
-            selectedCountry={selectedCountry}
-            onCountrySelect={onCountrySelect}
-          />
-        </div>
+        {data.length > 0 && (
+          <div
+            className={`lg:col-span-1 rounded-xl p-2 self-center ${isDark ? 'bg-card' : 'bg-white'}`}
+          >
+            <IpLocationsTable
+              data={data}
+              totalIps={totalIps}
+              selectedCountry={selectedCountry}
+              onCountrySelect={onCountrySelect}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

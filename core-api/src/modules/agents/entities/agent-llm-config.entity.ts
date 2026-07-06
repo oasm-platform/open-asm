@@ -9,7 +9,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { LLMProvider } from '../enums/agent.enums';
 
 @Entity('agent_llm_configs')
@@ -23,7 +23,7 @@ export class AgentLLMConfig extends BaseEntity {
 
   @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @ApiProperty({ example: 'My OpenAI key', required: false })
   @IsOptional()

@@ -1,19 +1,19 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, Relation } from 'typeorm';
 
 @Entity('reports')
 export class Report extends BaseEntity {
   @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @Column('uuid')
   userId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user: Relation<User>;
 
   @Column({
     type: 'enum',

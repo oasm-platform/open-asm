@@ -83,7 +83,7 @@ export default function WorkspaceSettings() {
       {
         onSuccess: () => {
           toast.success('Workspace updated successfully');
-          queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] });
           refetch();
         },
         onError: () => {
@@ -103,7 +103,7 @@ export default function WorkspaceSettings() {
       {
         onSuccess: () => {
           toast.success('Workspace deleted successfully');
-          queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] });
           navigate({ to: '/' });
         },
         onError: () => {

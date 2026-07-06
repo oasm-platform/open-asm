@@ -1,7 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 
 @Entity('ports')
 @Index('IDX_ports_assetId', ['assetId'])
@@ -29,5 +29,5 @@ export class Port extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'jobHistoryId' })
-  jobHistory: JobHistory;
+  jobHistory: Relation<JobHistory>;
 }

@@ -93,6 +93,7 @@ interface UseAgentChatReturn {
   todos: AgentTodoItem[];
   selectedModel: SelectedModel | null;
   agentMode: string;
+  selectedWorkerId: string | null;
   hasSentFirstMessage: boolean;
   hasMoreMessages: boolean;
   isLoadingMoreMessages: boolean;
@@ -104,6 +105,7 @@ interface UseAgentChatReturn {
   onDismissError: () => void;
   onLoadMore: (() => void) | undefined;
   onAgentModeChange: (mode: string) => void;
+  onWorkerSelect: (workerId: string | null) => void;
 }
 
 /**
@@ -238,6 +240,9 @@ export function useAgentChat({
   const selectedModelRef = useRef<SelectedModel | null>(selectedModel);
   const [agentMode, setAgentMode] = useState('ask');
   const agentModeRef = useRef('ask');
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(
+    null,
+  );
 
   const {
     state: { selectedWorkspaceId },
@@ -311,11 +316,12 @@ export function useAgentChat({
                 provider: modelInfo.provider,
               }),
               agentMode: agentModeRef.current,
+              workerId: selectedWorkerId,
             },
           };
         },
       }),
-    [selectedWorkspaceId, conversationId],
+    [selectedWorkspaceId, conversationId, selectedWorkerId],
   );
 
   const {
@@ -588,6 +594,7 @@ export function useAgentChat({
       pendingMessage?: string;
       selectedModel?: SelectedModel;
       agentMode?: string;
+      workerId?: string | null;
     } | null;
     if (state?.pendingMessage && !hasAutoSentRef.current) {
       hasAutoSentRef.current = true;
@@ -598,6 +605,9 @@ export function useAgentChat({
       if (state.agentMode !== undefined) {
         setAgentMode(state.agentMode);
         agentModeRef.current = state.agentMode;
+      }
+      if (state.workerId !== undefined) {
+        setSelectedWorkerId(state.workerId);
       }
       void handleSendMessageRef.current(state.pendingMessage);
       void navigate({
@@ -620,6 +630,7 @@ export function useAgentChat({
     createdAt,
     selectedModel,
     agentMode,
+    selectedWorkerId,
     hasSentFirstMessage,
     hasMoreMessages: hasNextPage ?? false,
     isLoadingMoreMessages: isFetchingNextPage,
@@ -631,5 +642,6 @@ export function useAgentChat({
     onDismissError: handleDismissError,
     onLoadMore: onLoadMoreAction,
     onAgentModeChange: setAgentMode,
+    onWorkerSelect: setSelectedWorkerId,
   };
 }
