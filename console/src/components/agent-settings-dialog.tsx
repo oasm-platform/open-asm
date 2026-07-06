@@ -1,101 +1,107 @@
 import LlmConnect from '@/components/llm-connect';
-import { MCPServersManager } from '@/components/mcp-servers-manager';
+import { MemoryManager } from '@/components/memory-manager';
+import { SkillsManager } from '@/components/skills-manager';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import { KeyRound, Server } from 'lucide-react';
-import { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BookOpen, Brain, KeyRound } from 'lucide-react';
+import { type ComponentType, type SVGProps } from 'react';
+
+interface TabConfig {
+  value: 'provider' | 'skills' | 'memory';
+  label: string;
+  description: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  component: ComponentType;
+}
+
+const tabs: TabConfig[] = [
+  {
+    value: 'provider',
+    label: 'Providers',
+    description: 'Manage your AI models and API connections',
+    icon: KeyRound,
+    component: LlmConnect,
+  },
+  {
+    value: 'skills',
+    label: 'Skills',
+    description: 'Specialized instructions the agent can use to perform tasks',
+    icon: BookOpen,
+    component: SkillsManager,
+  },
+  {
+    value: 'memory',
+    label: 'Memory',
+    description: 'Long-term memory content used by the AI agent',
+    icon: Brain,
+    component: MemoryManager,
+  },
+];
+
+const triggerClassName =
+  'data-[state=active]:bg-sidebar-accent border-sidebar-accent data-[state=active]:text-sidebar-accent-foreground text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold border-0 shadow-none';
 
 interface AgentSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultTab?: 'llm' | 'mcp';
+  defaultTab?: 'provider' | 'skills' | 'memory';
 }
-
-interface TabItem {
-  id: 'llm' | 'mcp';
-  label: string;
-  icon: typeof KeyRound;
-  element: React.ReactNode;
-  title: string;
-  description: string;
-}
-
-const TABS: TabItem[] = [
-  { id: 'llm', label: 'LLM Providers', icon: KeyRound, element: <LlmConnect />, title: 'LLM Providers', description: 'Manage your AI models and API connections' },
-  { id: 'mcp', label: 'MCP Servers', icon: Server, element: <MCPServersManager />, title: 'MCP Servers', description: 'Extend agent capabilities with external MCP servers' },
-];
 
 export function AgentSettingsDialog({
   open,
   onOpenChange,
-  defaultTab = 'llm',
+  defaultTab = 'provider',
 }: AgentSettingsDialogProps) {
-  const [activeTab, setActiveTab] = useState<TabItem['id']>(defaultTab);
-  const active = TABS.find((t) => t.id === activeTab);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-full h-[85vh] flex flex-col gap-0 p-0 overflow-hidden sm:rounded-xl">
-        {/* Hidden title for accessibility */}
+      <DialogContent className="inset-0 w-full h-full max-w-none rounded-none translate-x-0 translate-y-0 sm:max-w-3xl sm:w-full sm:h-[80vh] sm:rounded-xl sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] flex flex-col gap-0 px-4 py-4 overflow-hidden">
         <DialogTitle className="sr-only">Agent Settings</DialogTitle>
 
-        <div className="flex flex-1 min-h-0">
-          {/* Left sidebar */}
-          <aside className="w-60 shrink-0 border-r flex flex-col bg-sidebar">
-            <div className="px-6 pt-6 pb-4">
-              <p className="text-[10px] font-bold text-sidebar-foreground/50 uppercase tracking-widest">
-                Agent Settings
-              </p>
-            </div>
-            <nav className="flex flex-col gap-1 px-3 flex-1">
-              {TABS.map(({ id, label, icon: Icon }) => {
-                const isActive = activeTab === id;
+        <Tabs
+          defaultValue={defaultTab}
+          className="flex flex-col flex-1 min-h-0 gap-0"
+        >
+          <TabsList className="shrink-0 p-0 h-auto w-fit gap-2 rounded-none bg-transparent">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className={triggerClassName}
+                >
+                  <Icon className="size-4.5 shrink-0" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
 
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setActiveTab(id)}
-                    className={cn(
-                      'group relative flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200 text-left w-full border border-transparent',
-                      isActive
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
-                        : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
-                    )}
-                  >
-
-                    <Icon
-                      className={cn(
-                        'size-4.5 shrink-0 transition-colors',
-                        isActive
-                          ? 'text-sidebar-primary'
-                          : 'group-hover:text-sidebar-foreground',
-                      )}
-                    />
-                    {label}
-                  </button>
-                );
-              })}
-            </nav>
-          </aside>
-
-          {/* Right content */}
-          <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-background/50">
-            <div className="px-6 pt-3 pb-4 border-b shrink-0 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <p className="text-lg font-bold tracking-tight">
-                  {active?.title}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {active?.description}
-                </p>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {active?.element}
-            </div>
-          </div>
-        </div>
+          {tabs.map((tab) => {
+            const Component = tab.component;
+            return (
+              <TabsContent
+                key={tab.value}
+                value={tab.value}
+                className="flex flex-col flex-1 min-h-0 gap-0 mt-0"
+              >
+                <div className="pt-2 pb-3 border-b shrink-0 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <p className="text-lg font-bold tracking-tight">
+                      {tab.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {tab.description}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto py-4">
+                  <Component />
+                </div>
+              </TabsContent>
+            );
+          })}
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

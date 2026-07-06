@@ -2,7 +2,7 @@ import { Slot } from '@radix-ui/react-slot';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { buttonVariants, type VariantProps } from './button-variants';
 
 export interface ButtonProps
@@ -27,7 +27,7 @@ function Button({
       onClick={(e) => {
         if (props.href) {
           e.preventDefault();
-          navigate(props.href);
+          navigate({ to: props.href });
         }
       }}
       data-slot="button"

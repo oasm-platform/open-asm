@@ -11,7 +11,7 @@ import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { GetManyInternalNetworksResponseDtoDataItem } from '@/services/apis/gen/queries';
 import { useInternalNetworksControllerGetManyInternalNetworks } from '@/services/apis/gen/queries';
 import { Network } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 export function ListInternalNetworks() {
   const {
@@ -102,7 +102,7 @@ export function ListInternalNetworks() {
       onSortChange={(col, order) => {
         setParams({ sortBy: col, sortOrder: order });
       }}
-      onRowClick={(row) => navigate(`/internal-networks/${row.id}`)}
+      onRowClick={(row) => navigate({ to: `/internal-networks/${row.id}` })}
       filterColumnKey="name"
       filterValue={filter}
       onFilterChange={setFilter}
@@ -111,7 +111,7 @@ export function ListInternalNetworks() {
           key="create-network"
           variant="outline"
           className="gap-2"
-          onClick={() => navigate('/internal-networks/create')}
+          onClick={() => navigate({ to: '/internal-networks/create' })}
         >
           <Network className="shrink-0" />
           <span>Create network</span>

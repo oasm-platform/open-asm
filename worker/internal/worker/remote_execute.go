@@ -1,13 +1,12 @@
 package worker
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 
@@ -63,12 +62,6 @@ func (s *sessionSandbox) resolvePath(path string) (string, error) {
 	return absResolved, nil
 }
 
-func (s *sessionSandbox) chroot() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return os.Chdir(s.rootPath)
-}
-
 func (s *sessionSandbox) close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -91,10 +84,13 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 		handler, err := client.RemoteExecuteSubscribe(ctx)
 		if err != nil {
 			log.ErrorE("Failed to subscribe to remote execute, retrying in 5s...", err)
+
+			timer := time.NewTimer(5 * time.Second)
 			select {
 			case <-ctx.Done():
+				timer.Stop()
 				return
-			case <-time.After(5 * time.Second):
+			case <-timer.C:
 				continue
 			}
 		}
@@ -122,34 +118,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 			return sb, nil
 		}
 
-		cleanupSandbox := func(sessionID string) {
-			sessionsMu.Lock()
-			sb, ok := activeSessions[sessionID]
-			if ok {
-				delete(activeSessions, sessionID)
-			}
-			sessionsMu.Unlock()
-
-			if ok && sb != nil {
-				if err := sb.close(); err != nil {
-					log.ErrorE("Failed to cleanup session sandbox", err)
-				} else {
-					log.Info("Cleaned up session sandbox: %s", sessionID)
-				}
-			}
-		}
-
 		for {
-			select {
-			case <-ctx.Done():
-				log.Info("Remote execute handler shutting down...")
-				for sessionID := range activeSessions {
-					cleanupSandbox(sessionID)
-				}
-				return
-			default:
-			}
-
 			resp, err := handler.Next(ctx)
 			if err != nil {
 				log.ErrorE("Failed to receive remote execute event, reconnecting...", err)
@@ -171,9 +140,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 
 				if sessionID == "" || command == "" {
 					log.Warning("Received command with empty session or command field")
-					if handler.SessionID() != "" {
-						_ = handler.SendError(ctx, "empty session or command")
-					}
+					_ = handler.SendError(ctx, "empty session or command")
 					continue
 				}
 
@@ -184,51 +151,41 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 					continue
 				}
 
-				go executeRemoteCommand(ctx, handler, command, sb, log, toolPath)
+				go executeRemoteCommand(ctx, handler, sessionID, command, sb, log, toolPath)
 
 			default:
 				log.Warning("Unknown remote execute event type: %v", resp.Type)
 			}
 		}
 
-		for sessionID := range activeSessions {
-			cleanupSandbox(sessionID)
+		sessionsMu.Lock()
+		for sessionID, sb := range activeSessions {
+			if sb != nil {
+				if err := sb.close(); err != nil {
+					log.ErrorE("Failed to cleanup session sandbox", err)
+				} else {
+					log.Info("Cleaned up session sandbox: %s", sessionID)
+				}
+			}
+			delete(activeSessions, sessionID)
 		}
-		activeSessions = make(map[string]*sessionSandbox)
+		sessionsMu.Unlock()
 	}
 }
 
-func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, command string, sandbox *sessionSandbox, log *oasm.LoggerType, toolPath string) {
-	log.Info("Executing command in session %s: %s", handler.SessionID(), command)
+func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, sessionID string, command string, sandbox *sessionSandbox, log *oasm.LoggerType, toolPath string) {
+	log.Info("Executing command in session %s: %s", sessionID, command)
 
-	if err := sandbox.chroot(); err != nil {
-		log.ErrorE("Failed to change to session directory", err)
-		_ = handler.SendError(ctx, fmt.Sprintf("failed to enter session workspace: %v", err))
-		return
-	}
-
-	var cmd *exec.Cmd
-
-	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
-	} else {
-		cmd = exec.CommandContext(ctx, "sh", "-c", command)
-	}
-
+	wrappedCmd := fmt.Sprintf("(%s) 2>&1", command)
+	cmd := exec.CommandContext(ctx, "sh", "-c", wrappedCmd)
+	cmd.Dir = sandbox.rootPath
 	cmd.SysProcAttr = newSysProcAttr()
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PATH=%s%c%s", toolPath, os.PathListSeparator, os.Getenv("PATH")))
+	cmd.Env = setupCmdEnv(toolPath)
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		log.ErrorE("Failed to create stdout pipe", err)
 		_ = handler.SendError(ctx, fmt.Sprintf("stdout pipe failed: %v", err))
-		return
-	}
-
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		log.ErrorE("Failed to create stderr pipe", err)
-		_ = handler.SendError(ctx, fmt.Sprintf("stderr pipe failed: %v", err))
 		return
 	}
 
@@ -238,53 +195,35 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 		return
 	}
 
-	var wg sync.WaitGroup
+	scanner := bufio.NewScanner(stdoutPipe)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		line = append(line, '\n')
 
-	wg.Go(func() {
-		streamPipe(ctx, stdoutPipe, handler.SendStdout, log)
-	})
+		if sendErr := handler.SendStdout(ctx, line); sendErr != nil {
+			log.ErrorE("Failed to stream output", sendErr)
+			return
+		}
+	}
 
-	wg.Go(func() {
-		streamPipe(ctx, stderrPipe, handler.SendStderr, log)
-	})
-
-	wg.Wait()
+	if err := scanner.Err(); err != nil {
+		log.ErrorE("Error reading from pipe", err)
+	}
 
 	exitCode := int32(0)
 	if err := cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = int32(exitErr.ExitCode())
+			log.Warning("Command failed (code %d): %s", exitCode, command)
 		} else {
-			log.ErrorE("Command wait failed", err)
+			log.ErrorE(fmt.Sprintf("Command failed: %s", command), err)
 			_ = handler.SendError(ctx, fmt.Sprintf("command execution failed: %v", err))
 			_ = handler.SendExit(ctx, 1)
 			return
 		}
+	} else {
+		log.Success("Command completed successfully: %s", command)
 	}
 
-	log.Info("Command completed with exit code %d", exitCode)
-	if err := handler.SendExit(ctx, exitCode); err != nil {
-		log.ErrorE("Failed to send exit code", err)
-	}
-}
-
-func streamPipe(ctx context.Context, pipe io.ReadCloser, sendFunc func(context.Context, []byte) error, log *oasm.LoggerType) {
-	buf := make([]byte, 32*1024)
-	for {
-		n, err := pipe.Read(buf)
-		if n > 0 {
-			data := make([]byte, n)
-			copy(data, buf[:n])
-			if sendErr := sendFunc(ctx, data); sendErr != nil {
-				log.ErrorE("Failed to stream output", sendErr)
-				return
-			}
-		}
-		if err != nil {
-			if err != io.EOF {
-				log.ErrorE("Pipe read error", err)
-			}
-			return
-		}
-	}
+	_ = handler.SendExit(ctx, exitCode)
 }

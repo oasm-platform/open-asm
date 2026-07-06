@@ -131,34 +131,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       const timer = setTimeout(() => {
         if (!isResolved) {
           isResolved = true;
-          this.subscriber.removeListener('message', onMessage);
           resolve(null);
         }
       }, timeout);
 
-      const onMessage = (receivedChannel: string, message: string): void => {
+      this.subscribe(channel, (receivedChannel: string, message: string) => {
         if (receivedChannel === channel && !isResolved) {
           isResolved = true;
           clearTimeout(timer);
-          this.subscriber.removeListener('message', onMessage);
           resolve(message);
         }
-      };
-
-      // Subscribe to channel first
-      this.subscriber.subscribe(channel).catch((error: unknown) => {
+      }).catch((error: unknown) => {
         if (!isResolved) {
           isResolved = true;
           clearTimeout(timer);
-          // Using process.env.NODE_ENV check to allow console.error in non-production environments
           if (process.env.NODE_ENV !== 'production') {
             console.error(`Failed to subscribe to channel ${channel}:`, error);
           }
           resolve(null);
         }
       });
-
-      this.subscriber.on('message', onMessage);
     });
   }
 
@@ -225,14 +217,27 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     callback: MessageCallback,
   ): Promise<void> {
     try {
-      await this.subscriber.subscribe(channel);
-
+      // Register the listener BEFORE subscribe to prevent race condition:
+      // messages published between subscribe ack and listener registration
+      // would otherwise be lost.
       if (!this.channelCallbacks.has(channel)) {
         this.channelCallbacks.set(channel, new Set());
       }
       this.channelCallbacks.get(channel)!.add(callback);
       this.subscriber.on('message', callback);
+
+      await this.subscriber.subscribe(channel);
     } catch (error) {
+      // Rollback: remove the listener we just registered
+      this.subscriber.removeListener('message', callback);
+      const callbacks = this.channelCallbacks.get(channel);
+      if (callbacks) {
+        callbacks.delete(callback);
+        if (callbacks.size === 0) {
+          this.channelCallbacks.delete(channel);
+        }
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       throw new Error(

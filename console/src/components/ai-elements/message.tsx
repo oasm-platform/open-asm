@@ -41,17 +41,17 @@ export const Message = ({
     className={cn(
       'group flex flex-col gap-1.5',
       from === 'user'
-        ? 'is-user ml-auto items-end w-fit'
-        : 'is-assistant items-start w-full',
+          ? 'is-user ml-auto items-end w-fit max-w-full'
+          : 'is-assistant items-start w-full',
       className,
     )}
     {...props}
   >
     <div
       className={cn(
-        'px-3.5 py-1.5 text-sm',
+        'px-3.5 py-1.5 text-sm min-w-0 max-w-full',
         from === 'user'
-          ? 'bg-secondary text-foreground rounded-2xl'
+          ? 'bg-secondary text-foreground rounded-2xl break-words'
           : 'text-foreground w-full rounded-2xl',
       )}
     >
@@ -96,7 +96,7 @@ export const MessageContent = ({
       <div
         ref={contentRef}
         className={cn(
-          'flex min-w-0 w-full flex-col gap-2 overflow-x-auto text-sm break-words',
+          'flex min-w-0 w-full flex-col gap-2 overflow-hidden text-sm break-words',
           !isExpanded && needsExpansion
             ? 'max-h-[500px] overflow-hidden'
             : 'max-h-none',

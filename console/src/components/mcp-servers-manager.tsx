@@ -2,6 +2,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type {
   MCPServerConfigDto,
@@ -23,92 +25,42 @@ import {
   Plus,
   RefreshCw,
   Server,
-  Terminal,
   Trash2,
-  Wifi,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
 
 const MCP_QUERY_KEY = '/api/agents/mcp-configs';
 
-type TransportType = 'sse' | 'stdio';
 type MCPServerStatus = 'checking' | 'online' | 'offline' | 'unknown';
 
-const serverSchema = z
-  .object({
-    name: z
-      .string()
-      .min(1, 'Server name is required')
-      .regex(
-        /^[a-z0-9-_]+$/i,
-        'Only letters, numbers, hyphens and underscores',
-      ),
-    transport: z.enum(['sse', 'stdio']),
-    url: z.string().optional(),
-    command: z.string().optional(),
-    args: z.string().optional(),
-    apiKey: z.string().optional(),
-    timeout: z.coerce.number().min(1),
-  })
-  .superRefine((data, ctx) => {
-    if (data.transport === 'sse' && !data.url) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['url'],
-        message: 'URL is required for SSE transport',
-      });
-    }
-    if (data.transport === 'stdio' && !data.command) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['command'],
-        message: 'Command is required for stdio transport',
-      });
-    }
-  });
+const serverSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Server name is required')
+    .regex(
+      /^[a-z0-9-_]+$/i,
+      'Only letters, numbers, hyphens and underscores',
+    ),
+  url: z.string().url('URL is required'),
+  transport: z.enum(['sse', 'streamable-http']).default('sse'),
+  headers: z
+    .array(
+      z.object({
+        key: z.string().min(1),
+        value: z.string().min(1),
+      }),
+    )
+    .optional(),
+  timeout: z.coerce.number().min(1),
+  sseReadTimeout: z.coerce.number().min(1).default(300),
+});
 
 type ServerFormData = z.input<typeof serverSchema>;
-
-function parseArgs(input: string): string[] {
-  const args: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  let quoteChar = '';
-
-  for (let i = 0; i < input.length; i++) {
-    const char = input[i];
-    if ((char === '"' || char === "'") && (i === 0 || input[i - 1] !== '\\')) {
-      if (inQuotes) {
-        if (char === quoteChar) {
-          inQuotes = false;
-          quoteChar = '';
-        } else {
-          current += char;
-        }
-      } else {
-        inQuotes = true;
-        quoteChar = char;
-      }
-    } else if (char === ' ' && !inQuotes) {
-      if (current) {
-        args.push(current);
-        current = '';
-      }
-    } else {
-      current += char;
-    }
-  }
-  if (current) args.push(current);
-  return args;
-}
-
-function detectTransport(server: MCPServerResponseDto): TransportType {
-  return server.url ? 'sse' : 'stdio';
-}
 
 function StatusDot({ status }: { status: MCPServerStatus }) {
   if (status === 'checking') {
@@ -135,7 +87,7 @@ function StatusDot({ status }: { status: MCPServerStatus }) {
     unknown: {
       bg: 'bg-slate-500/50',
       shadow: '',
-      label: 'Status unknown (stdio)',
+      label: 'Unknown',
     },
   };
 
@@ -169,20 +121,29 @@ function AddServerForm({
   onCancel: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [transport, setTransport] = useState<TransportType>('sse');
 
   const {
     register,
     handleSubmit,
+    control,
     watch,
-    setValue,
     formState: { errors },
   } = useForm<ServerFormData>({
     resolver: zodResolver(serverSchema),
-    defaultValues: { transport: 'sse', timeout: 60 },
+    defaultValues: {
+      transport: 'sse',
+      timeout: 60,
+      sseReadTimeout: 300,
+      headers: [],
+    },
   });
 
-  const currentTransport = watch('transport');
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'headers',
+  });
+
+  const transportValue = watch('transport');
 
   const upsert = useAgentsControllerUpsertMCPServer({
     mutation: {
@@ -197,23 +158,28 @@ function AddServerForm({
 
   const onSubmit = (data: ServerFormData) => {
     const config: MCPServerConfigDto = {
+      url: data.url,
+      transport: data.transport,
       timeout: data.timeout,
+      sse_read_timeout: data.sseReadTimeout,
       disabled: false,
     };
-    if (data.transport === 'sse') {
-      config.url = data.url;
-      if (data.apiKey?.trim())
-        config.headers = { 'api-key': data.apiKey.trim() };
-    } else {
-      config.command = data.command;
-      config.args = data.args ? parseArgs(data.args) : [];
-    }
-    upsert.mutate({ name: data.name, data: config });
-  };
 
-  const handleTransportChange = (t: TransportType) => {
-    setTransport(t);
-    setValue('transport', t);
+    const headers: Record<string, string> = {};
+
+    if (data.headers && data.headers.length > 0) {
+      for (const h of data.headers) {
+        if (h.key.trim() && h.value.trim()) {
+          headers[h.key.trim()] = h.value.trim();
+        }
+      }
+    }
+
+    if (Object.keys(headers).length > 0) {
+      config.headers = headers;
+    }
+
+    upsert.mutate({ name: data.name, data: config });
   };
 
   return (
@@ -228,104 +194,130 @@ function AddServerForm({
         </span>
       </div>
 
-      <div className="flex p-1 bg-muted/50 rounded-lg w-fit border border-border/50">
-        {(['sse', 'stdio'] as TransportType[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => handleTransportChange(t)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-semibold transition-all duration-200',
-              currentTransport === t
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
-            )}
-          >
-            {t === 'sse' ? (
-              <Wifi className={cn('size-3.5', currentTransport === t && 'text-blue-500')} />
-            ) : (
-              <Terminal className={cn('size-3.5', currentTransport === t && 'text-amber-500')} />
-            )}
-            {t === 'sse' ? 'SSE / HTTP' : 'stdio'}
-          </button>
-        ))}
-      </div>
-
-      <input type="hidden" {...register('transport')} value={transport} />
-
       <div className="grid gap-3">
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Server Name</label>
           <Input
             {...register('name')}
-            placeholder="e.g. filesystem-server"
+            placeholder="e.g. my-mcp-server"
             error={errors.name?.message}
             className="bg-background/50 h-10"
           />
         </div>
 
-        {currentTransport === 'sse' && (
-          <>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Endpoint URL</label>
-              <Input
-                {...register('url')}
-                type="url"
-                placeholder="https://mcp.example.com/sse"
-                error={errors.url?.message}
-                className="bg-background/50 h-10 font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">API Key (Optional)</label>
-              <Input
-                {...register('apiKey')}
-                type="password"
-                placeholder="••••••••••••••••"
-                autoComplete="new-password"
-                className="bg-background/50 h-10"
-              />
-            </div>
-          </>
-        )}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Endpoint URL</label>
+          <Input
+            {...register('url')}
+            type="url"
+            placeholder="https://mcp.example.com/sse"
+            error={errors.url?.message}
+            className="bg-background/50 h-10 font-mono text-xs"
+          />
+        </div>
 
-        {currentTransport === 'stdio' && (
-          <>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Command</label>
-              <Input
-                {...register('command')}
-                placeholder="npx"
-                error={errors.command?.message}
-                className="bg-background/50 h-10 font-mono text-xs"
-              />
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Transport Type</label>
+          <RadioGroup
+            value={transportValue}
+            onValueChange={(val) => {
+              const event = { target: { name: 'transport', value: val } };
+              register('transport').onChange(event);
+            }}
+            className="flex gap-4"
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="sse" id="transport-sse" />
+              <Label htmlFor="transport-sse" className="text-sm font-medium cursor-pointer">
+                Server-Sent Events
+              </Label>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Arguments</label>
-              <Input
-                {...register('args')}
-                placeholder="-y @modelcontextprotocol/server-filesystem /path"
-                className="bg-background/50 h-10 font-mono text-xs"
-              />
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="streamable-http" id="transport-streamable" />
+              <Label htmlFor="transport-streamable" className="text-sm font-medium cursor-pointer">
+                Streamable HTTP
+              </Label>
             </div>
-          </>
-        )}
+          </RadioGroup>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Custom Headers</label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => append({ key: '', value: '' })}
+              className="h-6 text-xs"
+            >
+              <Plus className="size-3 mr-1" />
+              Add
+            </Button>
+          </div>
+          {fields.length > 0 && (
+            <div className="space-y-2">
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-2">
+                  <Input
+                    {...register(`headers.${index}.key`)}
+                    placeholder="Key"
+                    className="h-8 text-xs font-mono bg-background/50"
+                  />
+                  <Input
+                    {...register(`headers.${index}.value`)}
+                    placeholder="Value"
+                    className="h-8 text-xs font-mono bg-background/50"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => remove(index)}
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="size-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between pt-2 border-t border-border/50">
-        <div className="flex items-center gap-3">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
-            Timeout
-          </label>
+        <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Input
-              {...register('timeout')}
-              type="number"
-              min={1}
-              className="w-20 h-8 text-xs bg-background/50"
-            />
-            <span className="text-[10px] text-muted-foreground">seconds</span>
+            <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+              Timeout
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                {...register('timeout')}
+                type="number"
+                min={1}
+                className="w-20 h-8 text-xs bg-background/50"
+              />
+              <span className="text-[10px] text-muted-foreground">seconds</span>
+            </div>
           </div>
+
+          {transportValue === 'sse' && (
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+                SSE Read Timeout
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  {...register('sseReadTimeout')}
+                  type="number"
+                  min={1}
+                  className="w-20 h-8 text-xs bg-background/50"
+                />
+                <span className="text-[10px] text-muted-foreground">seconds</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2">
@@ -359,7 +351,6 @@ function ServerRow({
 }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
-  const transport = detectTransport(server);
 
   const toggle = useAgentsControllerToggleMCPServer({
     mutation: {
@@ -415,9 +406,7 @@ function ServerRow({
             )}
           </div>
           <p className="text-xs font-mono text-muted-foreground/60 truncate selection:bg-primary/10">
-            {transport === 'sse'
-              ? server.url
-              : `${server.command ?? ''} ${(server.args ?? []).join(' ')}`}
+            {server.url}
           </p>
         </div>
 
@@ -475,23 +464,18 @@ function ServerRow({
       </div>
 
       {expanded && (
-        <div className={cn(
-          "border-t px-4 py-3 space-y-2 text-[11px] animate-in fade-in slide-in-from-top-1 duration-200",
-          transport === 'sse' ? "bg-blue-500/[0.04] dark:bg-blue-500/[0.02]" : "bg-amber-500/[0.04] dark:bg-amber-500/[0.02]"
-        )}>
+        <div className="border-t px-4 py-3 space-y-2 text-[11px] animate-in fade-in slide-in-from-top-1 duration-200 bg-blue-500/[0.04] dark:bg-blue-500/[0.02]">
           {server.url && (
             <div className="flex gap-4">
               <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">URL</span>
               <span className="truncate font-mono text-muted-foreground/90 selection:bg-primary/20">{server.url}</span>
             </div>
           )}
-          {server.command && (
+          {server.transport && (
             <div className="flex gap-4">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
-                Command
-              </span>
-              <span className="font-mono text-muted-foreground/90 selection:bg-primary/20">
-                {server.command} {(server.args ?? []).join(' ')}
+              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Transport</span>
+              <span className="font-mono text-muted-foreground/90 uppercase tracking-wider text-[10px]">
+                {server.transport === 'streamable-http' ? 'Streamable HTTP' : 'SSE'}
               </span>
             </div>
           )}
@@ -522,6 +506,12 @@ function ServerRow({
             <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Timeout</span>
             <span className="text-muted-foreground/90 font-semibold">{server.timeout ?? 60}s</span>
           </div>
+          {server.transport === 'sse' && (
+            <div className="flex gap-4">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">SSE Read Timeout</span>
+              <span className="text-muted-foreground/90 font-semibold">{server.sse_read_timeout ?? 300}s</span>
+            </div>
+          )}
           <div className="flex gap-4">
             <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Status</span>
             <span
@@ -597,14 +587,12 @@ export function MCPServersManager() {
   // Keep ref up-to-date with the latest callback
   pingServerRef.current = pingServer;
 
-  // Auto-ping all enabled SSE servers when server list changes
+  // Auto-ping all enabled servers when server list changes
   useEffect(() => {
     if (!servers.length) return;
     for (const server of servers) {
       if (!server.disabled && server.url) {
         void pingServerRef.current(server.name);
-      } else if (!server.url) {
-        setStatuses((prev) => ({ ...prev, [server.name]: 'unknown' }));
       }
     }
     // pingServerRef is a ref — always current, safe to omit

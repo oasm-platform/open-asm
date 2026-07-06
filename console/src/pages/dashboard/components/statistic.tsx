@@ -14,7 +14,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 
 export default function Statistic() {
@@ -56,7 +56,6 @@ export default function Statistic() {
     value: number;
     path: string;
     trend: ReturnType<typeof calculateTrend>;
-    color: string;
     field: keyof TimelineStatistic;
   }> = [
     {
@@ -66,7 +65,6 @@ export default function Statistic() {
       value: statistics?.targets || 0,
       path: '/targets',
       trend: calculateTrend('targets'),
-      color: 'var(--chart-5)',
     },
     {
       title: 'Assets',
@@ -75,7 +73,6 @@ export default function Statistic() {
       value: statistics?.assets || 0,
       path: '/assets',
       trend: calculateTrend('assets'),
-      color: 'var(--chart-4)',
     },
     {
       title: 'Services',
@@ -84,7 +81,6 @@ export default function Statistic() {
       value: statistics?.services || 0,
       path: '/assets',
       trend: calculateTrend('services'),
-      color: 'var(--chart-1)',
     },
     {
       title: 'Technologies',
@@ -93,22 +89,19 @@ export default function Statistic() {
       value: statistics?.techs || 0,
       path: '/assets?tab=technology',
       trend: calculateTrend('techs'),
-      color: 'var(--chart-2)',
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 h-full">
       {statsCards.map((card, index) => (
         <Card
           key={index}
           className="cursor-pointer transition-colors hover:bg-accent/70 overflow-hidden relative group flex flex-col pb-0"
-          onClick={() => card.path && navigate(card.path)}
+          onClick={() => card.path && navigate({ to: card.path })}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {card.title}
-            </CardTitle>
+            <CardTitle>{card.title}</CardTitle>
             {card.icon}
           </CardHeader>
 
@@ -121,10 +114,10 @@ export default function Statistic() {
                 <div
                   className={`flex items-center text-sm ${
                     card.trend.isIncreasing
-                      ? 'text-green-500'
+                      ? 'text-success'
                       : card.trend.isDecreasing
-                        ? 'text-red-500'
-                        : 'text-gray-500'
+                        ? 'text-destructive'
+                        : 'text-muted-foreground'
                   }`}
                 >
                   {card.trend.isIncreasing ? (
@@ -139,40 +132,53 @@ export default function Statistic() {
               )}
             </div>
 
-            <div className="h-[60px] w-full mt-4 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient
-                      id={`fill-${card.field}`}
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor={card.color}
-                        stopOpacity={0.3}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor={card.color}
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <Area
-                    type="monotone"
-                    dataKey={card.field}
-                    stroke={card.color}
-                    fill={`url(#fill-${card.field})`}
-                    strokeWidth={2}
-                    isAnimationActive={true}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {chartData.length >= 2 && (
+              <div className="h-[60px] w-full mt-4">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  initialDimension={{ width: 320, height: 60 }}
+                  minHeight={60}
+                >
+                  <AreaChart
+                    data={chartData}
+                    margin={{ top: 10, right: 0, left: 0, bottom: 5 }}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id={`gradient-${index}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor="var(--chart-1)"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor="var(--chart-1)"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <Area
+                      type="basis"
+                      dataKey={card.field}
+                      stroke="var(--chart-1)"
+                      fill={`url(#gradient-${index})`}
+                      strokeWidth={2}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      isAnimationActive={true}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}

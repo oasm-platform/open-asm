@@ -6,6 +6,7 @@ import {
 import {
   BullMQName,
   CATEGORY_DATA_SOURCE_MAP,
+  EventTriggerType,
   JobPriority,
   JobRunType,
   JobStatus,
@@ -24,6 +25,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
@@ -64,6 +66,7 @@ export class JobsRegistryService {
     private storageService: StorageService,
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
+    private eventEmitter: EventEmitter2,
   ) {}
   public async getManyJobs(
     query: GetManyJobsRequestDto,
@@ -94,10 +97,7 @@ export class JobsRegistryService {
     }
 
     if (workspaceId) {
-      qb.innerJoin('target.workspaceTargets', 'workspaceTarget').andWhere(
-        'workspaceTarget.workspaceId = :workspaceId',
-        { workspaceId },
-      );
+      qb.andWhere('target.workspaceId = :workspaceId', { workspaceId });
     }
 
     qb.take(query.limit)
@@ -162,6 +162,19 @@ export class JobsRegistryService {
         jobHistoryName: jobName,
       });
       await this.jobHistoryRepo.save(jobHistory);
+      this.eventEmitter.emit(EventTriggerType.WORKFLOW_START, {
+        tool,
+        targetIds,
+        workspaceId,
+        assetIds,
+        workflow,
+        jobHistory,
+        priority,
+        isSaveRawResult,
+        jobName,
+        isPublishEvent,
+        jobRunType,
+      });
     }
 
     const jobRepo = this.dataSource.getRepository(Job);
@@ -286,9 +299,7 @@ export class JobsRegistryService {
     if (workspaceId) {
       assetsQueryBuilder
         .innerJoin('assets.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
-        .andWhere('workspace.id = :workspaceId', { workspaceId });
+        .andWhere('target.workspaceId = :workspaceId', { workspaceId });
     }
 
     return await assetsQueryBuilder.getMany();
@@ -330,9 +341,7 @@ export class JobsRegistryService {
     if (workspaceId) {
       assetServicesQueryBuilder
         .innerJoin('asset.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
-        .andWhere('workspace.id = :workspaceId', { workspaceId });
+        .andWhere('target.workspaceId = :workspaceId', { workspaceId });
     }
 
     return await assetServicesQueryBuilder.getMany();
@@ -364,34 +373,40 @@ export class JobsRegistryService {
   public async getNextJob(
     workerId: string,
   ): Promise<GetNextJobResponseDto | null> {
+    // [OPT-2] Fetch worker OUTSIDE transaction to reduce lock hold time
+    const worker = await this.dataSource.getRepository(WorkerInstance).findOne({
+      where: { id: workerId },
+      relations: ['workspace', 'tool'],
+      cache: {
+        id: `workers:${workerId}`,
+        milliseconds: 1000 * 30,
+      },
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker not found');
+    }
+
+    const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const worker = await queryRunner.manager
-        .getRepository(WorkerInstance)
-        .findOne({
-          where: {
-            id: workerId,
-          },
-          relations: ['workspace', 'tool'],
-        });
-
-      if (!worker) {
-        throw new NotFoundException('Worker not found');
-      }
-
-      const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
       const queryBuilder = queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
         .innerJoin('asset.target', 'target')
-        .leftJoin('target.workspaceTargets', 'workspace_targets')
-        .leftJoin('workspace_targets.workspace', 'workspaces')
         .leftJoin('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
+        // [OPT-1] Use addOrderBy for compound sort (priority first, then createdAt)
         .orderBy('jobs.priority', 'DESC')
-        .orderBy('jobs.createdAt', 'ASC');
+        .addOrderBy('jobs.createdAt', 'ASC');
+
+      // [OPT-3] Only join workspace when actually needed
+      if (isBuiltInTools && worker.scope !== WorkerScope.CLOUD) {
+        queryBuilder
+          .leftJoin('target.workspace', 'workspaces');
+      }
 
       if (isBuiltInTools) {
         const builtInToolsName = builtInTools.map((tool) => tool.name);
@@ -414,25 +429,21 @@ export class JobsRegistryService {
         });
       }
 
-      // Determine data source from category mapping and configure query accordingly
       const toolDataSource = worker.tool?.category
         ? CATEGORY_DATA_SOURCE_MAP[worker.tool.category]
         : ToolDataSource.ASSET;
 
       if (toolDataSource === ToolDataSource.ASSET_SERVICE) {
-        // For tools operating on asset services (e.g., HTTP_PROBE, SCREENSHOT)
-        // Join assetService and filter by category
         queryBuilder
           .leftJoinAndSelect('jobs.assetService', 'assetService')
           .andWhere('jobs.category = :category', {
             category: worker.tool?.category,
           });
       } else {
-        // For tools operating on assets (e.g., SUBDOMAINS, PORTS_SCANNER, VULNERABILITIES)
-        // Join assetService without category filter
         queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
       }
 
+      // [OPT-4] SKIP LOCKED avoids workers blocking each other on the same row
       const job = await queryBuilder
         .setLock('pessimistic_write', undefined, ['jobs'])
         .limit(1)
@@ -443,20 +454,21 @@ export class JobsRegistryService {
         return null;
       }
 
-      job.workerId = workerId;
-      job.status = JobStatus.IN_PROGRESS;
-      job.pickJobAt = new Date();
-      await queryRunner.manager.save(job);
-
-      if (isBuiltInTools) {
-        if (!job.command) {
-          await queryRunner.rollbackTransaction();
-          return null;
-        }
+      if (isBuiltInTools && !job.command) {
+        await queryRunner.rollbackTransaction();
+        return null;
       }
+
+      // [OPT-5] Use update() instead of save() — direct SQL, no extra SELECT
+      await queryRunner.manager.update(Job, job.id, {
+        workerId,
+        status: JobStatus.IN_PROGRESS,
+        pickJobAt: new Date(),
+      });
+
       await queryRunner.commitTransaction();
 
-      const response: GetNextJobResponseDto = {
+      return {
         id: job.id,
         category: job.category,
         createdAt: job.createdAt,
@@ -465,8 +477,6 @@ export class JobsRegistryService {
         command: job.command,
         asset: job.asset,
       };
-
-      return response;
     } catch (error) {
       Logger.error(
         'Error in getNextJob',
@@ -597,11 +607,20 @@ export class JobsRegistryService {
       error: error.message,
       retryCount: job.retryCount + 1,
     });
-    await this.jobErrorLogRepo.save({
-      job,
-      logMessage: error.message,
-      payload: JSON.stringify(dto.data),
+
+    // Deduplicate error logs - only create new log if message differs from last error
+    const lastErrorLog = await this.jobErrorLogRepo.findOne({
+      where: { jobId: job.id },
+      order: { createdAt: 'DESC' },
     });
+
+    if (!lastErrorLog || lastErrorLog.logMessage !== error.message) {
+      await this.jobErrorLogRepo.save({
+        job,
+        logMessage: error.message,
+        payload: JSON.stringify(dto.data),
+      });
+    }
   }
 
   /**
@@ -637,8 +656,7 @@ export class JobsRegistryService {
         join assets on jobs."assetId" = assets.id
         join tools on jobs."toolId" = tools.id
         join targets on assets."targetId" = targets.id
-        join "workspace_targets" on targets."id" = "workspace_targets"."targetId"
-        where "workspace_targets"."workspaceId" = $1
+        where targets."workspaceId" = $1
         order by jobs."createdAt" desc
       ),
       grouped_with_id as (
@@ -744,8 +762,6 @@ export class JobsRegistryService {
    * @param jobHistoryId the ID of the job history to mark as completed
    */
   public async markWorkflowDone(jobHistoryId: string): Promise<void> {
-    const logger = new Logger('JobHistoryCompletion');
-
     const pendingExists = await this.repo.exists({
       where: {
         jobHistory: { id: jobHistoryId },
@@ -768,16 +784,21 @@ export class JobsRegistryService {
     );
 
     if (updateResult.affected && updateResult.affected > 0) {
-      const jobHistory = await this.jobHistoryRepo.findOne({
-        where: { id: jobHistoryId },
-        relations: { workflow: true },
+      const lastJob = await this.repo.findOne({
+        where: { jobHistory: { id: jobHistoryId } },
+        order: { createdAt: 'DESC' },
+        relations: {
+          asset: {
+            target: true,
+          },
+          jobHistory: {
+            workflow: true,
+          },
+        },
       });
 
-      if (jobHistory) {
-        logger.log(
-          `🎉 JobHistory ${jobHistoryId} completed! ` +
-            `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
-        );
+      if (lastJob) {
+        this.eventEmitter.emit(EventTriggerType.WORKFLOW_END, lastJob);
       }
     }
   }
@@ -839,8 +860,7 @@ export class JobsRegistryService {
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('jTarget.workspace', 'workspace')
       .leftJoin('jobHistory.workflow', 'workflow')
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([
@@ -877,8 +897,7 @@ export class JobsRegistryService {
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('jTarget.workspace', 'workspace')
       .where('workspace.id = :workspaceId', { workspaceId })
       .getCount();
 
@@ -909,11 +928,6 @@ export class JobsRegistryService {
         workflow: true,
         jobs: {
           tool: true,
-          asset: {
-            target: true,
-          },
-          assetService: true,
-          errorLogs: true,
         },
       },
     });
@@ -928,8 +942,7 @@ export class JobsRegistryService {
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('jTarget.workspace', 'workspace')
       .where('jobHistory.id = :id', { id })
       .andWhere('workspace.id = :workspaceId', { workspaceId })
       .getExists();
@@ -955,7 +968,6 @@ export class JobsRegistryService {
       id: historyId,
       createdAt,
       updatedAt,
-      jobs,
       workflow,
       jobHistoryName,
     } = jobHistory;
@@ -967,7 +979,6 @@ export class JobsRegistryService {
       createdAt,
       updatedAt,
       tools,
-      jobs: jobs || [],
     };
   }
 
@@ -987,8 +998,7 @@ export class JobsRegistryService {
         .createQueryBuilder('job')
         .innerJoin('job.asset', 'asset')
         .innerJoin('asset.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
+        .innerJoin('target.workspace', 'workspace')
         .where('job.id = :jobId', { jobId })
         .andWhere('workspace.id = :workspaceId', { workspaceId })
         .getOne();

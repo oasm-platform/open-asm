@@ -1,7 +1,7 @@
 import Logo from '@/components/ui/logo';
 import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
 import { useEffect, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from '@tanstack/react-router';
 import type { JSX } from 'react/jsx-runtime';
 
 interface SplashProps {
@@ -59,9 +59,9 @@ export default function Splash({ children }: SplashProps) {
 
   if (showError) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen">
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
         <Logo width={64} height={64} />
-        <div className="mt-4 text-red-500 text-center">
+        <div className="text-destructive text-center text-sm">
           Loading failed after 5 attempts. Please refresh the page.
         </div>
       </div>

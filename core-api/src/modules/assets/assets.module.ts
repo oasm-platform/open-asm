@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyModule } from '../technology/technology.module';
@@ -21,6 +22,7 @@ import { TlsAssetsView } from './entities/tls-assets.entity';
       HttpResponse,
       AssetService,
       TlsAssetsView,
+      AgentLLMConfig,
     ]),
     TechnologyModule,
     WorkspacesModule,

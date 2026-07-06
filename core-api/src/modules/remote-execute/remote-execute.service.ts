@@ -31,26 +31,6 @@ enum ResultEventType {
   ERROR = 4,
 }
 
-/**
- * gRPC may serialize enum as string name (REMOTE_EXECUTE_RESULT_STDOUT)
- * or numeric value (1). Normalize to our numeric enum.
- */
-function normalizeEventType(raw: string | number): ResultEventType {
-  if (typeof raw === 'number') return raw as ResultEventType;
-
-  const map: Record<string, ResultEventType> = {
-    REMOTE_EXECUTE_RESULT_STDOUT: ResultEventType.STDOUT,
-    REMOTE_EXECUTE_RESULT_STDERR: ResultEventType.STDERR,
-    REMOTE_EXECUTE_RESULT_EXIT: ResultEventType.EXIT,
-    REMOTE_EXECUTE_RESULT_ERROR: ResultEventType.ERROR,
-    '1': ResultEventType.STDOUT,
-    '2': ResultEventType.STDERR,
-    '3': ResultEventType.EXIT,
-    '4': ResultEventType.ERROR,
-  };
-
-  return map[raw] ?? ResultEventType.ERROR;
-}
 
 interface ResultEvent {
   id: string;
@@ -68,6 +48,26 @@ export class RemoteExecuteService {
     private readonly redisService: RedisService,
     private readonly remoteExecuteSubscribeService: RemoteExecuteSubscribeService,
   ) {}
+
+  private static normalizeEventType(raw: string | number): ResultEventType | null {
+    if (typeof raw === 'number') {
+      if (raw >= 1 && raw <= 4) return raw;
+      return null;
+    }
+
+    const map: Record<string, ResultEventType> = {
+      REMOTE_EXECUTE_RESULT_STDOUT: ResultEventType.STDOUT,
+      REMOTE_EXECUTE_RESULT_STDERR: ResultEventType.STDERR,
+      REMOTE_EXECUTE_RESULT_EXIT: ResultEventType.EXIT,
+      REMOTE_EXECUTE_RESULT_ERROR: ResultEventType.ERROR,
+      '1': ResultEventType.STDOUT,
+      '2': ResultEventType.STDERR,
+      '3': ResultEventType.EXIT,
+      '4': ResultEventType.ERROR,
+    };
+
+    return map[raw] ?? null;
+  }
 
   runCommand(
     command: string,
@@ -99,14 +99,29 @@ export class RemoteExecuteService {
   ): Observable<MessageEvent> {
     const channel = `remote-execute:results:${sessionId}`;
     return new Observable<MessageEvent>((observer) => {
-      const handler = (_channel: string, message: string) => {
+      let unsubscribed = false;
+
+      const handler = (ch: string, message: string) => {
+        if (ch !== channel) return;
         observer.next({ data: message });
       };
 
-      void this.redisService.subscribe(channel, handler);
+      this.redisService.subscribe(channel, handler).then(() => {
+        if (unsubscribed) {
+          this.redisService.unsubscribe(channel).catch((err) => {
+            this.logger.warn(`Failed to unsubscribe ${channel}: ${err}`);
+          });
+        }
+      }).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        observer.error(new Error(`Redis subscribe failed: ${message}`));
+      });
 
       return () => {
-        void this.redisService.unsubscribe(channel);
+        unsubscribed = true;
+        this.redisService.unsubscribe(channel).catch((err) => {
+          this.logger.warn(`Failed to unsubscribe ${channel}: ${err}`);
+        });
       };
     });
   }
@@ -121,19 +136,23 @@ export class RemoteExecuteService {
   async waitForResult(
     command: string,
     sessionId: string,
+    conversationId: string,
     timeoutMs = 60_000,
+    onEvent?: (event: { type: ResultEventType; data: string; exitCode: number }) => void,
   ): Promise<RemoteCommandResult> {
     const channel = `remote-execute:results:${sessionId}`;
 
     const events: ResultEvent[] = [];
     let resolved = false;
+    let waitResolve: (() => void) | null = null;
 
-    this.logger.log(`[waitForResult] Subscribing to channel: ${channel}`);
+    this.logger.debug(`[waitForResult] Subscribing to channel: ${channel}`);
 
     await this.redisService.subscribe(channel, (ch, raw) => {
+      if (ch !== channel) return;
       if (resolved) return;
 
-      this.logger.log(
+      this.logger.debug(
         `[waitForResult] Received message on ${ch}: ${raw.substring(0, 100)}`,
       );
 
@@ -146,16 +165,30 @@ export class RemoteExecuteService {
           exitCode: number;
         };
 
+        const normalizedType = RemoteExecuteService.normalizeEventType(parsed.type);
+        if (normalizedType === null) {
+          this.logger.warn(
+            `[waitForResult] Unknown event type "${String(parsed.type)}" — skipping`,
+          );
+          return;
+        }
+
         const event: ResultEvent = {
           id: parsed.id,
           sessionId: parsed.sessionId,
-          type: normalizeEventType(parsed.type),
+          type: normalizedType,
           data: parsed.data,
           exitCode: parsed.exitCode,
         };
         events.push(event);
 
-        this.logger.log(
+        try {
+          onEvent?.({ type: event.type, data: event.data, exitCode: event.exitCode });
+        } catch (err) {
+          this.logger.warn(`onEvent callback threw: ${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        this.logger.debug(
           `[waitForResult] Event type: ${event.type}, exitCode: ${event.exitCode}`,
         );
 
@@ -164,9 +197,11 @@ export class RemoteExecuteService {
           event.type === ResultEventType.ERROR
         ) {
           resolved = true;
-          this.logger.log(
+          this.logger.debug(
             `[waitForResult] Command finished, type=${event.type}`,
           );
+
+          this.remoteExecuteSubscribeService.removeSession(sessionId);
 
           this.redisService
             .unsubscribe(channel)
@@ -175,16 +210,21 @@ export class RemoteExecuteService {
                 `Failed to unsubscribe from ${channel}: ${err}`,
               );
             });
+
+          if (waitResolve) {
+            waitResolve();
+          }
         }
       } catch (err) {
         this.logger.warn(`Failed to parse Redis message: ${err}`);
       }
     });
 
-    this.logger.log(`[waitForResult] Subscription confirmed, pushing command`);
+    this.logger.debug(`[waitForResult] Subscription confirmed, pushing command`);
 
     const pushResult =
-      this.remoteExecuteSubscribeService.pushCommandWithSession(
+      await this.remoteExecuteSubscribeService.pushCommandWithConversation(
+        conversationId,
         sessionId,
         command,
       );
@@ -200,24 +240,19 @@ export class RemoteExecuteService {
       );
     }
 
-    this.logger.log(
+    this.logger.debug(
       `[waitForResult] Command pushed, waiting for result (timeout: ${timeoutMs}ms)`,
     );
 
     await new Promise<void>((resolve) => {
-      const checkDone = () => {
-        if (resolved) {
-          resolve();
-          return;
-        }
-        setTimeout(checkDone, 50);
-      };
+      waitResolve = resolve;
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
           this.logger.warn(
             `[waitForResult] Timeout after ${timeoutMs}ms, collected ${events.length} events`,
           );
+          this.remoteExecuteSubscribeService.removeSession(sessionId);
           this.redisService
             .unsubscribe(channel)
             .catch((err) => {
@@ -226,15 +261,23 @@ export class RemoteExecuteService {
         }
         resolve();
       }, timeoutMs);
-      checkDone();
     });
 
     const exitEvent = events.find((e) => e.type === ResultEventType.EXIT);
     const errorEvent = events.find((e) => e.type === ResultEventType.ERROR);
     const isTimedOut = !exitEvent && !errorEvent;
 
-    this.logger.log(
+    this.logger.debug(
       `[waitForResult] Done. timedOut=${isTimedOut}, events=${events.length}, exitCode=${exitEvent?.exitCode}`,
+    );
+
+    const { stdout, stderr } = events.reduce(
+      (acc, e) => {
+        if (e.type === ResultEventType.STDOUT) acc.stdout += e.data;
+        if (e.type === ResultEventType.STDERR) acc.stderr += e.data;
+        return acc;
+      },
+      { stdout: '', stderr: '' },
     );
 
     return {
@@ -242,14 +285,8 @@ export class RemoteExecuteService {
       workerId: pushResult.workerId,
       sessionId,
       command,
-      stdout: events
-        .filter((e) => e.type === ResultEventType.STDOUT)
-        .map((e) => e.data)
-        .join(''),
-      stderr: events
-        .filter((e) => e.type === ResultEventType.STDERR)
-        .map((e) => e.data)
-        .join(''),
+      stdout,
+      stderr,
       exitCode: exitEvent?.exitCode ?? null,
       error: errorEvent?.data ?? null,
       timedOut: isTimedOut,

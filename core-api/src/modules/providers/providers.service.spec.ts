@@ -16,7 +16,7 @@ describe('ProvidersService', () => {
       save: jest.fn(),
       findOne: jest.fn(),
       softDelete: jest.fn(),
-    } as any;
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

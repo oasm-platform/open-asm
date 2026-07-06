@@ -8,11 +8,13 @@ export const axiosInstance = Axios.create({
   withCredentials: true,
 });
 
+import { getGlobalWorkspaceId } from '@/utils/workspaceState';
+
 axiosInstance.interceptors.request.use((config) => {
-  // const workspaceId = getGlobalWorkspaceId();
-  // if (workspaceId) {
-  //   config.headers.set('X-Workspace-Id', workspaceId);
-  // }
+  const workspaceId = getGlobalWorkspaceId();
+  if (workspaceId) {
+    config.headers.set('X-Workspace-Id', workspaceId);
+  }
 
   const cleanValue = (v: unknown) => v !== null && v !== undefined && v !== '';
 
@@ -63,9 +65,9 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
-      window.location.href = '/login';
-    }
+    // if (error.response?.status === 401) {
+    //   window.location.href = '/login';
+    // }
     return Promise.reject(error);
   },
 );

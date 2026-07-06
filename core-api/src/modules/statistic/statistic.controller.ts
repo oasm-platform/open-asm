@@ -1,6 +1,5 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { GeoIp } from '@/services/geo-ip/geo-ip.service';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
@@ -9,8 +8,10 @@ import {
   StatisticResponseDto,
 } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
+import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
 import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
+import { AssetLocationDto } from './dto/asset-location.dto';
 import { StatisticService } from './statistic.service';
 
 @ApiTags('Statistic')
@@ -90,13 +91,14 @@ export class StatisticController {
   }
 
   @Doc({
-    summary: 'Get assets location',
-    description: 'Retrieves the location of assets in a workspace.',
+    summary: 'Get asset locations',
+    description:
+      'Retrieves the top 10 countries by IP count for a workspace. Batches IP lookups to the geo IP service and aggregates results by country.',
     response: {
-      extraModels: [GeoIp],
+      extraModels: [AssetLocationDto],
       dataSchema: {
         type: 'array',
-        items: { $ref: getSchemaPath(GeoIp) },
+        items: { $ref: getSchemaPath(AssetLocationDto) },
       },
     },
     request: {
@@ -104,8 +106,28 @@ export class StatisticController {
     },
   })
   @Get('asset-locations')
-  getAssetLocations(@WorkspaceId() workspaceId: string) {
+  getAssetLocations(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<AssetLocationDto[]> {
     return this.statisticService.getAssetLocations(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get TLS certificate statistics for a workspace',
+    description:
+      'Retrieves TLS certificate statistics grouped by expiration status using not_after field, and counts newly discovered certificates within the last 30 days.',
+    response: {
+      serialization: TlsStatisticResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('tls')
+  getTlsStatistics(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<TlsStatisticResponseDto> {
+    return this.statisticService.getTlsStatistics(workspaceId);
   }
 
   @Doc({

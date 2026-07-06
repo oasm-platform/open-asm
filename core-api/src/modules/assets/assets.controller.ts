@@ -24,6 +24,10 @@ import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { SwitchAssetDto } from './dto/switch-asset.dto';
 import { GetTlsResponseDto, GetTlsQueryDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import {
+  GenerateServiceTagsDto,
+  GenerateServiceTagsResponseDto,
+} from './dto/generate-service-tags.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
 
 @ApiTags('Assets')
@@ -156,6 +160,29 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetsService.getManyTls(query, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Generate AI tags for a service',
+    description:
+      'Analyzes the service data (HTTP responses, tech stack, TLS, etc.) using AI and generates descriptive tags. Replaces existing tags with AI-generated ones.',
+    response: {
+      serialization: GenerateServiceTagsResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('service/tag/generate')
+  async generateServiceTags(
+    @Body() dto: GenerateServiceTagsDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    const tags = await this.assetsService.generateServiceTags(
+      dto.assetServiceId,
+      workspaceId,
+    );
+    return { tags };
   }
 
   @Doc({

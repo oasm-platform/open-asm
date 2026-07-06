@@ -10,12 +10,12 @@ import {
 } from '@/services/apis/gen/queries';
 import { Group, Verified } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from '@tanstack/react-router';
 import ToolInstallButton from './tool-install-button';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 export default function ToolDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -102,7 +102,7 @@ export default function ToolDetail() {
                   </div>
                   <div className="flex-shrink-0 flex-col md:flex-row flex md:items-center gap-2">
                     <div className="flex gap-2">
-                      <ToolApiKeyDialog tool={tool} />
+                      {!tool.isBuiltIn && <ToolApiKeyDialog tool={tool} />}
                       <ToolInstallButton
                         tool={tool}
                         workspaceId={selectedWorkspaceId || ''}
@@ -112,7 +112,7 @@ export default function ToolDetail() {
                     {(isInstalled || tool.isInstalled) &&
                       tool.type !==
                         ToolsControllerGetManyToolsType.built_in && (
-                        <Link to={`/assets/groups?toolId=${tool.id}`}>
+                        <Link to="/assets" search={{ filter: tool.id }}>
                           <Button>
                             <Group /> Add to group
                           </Button>

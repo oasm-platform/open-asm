@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image (Console)
         uses: docker/build-push-action@v5
@@ -60,6 +60,8 @@ jobs:
           push: false
           load: true
           tags: oasm/oasm-console:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   build-core-api:
     name: Build Docker - Core API
@@ -71,7 +73,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image (Core API)
         uses: docker/build-push-action@v5
@@ -80,6 +82,8 @@ jobs:
           push: false
           load: true
           tags: oasm/oasm-api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   build-worker:
     name: Build Docker - Worker
@@ -91,7 +95,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image (Worker)
         uses: docker/build-push-action@v5
@@ -100,37 +104,5 @@ jobs:
           push: false
           load: true
           tags: oasm/oasm-worker:test
-
-  check-build:
-    name: Check Build - All Services
-    runs-on: ubuntu-latest
-    needs: [build-console, build-core-api, build-worker]
-    if: >-
-      (needs.build-console.result == 'success' || needs.build-console.result == 'skipped') &&
-      (needs.build-core-api.result == 'success' || needs.build-core-api.result == 'skipped') &&
-      (needs.build-worker.result == 'success' || needs.build-worker.result == 'skipped')
-    steps:
-      - name: Check if all builds passed
-        run: |
-          FAILED=0
-
-          if [ "${{ needs.build-console.result }}" == "failure" ]; then
-            echo "Console build failed"
-            FAILED=1
-          fi
-
-          if [ "${{ needs.build-core-api.result }}" == "failure" ]; then
-            echo "Core API build failed"
-            FAILED=1
-          fi
-
-          if [ "${{ needs.build-worker.result }}" == "failure" ]; then
-            echo "Worker build failed"
-            FAILED=1
-          fi
-
-          if [ $FAILED -eq 1 ]; then
-            echo "One or more Docker builds failed"
-            exit 1
-          fi
-          echo "All Docker builds passed successfully"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

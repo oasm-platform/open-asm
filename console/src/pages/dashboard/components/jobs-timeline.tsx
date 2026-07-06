@@ -6,7 +6,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 
 // Define type for timeline item with jobHistoryId
 interface TimelineItemWithJobHistory {
@@ -33,7 +33,7 @@ const JobsTimeline = () => {
     });
 
     // Group by jobHistoryId first, then by target
-    const groupedByJobHistory = data?.data.reduce((acc: Record<string, Record<string, TimelineItemWithJobHistory[]>>, item) => {
+    const groupedByJobHistory = data?.data?.reduce((acc: Record<string, Record<string, TimelineItemWithJobHistory[]>>, item) => {
         const jobHistoryId = item.jobHistoryId || 'unknown';
         if (!acc[jobHistoryId]) {
             acc[jobHistoryId] = {};
@@ -86,7 +86,7 @@ const JobsTimeline = () => {
                                     <div key={`${jobHistoryId}-${target}`} className="mb-2 ml-2">
                                         <div
                                             className="font-medium text-md mb-1 hover:text-primary hover:cursor-pointer"
-                                            onClick={() => navigate(`/targets/${items[0]?.targetId}`)}
+                                            onClick={() => navigate({ to: `/targets/${items[0]?.targetId}` })}
                                         >
                                             {target}
                                         </div>
@@ -125,7 +125,7 @@ const JobsTimeline = () => {
                             </div>
                         ))}
 
-                        {data?.data.length === 0 && !isLoading && (
+                        {data?.data?.length === 0 && !isLoading && (
                             <div className="text-center py-4 text-muted-foreground">
                                 No jobs found
                             </div>

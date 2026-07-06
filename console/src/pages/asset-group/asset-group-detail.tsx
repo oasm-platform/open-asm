@@ -6,14 +6,14 @@ import {
   useAssetGroupControllerGetById,
 } from '@/services/apis/gen/queries';
 import { Trash } from 'lucide-react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import AssetGroupWorkflow from './components/asset-group-workflow';
 import { AssetSection } from './components/asset-section';
 import { EditAssetGroupDialog } from './components/edit-asset-group-dialog';
 
 export default function AssetGroupDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const { data, refetch } = useAssetGroupControllerGetById(id!);
   const { mutate, isPending } = useAssetGroupControllerDelete();
 

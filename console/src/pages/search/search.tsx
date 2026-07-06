@@ -17,24 +17,81 @@ import {
   TargetIcon,
 } from 'lucide-react';
 import * as React from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
+
+interface SearchItem {
+  id: string;
+  value: string;
+}
+
+function SearchResultSection({
+  icon,
+  label,
+  count,
+  items,
+  onItemClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  items: SearchItem[];
+  onItemClick: (id: string) => void;
+}) {
+  return (
+    <div className="rounded-lg shadow-sm border overflow-hidden">
+      <div className="px-6 py-4 border-b">
+        <div className="flex items-center gap-3">
+          {icon}
+          <h2 className="text-lg font-medium">
+            {label} ({count})
+          </h2>
+        </div>
+      </div>
+      <div className="divide-y">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            onClick={() => onItemClick(item.id)}
+            className="px-6 py-4 cursor-pointer transition-colors group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="font-medium group-hover:text-blue-600">
+                  {item.value}
+                </p>
+              </div>
+              <ExternalLink className="size-4 group-hover:text-blue-600" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const routeApi = getRouteApi('/_authed/search');
 
 export default function Search() {
-  const [param] = useSearchParams();
+  const { query: searchQuery } = routeApi.useSearch();
   const [page, setPage] = React.useState(1);
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const navigate = useNavigate();
 
-  const searchQuery = param.get('query') as string;
-
-  const { data, isFetching } = useSearchControllerSearchAssetsTargets({
-    value: searchQuery,
-    workspaceId: selectedWorkspaceId,
-    page: page,
-    isSaveHistory: true,
-  });
+  const { data, isFetching } = useSearchControllerSearchAssetsTargets(
+    {
+      value: searchQuery,
+      workspaceId: selectedWorkspaceId,
+      page: page,
+      isSaveHistory: true,
+    },
+    {
+      query: {
+        enabled: !!selectedWorkspaceId && !!searchQuery,
+      },
+    },
+  );
 
   if (isFetching) {
     return (
@@ -71,72 +128,23 @@ export default function Search() {
       )}
 
       {data && data.data.targets.length > 0 && (
-        <div className="rounded-lg shadow-sm border overflow-hidden">
-          <div className="px-6 py-4 border-b">
-            <div className="flex items-center gap-3">
-              <TargetIcon className="h-5 w-5 text-orange-600" />
-              <h2 className="text-lg font-medium">
-                Targets ({data.data.targets.length})
-              </h2>
-            </div>
-          </div>
-          <div className="divide-y">
-            {data.data.targets.map((target, index) => (
-              <div
-                key={target.id || index}
-                onClick={() => navigate('/targets/' + target.id)}
-                className="px-6 py-4 cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium group-hover:text-blue-600">
-                      {target.value}
-                    </p>
-                  </div>
-                  <ExternalLink className="size-4 group-hover:text-blue-600" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <SearchResultSection
+          icon={<TargetIcon className="h-5 w-5 text-orange-600" />}
+          label="Targets"
+          count={data.data.targets.length}
+          items={data.data.targets}
+          onItemClick={(id) => navigate({ to: '/targets/' + id })}
+        />
       )}
 
       {data && data.data.assets.length > 0 && (
-        <div className="rounded-lg shadow-sm border overflow-hidden">
-          <div className="px-6 py-4 border-b">
-            <div className="flex items-center gap-3">
-              <CloudCheckIcon className="h-5 w-5 text-green-600" />
-              <h2 className="text-lg font-medium">
-                Assets ({data.data.assets.length})
-              </h2>
-            </div>
-          </div>
-          <div className="divide-y">
-            {data.data.assets.map((asset, index) => (
-              <div
-                key={asset.id || index}
-                onClick={() => {
-                  navigate('assets/' + asset.id);
-                }}
-                className="px-6 py-4 cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium group-hover:text-blue-600">
-                      {asset.value}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm group-hover:text-blue-600">
-                      View details
-                    </span>
-                    <ExternalLink className="size-4 group-hover:text-blue-600" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <SearchResultSection
+          icon={<CloudCheckIcon className="h-5 w-5 text-green-600" />}
+          label="Assets"
+          count={data.data.assets.length}
+          items={data.data.assets}
+          onItemClick={(id) => navigate({ to: '/assets/' + id })}
+        />
       )}
 
       {data && data.pageCount > 1 && (

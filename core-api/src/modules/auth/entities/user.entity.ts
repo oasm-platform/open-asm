@@ -8,7 +8,7 @@ import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { WorkspaceMembers } from '@/modules/workspaces/entities/workspace-members.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity, OneToMany, Relation } from 'typeorm';
 import { Account } from './account.entity';
 import { Session } from './session.entity';
 
@@ -35,19 +35,19 @@ export class User extends BaseEntity {
   language: string;
 
   @OneToMany(() => Session, (session) => session.user)
-  sessions: Session[];
+  sessions: Relation<Session[]>;
 
   @OneToMany(() => Account, (account) => account.user)
-  accounts: Account[];
+  accounts: Relation<Account[]>;
 
   @OneToMany(
     () => WorkspaceMembers,
     (workspaceMembers) => workspaceMembers.user,
   )
-  workspaceMembers: WorkspaceMembers[];
+  workspaceMembers: Relation<WorkspaceMembers[]>;
 
   @OneToMany(() => Workspace, (workspace) => workspace.owner)
-  workspaces: Workspace[];
+  workspaces: Relation<Workspace[]>;
 
   @Column('date', { nullable: true })
   banExpires: Date;
@@ -59,23 +59,23 @@ export class User extends BaseEntity {
   banReason?: string;
 
   @OneToMany(() => SearchHistory, (searchHistory) => searchHistory.user)
-  searchHistory: SearchHistory[];
+  searchHistory: Relation<SearchHistory[]>;
 
   @OneToMany(() => ToolProvider, (toolProvider) => toolProvider.owner)
-  toolProviders: ToolProvider[];
+  toolProviders: Relation<ToolProvider[]>;
 
   @OneToMany(() => Workflow, (workflow) => workflow.createdBy)
-  createdWorkflows: Workflow[];
+  createdWorkflows: Relation<Workflow[]>;
 
   @OneToMany(
     () => InternalNetwork,
     (internalNetwork) => internalNetwork.creator,
   )
-  createdInternalNetworks: InternalNetwork[];
+  createdInternalNetworks: Relation<InternalNetwork[]>;
 
   @OneToMany(
     () => VulnerabilityDismissal,
     (vulnerabilityDismissal) => vulnerabilityDismissal.user,
   )
-  vulnerabilityDismissals: VulnerabilityDismissal[];
+  vulnerabilityDismissals: Relation<VulnerabilityDismissal[]>;
 }

@@ -8,6 +8,7 @@ const mockRedisService = {
     set: jest.fn(),
     get: jest.fn(),
     del: jest.fn(),
+    eval: jest.fn(),
   },
 };
 
@@ -46,6 +47,7 @@ describe('RedisLockService', () => {
         expect.any(String),
         'PX',
         1000,
+        'NX',
       );
     });
 
@@ -90,15 +92,18 @@ describe('RedisLockService', () => {
   describe('withLock', () => {
     it('should execute action when lock is acquired', async () => {
       mockRedisService.client.set.mockResolvedValue('OK');
-      mockRedisService.client.del.mockResolvedValue(1);
+      mockRedisService.client.eval.mockResolvedValue(1);
 
       const action = jest.fn().mockResolvedValue('success');
       const result = await service.withLock('test-key', 1000, action);
 
       expect(result).toBe('success');
       expect(action).toHaveBeenCalled();
-      expect(redisService.client.del).toHaveBeenCalledWith(
+      expect(redisService.client.eval).toHaveBeenCalledWith(
+        expect.stringContaining('redis.call'),
+        1,
         'distributed-lock:test-key',
+        expect.any(String),
       );
     });
 
@@ -110,12 +115,12 @@ describe('RedisLockService', () => {
 
       expect(result).toBeNull();
       expect(action).not.toHaveBeenCalled();
-      expect(redisService.client.del).not.toHaveBeenCalled();
+      expect(redisService.client.eval).not.toHaveBeenCalled();
     });
 
     it('should release lock even when action throws error', async () => {
       mockRedisService.client.set.mockResolvedValue('OK');
-      mockRedisService.client.del.mockResolvedValue(1);
+      mockRedisService.client.eval.mockResolvedValue(1);
 
       const action = jest.fn().mockRejectedValue(new Error('Action failed'));
 
@@ -123,8 +128,11 @@ describe('RedisLockService', () => {
         'Action failed',
       );
 
-      expect(redisService.client.del).toHaveBeenCalledWith(
+      expect(redisService.client.eval).toHaveBeenCalledWith(
+        expect.stringContaining('redis.call'),
+        1,
         'distributed-lock:test-key',
+        expect.any(String),
       );
     });
 
@@ -162,6 +170,7 @@ describe('RedisLockService', () => {
         now.toString(),
         'PX',
         1000,
+        'NX',
       );
     });
   });

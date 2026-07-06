@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button';
 import {
   VulnerabilityAnalyzeStatus,
-  useVulnerabilitiesControllerAnalyzeVulnerability,
+  vulnerabilitiesControllerAnalyzeVulnerability,
 } from '@/services/apis/gen/queries';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Loader2, Play, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -68,24 +68,23 @@ export function AnalyzeStatusButton({
     statusConfig[status] ||
     statusConfig[VulnerabilityAnalyzeStatus.not_analyzed];
 
-  const { mutate: analyzeVulnerability } =
-    useVulnerabilitiesControllerAnalyzeVulnerability({
-      mutation: {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
-          onAnalyze?.();
-        },
-      },
-    });
+  const { mutate: analyzeVulnerability } = useMutation({
+    mutationFn: ({ id: vulnId, forceRerun }: { id: string; forceRerun?: boolean }) =>
+      vulnerabilitiesControllerAnalyzeVulnerability(vulnId, { forceRerun: forceRerun ?? false }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
+      onAnalyze?.();
+    },
+  });
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (status === VulnerabilityAnalyzeStatus.not_analyzed) {
-      analyzeVulnerability({ id, data: {} });
+      analyzeVulnerability({ id, forceRerun: false });
     } else if (status === VulnerabilityAnalyzeStatus.done) {
       onView?.();
     } else if (status === VulnerabilityAnalyzeStatus.failed) {
-      analyzeVulnerability({ id, data: { forceRerun: true } });
+      analyzeVulnerability({ id, forceRerun: true });
     }
   };
 

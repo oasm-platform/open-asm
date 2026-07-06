@@ -1,0 +1,34 @@
+name: Frontend Tests
+
+on:
+  push:
+    branches: [main]
+    paths: ['console/**']
+  pull_request:
+    branches: [main]
+    paths: ['console/**']
+
+permissions:
+  contents: read
+
+jobs:
+  unit-integration:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+      - run: npm run test:run --workspace=console
+      - run: npm run test:coverage --workspace=console
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: console/coverage/
