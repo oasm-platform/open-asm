@@ -1,4 +1,5 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetStatusCodeAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -7,14 +8,14 @@ import { statusCodeAssetsColumn } from './status-code-assets-column';
 
 export default function StatusCodeAssetsTab() {
   const {
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
     targetId,
   } = useAsset();
 
-  const { data, isLoading } = useAssetsControllerGetStatusCodeAssets(
+  const { data, isLoading, refetch } = useAssetsControllerGetStatusCodeAssets(
     queryParams,
     {
       query: {
@@ -27,11 +28,12 @@ export default function StatusCodeAssetsTab() {
   const statusCodeAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading targets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load status code assets." onRetry={refetch} />;
 
   return (
     <>
-      <TabsContent value="status-code" className="overflow-hidden">
+      <TabsContent value="status-code">
         <CollapsibleDataTable
           data={statusCodeAssets}
           columns={statusCodeAssetsColumn}
@@ -43,8 +45,7 @@ export default function StatusCodeAssetsTab() {
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           onSortChange={(col, order) => {
-            setSortBy(col);
-            setSortOrder(order);
+            setParams({ sortBy: col, sortOrder: order });
           }}
           totalItems={total}
           collapsibleElement={(row) => (

@@ -4,10 +4,10 @@ import { AssetGroupWorkflowSubscriber } from '../modules/asset-group/entities/as
 
 @Injectable()
 export class DatabaseService implements OnModuleInit {
-    constructor(private dataSource: DataSource) { }
+  constructor(private dataSource: DataSource) {}
 
-    onModuleInit() {
-        // Register subscribers
-        this.dataSource.subscribers.push(new AssetGroupWorkflowSubscriber());
-    }
+  onModuleInit() {
+    // Register subscribers
+    this.dataSource.subscribers.push(new AssetGroupWorkflowSubscriber());
+  }
 }

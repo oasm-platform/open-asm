@@ -11,4 +11,4 @@ import { ApiKey } from './entities/apikey.entity';
   providers: [ApiKeysService],
   exports: [ApiKeysService],
 })
-export class ApiKeysModule { }
+export class ApiKeysModule {}

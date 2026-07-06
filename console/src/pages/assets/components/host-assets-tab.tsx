@@ -1,4 +1,5 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetHostAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -7,14 +8,14 @@ import { hostAssetsColumn } from './host-assets-column';
 
 export default function HostAssetsTab() {
   const {
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
     targetId,
   } = useAsset();
 
-  const { data, isLoading } = useAssetsControllerGetHostAssets(queryParams, {
+  const { data, isLoading, refetch } = useAssetsControllerGetHostAssets(queryParams, {
     query: {
       ...queryOptions.query,
       queryKey: ['hosts', ...queryOptions.query.queryKey],
@@ -24,11 +25,12 @@ export default function HostAssetsTab() {
   const hostAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading targets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load host assets." onRetry={refetch} />;
 
   return (
     <>
-      <TabsContent value="host" className="overflow-hidden">
+      <TabsContent value="host">
         <CollapsibleDataTable
           data={hostAssets}
           columns={hostAssetsColumn}
@@ -40,8 +42,7 @@ export default function HostAssetsTab() {
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           onSortChange={(col, order) => {
-            setSortBy(col);
-            setSortOrder(order);
+            setParams({ sortBy: col, sortOrder: order });
           }}
           totalItems={total}
           collapsibleElement={(row) => (

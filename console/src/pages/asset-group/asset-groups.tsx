@@ -7,7 +7,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { CreateAssetGroupDialog } from '../assets/components/create-asset-group-dialog';
 
 export function AssetGroups() {
@@ -68,14 +68,7 @@ export function AssetGroups() {
   const total = data?.total ?? 0;
 
   return (
-    <Page
-      title="Groups"
-      header={
-        <div className="flex justify-end">
-          <CreateAssetGroupDialog />
-        </div>
-      }
-    >
+    <Page title="Groups">
       <DataTable
         data={assetGroups}
         columns={columns}
@@ -86,9 +79,10 @@ export function AssetGroups() {
         onPageSizeChange={setPageSize}
         totalItems={total}
         sortBy={sortBy}
+        toolbarComponents={[<CreateAssetGroupDialog />]}
         sortOrder={sortOrder}
         isShowBorder={true}
-        onRowClick={(row) => navigate('/groups/' + row.id)}
+        onRowClick={(row) => navigate({ to: '/groups/' + row.id })}
         emptyMessage="No asset groups found"
         filterColumnKey="name"
         filterValue={filter}

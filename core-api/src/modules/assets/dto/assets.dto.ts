@@ -2,7 +2,7 @@ import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { TechnologyDetailDTO } from '@/modules/technology/dto/technology-detail.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsDateString, IsOptional, IsString, IsUUID } from 'class-validator';
 import { AssetTag } from '../entities/asset-tags.entity';
 import { HttpResponse } from '../entities/http-response.entity';
 
@@ -43,7 +43,7 @@ export class GetAssetsResponseDto {
   @ApiProperty()
   isEnabled?: boolean;
   @ApiProperty({ required: false })
-  screenshotPath?: string;
+  screenshotPath?: string | null;
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {
@@ -122,4 +122,14 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
     Array.isArray(value) ? value : [value],
   )
   tlsHosts?: string[];
+
+  @ApiProperty({ required: false, description: 'Filter assets created on or after this date (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiProperty({ required: false, description: 'Filter assets created on or before this date (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
 }

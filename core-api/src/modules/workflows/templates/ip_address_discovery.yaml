@@ -1,0 +1,14 @@
+name: ip_address_discovery
+
+on:
+  target: [cidr.create, cidr.re-scan, ip.create, ip.re-scan]
+
+jobs:
+  - name: Port Scan
+    run: naabu
+
+  - name: HTTP Probe
+    run: httpx
+
+  - name: Take Screenshot
+    run: screenshot

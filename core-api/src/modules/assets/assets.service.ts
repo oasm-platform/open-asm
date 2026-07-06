@@ -1,18 +1,30 @@
 import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as Mustache from 'mustache';
+import { decrypt } from '@/common/utils/encryption.util';
+import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { generateText } from 'ai';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { Brackets, DataSource, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
+import { LLMProvider } from '../agents/enums/agent.enums';
+import {
+  getLLMProviderConfig,
+} from '../agents/llm-provider-supported';
 import { Target } from '../targets/entities/target.entity';
-import { TechnologyDetailDTO } from '../technology/dto/technology-detail.dto';
+
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
@@ -46,6 +58,9 @@ import { TlsAssetsView } from './entities/tls-assets.entity';
 
 @Injectable()
 export class AssetsService {
+  private readonly logger = new Logger(AssetsService.name);
+  private readonly prompts = new Map<string, string>();
+
   constructor(
     @InjectRepository(Asset)
     public readonly assetRepo: Repository<Asset>,
@@ -55,12 +70,113 @@ export class AssetsService {
     public readonly targetRepo: Repository<Target>,
     @InjectRepository(TlsAssetsView)
     public readonly tlsAssetsViewRepo: Repository<TlsAssetsView>,
+    @InjectRepository(AgentLLMConfig)
+    private readonly llmConfigRepository: Repository<AgentLLMConfig>,
     private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
     private workspaceService: WorkspacesService,
-
+    private geoIpService: GeoIpService,
     private dataSource: DataSource,
-  ) {}
+  ) {
+    this.loadPrompts();
+  }
+
+  private loadPrompts(): void {
+    const promptsDir = path.join(__dirname, '../agents/prompts');
+    try {
+      const entries = fs.readdirSync(promptsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.name.endsWith('.md')) {
+          const key = entry.name.toLowerCase();
+          const content = fs.readFileSync(
+            path.join(promptsDir, entry.name),
+            'utf-8',
+          );
+          this.prompts.set(key, content);
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to load prompts directory', error);
+    }
+  }
+
+  private getPrompt(fileName: string, data?: Record<string, unknown>): string {
+    const key = fileName.toLowerCase();
+    const template = this.prompts.get(key) ?? '';
+    if (!template) {
+      this.logger.warn(`Prompt not found: ${fileName}`);
+    }
+    if (data) {
+      return Mustache.render(template, data);
+    }
+    return template;
+  }
+
+  private async generateTagsWithAI(
+    serviceData: string,
+    workspaceId: string,
+  ): Promise<string[]> {
+    const llmConfig = await this.llmConfigRepository.findOne({
+      where: { workspaceId, isPreferred: true },
+    });
+
+    if (!llmConfig) {
+      throw new BadRequestException(
+        'No preferred LLM config found. Please create and set a preferred LLM config first.',
+      );
+    }
+
+    const providerConfig = getLLMProviderConfig(llmConfig.provider);
+    if (!providerConfig) {
+      throw new BadRequestException(
+        `Unsupported LLM provider: ${String(llmConfig.provider)}`,
+      );
+    }
+
+    const apiKey = llmConfig.apiKey ? decrypt(llmConfig.apiKey) : '';
+    const baseURL =
+      llmConfig.provider === LLMProvider.CUSTOM
+        ? llmConfig.apiUrl
+        : undefined;
+    const model = providerConfig.handler(apiKey, llmConfig.model, baseURL);
+
+    const prompt = this.getPrompt('GENERATE_SERVICE_TAGS.md', {
+      SERVICE_DATA: serviceData,
+    });
+
+    const result = await generateText({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    let textContent = '';
+    if (typeof result.content === 'string') {
+      textContent = result.content;
+    } else if (Array.isArray(result.content)) {
+      const textPart = result.content.find((part) => part.type === 'text');
+      textContent = textPart?.type === 'text' ? textPart.text : '';
+    }
+
+    this.logger.log(`AI response: ${textContent.slice(0, 500)}`);
+
+    const jsonMatch = textContent.match(/\[[\s\S]*?\]/);
+    if (!jsonMatch) {
+      this.logger.warn(
+        `Failed to parse tags from AI response: ${textContent.slice(0, 200)}`,
+      );
+      return [];
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((item): item is string => typeof item === 'string')
+      .map((tag) => tag.trim().toLowerCase())
+      .filter((tag) => tag.length > 0 && tag.length <= 100);
+  }
 
   /**
    * Retrieves all assets services associated with a specified target.
@@ -120,28 +236,19 @@ export class AssetsService {
 
     const queryBuilder = this.assetServiceRepo
       .createQueryBuilder('asset_service')
-      .leftJoin('asset_service.asset', 'asset')
+      .leftJoinAndSelect('asset_service.asset', 'asset')
       .leftJoin('asset.target', 'targets')
       .leftJoinAndSelect(
         'asset_service.httpResponses',
         'latest_http_response',
         'latest_http_response.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = asset_service.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
-      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .leftJoin('asset.ipAssets', 'ipAssets')
+      .leftJoinAndSelect('asset.ipAssets', 'ipAssets')
       .leftJoin('asset_service.statusCodeAssets', 'statusCodeAssets')
       .leftJoin('asset_service.tlsAssets', 'tlsAssets')
-      .where('asset_service."isErrorPage" = false')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+      .where('targets.workspaceId = :workspaceId', {
         workspaceId,
-      })
-      .andWhere(
-        new Brackets((qb) => {
-          qb.where('"statusCodeAssets"."statusCode" IS NULL').orWhere(
-            '"statusCodeAssets"."statusCode" != 0',
-          );
-        }),
-      );
+      });
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -153,6 +260,18 @@ export class AssetsService {
           [key]: value.value,
         });
       }
+    }
+
+    if (query.startDate) {
+      queryBuilder.andWhere('asset_service."createdAt" >= :startDate', {
+        startDate: query.startDate,
+      });
+    }
+
+    if (query.endDate) {
+      queryBuilder.andWhere('asset_service."createdAt" <= :endDate', {
+        endDate: `${query.endDate} 23:59:59.999`,
+      });
     }
 
     return queryBuilder;
@@ -199,7 +318,6 @@ export class AssetsService {
       asset.isEnabled = item.asset?.isEnabled;
       asset.screenshotPath =
         item.screenshotPath && `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
-
       // asset.tags = item.asset.tags || [];
       asset.ipAddresses = item.asset?.ipAssets
         ? item.asset.ipAssets.map((e) => e.ipAddress)
@@ -316,7 +434,7 @@ export class AssetsService {
       lastDiscoveredAt: new Date(),
     });
 
-    this.eventEmitter.emit('target.re-scan', target);
+    this.eventEmitter.emit('target.domain.re-scan', target);
 
     return {
       message: 'Scan started',
@@ -349,7 +467,9 @@ export class AssetsService {
     asset.dnsRecords = item.asset?.dnsRecords;
     asset.isEnabled = item.asset?.isEnabled;
     asset.port = item.port;
-    asset.screenshotPath = `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
+    asset.screenshotPath = item.screenshotPath
+      ? `${STORAGE_BASE_PATH}/${item.screenshotPath}`
+      : null;
 
     // Load tags separately - tags belong to AssetService, not Asset
     const tagsResult = await this.dataSource
@@ -360,7 +480,7 @@ export class AssetsService {
       .getRawMany<{ tag: string; id: string }>();
 
     asset.tags = tagsResult.map(
-      (t) => ({ id: t.id, tag: t.tag }) as Partial<AssetTag>,
+      (t) => ({ id: t.id, tag: t.tag }),
     ) as AssetTag[];
 
     asset.ipAddresses = item.asset?.ipAssets
@@ -441,10 +561,15 @@ export class AssetsService {
 
     const total = totalInDb?.count ?? 0;
 
-    const data = list.map((item: GetIpAssetsDTO) => {
+    const ips = list.map((item: { ip: string }) => item.ip);
+    const geoIps = ips.length > 0 ? await this.geoIpService.getGeoIp(ips) : [];
+    const geoIpMap = new Map(geoIps.map((geoIp) => [geoIp.query, geoIp]));
+
+    const data = list.map((item: { ip: string; assetCount: number }) => {
       const obj = new GetIpAssetsDTO();
       obj.ip = item.ip;
       obj.assetCount = item.assetCount;
+      obj.geoIp = geoIpMap.get(item.ip) ?? null;
       return obj;
     });
 
@@ -636,7 +761,7 @@ export class AssetsService {
             categoryNames: [],
             categories: [],
             version,
-          } as TechnologyDetailDTO;
+          };
         }
 
         return obj;
@@ -670,16 +795,9 @@ export class AssetsService {
         '"statusCodeAssets"."statusCode"',
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
-      .groupBy('"statusCodeAssets"."statusCode"');
-
-    if (query.value) {
-      queryBuilder.andWhere(
-        '"statusCodeAssets"."statusCode"::text ILIKE :value',
-        {
-          value: `%${query.value}%`,
-        },
-      );
-    }
+      .groupBy('"statusCodeAssets"."statusCode"')
+      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
+      .andWhere('"statusCodeAssets"."statusCode" != 0');
 
     if (query.value) {
       queryBuilder.andWhere(
@@ -734,9 +852,8 @@ export class AssetsService {
       .createQueryBuilder('assetService')
       .leftJoinAndSelect('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'workspaceTargets')
       .where('assetService.id = :id', { id })
-      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('target.workspaceId = :workspaceId', { workspaceId })
       .getOne();
 
     if (!assetService) {
@@ -849,6 +966,18 @@ export class AssetsService {
       });
     }
 
+    // Date filtering on not_after field
+    if (query.startDate) {
+      qb.andWhere('"tlsAssets"."not_after"::timestamp >= :startDate', {
+        startDate: query.startDate,
+      });
+    }
+    if (query.endDate) {
+      qb.andWhere('"tlsAssets"."not_after"::timestamp <= :endDate', {
+        endDate: `${query.endDate} 23:59:59.999`,
+      });
+    }
+
     const totalResult = await this.dataSource
       .createQueryBuilder()
       .select('COUNT(*)')
@@ -900,6 +1029,62 @@ export class AssetsService {
     });
 
     return getManyResponse({ query, data, total });
+  }
+
+  public async generateServiceTags(
+    assetServiceId: string,
+    workspaceId: string,
+  ): Promise<string[]> {
+    const assetService = await this.assetServiceRepo
+      .createQueryBuilder('assetService')
+      .leftJoinAndSelect('assetService.asset', 'asset')
+      .leftJoinAndSelect('assetService.httpResponses', 'httpResponse')
+      .innerJoin('asset.target', 'target')
+      .where('assetService.id = :assetServiceId', { assetServiceId })
+      .andWhere('target.workspaceId = :workspaceId', { workspaceId })
+      .getOne();
+
+    if (!assetService) {
+      throw new NotFoundException('Asset service not found');
+    }
+
+    const latestHttpResponse = assetService.httpResponses?.[0];
+
+    const serviceContext = {
+      service: {
+        value: assetService.value,
+        port: assetService.port,
+      },
+      host: assetService.asset?.value,
+      ...(latestHttpResponse && {
+        http: {
+          title: latestHttpResponse.title,
+          webserver: latestHttpResponse.webserver,
+          tech: latestHttpResponse.tech,
+          status_code: latestHttpResponse.status_code,
+          scheme: latestHttpResponse.scheme,
+          host: latestHttpResponse.host,
+          path: latestHttpResponse.path,
+          content_type: latestHttpResponse.content_type,
+          words: latestHttpResponse.words,
+          lines: latestHttpResponse.lines,
+          tls: latestHttpResponse.tls,
+        },
+      }),
+    };
+
+    const tags = await this.generateTagsWithAI(
+      JSON.stringify(serviceContext, null, 2),
+      workspaceId,
+    );
+
+    if (tags.length === 0) {
+      throw new BadRequestException(
+        'AI model did not generate any tags. Ensure an LLM config is set up in your workspace.',
+      );
+    }
+
+    return tags;
   }
 
   public async switchAsset(

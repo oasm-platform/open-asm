@@ -6,6 +6,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -107,7 +108,7 @@ export class StorageController {
     // Upload file with fixed filename "logo.{extension}" to "system" bucket
     const filename = `logo-${randomUUID()}.${extension}`;
     const bucket = 'system';
-    const result = this.storageService.uploadFile(
+    const result = await this.storageService.uploadFile(
       filename,
       file.buffer,
       bucket,
@@ -164,7 +165,7 @@ export class StorageController {
     },
   })
   @Roles(Role.ADMIN)
-  uploadFile(
+  async uploadFile(
     @UploadedFile() file: Express.Multer.File,
     @Body('bucket') bucket: string = 'default',
   ) {
@@ -180,7 +181,7 @@ export class StorageController {
     }
 
     const filename = `${randomUUID()}.${extension}`;
-    const result = this.storageService.uploadFile(
+    const result = await this.storageService.uploadFile(
       filename,
       file.buffer,
       bucket,
@@ -191,6 +192,66 @@ export class StorageController {
       bucket: bucket,
       fullPath: `/${bucket}/${filename}`,
     };
+  }
+
+  @Public()
+  @Get(':bucket/:path/download')
+  @ApiOperation({ summary: 'Download a file with time-limited token' })
+  @ApiParam({ name: 'bucket', type: String, required: true })
+  @ApiParam({ name: 'path', type: String, required: true })
+  @ApiQuery({
+    name: 'token',
+    type: String,
+    required: true,
+    description: 'Time-limited download token',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'File downloaded successfully',
+    content: {
+      'application/octet-stream': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async downloadFile(
+    @Param('bucket') bucket: string,
+    @Param('path') path: string,
+    @Query('token') token: string,
+    @Res({ passthrough: true })
+    res: { set: (headers: Record<string, string>) => void },
+  ): Promise<StreamableFile> {
+    if (!token) {
+      throw new BadRequestException('Download token is required');
+    }
+
+    // Verify token and extract bucket/path from it (not from URL params)
+    const verified = this.storageService.verifyDownloadToken(token);
+
+    // Token-embedded values take precedence over URL params
+    const cleanPath = verified.filePath;
+    const fileBucket = verified.bucket;
+
+    const file = await this.storageService.getFile(cleanPath, fileBucket);
+
+    const extension = cleanPath.split('.').pop()?.toLowerCase();
+    if (extension) {
+      const mimeType = this.getMimeType(extension);
+      if (mimeType) {
+        res.set({
+          'Content-Type': mimeType,
+          'Content-Disposition': `attachment; filename="${cleanPath.split('/').pop()}"`,
+          'Cache-Control': 'no-store',
+        });
+      }
+    }
+
+    return file;
   }
 
   @Public()
@@ -214,19 +275,22 @@ export class StorageController {
     status: 404,
     description: 'File not found',
   })
-  getFile(
+  async getFile(
     @Param('bucket') bucket: string,
     @Param('path') path: string,
     @Res({ passthrough: true })
     res: { set: (headers: Record<string, string>) => void },
-  ): StreamableFile {
+  ): Promise<StreamableFile> {
     if (!path) {
       throw new NotFoundException('File path is required');
     }
 
-    // Remove any leading slashes from the path
+    if (this.storageService.isPrivateBucket(bucket)) {
+      throw new ForbiddenException('Access denied');
+    }
+
     const cleanPath = path.replace(/^\/+/, '');
-    const file = this.storageService.getFile(cleanPath, bucket);
+    const file = await this.storageService.getFile(cleanPath, bucket);
 
     const extension = cleanPath.split('.').pop()?.toLowerCase();
     if (extension) {
@@ -240,72 +304,6 @@ export class StorageController {
     }
 
     return file;
-  }
-
-  @Public()
-  @Get('forward')
-  @ApiOperation({ summary: 'Forward an image from a URL' })
-  @ApiQuery({
-    name: 'url',
-    type: String,
-    required: true,
-    description: 'The URL of the image to forward',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Image forwarded successfully',
-    content: {
-      'image/*': {
-        schema: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - URL is required or invalid',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Image not found at the provided URL',
-  })
-  async forwardImage(
-    @Query('url') url: string,
-    @Res({ passthrough: true })
-    res: { set: (headers: Record<string, string>) => void },
-  ): Promise<StreamableFile> {
-    // Validate URL
-    if (!url) {
-      throw new BadRequestException('URL query parameter is required');
-    }
-
-    try {
-      const { buffer, contentType } =
-        await this.storageService.forwardImage(url);
-
-      // Set the content type header
-      res.set({
-        'Content-Type': contentType,
-        'Cache-Control': `max-age=${CACHE_STATIC_RESOURCE}, no-transform`,
-      });
-
-      // Return the image as a StreamableFile
-      return new StreamableFile(buffer);
-    } catch (error) {
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      }
-
-      // Handle network errors or other unexpected errors
-      throw new BadRequestException(
-        'Failed to fetch image from the provided URL',
-      );
-    }
   }
 
   private getMimeType(extension?: string): string | undefined {

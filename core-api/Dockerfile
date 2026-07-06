@@ -1,23 +1,26 @@
-## https://dawchihliou.github.io/articles/the-last-dockerfile-you-need-for-nestjs
-
-FROM node:22-alpine AS base
-RUN apk add --no-cache curl && npm install -g bun
+FROM node:26-alpine AS base
+RUN apk add --no-cache curl
 
 # Build stage
 FROM base AS builder
 
+ARG APP_VERSION
+ENV APP_VERSION=$APP_VERSION
+
 WORKDIR /app
 
+COPY package*.json ./
+RUN npm install
 COPY . .
-RUN bun install
-RUN bun run build
-# Copy proto files before cleaning
+RUN npm run build
 RUN mkdir -p /tmp/proto && cp -r src/proto/* /tmp/proto/
-# Clean bun cache and remove unused files
-RUN bun pm cache clean && rm -rf src test
+RUN rm -rf src test node_modules/.cache
 
 # Production stage
 FROM base
+
+ARG APP_VERSION
+ENV APP_VERSION=$APP_VERSION
 
 WORKDIR /app
 

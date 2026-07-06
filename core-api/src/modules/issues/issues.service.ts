@@ -1,4 +1,3 @@
-import { BOT_EMAIL, BOT_ID, BOT_NAME } from '@/common/constants/app.constants';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
@@ -8,7 +7,6 @@ import {
   IssueCommentType,
   IssueSourceType,
   IssueStatus,
-  Role,
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -21,8 +19,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
-import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
-import { User } from '../auth/entities/user.entity';
 import { CreateIssueCommentDto } from './dto/create-issue-comment.dto';
 import { GetManyIssuesDto } from './dto/get-many-issues.dto';
 import {
@@ -49,7 +45,6 @@ export class IssuesService {
     @InjectQueue(BullMQName.ISSUE_CREATION)
     private issueCreationQueue: Queue,
     private readonly vulnerabilityHandler: VulnerabilitySourceHandler,
-    private readonly aiAssistantService: AiAssistantService,
   ) {
     this.sourceHandlers = new Map([
       [IssueSourceType.VULNERABILITY, this.vulnerabilityHandler],
@@ -200,55 +195,136 @@ export class IssuesService {
     return { message: 'Comment deleted successfully' };
   }
 
+  async findExistingOpenIssueBySource(
+    sourceId: string,
+    sourceType: IssueSourceType,
+    workspaceId: string,
+  ): Promise<Issue | null> {
+    if (!workspaceId) {
+      return null;
+    }
+    return this.issuesRepository.findOne({
+      where: {
+        sourceId,
+        sourceType,
+        workspaceId,
+        status: IssueStatus.OPEN,
+      },
+    });
+  }
+
   async createIssue(
     createIssueDto: CreateIssueDto,
     workspaceId: string,
     userId: string,
   ): Promise<Issue> {
-    // Add job to queue for processing
+    // Check for existing open issue with the same source before creating
+    if (createIssueDto.sourceId && createIssueDto.sourceType) {
+      const existing = await this.findExistingOpenIssueBySource(
+        createIssueDto.sourceId,
+        createIssueDto.sourceType,
+        workspaceId,
+      );
+      if (existing) {
+        this.logger.debug(
+          `Issue already exists for source ${createIssueDto.sourceType}:${createIssueDto.sourceId} in workspace ${workspaceId}, skipping creation`,
+        );
+        return existing;
+      }
+    }
+
     const job = await this.issueCreationQueue.add(
       'create-issue',
       { createIssueDto, workspaceId, userId },
       {
-        // Use a unique job ID to ensure proper queueing
-        jobId: `create-issue-${workspaceId}-${Date.now()}`,
-        // Add priority if needed
+        jobId: `create-issue-${workspaceId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         priority: 1,
       },
     );
 
-    // Wait for the job to complete and return the result
-    // We'll use a promise-based approach to wait for job completion
     return new Promise<Issue>((resolve, reject) => {
+      let isFinished = false;
+
+      const timeout = setTimeout(() => {
+        isFinished = true;
+        reject(new Error('Issue creation timed out'));
+      }, 30000);
+
       const checkJob = () => {
+        if (isFinished) {
+          return;
+        }
+
         this.issueCreationQueue
           .getJob(job.id!)
           .then(async (updatedJob) => {
-            if (updatedJob) {
-              const state = await updatedJob.getState();
-              if (state === 'completed') {
-                // For now, we'll query the database to get the created issue
-                // since the processor returns the issue object
-                const lastIssue = await this.issuesRepository.findOne({
-                  where: { workspaceId },
-                  order: { no: 'DESC' },
+            if (isFinished) {
+              return;
+            }
+
+            if (!updatedJob) {
+              clearTimeout(timeout);
+              isFinished = true;
+              reject(new Error('Job not found'));
+              return;
+            }
+
+            const state = await updatedJob.getState();
+            if (isFinished) {
+              return;
+            }
+
+            if (state === 'completed') {
+              clearTimeout(timeout);
+              isFinished = true;
+              const result = updatedJob.returnvalue as
+                | { id?: string }
+                | undefined;
+              if (result?.id) {
+                // Fetch the actual issue from DB to ensure correct data
+                const created = await this.issuesRepository.findOne({
+                  where: { id: result.id },
                 });
-                if (lastIssue) {
-                  resolve(lastIssue);
+                if (created) {
+                  resolve(created);
                 } else {
                   reject(new Error('Created issue not found in database'));
                 }
-              } else if (state === 'failed') {
-                reject(new Error('Issue creation failed'));
+              } else if (createIssueDto.sourceId && createIssueDto.sourceType) {
+                // Fallback: query by sourceId if processor didn't return the issue
+                const created = await this.findExistingOpenIssueBySource(
+                  createIssueDto.sourceId,
+                  createIssueDto.sourceType,
+                  workspaceId,
+                );
+                if (created) {
+                  resolve(created);
+                } else {
+                  reject(new Error('Created issue not found in database'));
+                }
               } else {
-                // Still processing, check again in 100ms
-                setTimeout(checkJob, 100);
+                reject(new Error('Created issue not found in database'));
               }
+            } else if (state === 'failed') {
+              clearTimeout(timeout);
+              isFinished = true;
+              reject(new Error('Issue creation failed'));
             } else {
-              reject(new Error('Job not found'));
+              setTimeout(checkJob, 100);
             }
           })
-          .catch(reject);
+          .catch((err: unknown) => {
+            if (isFinished) {
+              return;
+            }
+            clearTimeout(timeout);
+            isFinished = true;
+            reject(
+              err instanceof Error
+                ? err
+                : new Error(String(err)),
+            );
+          });
       };
       checkJob();
     });
@@ -374,7 +450,7 @@ export class IssuesService {
         type:
           issue.status === IssueStatus.OPEN
             ? IssueCommentType.OPEN
-            : (IssueCommentType.CLOSED as IssueCommentType),
+            : (IssueCommentType.CLOSED),
       });
 
       await this.issueCommentsRepository.save(comment);
@@ -416,8 +492,7 @@ export class IssuesService {
     originalComment: IssueComment,
   ): Promise<void> {
     try {
-      const { issueId, createdBy } = originalComment;
-      const userId = createdBy.id;
+      const { issueId } = originalComment;
       // Get the issue to provide context to the AI assistant
       const issue = await this.issuesRepository.findOne({
         where: { id: issueId },
@@ -429,83 +504,11 @@ export class IssuesService {
         return;
       }
 
-      // Determine issue type based on source type
-      // Default to 0 (General) as requested, to avoid forcing vulnerability prompts on general content
-      const issueType = 0; // IssueType.ISSUE_TYPE_UNSPECIFIED
-
-      // if (issue.sourceType === IssueSourceType.VULNERABILITY) {
-      //   issueType = 2; // IssueType.ISSUE_TYPE_VULNERABILITY
-      // }
-
-      let commentsContext = '';
-
-      // If this comment is a reply, ONLY use the context of the replied comment
-      if (originalComment.repCommentId) {
-        const repliedComment = await this.issueCommentsRepository.findOne({
-          where: { id: originalComment.repCommentId },
-          relations: ['createdBy'],
-        });
-
-        if (repliedComment) {
-          commentsContext = `[${repliedComment.createdBy.name}]: ${repliedComment.content}`;
-        }
-      } else {
-        // Fetch recent comments to provide conversation context
-        const recentComments = await this.issueCommentsRepository.find({
-          where: { issue: { id: issueId } },
-          order: { createdAt: 'DESC' },
-          take: 10,
-          relations: ['createdBy'],
-        });
-
-        // Format comments for context (chronological order)
-        commentsContext = recentComments
-          .reverse()
-          .map((c) => `[${c.createdBy.name}]: ${c.content}`)
-          .join('\n');
-      }
-
-      // Prepare metadata with issue information
-      const metadata = {
-        issueId: issue.id,
-        issueTitle: issue.title,
-        issueDescription: issue.description,
-        issueStatus: issue.status,
-        issueSourceType: issue.sourceType,
-        issueSourceId: issue.sourceId,
-        workspaceId: issue.workspaceId,
-        commentId: originalComment.id,
-        commentContent: originalComment.content,
-        userId: userId,
-        issueCommentsHistory: commentsContext, // Add history here
-      };
-
-      // Call AI assistant to resolve the issue
-      const response = await this.aiAssistantService.resolveIssue(
-        originalComment.content,
-        issueType,
-        metadata,
-        issue.workspaceId,
-        userId,
+      // AI assistant has been removed - skip processing
+      this.logger.warn(
+        `AI assistant is no longer available for issue ${issueId}. Skipping CAI request.`,
       );
-
-      // Create a new comment from the bot with the AI response
-      const botComment = this.issueCommentsRepository.create({
-        content: response.message,
-        issue: { id: issueId },
-        createdBy: {
-          id: BOT_ID,
-          name: BOT_NAME,
-          email: BOT_EMAIL,
-          role: Role.BOT,
-          emailVerified: true,
-        } as User,
-        isCanDelete: false,
-        isCanEdit: false,
-        repCommentId: originalComment.id,
-      });
-
-      await this.issueCommentsRepository.save(botComment);
+      return;
     } catch (error) {
       this.logger.error('Error in processCaiRequest:', error);
     }

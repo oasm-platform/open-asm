@@ -1,6 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsDateString, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class GetTlsResponseDto {
@@ -56,4 +56,14 @@ export class GetTlsQueryDto extends GetManyBaseQueryParams {
     Array.isArray(value) ? (value as string[]) : [value as string],
   )
   targetIds?: string[];
+
+  @ApiProperty({ required: false, description: 'Filter TLS certs with not_after on or after this date (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiProperty({ required: false, description: 'Filter TLS certs with not_after on or before this date (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
 }

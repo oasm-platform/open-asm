@@ -17,7 +17,7 @@ export class ApiKeysService {
   constructor(
     @InjectRepository(ApiKey)
     public apiKeysRepository: Repository<ApiKey>,
-  ) { }
+  ) {}
 
   /**
    * Finds an API key by its key value
@@ -26,7 +26,9 @@ export class ApiKeysService {
    * @throws NotFoundException if the API key with the given key value is not found
    */
   async findByKey(key: string): Promise<ApiKey> {
-    const apiKey = await this.apiKeysRepository.findOne({ where: { key, isRevoked: false } });
+    const apiKey = await this.apiKeysRepository.findOne({
+      where: { key, isRevoked: false },
+    });
     if (!apiKey) {
       throw new NotFoundException(`API key with key ${key} not found`);
     }
@@ -60,7 +62,10 @@ export class ApiKeysService {
    * @param createApiKeyDto - Data transfer object containing API key creation data
    * @returns The created API key entity
    */
-  async create(createApiKeyDto: CreateApiKeyDto, length = API_KEY_LENGTH): Promise<ApiKey> {
+  async create(
+    createApiKeyDto: CreateApiKeyDto,
+    length = API_KEY_LENGTH,
+  ): Promise<ApiKey> {
     const apiKey = new ApiKey();
     apiKey.name = createApiKeyDto.name;
     apiKey.type = createApiKeyDto.type;

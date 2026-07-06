@@ -1,10 +1,11 @@
+import { useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 
 interface PageProps {
   children?: React.ReactNode;
   title?: string | React.ReactNode;
+  description?: string;
   header?: React.ReactNode;
   action?: React.ReactNode;
   isShowButtonGoBack?: boolean;
@@ -13,32 +14,56 @@ interface PageProps {
 const Page = ({
   children,
   title,
+  description,
   header,
   action,
   isShowButtonGoBack,
   className,
 }: PageProps) => {
-  const navigate = useNavigate();
+  useEffect(() => {
+    if (typeof title === 'string' && title) {
+      document.title = `${title} | OASM`;
+    }
+    return () => {
+      document.title = 'OASM';
+    };
+  }, [title]);
 
   return (
-    <div className={(className || '') + ' h-full flex flex-col gap-4'}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 mr-3">
+    <div className={(className || '') + ' flex h-full flex-col gap-5'}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex items-start gap-3">
           {isShowButtonGoBack && (
-            <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => window.history.back()}
+              className="size-9 shrink-0"
+            >
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
-          {title && (
-            <h3 className="text-2xl font-bold tracking-tight">{title}</h3>
-          )}
+          <div className="flex min-w-0 flex-col gap-1">
+            {title && (
+              <span className="text-2xl font-semibold tracking-tight text-foreground">
+                {title}
+              </span>
+            )}
+            {description && (
+              <span className="text-pretty text-sm text-muted-foreground">
+                {description}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {header}
-          {action}
-        </div>
+        {(header || action) && (
+          <div className="flex items-center gap-2">
+            {header}
+            {action}
+          </div>
+        )}
       </div>
-      <div className="overflow-hidden">{children}</div>
+      <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>
   );
 };

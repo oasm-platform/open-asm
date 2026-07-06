@@ -5,9 +5,13 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import {
   BullMQName,
+  CATEGORY_DATA_SOURCE_MAP,
+  EventTriggerType,
   JobPriority,
+  JobRunType,
   JobStatus,
   ToolCategory,
+  DataSource as ToolDataSource,
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
@@ -21,6 +25,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
@@ -61,6 +66,7 @@ export class JobsRegistryService {
     private storageService: StorageService,
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
+    private eventEmitter: EventEmitter2,
   ) {}
   public async getManyJobs(
     query: GetManyJobsRequestDto,
@@ -91,10 +97,7 @@ export class JobsRegistryService {
     }
 
     if (workspaceId) {
-      qb.innerJoin('target.workspaceTargets', 'workspaceTarget').andWhere(
-        'workspaceTarget.workspaceId = :workspaceId',
-        { workspaceId },
-      );
+      qb.andWhere('target.workspaceId = :workspaceId', { workspaceId });
     }
 
     qb.take(query.limit)
@@ -127,7 +130,9 @@ export class JobsRegistryService {
     jobHistory: existingJobHistory,
     priority,
     isSaveRawResult,
+    jobName,
     isPublishEvent,
+    jobRunType,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
@@ -153,8 +158,23 @@ export class JobsRegistryService {
     } else {
       jobHistory = this.jobHistoryRepo.create({
         workflow,
+        jobRunType,
+        jobHistoryName: jobName,
       });
       await this.jobHistoryRepo.save(jobHistory);
+      this.eventEmitter.emit(EventTriggerType.WORKFLOW_START, {
+        tool,
+        targetIds,
+        workspaceId,
+        assetIds,
+        workflow,
+        jobHistory,
+        priority,
+        isSaveRawResult,
+        jobName,
+        isPublishEvent,
+        jobRunType,
+      });
     }
 
     const jobRepo = this.dataSource.getRepository(Job);
@@ -242,9 +262,6 @@ export class JobsRegistryService {
     // Step 4: save all jobs
     if (jobsToInsert.length > 0) {
       await jobRepo.save(jobsToInsert);
-
-      // Increment pending jobs counter (hybrid Redis + DB)
-      await this.incrementJobHistoryCounter(jobHistory.id, jobsToInsert.length);
     }
 
     return jobsToInsert;
@@ -282,9 +299,7 @@ export class JobsRegistryService {
     if (workspaceId) {
       assetsQueryBuilder
         .innerJoin('assets.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
-        .andWhere('workspace.id = :workspaceId', { workspaceId });
+        .andWhere('target.workspaceId = :workspaceId', { workspaceId });
     }
 
     return await assetsQueryBuilder.getMany();
@@ -326,9 +341,7 @@ export class JobsRegistryService {
     if (workspaceId) {
       assetServicesQueryBuilder
         .innerJoin('asset.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
-        .andWhere('workspace.id = :workspaceId', { workspaceId });
+        .andWhere('target.workspaceId = :workspaceId', { workspaceId });
     }
 
     return await assetServicesQueryBuilder.getMany();
@@ -360,33 +373,40 @@ export class JobsRegistryService {
   public async getNextJob(
     workerId: string,
   ): Promise<GetNextJobResponseDto | null> {
+    // [OPT-2] Fetch worker OUTSIDE transaction to reduce lock hold time
+    const worker = await this.dataSource.getRepository(WorkerInstance).findOne({
+      where: { id: workerId },
+      relations: ['workspace', 'tool'],
+      cache: {
+        id: `workers:${workerId}`,
+        milliseconds: 1000 * 30,
+      },
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker not found');
+    }
+
+    const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const worker = await queryRunner.manager
-        .getRepository(WorkerInstance)
-        .findOne({
-          where: {
-            id: workerId,
-          },
-          relations: ['workspace', 'tool'],
-        });
-      if (!worker) {
-        throw new NotFoundException('Worker not found');
-      }
-
-      const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
       const queryBuilder = queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
         .innerJoin('asset.target', 'target')
-        .leftJoin('target.workspaceTargets', 'workspace_targets')
-        .leftJoin('workspace_targets.workspace', 'workspaces')
         .leftJoin('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
+        // [OPT-1] Use addOrderBy for compound sort (priority first, then createdAt)
         .orderBy('jobs.priority', 'DESC')
-        .orderBy('jobs.createdAt', 'ASC');
+        .addOrderBy('jobs.createdAt', 'ASC');
+
+      // [OPT-3] Only join workspace when actually needed
+      if (isBuiltInTools && worker.scope !== WorkerScope.CLOUD) {
+        queryBuilder
+          .leftJoin('target.workspace', 'workspaces');
+      }
 
       if (isBuiltInTools) {
         const builtInToolsName = builtInTools.map((tool) => tool.name);
@@ -403,11 +423,17 @@ export class JobsRegistryService {
         queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
       }
 
-      // Only join assetService for HTTP_PROBE category jobs
-      if (
-        worker.tool?.category === ToolCategory.HTTP_PROBE ||
-        worker.tool?.category === ToolCategory.SCREENSHOT
-      ) {
+      if (worker.internalNetworkId) {
+        queryBuilder.andWhere('target.internalNetworkId = :internalNetworkId', {
+          internalNetworkId: worker.internalNetworkId,
+        });
+      }
+
+      const toolDataSource = worker.tool?.category
+        ? CATEGORY_DATA_SOURCE_MAP[worker.tool.category]
+        : ToolDataSource.ASSET;
+
+      if (toolDataSource === ToolDataSource.ASSET_SERVICE) {
         queryBuilder
           .leftJoinAndSelect('jobs.assetService', 'assetService')
           .andWhere('jobs.category = :category', {
@@ -417,6 +443,7 @@ export class JobsRegistryService {
         queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
       }
 
+      // [OPT-4] SKIP LOCKED avoids workers blocking each other on the same row
       const job = await queryBuilder
         .setLock('pessimistic_write', undefined, ['jobs'])
         .limit(1)
@@ -427,20 +454,21 @@ export class JobsRegistryService {
         return null;
       }
 
-      job.workerId = workerId;
-      job.status = JobStatus.IN_PROGRESS;
-      job.pickJobAt = new Date();
-      await queryRunner.manager.save(job);
-
-      if (isBuiltInTools) {
-        if (!job.command) {
-          await queryRunner.rollbackTransaction();
-          return null;
-        }
+      if (isBuiltInTools && !job.command) {
+        await queryRunner.rollbackTransaction();
+        return null;
       }
+
+      // [OPT-5] Use update() instead of save() — direct SQL, no extra SELECT
+      await queryRunner.manager.update(Job, job.id, {
+        workerId,
+        status: JobStatus.IN_PROGRESS,
+        pickJobAt: new Date(),
+      });
+
       await queryRunner.commitTransaction();
 
-      const response: GetNextJobResponseDto = {
+      return {
         id: job.id,
         category: job.category,
         createdAt: job.createdAt,
@@ -449,8 +477,6 @@ export class JobsRegistryService {
         command: job.command,
         asset: job.asset,
       };
-
-      return response;
     } catch (error) {
       Logger.error(
         'Error in getNextJob',
@@ -547,7 +573,7 @@ export class JobsRegistryService {
     dto: UpdateResultDto,
   ): Promise<{ jobId: string; queueId: string }> {
     const fileName = `${dto.jobId}-${Date.now()}.json`;
-    const { path: resultRef } = this.storageService.uploadFile(
+    const { path: resultRef } = await this.storageService.uploadFile(
       fileName,
       Buffer.from(JSON.stringify(dto.data)),
       'job-results',
@@ -581,11 +607,20 @@ export class JobsRegistryService {
       error: error.message,
       retryCount: job.retryCount + 1,
     });
-    await this.jobErrorLogRepo.save({
-      job,
-      logMessage: error.message,
-      payload: JSON.stringify(dto.data),
+
+    // Deduplicate error logs - only create new log if message differs from last error
+    const lastErrorLog = await this.jobErrorLogRepo.findOne({
+      where: { jobId: job.id },
+      order: { createdAt: 'DESC' },
     });
+
+    if (!lastErrorLog || lastErrorLog.logMessage !== error.message) {
+      await this.jobErrorLogRepo.save({
+        job,
+        logMessage: error.message,
+        payload: JSON.stringify(dto.data),
+      });
+    }
   }
 
   /**
@@ -621,8 +656,7 @@ export class JobsRegistryService {
         join assets on jobs."assetId" = assets.id
         join tools on jobs."toolId" = tools.id
         join targets on assets."targetId" = targets.id
-        join "workspace_targets" on targets."id" = "workspace_targets"."targetId"
-        where "workspace_targets"."workspaceId" = $1
+        where targets."workspaceId" = $1
         order by jobs."createdAt" desc
       ),
       grouped_with_id as (
@@ -681,40 +715,91 @@ export class JobsRegistryService {
   }
 
   /**
-   * Updates the result of a job with the given worker ID.
-   * @param job
+   * Gets the next step for a job based on workflow definition.
+   * @param job the completed job
+   * @returns number of new jobs created (0 means no more steps in workflow)
    */
-  public async getNextStepForJob(job: Job) {
+  public async getNextStepForJob(job: Job): Promise<number> {
     const workflow = job.jobHistory.workflow;
-    if (!workflow) return;
+    if (!workflow) return 0;
 
     const currentTool = job.tool.name;
     const { jobs } = workflow.content;
 
-    const curretJobMetadata = jobs.find((j) => j.run === currentTool);
-    if (!curretJobMetadata) return null;
+    const currentJobMetadata = jobs.find((j) => j.run === currentTool);
+    if (!currentJobMetadata) return 0;
 
     const indexCurrentTool = workflow?.content.jobs.findIndex(
-      (j) => j.name === curretJobMetadata.name,
+      (j) => j.name === currentJobMetadata.name,
     );
     const nextTool = workflow?.content.jobs[indexCurrentTool + 1]?.run;
-    if (nextTool) {
-      const tools = await this.toolsService.getToolByNames({
-        names: [nextTool],
+    if (!nextTool) return 0;
+
+    const tools = await this.toolsService.getToolByNames({
+      names: [nextTool],
+    });
+
+    const createPromises = tools.map((tool) =>
+      this.createNewJob({
+        tool,
+        targetIds: [job.asset.target.id],
+        assetIds: [job.asset.id],
+        workflow: job.jobHistory.workflow,
+        jobHistory: job.jobHistory,
+        priority: tool.priority,
+        workspaceId: workflow.workspace.id,
+      }),
+    );
+
+    const results = await Promise.all(createPromises);
+    return results.reduce((total, jobs) => total + jobs.length, 0);
+  }
+
+  /**
+   * Marks a workflow as completed when the last job finishes without spawning new jobs.
+   * Uses optimistic locking to prevent race conditions from multiple completions.
+   * Only marks as completed if no more pending/in-progress jobs exist.
+   * @param jobHistoryId the ID of the job history to mark as completed
+   */
+  public async markWorkflowDone(jobHistoryId: string): Promise<void> {
+    const pendingExists = await this.repo.exists({
+      where: {
+        jobHistory: { id: jobHistoryId },
+        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
+      },
+    });
+
+    if (pendingExists) {
+      return;
+    }
+
+    const updateResult = await this.jobHistoryRepo.update(
+      {
+        id: jobHistoryId,
+        isCompleted: false,
+      },
+      {
+        isCompleted: true,
+      },
+    );
+
+    if (updateResult.affected && updateResult.affected > 0) {
+      const lastJob = await this.repo.findOne({
+        where: { jobHistory: { id: jobHistoryId } },
+        order: { createdAt: 'DESC' },
+        relations: {
+          asset: {
+            target: true,
+          },
+          jobHistory: {
+            workflow: true,
+          },
+        },
       });
-      await Promise.all(
-        tools.map((tool) =>
-          this.createNewJob({
-            tool,
-            targetIds: [job.asset.target.id],
-            assetIds: [job.asset.id],
-            workflow: job.jobHistory.workflow,
-            jobHistory: job.jobHistory,
-            priority: tool.priority,
-            workspaceId: workflow.workspace.id,
-          }),
-        ),
-      );
+
+      if (lastJob) {
+        this.eventEmitter.emit(EventTriggerType.WORKFLOW_END, lastJob);
+      }
     }
   }
 
@@ -765,6 +850,8 @@ export class JobsRegistryService {
       totalJobs: string; // COUNT returns string in some databases
       status: JobStatus;
       workflowName: string;
+      jobHistoryName: string;
+      jobRunType: JobRunType;
     }
 
     // Query job histories with calculated counts and statuses using subqueries
@@ -773,15 +860,16 @@ export class JobsRegistryService {
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('jTarget.workspace', 'workspace')
       .leftJoin('jobHistory.workflow', 'workflow')
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([
         '"jobHistory".id as "id"',
         '"jobHistory"."createdAt" as "createdAt"',
+        '"jobHistory"."jobHistoryName" as "jobHistoryName"',
         '"jobHistory"."updatedAt" as "updatedAt"',
         '"workflow"."name" as "workflowName"',
+        '"jobHistory"."jobRunType" as "jobRunType"',
         // Subquery to count total jobs for this job history
         '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
         // Subquery with CASE to calculate status based on job statuses
@@ -809,8 +897,7 @@ export class JobsRegistryService {
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('jTarget.workspace', 'workspace')
       .where('workspace.id = :workspaceId', { workspaceId })
       .getCount();
 
@@ -821,7 +908,9 @@ export class JobsRegistryService {
       updatedAt: raw.updatedAt,
       totalJobs: parseInt(raw.totalJobs),
       status: raw.status,
-      workflowName: raw.workflowName || 'Manual',
+      workflowName: raw.workflowName,
+      jobHistoryName: raw.jobHistoryName,
+      jobRunType: raw.jobRunType,
     }));
 
     return getManyResponse({ query, data: transformedData, total });
@@ -839,11 +928,6 @@ export class JobsRegistryService {
         workflow: true,
         jobs: {
           tool: true,
-          asset: {
-            target: true,
-          },
-          assetService: true,
-          errorLogs: true,
         },
       },
     });
@@ -858,8 +942,7 @@ export class JobsRegistryService {
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('jTarget.workspace', 'workspace')
       .where('jobHistory.id = :id', { id })
       .andWhere('workspace.id = :workspaceId', { workspaceId })
       .getExists();
@@ -881,15 +964,21 @@ export class JobsRegistryService {
       })
       .filter((tool) => tool !== undefined);
 
-    const { id: historyId, createdAt, updatedAt, jobs, workflow } = jobHistory;
+    const {
+      id: historyId,
+      createdAt,
+      updatedAt,
+      workflow,
+      jobHistoryName,
+    } = jobHistory;
 
     return {
       id: historyId,
       workflowName: workflow.name,
+      jobHistoryName,
       createdAt,
       updatedAt,
       tools,
-      jobs: jobs || [],
     };
   }
 
@@ -909,8 +998,7 @@ export class JobsRegistryService {
         .createQueryBuilder('job')
         .innerJoin('job.asset', 'asset')
         .innerJoin('asset.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
+        .innerJoin('target.workspace', 'workspace')
         .where('job.id = :jobId', { jobId })
         .andWhere('workspace.id = :workspaceId', { workspaceId })
         .getOne();
@@ -1009,304 +1097,5 @@ export class JobsRegistryService {
     } finally {
       await queryRunner.release();
     }
-  }
-
-  /**
-   * Helper to get Redis pending jobs counter key
-   */
-  private getRedisPendingKey(jobHistoryId: string): string {
-    return `jh:${jobHistoryId}:pending`;
-  }
-
-  /**
-   * Increment pending jobs counter for a job history (hybrid Redis + DB)
-   * Redis is used for fast atomic operations, DB is backup for durability
-   */
-  private async incrementJobHistoryCounter(
-    jobHistoryId: string,
-    count: number = 1,
-  ): Promise<void> {
-    const redisKey = this.getRedisPendingKey(jobHistoryId);
-
-    // Increment Redis counter for each job (atomic)
-    for (let i = 0; i < count; i++) {
-      await this.redis.client.incr(redisKey);
-    }
-
-    // Increment DB counter async (non-blocking)
-    setImmediate(() => {
-      void (async () => {
-        try {
-          await this.jobHistoryRepo.increment(
-            { id: jobHistoryId },
-            'pendingJobsCount',
-            count,
-          );
-        } catch (error) {
-          Logger.error(
-            `Failed to increment DB counter for JobHistory ${jobHistoryId}`,
-            error instanceof Error ? error : new Error(String(error)),
-          );
-        }
-      })();
-    });
-  }
-
-  /**
-   * Decrement counter and check if JobHistory is completed
-   * Uses Redis for performance + DB for durability
-   */
-  public async decrementAndCheckCompletion(
-    jobHistoryId: string,
-  ): Promise<void> {
-    const logger = new Logger('JobHistoryCompletion');
-    const redisKey = this.getRedisPendingKey(jobHistoryId);
-
-    try {
-      // 1. Decrement Redis counter (atomic)
-      const remaining = await this.redis.client.decr(redisKey);
-
-      // 2. Decrement DB counter async
-      setImmediate(() => {
-        void (async () => {
-          try {
-            await this.jobHistoryRepo.decrement(
-              { id: jobHistoryId },
-              'pendingJobsCount',
-              1,
-            );
-          } catch (error) {
-            logger.error(
-              `Failed to decrement DB counter for JobHistory ${jobHistoryId}`,
-              error instanceof Error ? error : new Error(String(error)),
-            );
-          }
-        })();
-      });
-
-      // 3. If counter = 0, check completion
-      if (remaining === 0) {
-        await this.checkAndTriggerCompletion(jobHistoryId);
-      } else if (remaining < 0) {
-        // Counter error, rebuild from DB
-        logger.warn(
-          `Redis counter negative for JobHistory ${jobHistoryId}, rebuilding...`,
-        );
-        const realCount = await this.rebuildCounterFromDB(jobHistoryId);
-        // If real count = 0, it means completed but Redis was out of sync
-        if (realCount === 0) {
-          await this.checkAndTriggerCompletion(jobHistoryId);
-        }
-      }
-    } catch (error) {
-      logger.error(
-        `Error in decrementAndCheckCompletion for JobHistory ${jobHistoryId}`,
-        error instanceof Error ? error : new Error(String(error)),
-      );
-      // Fallback: check completion from DB
-      await this.checkAndTriggerCompletionFromDB(jobHistoryId);
-    }
-  }
-
-  /**
-   * Check and trigger completion event (ensures exactly-once execution)
-   */
-  private async checkAndTriggerCompletion(jobHistoryId: string): Promise<void> {
-    const logger = new Logger('JobHistoryCompletion');
-
-    // Double-check with DB to be sure
-    const actualPendingCount = await this.repo.count({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
-      },
-    });
-
-    if (actualPendingCount > 0) {
-      logger.warn(
-        `Redis counter = 0 but DB has ${actualPendingCount} pending jobs. Rebuilding counter.`,
-      );
-      await this.rebuildCounterFromDB(jobHistoryId);
-      return;
-    }
-
-    // Check for FAILED jobs
-    const hasFailedJobs = await this.repo.exists({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: JobStatus.FAILED,
-      },
-    });
-
-    if (hasFailedJobs) {
-      logger.log(
-        `JobHistory ${jobHistoryId} has failed jobs, not triggering completion`,
-      );
-      // Cleanup Redis counter even if failed (completed but failed)
-      const redisKey = this.getRedisPendingKey(jobHistoryId);
-      await this.redis.client.del(redisKey);
-      return;
-    }
-
-    // Update DB with optimistic locking (only 1 process succeeds)
-    const updateResult = await this.jobHistoryRepo.update(
-      {
-        id: jobHistoryId,
-        isCompleted: false,
-      },
-      {
-        isCompleted: true,
-        pendingJobsCount: 0,
-      },
-    );
-
-    // If update success, trigger event
-    if (updateResult.affected && updateResult.affected > 0) {
-      const jobHistory = await this.jobHistoryRepo.findOne({
-        where: { id: jobHistoryId },
-        relations: { workflow: true },
-      });
-
-      if (jobHistory) {
-        await this.triggerJobHistoryCompletedEvent(jobHistory);
-      }
-    } else {
-      // If update failed (maybe completed by another process), double check
-      const current = await this.jobHistoryRepo.findOne({
-        where: { id: jobHistoryId },
-        select: ['isCompleted'],
-      });
-      if (current?.isCompleted) {
-        // Already completed -> ensure key cleanup
-        const redisKey = this.getRedisPendingKey(jobHistoryId);
-        await this.redis.client.del(redisKey);
-      }
-    }
-  }
-
-  /**
-   * Trigger event when JobHistory completed
-   * (Simple logger implementation, custom logic can be added later)
-   */
-  private async triggerJobHistoryCompletedEvent(
-    jobHistory: JobHistory,
-  ): Promise<void> {
-    const logger = new Logger('JobHistoryCompletion');
-
-    logger.log(
-      `🎉 JobHistory ${jobHistory.id} completed! ` +
-        `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
-    );
-
-    // Cleanup Redis counter
-    const redisKey = this.getRedisPendingKey(jobHistory.id);
-    await this.redis.client.del(redisKey);
-
-    // TODO: Add custom logic here (webhook, notification, etc.)
-  }
-
-  /**
-   * Rebuild Redis counter from database (recovery mechanism)
-   */
-  private async rebuildCounterFromDB(jobHistoryId: string): Promise<number> {
-    const logger = new Logger('JobHistoryCompletion');
-
-    const pendingCount = await this.repo.count({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
-      },
-    });
-
-    const redisKey = this.getRedisPendingKey(jobHistoryId);
-
-    if (pendingCount > 0) {
-      await this.redis.client.set(redisKey, pendingCount);
-    } else {
-      // If count = 0, delete key to avoid "stuck at 0" state
-      await this.redis.client.del(redisKey);
-    }
-
-    logger.log(
-      `Rebuilt Redis counter for JobHistory ${jobHistoryId}: ${pendingCount}`,
-    );
-
-    return pendingCount;
-  }
-
-  /**
-   * Fallback: Check completion from DB when Redis fails
-   */
-  private async checkAndTriggerCompletionFromDB(
-    jobHistoryId: string,
-  ): Promise<void> {
-    const jobHistory = await this.jobHistoryRepo.findOne({
-      where: { id: jobHistoryId },
-      relations: { workflow: true },
-    });
-
-    if (!jobHistory || jobHistory.isCompleted) {
-      // If already completed, ensure key cleanup
-      if (jobHistory?.isCompleted) {
-        const redisKey = this.getRedisPendingKey(jobHistoryId);
-        await this.redis.client.del(redisKey);
-      }
-      return;
-    }
-
-    const pendingCount = await this.repo.count({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
-      },
-    });
-
-    if (pendingCount === 0) {
-      await this.checkAndTriggerCompletion(jobHistoryId);
-    } else {
-      // If not completed but fallback called, maybe sync redis again?
-      // But this is error handler path, safest to rebuild counter
-      await this.rebuildCounterFromDB(jobHistoryId);
-    }
-  }
-
-  /**
-   * Validate counters between Redis and DB (optional monitoring)
-   * Can be run via cron job
-   */
-  public async validateCounters(jobHistoryId: string): Promise<boolean> {
-    const logger = new Logger('CounterValidation');
-
-    // Get Redis counter
-    const redisKey = this.getRedisPendingKey(jobHistoryId);
-    const redisCount = parseInt(
-      (await this.redis.client.get(redisKey)) || '0',
-      10,
-    );
-
-    // Get actual count from DB
-    const actualCount = await this.repo.count({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
-      },
-    });
-
-    // Get DB counter
-    const jobHistory = await this.jobHistoryRepo.findOne({
-      where: { id: jobHistoryId },
-      select: ['pendingJobsCount'],
-    });
-
-    if (redisCount !== actualCount) {
-      logger.warn(
-        `Counter mismatch for JobHistory ${jobHistoryId}: ` +
-          `Redis=${redisCount}, Actual=${actualCount}, DB=${jobHistory?.pendingJobsCount}`,
-      );
-      await this.rebuildCounterFromDB(jobHistoryId);
-      return false;
-    }
-
-    return true;
   }
 }

@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
+import { getWorkspaceIdFromRequest } from '../decorators/workspace-id.decorator';
 import {
   RequestWithMetadata,
   UserContextPayload,
@@ -27,11 +28,7 @@ export class WorkspaceOwnerGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    // Get workspaceId from header (using x-workspace-id)
-    const workspaceIdHeader = request.headers['x-workspace-id'];
-    const workspaceId = Array.isArray(workspaceIdHeader)
-      ? workspaceIdHeader[0]
-      : workspaceIdHeader;
+    const workspaceId = getWorkspaceIdFromRequest(request);
     if (!workspaceId) {
       throw new ForbiddenException('Workspace ID not provided in headers');
     }

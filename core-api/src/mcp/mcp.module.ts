@@ -1,46 +1,25 @@
-import { McpGuard } from '@/common/guards/mcp.guard';
-import { AssetsModule } from '@/modules/assets/assets.module';
-import { StatisticModule } from '@/modules/statistic/statistic.module';
-import { TargetsModule } from '@/modules/targets/targets.module';
-import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
-import { WorkspacesModule } from '@/modules/workspaces/workspaces.module';
-import { IssuesModule } from '@/modules/issues/issues.module';
-import { ToolsModule } from '@/modules/tools/tools.module';
-import { WorkersModule } from '@/modules/workers/workers.module';
-import { JobsRegistryModule } from '@/modules/jobs-registry/jobs-registry.module';
+import { API_GLOBAL_PREFIX } from '@/common/constants/app.constants';
+import { AgentsModule } from '@/modules/agents/agents.module';
+import { ApiKeysModule } from '@/modules/apikeys/apikeys.module';
+import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { Global, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { McpModule, McpTransportType } from '@rekog/mcp-nest';
-import { McpPermission } from './entities/mcp-permission.entity';
+import { json } from 'express';
 import { McpController } from './mcp.controller';
-import { McpPrompts } from './mcp.prompt';
-import { McpResources } from './mcp.resource';
+import { McpGuard } from './mcp.guard';
 import { McpService } from './mcp.service';
-import { McpTools } from './mcp.tools';
+
 @Global()
 @Module({
+  imports: [AgentsModule, ApiKeysModule],
   controllers: [McpController],
-  imports: [
-    AssetsModule,
-    WorkspacesModule,
-    TargetsModule,
-    StatisticModule,
-    VulnerabilitiesModule,
-    TypeOrmModule.forFeature([McpPermission]),
-    IssuesModule,
-    ToolsModule,
-    WorkersModule,
-    JobsRegistryModule,
-    McpModule.forRoot({
-      name: 'oasm-server',
-      instructions: 'OpenASM Server',
-      sseEndpoint: '/mcp',
-      version: '1.0.0',
-      transport: McpTransportType.SSE,
-      guards: [McpGuard],
-    }),
-  ],
-  providers: [McpTools, McpService, McpResources, McpPrompts],
+  providers: [McpService, McpGuard],
   exports: [McpService],
 })
-export class McpServerModule {}
+export class McpServerModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    // MCP message endpoint needs JSON body parser (global bodyParser: false)
+    consumer
+      .apply(json())
+      .forRoutes(`/${API_GLOBAL_PREFIX}/mcp/message`);
+  }
+}

@@ -10,6 +10,11 @@ export enum Role {
   BOT = 'bot',
 }
 
+export enum WorkspaceRole {
+  OWNER = 'owner',
+  MEMBER = 'member',
+}
+
 /**
  * Enum representing tool categories used in the system
  */
@@ -124,6 +129,7 @@ export enum BullMQName {
   NOTIFICATION = 'notification',
   JOB_RESULT = 'job-result',
   ISSUE_CREATION = 'issue-creation',
+  VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
 }
 
 export enum NotificationStatus {
@@ -140,17 +146,13 @@ export enum NotificationScope {
 
 export enum NotificationType {
   WORKSPACE_CREATED = 'WORKSPACE_CREATED',
+  VULNERABILITY_ANALYSIS_COMPLETED = 'VULNERABILITY_ANALYSIS_COMPLETED',
+  ASSET_NEW_DETECT = 'ASSET_NEW_DETECT',
 }
 
 export enum Language {
   EN = 'en',
   VI = 'vi',
-}
-
-export enum NotificationEventType {
-  SCAN_FAILED = 'events.notification.content.SCAN_FAILED',
-  VULNERABILITY_DISCOVERY = 'events.notification.content.VULNERABILITY_DISCOVERY',
-  WORKFLOW_RUN = 'events.notification.content.WORKFLOW_RUN',
 }
 
 export enum IssueStatus {
@@ -172,4 +174,67 @@ export enum DismissReason {
   FALSE_POSITIVE = 'false_positive',
   USED_IN_TEST = 'used_in_test',
   WONT_FIX = 'wont_fix',
+}
+
+export enum JobRunType {
+  MANUAL = 'manual',
+  SCHEDULED = 'scheduled',
+}
+
+/**
+ * Enum representing data sources for tools
+ * Determines which entity the tool operates on
+ */
+export enum DataSource {
+  /** Tool operates on assets (e.g., subdomain discovery, port scanning) */
+  ASSET = 'asset',
+  /** Tool operates on asset services (e.g., HTTP probe, screenshot) */
+  ASSET_SERVICE = 'asset_service',
+}
+
+/**
+ * Mapping between tool categories and their data sources
+ * Each category maps to exactly one data source
+ */
+export const CATEGORY_DATA_SOURCE_MAP: Record<ToolCategory, DataSource> = {
+  [ToolCategory.SUBDOMAINS]: DataSource.ASSET,
+  [ToolCategory.HTTP_PROBE]: DataSource.ASSET_SERVICE,
+  [ToolCategory.PORTS_SCANNER]: DataSource.ASSET,
+  [ToolCategory.VULNERABILITIES]: DataSource.ASSET,
+  [ToolCategory.SCREENSHOT]: DataSource.ASSET_SERVICE,
+  [ToolCategory.CLASSIFIER]: DataSource.ASSET,
+  [ToolCategory.ASSISTANT]: DataSource.ASSET,
+};
+
+export enum VulnerabilityAnalyzeStatus {
+  NOT_ANALYZED = 'not_analyzed',
+  RUNNING = 'running',
+  DONE = 'done',
+  FAILED = 'failed',
+}
+
+/**
+ * Enum representing target scope - internal or external networks
+ */
+export enum TargetScopeType {
+  /** Targets belonging to internal networks */
+  INTERNAL = 'INTERNAL',
+  /** Targets belonging to external networks (public) */
+  EXTERNAL = 'EXTERNAL',
+}
+
+export enum AgentMode {
+  ASK = 'ask',
+  AGENT = 'agent',
+}
+
+export enum DefaultWorkflow {
+  DOMAIN_DISCOVERY = 'domain_discovery.yaml',
+  IP_ADDRESS_DISCOVERY = 'ip_address_discovery.yaml',
+  VULNERABILITY_SCAN_BASIC = 'vulnerability_scan_basic.yaml',
+}
+
+export enum EventTriggerType {
+  WORKFLOW_START = 'WORKFLOW_START',
+  WORKFLOW_END = 'WORKFLOW_END',
 }

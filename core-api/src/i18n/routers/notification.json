@@ -1,3 +1,5 @@
 {
-  "WORKSPACE_CREATED": "/settings/workspaces"
+  "WORKSPACE_CREATED": "/settings/workspaces",
+  "VULNERABILITY_ANALYSIS_COMPLETED": "/vulnerabilities/{id}",
+  "ASSET_NEW_DETECT": "/targets/{targetId}"
 }

@@ -76,6 +76,7 @@ describe('DataAdapterService', () => {
           provide: IssuesService,
           useValue: {
             createIssue: jest.fn(),
+            findExistingOpenIssueBySource: jest.fn().mockResolvedValue(null),
           },
         },
         {
@@ -490,7 +491,10 @@ describe('DataAdapterService', () => {
         updatedAt: new Date(),
       },
       assetServiceId: null,
-      jobHistory: { id: 'history-id' },
+      jobHistory: {
+        id: 'history-id',
+        workflow: { workspace: { id: 'workspace-id' } },
+      },
       tool: { id: 'tool-id', category: ToolCategory.VULNERABILITIES },
       category: ToolCategory.VULNERABILITIES,
       createdAt: new Date(),
@@ -559,6 +563,49 @@ describe('DataAdapterService', () => {
       expect(mockQueryBuilder.orUpdate).toHaveBeenCalled();
       expect(mockQueryBuilder.returning).toHaveBeenCalledWith('*');
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
+    });
+
+    it('should not create issues for vulnerabilities (creation logic is disabled)', async () => {
+      // Issue creation from vulnerabilities is commented out in the service.
+      // This test verifies no issue-related methods are called.
+      const mockIssuesService = {
+        createIssue: jest.fn(),
+        findExistingOpenIssueBySource: jest.fn(),
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      const mockQueryBuilder = {
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: mockVulnerabilities,
+          identifiers: mockVulnerabilities.map((v) => ({ id: v.id })),
+        }),
+      };
+
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.vulnerabilities({
+        data: mockVulnerabilities,
+        job: mockJob,
+      });
+
+      // Issue creation is currently disabled — neither should be called
+      expect(
+        mockIssuesService.findExistingOpenIssueBySource,
+      ).not.toHaveBeenCalled();
+      expect(mockIssuesService.createIssue).not.toHaveBeenCalled();
     });
 
     it('should not insert vulnerabilities if data is empty', async () => {

@@ -1,20 +1,22 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { useStatisticControllerGetTopTagsAssets, type TopTagAsset } from '@/services/apis/gen/queries';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import {
+  useStatisticControllerGetTopTagsAssets,
+  type TopTagAsset,
+} from '@/services/apis/gen/queries';
 import { Tag } from 'lucide-react';
 
 export default function TopTagsAssets() {
-  const { selectedWorkspace } = useWorkspaceSelector();
-
-  const { data: topTags, isLoading } = useStatisticControllerGetTopTagsAssets(
-    {
-      query: {
-        enabled: !!selectedWorkspace,
-        refetchInterval: 5000, // Auto refresh every 5 seconds
-      },
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
+  const { data: topTags, isLoading } = useStatisticControllerGetTopTagsAssets({
+    query: {
+      enabled: !!selectedWorkspaceId,
+      refetchInterval: 5000, // Auto refresh every 5 seconds
     },
-  );
+  });
 
   if (isLoading) {
     return (
@@ -42,18 +44,21 @@ export default function TopTagsAssets() {
         <CardTitle className="font-medium text-base">Top tags assets</CardTitle>
         <Tag className="h-5 w-5 text-primary" />
       </CardHeader>
-      {!topTags || topTags.length === 0 && (
-        <CardContent className="text-center text-sm text-muted-foreground">
-          No tags assets found
-        </CardContent>
-      )}
+      {!topTags ||
+        (topTags.length === 0 && (
+          <CardContent className="text-center text-sm text-muted-foreground">
+            No tags assets found
+          </CardContent>
+        ))}
       <CardContent>
         <div className="flex flex-col gap-2">
           {topTags &&
             topTags.map((item: TopTagAsset, index: number) => (
               <div key={index} className="flex items-center gap-2 py-1">
-                <span className="w-3/8 truncate text-sm font-bold">{item.tag}</span>
-                <div className='w-5/8 flex items-center'>
+                <span className="w-3/8 truncate text-sm font-bold">
+                  {item.tag}
+                </span>
+                <div className="w-5/8 flex items-center">
                   <Progress
                     value={maxCount > 0 ? (item.count / maxCount) * 100 : 0}
                     className="w-full mr-2"

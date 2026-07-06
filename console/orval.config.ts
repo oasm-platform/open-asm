@@ -47,14 +47,12 @@ export default defineConfig({
   api: {
     output: {
       target: 'src/services/apis/gen/queries.ts',
-      prettier: true,
+      formatter: 'prettier',
       clean: true,
       client: 'react-query',
+      httpClient: 'axios',
       override: {
         useTypeOverInterfaces: true,
-        query: {
-          useQuery: true,
-        },
         mutator: {
           path: 'src/services/apis/axios-client.ts',
           name: 'orvalClient',
@@ -63,7 +61,6 @@ export default defineConfig({
       },
     },
     input: {
-      validation: false,
       target: '../.open-api/open-api.json',
     },
   },

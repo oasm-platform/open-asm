@@ -1,4 +1,5 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetTlsAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -7,14 +8,14 @@ import { tlsAssetsColumn } from './tls-assets-column';
 
 export default function TlsAssetsTab() {
   const {
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
     targetId,
   } = useAsset();
 
-  const { data, isLoading } = useAssetsControllerGetTlsAssets(
+  const { data, isLoading, refetch } = useAssetsControllerGetTlsAssets(
     {
       page: queryParams.page,
       limit: queryParams.limit,
@@ -22,6 +23,8 @@ export default function TlsAssetsTab() {
       sortOrder: queryParams.sortOrder,
       search: queryParams.value,
       targetIds: queryParams.targetIds,
+      startDate: queryParams.startDate,
+      endDate: queryParams.endDate,
     },
     {
       query: {
@@ -34,11 +37,12 @@ export default function TlsAssetsTab() {
   const tlsAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading TLS assets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load TLS assets." onRetry={refetch} />;
 
   return (
     <>
-      <TabsContent value="tls" className="overflow-hidden">
+      <TabsContent value="tls">
         <CollapsibleDataTable
           data={tlsAssets}
           columns={tlsAssetsColumn}
@@ -50,8 +54,7 @@ export default function TlsAssetsTab() {
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           onSortChange={(col, order) => {
-            setSortBy(col);
-            setSortOrder(order);
+            setParams({ sortBy: col, sortOrder: order });
           }}
           totalItems={total}
           collapsibleElement={(row) => (

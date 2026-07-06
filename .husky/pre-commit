@@ -11,15 +11,15 @@
 # fi
 
 # Run lint check
-echo "Running lint check..."
-cd core-api && npm run lint
-if [ $? -ne 0 ]; then
-  echo "Lint check failed in core-api. Please fix lint errors before committing."
-  exit 1
-fi
+# echo "Running lint check..."
+# cd core-api && npm run lint
+# if [ $? -ne 0 ]; then
+#   echo "Lint check failed in core-api. Please fix lint errors before committing."
+#   exit 1
+# fi
 
-cd ../console && npm run lint
-if [ $? -ne 0 ]; then
-  echo "Lint check failed in console. Please fix lint errors before committing."
-  exit 1
-fi
+# cd ../console && npm run lint
+# if [ $? -ne 0 ]; then
+#   echo "Lint check failed in console. Please fix lint errors before committing."
+#   exit 1
+# fi

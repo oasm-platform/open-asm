@@ -116,11 +116,10 @@ export class WorkflowsService implements OnModuleInit {
           const baseName = fileName.replace(/\.(yaml|yml)$/, '');
           const normalizedName = baseName
             .replace(/[-_]/g, ' ')
-            .split(' ')
-            .filter(Boolean)
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
-          const workflowName = `[Default] ${normalizedName}`;
+            .replace(/\s+/g, ' ')
+            .trim();
+          const workflowName =
+            normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1);
 
           // Check current workflow for this workspace
           const existing = await this.workflowRepository.findOne({

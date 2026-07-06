@@ -9,7 +9,7 @@ import { UpdateTargetDtoScanSchedule } from '@/services/apis/gen/queries';
 import { Clock, X } from 'lucide-react';
 
 interface ScanScheduleSelectProps {
-  value: UpdateTargetDtoScanSchedule;
+  value?: UpdateTargetDtoScanSchedule;
   onChange: (value: UpdateTargetDtoScanSchedule) => void;
   disabled?: boolean;
 }
@@ -42,7 +42,7 @@ const scheduleOptions = [
 ];
 
 export const ScanScheduleSelect = ({
-  value,
+  value = UpdateTargetDtoScanSchedule.disabled,
   onChange,
   disabled,
 }: ScanScheduleSelectProps) => {

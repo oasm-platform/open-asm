@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 # Install BASH to make our lives easier for entrypoint.sh...
 RUN apk add --no-cache curl bash && \
     npm install -g serve && \

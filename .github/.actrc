@@ -1,0 +1,3 @@
+-P ubuntu-latest=catthehacker/ubuntu:full-latest
+--container-architecture linux/amd64
+--reuse

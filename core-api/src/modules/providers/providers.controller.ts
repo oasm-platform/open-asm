@@ -19,7 +19,7 @@ import { ProvidersService } from './providers.service';
 
 @Controller('providers')
 export class ProvidersController {
-  constructor(private readonly providersService: ProvidersService) { }
+  constructor(private readonly providersService: ProvidersService) {}
 
   @Doc({
     summary: 'Get all providers',

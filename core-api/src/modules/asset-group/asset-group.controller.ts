@@ -3,6 +3,7 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { JobRunType } from '@/common/enums/enum';
 import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -326,6 +327,9 @@ export class AssetGroupController {
   @UseGuards(WorkspaceOwnerGuard)
   @Post('workflows/:id/run')
   runGroupWorkflowScheduler(@Param() queryParams: IdQueryParamDto) {
-    return this.assetGroupService.runGroupWorkflowScheduler(queryParams.id);
+    return this.assetGroupService.runGroupWorkflowScheduler(
+      queryParams.id,
+      JobRunType.MANUAL,
+    );
   }
 }

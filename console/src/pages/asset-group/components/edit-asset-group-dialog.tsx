@@ -105,7 +105,7 @@ export function EditAssetGroupDialog({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Asset Group</DialogTitle>
+            <DialogTitle>Edit asset group</DialogTitle>
             <DialogDescription>
               Update the name and color of your asset group.
             </DialogDescription>
@@ -172,7 +172,7 @@ export function EditAssetGroupDialog({
                 )}
               />
               <DialogFooter>
-                <Button type="submit">Save Changes</Button>
+                <Button type="submit">Save</Button>
               </DialogFooter>
             </form>
           </Form>

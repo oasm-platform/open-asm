@@ -1,4 +1,5 @@
 import { DataTable } from '@/components/ui/data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
 import { useState } from 'react';
 import { type AssetContextType } from '../context/asset-context';
@@ -15,7 +16,7 @@ export function AssetTable({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
-  const { data, isLoading } = useAssetsControllerGetAssetsInWorkspace(
+  const { data, isLoading, refetch } = useAssetsControllerGetAssetsInWorkspace(
     {
       page,
       limit: pageSize,
@@ -27,7 +28,8 @@ export function AssetTable({
   const assets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading targets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load assets." onRetry={refetch} />;
   return (
     <>
       <DataTable

@@ -1,4 +1,3 @@
-import type { McpPermission } from '@/mcp/entities/mcp-permission.entity';
 import type { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { IsString } from 'class-validator';
 import type { Request } from 'express';
@@ -54,9 +53,7 @@ export interface RequestWithMetadata extends Request {
     image?: string | null | undefined;
     role: Role;
   };
-  mcp?: {
-    permissions: McpPermission;
-  };
+  workspaceId: string;
 }
 
 export interface Technology {
@@ -72,4 +69,27 @@ export class ScreenshotPayload {
   url: string;
   @IsString()
   screenshot: string;
+}
+
+export interface ReleaseVersion {
+  url: string;
+  assets_url: string;
+  upload_url: string;
+  html_url: string;
+  id: number;
+  node_id: string;
+  tag_name: string;
+  target_commitish: string;
+  name: string;
+  draft: boolean;
+  immutable: boolean;
+  prerelease: boolean;
+  created_at: string;
+  updated_at: string;
+  published_at: string;
+  tarball_url: string;
+  zipball_url: string;
+  body: string;
+  mentions_count: number;
+  last_check: string;
 }

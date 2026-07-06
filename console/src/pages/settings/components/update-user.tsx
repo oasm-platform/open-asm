@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Card, CardTitle } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -50,7 +51,8 @@ export default function UpdateUser() {
   }
 
   return (
-    <div className="w-full">
+    <Card className="p-4">
+      <CardTitle>Profile</CardTitle>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
@@ -71,17 +73,18 @@ export default function UpdateUser() {
               </FormItem>
             )}
           />
-          <Button
-            disabled={loading || !form.formState.isDirty}
-            type="submit"
-            className="w-full"
-            size="sm"
-          >
-            {loading && <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />}
-            Update
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              disabled={loading || !form.formState.isDirty}
+              type="submit"
+              size="sm"
+            >
+              {loading && <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />}
+              Save
+            </Button>
+          </div>
         </form>
       </Form>
-    </div>
+    </Card>
   );
 }

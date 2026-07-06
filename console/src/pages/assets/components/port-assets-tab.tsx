@@ -1,4 +1,5 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetPortAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -7,14 +8,14 @@ import { portAssetsColumn } from './port-assets-column';
 
 export default function PortAssetsTab() {
   const {
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
     targetId,
   } = useAsset();
 
-  const { data, isLoading } = useAssetsControllerGetPortAssets(queryParams, {
+  const { data, isLoading, refetch } = useAssetsControllerGetPortAssets(queryParams, {
     query: {
       ...queryOptions.query,
       queryKey: ['ports', ...queryOptions.query.queryKey],
@@ -24,11 +25,12 @@ export default function PortAssetsTab() {
   const portAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading targets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load port assets." onRetry={refetch} />;
 
   return (
     <>
-      <TabsContent value="port" className="overflow-hidden">
+      <TabsContent value="port">
         <CollapsibleDataTable
           data={portAssets}
           columns={portAssetsColumn}
@@ -40,8 +42,7 @@ export default function PortAssetsTab() {
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           onSortChange={(col, order) => {
-            setSortBy(col);
-            setSortOrder(order);
+            setParams({ sortBy: col, sortOrder: order });
           }}
           totalItems={total}
           collapsibleElement={(row) => (

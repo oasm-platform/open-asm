@@ -2,15 +2,16 @@ import { Slot } from '@radix-ui/react-slot';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
-import { badgeVariants } from './badge-variants';
+import { badgeVariants, type VariantProps } from './badge-variants';
 
-function Badge({
-  className,
-  variant,
-  asChild = false,
-  ...props
-}: React.ComponentProps<'span'> &
-  React.ComponentProps<typeof badgeVariants> & { asChild?: boolean }) {
+export interface BadgeProps
+  extends
+    React.ComponentPropsWithRef<'span'>,
+    VariantProps<typeof badgeVariants> {
+  asChild?: boolean;
+}
+
+function Badge({ className, variant, asChild = false, ...props }: BadgeProps) {
   const Comp = asChild ? Slot : 'span';
 
   return (

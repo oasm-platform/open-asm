@@ -1,7 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from '@tanstack/react-router';
 
-import { CodeBlock } from '@/components/common/code-block';
 import Page from '@/components/common/page';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
@@ -19,12 +18,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Image from '@/components/ui/image';
 import JobStatusBadge from '@/components/ui/job-status';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Job } from '@/services/apis/gen/queries';
 import {
   JobStatus,
   useJobsRegistryControllerCancelJob,
   useJobsRegistryControllerDeleteJob,
   useJobsRegistryControllerGetJobHistoryDetail,
+  useJobsRegistryControllerGetManyJobs,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -37,12 +38,24 @@ import {
   MoreHorizontal,
   X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 export default function Runs() {
-  const { id: jobHistoryId } = useParams<{ id: string }>();
+  const { id: jobHistoryId } = useParams({ strict: false });
   const [jobError, setJobError] = useState<Job | null>();
   const queryClient = useQueryClient();
+
+  const { mutate: deleteJobMutate } = useJobsRegistryControllerDeleteJob();
+  const { mutate: cancelJobMutate } = useJobsRegistryControllerCancelJob();
+
+  const { tableParams, tableHandlers } = useServerDataTable({
+    defaultPage: 1,
+    defaultPageSize: 10,
+    defaultSortBy: 'createdAt',
+    defaultSortOrder: 'DESC',
+    isUpdateSearchQueryParam: false,
+  });
+
   const { data: jobHistoryDetail } =
     useJobsRegistryControllerGetJobHistoryDetail(jobHistoryId || '', {
       query: {
@@ -50,26 +63,76 @@ export default function Runs() {
       },
     });
 
-  const { mutate: deleteJobMutate } = useJobsRegistryControllerDeleteJob();
-  const { mutate: cancelJobMutate } = useJobsRegistryControllerCancelJob();
+  // Fetch all jobs for pipeline indicators (without pagination)
+  const {
+    data: allJobsData,
+    error: allJobsError,
+  } = useJobsRegistryControllerGetManyJobs({
+    page: 1,
+    limit: 100,
+    sortBy: 'createdAt',
+    sortOrder: 'ASC',
+    jobHistoryId: jobHistoryId || '',
+  });
 
-  // Memoize jobs grouped by tool ID for efficient lookups
+  // Check if any jobs are still in progress (pending or in_progress)
+  // Always poll initially, stop when no active jobs remain
+  const hasActiveJobsRef = useRef(true);
+  const hasActiveJobs = useMemo(() => {
+    const jobs = allJobsData?.data || [];
+    const active = jobs.some(
+      (job) =>
+        job.status === JobStatus.pending ||
+        job.status === JobStatus.in_progress,
+    );
+    hasActiveJobsRef.current = active;
+    return active;
+  }, [allJobsData?.data]);
+
+  const {
+    data: paginatedJobsData,
+    isLoading: isLoadingJobs,
+    error: jobsError,
+    queryKey: paginatedJobsQueryKey,
+  } = useJobsRegistryControllerGetManyJobs({
+    page: tableParams.page,
+    limit: tableParams.pageSize,
+    sortBy: tableParams.sortBy,
+    sortOrder: tableParams.sortOrder,
+    jobHistoryId: jobHistoryId || '',
+  }, {
+    query: {
+      refetchInterval: hasActiveJobs ? 1000 : false,
+    },
+  });
+
+  // Memoize jobs grouped by tool ID for efficient lookups, with name-based fallback
   const jobsByToolId = useMemo(() => {
-    if (!jobHistoryDetail?.jobs) return new Map<string, Job[]>();
-    return jobHistoryDetail.jobs.reduce((acc, job) => {
-      // Check if job.tool exists before accessing its id property
-      if (!job.tool) {
-        console.warn(`Job ${job.id} has no tool assigned:`, job);
-        return acc;
-      }
-      const toolId = job.tool.id;
-      if (!acc.has(toolId)) {
-        acc.set(toolId, []);
-      }
-      acc.get(toolId)!.push(job);
-      return acc;
-    }, new Map<string, Job[]>());
-  }, [jobHistoryDetail?.jobs]);
+    const jobs = allJobsData?.data || [];
+    const byId = new Map<string, Job[]>();
+    const byName = new Map<string, Job[]>();
+    jobs.forEach((job) => {
+      if (!job.tool) return;
+      const id = job.tool.id;
+      if (!byId.has(id)) byId.set(id, []);
+      byId.get(id)!.push(job);
+      const name = job.tool.name.toLowerCase();
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name)!.push(job);
+    });
+    return { byId, byName };
+  }, [allJobsData?.data]);
+
+  // Get jobs for a tool, matching by ID first then by name as fallback
+  const getJobsForTool = useCallback((toolId: string, toolName?: string): Job[] => {
+    if (!jobsByToolId) return [];
+    const byId = jobsByToolId.byId.get(toolId);
+    if (byId) return byId;
+    if (toolName) {
+      return jobsByToolId.byName.get(toolName.toLowerCase()) || [];
+    }
+    return [];
+  }, [jobsByToolId]);
 
   const getTitle = (row: Job) => {
     const value = row?.assetService
@@ -99,7 +162,7 @@ export default function Runs() {
         <div className="min-h-[60px] flex items-center">
           {row.original.tool ? (
             <Link
-              to={`/tools/${row.original.tool.id}`}
+              to="/tools/$id" params={{ id: row.original.tool.id }}
               className="flex items-center gap-2"
             >
               <Image
@@ -206,6 +269,9 @@ export default function Runs() {
                                 jobHistoryId,
                               ],
                             });
+                            queryClient.invalidateQueries({
+                              queryKey: paginatedJobsQueryKey,
+                            });
                           },
                         },
                       )
@@ -230,6 +296,9 @@ export default function Runs() {
                               'JobsRegistryControllerGetJobHistoryDetail',
                               jobHistoryId,
                             ],
+                          });
+                          queryClient.invalidateQueries({
+                            queryKey: paginatedJobsQueryKey,
                           });
                         },
                       },
@@ -259,37 +328,33 @@ export default function Runs() {
       // Check if any previous tool in the workflow is still running or waiting
       for (let i = 0; i < toolIndex; i++) {
         const prevTool = tools[i];
-        // Check if prevTool exists before accessing its id
         if (!prevTool) {
           console.warn(`Previous tool is undefined at index: ${i}`);
           continue;
         }
-        const prevToolJobs = jobsByToolId.get(prevTool.id) || [];
+        const prevToolJobs = getJobsForTool(prevTool.id, prevTool.name);
 
         if (prevToolJobs.length > 0) {
           const hasPrevRunning = prevToolJobs.some(
             (job) => job.status === JobStatus.in_progress,
           );
-          if (hasPrevRunning) return 'pending'; // Changed from 'running' to 'pending'
+          if (hasPrevRunning) return 'pending';
 
           const allPrevCompleted = prevToolJobs.every(
             (job) => job.status === JobStatus.completed,
           );
-          if (!allPrevCompleted) return 'pending'; // Changed from 'running' to 'pending'
+          if (!allPrevCompleted) return 'pending';
         }
-        // If previous tool has no jobs or is completed, continue to check current tool
       }
 
       // Check current tool jobs
       const currentTool = tools[toolIndex];
-      // Check if currentTool exists before accessing its id
       if (!currentTool) {
         console.warn(`Current tool is undefined at index: ${toolIndex}`);
         return 'pending';
       }
-      const currentToolJobs = jobsByToolId.get(currentTool.id) || [];
+      const currentToolJobs = getJobsForTool(currentTool.id, currentTool.name);
 
-      // If current tool has no jobs yet, it's pending
       if (currentToolJobs.length === 0) return 'pending';
 
       const hasFailed = currentToolJobs.some(
@@ -312,36 +377,31 @@ export default function Runs() {
       );
       if (allPending) return 'pending';
 
-      // Mixed statuses - some pending, some running, some completed
       return 'running';
     };
-  }, [jobHistoryDetail?.tools, jobsByToolId]);
-
-  // Memoize sorted jobs to avoid sorting on every render
-  const sortedJobs = useMemo(() => {
-    // Use .slice() to create a shallow copy before sorting to avoid mutating the original array
-    return (jobHistoryDetail?.jobs || [])
-      .slice()
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-  }, [jobHistoryDetail?.jobs]);
+  }, [jobHistoryDetail?.tools, getJobsForTool]);
 
   const navigate = useNavigate();
   return (
-    <Page isShowButtonGoBack title={jobHistoryDetail?.workflowName}>
+    <Page
+      isShowButtonGoBack
+      title={
+        jobHistoryDetail?.jobHistoryName ||
+        jobHistoryDetail?.workflowName ||
+        'Job History Detail'
+      }
+    >
       {/* Tools Section */}
-      {jobHistoryDetail?.tools && jobHistoryDetail.tools.length > 0 && (
+      {!!jobHistoryDetail?.tools?.length && (
         <div className="mb-6 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold mb-4">Workflow</h3>
+          <h3 className="text-lg font-semibold mb-4">Pipeline</h3>
           <div className="flex items-center gap-4 flex-wrap">
             {jobHistoryDetail.tools.map((tool, index) => {
               const status = getToolStatus(index);
               return (
                 <div key={tool.id} className="flex items-center gap-2">
                   <Link
-                    to={`/tools/${tool.id}`}
+                    to="/tools/$id" params={{ id: tool.id }}
                     className="flex items-center gap-2 hover:opacity-80"
                   >
                     <Image
@@ -372,43 +432,79 @@ export default function Runs() {
         </div>
       )}
 
+      {!!jobsError && (
+        <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
+          Failed to load jobs. Please try again.
+        </div>
+      )}
+
+      {!!allJobsError && (
+        <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
+          Failed to load pipeline status. Please try again.
+        </div>
+      )}
+
       <DataTable
         isShowHeader={false}
         columns={columns}
-        data={sortedJobs}
+        data={paginatedJobsData?.data || []}
+        isLoading={isLoadingJobs}
         showColumnVisibility={true}
-        showPagination={false}
-        page={1}
-        pageSize={jobHistoryDetail?.jobs?.length || 0}
-        totalItems={jobHistoryDetail?.jobs?.length || 0}
+        showPagination={true}
+        page={paginatedJobsData?.page || 1}
+        pageSize={paginatedJobsData?.limit || 10}
+        totalItems={paginatedJobsData?.total || 0}
+        onPageChange={tableHandlers.setPage}
+        onPageSizeChange={tableHandlers.setPageSize}
         onRowClick={(row) => {
           if (row.status === JobStatus.failed) {
             setJobError(row);
             return;
           }
-          const redirect = row.assetServiceId
-            ? `/assets/${row.assetServiceId}`
-            : `/assets?filter=${row?.asset?.value}`;
-          navigate(redirect);
+          if (row.assetServiceId) {
+            navigate({ to: `/assets/${row.assetServiceId}` });
+          } else {
+            navigate({ to: '/assets', search: { filter: row?.asset?.value } });
+          }
         }}
       />
       <Dialog open={!!jobError} onOpenChange={() => setJobError(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[80vh] flex flex-col max-w-2xl">
           <DialogHeader>
             <DialogTitle>{jobError && getTitle(jobError)}</DialogTitle>
-            {jobError?.errorLogs.map((errorLog) => (
-              <div className="mb-1 flex flex-col border-b-2" key={errorLog.id}>
-                <CodeBlock
-                  language="Payload"
-                  value={String(errorLog.payload).replace(/\n$/, '')}
-                />
-                <CodeBlock
-                  language="Log Message"
-                  value={String(errorLog.logMessage).replace(/\n$/, '')}
-                />
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-2 -mr-2 space-y-3">
+            {jobError?.errorLogs?.map((errorLog, index) => (
+              <div
+                className="rounded-lg border bg-muted/50 p-3"
+                key={errorLog.id}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Error {index + 1}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1">
+                      Payload
+                    </span>
+                    <pre className="text-sm font-mono bg-background rounded p-2 overflow-x-auto">
+                      {String(errorLog.payload).replace(/\n$/, '')}
+                    </pre>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1">
+                      Message
+                    </span>
+                    <pre className="text-sm font-mono bg-background rounded p-2 overflow-x-auto text-destructive">
+                      {String(errorLog.logMessage).replace(/\n$/, '')}
+                    </pre>
+                  </div>
+                </div>
               </div>
             ))}
-          </DialogHeader>
+          </div>
         </DialogContent>
       </Dialog>
     </Page>

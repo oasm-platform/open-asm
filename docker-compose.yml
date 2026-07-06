@@ -12,6 +12,11 @@ services:
     ports:
       - '3000:80'
     restart: 'always'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
     depends_on:
       core-api:
@@ -29,20 +34,30 @@ services:
       - ./core-api/.env
     ports:
       - '6276:6276'
+      - '16276:16276'
     environment:
       - POSTGRES_HOST=postgres
       - REDIS_URL=redis://:password@redis:6379/0
       - GEO_IP_URL=geo-ip:4360
       - OASM_CLOUD_APIKEY=change_me
+      - RUSTFS_ENDPOINT=http://rustfs:9000
     restart: 'always'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     depends_on:
+      migration:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rustfs:
+        condition: service_started
     volumes:
       - ./.open-api:/.open-api
-      - api-storage:/app/.storage:rw
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:6276/api/health']
       interval: 1s
@@ -57,11 +72,18 @@ services:
     env_file:
       - ./worker/.env
     environment:
-      - API=http://core-api:6276/
-      - MAX_JOBS=10
-      - OASM_CLOUD_APIKEY=change_me
+      - WORKER_API_KEY=change_me
+      - WORKER_GRPC_HOST=core-api
+      - WORKER_GRPC_PORT=16276
+      - WORKER_MAX_CONCURRENCY=10
+      - WORKER_TOOL_PATH=/app/oasm-tools
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     volumes:
-      - nuclei-templates:/root/nuclei-templates:rw
+      - worker-tools-cache:/app/oasm-tools:rw
     networks:
       - oasm
     restart: 'always'
@@ -82,6 +104,11 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
       PGUSER: '${POSTGRES_USERNAME:-postgres}'
       PGPASSWORD: '${POSTGRES_PASSWORD:-postgres}'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     volumes:
       - pgdata:/var/lib/postgresql/data:rw
     ports:
@@ -102,6 +129,11 @@ services:
       - '6379:6379'
     networks:
       - oasm
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     volumes:
       - redis-data:/data
     command: 'redis-server --requirepass password'
@@ -131,69 +163,59 @@ services:
     volumes:
       - geoip-data:/app/data:rw
 
-  assistant:
-    container_name: assistant
-    image: oasm/oasm-assistant:dev
-    restart: on-failure
+  rustfs:
+    container_name: oasm-rustfs
+    image: rustfs/rustfs:latest
+    networks:
+      - oasm
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    environment:
+      - RUSTFS_ACCESS_KEY=rustfsadmin
+      - RUSTFS_SECRET_KEY=rustfssecret
+    volumes:
+      - rustfs-data:/data:rw
+    restart: 'always'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    command: ['/data']
+
+  migration:
+    container_name: oasm-migration
+    image: oasm/oasm-api:latest
+    networks:
+      - oasm
     env_file:
       - ./core-api/.env
     environment:
-      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - POSTGRES_USER=${POSTGRES_USERNAME:-postgres}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USERNAME=${POSTGRES_USERNAME:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_ASSISTANT_DB:-open_asm}
-      - REDIS_URL=${REDIS_URL:-redis://:password@redis:6379/1}
-      - ASSISTANT_HOST=${ASSISTANT_HOST:-0.0.0.0}
-      - ASSISTANT_PORT=${ASSISTANT_PORT:-8000}
-      - SEARXNG_URL=http://searxng:8080
-      - OASM_CORE_API_URL=${OASM_CORE_API_URL:-http://host.docker.internal:6276}
-      - OASM_CLOUD_APIKEY=${OASM_CLOUD_APIKEY:-change_me}
-    volumes:
-      - assistant-logs:/app/logs
-      - assistant-knowledge:/app/knowledge
-    ports:
-      - '${ASSISTANT_PORT:-8000}:8000'
-    networks:
-      - oasm
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - searxng
-
-  searxng:
-    container_name: searxng
-    image: docker.io/searxng/searxng:latest
-    restart: unless-stopped
-    networks:
-      - oasm
-    ports:
-      - "8080:8080"
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    volumes:
-      - ./searxng:/etc/searxng:rw
-      - searxng-data:/var/cache/searxng:rw
-    environment:
-      - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME:-localhost}/
-      - SEARXNG_PORT=8080
+      - POSTGRES_DB=${POSTGRES_DB:-open_asm}
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "1m"
-        max-file: "1"
+        max-size: 10m
+        max-file: "3"
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "node node_modules/typeorm/cli.js migration:run -d dist/database/database-config.js"
 
 volumes:
   pgdata:
-  nuclei-templates:
   redis-data:
   redpanda-data:
   geoip-data:
-  api-storage:
-  assistant-logs:
-  assistant-knowledge:
-  searxng-data:
+  rustfs-data:
+  worker-tools-cache:
 
 networks:
   oasm:

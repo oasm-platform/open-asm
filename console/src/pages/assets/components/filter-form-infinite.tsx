@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
+import { DatePickerWithRange } from '@/components/ui/date-picker-range';
 import { Input } from '@/components/ui/input';
 import useDebounce from '@/hooks/use-debounce';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useAsset } from '../context/asset-context';
 import {
   HostsFacetedFilter,
@@ -15,10 +16,13 @@ import {
 } from './faceted-filter';
 
 export default function FilterFormInfinite() {
-  const [params, setParams] = useSearchParams();
+  const search = useSearch({ strict: false });
+  const navigate = useNavigate();
   const {
     tableParams: { filter },
     tableHandlers: { setFilter },
+    dateRange,
+    setDateRange,
   } = useAsset();
 
   const [searchValue, setSearchValue] = useState(filter ?? '');
@@ -35,7 +39,10 @@ export default function FilterFormInfinite() {
     'hosts',
     'tlsHosts',
   ];
-  const isFiltered = facets.some((e: string) => params.has(e));
+  const isFiltered =
+    facets.some((e: string) => e in search) ||
+    'startDate' in search ||
+    'endDate' in search;
 
   return (
     <div className="flex flex-col gap-2 w-full md:flex-row md:items-center md:justify-between md:gap-0">
@@ -44,7 +51,7 @@ export default function FilterFormInfinite() {
           placeholder="Filter value"
           value={searchValue}
           onChange={(event) => setSearchValue(event.target.value)}
-          className="h-8 w-full md:w-[200px] lg:w-[300px]"
+          className="h-9 w-full md:w-[200px] lg:w-[300px]"
         />
         <div className="flex flex-wrap gap-x-2 gap-y-2 md:flex-nowrap md:gap-x-2">
           <IpFacetedFilter />
@@ -53,16 +60,21 @@ export default function FilterFormInfinite() {
           <StatusCodesFacetedFilter />
           <HostsFacetedFilter />
           <TlsFacetedFilter />
+          <DatePickerWithRange
+            label="Date"
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-60"
+          />
         </div>
         {isFiltered && (
           <Button
             variant="ghost"
             onClick={() => {
-              for (const facet of facets) {
-                params.delete(facet);
-              }
-              params.set('page', '1');
-              setParams(params);
+              navigate({
+                search: (() => ({ page: 1 })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+              });
+              setDateRange(undefined);
             }}
             className="h-8 px-2 lg:px-3"
           >

@@ -25,7 +25,7 @@ export class NotificationsService {
   ) {}
 
   async createNotification(body: CreateNotificationDto) {
-    await this.notificationQueue.add('create-notification', body);
+    await this.notificationQueue.add(BullMQName.NOTIFICATION, body);
   }
 
   subscribeToStream(userId: string) {
@@ -34,6 +34,7 @@ export class NotificationsService {
 
   async getNotifications(
     userId: string,
+    workspaceId: string,
     query: GetManyBaseQueryParams,
     lang: string = 'en',
   ) {
@@ -42,6 +43,10 @@ export class NotificationsService {
       .createQueryBuilder('recipient')
       .leftJoinAndSelect('recipient.notification', 'notification')
       .where('recipient.userId = :userId', { userId })
+      .andWhere(
+        '(notification.workspaceId = :workspaceId OR notification.workspaceId IS NULL)',
+        { workspaceId },
+      )
       .orderBy('recipient.createdAt', 'DESC')
       .select([
         'recipient.id',
@@ -50,11 +55,12 @@ export class NotificationsService {
         'notification.id',
         'notification.type',
         'notification.metadata',
+        'notification.workspaceId',
       ])
       .skip(offset)
       .take(query.limit)
       .getManyAndCount();
-    const data = notifications.map((n) => {
+    const data: NotificationResponseDto[] = notifications.map((n) => {
       const key = `notification.${n.notification.type}`;
       const message = this.i18n.translate<string>(key, {
         lang,
@@ -66,12 +72,13 @@ export class NotificationsService {
       }) as string;
 
       return {
-        id: n.notification.id,
+        id: n.id,
         status: n.status,
         createdAt: n.createdAt,
         message,
         url,
-      } as NotificationResponseDto;
+        workspaceId: n.notification.workspaceId ?? undefined,
+      };
     });
     return getManyResponse({
       query,
@@ -108,5 +115,9 @@ export class NotificationsService {
       { id, userId },
       { status: NotificationStatus.READ },
     );
+  }
+
+  async deleteNotification(id: string, userId: string) {
+    return this.notificationRecipientRepo.delete({ id, userId });
   }
 }

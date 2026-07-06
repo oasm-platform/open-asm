@@ -1,10 +1,16 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/services/apis/gen/queries';
+import { useNavigate } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
-import { useNavigate } from 'react-router-dom';
 
 interface VulnerabilityAsset {
   asset: string;
@@ -18,25 +24,27 @@ interface VulnerabilityAsset {
 }
 
 const severityColors = {
-  info: 'bg-stone-500',
-  low: 'bg-yellow-500',
-  medium: 'bg-orange-500',
-  high: 'bg-red-500',
-  critical: 'bg-red-700',
+  info: 'bg-muted-foreground/40',
+  low: 'bg-chart-1',
+  medium: 'bg-chart-2',
+  high: 'bg-chart-3',
+  critical: 'bg-chart-5',
 };
 
 const severityOrder = ['info', 'low', 'medium', 'high', 'critical'] as const;
 
 const TopAssetsVulnerabilitiesTable = () => {
   const navigate = useNavigate();
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const {
     data: apiData,
     isLoading,
     error,
   } = useStatisticControllerGetTopAssetsWithMostVulnerabilities({
     query: {
-      queryKey: ['top-assets-vulnerabilities', selectedWorkspace],
+      queryKey: ['top-assets-vulnerabilities', selectedWorkspaceId],
     },
   });
 
@@ -49,11 +57,11 @@ const TopAssetsVulnerabilitiesTable = () => {
         const total = row.original.total || 0;
 
         if (total === 0) {
-          return <div className="h-8 flex items-center"></div>;
+          return <div className="h-5 flex items-center"></div>;
         }
 
         return (
-          <div className="h-8 flex items-center w-full">
+          <div className="h-5 flex items-center w-full">
             <div className="flex w-40 h-4 rounded-xl overflow-hidden">
               {severityOrder.map((severity) => {
                 const count = row.original[severity] || 0;
@@ -75,7 +83,7 @@ const TopAssetsVulnerabilitiesTable = () => {
       accessorKey: 'asset',
       header: 'Asset',
       cell: ({ row }) => (
-        <div className="font-medium h-8 flex items-center">
+        <div className="font-medium h-5 flex items-center">
           {row.getValue('asset') || ''}
         </div>
       ),
@@ -87,7 +95,7 @@ const TopAssetsVulnerabilitiesTable = () => {
       cell: ({ row }) => {
         const total = row.getValue('total') as number;
         return (
-          <div className="font-semibold h-8 flex items-center text-center">
+          <div className="font-semibold h-5 flex items-center text-center">
             {total > 0 ? total : ''}
           </div>
         );
@@ -106,23 +114,8 @@ const TopAssetsVulnerabilitiesTable = () => {
         low: item.low,
         info: item.info,
         total: item.total,
-        id: item.id, // assuming id is available
+        id: item.id,
       })) || [];
-
-  // Pad the data to ensure at least 10 rows
-  const tableData = [...filteredData];
-  while (tableData.length < 10) {
-    tableData.push({
-      asset: '',
-      critical: 0,
-      high: 0,
-      medium: 0,
-      low: 0,
-      info: 0,
-      total: 0,
-      id: '',
-    });
-  }
 
   if (error) {
     return (
@@ -138,24 +131,32 @@ const TopAssetsVulnerabilitiesTable = () => {
   }
 
   return (
-    <Card className="py-3 pt-6">
+    <Card className="py-3 pt-6 h-full">
       <CardHeader>
         <CardTitle>Top assets with most vulnerabilities</CardTitle>
+        <CardDescription>
+          10 assets with the highest number of vulnerabilities
+        </CardDescription>
       </CardHeader>
       <CardContent className="p-4 py-0">
         <DataTable
           onRowClick={(row) =>
-            row.asset && navigate(`/assets/?tab=host&hosts=${row.asset}`)
+            row.asset &&
+            navigate({
+              to: '/assets',
+              search: { tab: 'host', hosts: row.asset },
+            })
           }
           isShowBorder={false}
           columns={columns}
-          data={tableData}
+          data={filteredData}
           isLoading={isLoading}
           page={1}
           pageSize={10}
-          totalItems={10}
+          totalItems={filteredData.length}
           showPagination={false}
           isShowHeader={true}
+          minRows={10}
         />
       </CardContent>
     </Card>
@@ -163,4 +164,3 @@ const TopAssetsVulnerabilitiesTable = () => {
 };
 
 export default TopAssetsVulnerabilitiesTable;
-

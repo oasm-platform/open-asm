@@ -128,7 +128,7 @@ function FacetedFilterTemplate({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 border-dashed">
+        <Button variant="outline" size="sm" className="h-9 border-dashed">
           <CirclePlus className="size-4" />
           {title}
           {selectedValues.size > 0 && (

@@ -9,21 +9,21 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { Target } from '@/services/apis/gen/queries';
 import {
   JobStatus,
   UpdateTargetDtoScanSchedule,
-  useTargetsControllerDeleteTargetFromWorkspace,
+  useTargetsControllerDeleteTarget,
   useTargetsControllerReScanTarget,
   useTargetsControllerUpdateTarget,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
 import clsx from 'clsx';
-import { Clock, OctagonAlert, RefreshCw, Settings, Trash2 } from 'lucide-react';
+import { Clock, RefreshCw, Settings, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 const SettingTarget = ({
@@ -33,9 +33,9 @@ const SettingTarget = ({
   target: Target;
   refetch: () => void;
 }) => {
-  const { selectedWorkspace, workspaces } = useWorkspaceSelector();
-  const workspaceData = workspaces.find((w) => w.id === selectedWorkspace);
-  const isAssetsDiscovery = workspaceData?.isAssetsDiscovery ?? false;
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -45,19 +45,26 @@ const SettingTarget = ({
   ); // Default to target's scan schedule or weekly if not set
   const [isRediscovering, setIsRediscovering] = useState(false);
 
-  // Mutation hook to delete a target from the workspace
-  const { mutate: deleteTarget } =
-    useTargetsControllerDeleteTargetFromWorkspace({
-      mutation: {
-        onSuccess: () => {
-          queryClient.refetchQueries({
-            queryKey: ['targets'],
-          });
-          setIsDeleting(false);
-        },
-        onError: () => setIsDeleting(false),
+  // Mutation hook to permanently delete a target
+  const { mutate: deleteTarget } = useTargetsControllerDeleteTarget({
+    mutation: {
+      onSuccess: () => {
+        toast.success('Target deleted successfully');
+        queryClient.refetchQueries({
+          queryKey: ['targets'],
+        });
+        setIsDeleting(false);
+        window.history.back();
       },
-    });
+      onError: (err) => {
+        const axiosErr = err as AxiosError<{ message: string }>;
+        toast.error(
+          axiosErr.response?.data.message ?? 'Failed to delete target',
+        );
+        setIsDeleting(false);
+      },
+    },
+  });
 
   // Mutation hook to rediscover/re-scan a target
   const { mutate: rediscoverTarget } = useTargetsControllerReScanTarget({
@@ -101,22 +108,7 @@ const SettingTarget = ({
 
         <div className="flex flex-col h-full">
           <div className="flex-1 space-y-0.5 overflow-y-auto p-1">
-            {!isAssetsDiscovery && (
-              <div className="flex gap-2 mb-5 justify-center text-red-500">
-                <OctagonAlert />
-                <span className="">
-                  Assets discovery is disabled for this workspace
-                </span>
-              </div>
-            )}
-            <div
-              className={clsx(
-                'space-y-4',
-                isAssetsDiscovery
-                  ? ''
-                  : 'border-dashed border-2 border-red-500 opacity-50 py-3 px-3 space-y-4 rounded-xl',
-              )}
-            >
+            <div className={clsx('space-y-4')}>
               <div className="space-y-2">
                 <div>
                   <div className="flex items-center gap-3 p-2">
@@ -172,9 +164,11 @@ const SettingTarget = ({
                           },
                         },
                       );
-                      navigate(
-                        `/targets/${target.id}?animation=true&page=1&pageSize=100`,
-                      );
+                      navigate({
+                        to: '/targets/$id/$tab',
+                        params: { id: target.id, tab: 'inventory' },
+                        search: { animation: 'true', page: 1, pageSize: 100 },
+                      });
                       setIsSheetOpen(false);
                     }}
                     trigger={
@@ -219,9 +213,8 @@ const SettingTarget = ({
                 setIsDeleting(true);
                 deleteTarget({
                   id: target.id,
-                  workspaceId: selectedWorkspace ?? '',
+                  workspaceId: selectedWorkspaceId ?? '',
                 });
-                navigate(-1);
               }}
               typeToConfirm={target.value}
               trigger={
