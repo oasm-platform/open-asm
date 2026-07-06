@@ -1,4 +1,6 @@
+import type { WrapperType } from '@/common/types/app.types';
 import { AgentConversation } from '@/modules/agents/entities/agent-conversation.entity';
+import { RedisService } from '@/services/redis/redis.service';
 import {
   forwardRef,
   Inject,
@@ -39,9 +41,10 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
 
   constructor(
     @Inject(forwardRef(() => WorkersService))
-    private readonly workersService: WorkersService,
+    private readonly workersService: WrapperType<WorkersService>,
     @InjectRepository(AgentConversation)
     private readonly conversationRepo: Repository<AgentConversation>,
+    private readonly redisService: RedisService,
   ) {}
 
   registerWorker(worker: WorkerInstance): WorkerRegistration {
@@ -78,6 +81,63 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   private isWorkerAlive(workerId: string): boolean {
     const subject = this.workers.get(workerId);
     return subject !== undefined && !subject.closed;
+  }
+
+  private static readonly CONV_WORKER_TTL = 86_400; // 1 day in seconds
+
+  /**
+   * Reads the cached worker ID for a conversation from Redis.
+   * Returns null if no cache entry exists or on error.
+   */
+  private async getCachedConversationWorker(
+    conversationId: string,
+  ): Promise<string | null> {
+    try {
+      return await this.redisService.get(
+        `agent:conv:worker:${conversationId}`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `[RedisCache] Failed to read cached worker for ${conversationId}: ${err}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Writes the conversation-to-worker mapping to Redis with 1-day TTL.
+   * Fire-and-forget: non-blocking, failures are logged but do not block command push.
+   */
+  private async cacheConversationWorker(
+    conversationId: string,
+    workerId: string,
+  ): Promise<void> {
+    try {
+      await this.redisService.setex(
+        `agent:conv:worker:${conversationId}`,
+        RemoteExecuteSubscribeService.CONV_WORKER_TTL,
+        workerId,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `[RedisCache] Failed to cache worker ${workerId} for conversation ${conversationId}: ${err}`,
+      );
+    }
+  }
+
+  /**
+   * Deletes the Redis cache entry for a conversation-to-worker mapping.
+   */
+  private async deleteCachedConversationWorker(
+    conversationId: string,
+  ): Promise<void> {
+    try {
+      await this.redisService.del(`agent:conv:worker:${conversationId}`);
+    } catch (err) {
+      this.logger.warn(
+        `[RedisCache] Failed to delete cached worker for conversation ${conversationId}: ${err}`,
+      );
+    }
   }
 
   private getNextAvailableWorker(): string | null {
@@ -156,6 +216,26 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       return this.pushCommandWithSession(sessionId, command);
     }
 
+    // 1. Try Redis cache first (fast path)
+    const cachedWorkerId =
+      await this.getCachedConversationWorker(conversationId);
+
+    if (cachedWorkerId && this.isWorkerAlive(cachedWorkerId)) {
+      this.logger.verbose(
+        `[StickyWorker][Redis] Using cached worker ${cachedWorkerId} for conversation ${conversationId}`,
+      );
+      return this.pushCommand(cachedWorkerId, sessionId, command);
+    }
+
+    if (cachedWorkerId) {
+      // Cached worker is dead — clear stale cache
+      this.logger.warn(
+        `[StickyWorker][Redis] Cached worker ${cachedWorkerId} dead, clearing for conversation ${conversationId}`,
+      );
+      await this.deleteCachedConversationWorker(conversationId);
+    }
+
+    // 2. Try Postgres (existing sticky logic)
     const conversation = await this.conversationRepo.findOne({
       where: { id: conversationId },
       select: ['id', 'workerId'],
@@ -163,20 +243,30 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
 
     if (conversation?.workerId && this.isWorkerAlive(conversation.workerId)) {
       this.logger.verbose(
-        `[StickyWorker] Using pinned worker ${conversation.workerId} for conversation ${conversationId}`,
+        `[StickyWorker][DB] Using pinned worker ${conversation.workerId} for conversation ${conversationId}`,
       );
-      return this.pushCommand(
-        conversation.workerId,
-        sessionId,
-        command,
-      );
+      // Warm the Redis cache
+      void this.cacheConversationWorker(conversationId, conversation.workerId);
+      return this.pushCommand(conversation.workerId, sessionId, command);
     }
 
+    // 3. Fallback to any available worker
     const workerId = this.getNextAvailableWorker();
     if (!workerId) {
       return null;
     }
 
+    // Push command FIRST — ensures the worker subject is still alive
+    // before updating the conversation record (TOCTOU race prevention).
+    const result = this.pushCommand(workerId, sessionId, command);
+    if (!result) {
+      this.logger.warn(
+        `[StickyWorker] Worker ${workerId} became unavailable before command could be pushed`,
+      );
+      return null;
+    }
+
+    // Persist assignment to both Postgres and Redis
     if (conversation) {
       await this.conversationRepo
         .createQueryBuilder()
@@ -187,12 +277,15 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
           workerId,
         })
         .execute();
+
+      // Write to Redis cache (fire-and-forget)
+      void this.cacheConversationWorker(conversationId, workerId);
     }
 
     this.logger.log(
       `[StickyWorker] Assigned worker ${workerId} to conversation ${conversationId}`,
     );
-    return this.pushCommand(workerId, sessionId, command);
+    return result;
   }
 
   removeSession(sessionId: string): void {

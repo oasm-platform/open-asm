@@ -3,7 +3,7 @@ import { CronSchedule } from '@/common/enums/enum';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum } from 'class-validator';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { AssetGroup } from './asset-groups.entity';
 
 @Entity('asset_group_workflows')
@@ -15,14 +15,14 @@ export class AssetGroupWorkflow extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'assetGroupId' })
-  assetGroup: AssetGroup;
+  assetGroup: Relation<AssetGroup>;
 
   @ApiProperty()
   @ManyToOne(() => Workflow, (workflow) => workflow.id, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'workflowId' })
-  workflow: Workflow;
+  workflow: Relation<Workflow>;
 
   @ApiProperty({ enum: CronSchedule })
   @Column({ type: 'enum', enum: CronSchedule, default: CronSchedule.DISABLED })

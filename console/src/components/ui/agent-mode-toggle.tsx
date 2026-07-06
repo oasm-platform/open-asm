@@ -10,18 +10,22 @@ import {
   useAgentsControllerGetAgentModes,
 } from '@/services/apis/gen/queries';
 import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
-import { InfinityIcon, MonitorIcon } from 'lucide-react';
+import { CheckIcon, InfinityIcon, MonitorIcon } from 'lucide-react';
 import { memo } from 'react';
 import { toast } from 'sonner';
 
 interface AgentModeSelectProps {
   value: string;
   onChange: (mode: string) => void;
+  selectedWorkerId?: string | null;
+  onWorkerChange?: (workerId: string | null) => void;
 }
 
 export const AgentModeSelect = memo(function AgentModeSelect({
   value,
   onChange,
+  selectedWorkerId,
+  onWorkerChange,
 }: AgentModeSelectProps) {
   const isAgent = value === SendMessageDtoAgentMode.agent;
   const { data } = useAgentsControllerGetAgentModes();
@@ -41,7 +45,16 @@ export const AgentModeSelect = memo(function AgentModeSelect({
     if (next === SendMessageDtoAgentMode.agent) {
       toast.success('Agent mode enabled');
     }
+    if (next === SendMessageDtoAgentMode.ask) {
+      onWorkerChange?.(null);
+    }
     onChange(next);
+  };
+
+  const handleWorkerSelect = (workerId: string) => {
+    // Toggle selection: deselect if same worker is clicked again
+    const newId = selectedWorkerId === workerId ? null : workerId;
+    onWorkerChange?.(newId);
   };
 
   return (
@@ -58,27 +71,45 @@ export const AgentModeSelect = memo(function AgentModeSelect({
           </PromptInputActionMenuTrigger>
           <PromptInputActionMenuContent>
             {workers.length > 0 ? (
-              workers.map((worker) => (
+              <>
                 <PromptInputActionMenuItem
-                  key={worker.id}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={() => onWorkerChange?.(null)}
                 >
-                  {worker.os && (
-                    <img
-                      className="size-5 dark:brightness-0 dark:invert"
-                      src={`/${worker.os}.svg`}
-                      alt={worker.os}
-                    />
+                  <span className="flex-1 font-medium">Auto (any worker)</span>
+                  {!selectedWorkerId && (
+                    <CheckIcon className="size-4 text-green-500" />
                   )}
-                  <span className="flex-1">
-                    {worker.name ?? worker.id.slice(0, 8)}
-                  </span>
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-                  </span>
                 </PromptInputActionMenuItem>
-              ))
+                {workers.map((worker) => {
+                  const isSelected = selectedWorkerId === worker.id;
+                  return (
+                    <PromptInputActionMenuItem
+                      key={worker.id}
+                      className="flex items-center gap-2 cursor-pointer"
+                      onClick={() => handleWorkerSelect(worker.id)}
+                    >
+                      {worker.os && (
+                        <img
+                          className="size-5 dark:brightness-0 dark:invert"
+                          src={`/${worker.os}.svg`}
+                          alt={worker.os}
+                        />
+                      )}
+                      <span className="flex-1">
+                        {worker.name ?? worker.id.slice(0, 8)}
+                      </span>
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                      </span>
+                      {isSelected && (
+                        <CheckIcon className="size-4 text-green-500 ml-1" />
+                      )}
+                    </PromptInputActionMenuItem>
+                  );
+                })}
+              </>
             ) : (
               <PromptInputActionMenuItem disabled>
                 No workers connected
