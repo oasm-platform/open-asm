@@ -1,7 +1,6 @@
 import { customAlphabet } from 'nanoid';
 
-const alphabet =
-  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 /**
  * Generates a random token string using a specific alphabet and length.

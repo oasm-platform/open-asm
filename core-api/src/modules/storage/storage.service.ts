@@ -15,6 +15,9 @@ import {
   PutObjectCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
+import { createHmac, randomBytes } from 'crypto';
+import { DEFAULT_ENCRYPTION_KEY } from '@/common/constants/app.constants';
+import { ConfigService } from '@nestjs/config';
 import { RustFsClient } from './rustfs.client';
 import { Readable } from 'stream';
 
@@ -27,13 +30,27 @@ export class StorageService implements OnModuleInit {
     'nuclei-templates',
     'job-results',
     'cached-static',
+    'reports',
     'default',
   ];
 
-  constructor(private readonly rustFsClient: RustFsClient) {}
+  private readonly privateBuckets = ['reports', 'job-results'];
+
+  private readonly downloadSecret: string;
+
+  constructor(
+    private readonly rustFsClient: RustFsClient,
+    private readonly configService: ConfigService,
+  ) {
+    this.downloadSecret = this.configService.get<string>('DEFAULT_ENCRYPTION_KEY', DEFAULT_ENCRYPTION_KEY);
+  }
 
   async onModuleInit() {
     await this.ensureBucketsExist();
+  }
+
+  public isPrivateBucket(bucket: string): boolean {
+    return this.privateBuckets.includes(bucket);
   }
 
   private async ensureBucketsExist() {
@@ -114,6 +131,59 @@ export class StorageService implements OnModuleInit {
       throw new InternalServerErrorException(
         `Failed to get file: ${errorMessage}`,
       );
+    }
+  }
+
+  public generateDownloadToken(
+    filePath: string,
+    bucket: string = 'default',
+    expiresIn: number = 900,
+  ): string {
+    const cleanPath = filePath.replace(/^[./\s]+/, '');
+
+    if (!cleanPath || cleanPath.includes('..')) {
+      throw new BadRequestException('Invalid file path');
+    }
+
+    const exp = Math.floor(Date.now() / 1000) + expiresIn;
+    const nonce = randomBytes(16).toString('hex');
+    const payload = `${bucket}:${cleanPath}:${exp}:${nonce}`;
+    const signature = createHmac('sha256', this.downloadSecret)
+      .update(payload)
+      .digest('hex');
+
+    return Buffer.from(`${payload}:${signature}`).toString('base64url');
+  }
+
+  public verifyDownloadToken(
+    token: string,
+  ): { bucket: string; filePath: string } {
+    try {
+      const decoded = Buffer.from(token, 'base64url').toString('utf8');
+      const parts = decoded.split(':');
+      if (parts.length !== 5) {
+        throw new Error('Invalid token format');
+      }
+
+      const [bucket, filePath, expStr, nonce, signature] = parts;
+      const exp = parseInt(expStr, 10);
+
+      if (Math.floor(Date.now() / 1000) > exp) {
+        throw new Error('Token expired');
+      }
+
+      const payload = `${bucket}:${filePath}:${expStr}:${nonce}`;
+      const expectedSignature = createHmac('sha256', this.downloadSecret)
+        .update(payload)
+        .digest('hex');
+
+      if (signature !== expectedSignature) {
+        throw new Error('Invalid signature');
+      }
+
+      return { bucket, filePath };
+    } catch {
+      throw new BadRequestException('Invalid or expired download token');
     }
   }
 

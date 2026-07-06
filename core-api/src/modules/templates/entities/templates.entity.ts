@@ -2,9 +2,10 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, Relation } from 'typeorm';
 
 @Entity('templates')
+@Index('IDX_templates_workspace', ['workspace'])
 export class Template extends BaseEntity {
   @ApiProperty()
   @Column({ nullable: false })
@@ -18,5 +19,5 @@ export class Template extends BaseEntity {
   @ManyToOne(() => Workspace, (workspace) => workspace.templates, {
     onDelete: 'CASCADE',
   })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 }

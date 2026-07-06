@@ -53,9 +53,6 @@ export default defineConfig({
       httpClient: 'axios',
       override: {
         useTypeOverInterfaces: true,
-        query: {
-          useQuery: true,
-        },
         mutator: {
           path: 'src/services/apis/axios-client.ts',
           name: 'orvalClient',

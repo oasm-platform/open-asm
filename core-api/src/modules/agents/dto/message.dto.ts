@@ -1,6 +1,14 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { AgentMode } from '@/common/enums/enum';
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { MessageRole, MessageType } from '../enums/agent.enums';
 
 export class SendMessageDto {
@@ -37,7 +45,34 @@ export class SendMessageDto {
   @ApiProperty({ enum: AgentMode, required: false })
   @IsOptional()
   @IsEnum(AgentMode)
-  agentMode?: AgentMode;
+  agentMode: AgentMode;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Preferred worker ID for remote command execution. Only respected when agentMode is "agent".',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsOptional()
+  @IsUUID()
+  workerId?: string;
+}
+
+export class ToolCallResponseDto {
+  @ApiProperty()
+  toolCallId: string;
+
+  @ApiProperty()
+  toolName: string;
+
+  @ApiProperty()
+  args: Record<string, unknown>;
+
+  @ApiProperty({ required: false })
+  result?: Record<string, unknown> | null;
+
+  @ApiProperty({ required: false, default: false })
+  isError?: boolean;
 }
 
 export class MessageResponseDto {
@@ -58,6 +93,24 @@ export class MessageResponseDto {
 
   @ApiProperty({ required: false })
   metadata?: Record<string, unknown>;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Chronological parts array preserving the real order of reasoning, tool calls, and text.',
+    type: 'array',
+    items: { type: 'object' },
+  })
+  @IsOptional()
+  @IsArray()
+  parts?: Record<string, unknown>[];
+
+  @ApiProperty({ required: false, type: [ToolCallResponseDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ToolCallResponseDto)
+  toolCalls?: ToolCallResponseDto[];
 
   @ApiProperty()
   createdAt: Date;

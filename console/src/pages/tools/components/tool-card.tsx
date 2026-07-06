@@ -29,7 +29,6 @@ const ToolCard = ({ tool, button }: ToolCardProps) => {
 
   return (
     <Card
-      key={tool.id}
       className="flex flex-col overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-md"
       onClick={handleCardClick}
     >

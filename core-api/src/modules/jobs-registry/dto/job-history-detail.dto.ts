@@ -3,7 +3,6 @@ import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Job } from '../entities/job.entity';
 
 export class JobHistoryJobItemDetail {
   @ApiProperty()
@@ -73,9 +72,6 @@ export class JobHistoryDetailResponseDto {
 
   @ApiProperty({ type: () => [Tool] })
   tools?: Tool[];
-
-  @ApiProperty({ type: () => [Job] })
-  jobs: Job[];
 
   @ApiProperty()
   workflowName?: string;

@@ -13,6 +13,7 @@ import { fromNodeHeaders } from 'better-auth/node';
 import {
   API_GLOBAL_PREFIX,
   AUTH_INSTANCE_KEY,
+  MCP_API_KEY_HEADER,
   ROLE_METADATA_KEY,
 } from '../constants/app.constants';
 import { Role } from '../enums/enum';
@@ -56,19 +57,32 @@ export class AuthGuard implements CanActivate {
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request: RequestWithMetadata = context.switchToHttp().getRequest();
+
+    // Check disabled paths FIRST — before any session lookup.
+    // Disabled paths (like /api/mcp) rely on their own auth (e.g. McpGuard)
+    // and don't need a browser session. Uses prefix match so sub-paths
+    // like /api/mcp/message are also excluded.
+    const disabledPaths = this.auth.options.disabledPaths
+      ?.map((path) => `/${API_GLOBAL_PREFIX}/${path}`) ?? [];
+    const isDisabledAuth = disabledPaths.some(
+      (p) => request.path === p || request.path.startsWith(p + '/'),
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const isPublic = this.reflector.get('PUBLIC', context.getHandler());
+    if (isPublic || isDisabledAuth) return true;
+
+    // If any request carries an MCP API key header, skip session check.
+    // The downstream guard (McpGuard) validates the key and sets workspaceId.
+    if (request.headers[MCP_API_KEY_HEADER]) return true;
+
     const currentSession = await this.auth.api.getSession({
       headers: fromNodeHeaders(request.headers),
     });
 
-    const isDisabledAuth = this.auth.options.disabledPaths
-      ?.map((path) => `/${API_GLOBAL_PREFIX}/${path}`)
-      ?.includes(request.path);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const isPublic = this.reflector.get('PUBLIC', context.getHandler());
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const isOptional = this.reflector.get('OPTIONAL', context.getHandler());
-    if (isPublic || isDisabledAuth || (isOptional && !currentSession))
-      return true;
+    if (isOptional && !currentSession) return true;
 
     if (!currentSession) {
       throw new UnauthorizedException();

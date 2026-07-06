@@ -15,7 +15,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
 
@@ -56,9 +56,11 @@ const ALL_QUICK_SUGGESTIONS = [
   'What services are running with excessive permissions?',
 ];
 
+const routeApi = getRouteApi('/_authed/agents/');
+
 export default function AgentsLandingPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { text: queryText } = routeApi.useSearch();
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
     provider: string;
@@ -66,6 +68,9 @@ export default function AgentsLandingPage() {
     configId: string;
   } | null>(null);
   const [agentMode, setAgentMode] = useState('ask');
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(
+    null,
+  );
 
   const {
     state: { selectedWorkspaceId },
@@ -110,8 +115,6 @@ export default function AgentsLandingPage() {
     return shuffled.slice(0, 5);
   }, []);
 
-  const queryText = searchParams.get('text');
-
   const handleSendMessage = useCallback(
     (content: string, options?: { agentMode?: string }) => {
       if (!content.trim() || isSending) return;
@@ -120,15 +123,19 @@ export default function AgentsLandingPage() {
 
       // Generate UUID v7 for new conversation and navigate immediately
       const newConversationId = uuidv7();
-      void navigate(`/agents/conversations/${newConversationId}`, {
-        state: {
-          pendingMessage: content.trim(),
-          ...(selectedModel && { selectedModel }),
-          agentMode: options?.agentMode ?? agentMode,
-        },
+      const navState: Record<string, unknown> = {
+        pendingMessage: content.trim(),
+        ...(selectedModel && { selectedModel }),
+        agentMode: options?.agentMode ?? agentMode,
+        workerId: selectedWorkerId,
+      };
+      void navigate({
+        to: '/agents/conversations/$conversationId',
+        params: { conversationId: newConversationId },
+        state: navState,
       });
     },
-    [isSending, navigate, selectedModel, agentMode],
+    [isSending, navigate, selectedModel, agentMode, selectedWorkerId],
   );
 
   useEffect(() => {
@@ -146,7 +153,7 @@ export default function AgentsLandingPage() {
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
-      void navigate(`/agents/conversations/${conversationId}`);
+      void navigate({ to: `/agents/conversations/${conversationId}` });
     },
     [navigate],
   );
@@ -202,6 +209,8 @@ export default function AgentsLandingPage() {
             }}
             agentMode={agentMode}
             onAgentModeChange={setAgentMode}
+            selectedWorkerId={selectedWorkerId}
+            onWorkerSelect={setSelectedWorkerId}
           />
 
           {/* Quick suggestions */}
@@ -235,7 +244,7 @@ export default function AgentsLandingPage() {
               </button>
             ))}
             <button
-              onClick={() => void navigate('/agents/conversations')}
+              onClick={() => void navigate({ to: '/agents/conversations' })}
               className="text-xs text-muted-foreground hover:text-accent-foreground transition-colors mt-1 py-1 px-3 text-left"
             >
               View all conversations →

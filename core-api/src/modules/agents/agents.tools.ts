@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await */
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import type { WrapperType } from '@/common/types/app.types';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { tool } from 'ai';
 import { randomUUID } from 'node:crypto';
+import * as dns from 'node:dns/promises';
+import { EventEmitter } from 'node:events';
+import { Repository } from 'typeorm';
 import { z } from 'zod';
 
 import { AssetsService } from '@/modules/assets/assets.service';
@@ -15,6 +20,7 @@ import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilitie
 import { WorkersService } from '@/modules/workers/workers.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
+import { AgentMode } from '@/common/enums/enum';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -32,49 +38,63 @@ import {
   listToolsSchema,
   listWorkersSchema,
 } from '@/mcp/mcp.schema';
+import { AgentsMemoriesService } from './agents.memories';
+import type { AgentTodoItem } from './agents.todo';
+import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
+import { AgentConversation } from './entities/agent-conversation.entity';
 
-// Web fetch tool schema
 const webFetchSchema = z.object({
-  url: z
-    .string()
-    .url()
-    .describe('The URL to fetch content from (e.g., "https://example.com")'),
+  url: z.string().url().describe('Target URL'),
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolType = any;
 
-/**
- * AgentTool service that provides multiple tools for the agent
- * Can inject other services for data retrieval
- */
+function isPrivateIp(ip: string): boolean {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(isNaN)) return false;
+  const [a, b] = parts;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a === 0) return true;
+  return false;
+}
+
 @Injectable()
 export class AgentTool {
+  private readonly logger = new Logger(AgentTool.name);
+
   constructor(
     private readonly assetsService: AssetsService,
     private readonly targetsService: TargetsService,
     @Inject(forwardRef(() => VulnerabilitiesService))
-    private readonly vulnerabilitiesService: VulnerabilitiesService,
+    private readonly vulnerabilitiesService: WrapperType<VulnerabilitiesService>,
     private readonly statisticService: StatisticService,
     @Inject(forwardRef(() => IssuesService))
-    private readonly issuesService: IssuesService,
+    private readonly issuesService: WrapperType<IssuesService>,
     @Inject(forwardRef(() => ToolsService))
-    private readonly toolsService: ToolsService,
+    private readonly toolsService: WrapperType<ToolsService>,
     @Inject(forwardRef(() => WorkersService))
-    private readonly workersService: WorkersService,
+    private readonly workersService: WrapperType<WorkersService>,
     @Inject(forwardRef(() => JobsRegistryService))
-    private readonly jobsRegistryService: JobsRegistryService,
+    private readonly jobsRegistryService: WrapperType<JobsRegistryService>,
     private readonly remoteExecuteService: RemoteExecuteService,
+    @InjectRepository(AgentConversation)
+    private readonly conversationRepository: Repository<AgentConversation>,
+    @InjectRepository(AgentConversationTodo)
+    private readonly todoRepository: Repository<AgentConversationTodo>,
+    private readonly agentsMemories: AgentsMemoriesService,
   ) {}
 
-  /**
-   * Get assets tool - returns a factory that accepts workspaceId
-   */
   get getAssetsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ USE THIS TOOL FIRST when user asks about any discovered infrastructure.\n\nLists all assets found during security scanning in the workspace. Assets = actual discovered items: domains, subdomains, IP addresses, URLs, endpoints.\n\n✅ WHEN TO USE:\n- User asks "what assets have been found?"\n- User wants list of domains / IPs\n- Looking for specific asset value\n\n❌ WHEN NOT TO USE:\n- For scanning scope definition → use get_targets instead\n- For full technical details → use detail_asset instead\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- value: Filter results containing this text (e.g. "hackerone", "api", "192.168.1")',
+          'List discovered assets (domains, IPs, URLs) in the workspace. Params: page, limit, value (filter text).',
         parameters: getAssetsSchema,
         execute: async (params: z.infer<typeof getAssetsSchema>) => {
           const { page, limit, value } = params;
@@ -90,10 +110,7 @@ export class AgentTool {
           );
           return {
             ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              value: i.value,
-            })),
+            data: response.data.map((i) => ({ id: i.id, value: i.value })),
           };
         },
       };
@@ -101,14 +118,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Get vulnerabilities tool - returns a factory that accepts workspaceId
-   */
   get getVulnerabilitiesTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ PRIMARY TOOL for security vulnerability listings.\n\nReturns all identified security vulnerabilities with severity level (CRITICAL / HIGH / MEDIUM / LOW / INFO). This is the overview list. For full technical details use detail_vuln tool.\n\n✅ WHEN TO USE:\n- User asks "what vulnerabilities are there?"\n- User wants list of CVEs / security issues\n- Filter vulnerabilities by name or CVE number\n- Count security issues by severity\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- q: Search filter (e.g. "XSS", "SQL Injection", "CVE-2024", "RCE")',
+          'List security vulnerabilities with severity. Params: page, limit, q (search e.g. "XSS", "CVE-2024").',
         parameters: getVulnerabilitiesSchema,
         execute: async (params: z.infer<typeof getVulnerabilitiesSchema>) => {
           const { page, limit, q } = params;
@@ -136,14 +150,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Get targets tool - returns a factory that accepts workspaceId
-   */
   get getTargetsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Shows the actual SCANNING SCOPE of the workspace.\n\nTargets = what was ADDED to be scanned (root domains, IP ranges, CIDR blocks). This is the defined scope, not what was actually discovered.\n\n✅ WHEN TO USE:\n- User asks "what is in the scanning scope?"\n- User wants to know what targets are configured\n- Looking for root domains / IP ranges added by user\n\n❌ WHEN NOT TO USE:\n- For actual discovered items → use get_assets instead\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- value: Filter targets containing this text',
+          'Show scanning scope (root domains, IP ranges added by user). Params: page, limit, value (filter text).',
         parameters: getTargetsSchema,
         execute: async (params: z.infer<typeof getTargetsSchema>) => {
           const { page, limit, value } = params;
@@ -159,10 +170,7 @@ export class AgentTool {
           );
           return {
             ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              value: i.value,
-            })),
+            data: response.data.map((i) => ({ id: i.id, value: i.value })),
           };
         },
       };
@@ -170,31 +178,23 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Get statistics tool - returns a factory that accepts workspaceId
-   */
   get getStatisticsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ USE THIS FOR ALL SUMMARY QUESTIONS. Returns security dashboard statistics instantly.\n\n✅ WHEN TO USE:\n- "How many assets are there?"\n- "How many critical vulnerabilities?"\n- "What is the security score?"\n- "Give me summary of this workspace"\n- Any "count" question\n\nRETURNS:\n- Total assets, targets, vulnerabilities\n- Vulnerabilities grouped by severity\n- Overall security score (0-100)\n- Detected technologies count\n- No parameters required',
-        parameters: getStatisticOutPutSchema,
-        execute: async () => {
-          return this.statisticService.getStatistics({ workspaceId });
-        },
+          'Return security dashboard summary: asset/vulnerability counts, severity breakdown, security score. No params.',
+        parameters: z.object({}),
+        execute: async () =>
+          this.statisticService.getStatistics({ workspaceId }),
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * Detail asset tool - returns a factory that accepts workspaceId
-   */
   get detailAssetTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description:
-          '✅ Get FULL TECHNICAL DETAILS about a single asset.\n\nUse this after you have an asset ID from get_assets. Returns everything known about this specific domain / IP.\n\n✅ WHEN TO USE:\n- "Tell me more about this domain"\n- "What technologies are running on this IP?"\n- "What ports are open?"\n- User asks for technical details about specific asset\n\nPARAMETERS:\n- assetId: REQUIRED. The ID of the asset you want details for',
+        description: 'Get full technical details of a single asset by assetId.',
         parameters: detailAssetSchema,
         execute: async (params: z.infer<typeof detailAssetSchema>) => {
           const { assetId } = params;
@@ -205,14 +205,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * List assets in target tool - returns a factory that accepts workspaceId
-   */
   get listAssetsInTargetTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ List ALL assets that were discovered FROM a specific target.\n\nThis shows what was actually found under a single root domain / IP range that was added to the scope.\n\n✅ WHEN TO USE:\n- "What subdomains were found for example.com?"\n- "Show everything discovered under this target"\n- Drill down from target to actual discovered assets\n\nPARAMETERS:\n- targetId: REQUIRED. ID of the target to get assets for\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- value: Filter assets inside this target',
+          'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter).',
         parameters: listAssetsInTargetSchema,
         execute: async (params: z.infer<typeof listAssetsInTargetSchema>) => {
           const { targetId, limit, page, value } = params;
@@ -233,14 +230,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Detail vulnerability tool - returns a factory that accepts workspaceId
-   */
   get detailVulnTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Get FULL TECHNICAL DETAILS about a single vulnerability.\n\nUse this after you have vulnerability ID from get_vulnerabilities. This is the complete vulnerability report.\n\n✅ WHEN TO USE:\n- "Tell me about this vulnerability"\n- "How do I fix this issue?"\n- "What is the PoC for this CVE?"\n- User wants remediation steps / solution\n\nRETURNS:\n- Full description\n- CVSS score & severity\n- Proof of Concept\n- Step by step remediation\n- References & external links\n\nPARAMETERS:\n- vulnId: REQUIRED. ID of the vulnerability',
+          'Get full vulnerability report with CVSS, PoC, remediation steps. Params: vulnId.',
         parameters: detailVulnSchema,
         execute: async (params: z.infer<typeof detailVulnSchema>) => {
           const vulnId: string = (params.vulnId ?? params.id) as string;
@@ -254,14 +248,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Get ports tool - returns a factory that accepts workspaceId
-   */
   get getPortsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Lists all open ports discovered during scanning.\n\nReturns all unique open network ports with count of assets running on each port.\n\n✅ WHEN TO USE:\n- User asks "what ports are open?"\n- Find most common open ports\n- Search for specific port number\n- Analyze network exposure\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- value: Filter ports by number (e.g. "80", "443", "22")',
+          'List open network ports with asset counts. Params: page, limit, value (port number filter).',
         parameters: getPortsSchema,
         execute: async (params: z.infer<typeof getPortsSchema>) => {
           const { page, limit, value } = params;
@@ -281,14 +272,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Get technologies tool - returns a factory that accepts workspaceId
-   */
   get getTechnologiesTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Lists all detected technologies running on assets.\n\nReturns all unique software, frameworks, servers and technologies identified with full enrichment data.\n\n✅ WHEN TO USE:\n- User asks "what technologies are running?"\n- Find specific software versions\n- Count technology usage\n- Technology stack analysis\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- value: Filter technologies by name (e.g. "Nginx", "WordPress", "React")',
+          'List detected technologies (software, frameworks, servers). Params: page, limit, value (filter by name).',
         parameters: getTechnologiesSchema,
         execute: async (params: z.infer<typeof getTechnologiesSchema>) => {
           const { page, limit, value } = params;
@@ -308,14 +296,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Get TLS certificates tool - returns a factory that accepts workspaceId
-   */
   get getTlsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Lists all discovered SSL/TLS certificates.\n\nReturns all TLS certificates with full details: issuer, subject, expiration dates, TLS version, cipher suite.\n\n✅ WHEN TO USE:\n- User asks "what SSL certificates are there?"\n- Check certificate expiration dates\n- Find weak TLS configurations\n- Analyze certificate chain issues\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- search: Filter certificates by host name',
+          'List TLS/SSL certificates with issuer, subject, expiry. Params: page, limit, search (host name filter).',
         parameters: getTlsSchema,
         execute: async (params: z.infer<typeof getTlsSchema>) => {
           const { page, limit, search } = params;
@@ -335,36 +320,34 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Web fetch tool - makes HTTP GET requests to fetch content from URLs
-   */
   get webFetchTool(): (workspaceId: string) => any {
     return (_workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Make HTTP GET request to any public URL.\n\nUse this tool when you need to read content from external websites, documentation, APIs, or any online resource.\n\n✅ WHEN TO USE:\n- Read content from a web page\n- Call public API endpoints\n- Fetch documentation / reference material\n- Verify URL is accessible\n\nPARAMETERS:\n- url: REQUIRED. Full valid URL starting with http:// or https://',
+          'HTTP GET to any public URL. Returns statusCode + body. Params: url.',
         parameters: webFetchSchema,
         execute: async (params: z.infer<typeof webFetchSchema>) => {
-          const { url } = params;
-
+          const { url: rawUrl } = params;
           try {
-            const response = await fetch(url, {
+            const parsedUrl = new URL(rawUrl);
+            if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+              return { error: 'Only http and https protocols are allowed', url: rawUrl };
+            }
+            const addresses = await dns.resolve4(parsedUrl.hostname);
+            for (const ip of addresses) {
+              if (isPrivateIp(ip)) {
+                return { error: 'Request blocked: target address is not publicly accessible', url: rawUrl };
+              }
+            }
+            const response = await fetch(rawUrl, {
               method: 'GET',
-              headers: {
-                'User-Agent': 'OASM-Security-Agent/1.0',
-              },
+              headers: { 'User-Agent': 'OASM-Security-Agent/1.0' },
             });
-
-            const body = await response.text();
-
-            return {
-              statusCode: response.status,
-              body,
-            };
+            return { statusCode: response.status, body: await response.text() };
           } catch (error) {
             return {
               error: error instanceof Error ? error.message : 'Unknown error',
-              url,
+              url: rawUrl,
             };
           }
         },
@@ -373,14 +356,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * List issues tool - returns a factory that accepts workspaceId
-   */
   get listIssuesTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ List all security issues in the workspace.\n\nReturns all issues (tickets/findings) with their status.\n\n✅ WHEN TO USE:\n- User asks "what issues are there?"\n- Search for specific issues\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- search: Filter by title or content\n- status: Filter by status (e.g. OPEN, IN_PROGRESS, RESOLVED)',
+          'List security issues with status. Params: page, limit, search, status (OPEN/IN_PROGRESS/RESOLVED).',
         parameters: listIssuesSchema,
         execute: async (params: z.infer<typeof listIssuesSchema>) => {
           const { page, limit, search, status } = params;
@@ -410,14 +390,10 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Detail issue tool - returns a factory that accepts workspaceId
-   */
   get detailIssueTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description:
-          '✅ Get FULL DETAILS about a single issue.\n\nUse this after you have an issue ID from list_issues. Returns everything known about this specific issue.\n\nPARAMETERS:\n- issueId: REQUIRED. The ID of the issue',
+        description: 'Get full details of a single issue by issueId.',
         parameters: detailIssueSchema,
         execute: async (params: z.infer<typeof detailIssueSchema>) => {
           const { issueId } = params;
@@ -428,14 +404,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * List tools tool - returns a factory that accepts workspaceId
-   */
   get listToolsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ List all installed security tools/scanners.\n\nReturns tools configured in the workspace.\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- q: Search query to filter tools',
+          'List installed security tools/scanners. Params: page, limit, q (search filter).',
         parameters: listToolsSchema,
         execute: async (params: z.infer<typeof listToolsSchema>) => {
           const { page, limit, q } = params;
@@ -448,10 +421,7 @@ export class AgentTool {
           });
           return {
             ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              name: i.name,
-            })),
+            data: response.data.map((i) => ({ id: i.id, name: i.name })),
           };
         },
       };
@@ -459,14 +429,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * List workers tool - returns a factory that accepts workspaceId
-   */
   get listWorkersTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ List all worker nodes.\n\nReturns worker nodes that are connected or configured.\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- q: Search query to filter workers',
+          'List connected worker nodes. Params: page, limit, q (search query).',
         parameters: listWorkersSchema,
         execute: async (params: z.infer<typeof listWorkersSchema>) => {
           const { page, limit, q } = params;
@@ -481,10 +448,7 @@ export class AgentTool {
           });
           return {
             ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              name: i.name,
-            })),
+            data: response.data.map((i) => ({ id: i.id, name: i.name })),
           };
         },
       };
@@ -492,14 +456,11 @@ export class AgentTool {
     };
   }
 
-  /**
-   * List jobs tool - returns a factory that accepts workspaceId
-   */
   get listJobsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ List background jobs.\n\nReturns background scan jobs and their status.\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- jobHistoryId: Filter by specific job run ID\n- jobStatus: Filter by status (completed, failed, active)',
+          'List background scan jobs with status. Params: page, limit, jobHistoryId, jobStatus (completed/failed/active).',
         parameters: listJobsSchema,
         execute: async (params: z.infer<typeof listJobsSchema>) => {
           const { page, limit, jobHistoryId, jobStatus } = params;
@@ -508,15 +469,12 @@ export class AgentTool {
             page: page ?? 1,
             sortBy: 'createdAt',
             sortOrder: SortOrder.DESC,
-            jobHistoryId: jobHistoryId,
-            jobStatus: jobStatus,
+            jobHistoryId,
+            jobStatus,
           });
           return {
             ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              status: i.status,
-            })),
+            data: response.data.map((i) => ({ id: i.id, status: i.status })),
           };
         },
       };
@@ -524,88 +482,748 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Remote execute tool - returns a factory that accepts workspaceId
-   */
-  get remoteExecuteTool(): (workspaceId: string) => any {
-    return (_workspaceId: string) => {
-      const toolConfig: any = {
-        description: [
-          'EXECUTE REMOTE COMMANDS on scanning infrastructure.',
-          '',
-          'Publishes arbitrary system commands (e.g., nmap, curl, dig, nslookup, ping, traceroute, whois, openssl s_client, python scripts) to be executed by remote worker nodes.',
-          '',
-          '✅ WHEN TO USE:',
-          '- Run an ad-hoc nmap scan (e.g., "nmap -sV -p 80,443 10.0.0.1")',
-          '- Fetch HTTP responses with curl (e.g., "curl -sI https://example.com")',
-          '- DNS lookups via dig/nslookup (e.g., "dig A example.com")',
-          '- Network diagnostics (e.g., "ping -c 3 8.8.8.8", "traceroute example.com")',
-          '- WHOIS lookups (e.g., "whois example.com")',
-          '- SSL/TLS inspection (e.g., "openssl s_client -connect example.com:443")',
-          '- Run any CLI tool available on the worker infrastructure',
-          '',
-          '❌ WHEN NOT TO USE:',
-          '- For scanning scope/target definitions → use get_targets or list_assets_in_target',
-          '- For reading existing data → use get_assets, get_vulnerabilities, etc.',
-          '- For fetching web page content → use web_fetch instead',
-          '- For interactive or long-running commands (no PTY, no stdin, strict timeout)',
-          '',
-          '⚠️ CONSTRAINTS:',
-          '- Commands are executed with OS-level permissions — avoid destructive operations',
-          '- The command is sent via gRPC to an available online worker',
-          '- If no worker is available, the command will fail',
-          '- Waits for command completion (stdout, stderr, exit code) before returning',
-          '',
-          'PARAMETERS:',
-          '- command: REQUIRED. The full shell command string to execute (e.g., "nmap -p 22 10.0.0.0/24")',
-          '',
-          'OUTPUT:',
-          '- stdout: Standard output from the command',
-          '- stderr: Standard error output from the command',
-          '- exitCode: Process exit code (0 = success, non-zero = failure)',
-          '- error: Error message if the command failed',
-          '- timedOut: Whether the command timed out before completion',
-        ].join('\n'),
-        parameters: z.object({
-          command: z
-            .string()
-            .min(1)
-            .describe(
-              'The full shell command to execute (e.g., "nmap -sV 10.0.0.1", "curl -s https://example.com", "dig A google.com")',
-            ),
-        }),
-        execute: async (params: { command: string }) => {
-          const { command } = params;
-          const sessionId = randomUUID();
-          return this.remoteExecuteService.waitForResult(command, sessionId);
-        },
-      };
-      return tool(toolConfig);
+  remoteExecuteTool(
+    workspaceId: string,
+    conversationId: string,
+    emitter?: EventEmitter,
+  ): ToolType {
+    const toolConfig: any = {
+      description: [
+        'Execute arbitrary shell commands on remote worker nodes (nmap, curl, dig, etc.).',
+        'Params: command (required shell command string).',
+        'Output: stdout, stderr, exitCode, error, timedOut.',
+        'Warning: OS-level permissions, no PTY, strict timeout.',
+      ].join('\n'),
+      parameters: z.object({
+        command: z.string().min(1).describe('Shell command to execute'),
+      }),
+      execute: async (
+        params: { command: string },
+        options: { toolCallId: string },
+      ) => {
+        const { command } = params;
+        const { toolCallId } = options;
+        const sessionId = randomUUID();
+
+        return this.remoteExecuteService.waitForResult(
+          command,
+          sessionId,
+          conversationId,
+          60_000,
+          (event) => {
+            if (emitter) {
+              emitter.emit('remote-execute-output', { toolCallId, ...event });
+            }
+          },
+        );
+      },
+    };
+    return tool(toolConfig);
+  }
+
+  getTodoTools(
+    conversationId: string,
+    emitter?: EventEmitter,
+  ): Record<string, ToolType> {
+    const todoRepo = this.todoRepository;
+
+    /**
+     * Tries to parse a string as a JSON array with fallback strategies.
+     * Handles cases where LLM sends steps with invalid JSON escapes (e.g., \`)
+     * that cause JSON.parse to fail.
+     *
+     * Strategy:
+     * 1. Normal JSON.parse
+     * 2. Sanitize invalid escapes and retry
+     * 3. Regex extraction for ["...", "..."] patterns
+     */
+    const tryParseJsonArray = (str: string): string[] | null => {
+      // Strategy 1: Normal JSON.parse
+      try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed)) return parsed.map((s) => String(s));
+        return null;
+      } catch {
+        // Fall through
+      }
+
+      // Strategy 2: Sanitize invalid escapes and retry
+      // Common issue: LLM sends \` which is not valid JSON
+      try {
+        const sanitized = str.replace(/\\`/g, '`');
+        const parsed = JSON.parse(sanitized);
+        if (Array.isArray(parsed)) return parsed.map((s) => String(s));
+        return null;
+      } catch {
+        // Fall through
+      }
+
+      // Strategy 3: Regex extraction for ["...", "..."] pattern
+      const trimmed = str.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        const inner = trimmed.slice(1, -1);
+        const items: string[] = [];
+        let current = '';
+        let inQuote = false;
+        let escaped = false;
+
+        for (let i = 0; i < inner.length; i++) {
+          const ch = inner[i]!;
+          if (escaped) {
+            current += ch;
+            escaped = false;
+            continue;
+          }
+          if (ch === '\\') {
+            escaped = true;
+            current += ch;
+            continue;
+          }
+          if (ch === '"') {
+            inQuote = !inQuote;
+            continue;
+          }
+          if (ch === ',' && !inQuote) {
+            const trimmedItem = current.trim();
+            if (trimmedItem) items.push(trimmedItem);
+            current = '';
+            continue;
+          }
+          current += ch;
+        }
+        const lastItem = current.trim();
+        if (lastItem) items.push(lastItem);
+
+        if (items.length > 0) {
+          // Clean up escaped quotes in each item
+          return items.map((s) =>
+            s.replace(/^"|"$/g, '').replace(/\\"/g, '"').trim(),
+          );
+        }
+      }
+
+      return null;
+    };
+
+    const getAllTodos = async (): Promise<AgentTodoItem[]> => {
+      const entities = await todoRepo.find({
+        where: { conversationId },
+        order: { sortOrder: 'ASC' },
+      });
+      return entities.map((t) => ({
+        id: t.id,
+        content: t.content,
+        status: t.status,
+        sortOrder: t.sortOrder,
+        updatedAt: t.updatedAt.toISOString(),
+      }));
+    };
+
+    const emitTodos = async (): Promise<void> => {
+      if (emitter) {
+        const todos = await getAllTodos();
+        emitter.emit('todos-updated', todos);
+      }
+    };
+
+    const setPlanTool: any = {
+      description:
+        'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
+      parameters: z.object({
+        steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
+      }),
+      execute: async (params: { steps: string[] }) => {
+        try {
+          // Guard: reject if there are active (pending/in_progress) todos
+          const existingTodos = await todoRepo.find({
+            where: { conversationId },
+            order: { sortOrder: 'ASC' },
+          });
+          const hasActiveTodos = existingTodos.some(
+            (t) => t.status === 'pending' || t.status === 'in_progress',
+          );
+          if (hasActiveTodos) {
+            const activeSteps = existingTodos
+              .filter(
+                (t) => t.status === 'pending' || t.status === 'in_progress',
+              )
+              .map((t) => `  - [${t.status}] ${t.content}`)
+              .join('\n');
+            return {
+              success: false,
+              message:
+                `REJECTED: A plan is already in progress with ${existingTodos.filter((t) => t.status !== 'completed' && t.status !== 'failed').length} pending step(s).\n` +
+                `Active steps:\n${activeSteps}\n\n` +
+                'You MUST execute the existing steps first. Do NOT create a new plan while steps are pending. ' +
+                'Use transition_step(id, "in_progress") to start the first pending step.',
+            };
+          }
+
+          // Log raw params for debugging
+          this.logger.log('[formulate_plan] Raw params: ' + JSON.stringify(params, null, 2));
+
+          // Normalize steps: handle various formats AI might send
+          let normalizedSteps: string[] = [];
+
+          const rawSteps = params.steps as string[] | string;
+
+          const cleanStep = (s: string): string => {
+            let cleaned = s.trim();
+            // Remove surrounding quotes (single or double)
+            if (
+              (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+              (cleaned.startsWith("'") && cleaned.endsWith("'"))
+            ) {
+              cleaned = cleaned.slice(1, -1).trim();
+            }
+            // Remove escaped quotes
+            cleaned = cleaned.replace(/\\"/g, '"').replace(/\\'/g, "'");
+            // Remove extra whitespace but preserve intentional newlines
+            cleaned = cleaned.replace(/[ \t]+/g, ' ').trim();
+            return cleaned;
+          };
+
+          let stepsArray: string[] = [];
+
+          if (typeof rawSteps === 'string') {
+            const parsed = tryParseJsonArray(rawSteps);
+            if (parsed) {
+              stepsArray = parsed;
+              this.logger.log('[formulate_plan] Parsed from JSON string');
+            } else {
+              stepsArray = [rawSteps];
+            }
+          } else if (Array.isArray(rawSteps)) {
+            if (rawSteps.length === 1 && typeof rawSteps[0] === 'string') {
+              const parsed = tryParseJsonArray(rawSteps[0]!);
+              if (parsed) {
+                stepsArray = parsed;
+                this.logger.log('[formulate_plan] Parsed from nested JSON string');
+              } else {
+                stepsArray = rawSteps;
+              }
+            } else {
+              stepsArray = rawSteps;
+            }
+          }
+
+          this.logger.log('[formulate_plan] Steps array: ' + JSON.stringify(stepsArray));
+
+          // Clean each step
+          for (const s of stepsArray) {
+            if (typeof s === 'string' && s.trim()) {
+              const cleaned = cleanStep(s);
+              if (!cleaned) continue;
+
+              // Split by newline in case AI puts all steps in one string
+              if (cleaned.includes('\n')) {
+                const lines = cleaned
+                  .split('\n')
+                  .map((l) => cleanStep(l))
+                  .filter((l) => l.length > 0);
+                normalizedSteps.push(...lines);
+              } else {
+                normalizedSteps.push(cleaned);
+              }
+            } else if (typeof s === 'object' && s !== null) {
+              normalizedSteps.push(JSON.stringify(s));
+            } else if (s !== null && s !== undefined) {
+              const cleaned = cleanStep(String(s));
+              if (cleaned) normalizedSteps.push(cleaned);
+            }
+          }
+
+          this.logger.log('[formulate_plan] Normalized steps: ' + JSON.stringify(normalizedSteps));
+          this.logger.log('[formulate_plan] Normalized count: ' + normalizedSteps.length);
+
+          if (normalizedSteps.length === 0) {
+            return { success: false, message: 'No valid steps provided.' };
+          }
+
+          await todoRepo.delete({ conversationId });
+
+          const entities = normalizedSteps.map((step, index) =>
+            todoRepo.create({
+              conversationId,
+              content: step,
+              status: 'pending' as const,
+              sortOrder: index,
+            }),
+          );
+          await todoRepo.save(entities);
+
+          const todos = await getAllTodos();
+          this.logger.log('[formulate_plan] Final todos: ' + JSON.stringify(todos, null, 2));
+
+          await emitTodos();
+          return {
+            success: true,
+            message: `Plan set with ${todos.length} steps.`,
+            todos,
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error('[formulate_plan] Error: ' + (error instanceof Error ? error.message : String(error)));
+          return { success: false, message: `Failed to set plan: ${message}` };
+        }
+      },
+    };
+
+    const updateTodoStatusTool: any = {
+      description:
+        'Update the status of a specific step in the execution plan. You MUST call this at two points: (1) BEFORE starting work on a step — call transition_step(id, "in_progress"), and (2) AFTER finishing work on a step — call transition_step(id, "completed") or transition_step(id, "failed"). ALWAYS transition the current step before moving to the next sequential step. NEVER skip steps. NEVER call this for a step that is not your current step. Params: id (UUID of the step), status (pending/in_progress/completed/failed).',
+      parameters: z.object({
+        id: z.string().uuid().describe('Todo item ID'),
+        status: z
+          .enum(['pending', 'in_progress', 'completed', 'failed'])
+          .describe('New status'),
+      }),
+      execute: async (params: {
+        id: string;
+        status: AgentTodoItem['status'];
+      }) => {
+        try {
+          const targetTodo = await todoRepo.findOne({
+            where: { id: params.id, conversationId },
+          });
+          if (!targetTodo)
+            return {
+              success: false,
+              message: `Todo "${params.id}" not found.`,
+            };
+
+          // Server-side ordering guard: enforce sequential execution
+          if (params.status === 'in_progress') {
+            // Only the first pending/in_progress step (by sortOrder) may be started
+            const allTodos = await todoRepo.find({
+              where: { conversationId },
+              order: { sortOrder: 'ASC' },
+            });
+            const currentStep = allTodos.find(
+              (t) => t.status === 'pending' || t.status === 'in_progress',
+            );
+            if (currentStep && currentStep.id !== targetTodo.id) {
+              return {
+                success: false,
+                message: `REJECTED: Cannot start "${targetTodo.content}" (sortOrder ${targetTodo.sortOrder}). You must complete the current step first: "${currentStep.content}" (sortOrder ${currentStep.sortOrder}). Execute steps in strict sequential order.`,
+              };
+            }
+          } else if (
+            params.status === 'completed' ||
+            params.status === 'failed'
+          ) {
+            // Can only complete/fail a step that is currently in_progress
+            if (targetTodo.status !== 'in_progress') {
+              return {
+                success: false,
+                message: `REJECTED: Cannot mark "${targetTodo.content}" as ${params.status}. It is currently "${targetTodo.status}". Call transition_step(id, "in_progress") before completing or failing a step.`,
+              };
+            }
+          }
+
+          targetTodo.status = params.status;
+          await todoRepo.save(targetTodo);
+
+          await emitTodos();
+          return {
+            success: true,
+            message: `Updated "${targetTodo.content}" -> ${params.status}`,
+            todo: {
+              id: targetTodo.id,
+              content: targetTodo.content,
+              status: targetTodo.status,
+              sortOrder: targetTodo.sortOrder,
+              updatedAt: targetTodo.updatedAt.toISOString(),
+            },
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to update step: ${message}`,
+          };
+        }
+      },
+    };
+
+    const addTodoTool: any = {
+      description:
+        'Append a new step to the plan. Params: content (string). ONLY use when you genuinely discover a new requirement during execution that was not part of the original plan. Do NOT use to re-create steps you forgot to add earlier — finish the current step first.',
+      parameters: z.object({
+        content: z.string().min(1).describe('Todo content'),
+      }),
+      execute: async (params: { content: string }) => {
+        try {
+          const existingTodos = await todoRepo.find({
+            where: { conversationId },
+          });
+          const hasActiveTodos = existingTodos.some(
+            (t) => t.status === 'pending' || t.status === 'in_progress',
+          );
+
+          // Guard: warn but allow append during active plan (the LLM might genuinely need it)
+          if (hasActiveTodos) {
+            this.logger.warn(
+              `[append_step] Adding step while ${existingTodos.filter((t) => t.status === 'pending' || t.status === 'in_progress').length} step(s) still active`,
+            );
+          }
+
+          const maxOrderResult = await todoRepo
+            .createQueryBuilder('todo')
+            .select('MAX(todo.sortOrder)', 'max')
+            .where('todo.conversationId = :id', { id: conversationId })
+            .getRawOne();
+          const nextSortOrder = (maxOrderResult?.max ?? -1) + 1;
+
+          const newEntity = todoRepo.create({
+            conversationId,
+            content: params.content,
+            status: 'pending',
+            sortOrder: nextSortOrder,
+          });
+          await todoRepo.save(newEntity);
+
+          await getAllTodos();
+          await emitTodos();
+          return {
+            success: true,
+            message: `Added todo "${params.content}".`,
+            todo: {
+              id: newEntity.id,
+              content: newEntity.content,
+              status: newEntity.status,
+              sortOrder: newEntity.sortOrder,
+              updatedAt: newEntity.updatedAt.toISOString(),
+            },
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to add step: ${message}` };
+        }
+      },
+    };
+
+    const clearPlanTool: any = {
+      description:
+        'Clear entire plan (irreversible). Then call formulate_plan to create a new one.',
+      parameters: z.object({}),
+      execute: async () => {
+        try {
+          await todoRepo.delete({ conversationId });
+          await emitTodos();
+          return { success: true, message: 'Plan cleared.' };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to clear plan: ${message}`,
+          };
+        }
+      },
+    };
+
+    return {
+      formulate_plan: tool(setPlanTool),
+      transition_step: tool(updateTodoStatusTool),
+      append_step: tool(addTodoTool),
+      scrap_plan: tool(clearPlanTool),
     };
   }
 
-  /**
-   * Returns all available tools as a record, bound to the given workspaceId
-   */
-  getTools(workspaceId: string): Record<string, ToolType> {
-    return {
-      get_assets: this.getAssetsTool(workspaceId),
-      get_vulnerabilities: this.getVulnerabilitiesTool(workspaceId),
-      get_targets: this.getTargetsTool(workspaceId),
-      get_statistics: this.getStatisticsTool(workspaceId),
-      detail_asset: this.detailAssetTool(workspaceId),
-      list_assets_in_target: this.listAssetsInTargetTool(workspaceId),
-      detail_vuln: this.detailVulnTool(workspaceId),
-      get_ports: this.getPortsTool(workspaceId),
-      get_technologies: this.getTechnologiesTool(workspaceId),
-      get_tls: this.getTlsTool(workspaceId),
-      web_fetch: this.webFetchTool(workspaceId),
-      list_issues: this.listIssuesTool(workspaceId),
-      detail_issue: this.detailIssueTool(workspaceId),
-      list_tools: this.listToolsTool(workspaceId),
-      list_workers: this.listWorkersTool(workspaceId),
-      list_jobs: this.listJobsTool(workspaceId),
-      remote_execute: this.remoteExecuteTool(workspaceId),
+  getMemoryTools(
+    workspaceId: string,
+    userId: string,
+    conversationId: string,
+  ): Record<string, ToolType> {
+    const memoriesService = this.agentsMemories;
+
+    const stmWriteTool: any = {
+      description:
+        'Save a key-value pair to short-term memory (conversation scope). ' +
+        'Use this to remember important findings during execution (e.g., discovered IPs, scan results, target info).',
+      parameters: z.object({
+        key: z
+          .string()
+          .min(1)
+          .describe(
+            'Memory key (e.g. "target_info", "open_ports", "scan_results")',
+          ),
+        value: z.string().min(1).describe('Memory value to store'),
+      }),
+      execute: async (params: { key: string; value: string }) => {
+        try {
+          await memoriesService.stmSet(
+            conversationId,
+            params.key,
+            params.value,
+          );
+          return {
+            success: true,
+            message: `Stored "${params.key}" in short-term memory.`,
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to store memory: ${message}`,
+          };
+        }
+      },
     };
+
+    const stmReadTool: any = {
+      description: 'Read a value from short-term memory by key.',
+      parameters: z.object({
+        key: z.string().describe('Memory key to read'),
+      }),
+      execute: async (params: { key: string }) => {
+        try {
+          const entry = await memoriesService.stmGet(
+            conversationId,
+            params.key,
+          );
+          if (!entry) {
+            return {
+              found: false,
+              message: `No memory found for key "${params.key}".`,
+            };
+          }
+          return {
+            found: true,
+            key: entry.key,
+            value: entry.value,
+            updatedAt: entry.updatedAt,
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to read memory: ${message}`,
+          };
+        }
+      },
+    };
+
+    const stmListTool: any = {
+      description: 'List all short-term memory entries for this conversation.',
+      parameters: z.object({}),
+      execute: async () => {
+        try {
+          const entries = await memoriesService.stmGetAll(conversationId);
+          return {
+            count: entries.length,
+            entries: entries.map((e) => ({
+              key: e.key,
+              value: e.value,
+              updatedAt: e.updatedAt,
+            })),
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to list memories: ${message}`,
+          };
+        }
+      },
+    };
+
+    const ltmWriteTool: any = {
+      description:
+        'Save important information to long-term memory (workspace scope, persists across conversations). ' +
+        'Use this for persistent knowledge like target profiles, known vulnerabilities, organizational policies.',
+      parameters: z.object({
+        content: z
+          .string()
+          .min(1)
+          .describe('Content to store in long-term memory'),
+      }),
+      execute: async (params: { content: string }) => {
+        try {
+          await memoriesService.ltmSet(workspaceId, userId, params.content);
+          return {
+            success: true,
+            message: 'Saved to long-term memory.',
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to save LTM: ${message}` };
+        }
+      },
+    };
+
+    const ltmAppendTool: any = {
+      description:
+        'Append information to existing long-term memory (keeps previous content).',
+      parameters: z.object({
+        content: z
+          .string()
+          .min(1)
+          .describe('Content to append to existing long-term memory'),
+      }),
+      execute: async (params: { content: string }) => {
+        try {
+          const existing = await memoriesService.ltmGet(workspaceId, userId);
+          const newContent = existing?.content
+            ? `${existing.content}\n\n${params.content}`
+            : params.content;
+          await memoriesService.ltmSet(workspaceId, userId, newContent);
+          return {
+            success: true,
+            message: 'Appended to long-term memory.',
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to append LTM: ${message}`,
+          };
+        }
+      },
+    };
+
+    const ltmReadTool: any = {
+      description: 'Read the current long-term memory content.',
+      parameters: z.object({}),
+      execute: async () => {
+        try {
+          const record = await memoriesService.ltmGet(workspaceId, userId);
+          return { content: record?.content || '(empty)' };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return { success: false, message: `Failed to read LTM: ${message}` };
+        }
+      },
+    };
+
+    return {
+      stm_write: tool(stmWriteTool),
+      stm_read: tool(stmReadTool),
+      stm_list: tool(stmListTool),
+      ltm_write: tool(ltmWriteTool),
+      ltm_append: tool(ltmAppendTool),
+      ltm_read: tool(ltmReadTool),
+    };
+  }
+
+  getTools(
+    workspaceId: string,
+    agentMode: AgentMode,
+    emitter?: EventEmitter,
+    conversationId?: string,
+    mcpOnly = false,
+  ): Record<string, ToolType> {
+    const { AGENT, ASK } = AgentMode;
+    const tools: Record<
+      string,
+      { method: ToolType; permissions: AgentMode[]; mcp: boolean }
+    > = {
+      enumerate_assets: {
+        method: this.getAssetsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      discover_vulnerabilities: {
+        method: this.getVulnerabilitiesTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      retrieve_targets: {
+        method: this.getTargetsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      gather_statistics: {
+        method: this.getStatisticsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      inspect_asset: {
+        method: this.detailAssetTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      examine_target_assets: {
+        method: this.listAssetsInTargetTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      investigate_vulnerability: {
+        method: this.detailVulnTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      list_network_ports: {
+        method: this.getPortsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      fingerprint_technologies: {
+        method: this.getTechnologiesTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      verify_tls_settings: {
+        method: this.getTlsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      retrieve_web_page: {
+        method: this.webFetchTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      enumerate_open_issues: {
+        method: this.listIssuesTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      inspect_issue: {
+        method: this.detailIssueTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      display_available_tools: {
+        method: this.listToolsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: false,
+      },
+      list_active_workers: {
+        method: this.listWorkersTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      review_jobs: {
+        method: this.listJobsTool(workspaceId),
+        permissions: [AGENT, ASK],
+        mcp: true,
+      },
+      execute_remote_command: {
+        method: this.remoteExecuteTool(
+          workspaceId,
+          conversationId ?? '',
+          emitter,
+        ),
+        permissions: [AGENT],
+        mcp: false,
+      },
+    };
+
+    return Object.fromEntries(
+      Object.entries(tools)
+        .filter(([, config]) => config.permissions.includes(agentMode))
+        .filter(([, config]) => (mcpOnly ? config.mcp : true))
+        .map(([key, config]) => [key, config.method]),
+    ) as Record<string, ToolType>;
   }
 }

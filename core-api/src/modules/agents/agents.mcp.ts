@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { AgentsService } from './agents.service';
 import { MCPServerResponseDto } from './dto/mcp-config.dto';
 
@@ -32,6 +32,29 @@ export class AgentsMcpService {
     return allTools;
   }
 
+  private createTransport(server: MCPServerResponseDto) {
+    if (!server.url) {
+      return null;
+    }
+
+    const url = new URL(server.url);
+    const headers = server.headers ?? {};
+
+    if (server.transport === 'streamable-http') {
+      return new StreamableHTTPClientTransport(url, {
+        requestInit: {
+          headers,
+        },
+      });
+    }
+
+    return new SSEClientTransport(url, {
+      requestInit: {
+        headers,
+      },
+    });
+  }
+
   private async fetchToolsFromServer(
     server: MCPServerResponseDto,
   ): Promise<Record<string, unknown>> {
@@ -45,19 +68,8 @@ export class AgentsMcpService {
       },
     );
 
-    let transport;
-    if (server.url) {
-      transport = new SSEClientTransport(new URL(server.url));
-    } else if (server.command) {
-      transport = new StdioClientTransport({
-        command: server.command,
-        args: server.args || [],
-        env: {
-          ...process.env,
-          ...(server.env || {}),
-        } as Record<string, string>,
-      });
-    } else {
+    const transport = this.createTransport(server);
+    if (!transport) {
       return {};
     }
 
@@ -110,20 +122,9 @@ export class AgentsMcpService {
       },
     );
 
-    let transport;
-    if (server.url) {
-      transport = new SSEClientTransport(new URL(server.url));
-    } else if (server.command) {
-      transport = new StdioClientTransport({
-        command: server.command,
-        args: server.args || [],
-        env: {
-          ...process.env,
-          ...(server.env || {}),
-        } as Record<string, string>,
-      });
-    } else {
-      throw new Error(`Invalid MCP server configuration for ${server.name}`);
+    const transport = this.createTransport(server);
+    if (!transport) {
+      throw new Error(`Invalid MCP server configuration for ${server.name}: missing URL`);
     }
 
     try {

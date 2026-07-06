@@ -19,6 +19,7 @@ import {
   Tag,
 } from 'lucide-react';
 import AssetValue from './asset-value';
+import AddTagDialog from './add-tag-dialog';
 import BadgeList from './badge-list';
 import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
@@ -26,7 +27,7 @@ import { TechnologyTooltip } from './technology-tooltip';
 import ViewCode from './view-code';
 
 export default function AssetDetail({ id }: { id: string }) {
-  const { data } = useAssetsControllerGetAssetById(id, {});
+  const { data, refetch } = useAssetsControllerGetAssetById(id, {});
 
   if (!data) {
     return (
@@ -133,7 +134,7 @@ export default function AssetDetail({ id }: { id: string }) {
               <Tag size={16} /> {tag.tag}
             </Badge>
           ))}
-          {/* <AddTagDialog id={id} domain={value} tags={tags} refetch={refetch} /> */}
+          <AddTagDialog id={id} tags={tags} refetch={refetch} />
         </div>
 
         {tls && (

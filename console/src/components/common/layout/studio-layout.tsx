@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { GithubBadge } from '@/components/ui/github-badge';
 import { ArrowLeft } from 'lucide-react';
 import type { JSX } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 
 export default function StudioLayout({ children }: { children: JSX.Element }) {
   return (

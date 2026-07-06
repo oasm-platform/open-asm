@@ -8,7 +8,7 @@ const BuiltInTools = () => {
 
   return (
     <ToolsList
-      data={data?.data}
+      data={data?.data ?? []}
       isLoading={isLoading}
       icon={<Bolt className="w-6 h-6" />}
       title="Built-in tools"

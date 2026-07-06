@@ -18,7 +18,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentModeDto, GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
@@ -39,11 +39,14 @@ import {
   MCPServerPingResponseDto,
   MCPServerResponseDto,
 } from './dto/mcp-config.dto';
-import { MessageResponseDto } from './dto/message.dto';
+import { MessageResponseDto, ToolCallResponseDto } from './dto/message.dto';
+import { WorkspaceMemoryResponseDto } from './dto/workspace-memory.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
+import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
+import { AgentMessageToolCall } from './entities/tool-call.entity';
 import {
   getLLMProviderConfig,
   llmProviderSupported,
@@ -62,6 +65,10 @@ export class AgentsService {
     private readonly messageRepository: Repository<AgentMessage>,
     @InjectRepository(AgentMCPConfig)
     private readonly mcpConfigRepository: Repository<AgentMCPConfig>,
+    @InjectRepository(AgentMessageToolCall)
+    private readonly toolCallRepository: Repository<AgentMessageToolCall>,
+    @InjectRepository(AgentConversationTodo)
+    private readonly todoRepository: Repository<AgentConversationTodo>,
     private readonly redisService: RedisService,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly httpService: HttpService,
@@ -92,13 +99,16 @@ export class AgentsService {
     ];
   }
 
-  async getAgentModesWithWorkers(): Promise<GetAgentModesResponseDto> {
+  async getAgentModesWithWorkers(
+    workspaceId: string,
+  ): Promise<GetAgentModesResponseDto> {
     const modes = this.getAgentModes();
     const workersResponse = await this.workersService.getWorkers({
       page: 1,
       limit: 1000,
       sortBy: '"createdAt"',
       sortOrder: SortOrder.DESC,
+      workspaceId,
       enabledAgentMode: true,
     });
     return {
@@ -123,6 +133,7 @@ export class AgentsService {
       name: config.name,
       model: config.model,
       apiUrl: config.apiUrl,
+      contextWindow: config.contextWindow,
       isPreferred: config.isPreferred,
       apiKeyMasked,
       createdAt: config.createdAt,
@@ -361,6 +372,43 @@ export class AgentsService {
     return models;
   }
 
+  async getConversation(
+    id: string,
+    workspaceId: string,
+  ): Promise<ConversationResponseDto> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id, workspaceId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    const todoEntities = await this.todoRepository.find({
+      where: { conversationId: id },
+      order: { sortOrder: 'ASC' },
+    });
+    const todos = todoEntities.map((t) => ({
+      id: t.id,
+      content: t.content,
+      status: t.status,
+      sortOrder: t.sortOrder,
+      updatedAt: t.updatedAt.toISOString(),
+    }));
+
+    return {
+      id: conversation.id,
+      llmConfigId: conversation.llmConfigId,
+      title: conversation.title,
+      agentMode: conversation.agentMode,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      todos,
+      summary: conversation.summary,
+      workerId: conversation.workerId,
+    };
+  }
+
   async getConversations(
     workspaceId: string,
     query?: GetManyBaseQueryParams,
@@ -392,6 +440,7 @@ export class AgentsService {
         id: c.id,
         llmConfigId: c.llmConfigId,
         title: c.title,
+        agentMode: c.agentMode,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
       })),
@@ -421,6 +470,7 @@ export class AgentsService {
       id: saved.id,
       llmConfigId: saved.llmConfigId,
       title: saved.title,
+      agentMode: saved.agentMode,
       createdAt: saved.createdAt,
       updatedAt: saved.updatedAt,
     };
@@ -476,6 +526,29 @@ export class AgentsService {
 
     const [messages, total] = await qb.getManyAndCount();
 
+    // Batch load tool calls for all returned messages (1 query, avoids N+1)
+    const messageIds = messages.map((m) => m.id);
+    const toolCalls: AgentMessageToolCall[] =
+      messageIds.length > 0
+        ? await this.toolCallRepository.find({
+            where: { messageId: In(messageIds) },
+            order: { createdAt: 'ASC' },
+          })
+        : [];
+
+    const toolCallsByMessageId = new Map<string, ToolCallResponseDto[]>();
+    for (const tc of toolCalls) {
+      const list = toolCallsByMessageId.get(tc.messageId) ?? [];
+      list.push({
+        toolCallId: tc.toolCallId,
+        toolName: tc.toolName,
+        args: tc.args,
+        result: tc.result,
+        isError: tc.isError,
+      });
+      toolCallsByMessageId.set(tc.messageId, list);
+    }
+
     return getManyResponse({
       query: { ...query, page, limit } as GetManyBaseQueryParams,
       data: messages.map((m) => ({
@@ -485,6 +558,8 @@ export class AgentsService {
         content: m.content,
         messageType: m.messageType,
         metadata: m.metadata,
+        parts: m.parts,
+        toolCalls: toolCallsByMessageId.get(m.id) ?? [],
         createdAt: m.createdAt,
       })),
       total,
@@ -604,7 +679,9 @@ export class AgentsService {
     const existing = config.configJson.mcpServers[name] ?? {};
     config.configJson.mcpServers[name] = {
       disabled: false,
+      transport: 'sse',
       timeout: 60,
+      sse_read_timeout: 300,
       allowed_tools: null,
       ...existing,
       ...dto,
@@ -689,5 +766,43 @@ export class AgentsService {
     } catch {
       return { status: 'offline' };
     }
+  }
+
+  async getWorkspaceMemory(
+    workspaceId: string,
+    userId: string,
+    query?: GetManyBaseQueryParams,
+  ): Promise<GetManyBaseResponseDto<WorkspaceMemoryResponseDto>> {
+    const page = query?.page || 1;
+    const limit = query?.limit || 10;
+    const sortBy = query?.sortBy || 'createdAt';
+    const sortOrder = (query?.sortOrder || 'DESC') as 'ASC' | 'DESC';
+
+    const { data, total } = await this.agentsMemories.ltmGetAllPaginated(
+      workspaceId,
+      userId,
+      { page, limit, sortBy, sortOrder },
+    );
+
+    return getManyResponse({
+      query: { ...query, page, limit } as GetManyBaseQueryParams,
+      data: data.map((r) => ({
+        id: r.id,
+        workspaceId: r.workspaceId,
+        userId: r.userId,
+        content: r.content,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      })),
+      total,
+    });
+  }
+
+  async deleteWorkspaceMemory(
+    id: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.agentsMemories.ltmDeleteById(id, workspaceId, userId);
   }
 }

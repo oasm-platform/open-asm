@@ -19,9 +19,9 @@ export const StatusBadge = ({ status }: StatusBadgeProps) => {
   }
   return (
     <div
-      className={`${statusColor} flex items-center gap-1 capitalize font-bold border p-2 rounded-md`}
+      className={`${statusColor} flex items-center gap-1 capitalize font-bold border p-1 rounded-md`}
     >
-      <StatusIcon size={17} />
+      <StatusIcon size={14} />
       {status}
     </div>
   );

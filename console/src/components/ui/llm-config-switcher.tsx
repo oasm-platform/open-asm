@@ -17,7 +17,7 @@ import {
   useAgentsControllerSetPreferredLLMConfig,
 } from '@/services/apis/gen/queries';
 import { Check, ChevronsUpDown, Settings } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import Image from './image';
 import { Separator } from './separator';
@@ -56,7 +56,7 @@ export function LlmConfigSwitcher() {
   };
 
   const handleConnect = () => {
-    void navigate('/agents/providers/connect');
+    void navigate({ to: '/agents/providers/connect' });
   };
 
   if (isLoading) {

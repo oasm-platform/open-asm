@@ -27,6 +27,7 @@ import {
   WorkerJoinDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+import { AliveStreamManager } from './alive-stream-manager.service';
 import {
   RemoteExecuteCommand,
   RemoteExecuteSubscribeService,
@@ -45,6 +46,7 @@ export class WorkersController {
     private readonly workersService: WorkersService,
     private readonly remoteExecuteSubscribeService: RemoteExecuteSubscribeService,
     private readonly grpcWorkerContext: GrpcWorkerContext,
+    private readonly aliveStreamManager: AliveStreamManager,
   ) {}
 
   @Doc({
@@ -91,7 +93,7 @@ export class WorkersController {
   @GrpcMethod('WorkersService', 'GetManifest')
   grpcGetManifest(): { initCommands: string[] } {
     return {
-      initCommands: ['nuclei -ut'],
+      initCommands: ['nuclei -ut --silent'],
     };
   }
 
@@ -154,6 +156,8 @@ export class WorkersController {
   }): Observable<{ alive: boolean; lastSeenAt: string; workerId: string }> {
     return new Observable((subscriber) => {
       let intervalId: NodeJS.Timeout;
+      let registeredWorkerId: string | undefined;
+      let streamId: string | undefined;
 
       const updateAlive = async () => {
         try {
@@ -161,6 +165,15 @@ export class WorkersController {
             token: request.workerToken,
           });
           if (worker) {
+            if (!registeredWorkerId) {
+              streamId = this.aliveStreamManager.register(
+                worker.id,
+                request.workerToken,
+              );
+              registeredWorkerId = worker.id;
+            } else {
+              this.aliveStreamManager.updateAlive(registeredWorkerId);
+            }
             subscriber.next({
               alive: true,
               lastSeenAt: worker.lastSeenAt.toISOString(),
@@ -182,6 +195,13 @@ export class WorkersController {
 
       return () => {
         if (intervalId) clearInterval(intervalId);
+        if (registeredWorkerId && streamId) {
+          this.aliveStreamManager.unregister(registeredWorkerId, streamId);
+          this.logger.log(
+            `[grpcAlive] Worker ${registeredWorkerId} stream disconnected, releasing jobs`,
+          );
+          void this.workersService.releaseWorkerJobs(registeredWorkerId);
+        }
       };
     });
   }
@@ -203,33 +223,21 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'BuiltinToolRegistry')
-  async grpcBuiltinToolRegistry(): Promise<{
-    linux: string[];
-    windows: string[];
-    macos: string[];
-  }> {
-    const archivedPath = join(process.cwd(), 'public/archived');
+  async grpcBuiltinToolRegistry(request: {
+    os: string;
+    arch: string;
+  }): Promise<{ toolPaths: string[] }> {
+    const platform = `${request.os.toLowerCase()}_${request.arch.toLowerCase()}`;
+    const platformPath = join(process.cwd(), 'public/archived', platform);
 
-    const getFiles = async (dir: string): Promise<string[]> => {
-      try {
-        const files = await readdir(dir);
-        return files;
-      } catch {
-        return [];
-      }
-    };
-
-    const [linux, windows, macos] = await Promise.all([
-      getFiles(join(archivedPath, 'linux')),
-      getFiles(join(archivedPath, 'windows')),
-      getFiles(join(archivedPath, 'macos')),
-    ]);
-
-    return {
-      linux: linux.map((f) => `static/archived/linux/${f}`),
-      windows: windows.map((f) => `static/archived/windows/${f}`),
-      macos: macos.map((f) => `static/archived/macos/${f}`),
-    };
+    try {
+      const files = await readdir(platformPath);
+      return {
+        toolPaths: files.map((file) => `static/archived/${platform}/${file}`),
+      };
+    } catch {
+      return { toolPaths: [] };
+    }
   }
 
   @UseGuards(GrpcWorkerTokenGuard)

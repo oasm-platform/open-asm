@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { useInternalNetworksControllerCreateInternalNetwork } from '@/services/apis/gen/queries';
 import { Loader2Icon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 type FormData = {
@@ -41,7 +41,7 @@ const CreateInternalNetwork = () => {
       {
         onSuccess: () => {
           toast.success('Internal network created successfully');
-          navigate('/internal-networks');
+          navigate({ to: '/internal-networks' });
           reset();
         },
         onError: () => {
@@ -52,7 +52,7 @@ const CreateInternalNetwork = () => {
   };
 
   const handleCancel = () => {
-    navigate('/internal-networks');
+    navigate({ to: '/internal-networks' });
   };
 
   return (

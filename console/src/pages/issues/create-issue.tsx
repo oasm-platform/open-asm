@@ -8,7 +8,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 interface CreateIssueForm {
   title: string;
@@ -43,7 +43,7 @@ export default function CreateIssue() {
       });
 
       // Redirect to the newly created issue detail page
-      navigate(`/issues/${response.id}`);
+      navigate({ to: `/issues/${response.id}` });
     } catch (error) {
       console.error('Failed to create issue:', error);
     }

@@ -23,24 +23,28 @@ Open-source platform for cybersecurity Attack Surface Management. Built to help 
 - **Asset Discovery & Management**: Discover and manage internet-facing assets (domains, IPs, services) with grouping and multi-workspace support.
 - **Vulnerability Assessment**: Scan for vulnerabilities and misconfigurations with issue tracking, risk analysis, and remediation guidance.
 - **Technology Detection**: Identify technologies and services running on discovered assets.
-- **Distributed Scanning Engine**: High-performance distributed workers that can be easily scaled for parallel scanning tasks.
-- **Tool Integration**: Extensible framework for integrating security scanning tools.
-- **AI Assistant Integration**: MCP server integration for AI assistants to query asset data via natural language.
+- **Distributed Scanning Engine**: High-performance Go-based workers with gRPC communication, designed for horizontal scaling and parallel scanning tasks.
+- **Tool Integration**: Extensible framework for integrating security scanning tools (nuclei, subfinder, httpx, naabu, dnsx).
+- **AI Assistant Integration**: MCP server and AI SDK (OpenAI, Anthropic, Google) integration for intelligent querying and analysis of asset data.
 - **Workflow Automation**: Automated scanning schedules, alerts, and remediation workflows.
-- **Real-time Monitoring**: Monitor asset changes with instant notifications and a statistics dashboard.
-- **Search & Analytics**: Search and filter asset data with analytics for risk trends and reporting.
+- **Real-time Monitoring**: Monitor asset changes with SSE-based instant notifications and statistics dashboard.
+- **Search & Analytics**: Full-text search and filter asset data with analytics for risk trends and reporting.
+- **Geo-IP Enrichment**: Automatic IP geolocation enrichment for discovered assets.
+- **File Storage**: S3-compatible object storage (Rustfs) for scan artifacts and reports.
 
 ## System Architecture
 
 The system runs on a distributed architecture consisting of:
 
-* A web-based console for user interaction, asset management, and real-time monitoring.
-* A core API service responsible for business logic, data persistence, and job orchestration.
-* A Redis-based queue and caching layer enabling asynchronous job distribution, rate limiting, and system decoupling.
-* Distributed workers that execute high-performance scanning tasks, designed for horizontal auto-scaling and fault tolerance.
-* A PostgreSQL database for persistent storage of assets, scan results, and system state.
+* A React-based web console (Vite + TanStack Query/Router) for user interaction, asset management, and real-time monitoring.
+* A NestJS core API service responsible for business logic, data persistence, and job orchestration.
+* A Redis-based queue and caching layer (BullMQ) enabling asynchronous job distribution, rate limiting, and system decoupling.
+* Distributed Go workers that execute high-performance scanning tasks via gRPC, designed for horizontal auto-scaling and fault tolerance.
+* A PostgreSQL database (with pgvector) for persistent storage of assets, scan results, and system state.
+* A Rustfs (S3-compatible) object storage for scan artifacts and reports.
+* A Geo-IP proxy service for automatic IP geolocation enrichment.
 * An MCP (Model Context Protocol) server that provides structured context to AI systems.
-* Integration with AI/LLM components to enable intelligent querying, analysis, and automation over collected asset data.
+* Integration with AI/LLM components (AI SDK, LangGraph) for intelligent querying, analysis, and automation over collected asset data.
 
 ```mermaid
 graph TD
@@ -51,11 +55,13 @@ graph TD
 
     %% Core Components
     subgraph "OASM Platform"
-        Console[Web Console]
-        API[Core API Service]
-        DB[(PostgreSQL)]
-        Redis[(Redis)]
+        Console[Web Console<br/>]
+        API[Core API Service<br/>]
+        DB[(PostgreSQL<br/>pgvector)]
+        Redis[(Redis / BullMQ)]
         MCP[MCP Server]
+        Rustfs[(Rustfs<br/>S3 Storage)]
+        GeoIP[Geo-IP Proxy]
 
         subgraph "Execution Plane"
             W1[Worker 1]
@@ -70,11 +76,13 @@ graph TD
 
     API <-->|Persist Data| DB
     API <-->|Queue / Cache| Redis
+    API <-->|Store Artifacts| Rustfs
+    API <-->|IP Enrichment| GeoIP
 
-    %% Job Flow (2-way)
-    API <-->|Job / Result| W1
-    API <-->|Job / Result| W2
-    API <-->|Job / Result| WN
+    %% Job Flow (gRPC)
+    API <-->|gRPC Jobs| W1
+    API <-->|gRPC Jobs| W2
+    API <-->|gRPC Jobs| WN
 
     %% Scan
     W1 -->|Scan| Internet
@@ -110,30 +118,80 @@ graph TD
 
 ## Installation
 
+### Docker (Recommended)
+
 To quickly get started with OASM using Docker:
 
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/oasm-platform/oasm-docker.git
-   cd oasm-docker
+   git clone https://github.com/oasm-platform/open-asm.git
+   cd open-asm
    ```
 
-2. Rename the example environment file:
+2. Copy the example environment files:
 
    ```bash
-   cp .env.example .env
+   cp core-api/example.env core-api/.env
+   cp console/example.env console/.env
+   cp worker/example.env worker/.env
    ```
 
 3. Start the services:
+
    ```bash
-   docker compose up -d
+   docker compose up -d --build
    ```
 
-This will launch the entire system, including the console, core API, workers, and database. Access the application at the configured URL (http://localhost:6276).
+This will launch the entire system, including the console, core API, workers, PostgreSQL, Redis, Geo-IP proxy, and Rustfs storage. Access the console at `http://localhost:3000`.
 
-[Docker Repository](https://github.com/oasm-platform/oasm-docker)
+### Pre-built Images
+
+You can also use pre-built images from Docker Hub:
+
+```bash
+docker compose -f docker-compose.yml up -d
+```
+
+Images: `oasm/oasm-console`, `oasm/oasm-api`, `oasm/oasm-worker`
 
 ## Developer Guide
 
 For detailed instructions on setting up your development environment, running services, and contributing, please refer to our dedicated [Developer Guide](DEVELOPER_GUIDE.md).
+
+### Quick Start
+
+```bash
+# Install all dependencies and worker tools
+task init
+
+# Start API + Console dev servers
+task dev
+
+# Run workers locally
+task worker:dev
+```
+
+### Key Commands
+
+```bash
+task test          # Run API tests
+task lint          # Lint API + Console
+task build         # Build all services
+task docker-compose # Start full stack with Docker
+task gen-api       # Regenerate console API client
+task proto         # Regenerate gRPC stubs
+task migration:run # Run database migrations
+```
+
+## Tech Stack
+
+| Service | Technology |
+|---------|-----------|
+| **Console** | React 19, Vite, Tailwind CSS v4, TanStack Query/Router, shadcn/ui |
+| **Core API** | NestJS 11, TypeORM, BullMQ, AI SDK, LangGraph |
+| **Worker** | Go 1.26, Cobra, Viper, go-rod (browser automation) |
+| **Database** | PostgreSQL 17 + pgvector |
+| **Queue/Cache** | Redis + BullMQ |
+| **Object Storage** | Rustfs (S3-compatible) |
+| **Communication** | REST API, gRPC, SSE |

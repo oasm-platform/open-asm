@@ -62,7 +62,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .vscode/*
 .vscode/settings.json
 core-api/.storage/*
-
 # Nix
 /result
 /.cache/
@@ -79,3 +78,12 @@ core-api/public/tools/*
 .qwen/
 .agents/plans/*
 worker/.configs.json
+worker/agent-sessions/*
+console/sw.js
+.omo
+
+# Test coverage
+console/coverage/
+console/e2e/playwright-report/
+console/e2e/test-results/
+console/e2e/.auth/

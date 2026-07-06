@@ -22,7 +22,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from '@tanstack/react-router';
 import HTTPXStatusCode from './components/status-code';
 import { TechnologyTooltip } from './components/technology-tooltip';
 
@@ -54,8 +54,7 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export default function DetailAsset() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const { id } = useParams({ strict: false });
 
   const { data, isLoading, error } = useAssetsControllerGetAssetById(
     id ?? '',
@@ -83,7 +82,7 @@ export default function DetailAsset() {
             The asset you're looking for doesn't exist or you don't have
             permission to view it.
           </p>
-          <Button className="mt-4" onClick={() => navigate(-1)}>
+          <Button className="mt-4" onClick={() => window.history.back()}>
             Go back
           </Button>
         </div>

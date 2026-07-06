@@ -14,6 +14,7 @@ import { useState } from 'react';
 interface AgentPromptInputProps {
   onSubmit: (content: string, options?: { agentMode?: string }) => void;
   isSending?: boolean;
+  onStop?: () => void;
   selectedModel?: {
     provider: string;
     model: string;
@@ -22,6 +23,8 @@ interface AgentPromptInputProps {
   onSelectModel?: (provider: string, model: string, configId: string) => void;
   agentMode?: string;
   onAgentModeChange?: (mode: string) => void;
+  selectedWorkerId?: string | null;
+  onWorkerSelect?: (workerId: string | null) => void;
   placeholder?: string;
   className?: string;
 }
@@ -29,10 +32,13 @@ interface AgentPromptInputProps {
 export default function AgentPromptInput({
   onSubmit,
   isSending = false,
+  onStop,
   selectedModel,
   onSelectModel,
   agentMode = 'ask',
   onAgentModeChange,
+  selectedWorkerId,
+  onWorkerSelect,
   placeholder = 'Ask anything about security...',
   className,
 }: AgentPromptInputProps) {
@@ -47,7 +53,7 @@ export default function AgentPromptInput({
 
   return (
     <div className={className}>
-      <PromptInput onSubmit={handleSubmit} className="w-full shadow-sm">
+      <PromptInput onSubmit={handleSubmit} className="w-full">
         <PromptInputBody>
           <PromptInputTextarea
             value={input}
@@ -71,11 +77,14 @@ export default function AgentPromptInput({
               <AgentModeSelect
                 value={agentMode}
                 onChange={onAgentModeChange}
+                selectedWorkerId={selectedWorkerId}
+                onWorkerChange={onWorkerSelect}
               />
             )}
             <PromptInputSubmit
               status={isSending ? 'streaming' : 'ready'}
               disabled={!input.trim() || isSending}
+              onStop={onStop}
             />
           </div>
         </PromptInputFooter>

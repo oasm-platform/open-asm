@@ -70,6 +70,11 @@ export class GetManyWorkersDto extends GetManyBaseQueryParams {
   @IsOptional()
   workspaceId?: string;
 
+  @ApiProperty({ required: false, enum: ['cloud', 'workspace'] })
+  @IsString()
+  @IsOptional()
+  scope?: string;
+
   @ApiProperty({ required: false })
   @IsBoolean()
   @IsOptional()

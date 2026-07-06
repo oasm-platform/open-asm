@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,9 +13,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useWorkspacesControllerCreateWorkspace } from '@/services/apis/gen/queries';
+import { useSession } from '@/utils/authClient';
 import { Loader2Icon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 type FormData = {
@@ -25,7 +27,9 @@ type FormData = {
 const CreateWorkspace = () => {
   const navigate = useNavigate();
   const { mutate, isPending } = useWorkspacesControllerCreateWorkspace();
-  const { refetch, handleSelectWorkspace } = useWorkspaceSelector();
+  const { workspaces, isLoading: isWorkspacesLoading, refetch, handleSelectWorkspace } =
+    useWorkspaceSelector();
+  const { data: session } = useSession();
 
   const {
     register,
@@ -33,6 +37,15 @@ const CreateWorkspace = () => {
     reset,
     formState: { errors },
   } = useForm<FormData>();
+
+  useEffect(() => {
+    if (!isWorkspacesLoading && workspaces.length === 0 && session?.user?.name) {
+      reset((formValues) => ({
+        ...formValues,
+        name: `${session.user.name.charAt(0).toUpperCase() + session.user.name.slice(1)}'s workspace`,
+      }));
+    }
+  }, [isWorkspacesLoading, workspaces.length, session?.user?.name, reset]);
 
   const onSubmit = (data: FormData) => {
     mutate(
@@ -47,8 +60,7 @@ const CreateWorkspace = () => {
           toast.success('Workspace created successfully');
           refetch().then(() => {
             handleSelectWorkspace(data.id);
-            // Redirect to home page after successful workspace creation
-            navigate('/');
+            navigate({ to: workspaces.length === 0 ? '/targets/start-discovery' : '/' });
           });
           reset();
         },
@@ -79,6 +91,7 @@ const CreateWorkspace = () => {
                 {...register('name', {
                   required: 'Workspace name is required',
                 })}
+                onFocus={(e) => e.target.select()}
                 placeholder="Workspace Name"
               />
               {errors.name && (
@@ -105,10 +118,25 @@ const CreateWorkspace = () => {
                 </p>
               )}
             </div>
-            <Button type="submit" disabled={isPending} className="w-full">
-              {isPending && <Loader2Icon className="animate-spin mr-2" />}
-              Create workspace
-            </Button>
+            <div className={`flex gap-2 ${workspaces.length > 0 ? 'justify-between' : ''}`}>
+              {workspaces.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate({ to: '/' })}
+                >
+                  Cancel
+                </Button>
+              )}
+              <Button
+                type="submit"
+                disabled={isPending}
+                className={workspaces.length > 0 ? '' : 'w-full'}
+              >
+                {isPending && <Loader2Icon className="animate-spin mr-2" />}
+                Create workspace
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

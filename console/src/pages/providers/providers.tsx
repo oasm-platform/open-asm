@@ -1,14 +1,14 @@
 import Page from "@/components/common/page";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import { ListProviders } from "./list-provider";
 
 export default function ProvidersPage() {
   const navigate = useNavigate();
 
   const handleCreateProvider = () => {
-    navigate("/providers/create");
+    navigate({ to: "/providers/create" });
   };
 
   return (
