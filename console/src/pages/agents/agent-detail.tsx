@@ -12,10 +12,11 @@ import {
   useAgentsControllerDeleteLLMConfig,
   useAgentsControllerGetLLMConfigs,
   useAgentsControllerSetPreferredLLMConfig,
+  type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { format } from 'date-fns';
 import { Loader2, MoreHorizontal, Pencil, Star, Trash2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
@@ -26,7 +27,7 @@ const providerLabels: Record<string, string> = {
 };
 
 export function AgentDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const navigate = useNavigate();
   const {
     state: { selectedWorkspaceId },
@@ -45,7 +46,9 @@ export function AgentDetail() {
   const { mutate: setPreferred, isPending: isSettingPreferred } =
     useAgentsControllerSetPreferredLLMConfig();
 
-  const agent = data?.data?.find((a) => a.configId === id);
+  const agent = (data as LLMConfigWithProviderDto[] | undefined)?.find(
+    (a) => a.configId === id,
+  );
 
   const handleDelete = () => {
     deleteConfig(
@@ -53,7 +56,7 @@ export function AgentDetail() {
       {
         onSuccess: () => {
           toast.success('Provider deleted successfully');
-          navigate('/agents');
+          navigate({ to: '/agents' });
         },
         onError: (error) => {
           toast.error('Failed to delete provider');
@@ -79,7 +82,7 @@ export function AgentDetail() {
   };
 
   const handleEdit = () => {
-    navigate(`/agents/${id}/edit`);
+    navigate({ to: `/agents/${id}/edit` });
   };
 
   if (isLoading) {
@@ -98,7 +101,7 @@ export function AgentDetail() {
           The provider you&apos;re looking for doesn&apos;t exist or you
           don&apos;t have permission to view it.
         </p>
-        <Button className="mt-4" onClick={() => navigate(-1)}>
+        <Button className="mt-4" onClick={() => window.history.back()}>
           Go back
         </Button>
       </div>

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"oasm-worker/internal/config"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 )
 
 var (
-	activeJobsMu sync.Mutex
+	activeJobsMu sync.RWMutex
 	activeJobs   = make(map[string]struct{})
 )
 
@@ -68,7 +69,6 @@ func Start(ctx context.Context, cfg *config.Config) {
 	}
 
 	jobLog.Info("Initializing headless browser...")
-
 	l := launcher.New().Leakless(false).Headless(true)
 
 	if _, err := os.Stat("/usr/bin/chromium"); err == nil {
@@ -86,62 +86,52 @@ func Start(ctx context.Context, cfg *config.Config) {
 
 	browser := rod.New().ControlURL(l.MustLaunch()).MustConnect()
 
+	workspaceRoot, err := filepath.Abs(cfg.WorkspaceRoot)
+	if err != nil {
+		sysLog.ErrorE("Failed to resolve workspace root", err)
+		return
+	}
+
+	if err := os.MkdirAll(workspaceRoot, 0o755); err != nil {
+		sysLog.ErrorE("Failed to create workspace root", err)
+		return
+	}
+
+	toolPath, err := filepath.Abs(cfg.ToolPath)
+	if err != nil {
+		sysLog.ErrorE("Failed to resolve tool path", err)
+		return
+	}
+
 	ready := make(chan bool, 1)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
-	jobsCtx, jobsCancel := context.WithCancel(context.Background())
-	defer jobsCancel()
 
-	go client.WorkerConnect(workerCtx, ready)
-
-	isConnected, ok := <-ready
-	if !ok || !isConnected {
-		sysLog.Error("Worker failed to join. Shutting down...")
-		workerCancel()
-		return
-	}
-
-	if cfg.Network != "" {
-		if err := connectInternalNetwork(client, cfg.Network); err != nil {
-			netLog.ErrorE("Failed to connect internal network", err)
-			workerCancel()
-			return
-		}
-		netLog.Success("Connected to internal network: %s", cfg.Network)
-	}
-
-	sysLog.Info("Core is ready, syncing tools...")
-	if err := client.WorkerDownloadTools(ctx); err != nil {
-		sysLog.ErrorE("Download tools failed", err)
-		workerCancel()
-		return
-	}
+	var (
+		stateMu          sync.Mutex
+		sessionCtx       context.Context
+		sessionCancel    context.CancelFunc
+		schedulerStarted bool
+	)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
 	scheduler := gocron.NewScheduler(time.UTC)
-
 	var wg sync.WaitGroup
-	var lastLogged int
-
-	logJobStatus := func(running int) {
-		jobLog.Verbose("Jobs running: %d/%d", running, cfg.MaxConcurrency)
-	}
-
-	logJobStatus(0)
-	lastLogged = 0
 
 	_, err = scheduler.Every(1).Second().Do(func() {
-		select {
-		case <-ctx.Done():
+		stateMu.Lock()
+		currentCtx := sessionCtx
+		stateMu.Unlock()
+
+		if currentCtx == nil || currentCtx.Err() != nil {
 			return
-		default:
 		}
 
 		select {
 		case semaphore <- struct{}{}:
 			wg.Go(func() {
 				defer func() { <-semaphore }()
-				processJob(jobsCtx, client, browser, cfg.ToolPath, &activeJobsMu, &activeJobs)
+				processJob(currentCtx, client, browser, toolPath)
 			})
 		default:
 		}
@@ -151,21 +141,77 @@ func Start(ctx context.Context, cfg *config.Config) {
 		return
 	}
 
-	scheduler.StartAsync()
-	jobLog.Success("Gocron poller started (Max Concurrency: %d)", cfg.MaxConcurrency)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				stateMu.Lock()
+				if sessionCancel != nil {
+					sessionCancel()
+				}
+				stateMu.Unlock()
+				return
+			case isConnected, ok := <-ready:
+				if !ok {
+					return
+				}
+
+				stateMu.Lock()
+				if sessionCancel != nil {
+					sessionCancel()
+				}
+
+				if isConnected {
+					sysLog.Success("Worker connected/reconnected. Initializing sub-systems...")
+					sessionCtx, sessionCancel = context.WithCancel(ctx)
+
+					if cfg.Network != "" {
+						if err := connectInternalNetwork(client, cfg.Network); err != nil {
+							netLog.ErrorE("Failed to connect internal network", err)
+							stateMu.Unlock()
+							continue
+						}
+						netLog.Success("Connected to internal network: %s", cfg.Network)
+					}
+
+					if err := client.WorkerDownloadTools(sessionCtx); err != nil {
+						sysLog.ErrorE("Download tools failed", err)
+						stateMu.Unlock()
+						continue
+					}
+
+					go startRemoteExecuteHandler(sessionCtx, client, workspaceRoot, toolPath)
+
+					if !schedulerStarted {
+						scheduler.StartAsync()
+						jobLog.Success("Gocron poller started (Max Concurrency: %d)", cfg.MaxConcurrency)
+						schedulerStarted = true
+					}
+				} else {
+					sysLog.Warning("Worker disconnected from core. Suspending job poller and streams...")
+					sessionCtx = nil
+					sessionCancel = nil
+				}
+				stateMu.Unlock()
+			}
+		}
+	}()
+
+	go client.WorkerConnect(workerCtx, ready)
 
 	ticker := time.NewTicker(time.Second)
 	go func() {
 		defer ticker.Stop()
+		var lastLogged int
 		for {
 			select {
 			case <-ticker.C:
-				activeJobsMu.Lock()
+				activeJobsMu.RLock()
 				running := len(activeJobs)
-				activeJobsMu.Unlock()
+				activeJobsMu.RUnlock()
 
 				if running != lastLogged {
-					logJobStatus(running)
+					jobLog.Verbose("Jobs running: %d/%d", running, cfg.MaxConcurrency)
 					lastLogged = running
 				}
 			case <-ctx.Done():
@@ -181,8 +227,13 @@ func Start(ctx context.Context, cfg *config.Config) {
 	shutLog.Info("Scheduler stopped. Waiting for running jobs to finish...")
 
 	wg.Wait()
-	shutLog.Info("All jobs completed. Cancelling job context...")
-	jobsCancel()
+	shutLog.Info("All jobs completed. Cancelling session contexts...")
+
+	stateMu.Lock()
+	if sessionCancel != nil {
+		sessionCancel()
+	}
+	stateMu.Unlock()
 
 	if err := browser.Close(); err != nil {
 		shutLog.Warning("Browser close warning: %v", err)

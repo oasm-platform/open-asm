@@ -1,6 +1,6 @@
 import Page from "@/components/common/page";
 import { useProvidersControllerCreateProvider } from "@/services/apis/gen/queries";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ProviderForm, type FormData } from "./provider-form";
 
@@ -15,7 +15,7 @@ export default function CreateProviderPage() {
       onSuccess: () => {
         toast.success("Provider created successfully");
         // Navigate back to the providers list page
-        navigate("/providers");
+        navigate({ to: "/providers" });
       },
       onError: (error) => {
         toast.error("Failed to create provider");

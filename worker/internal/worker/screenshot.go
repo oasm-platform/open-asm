@@ -14,40 +14,42 @@ import (
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
 )
 
-var userAgents = []string{
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
-	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.0.0 Safari/537.36",
-}
+var (
+	screenshotLog = oasm.NewLogger("Worker.Screenshot")
+	userAgents    = []string{
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+		"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.0.0 Safari/537.36",
+	}
+)
 
 func getRandomUserAgent() string {
-	return userAgents[rand.Intn(len(userAgents))]
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return userAgents[r.Intn(len(userAgents))]
 }
 
 func formatURL(target string) string {
 	target = strings.TrimSpace(target)
-
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
 		return target
 	}
-
 	if strings.HasSuffix(target, ":443") || strings.HasSuffix(target, ":8443") {
 		return "https://" + target
 	}
-
 	return "http://" + target
 }
 
 func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL string) (string, error) {
-	l := oasm.NewLogger("Worker.Screenshot")
 	url := formatURL(rawURL)
+	screenshotLog.Verbose("Preparing browser context for: %s", url)
 
-	l.Verbose("Preparing browser context for: %s", url)
-
-	page := stealth.MustPage(browser.Context(ctx))
+	page, err := stealth.Page(browser.Context(ctx))
+	if err != nil {
+		return "", fmt.Errorf("failed to create stealth page: %w", err)
+	}
 	defer page.MustClose()
 
 	_ = page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
@@ -71,11 +73,9 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 		"Sec-Fetch-User", "?1",
 	})
 
-	err := rod.Try(func() {
-		page.Timeout(15 * time.Second).MustNavigate(url)
-		page.Timeout(10 * time.Second).MustWaitLoad()
-		waitIdle := page.Timeout(10 * time.Second).MustWaitRequestIdle()
-		waitIdle()
+	err = rod.Try(func() {
+		page.Timeout(30 * time.Second).MustNavigate(url)
+		page.Timeout(30 * time.Second).MustWaitStable()
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "timeout") {
@@ -96,6 +96,6 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 		return "", fmt.Errorf("failed to take screenshot: %w", err)
 	}
 
-	l.Debug("Screenshot captured successfully: %s", url)
+	screenshotLog.Debug("Screenshot captured successfully: %s", url)
 	return base64.StdEncoding.EncodeToString(imgBytes), nil
 }

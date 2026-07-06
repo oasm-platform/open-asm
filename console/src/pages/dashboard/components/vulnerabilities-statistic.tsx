@@ -1,10 +1,9 @@
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
-import { useTimelineTrend } from "@/hooks/useTimelineTrend";
+import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 import Score from './score';
 
 export default function VulnerabilityStatistic() {
@@ -16,27 +15,57 @@ export default function VulnerabilityStatistic() {
   const getSeverityColorClass = (severity: string) => {
     switch (severity) {
       case 'critical':
-        return 'text-red-500';
+        return 'text-[color:var(--chart-5)]';
       case 'high':
-        return 'text-orange-500';
+        return 'text-[color:var(--chart-3)]';
       case 'medium':
-        return 'text-yellow-500';
+        return 'text-[color:var(--chart-4)]';
       case 'low':
-        return 'text-blue-500';
+        return 'text-[color:var(--chart-1)]';
       case 'info':
-        return 'text-gray-500';
+        return 'text-muted-foreground';
       default:
         return '';
     }
   };
 
   const vulnerabilityStats = [
-    { severity: 'total', label: 'Total', colorClass: '', count: statistics?.vuls || 0 },
-    { severity: 'critical', label: 'Critical', colorClass: getSeverityColorClass('critical'), count: statistics?.criticalVuls || 0 },
-    { severity: 'high', label: 'High', colorClass: getSeverityColorClass('high'), count: statistics?.highVuls || 0 },
-    { severity: 'medium', label: 'Medium', colorClass: getSeverityColorClass('medium'), count: statistics?.mediumVuls || 0 },
-    { severity: 'low', label: 'Low', colorClass: getSeverityColorClass('low'), count: statistics?.lowVuls || 0 },
-    { severity: 'info', label: 'Info', colorClass: getSeverityColorClass('info'), count: statistics?.infoVuls || 0 },
+    {
+      severity: 'total',
+      label: 'Total',
+      colorClass: '',
+      count: statistics?.vuls || 0,
+    },
+    {
+      severity: 'critical',
+      label: 'Critical',
+      colorClass: getSeverityColorClass('critical'),
+      count: statistics?.criticalVuls || 0,
+    },
+    {
+      severity: 'high',
+      label: 'High',
+      colorClass: getSeverityColorClass('high'),
+      count: statistics?.highVuls || 0,
+    },
+    {
+      severity: 'medium',
+      label: 'Medium',
+      colorClass: getSeverityColorClass('medium'),
+      count: statistics?.mediumVuls || 0,
+    },
+    {
+      severity: 'low',
+      label: 'Low',
+      colorClass: getSeverityColorClass('low'),
+      count: statistics?.lowVuls || 0,
+    },
+    {
+      severity: 'info',
+      label: 'Info',
+      colorClass: getSeverityColorClass('info'),
+      count: statistics?.infoVuls || 0,
+    },
   ];
 
   const totalVulsTrend = calculateTrend('vuls');
@@ -44,7 +73,9 @@ export default function VulnerabilityStatistic() {
   const renderTrend = (trend: ReturnType<typeof calculateTrend>) => {
     if (!trend) return null;
     return (
-      <div className={`flex items-center text-sm ${trend.isIncreasing ? 'text-green-500' : trend.isDecreasing ? 'text-red-500' : 'text-gray-500'}`}>
+      <div
+        className={`flex items-center text-sm ${trend.isIncreasing ? 'text-success' : trend.isDecreasing ? 'text-destructive' : 'text-muted-foreground'}`}
+      >
         {trend.isIncreasing ? (
           <TrendingUp className="h-4 w-4 mr-1" />
         ) : trend.isDecreasing ? (
@@ -58,31 +89,29 @@ export default function VulnerabilityStatistic() {
   };
 
   return (
-    <Link to="/vulnerabilities">
-      <Card className="w-full hover:bg-accent/70 pt-3 cursor-pointer">
+    <Link to="/vulnerabilities" className="block h-full">
+      <Card className="w-full h-full hover:bg-accent/70 pt-3 cursor-pointer">
         <Score />
-        <CardHeader className='flex justify-between items-center'>
+        <CardHeader className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <CardTitle>Vulnerabilities issues</CardTitle>
             {totalVulsTrend?.difference !== 0 && renderTrend(totalVulsTrend)}
           </div>
           <Bug />
         </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4">
-          {vulnerabilityStats.map((stat, index) => (
-            <>
-              <div key={stat.severity} className={`text-center ${index % 3 === 2 ? 'pl-4' : index % 3 === 0 ? 'pr-4 border-r' : 'px-4 border-r'}`}>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-                <div className="flex items-baseline justify-center gap-1">
-                  <p className={`text-2xl font-bold font-mono min-w-[3rem] ${stat.colorClass}`}>
-                    <NumberAnimate value={stat.count} />
-                  </p>
-                </div>
-              </div>
-              {index === 2 && <div className="col-span-3 border-b pb-2 mb-2"></div>}
-            </>
+        <CardContent className="grid grid-cols-3 gap-4 -mt-2">
+          {vulnerabilityStats.map((stat) => (
+            <div key={stat.severity} className="text-center px-4 py-2">
+              <p className="text-sm text-muted-foreground">{stat.label}</p>
+              <p
+                className={`text-2xl font-bold font-mono ${stat.colorClass}`}
+              >
+                <NumberAnimate value={stat.count} />
+              </p>
+            </div>
           ))}
         </CardContent>
-      </Card></Link>
+      </Card>
+    </Link>
   );
 }

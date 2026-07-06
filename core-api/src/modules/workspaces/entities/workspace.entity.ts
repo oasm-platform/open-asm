@@ -2,7 +2,6 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Statistic } from '@/modules/statistic/entities/statistic.entity';
-import { WorkspaceTarget } from '@/modules/targets/entities/workspace-target.entity';
 import { Template } from '@/modules/templates/entities/templates.entity';
 import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
@@ -14,14 +13,17 @@ import {
   Column,
   DeleteDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
   OneToOne,
+  Relation,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
 
 @Entity('workspaces')
+@Index('IDX_workspaces_owner', ['owner'])
 export class Workspace extends BaseEntity {
   @ApiProperty({
     example: 'My Workspace',
@@ -40,29 +42,22 @@ export class Workspace extends BaseEntity {
   description?: string;
 
   @ManyToOne(() => User, (user) => user.workspaces, { onDelete: 'CASCADE' })
-  owner: User;
+  owner: Relation<User>;
 
   @OneToMany(
     () => WorkspaceMembers,
     (workspaceMembers) => workspaceMembers.workspace,
   )
-  workspaceMembers: WorkspaceMembers[];
-
-  @OneToMany(
-    () => WorkspaceTarget,
-    (workspaceTarget) => workspaceTarget.workspace,
-    { onDelete: 'CASCADE' },
-  )
-  workspaceTargets: WorkspaceTarget[];
+  workspaceMembers: Relation<WorkspaceMembers[]>;
 
   @OneToMany(() => WorkspaceTool, (workspaceTool) => workspaceTool.workspace)
-  workspaceTools: WorkspaceTool[];
+  workspaceTools: Relation<WorkspaceTool[]>;
 
   @DeleteDateColumn()
   deletedAt?: Date;
 
   @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.workspace)
-  workers: WorkerInstance[];
+  workers: Relation<WorkerInstance[]>;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -72,22 +67,22 @@ export class Workspace extends BaseEntity {
 
   @OneToOne(() => ApiKey)
   @JoinColumn({ name: 'apiKeyId', referencedColumnName: 'id' })
-  apiKey: ApiKey;
+  apiKey: Relation<ApiKey>;
 
   @OneToMany(() => Template, (template) => template.workspace)
-  templates: Template[];
+  templates: Relation<Template[]>;
 
   @OneToMany(() => Statistic, (statistic) => statistic.workspace)
-  statistics: Statistic[];
+  statistics: Relation<Statistic[]>;
 
   @OneToMany(() => Workflow, (workflow) => workflow.workspace)
-  workflows: Workflow[];
+  workflows: Relation<Workflow[]>;
 
   @OneToMany(
     () => InternalNetwork,
     (internalNetwork) => internalNetwork.workspace,
   )
-  internalNetworks: InternalNetwork[];
+  internalNetworks: Relation<InternalNetwork[]>;
 
   @ApiProperty({
     example: true,

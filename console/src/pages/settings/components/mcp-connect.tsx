@@ -30,7 +30,7 @@ export default function McpConnect() {
           'oasm-platform': {
             url: `${baseUrl}/api/mcp`,
             headers: {
-              'api-key': apiKey,
+              'x-oasm-api-key': apiKey,
             },
           },
         },

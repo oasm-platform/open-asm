@@ -7,7 +7,6 @@ import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
 import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
-import { IssuesController } from './issues.controller';
 import { IssuesService } from './issues.service';
 
 @Global()
@@ -31,7 +30,7 @@ import { IssuesService } from './issues.service';
       },
     }),
   ],
-  controllers: [IssuesController],
+  // controllers: [IssuesController],
   providers: [IssuesService, VulnerabilitySourceHandler],
   exports: [IssuesService],
 })

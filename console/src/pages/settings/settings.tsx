@@ -1,6 +1,6 @@
 import { useSession } from '@/utils/authClient';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import { useEffect, useMemo, type JSX } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import GetAboutProject from './components/get-about-project';
@@ -87,7 +87,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
       },
     ],
   },
-  // Group: Integration
+  // // Group: Integration
   {
     name: 'Integration',
     tabs: [
@@ -149,7 +149,7 @@ export function filterTabGroups(
 export const settingsTabs = settingsTabGroups.flatMap((group) => group.tabs);
 
 const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
-  const { tab } = useParams<{ tab?: string }>();
+  const { tab } = useParams({ strict: false });
   const navigate = useNavigate();
   const { data } = useSession();
 
@@ -163,7 +163,7 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
 
   useEffect(() => {
     if (!tab && defaultTab) {
-      navigate(`/settings/${defaultTab}`, { replace: true });
+      navigate({ to: `/settings/${defaultTab}`, replace: true });
     }
   }, [tab, defaultTab, navigate]);
 
@@ -172,7 +172,7 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
     visibleTabs.find((t) => t.id === currentTab) || visibleTabs[0];
 
   return (
-    <div className="mx-auto w-full sm:w-3/4 xl:w-1/3">
+    <div className="mx-auto w-full sm:w-3/4 xl:w-1/2">
       {activeTab && (
         <div className="space-y-4">
           <div className="flex items-center flex-row justify-between">

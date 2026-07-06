@@ -6,9 +6,13 @@ import { Tool } from '@/modules/tools/entities/tools.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, Relation } from 'typeorm';
 
 @Entity('workers')
+@Index('IDX_workers_token', ['token'])
+@Index('IDX_workers_workspaceId', ['workspace'])
+@Index('IDX_workers_toolId', ['tool'])
+@Index('IDX_workers_internalNetworkId', ['internalNetwork'])
 export class WorkerInstance extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
@@ -48,7 +52,7 @@ export class WorkerInstance extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @Column({ type: 'uuid', nullable: true })
   toolId: string;
@@ -56,7 +60,7 @@ export class WorkerInstance extends BaseEntity {
   @ApiProperty({ type: () => Tool })
   @ManyToOne(() => Tool, (tool) => tool.workers)
   @JoinColumn({ name: 'toolId' })
-  tool: Tool;
+  tool: Relation<Tool>;
 
   @ApiProperty()
   @IsUUID()
@@ -69,10 +73,10 @@ export class WorkerInstance extends BaseEntity {
     { nullable: true, onDelete: 'CASCADE' },
   )
   @JoinColumn({ name: 'internalNetworkId' })
-  internalNetwork?: InternalNetwork;
+  internalNetwork?: Relation<InternalNetwork>;
 
   /**
-   * Active tools on this worker.
+   * Active tools on this worker.oin
    * For BUILT_IN workers: returns all built-in tools (array).
    * For PROVIDER workers: returns the current tool (array with single element).
    */
@@ -80,5 +84,12 @@ export class WorkerInstance extends BaseEntity {
   tools?: Tool[];
 
   @OneToMany(() => NetworkInterface, (ni) => ni.worker)
-  networkInterfaces: NetworkInterface[];
+  networkInterfaces: Relation<NetworkInterface[]>;
+
+  @ApiProperty({ required: false })
+  @Column({ nullable: true, default: false })
+  enabledAgentMode: boolean;
+
+  @ApiProperty({ required: false })
+  isOnline?: boolean;
 }

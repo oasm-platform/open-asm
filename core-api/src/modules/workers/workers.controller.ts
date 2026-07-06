@@ -1,12 +1,24 @@
+import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
 import { Public } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
+import { Metadata } from '@grpc/grpc-js';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
 import { createReadStream } from 'fs';
+import { readdir } from 'fs/promises';
 import { join } from 'path';
 import { Observable } from 'rxjs';
 import {
@@ -15,6 +27,11 @@ import {
   WorkerJoinDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+import { AliveStreamManager } from './alive-stream-manager.service';
+import {
+  RemoteExecuteCommand,
+  RemoteExecuteSubscribeService,
+} from './remote-execute-subscribe.service';
 import { WorkersService } from './workers.service';
 
 interface GrpcCall {
@@ -24,7 +41,13 @@ interface GrpcCall {
 @ApiTags('Workers')
 @Controller('workers')
 export class WorkersController {
-  constructor(private readonly workersService: WorkersService) {}
+  private readonly logger = new Logger(WorkersController.name);
+  constructor(
+    private readonly workersService: WorkersService,
+    private readonly remoteExecuteSubscribeService: RemoteExecuteSubscribeService,
+    private readonly grpcWorkerContext: GrpcWorkerContext,
+    private readonly aliveStreamManager: AliveStreamManager,
+  ) {}
 
   @Doc({
     summary: 'Worker alive',
@@ -68,19 +91,19 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'GetManifest')
-  grpcGetManifest(): { downloadToolsUrl: string; initCommands: string[] } {
+  grpcGetManifest(): { initCommands: string[] } {
     return {
-      downloadToolsUrl: '/public/archived/tools.tar.gz',
-      initCommands: ['nuclei -ut'],
+      initCommands: ['nuclei -ut --silent'],
     };
   }
 
-  @GrpcMethod('WorkersService', 'DownloadTools')
-  grpcDownloadTools(request: {
-    url: string;
+  @GrpcMethod('WorkersService', 'Storage')
+  grpcStorage(request: {
+    path: string;
   }): Observable<{ chunk: Buffer; offset: number; eof: boolean }> {
     return new Observable((subscriber) => {
-      const filePath = join(process.cwd(), request.url);
+      const normalizedPath = request.path.replace(/^static/, 'public');
+      const filePath = join(process.cwd(), normalizedPath);
       const stream = createReadStream(filePath, { highWaterMark: 1024 * 1024 }); // 1MB chunks
       let offset = 0;
 
@@ -133,6 +156,8 @@ export class WorkersController {
   }): Observable<{ alive: boolean; lastSeenAt: string; workerId: string }> {
     return new Observable((subscriber) => {
       let intervalId: NodeJS.Timeout;
+      let registeredWorkerId: string | undefined;
+      let streamId: string | undefined;
 
       const updateAlive = async () => {
         try {
@@ -140,6 +165,15 @@ export class WorkersController {
             token: request.workerToken,
           });
           if (worker) {
+            if (!registeredWorkerId) {
+              streamId = this.aliveStreamManager.register(
+                worker.id,
+                request.workerToken,
+              );
+              registeredWorkerId = worker.id;
+            } else {
+              this.aliveStreamManager.updateAlive(registeredWorkerId);
+            }
             subscriber.next({
               alive: true,
               lastSeenAt: worker.lastSeenAt.toISOString(),
@@ -161,6 +195,13 @@ export class WorkersController {
 
       return () => {
         if (intervalId) clearInterval(intervalId);
+        if (registeredWorkerId && streamId) {
+          this.aliveStreamManager.unregister(registeredWorkerId, streamId);
+          this.logger.log(
+            `[grpcAlive] Worker ${registeredWorkerId} stream disconnected, releasing jobs`,
+          );
+          void this.workersService.releaseWorkerJobs(registeredWorkerId);
+        }
       };
     });
   }
@@ -179,5 +220,67 @@ export class WorkersController {
     }>;
   }): Promise<{ message: string }> {
     return this.workersService.connectInternalNetwork(request);
+  }
+
+  @GrpcMethod('WorkersService', 'BuiltinToolRegistry')
+  async grpcBuiltinToolRegistry(request: {
+    os: string;
+    arch: string;
+  }): Promise<{ toolPaths: string[] }> {
+    const platform = `${request.os.toLowerCase()}_${request.arch.toLowerCase()}`;
+    const platformPath = join(process.cwd(), 'public/archived', platform);
+
+    try {
+      const files = await readdir(platformPath);
+      return {
+        toolPaths: files.map((file) => `static/archived/${platform}/${file}`),
+      };
+    } catch {
+      return { toolPaths: [] };
+    }
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('WorkersService', 'RemoteExecuteSubscribe')
+  grpcRemoteExecuteSubscribe(
+    _request: Record<string, never>,
+    metadata: Metadata,
+  ): Observable<RemoteExecuteCommand> {
+    const tokenValues = metadata.get(WORKER_TOKEN_HEADER);
+    const workerToken = tokenValues?.[0] as string | undefined;
+    const worker = this.grpcWorkerContext.getWorker(workerToken!);
+
+    if (!worker) {
+      throw new RpcException('Worker not found in context');
+    }
+
+    const { subject, observable } =
+      this.remoteExecuteSubscribeService.registerWorker(worker);
+
+    subject.next({
+      id: '',
+      workerId: '',
+      type: 1, // REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED
+      sessionId: '',
+      command: '',
+    });
+
+    return observable;
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('WorkersService', 'RemoteExecuteResult')
+  async grpcRemoteExecuteResult(request: {
+    id: string;
+    sessionId: string;
+    type: number;
+    data: Uint8Array;
+    exitCode: number;
+  }): Promise<{ success: boolean; message: string }> {
+    this.logger.log(
+      `[grpcRemoteExecuteResult] Received: sessionId=${request.sessionId}, type=${request.type}, exitCode=${request.exitCode}`,
+    );
+    await this.workersService.handleRemoteExecuteResult(request);
+    return { success: true, message: 'Result acknowledged' };
   }
 }

@@ -229,3 +229,46 @@ export const getLLMProviderConfig = (
   provider: LLMProvider,
 ): LLMProviderSupported | undefined =>
   llmProviderSupported.find((p) => p.id === provider);
+
+/**
+ * Returns provider-specific reasoning/thinking options for streamText.
+ * Each provider has its own configuration format — the AI SDK normalizes
+ * the output into a consistent `reasoning` part type on the stream.
+ */
+export function getReasoningProviderOptions(
+  provider: LLMProvider,
+): Record<string, any> | undefined { // eslint-disable-line @typescript-eslint/no-explicit-any
+  switch (provider) {
+    case LLMProvider.ANTHROPIC:
+      return {
+        anthropic: {
+          thinking: { type: 'enabled', budgetTokens: 10000 },
+        },
+      };
+    case LLMProvider.OPENAI:
+      return {
+        openai: {
+          reasoningEffort: 'high',
+          reasoningSummary: 'auto',
+        },
+      };
+    case LLMProvider.GEMINI:
+      return {
+        google: {
+          thinkingConfig: { thinkingBudget: 10000, includeThoughts: true },
+        },
+      };
+    case LLMProvider.OPENROUTER:
+    case LLMProvider.KILO_CODE:
+      return {
+        openai: {
+          reasoningEffort: 'high',
+          reasoningSummary: 'auto',
+        },
+      };
+    case LLMProvider.CUSTOM:
+      return undefined;
+    default:
+      return undefined;
+  }
+}

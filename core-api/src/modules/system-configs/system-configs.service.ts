@@ -84,7 +84,7 @@ export class SystemConfigsService implements OnModuleInit {
     const config = await this.findOrCreateConfig();
     if (config.logoPath) {
       const [bucket, fileName] = config.logoPath.split('/');
-      this.storageService.deleteFile(fileName, bucket);
+      await this.storageService.deleteFile(fileName, bucket);
       config.logoPath = null;
       await this.systemConfigRepository.save(config);
       return { message: 'System logo removed successfully' };

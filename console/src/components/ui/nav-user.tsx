@@ -16,8 +16,8 @@ import {
 } from '@/components/ui/sidebar';
 import { authClient } from '@/utils/authClient';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { LogOut, Settings } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 interface NavUserProps {
   isOnlyAvatar?: boolean;
@@ -35,10 +35,23 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
     return <></>;
   }
 
-  const handleLogout = () => {
-    signOut();
-    queryClient.clear();
+  const handleLogout = async () => {
+    await signOut({
+      fetchOptions: {
+        onSuccess: async () => {
+          // Navigate first so _authed unmounts before we wipe the cache.
+          // This prevents the workspace selector from refetching with an
+          // empty session and briefly flashing /workspaces/create.
+          await navigate({ to: '/login' });
+          queryClient.clear();
+        },
+        onError: (ctx) => {
+          console.error('Logout failed:', ctx.error);
+        },
+      },
+    });
   };
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -89,7 +102,7 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <DropdownMenuItem onClick={() => navigate({ to: '/settings' })}>
                 <Settings />
                 Settings
               </DropdownMenuItem>

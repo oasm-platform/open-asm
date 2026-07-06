@@ -20,7 +20,7 @@ import {
   type WorkspaceResponseDto,
 } from '@/services/apis/gen/queries';
 import { Crown, Plus, Target, Users } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 const PAGE_SIZE = 12;
 
@@ -42,7 +42,7 @@ export default function Workspaces() {
 
   const onSelectWorkspace = (workspaceId: string) => {
     handleSelectWorkspace(workspaceId);
-    navigate('/');
+    navigate({ to: '/' });
   };
 
   return (
@@ -52,7 +52,7 @@ export default function Workspaces() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate('/workspaces/create')}
+          onClick={() => navigate({ to: '/workspaces/create' })}
         >
           <Plus size={16} className="mr-2" />
           New workspace
@@ -73,7 +73,7 @@ export default function Workspaces() {
                   </CardContent>
                 </Card>
               ))
-            : data?.data.map((workspace: WorkspaceResponseDto) => {
+            : (data?.data ?? []).map((workspace: WorkspaceResponseDto) => {
                 const isOwner =
                   workspace.role === WorkspaceResponseDtoRole.owner;
                 return (

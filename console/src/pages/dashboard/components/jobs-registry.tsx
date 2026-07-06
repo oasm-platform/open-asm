@@ -34,7 +34,7 @@ const JobsRegistry = () => {
                 </CardHeader>
                 <CardContent className="p-0">
                     <ScrollArea className="h-[500px] p-4 space-y-4">
-                        {data?.data.map((job) => {
+                        {(data?.data ?? []).map((job) => {
                             return (
                                 <div
                                     key={job.id}
@@ -51,7 +51,7 @@ const JobsRegistry = () => {
                                 </div>
                             );
                         })}
-                        {data?.data.length === 0 && (
+                        {data?.data?.length === 0 && (
                             <p className="text-sm text-muted-foreground text-center">No jobs found.</p>
                         )}
                     </ScrollArea>

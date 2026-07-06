@@ -25,12 +25,12 @@ const ToolsList = ({
         <ToolCardLoading />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-          {data?.map((tool) => (
-            <ToolCard key={tool.id} tool={tool} button={renderButton(tool)} />
+          {data?.map((tool, index) => (
+            <ToolCard key={tool.id ?? index} tool={tool} button={renderButton(tool)} />
           ))}
         </div>
       )}
-      {data?.length === 0 && !isLoading && (
+      {(!data || data.length === 0) && !isLoading && (
         <div className="flex items-center justify-center gap-2 text-blue-500">
           {icon &&
             React.cloneElement(icon as JSX.Element, {

@@ -10,6 +10,8 @@ import { InternalNetwork } from '../internal-networks/entities/internal-network.
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
+import { RedisService } from '@/services/redis/redis.service';
+import { AliveStreamManager } from './alive-stream-manager.service';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
 
@@ -24,6 +26,8 @@ describe('WorkersService', () => {
   let mockApiKeysService: Partial<ApiKeysService>;
   let mockConfigService: Partial<ConfigService>;
   let mockToolsService: Partial<ToolsService>;
+  let mockRedisService: Partial<RedisService>;
+  let mockAliveStreamManager: Partial<AliveStreamManager>;
 
   beforeEach(async () => {
     mockWorkerInstanceRepository = {
@@ -81,11 +85,24 @@ describe('WorkersService', () => {
 
     mockConfigService = {
       get: jest.fn(),
-    } as any;
+    };
 
     mockToolsService = {
       getBuiltInTools: jest.fn().mockResolvedValue({ data: [] }),
-    } as any;
+    };
+
+    mockRedisService = {
+      publish: jest.fn(),
+    };
+
+    mockAliveStreamManager = {
+      isActive: jest.fn().mockReturnValue(false),
+      register: jest.fn().mockReturnValue('stream-1'),
+      unregister: jest.fn(),
+      updateAlive: jest.fn(),
+      getActiveWorkerIds: jest.fn().mockReturnValue(new Set()),
+      getActiveStreamCount: jest.fn().mockReturnValue(0),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -126,6 +143,14 @@ describe('WorkersService', () => {
           provide: ToolsService,
           useValue: mockToolsService,
         },
+        {
+          provide: RedisService,
+          useValue: mockRedisService,
+        },
+        {
+          provide: AliveStreamManager,
+          useValue: mockAliveStreamManager,
+        },
       ],
     }).compile();
 
@@ -134,5 +159,112 @@ describe('WorkersService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('autoCleanupWorkersAndJobs', () => {
+    it('should delete stale workers without active streams', async () => {
+      const staleWorker = {
+        id: 'worker-1',
+        lastSeenAt: new Date(Date.now() - 120000),
+      } as WorkerInstance;
+
+      (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([
+        staleWorker,
+      ]);
+      (mockAliveStreamManager.isActive as jest.Mock).mockReturnValue(false);
+
+      // Mock workerLeave dependencies
+      (mockJobsRegistryService.repo as any).execute = jest.fn();
+      (mockWorkerInstanceRepository.delete as jest.Mock).mockResolvedValue(
+        undefined,
+      );
+      // Mock resetStuckAndFailedJobs
+      (mockWorkerInstanceRepository.manager as any) = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      await service.autoCleanupWorkersAndJobs();
+
+      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith(
+        'worker-1',
+      );
+      expect(mockWorkerInstanceRepository.delete).toHaveBeenCalledWith(
+        'worker-1',
+      );
+    });
+
+    it('should skip stale workers that have active streams', async () => {
+      const staleWorker = {
+        id: 'worker-1',
+        lastSeenAt: new Date(Date.now() - 120000),
+      } as WorkerInstance;
+
+      (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([
+        staleWorker,
+      ]);
+      (mockAliveStreamManager.isActive as jest.Mock).mockReturnValue(true);
+
+      // Mock resetStuckAndFailedJobs
+      (mockWorkerInstanceRepository.manager as any) = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      await service.autoCleanupWorkersAndJobs();
+
+      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith(
+        'worker-1',
+      );
+      expect(mockWorkerInstanceRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('should handle mixed workers: some active, some stale', async () => {
+      const activeStreamWorker = {
+        id: 'worker-1',
+        lastSeenAt: new Date(Date.now() - 120000),
+      } as WorkerInstance;
+      const trulyStaleWorker = {
+        id: 'worker-2',
+        lastSeenAt: new Date(Date.now() - 120000),
+      } as WorkerInstance;
+
+      (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([
+        activeStreamWorker,
+        trulyStaleWorker,
+      ]);
+      (mockAliveStreamManager.isActive as jest.Mock)
+        .mockReturnValueOnce(true) // worker-1 has active stream
+        .mockReturnValueOnce(false); // worker-2 does not
+
+      // Mock workerLeave dependencies
+      (mockJobsRegistryService.repo as any).execute = jest.fn();
+      (mockWorkerInstanceRepository.delete as jest.Mock).mockResolvedValue(
+        undefined,
+      );
+      // Mock resetStuckAndFailedJobs
+      (mockWorkerInstanceRepository.manager as any) = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      await service.autoCleanupWorkersAndJobs();
+
+      expect(mockWorkerInstanceRepository.delete).toHaveBeenCalledTimes(1);
+      expect(mockWorkerInstanceRepository.delete).toHaveBeenCalledWith(
+        'worker-2',
+      );
+    });
+
+    it('should handle no stale workers', async () => {
+      (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([]);
+
+      // Mock resetStuckAndFailedJobs
+      (mockWorkerInstanceRepository.manager as any) = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      await service.autoCleanupWorkersAndJobs();
+
+      expect(mockAliveStreamManager.isActive).not.toHaveBeenCalled();
+      expect(mockWorkerInstanceRepository.delete).not.toHaveBeenCalled();
+    });
   });
 });

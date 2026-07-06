@@ -9,7 +9,6 @@ import type { Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
@@ -19,7 +18,6 @@ describe('WorkspacesService', () => {
   let service: WorkspacesService;
   let mockWorkspaceRepository: Partial<Repository<Workspace>>;
   let mockWorkspaceMembersRepository: Partial<Repository<WorkspaceMembers>>;
-  let mockWorkspaceTargetRepository: Partial<Repository<WorkspaceTarget>>;
   let mockApiKeysService: Partial<ApiKeysService>;
   let mockNotificationsService: Partial<NotificationsService>;
   let mockDataSource: Partial<DataSource>;
@@ -152,26 +150,18 @@ describe('WorkspacesService', () => {
       save: jest.fn(),
       findOne: jest.fn(),
       find: jest.fn(),
-    } as any;
-
-    mockWorkspaceTargetRepository = {
-      createQueryBuilder: jest.fn().mockReturnThis(),
-      innerJoin: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      getRawOne: jest.fn(),
-    } as any;
+    };
 
     mockApiKeysService = {
       create: jest.fn(),
       getCurrentApiKey: jest.fn(),
-    } as any;
+    };
 
     mockNotificationsService = {
       createNotification: jest.fn(),
-    } as any;
+    };
 
-    mockDataSource = {} as any;
+    mockDataSource = {};
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -183,10 +173,6 @@ describe('WorkspacesService', () => {
         {
           provide: getRepositoryToken(WorkspaceMembers),
           useValue: mockWorkspaceMembersRepository,
-        },
-        {
-          provide: getRepositoryToken(WorkspaceTarget),
-          useValue: mockWorkspaceTargetRepository,
         },
         {
           provide: ApiKeysService,

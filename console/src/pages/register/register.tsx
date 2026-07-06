@@ -1,6 +1,5 @@
 import AuthLayout from '@/components/common/layout/auth-layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -11,6 +10,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
+  getRootControllerGetMetadataQueryKey,
   useRootControllerCreateFirstAdmin,
   type CreateFirstAdminDto,
 } from '@/services/apis/gen/queries';
@@ -18,8 +18,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { z } from 'zod';
+import { useQueryClient } from '@tanstack/react-query';
 
 const formSchema = z
   .object({
@@ -46,6 +47,7 @@ export default function Register() {
 
   const { mutate } = useRootControllerCreateFirstAdmin();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -53,87 +55,95 @@ export default function Register() {
     mutate(
       { data: values as CreateFirstAdminDto },
       {
-        onSuccess: () => {
-          navigate('/login');
+        onSuccess: async () => {
+          queryClient.removeQueries({
+            queryKey: getRootControllerGetMetadataQueryKey(),
+          });
+          await navigate({ to: '/login' });
         },
         onError: () => {
           form.setError('email', { message: 'Invalid email or password' });
         },
+        onSettled: () => {
+          setLoading(false);
+        },
       },
     );
-    setLoading(false);
   }
 
   return (
     <AuthLayout>
-      <div className="w-full lg:w-1/2 flex items-center justify-center bg-card p-6">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-2xl">
-              Create your first admin account
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-6"
+      <div className="flex w-full items-center justify-center bg-background px-6 py-12 lg:w-1/2">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="space-y-2 text-center lg:text-left">
+            <h1 className="text-balance text-2xl font-semibold tracking-tight">
+              Create your first admin
+            </h1>
+            <p className="text-pretty text-sm text-muted-foreground">
+              Set up the workspace administrator account.
+            </p>
+          </div>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="email@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                disabled={loading}
+                type="submit"
+                className="w-full"
+                size="lg"
               >
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="email@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button disabled={loading} type="submit" className="w-full">
-                  {loading && <Loader2Icon className="animate-spin" />}
-                  Sign Up
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+                {loading && <Loader2Icon className="animate-spin" />}
+                Create account
+              </Button>
+            </form>
+          </Form>
+        </div>
       </div>
     </AuthLayout>
   );

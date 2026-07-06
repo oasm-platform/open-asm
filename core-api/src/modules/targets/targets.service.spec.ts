@@ -10,13 +10,11 @@ import { AssetsService } from '../assets/assets.service';
 import type { Asset } from '../assets/entities/assets.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { Target, TargetType } from './entities/target.entity';
-import { WorkspaceTarget } from './entities/workspace-target.entity';
 import { TargetsService } from './targets.service';
 
 describe('TargetsService', () => {
   let service: TargetsService;
   let mockTargetRepository: Partial<Repository<Target>>;
-  let mockWorkspaceTargetRepository: Partial<Repository<WorkspaceTarget>>;
   let mockWorkspacesService: Partial<WorkspacesService>;
   let mockAssetsService: Partial<AssetsService>;
   let mockEventEmitter: Partial<EventEmitter2>;
@@ -30,6 +28,7 @@ describe('TargetsService', () => {
       select: jest.fn().mockReturnThis(),
       leftJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       groupBy: jest.fn().mockReturnThis(),
       getRawOne: jest.fn(),
       getRawMany: jest.fn(),
@@ -43,31 +42,18 @@ describe('TargetsService', () => {
       } as unknown as EntityManager,
     } as any;
 
-    mockWorkspaceTargetRepository = {
-      findOneBy: jest.fn(),
-      upsert: jest.fn(),
-      delete: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnThis(),
-      innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      getRawMany: jest.fn(),
-      save: jest.fn(),
-    } as any;
-
     mockWorkspacesService = {
       getWorkspaceByIdAndOwner: jest.fn(),
       getWorkspaceConfigValue: jest.fn(),
-    } as any;
+    };
 
     mockAssetsService = {
       createPrimaryAsset: jest.fn(),
-    } as any;
+    };
 
     mockEventEmitter = {
       emit: jest.fn(),
-    } as any;
+    };
 
     mockQueue = {
       add: jest.fn(),
@@ -80,10 +66,6 @@ describe('TargetsService', () => {
         {
           provide: getRepositoryToken(Target),
           useValue: mockTargetRepository,
-        },
-        {
-          provide: getRepositoryToken(WorkspaceTarget),
-          useValue: mockWorkspaceTargetRepository,
         },
         {
           provide: WorkspacesService,
@@ -144,23 +126,21 @@ describe('TargetsService', () => {
         createdTargets = [],
       } = options;
 
-      const mockWorkspaceTargetRepo = {
-        createQueryBuilder: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
+      // Mock query builder for duplicate check on Target
+      const duplicateCheckQB = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue(
           existingTargets.map((value) => ({ value, internalNetworkId: null })),
         ),
-        save: jest.fn().mockResolvedValue(undefined),
       };
 
       const mockTargetRepo: Record<string, jest.Mock> = {
-        createQueryBuilder: jest.fn(),
-        insert: jest.fn(),
-        into: jest.fn(),
-        values: jest.fn(),
+        createQueryBuilder: jest.fn(() => duplicateCheckQB),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue(
           insertResult || {
             identifiers: createdTargets.map((t) => ({ id: t.id })),
@@ -168,12 +148,6 @@ describe('TargetsService', () => {
         ),
         findByIds: jest.fn().mockResolvedValue(createdTargets),
       };
-
-      // Setup chaining
-      mockTargetRepo.createQueryBuilder.mockReturnValue(mockTargetRepo);
-      mockTargetRepo.insert.mockReturnValue(mockTargetRepo);
-      mockTargetRepo.into.mockReturnValue(mockTargetRepo);
-      mockTargetRepo.values.mockReturnValue(mockTargetRepo);
 
       const mockAssetRepo = {
         createQueryBuilder: jest.fn().mockReturnThis(),
@@ -197,8 +171,6 @@ describe('TargetsService', () => {
 
       return {
         getRepository: jest.fn((entity: { name: string }) => {
-          if (entity.name === 'WorkspaceTarget')
-            return mockWorkspaceTargetRepo as unknown as Repository<WorkspaceTarget>;
           if (entity.name === 'Target')
             return mockTargetRepo as unknown as Repository<Target>;
           if (entity.name === 'Asset')
@@ -266,7 +238,7 @@ describe('TargetsService', () => {
       expect(mockEventEmitter.emit).toHaveBeenCalledTimes(3);
     });
 
-    it('should skip duplicate targets and create new ones', async () => {
+    it('should throw BadRequestException when duplicate targets exist', async () => {
       // Arrange
       const targetValues = [
         'existing.com',
@@ -275,24 +247,10 @@ describe('TargetsService', () => {
         'new2.com',
       ];
       const dto = { targets: targetValues.map((value) => ({ value })) };
-      const newTargets = [
-        {
-          id: randomUUID(),
-          value: 'new1.com',
-          type: TargetType.DOMAIN,
-          scanSchedule: 'DISABLED',
-        },
-        {
-          id: randomUUID(),
-          value: 'new2.com',
-          type: TargetType.DOMAIN,
-          scanSchedule: 'DISABLED',
-        },
-      ] as unknown as Target[];
 
       const mockManager = createMockEntityManager({
         existingTargets: ['existing.com', 'existing2.com'],
-        createdTargets: newTargets,
+        createdTargets: [],
       });
 
       (mockTargetRepository.manager as EntityManager).transaction = jest
@@ -302,23 +260,13 @@ describe('TargetsService', () => {
             callback(mockManager),
         );
 
-      // Act
-      const result = await service.createMultipleTargets(
-        dto,
-        workspaceId,
-        userContext,
-      );
-
-      // Assert
-      expect(result.created).toHaveLength(2);
-      expect(result.totalCreated).toBe(2);
-      expect(result.totalSkipped).toBe(2);
-      expect(result.skipped).toContain('existing.com');
-      expect(result.skipped).toContain('existing2.com');
-      expect(result.totalRequested).toBe(4);
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow('Target already exists: existing.com, existing2.com');
     });
 
-    it('should skip all targets when all are duplicates', async () => {
+    it('should throw BadRequestException when all targets are duplicates', async () => {
       // Arrange
       const targetValues = ['dup1.com', 'dup2.com'];
       const dto = { targets: targetValues.map((value) => ({ value })) };
@@ -335,20 +283,10 @@ describe('TargetsService', () => {
             callback(mockManager),
         );
 
-      // Act
-      const result = await service.createMultipleTargets(
-        dto,
-        workspaceId,
-        userContext,
-      );
-
-      // Assert
-      expect(result.created).toHaveLength(0);
-      expect(result.totalCreated).toBe(0);
-      expect(result.totalSkipped).toBe(2);
-      expect(result.skipped).toEqual(['dup1.com', 'dup2.com']);
-      expect(result.totalRequested).toBe(2);
-      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow('Target already exists: dup1.com, dup2.com');
     });
 
     it('should handle empty targets array', async () => {

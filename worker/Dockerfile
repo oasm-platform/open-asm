@@ -1,5 +1,7 @@
-# Stage 1: Build
-FROM golang:1.26-alpine AS builder
+# Stage 1: Build — always runs on the native build platform for fast cross-compilation
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -15,8 +17,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build static binary with optimizations from the new APP entrypoint
-RUN CGO_ENABLED=0 GOOS=linux go build \
+# Cross-compile for the target architecture; CGO_ENABLED=0 makes this dependency-free
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build \
     -ldflags='-w -s -extldflags "-static"' \
     -o oasm-worker ./cmd/app
 
@@ -31,6 +33,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     chromium \
     libpcap0.8 \
+    curl \
+    iputils-ping \
+    dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create tool directory

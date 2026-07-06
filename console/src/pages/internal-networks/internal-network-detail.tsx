@@ -1,7 +1,7 @@
 import Page from '@/components/common/page';
 import { NetworkInterfacesTable } from '@/components/internal-networks/network-interfaces-table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConnectWorker } from '@/components/ui/connect-worker';
+import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
 import {
   useInternalNetworksControllerDeleteInternalNetwork,
   useInternalNetworksControllerGetInternalNetworkById,
@@ -11,10 +11,10 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EditInternalNetworkDialog } from './components/edit-internal-network-dialog';
 import { Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@tanstack/react-router';
 
 export default function InternalNetworkDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const navigate = useNavigate();
 
   const { data: network, isLoading: networkLoading, refetch } =
@@ -27,7 +27,7 @@ export default function InternalNetworkDetail() {
   const deleteMutation = useInternalNetworksControllerDeleteInternalNetwork({
     mutation: {
       onSuccess: () => {
-        navigate('/internal-networks');
+        navigate({ to: '/internal-networks' });
       },
     },
   });
@@ -92,7 +92,7 @@ export default function InternalNetworkDetail() {
           </CardContent>
         </Card>
 
-        <ConnectWorker networkId={network.id} />
+        <ConnectWorkerTrigger networkId={network.id} />
 
         <NetworkInterfacesTable networkId={network.id} />
       </div>

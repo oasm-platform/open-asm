@@ -1,5 +1,5 @@
 import { RedisService } from '@/services/redis/redis.service';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
@@ -104,27 +104,58 @@ export class AgentsMemoriesService {
   }
 
   /**
-   * Returns the LTM record for the workspace, creates an empty one if not exists.
+   * Returns the LTM record for the user in a workspace, or null if none exists.
+   * Does NOT auto-create empty records — callers must use ltmSet to create.
    */
-  async ltmGet(workspaceId: string): Promise<AgentWorkspaceMemory> {
-    let record = await this.ltmRepository.findOne({ where: { workspaceId } });
-    if (!record) {
-      record = this.ltmRepository.create({ workspaceId, content: '' });
-      record = await this.ltmRepository.save(record);
-    }
-    return record;
+  async ltmGet(workspaceId: string, userId: string): Promise<AgentWorkspaceMemory | null> {
+    return this.ltmRepository.findOne({ where: { workspaceId, userId } });
+  }
+
+  async ltmGetAll(workspaceId: string, userId: string): Promise<AgentWorkspaceMemory[]> {
+    return this.ltmRepository.find({
+      where: { workspaceId, userId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async ltmGetAllPaginated(
+    workspaceId: string,
+    userId: string,
+    options?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'ASC' | 'DESC' },
+  ): Promise<{ data: AgentWorkspaceMemory[]; total: number }> {
+    const page = options?.page || 1;
+    const limit = options?.limit || 10;
+    const sortBy = options?.sortBy || 'createdAt';
+    const sortOrder = options?.sortOrder || 'DESC';
+
+    const qb = this.ltmRepository
+      .createQueryBuilder('memory')
+      .where('memory.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('memory.userId = :userId', { userId })
+      .orderBy(`memory.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total };
   }
 
   /**
-   * Overwrites the LTM content for the workspace.
+   * Overwrites the LTM content for the user in a workspace.
+   * Rejects empty or whitespace-only content to prevent noise records.
    */
   async ltmSet(
     workspaceId: string,
+    userId: string,
     content: string,
   ): Promise<AgentWorkspaceMemory> {
-    let record = await this.ltmRepository.findOne({ where: { workspaceId } });
+    if (!content?.trim()) {
+      throw new Error('Cannot save empty content to long-term memory');
+    }
+
+    let record = await this.ltmRepository.findOne({ where: { workspaceId, userId } });
     if (!record) {
-      record = this.ltmRepository.create({ workspaceId, content });
+      record = this.ltmRepository.create({ workspaceId, userId, content });
     } else {
       record.content = content;
     }
@@ -132,18 +163,36 @@ export class AgentsMemoriesService {
   }
 
   /**
-   * Clears the LTM content for the workspace.
+   * Clears the LTM content for the user in a workspace.
    */
-  async ltmClear(workspaceId: string): Promise<void> {
-    await this.ltmRepository.update({ workspaceId }, { content: '' });
+  async ltmClear(workspaceId: string, userId: string): Promise<void> {
+    await this.ltmRepository.update({ workspaceId, userId }, { content: '' });
+  }
+
+  /**
+   * Deletes the LTM record for the user in a workspace.
+   */
+  async ltmDelete(workspaceId: string, userId: string): Promise<void> {
+    await this.ltmRepository.delete({ workspaceId, userId });
+  }
+
+  /**
+   * Deletes a specific LTM record by ID if it belongs to the user in the workspace.
+   */
+  async ltmDeleteById(id: string, workspaceId: string, userId: string): Promise<void> {
+    const record = await this.ltmRepository.findOne({ where: { id, workspaceId, userId } });
+    if (!record) {
+      throw new NotFoundException('Memory record not found');
+    }
+    await this.ltmRepository.remove(record);
   }
 
   /**
    * Returns LTM as a prompt context block.
    * Returns empty string if content is empty.
    */
-  async ltmFormatForPrompt(workspaceId: string): Promise<string> {
-    const record = await this.ltmRepository.findOne({ where: { workspaceId } });
+  async ltmFormatForPrompt(workspaceId: string, userId: string): Promise<string> {
+    const record = await this.ltmRepository.findOne({ where: { workspaceId, userId } });
     if (!record?.content?.trim()) return '';
     return `[Long-Term Memory]\n${record.content}`;
   }

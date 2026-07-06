@@ -2,7 +2,7 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 
 class TlsInfo {
@@ -62,6 +62,8 @@ class KnowledgebaseInfo {
 }
 
 @Entity('http_responses')
+@Index('IDX_http_jobHistoryId', ['jobHistory'])
+@Index('IDX_http_host', ['host'])
 export class HttpResponse extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'timestamp with time zone', nullable: true })
@@ -193,7 +195,7 @@ export class HttpResponse extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'assetServiceId' })
-  assetService: AssetService;
+  assetService: Relation<AssetService>;
 
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })
@@ -203,5 +205,5 @@ export class HttpResponse extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'jobHistoryId' })
-  jobHistory: JobHistory;
+  jobHistory: Relation<JobHistory>;
 }

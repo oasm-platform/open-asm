@@ -10,7 +10,6 @@ import {
 import type { CreateLLMConfigDtoProvider } from '@/services/apis/gen/queries';
 import { Loader2Icon } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
 
 export type AgentFormData = {
   provider: CreateLLMConfigDtoProvider;
@@ -47,7 +46,6 @@ export function AgentForm({
   submitButtonText,
   isEdit = false,
 }: AgentFormProps) {
-  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
@@ -162,7 +160,7 @@ export function AgentForm({
         <Button
           type="button"
           variant="outline"
-          onClick={() => navigate(-1)}
+          onClick={() => window.history.back()}
           disabled={isPending}
         >
           Cancel

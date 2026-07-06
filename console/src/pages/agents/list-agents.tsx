@@ -1,5 +1,5 @@
 import { type ColumnDef } from '@tanstack/react-table';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 import { DataTable } from '@/components/ui/data-table';
 import {
@@ -87,12 +87,12 @@ export function ListAgents() {
     },
   });
 
-  const agents = data?.data ?? [];
+  const agents = (data as LLMConfigWithProviderDto[] | undefined) ?? [];
   const total = agents.length;
 
   const handleRowClick = (row: LLMConfigWithProviderDto) => {
     if (row.configId) {
-      navigate(`/agents/${row.configId}`);
+      navigate({ to: `/agents/${row.configId}` });
     }
   };
 

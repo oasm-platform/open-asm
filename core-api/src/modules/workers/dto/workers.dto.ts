@@ -1,20 +1,22 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsOptional,
   IsString,
   IsUUID,
   IsObject,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class WorkerManifestResponseDto {
   @ApiProperty({
-    description: 'URL to the worker tools archive package',
-    example: '/static/archived/tools.tar.gz',
+    description: 'Commands to initialize worker tools',
+    example: ['nuclei -ut'],
+    type: [String],
   })
-  downloadToolsUrl: string;
+  initCommands: string[];
 }
 
 export class WorkerMetadataDto {
@@ -67,4 +69,19 @@ export class GetManyWorkersDto extends GetManyBaseQueryParams {
   @IsUUID('4')
   @IsOptional()
   workspaceId?: string;
+
+  @ApiProperty({ required: false, enum: ['cloud', 'workspace'] })
+  @IsString()
+  @IsOptional()
+  scope?: string;
+
+  @ApiProperty({ required: false })
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  })
+  enabledAgentMode?: boolean;
 }

@@ -5,7 +5,7 @@ import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useAssetsControllerGetTlsAssets } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 interface TlsAsset {
   host: string;
@@ -108,7 +108,7 @@ const TlsExpirationTable = () => {
       </CardHeader>
       <CardContent className="p-4 py-0">
         <DataTable
-          onRowClick={(row) => navigate(`/assets?filter=${row.host}`)}
+          onRowClick={(row) => navigate({ to: '/assets', search: { filter: row.host } })}
           isShowBorder={false}
           columns={columns}
           data={expiringSoon}

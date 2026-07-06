@@ -11,10 +11,12 @@ import {
   QueryResolver,
 } from 'nestjs-i18n';
 import * as path from 'path';
+import { icuFormatter } from './utils/icu-formatter';
 import { DatabaseModule } from './database/database.module';
 import { CombineModule } from './modules/combine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { StorageModule } from './modules/storage/storage.module';
+import { McpServerModule } from './mcp/mcp.module';
 import { ServicesModule } from './services/services.module';
 
 @Module({
@@ -27,10 +29,12 @@ import { ServicesModule } from './services/services.module';
     ScheduleModule.forRoot(),
     I18nModule.forRoot({
       fallbackLanguage: 'en',
+      formatter: icuFormatter,
       loaderOptions: {
         path: path.join(__dirname, '/i18n/'),
-        watch: false,
+        watch: process.env.NODE_ENV !== 'production',
       },
+      logging: process.env.NODE_ENV !== 'production',
       resolvers: [
         { use: QueryResolver, options: ['lang'] },
         AcceptLanguageResolver,
@@ -50,7 +54,7 @@ import { ServicesModule } from './services/services.module';
     NotificationsModule,
     StorageModule,
     ServicesModule,
-    // McpServerModule,
+    McpServerModule,
   ],
 })
 export class AppModule {}
