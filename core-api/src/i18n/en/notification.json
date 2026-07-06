@@ -1,3 +1,5 @@
 {
-  "WORKSPACE_CREATED": "Workspace {name} created"
+  "WORKSPACE_CREATED": "Workspace {name} created",
+  "VULNERABILITY_ANALYSIS_COMPLETED": "Vulnerability analysis completed for {name}",
+  "ASSET_NEW_DETECT": "New assets discovered for {targetValue}: {hosts, plural, =0 {} one {# host} other {# hosts}}{ports, plural, =0 {} one { # port} other { # ports}}{services, plural, =0 {} one { # service} other { # services}}{tech, plural, =0 {} one { # technology} other { # technologies}}"
 }

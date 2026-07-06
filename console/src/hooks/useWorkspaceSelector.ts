@@ -1,5 +1,6 @@
 import { useWorkspacesControllerGetWorkspaces } from '@/services/apis/gen/queries';
 import { setGlobalWorkspaceId } from '@/utils/workspaceState';
+import { setCookie, deleteCookie } from '@/utils/cookie';
 import { useQueryClient } from '@tanstack/react-query';
 import React from 'react';
 import createState from './createState'; // adjust path as needed
@@ -10,7 +11,7 @@ interface WorkspaceState {
 }
 
 // Create global workspace state
-const useWorkspaceState = createState<WorkspaceState>(
+export const useWorkspaceState = createState<WorkspaceState>(
   'workspace',
   { selectedWorkspaceId: '' },
   {
@@ -40,11 +41,12 @@ export function useWorkspaceSelector() {
       page: 1,
       isArchived: false,
     },
-    {
-      query: {
-        queryKey: ['workspaces'],
-      },
-    },
+    // {
+    //   query: {
+    //     queryKey: ['workspaces'],
+    //     staleTime: 1000 * 60 * 5,
+    //   },
+    // },
   );
 
   const { state, setSelectedWorkspace, clearSelectedWorkspace } =
@@ -55,7 +57,8 @@ export function useWorkspaceSelector() {
   const handleSelectWorkspace = React.useCallback(
     (id: string) => {
       setSelectedWorkspace(id);
-      setGlobalWorkspaceId(id); // Always set the global workspace ID when manually selecting
+      setGlobalWorkspaceId(id);
+      setCookie('wid', id);
       queryClient.invalidateQueries({
         predicate: (query) => query.queryKey[0] !== 'global',
       });
@@ -79,17 +82,17 @@ export function useWorkspaceSelector() {
         finalSelectedId = response.data[0].id;
       }
 
-      // Always update the global workspace ID to ensure it's in sync
       setGlobalWorkspaceId(finalSelectedId);
+      setCookie('wid', finalSelectedId);
 
       // Update state only if different
       if (state.selectedWorkspaceId !== finalSelectedId) {
         setSelectedWorkspace(finalSelectedId);
       }
     } else if (response?.data && response.data.length === 0) {
-      // Clear selection when no workspaces
       clearSelectedWorkspace();
       setGlobalWorkspaceId(null);
+      deleteCookie('wid');
     }
   }, [
     response,

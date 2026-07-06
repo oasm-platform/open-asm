@@ -9,6 +9,7 @@ import {
   Entity,
   ManyToOne,
   OneToMany,
+  Relation,
 } from 'typeorm';
 
 export enum AuthType {
@@ -78,10 +79,10 @@ export class ToolProvider extends BaseEntity {
   isActive: boolean;
 
   @ManyToOne(() => User, (user) => user.toolProviders)
-  owner: User;
+  owner: Relation<User>;
 
   @OneToMany(() => Tool, (tool) => tool.provider)
-  tools: Tool[];
+  tools: Relation<Tool[]>;
 
   @DeleteDateColumn()
   deletedAt?: Date;

@@ -17,9 +17,14 @@
     "console"
   ],
   "devDependencies": {
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "shadcn": "^4.1.2"
   },
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky || true"
+  },
+  "dependencies": {
+    "@tanstack/intent": "^0.0.41",
+    "@tanstack/router-core": "^1.171.8"
   }
 }

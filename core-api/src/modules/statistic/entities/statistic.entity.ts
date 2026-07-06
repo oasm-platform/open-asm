@@ -1,9 +1,10 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, Relation } from 'typeorm';
 import { Workspace } from '../../workspaces/entities/workspace.entity';
 
 @Entity('workspace_statistics')
+@Index('IDX_stats_workspace_createdAt', ['workspace', 'createdAt'])
 export class Statistic extends BaseEntity {
   @ApiProperty({ description: 'Number of assets', default: 0 })
   @Column({ default: 0 })
@@ -60,10 +61,16 @@ export class Statistic extends BaseEntity {
   @Column({ default: 0 })
   ports: number;
 
+  @ApiProperty({ description: 'Number of services', default: 0 })
+  @Column({ default: 0 })
+  services: number;
+
   @ApiProperty({ description: 'Security score', default: 0 })
   @Column({ default: 0, type: 'decimal', precision: 5, scale: 2 })
   score: number;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.statistics)
-  workspace: Workspace;
+  @ManyToOne(() => Workspace, (workspace) => workspace.statistics, {
+    onDelete: 'CASCADE',
+  })
+  workspace: Relation<Workspace>;
 }

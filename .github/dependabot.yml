@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directories:
+      - '/'
+      - '/core-api'
+      - '/console'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 10
+    groups:
+      nestjs:
+        patterns: ['@nestjs/*']
+      react:
+        patterns: ['react', 'react-dom', '@types/react*']
+      eslint:
+        patterns: ['eslint', '@eslint/*', 'typescript-eslint']
+    commit-message:
+      prefix: 'chore'
+
+  - package-ecosystem: 'docker'
+    directories:
+      - '/core-api'
+      - '/console'
+      - '/worker'
+    schedule:
+      interval: 'daily'
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore'
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore'

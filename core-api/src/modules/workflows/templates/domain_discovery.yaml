@@ -1,0 +1,17 @@
+name: vulnerability_scan_basic
+
+on:
+  target: [domain.create, domain.re-scan]
+
+jobs:
+  - name: Scan Subdomain
+    run: subfinder
+
+  - name: Port Scan
+    run: naabu
+
+  - name: HTTP Probe
+    run: httpx
+
+  - name: Take Screenshot
+    run: screenshot

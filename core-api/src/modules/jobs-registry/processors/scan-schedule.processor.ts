@@ -1,4 +1,4 @@
-import { BullMQName } from '@/common/enums/enum';
+import { BullMQName, JobRunType } from '@/common/enums/enum';
 import { AssetGroupService } from '@/modules/asset-group/asset-group.service';
 import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
 import { AssetsService } from '@/modules/assets/assets.service';
@@ -27,6 +27,7 @@ export class AssetGroupsScheduleConsumer extends WorkerHost {
     const assetGroupWorkflowId = job.data.id;
     await this.assetGroupService.runGroupWorkflowScheduler(
       assetGroupWorkflowId,
+      JobRunType.SCHEDULED,
     );
   }
 }

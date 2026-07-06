@@ -13,6 +13,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  Relation,
 } from 'typeorm';
 
 export class On {
@@ -45,6 +46,7 @@ export class WorkflowContent {
 
 @Entity('workflows')
 @Index(['filePath', 'workspace'], { unique: true })
+@Index('IDX_workflows_workspaceId', ['workspace'])
 export class Workflow extends BaseEntity {
   @Column()
   name: string;
@@ -58,11 +60,13 @@ export class Workflow extends BaseEntity {
 
   @ManyToOne(() => User, (user) => user.id, { nullable: true })
   @JoinColumn({ name: 'createdBy' })
-  createdBy?: User;
+  createdBy?: Relation<User>;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.id, { nullable: true })
+  @ManyToOne(() => Workspace, (workspace) => workspace.workflows, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @OneToMany(() => JobHistory, (jobHistory) => jobHistory.workflow, {
     onDelete: 'CASCADE',
@@ -72,7 +76,7 @@ export class Workflow extends BaseEntity {
   @OneToMany(() => AssetGroupWorkflow, (agt) => agt.workflow, {
     onDelete: 'CASCADE',
   })
-  assetGroupWorkflows?: AssetGroupWorkflow[];
+  assetGroupWorkflows?: Relation<AssetGroupWorkflow[]>;
 
   @ApiProperty()
   @Column({ default: true })

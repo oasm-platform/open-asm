@@ -1,34 +1,58 @@
-# dependencies (bun install)
-node_modules
+# ========================
+# Go (Golang)
+# ========================
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+main
 
-# output
-out
-dist
-*.tgz
+# Test binary, built with `go test -c`
+*.test
 
-# code coverage
-coverage
-*.lcov
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
 
-# logs
-logs
-_.log
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+# Dependency directories
+# vendor/
 
-# dotenv environment variable files
+# Go workspace file
+go.work
+go.work.sum
+
+# ========================
+# Open ASM & Worker Runtime
+# ========================
+# Local state and config files (Do not commit secrets)
+worker-state.json
+config.json
+config.yaml
 .env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
 
-# caches
-.eslintcache
-.cache
-*.tsbuildinfo
+# Downloaded tools and temporary archives
+*.tar.gz
+*.gz
+*.zip
+oasm-tools/
+tools/
+tmp/
 
-# IntelliJ based IDEs
-.idea
+# ========================
+# Nix & Local Environments
+# ========================
+result
+result-*
+.direnv/
 
-# Finder (MacOS) folder config
+# ========================
+# IDEs & OS
+# ========================
+.vscode/
+.idea/
 .DS_Store
+Thumbs.db

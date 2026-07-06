@@ -1,201 +1,179 @@
-import { GET_WORKSPACE_MCP_TOOL_NAME } from '@/common/constants/app.constants';
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from '@/common/dtos/get-many-base.dto';
-import { ApiKeyType } from '@/common/enums/enum';
-import { UserContextPayload } from '@/common/interfaces/app.interface';
-import { ApiKeysService } from '@/modules/apikeys/apikeys.service';
-import { GetApiKeyResponseDto } from '@/modules/tools/dto/get-apikey-response.dto';
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { McpRegistryService } from '@rekog/mcp-nest';
-import { Repository } from 'typeorm';
-import { CreateMcpPermissionsRequestDto, McpTool } from './dto/mcp.dto';
-import { McpPermission } from './entities/mcp-permission.entity';
+import { API_GLOBAL_PREFIX } from '@/common/constants/app.constants';
+import { AgentMode } from '@/common/enums/enum';
+import { AgentTool } from '@/modules/agents/agents.tools';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import type { Request, Response } from 'express';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { z } from 'zod';
+
+interface AiToolLike {
+  description: string;
+  parameters: z.ZodTypeAny;
+  execute: (
+    args: unknown,
+    options?: { toolCallId?: string },
+  ) => Promise<unknown>;
+}
+
+interface McpSession {
+  transport: SSEServerTransport;
+  server: McpServer;
+  workspaceId: string;
+  createdAt: number;
+}
+
+function schemaToShape(schema: z.ZodTypeAny): Record<string, unknown> {
+  if (schema instanceof z.ZodObject) {
+    return schema.shape as Record<string, unknown>;
+  }
+  return {};
+}
 
 @Injectable()
-export class McpService {
-  constructor(
-    private mcpRegistryService: McpRegistryService,
-    @InjectRepository(McpPermission)
-    private mcpPermissionRepo: Repository<McpPermission>,
-    private apiKeyService: ApiKeysService,
-  ) {}
+export class McpService implements OnModuleInit, OnModuleDestroy {
+  private readonly sessions = new Map<string, McpSession>();
 
-  /**
-   * Check if the API key is valid and return the permission.
-   * @param key
-   * @returns
-   */
-  public async checkApiKey(key: string): Promise<McpPermission> {
-    const apiKey = await this.apiKeyService.findByKey(key);
+  private static readonly SESSION_TTL = 30 * 60 * 1000;
+  private static readonly MAX_SESSIONS = 100;
+  private static readonly CLEANUP_INTERVAL = 5 * 60 * 1000;
 
-    if (!apiKey || !apiKey.ref) {
-      throw new UnauthorizedException('Invalid API key');
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor(private readonly agentTool: AgentTool) {}
+
+  onModuleInit(): void {
+    this.cleanupTimer = setInterval(() => {
+      this.evictStaleSessions();
+    }, McpService.CLEANUP_INTERVAL);
+  }
+
+  onModuleDestroy(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
     }
+  }
 
-    const permission = await this.mcpPermissionRepo.findOne({
-      where: {
-        id: apiKey.ref,
-      },
-      relations: ['owner'],
-    });
-
-    if (!permission) {
-      throw new UnauthorizedException('MCP permission not found for this API key');
+  private evictStaleSessions(): void {
+    const now = Date.now();
+    for (const [id, session] of this.sessions.entries()) {
+      if (now - session.createdAt > McpService.SESSION_TTL) {
+        this.sessions.delete(id);
+      }
     }
-
-    return permission;
-  }
-  /**
-   * Get MCP permissions for a user.
-   * @param queryParams
-   * @param userContext
-   * @returns
-   */
-  public async getMcpPermissions(
-    queryParams: GetManyBaseQueryParams,
-    userContext: UserContextPayload,
-  ): Promise<GetManyBaseResponseDto<McpPermission>> {
-    const { limit, page, sortBy, sortOrder } = queryParams;
-    const [data, total] = await this.mcpPermissionRepo.findAndCount({
-      where: {
-        owner: { id: userContext.id },
-      },
-      take: limit,
-      skip: (page - 1) * limit,
-      order: {
-        [sortBy]: sortOrder,
-      },
-    });
-
-    return {
-      data,
-      total,
-      limit,
-      page,
-      pageCount: Math.ceil(total / limit),
-      hasNextPage: page * limit < total,
-    };
   }
 
-  /**
-   * Create a new MCP permission.
-   * @param userContext
-   * @param dto
-   * @returns
-   */
-  public async createMcpPermission(
-    userContext: UserContextPayload,
-    dto: CreateMcpPermissionsRequestDto,
-  ) {
-    const newMcpPermission = await this.mcpPermissionRepo.save({
-      ...dto,
-      owner: { id: userContext.id },
-    });
-    const newApiKey = await this.apiKeyService.create({
-      name: newMcpPermission.name,
-      type: ApiKeyType.MCP,
-      ref: newMcpPermission.id,
-    });
-
-    return {
-      apiKey: newApiKey.key,
-    };
-  }
-
-  /**
-   * Get all tools from all registered MCP modules.
-   * @returns A flattened array of all tools from all MCP modules.
-   */
-  public getMcpTools(): McpTool[] {
-    const mcpModuleIds = this.mcpRegistryService.getMcpModuleIds();
-    return mcpModuleIds
-      .map((id) =>
-        this.mcpRegistryService.getTools(id).map((tool) => ({
-          name: tool.metadata.name,
-          type: tool.type,
-          description: tool.metadata.description,
-          moduleId: id,
-        })),
-      )
-      .flat()
-      .filter((tool) => tool.name !== GET_WORKSPACE_MCP_TOOL_NAME);
-  }
-
-  /**
-   * Get the API key for a specific MCP permission.
-   * @param user
-   * @param id
-   * @returns
-   */
-  public async getMcpApiKey(
-    user: UserContextPayload,
-    id: string,
-  ): Promise<GetApiKeyResponseDto> {
-    const permissions = await this.mcpPermissionRepo.findOne({
-      where: {
-        id,
-        owner: { id: user.id },
-      },
-    });
-
-    if (!permissions) {
-      throw new NotFoundException('MCP permission not found');
-    }
-
-    const apiKey = await this.apiKeyService.getCurrentApiKey(
-      ApiKeyType.MCP,
-      permissions.id,
+  async handleSSEConnection(
+    workspaceId: string,
+    _req: Request,
+    res: Response,
+  ): Promise<void> {
+    const messageEndpoint = `/${API_GLOBAL_PREFIX}/mcp/message`;
+    const transport = new SSEServerTransport(
+      messageEndpoint,
+      res as unknown as ServerResponse,
     );
 
-    return {
-      apiKey: apiKey?.key || '',
-    };
-  }
+    const server = this.createMcpServer(workspaceId);
 
-  /**
-   * Delete an MCP permission by ID and its associated API key.
-   * @param userContext The current user context
-   * @param id The ID of the MCP permission to delete
-   * @returns A confirmation message
-   */
-  public async deleteMcpPermissionById(
-    userContext: UserContextPayload,
-    id: string,
-  ): Promise<DefaultMessageResponseDto> {
-    // Find the permission to delete, ensuring it belongs to the current user
-    const permission = await this.mcpPermissionRepo.findOne({
-      where: {
-        id,
-        owner: { id: userContext.id },
-      },
+    if (this.sessions.size >= McpService.MAX_SESSIONS) {
+      this.evictStaleSessions();
+      // If still at capacity after TTL eviction, evict the single oldest session
+      if (this.sessions.size >= McpService.MAX_SESSIONS) {
+        let oldestId = '';
+        let oldestTime = Infinity;
+        for (const [id, session] of this.sessions.entries()) {
+          if (session.createdAt < oldestTime) {
+            oldestTime = session.createdAt;
+            oldestId = id;
+          }
+        }
+        if (oldestId) {
+          this.sessions.delete(oldestId);
+        }
+      }
+    }
+
+    this.sessions.set(transport.sessionId, {
+      transport,
+      server,
+      workspaceId,
+      createdAt: Date.now(),
     });
 
-    if (!permission) {
-      throw new NotFoundException(
-        'MCP permission not found or does not belong to the current user',
-      );
-    }
-
-    const apiKey = await this.apiKeyService.getCurrentApiKey(
-      ApiKeyType.MCP,
-      permission.id,
-    );
-    if (apiKey) {
-      await this.apiKeyService.revoke(apiKey.id); // Revoke the API key
-    }
-    // Delete the MCP permission
-    await this.mcpPermissionRepo.delete(id);
-
-    return {
-      message: 'MCP permission and its associated API key deleted successfully',
+    transport.onclose = () => {
+      this.sessions.delete(transport.sessionId);
     };
+
+    transport.onerror = () => {};
+
+    await server.connect(transport);
+  }
+
+  async handleMessage(req: Request, res: Response): Promise<void> {
+    const sessionId = req.query.sessionId as string;
+    const session = this.sessions.get(sessionId);
+
+    if (!session) {
+      res.status(404).json({ error: 'MCP session not found' });
+      return;
+    }
+
+    // Body is parsed by express.json() middleware (configured in McpServerModule)
+    await session.transport.handlePostMessage(
+      req as unknown as IncomingMessage,
+      res as unknown as ServerResponse,
+      (req as unknown as Record<string, unknown>).body,
+    );
+  }
+
+  private createMcpServer(workspaceId: string): McpServer {
+    const server = new McpServer({
+      name: 'oasm-server',
+      version: '1.0.0',
+    });
+
+    this.registerTools(server, workspaceId);
+
+    return server;
+  }
+
+  private registerTools(server: McpServer, workspaceId: string): void {
+    const allTools = this.agentTool.getTools(workspaceId, AgentMode.AGENT, undefined, undefined, true);
+
+    for (const [name, toolInstance] of Object.entries(allTools)) {
+      try {
+        this.registerToolOnServer(server, name, toolInstance as AiToolLike);
+      } catch {
+        // skip
+      }
+    }
+  }
+
+
+  private registerToolOnServer(server: McpServer, name: string, aiTool: AiToolLike): void {
+    try {
+      const execute = aiTool.execute;
+
+      const shape = schemaToShape(aiTool.parameters);
+
+      server.tool(name, aiTool.description, shape, async (...args: unknown[]) => {
+        try {
+          const result = await execute(args[0]);
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          };
+        } catch {
+          return {
+            content: [{ type: 'text' as const, text: 'Error: Internal error' }],
+            isError: true,
+          };
+        }
+      });
+    } catch {
+      // skip
+    }
   }
 }

@@ -73,6 +73,12 @@ interface DataTableProps<TData, TValue> {
     selectedCount: number,
     table: ReturnType<typeof useReactTable<TData>>,
   ) => React.ReactNode;
+  /** Show a checkbox column with select-all header */
+  showCheckBox?: boolean;
+  /** Callback fired when checkbox selection changes, returns array of selected row data */
+  onCheck?: (selectedRows: TData[]) => void;
+  /** Minimum number of rows to display (fills with empty placeholder rows) */
+  minRows?: number;
 }
 
 export function DataTable<TData, TValue>({
@@ -103,6 +109,9 @@ export function DataTable<TData, TValue>({
   rowSelection: externalRowSelection,
   onRowSelectionChange,
   selectionHeader,
+  showCheckBox = false,
+  onCheck,
+  minRows,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -159,6 +168,15 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
   });
 
+  React.useEffect(() => {
+    if (showCheckBox && onCheck) {
+      const selectedRows = table
+        .getSelectedRowModel()
+        .rows.map((row) => row.original);
+      onCheck(selectedRows);
+    }
+  }, [rowSelection, showCheckBox, onCheck, table]);
+
   // Handle column sorting
   const handleSort = (columnId: string) => {
     if (!onSortChange) return;
@@ -189,26 +207,30 @@ export function DataTable<TData, TValue>({
   const showSkeleton = isLoading && data.length === 0;
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-2 md:flex-row-reverse md:justify-between md:items-center mb-2">
-        <div className="flex gap-2 flex-col w-full justify-end md:w-auto">
-          {toolbarComponents.map((c, i) => (
-            <div key={i}>{c}</div>
-          ))}
+      {(toolbarComponents.length > 0 ||
+        filterColumnKey ||
+        filterComponents) && (
+        <div className="flex flex-col mb-2 gap-2 md:flex-row-reverse md:justify-between md:items-center">
+          <div className="flex gap-2 flex-col md:flex-row w-full justify-end md:w-auto">
+            {toolbarComponents.map((c, i) => (
+              <div key={i}>{c}</div>
+            ))}
+          </div>
+          <div className="flex items-center gap-4">
+            {filterColumnKey && (
+              <Input
+                placeholder={filterPlaceholder}
+                className="w-full max-w-xs xl:max-w-sm"
+                value={searchValue}
+                onChange={(e) => {
+                  setSearchValue(e.target.value);
+                }}
+              />
+            )}
+            {filterComponents}
+          </div>
         </div>
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          {filterColumnKey && (
-            <Input
-              placeholder={filterPlaceholder}
-              className="w-full md:max-w-sm"
-              value={searchValue}
-              onChange={(e) => {
-                setSearchValue(e.target.value);
-              }}
-            />
-          )}
-          {filterComponents}
-        </div>
-      </div>
+      )}
 
       {/* Table */}
       <div className={cn('rounded-md', isShowBorder && 'border')}>
@@ -225,7 +247,10 @@ export function DataTable<TData, TValue>({
                   return (
                     <TableRow className="border-b! bg-muted/30">
                       <TableHead
-                        colSpan={table.getAllLeafColumns().length}
+                        colSpan={
+                          table.getAllLeafColumns().length +
+                          (showCheckBox ? 1 : 0)
+                        }
                         className="h-10"
                       >
                         <div className="flex items-center gap-3">
@@ -250,6 +275,21 @@ export function DataTable<TData, TValue>({
                 // Normal header
                 return table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="border-b!">
+                    {showCheckBox && (
+                      <TableHead className="w-10 cursor-pointer">
+                        <Checkbox
+                          checked={
+                            table.getIsAllPageRowsSelected() ||
+                            (table.getIsSomePageRowsSelected() &&
+                              'indeterminate')
+                          }
+                          onCheckedChange={(value) =>
+                            table.toggleAllPageRowsSelected(!!value)
+                          }
+                          aria-label="Select all"
+                        />
+                      </TableHead>
+                    )}
                     {headerGroup.headers.map((header) => (
                       <TableHead
                         key={header.id}
@@ -282,6 +322,11 @@ export function DataTable<TData, TValue>({
             {showSkeleton ? (
               [...Array(pageSize)].map((_, rowIndex) => (
                 <TableRow key={`skeleton-${rowIndex}`}>
+                  {showCheckBox && (
+                    <TableCell className="w-10">
+                      <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                    </TableCell>
+                  )}
                   {[...Array(table.getAllLeafColumns().length)].map(
                     (_, colIndex) => (
                       <TableCell key={`skeleton-cell-${colIndex}`}>
@@ -302,6 +347,17 @@ export function DataTable<TData, TValue>({
                   )}
                   onClick={() => onRowClick?.(row.original)}
                 >
+                  {showCheckBox && (
+                    <TableCell className="w-10 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) =>
+                          row.toggleSelected(!!value)
+                        }
+                        aria-label="Select row"
+                      />
+                    </TableCell>
+                  )}
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(
@@ -315,13 +371,33 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
+                  colSpan={
+                    columns.length + (showCheckBox ? 1 : 0)
+                  }
+                  className="h-24 text-center text-muted-foreground"
                 >
                   {emptyMessage}
                 </TableCell>
               </TableRow>
             )}
+            {minRows !== undefined &&
+              table.getRowModel().rows.length < minRows &&
+              [...Array(minRows - table.getRowModel().rows.length)].map(
+                (_, idx) => (
+                  <TableRow key={`placeholder-${idx}`}>
+                    {showCheckBox && (
+                      <TableCell className="w-10" />
+                    )}
+                    {[...Array(table.getAllLeafColumns().length)].map(
+                      (_, colIndex) => (
+                        <TableCell key={`placeholder-cell-${colIndex}`}>
+                          <div className="h-4 w-full" />
+                        </TableCell>
+                      ),
+                    )}
+                  </TableRow>
+                ),
+              )}
           </TableBody>
         </Table>
       </div>

@@ -11,7 +11,7 @@ import { WORKER_TOKEN_HEADER } from '../constants/app.constants';
 export class WorkerTokenGuard implements CanActivate {
   constructor(
     @Inject(WorkersService) private readonly workersService: WorkersService,
-  ) { }
+  ) {}
 
   /**
    * Validates if the current request has a valid worker token
@@ -30,9 +30,10 @@ export class WorkerTokenGuard implements CanActivate {
     }
 
     // Validate the worker token against the database
-    const isValidToken = await this.workersService.validateWorkerToken(workerToken);
+    const workerInstance =
+      await this.workersService.validateWorkerToken(workerToken);
 
-    if (!isValidToken) {
+    if (!workerInstance) {
       throw new UnauthorizedException('Invalid worker token');
     }
 

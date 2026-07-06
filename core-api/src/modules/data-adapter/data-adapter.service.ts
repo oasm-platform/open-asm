@@ -1,16 +1,11 @@
-import { BOT_ID } from '@/common/constants/app.constants';
 import { ScreenshotPayload } from '@/common/interfaces/app.interface';
 import { JobDataResultType } from '@/common/types/app.types';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { DataSource, InsertResult } from 'typeorm';
-import {
-  IssueSourceType,
-  Severity,
-  ToolCategory,
-} from '../../common/enums/enum';
+import { Severity, ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
@@ -23,6 +18,8 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterInput } from './data-adapter.interface';
 @Injectable()
 export class DataAdapterService {
+  private readonly logger = new Logger(DataAdapterService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private workspaceService: WorkspacesService,
@@ -225,6 +222,7 @@ export class DataAdapterService {
         return;
       }
 
+      const now = new Date();
       const values = data.map((vuln) => {
         const stringHash = `${vuln.name}-${job.asset.id}-${job.tool.id}`;
         const fingerprint = crypto
@@ -239,6 +237,8 @@ export class DataAdapterService {
           asset: { id: job.asset.id },
           jobHistory: { id: job.jobHistory.id },
           tool: { id: job.tool.id },
+          firstDetectedDate: now,
+          lastSeenDate: now,
         };
       });
 
@@ -254,7 +254,7 @@ export class DataAdapterService {
         .values(uniqueValues)
         .orUpdate({
           conflict_target: ['fingerprint'],
-          overwrite: ['updatedAt', 'severity'],
+          overwrite: ['updatedAt', 'severity', 'lastSeenDate'],
         })
         .returning('*')
         .execute();
@@ -274,20 +274,47 @@ export class DataAdapterService {
       );
 
       if (vulsForAlert.length > 0) {
-        await Promise.all(
-          vulsForAlert.map((v) =>
-            this.issuesService.createIssue(
-              {
-                title: `[${v.severity.charAt(0).toUpperCase() + v.severity.slice(1).toLowerCase()}] ${v.name}`,
-                description: v.description,
-                sourceId: v.id,
-                sourceType: IssueSourceType.VULNERABILITY,
-              },
-              job.jobHistory.workflow?.workspace.id,
-              BOT_ID,
-            ),
-          ),
-        );
+        const workspaceId = job.jobHistory.workflow?.workspace.id;
+
+        if (!workspaceId) {
+          this.logger.warn(
+            'Workspace ID is missing from job history workflow, skipping issue creation',
+          );
+          return;
+        }
+
+        // const vulnsWithoutExistingIssue = await Promise.all(
+        //   vulsForAlert.map(async (v) => {
+        //     const existing =
+        //       await this.issuesService.findExistingOpenIssueBySource(
+        //         v.id,
+        //         IssueSourceType.VULNERABILITY,
+        //         workspaceId,
+        //       );
+        //     return existing ? null : v;
+        //   }),
+        // );
+
+        // const newVulsForAlert = vulnsWithoutExistingIssue.filter(
+        //   (v): v is Vulnerability => v !== null,
+        // );
+
+        // if (newVulsForAlert.length > 0) {
+        //   await Promise.all(
+        //     newVulsForAlert.map((v) =>
+        //       this.issuesService.createIssue(
+        //         {
+        //           title: `[${v.severity.charAt(0).toUpperCase() + v.severity.slice(1).toLowerCase()}] ${v.name}`,
+        //           description: v.description,
+        //           sourceId: v.id,
+        //           sourceType: IssueSourceType.VULNERABILITY,
+        //         },
+        //         workspaceId,
+        //         BOT_ID,
+        //       ),
+        //     ),
+        //   );
+        // }
       }
     });
   }
@@ -333,7 +360,7 @@ export class DataAdapterService {
     }
 
     const buffer = Buffer.from(data.screenshot, 'base64');
-    const { path } = this.storageService.uploadFile(
+    const { path } = await this.storageService.uploadFile(
       `${crypto.createHash('md5').update(job.asset.value).digest('hex')}.png`,
       buffer,
       'screenshot',
@@ -416,7 +443,7 @@ export class DataAdapterService {
       // Validate data before syncing
       if (syncFunction.validationClass && data !== undefined) {
         const isValid = await this.validateData(
-          data as object | object[],
+          data,
           syncFunction.validationClass,
         );
         if (!isValid) {

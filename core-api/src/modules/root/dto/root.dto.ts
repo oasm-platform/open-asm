@@ -26,4 +26,32 @@ export class GetMetadataDto {
     nullable: true,
   })
   logoPath?: string | null;
+
+  @ApiProperty({ description: 'Current system version' })
+  currentVersion: string | null;
+}
+
+export class GetVersionDto {
+  @ApiProperty({
+    description: 'Current system version',
+    type: String,
+    nullable: true,
+  })
+  currentVersion: string | null;
+
+  @ApiProperty({
+    description: 'Latest system version',
+    type: String,
+    nullable: true,
+  })
+  latestVersion: string | null;
+
+  @ApiProperty({ description: 'Release date', nullable: true })
+  releaseDate?: string;
+
+  @ApiProperty({ description: 'Release notes', nullable: true })
+  notes?: string;
+
+  @ApiProperty({ description: 'Is latest version', nullable: true })
+  isLatest?: boolean;
 }

@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyModule } from '../technology/technology.module';
@@ -9,11 +10,20 @@ import { AssetsService } from './assets.service';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
+import { TlsAssetsView } from './entities/tls-assets.entity';
 
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Asset, Job, Target, HttpResponse, AssetService]),
+    TypeOrmModule.forFeature([
+      Asset,
+      Job,
+      Target,
+      HttpResponse,
+      AssetService,
+      TlsAssetsView,
+      AgentLLMConfig,
+    ]),
     TechnologyModule,
     WorkspacesModule,
   ],

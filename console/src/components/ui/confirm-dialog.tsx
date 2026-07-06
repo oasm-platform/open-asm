@@ -62,11 +62,28 @@ export const ConfirmDialog = ({
     onClick: (e: React.MouseEvent) => {
       e.preventDefault(); // Prevent default to avoid dropdown closing
       e.stopPropagation(); // Prevent bubbling up to parent elements
+
+      // Call original onClick handler if it exists
+      const originalOnClick = (
+        trigger.props as { onClick?: (e: React.MouseEvent) => void }
+      ).onClick;
+      if (originalOnClick) {
+        originalOnClick(e);
+      }
+
       setOpen(true);
     },
     onMouseDown: (e: React.MouseEvent) => {
-      // Prevent dropdown from auto-closing
-      e.preventDefault();
+      e.preventDefault(); // Prevent dropdown from auto-closing
+      e.stopPropagation(); // Prevent bubbling up to parent elements
+
+      // Call original onMouseDown handler if it exists
+      const originalOnMouseDown = (
+        trigger.props as { onMouseDown?: (e: React.MouseEvent) => void }
+      ).onMouseDown;
+      if (originalOnMouseDown) {
+        originalOnMouseDown(e);
+      }
     },
   });
 

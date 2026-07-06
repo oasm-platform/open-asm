@@ -1,14 +1,13 @@
-import Page from '@/components/common/page';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useEffect, type JSX } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import CreateWorkspaceDialog from '../workspaces/create-workspace-dialog';
-import AccountSettings from './components/account-settings';
-import ConfigsSettings from './components/configs';
-import CreateMcpPermission from './components/create-mcp-permission';
-import ListMcpPermissions from './components/list-mcp-permissions';
-import ListWorkspaces from './components/list-workspaces';
-import { ThemeSwitcher } from './components/theme-switcher';
+import { useSession } from '@/utils/authClient';
+import { useNavigate, useParams } from '@tanstack/react-router';
+import { useEffect, useMemo, type JSX } from 'react';
+import ApiKeysSettings from './components/api-keys-settings';
+import BrandNameAndLogoSettings from './components/brand-name-and-logo';
+import GetAboutProject from './components/get-about-project';
+import McpConnect from './components/mcp-connect';
+import Preferences from './components/preferences';
+import SecuritySettings from './components/security-settings';
+import WorkspaceSettings from './components/workspace-settings';
 
 interface TabContentProps {
   title: string;
@@ -17,125 +16,180 @@ interface TabContentProps {
   action?: JSX.Element;
 }
 
-interface SettingsTab {
+interface SettingsTabItem {
   id: string;
   label: string;
-  content: TabContentProps;
-  component: JSX.Element;
+  path: string;
+  content?: TabContentProps;
+  component?: JSX.Element;
+}
+
+interface SettingsTabGroup {
+  name: string;
+  tabs: SettingsTabItem[];
+  roles?: string[];
 }
 
 interface SettingsProps {
   defaultTab?: string;
 }
 
-const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
-  const { tab } = useParams<{ tab?: string }>();
+// Settings tab groups with content and component - exported for SettingsLayout
+export const settingsTabGroups: SettingsTabGroup[] = [
+  {
+    name: 'Workspace',
+    tabs: [
+      {
+        id: 'general',
+        label: 'General',
+        path: '/settings/general',
+        content: {
+          title: 'Workspace settings',
+          description: 'Manage your workspace settings',
+        },
+        component: <WorkspaceSettings />,
+      },
+      {
+        id: 'apikeys',
+        label: 'API keys',
+        path: '/settings/apikeys',
+        content: {
+          title: 'API Keys',
+          description: 'Manage your workspace API keys',
+        },
+        component: <ApiKeysSettings />,
+      },
+    ],
+  },
+  // Group: Account Settings
+  {
+    name: 'Account Settings',
+    tabs: [
+      {
+        id: 'preferences',
+        label: 'Preferences',
+        path: '/settings/preferences',
+        content: {
+          title: 'Preferences',
+          description: 'Manage your account preferences',
+        },
+        component: <Preferences />,
+      },
+      {
+        id: 'security',
+        label: 'Security',
+        path: '/settings/security',
+        content: {
+          title: 'Security',
+          description: 'Manage your account security settings',
+        },
+        component: <SecuritySettings />,
+      },
+    ],
+  },
+  // // Group: Integration
+  {
+    name: 'Integration',
+    tabs: [
+      {
+        id: 'mcp',
+        label: 'MCP Connect',
+        path: '/settings/mcp',
+        content: {
+          title: 'MCP Connect',
+          description: 'Connect to OASM server via MCP protocol',
+        },
+        component: <McpConnect />,
+      },
+    ],
+  },
+  // Group: System
+  {
+    name: 'System',
+    roles: ['admin'],
+    tabs: [
+      {
+        id: 'brand',
+        label: 'Brand name and logo',
+        path: '/settings/brand',
+        content: {
+          title: 'Brand name and logo',
+          description: 'Customize your brand name and logo',
+        },
+        component: <BrandNameAndLogoSettings />,
+      },
+      {
+        id: 'about',
+        label: 'About',
+        path: '/settings/about',
+        content: {
+          title: 'About',
+          description:
+            'Open-source platform for cybersecurity Attack Surface Management.',
+        },
+        component: <GetAboutProject />,
+      },
+    ],
+  },
+];
+
+export function filterTabGroups(
+  groups: typeof settingsTabGroups,
+  userRole: string | null | undefined,
+): typeof settingsTabGroups {
+  return groups.filter(
+    (group) =>
+      !group.roles ||
+      group.roles.length === 0 ||
+      (userRole != null && group.roles.includes(userRole)),
+  );
+}
+
+// Backward compatibility - flattened array of all tabs
+export const settingsTabs = settingsTabGroups.flatMap((group) => group.tabs);
+
+const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
+  const { tab } = useParams({ strict: false });
   const navigate = useNavigate();
+  const { data } = useSession();
+
+  const visibleTabs = useMemo(
+    () =>
+      filterTabGroups(settingsTabGroups, data?.user.role).flatMap((group) =>
+        group.tabs.map((t) => ({ ...t, group: group.name })),
+      ),
+    [data?.user.role],
+  );
 
   useEffect(() => {
     if (!tab && defaultTab) {
-      navigate(`/settings/${defaultTab}`, { replace: true });
+      navigate({ to: `/settings/${defaultTab}`, replace: true });
     }
   }, [tab, defaultTab, navigate]);
 
-  const handleTabChange = (value: string) => {
-    navigate(`/settings/${value}`);
-  };
-
-  const settingsTabs: SettingsTab[] = [
-    {
-      id: 'account',
-      label: 'Account',
-      content: {
-        title: 'Account Settings',
-        description: 'Manage your account settings and preferences',
-      },
-      component: <AccountSettings />,
-    },
-    {
-      id: 'mcp',
-      label: 'Mcp',
-      content: {
-        title: 'MCP Permissions',
-        description: 'Manage your MCP permissions',
-        action: <CreateMcpPermission />,
-      },
-      component: <ListMcpPermissions />,
-    },
-    {
-      id: 'appearance',
-      label: 'Appearance',
-      content: {
-        title: 'Appearance',
-        description: 'Customize the look and feel of the application',
-      },
-      component: (
-        <div className="space-y-4">
-          <div className="rounded-lg border p-4">
-            <ThemeSwitcher />
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 'workspaces',
-      label: 'Workspaces',
-      content: {
-        title: 'Workspaces',
-        description: 'Manage your workspaces and permissions',
-        action: <CreateWorkspaceDialog />,
-      },
-      component: <ListWorkspaces />,
-    },
-    {
-      id: 'configs',
-      label: 'Configs',
-      content: {
-        title: 'Configs',
-        description: '',
-      },
-      component: <ConfigsSettings />,
-    },
-  ];
-
   const currentTab = tab || defaultTab;
+  const activeTab =
+    visibleTabs.find((t) => t.id === currentTab) || visibleTabs[0];
 
   return (
-    <Page title="Settings">
-      <div className="space-y-6">
-        <Tabs
-          value={currentTab}
-          onValueChange={handleTabChange}
-          className="w-full"
-        >
-          <TabsList className="grid w-full grid-cols-5 max-w-5xl mb-4">
-            {settingsTabs.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id}>
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {settingsTabs.map((tab) => {
-            const { title, description, action } = tab.content;
-            return (
-              <TabsContent key={tab.id} value={tab.id} className="space-y-4">
-                <div className="flex items-center flex-row justify-between">
-                  <div>
-                    <h3 className="text-lg font-medium">{title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {description}
-                    </p>
-                  </div>
-                  {action}
-                </div>
-                {tab.component}
-              </TabsContent>
-            );
-          })}
-        </Tabs>
-      </div>
-    </Page>
+    <div className="mx-auto w-full sm:w-3/4 xl:w-1/2">
+      {activeTab && (
+        <div className="space-y-4">
+          <div className="flex items-center flex-row justify-between">
+            <div>
+              <h3 className="text-lg font-medium">
+                {activeTab.content?.title}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {activeTab.content?.description}
+              </p>
+            </div>
+            {activeTab.content?.action}
+          </div>
+          {activeTab.component}
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Card, CardTitle } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -76,9 +77,10 @@ export default function ChangePassword() {
   }
 
   return (
-    <div className="w-full">
+    <Card className="p-4">
+      <CardTitle>Change Password</CardTitle>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
             control={form.control}
             name="currentPassword"
@@ -156,7 +158,7 @@ export default function ChangePassword() {
             name="confirmPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Confirm New Password</FormLabel>
+                <FormLabel>Confirm new password</FormLabel>
                 <FormControl>
                   <div className="relative">
                     <Input
@@ -187,17 +189,18 @@ export default function ChangePassword() {
             )}
           />
 
-          <Button
-            disabled={loading || !form.formState.isDirty}
-            type="submit"
-            className="w-full"
-            size="sm"
-          >
-            {loading && <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />}
-            Change Password
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              disabled={loading || !form.formState.isDirty}
+              type="submit"
+              size="sm"
+            >
+              {loading && <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />}
+              Change password
+            </Button>
+          </div>
         </form>
       </Form>
-    </div>
+    </Card>
   );
 }

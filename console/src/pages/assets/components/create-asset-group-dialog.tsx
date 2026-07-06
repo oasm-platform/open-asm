@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useAssetGroupControllerCreate,
   type AssetGroup,
@@ -25,7 +25,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { z } from 'zod';
 
 const formSchema = z.object({
@@ -42,7 +42,9 @@ export function CreateAssetGroupDialog({
   onSuccess,
 }: CreateAssetGroupDialogProps) {
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -55,7 +57,7 @@ export function CreateAssetGroupDialog({
     useAssetGroupControllerCreate();
 
   const onSubmit = (values: FormValues) => {
-    if (!selectedWorkspace) {
+    if (!selectedWorkspaceId) {
       // Handle case where workspace is not selected
       console.error('No workspace selected');
       return;
@@ -70,7 +72,7 @@ export function CreateAssetGroupDialog({
         onSuccess: (response: AssetGroup) => {
           setCreateDialogOpen(false);
           onSuccess?.();
-          navigate(`/groups/${response.id}`);
+          navigate({ to: `/groups/${response.id}` });
           form.reset();
         },
       },
@@ -79,11 +81,7 @@ export function CreateAssetGroupDialog({
 
   return (
     <div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setCreateDialogOpen(true)}
-      >
+      <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
         <Plus />
         Create
       </Button>

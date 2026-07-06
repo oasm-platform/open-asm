@@ -17,6 +17,7 @@ import {
   OneToMany,
   OneToOne,
   PrimaryColumn,
+  Relation,
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
@@ -56,7 +57,7 @@ export class Tool {
   command?: string;
 
   @OneToMany(() => WorkspaceTool, (workspaceTool) => workspaceTool.tool)
-  workspaceTools?: WorkspaceTool[];
+  workspaceTools?: Relation<WorkspaceTool[]>;
 
   @ApiProperty({ enum: ToolCategory })
   @IsEnum(ToolCategory)
@@ -97,17 +98,17 @@ export class Tool {
   @OneToMany(() => Job, (job) => job.tool, {
     onDelete: 'CASCADE',
   })
-  jobs?: Job[];
+  jobs?: Relation<Job[]>;
 
   @OneToMany(() => Vulnerability, (vulnerability) => vulnerability.tool, {
     onDelete: 'CASCADE',
   })
-  vulnerabilities?: Vulnerability[];
+  vulnerabilities?: Relation<Vulnerability[]>;
 
   @OneToMany(() => AssetTag, (assetTag) => assetTag.tool, {
     onDelete: 'CASCADE',
   })
-  assetTags?: AssetTag[];
+  assetTags?: Relation<AssetTag[]>;
 
   @ApiProperty()
   @Column({ name: 'providerId', nullable: true })
@@ -117,15 +118,18 @@ export class Tool {
     nullable: true,
     onDelete: 'SET NULL',
   })
-  provider?: ToolProvider;
+  provider?: Relation<ToolProvider>;
 
   @OneToOne(() => ApiKey)
   @JoinColumn({ name: 'apiKeyId', referencedColumnName: 'id' })
-  apiKey?: ApiKey;
+  apiKey?: Relation<ApiKey>;
 
   @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.tool)
-  workers?: WorkerInstance[];
+  workers?: Relation<WorkerInstance[]>;
 
-  @Column({ default: JobPriority.BACKGROUND })
+  @Column({ type: 'enum', enum: JobPriority, default: JobPriority.BACKGROUND })
   priority?: JobPriority;
+
+  @ApiProperty({ required: false })
+  availableWorkersCount?: number;
 }

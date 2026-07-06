@@ -8,6 +8,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  Relation,
   Unique,
 } from 'typeorm';
 import { AssetGroupAsset } from './asset-groups-assets.entity';
@@ -22,9 +23,11 @@ export class AssetGroup extends BaseEntity {
   @Column()
   name: string;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.id)
+  @ManyToOne(() => Workspace, (workspace) => workspace.id, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @ApiProperty({ example: '#78716C', required: false })
   @IsString()
@@ -36,13 +39,13 @@ export class AssetGroup extends BaseEntity {
     () => AssetGroupAsset,
     (assetGroupAsset) => assetGroupAsset.assetGroup,
   )
-  assetGroupAssets: AssetGroupAsset[];
+  assetGroupAssets: Relation<AssetGroupAsset[]>;
 
   @OneToMany(
     () => AssetGroupWorkflow,
     (assetGroupWorkflows) => assetGroupWorkflows.assetGroup,
   )
-  assetGroupWorkflows: AssetGroupWorkflow[];
+  assetGroupWorkflows: Relation<AssetGroupWorkflow[]>;
 
   @ApiProperty()
   totalAssets: number;

@@ -1,37 +1,104 @@
-version: '3'
+version: "3"
 
 vars:
-  replicas: '{{.replicas | default 1}}'
-  apiKey: '{{.apiKey | default .API_KEY}}'
-  maxJobs: '{{.maxJobs | default .MAX_JOBS}}'
+  replicas: "{{.replicas | default 1}}"
+  apiKey: "{{.apiKey | default .API_KEY}}"
+  maxJobs: "{{.maxJobs | default .MAX_JOBS}}"
+  network: '{{.network | default ""}}'
 
 tasks:
+  # ==========================================
+  # DEVELOPMENT TASKS
+  # ==========================================
   dev:
-    env:
-      API_KEY: '{{.apiKey}}'
-      MAX_JOBS: '{{.maxJobs}}'
     cmds:
       - |
-        for i in $(seq 1 {{.replicas}}); do
-          echo "Starting worker $i"
-          bun --watch index.ts &
-        done
-        wait
+        if [ "{{.replicas}}" = "1" ]; then
+          exec go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}{{if .network}} --network {{.network}}{{end}}
+        else
+          trap 'wait; exit 0' INT TERM
+          for i in $(seq 1 {{.replicas}}); do
+            echo "Starting CLI worker instance $i"
+            CMD="go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}"
+            {{- if .network}}
+            CMD="$CMD --network {{.network}}"
+            {{- end}}
+            $CMD &
+          done
+          wait
+        fi
     silent: false
 
-  install:
+  dev-app:
     cmds:
-      - bun install
+      - |
+        if [ "{{.replicas}}" = "1" ]; then
+          ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}}{{if .network}} WORKER_NETWORK={{.network}}{{end}}"
+          exec env $ENV_VARS go run ./cmd/app
+        else
+          trap 'wait; exit 0' INT TERM
+          for i in $(seq 1 {{.replicas}}); do
+            echo "Starting App worker instance $i"
+            ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}}"
+            {{- if .network}}
+            ENV_VARS="$ENV_VARS WORKER_NETWORK={{.network}}"
+            {{- end}}
+            env $ENV_VARS go run ./cmd/app &
+          done
+          wait
+        fi
+    silent: false
+
+  # ==========================================
+  # BUILD TASKS
+  # ==========================================
+
+  build:
+    deps: [build-cli, build-app]
+
+  build-cli:
+    cmds:
+      - echo "Building OASM CLI Worker..."
+      - go build -o bin/oasm-cli ./cmd/cli
+
+  build-app:
+    cmds:
+      - echo "Building OASM App Worker..."
+      - CGO_ENABLED=0 go build -o bin/oasm-app ./cmd/app
+
   clean:
     cmds:
-      - rm -rf ./husky
-      - rm -rf ./node_modules
-      - rm -rf ./dist
+      - rm -rf bin/
 
-  tools:
+  # ==========================================
+  # UTILITY TASKS
+  # ==========================================
+
+  # Install dependencies (Go modules)
+  install:
     cmds:
-      - go install -v github.com/projectdiscovery/pdtm/cmd/pdtm@latest
-      - pdtm -duc -dc -install-go-path -install httpx,subfinder,nuclei,dnsx,naabu
-  build:
+      - go mod tidy
+
+  # Run tests
+  # Executes all tests in the project
+  test:
     cmds:
-      - bun run build
+      - go test ./...
+
+  # Check code without building binary
+  # Verifies compilation of all packages
+  check:
+    cmds:
+      - go build ./...
+
+  # Format code
+  # Applies gofmt to all source files
+  format:
+    cmds:
+      - go fmt ./...
+
+  # Run linter
+  # Executes go vet for code quality checks
+  lint:
+    cmds:
+      - go vet ./...

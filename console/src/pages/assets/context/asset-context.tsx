@@ -1,4 +1,5 @@
 import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { format } from 'date-fns';
 import {
   createContext,
   useCallback,
@@ -6,7 +7,8 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { type DateRange } from 'react-day-picker';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 
 export type AssetContextType = ReturnType<typeof useServerDataTable> & {
   queryParams: {
@@ -16,8 +18,11 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ipAddresses?: string[];
     ports?: string[];
     techs?: string[];
+    tlsHosts?: string[];
     statusCodes?: string[];
     hosts?: string[];
+    startDate?: string;
+    endDate?: string;
     page: number;
     sortBy: string;
     sortOrder: 'ASC' | 'DESC';
@@ -42,8 +47,11 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ports?: string[];
     hosts?: string[];
     statusCodes?: string[];
+    tlsHosts?: string[];
   };
   filterHandlers: (key: string, value: string[]) => void;
+  dateRange: DateRange | undefined;
+  setDateRange: (date: DateRange | undefined) => void;
   generatingAssets: Set<string>;
   startGenerating: (assetId: string) => void;
   stopGenerating: (assetId: string) => void;
@@ -61,9 +69,20 @@ export default function AssetProvider({
   targetId?: string;
   refetchInterval?: number;
 }) {
-  const [params, setParams] = useSearchParams();
+  const search = useSearch({ strict: false }) as Record<string, string | string[] | undefined>;
+  const navigate = useNavigate();
   const [generatingAssets, setGeneratingAssets] = useState<Set<string>>(
     new Set(),
+  );
+
+  const urlDateFrom = Array.isArray(search.startDate) ? search.startDate[0] : search.startDate;
+  const urlDateTo = Array.isArray(search.endDate) ? search.endDate[0] : search.endDate;
+  const initialDateRange =
+    urlDateFrom && urlDateTo
+      ? { from: new Date(urlDateFrom), to: new Date(urlDateTo) }
+      : undefined;
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(
+    initialDateRange,
   );
 
   const { tableParams, tableHandlers } = useServerDataTable({
@@ -71,28 +90,51 @@ export default function AssetProvider({
     defaultSortOrder: 'ASC',
   });
 
-  const ipAddresses = params.getAll('ipAddresses');
-  const ports = params.getAll('ports');
-  const techs = params.getAll('techs');
-  const hosts = params.getAll('hosts');
-  const statusCodes = params.getAll('statusCodes');
+  const toArray = (value: string | string[] | undefined): string[] => {
+    if (Array.isArray(value)) return value;
+    if (value) return value.split(',');
+    return [];
+  };
+
+  const ipAddresses = toArray(search.ipAddresses);
+  const ports = toArray(search.ports);
+  const techs = toArray(search.techs);
+  const hosts = toArray(search.hosts);
+  const statusCodes = toArray(search.statusCodes);
+  const tlsHosts = toArray(search.tlsHosts);
 
   const filterHandlers = useCallback(
     (key: string, value: string[]) => {
-      setParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set('page', '1');
-          next.delete(key);
+      navigate({
+        search: ((prev: Record<string, unknown>) => {
+          const next = { ...prev, page: 1 } as Record<string, unknown>;
           if (value.length > 0) {
-            for (const v of value) next.append(key, v.toString());
+            next[key] = value;
+          } else {
+            delete next[key];
           }
           return next;
-        },
-        { replace: true },
-      );
+        }) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        replace: true,
+      });
     },
-    [setParams],
+    [navigate],
+  );
+
+  const handleDateRangeChange = useCallback(
+    (date: DateRange | undefined) => {
+      setDateRange(date);
+      navigate({
+        search: ((prev: Record<string, unknown>) => ({
+          ...prev,
+          page: 1,
+          startDate: date?.from ? format(date.from, 'yyyy-MM-dd') : undefined,
+          endDate: date?.to ? format(date.to, 'yyyy-MM-dd') : undefined,
+        })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        replace: true,
+      });
+    },
+    [navigate],
   );
 
   const startGenerating = useCallback((assetId: string) => {
@@ -124,6 +166,13 @@ export default function AssetProvider({
       techs: techs,
       hosts: hosts,
       statusCodes: statusCodes,
+      tlsHosts: tlsHosts,
+      startDate: dateRange?.from
+        ? format(dateRange.from, 'yyyy-MM-dd')
+        : undefined,
+      endDate: dateRange?.to
+        ? format(dateRange.to, 'yyyy-MM-dd')
+        : undefined,
       page: tableParams.page,
       sortBy: tableParams.sortBy,
       sortOrder: tableParams.sortOrder,
@@ -140,6 +189,8 @@ export default function AssetProvider({
       techs,
       hosts,
       statusCodes,
+      tlsHosts,
+      dateRange,
     ],
   );
 
@@ -168,6 +219,11 @@ export default function AssetProvider({
           techs,
           hosts,
           statusCodes,
+          tlsHosts,
+          dateRange?.from
+            ? format(dateRange.from, 'yyyy-MM-dd')
+            : undefined,
+          dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
         ],
       },
     }),
@@ -184,6 +240,8 @@ export default function AssetProvider({
       techs,
       hosts,
       statusCodes,
+      tlsHosts,
+      dateRange,
     ],
   );
 
@@ -202,8 +260,11 @@ export default function AssetProvider({
           techs,
           hosts,
           statusCodes,
+          tlsHosts,
         },
         filterHandlers,
+        dateRange,
+        setDateRange: handleDateRangeChange,
         targetId,
         generatingAssets,
         startGenerating,

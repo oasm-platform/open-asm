@@ -2,6 +2,7 @@ import { BullMQName, JobStatus } from '@/common/enums/enum';
 import { RedisService } from '@/services/redis/redis.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -25,11 +26,14 @@ describe('JobsRegistryService', () => {
     getOne: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
+    count: jest.fn(),
+    exists: jest.fn(),
   };
 
   const mockJobHistoryRepository = {
     createQueryBuilder: jest.fn(),
     findOne: jest.fn(),
+    update: jest.fn(),
   };
 
   const mockJobErrorLogRepository = {
@@ -51,10 +55,18 @@ describe('JobsRegistryService', () => {
 
   const mockRedisService = {
     publish: jest.fn(),
+    client: {
+      incr: jest.fn(),
+      decr: jest.fn(),
+      del: jest.fn(),
+      get: jest.fn(),
+      set: jest.fn(),
+    },
   };
 
   const mockToolsService = {
     getInstalledTools: jest.fn(),
+    getToolByNames: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -95,6 +107,10 @@ describe('JobsRegistryService', () => {
         {
           provide: getQueueToken(BullMQName.JOB_RESULT),
           useValue: { add: jest.fn() },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
         },
         JobsRegistryService,
       ],
@@ -418,10 +434,12 @@ describe('JobsRegistryService', () => {
       updatedAt: new Date(),
       jobs: mockJobs,
       workflow: {
+        name: 'test-workflow',
         content: {
           jobs: [{ run: 'test-tool' }],
         },
       },
+      jobHistoryName: 'test-job-history',
     };
 
     it('should return job history detail with jobs', async () => {
@@ -447,18 +465,16 @@ describe('JobsRegistryService', () => {
           workflow: true,
           jobs: {
             tool: true,
-            asset: { target: true },
-            assetService: true,
-            errorLogs: true,
           },
         },
       });
       expect(result).toEqual({
         id: mockHistoryId,
+        workflowName: 'test-workflow',
+        jobHistoryName: 'test-job-history',
         createdAt: mockJobHistory.createdAt,
         updatedAt: mockJobHistory.updatedAt,
         tools: [{ name: 'test-tool' }],
-        jobs: mockJobs,
       });
     });
 
@@ -482,6 +498,140 @@ describe('JobsRegistryService', () => {
       await expect(
         service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getNextStepForJob', () => {
+    const mockJob = {
+      id: 'job-uuid',
+      tool: { name: 'tool-a' },
+      asset: {
+        target: { id: 'target-uuid' },
+      },
+      jobHistory: {
+        workflow: {
+          content: {
+            jobs: [
+              { name: 'job-1', run: 'tool-a' },
+              { name: 'job-2', run: 'tool-b' },
+            ],
+          },
+          workspace: { id: 'workspace-uuid' },
+        },
+      },
+    };
+
+    it('should return 0 when no workflow exists', async () => {
+      const jobNoWorkflow = { ...mockJob, jobHistory: { workflow: null } };
+
+      const result = await service.getNextStepForJob(jobNoWorkflow as any);
+
+      expect(result).toBe(0);
+    });
+
+    it('should return 0 when current tool not found in workflow', async () => {
+      const jobNoTool = {
+        ...mockJob,
+        tool: { name: 'unknown-tool' },
+      };
+
+      const result = await service.getNextStepForJob(jobNoTool as any);
+
+      expect(result).toBe(0);
+    });
+
+    it('should return 0 when current tool is last in workflow', async () => {
+      const lastToolJob = {
+        ...mockJob,
+        tool: { name: 'tool-b' },
+      };
+
+      const result = await service.getNextStepForJob(lastToolJob as any);
+
+      expect(result).toBe(0);
+    });
+
+    it('should return number of new jobs created when next step exists', async () => {
+      const jobWithNextStep = {
+        id: 'job-uuid',
+        tool: { name: 'tool-a' },
+        asset: {
+          target: { id: 'target-uuid' },
+        },
+        jobHistory: {
+          workflow: {
+            content: {
+              jobs: [
+                { name: 'job-1', run: 'tool-a' },
+                { name: 'job-2', run: 'tool-b' },
+              ],
+            },
+            workspace: { id: undefined },
+          },
+        },
+      };
+
+      mockToolsService.getToolByNames.mockResolvedValue([
+        { name: 'tool-b', priority: 4, category: 'SUBDOMAINS' },
+      ]);
+
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([{ id: 'asset-1', isPrimary: true }]),
+      };
+      const mockJobRepo = {
+        create: jest.fn().mockReturnValue({}),
+        save: jest.fn().mockResolvedValue([{}]),
+        createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+      };
+      mockDataSource.getRepository.mockReturnValue(mockJobRepo);
+
+      const result = await service.getNextStepForJob(jobWithNextStep as any);
+
+      expect(result).toBe(1);
+    });
+  });
+
+  describe('markWorkflowDone', () => {
+    const mockJobHistoryId = 'history-uuid';
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should update job history isCompleted to true', async () => {
+      mockJobRepository.exists.mockResolvedValue(false);
+      mockJobHistoryRepository.update.mockResolvedValue({ affected: 1 });
+      mockJobHistoryRepository.findOne.mockResolvedValue({
+        id: mockJobHistoryId,
+        workflow: { name: 'test-workflow' },
+      });
+
+      await service.markWorkflowDone(mockJobHistoryId);
+
+      expect(mockJobRepository.exists).toHaveBeenCalled();
+      expect(mockJobHistoryRepository.update).toHaveBeenCalledWith(
+        { id: mockJobHistoryId, isCompleted: false },
+        { isCompleted: true },
+      );
+    });
+
+    it('should not update when there are pending jobs', async () => {
+      mockJobRepository.exists.mockResolvedValue(true);
+
+      await service.markWorkflowDone(mockJobHistoryId);
+
+      expect(mockJobHistoryRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('should not update when already completed', async () => {
+      mockJobRepository.exists.mockResolvedValue(false);
+      mockJobHistoryRepository.update.mockResolvedValue({ affected: 0 });
+
+      await service.markWorkflowDone(mockJobHistoryId);
+
+      expect(mockJobHistoryRepository.update).toHaveBeenCalled();
     });
   });
 });

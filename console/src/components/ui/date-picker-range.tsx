@@ -16,9 +16,11 @@ interface DatePickerWithRangeProps {
   value?: DateRange;
   onChange?: (date: DateRange | undefined) => void;
   className?: string;
+  label?: string;
 }
 
 const PRESET_OPTIONS = [
+  { label: 'Today', days: 0 },
   { label: 'Last 7 days', days: 7 },
   { label: 'Last 30 days', days: 30 },
   { label: 'Last 60 days', days: 60 },
@@ -29,6 +31,7 @@ export function DatePickerWithRange({
   value,
   onChange,
   className,
+  label,
 }: DatePickerWithRangeProps) {
   const internalDate = value ?? {
     from: new Date(new Date().getFullYear(), 0, 20),
@@ -41,7 +44,7 @@ export function DatePickerWithRange({
 
   const handlePresetClick = (days: number) => {
     const to = new Date();
-    const from = addDays(to, -days);
+    const from = days === 0 ? new Date() : addDays(to, -days);
     onChange?.({ from, to });
   };
 
@@ -58,7 +61,7 @@ export function DatePickerWithRange({
           <Button
             variant="outline"
             id="date-picker-range"
-            className="justify-start px-2.5 font-normal gap-2"
+            className="h-9 justify-start px-2.5 font-normal gap-2 border-dashed"
           >
             <CalendarIcon className="h-4 w-4" />
             {value?.from ? (
@@ -71,7 +74,7 @@ export function DatePickerWithRange({
                 format(value.from, 'LLL dd, y')
               )
             ) : (
-              <span>Pick a date</span>
+              <span>{label ?? 'Pick a date range'}</span>
             )}
           </Button>
         </PopoverTrigger>

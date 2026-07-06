@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -6,7 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -14,83 +14,77 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useWorkspacesControllerUpdateWorkspace, type Workspace } from "@/services/apis/gen/queries";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient } from "@tanstack/react-query";
-import { Edit } from "lucide-react";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-import { z } from "zod";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  useWorkspacesControllerUpdateWorkspace,
+  type Workspace,
+} from '@/services/apis/gen/queries';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
+import { Edit } from 'lucide-react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
 });
 
 interface EditWorkspaceDialogProps {
-  workspace: Workspace
+  workspace: Workspace;
 }
 
-export function EditWorkspaceDialog({
-  workspace,
-}: EditWorkspaceDialogProps) {
+export function EditWorkspaceDialog({ workspace }: EditWorkspaceDialogProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: workspace.name,
-      description: workspace.description || "",
+      description: workspace.description || '',
     },
   });
 
-  const { mutate } = useWorkspacesControllerUpdateWorkspace()
+  const { mutate } = useWorkspacesControllerUpdateWorkspace();
 
   const queryClient = useQueryClient();
 
   function handleSubmit(data: z.infer<typeof formSchema>) {
-    mutate({
-      id: workspace.id,
-      data,
-    }, {
-      onSuccess: () => {
-        setOpen(false);
-        toast.success("Workspace updated successfully")
-        queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    mutate(
+      {
+        id: workspace.id,
+        data,
       },
-      onError: () => {
-        toast.error("Failed to update workspace")
-      }
-    })
+      {
+        onSuccess: () => {
+          setOpen(false);
+          toast.success('Workspace updated successfully');
+          queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+        },
+        onError: () => {
+          toast.error('Failed to update workspace');
+        },
+      },
+    );
   }
 
   const [open, setOpen] = useState(false);
 
   return (
     <div>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-muted-foreground/80"
-              onClick={() => setOpen(true)}
-            >
-              <Edit className="h-4 w-4" />
-              <span className="sr-only">Edit</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Edit workspace</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-muted-foreground/80"
+        onClick={() => setOpen(true)}
+      >
+        <Edit className="h-4 w-4" />
+        <span className="sr-only">Edit</span>
+      </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-106.25">
           <DialogHeader>
             <DialogTitle>Edit Workspace</DialogTitle>
             <DialogDescription>
@@ -98,7 +92,10 @@ export function EditWorkspaceDialog({
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <form
+              onSubmit={form.handleSubmit(handleSubmit)}
+              className="space-y-4"
+            >
               <FormField
                 control={form.control}
                 name="name"
@@ -137,6 +134,5 @@ export function EditWorkspaceDialog({
         </DialogContent>
       </Dialog>
     </div>
-
   );
 }

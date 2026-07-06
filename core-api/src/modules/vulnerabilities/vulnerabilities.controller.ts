@@ -1,22 +1,34 @@
+import { UserContext } from '@/common/decorators/app.decorator';
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { User } from '../auth/entities/user.entity';
+import { AnalyzeVulnerabilityDto } from './dto/analyze-vulnerability.dto';
+import {
+  BulkDismissVulnerabilitiesDto,
+  BulkReopenVulnerabilitiesDto,
+} from './dto/bulk-vulnerability.dto';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   GetVulnerabilitiesStatisticsResponseDto,
 } from './dto/get-vulnerability-statistics.dto';
 import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
+import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilitiesService } from './vulnerabilities.service';
-import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
-import { UserContext } from '@/common/decorators/app.decorator';
-import { User } from '../auth/entities/user.entity';
-import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
-import {
-  BulkDismissVulnerabilitiesDto,
-  BulkReopenVulnerabilitiesDto,
-} from './dto/bulk-vulnerability.dto';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
@@ -44,10 +56,16 @@ export class VulnerabilitiesController {
     response: {
       serialization: GetManyResponseDto(Vulnerability),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get()
-  async getVulnerabilities(@Query() query: GetVulnerabilitiesQueryDto) {
-    return this.vulnerabilitiesService.getVulnerabilities(query);
+  async getVulnerabilities(
+    @Query() query: GetVulnerabilitiesQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.vulnerabilitiesService.getVulnerabilities(query, workspaceId);
   }
 
   @Doc({
@@ -82,6 +100,55 @@ export class VulnerabilitiesController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.vulnerabilitiesService.getVulnerability(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Analyze a vulnerability',
+    description:
+      'Initiates an AI-powered analysis of a specific security vulnerability to provide detailed insights and recommendations.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post(':id/analyze')
+  @HttpCode(HttpStatus.OK)
+  async analyzeVulnerability(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: User,
+    @Body() dto: AnalyzeVulnerabilityDto,
+  ) {
+    return this.vulnerabilitiesService.analyzeVulnerability(
+      id,
+      workspaceId,
+      user.id,
+      dto.forceRerun ?? false,
+    );
+  }
+
+  @Doc({
+    summary: 'Delete vulnerability analysis result',
+    description:
+      'Removes the AI analysis result from a vulnerability and resets its status to not analyzed.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete(':id/analyze')
+  async deleteVulnerabilityAnalysis(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.vulnerabilitiesService.deleteVulnerabilityAnalysis(
+      id,
+      workspaceId,
+    );
   }
 
   @Doc({

@@ -53,12 +53,18 @@ tasks:
       - task: console:install
       - task: worker:install
 
+  # Run linter
+  # Executes ESLint for both core-api and console
+  lint:
+    deps:
+      - api:lint
+      - console:lint
+
   # API documentation generation
   # Generates API documentation after ensuring API server is ready
   # Waits for API server health check before generating docs
   gen-api:
     cmds:
-      - npx swagger-typescript-api generate -n api.ts -p ./.open-api/open-api.json -o ./worker/services/core-api --route-types --axios --extract-enums --unwrap-response-data --default-response any --module-name-index 1000
       - cd console && task gen-api
 
   # Docker Compose orchestration
@@ -69,25 +75,21 @@ tasks:
       - |
         docker compose --env-file ./core-api/.env up -d --build --force-recreate --scale worker=3
 
+  proto:
+    cmds:
+      - mkdir -p grpc-client/go grpc-client/ts
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+      - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+      - cd core-api && npx protoc -I src/proto src/proto/*.proto --go_out=../grpc-client/go --go-grpc_out=../grpc-client/go --ts_out=../grpc-client/ts
+
   # Project initialization
   # Sets up environment files and initializes the development environment
   # Copies example env files and starts required infrastructure services
   init:
     cmds:
-      - node -e "require('fs').copyFileSync('core-api/example.env', 'core-api/.env')"
-      - node -e "require('fs').copyFileSync('worker/example.env', 'worker/.env')"
-      - node -e "require('fs').copyFileSync('console/example.env', 'console/.env')"
-      - docker compose up -d postgres redis --force-recreate
     deps:
       - install
       - worker:tools
-
-  # Protocol buffer generation
-  # Generates TypeScript code from protocol buffer definitions
-  # Updates API client和服务 definitions based on proto files
-  proto:
-    cmds:
-      - task: api:proto
 
   # Clean build artifacts
   # Removes all node_modules and build artifacts from all services
@@ -98,3 +100,21 @@ tasks:
       - task: api:clean
       - task: console:clean
       - task: worker:clean
+
+  # Generate migration with custom name
+  # Usage: task migration:generate MIGRATION_NAME=AddUserType
+  migration:generate:
+    cmds:
+      - task: api:migration:generate
+
+  # Run all pending migrations
+  # Executes all pending database migrations
+  migration:run:
+    cmds:
+      - task: api:migration:run
+
+  # Revert the last migration
+  # Rolls back the most recently executed migration
+  migration:revert:
+    cmds:
+      - task: api:migration:revert

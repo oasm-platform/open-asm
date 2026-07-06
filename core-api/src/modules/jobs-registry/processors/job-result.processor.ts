@@ -2,7 +2,7 @@ import { BullMQName, JobStatus, WorkerType } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { StorageService } from '@/modules/storage/storage.service';
-import { builtInTools } from '@/modules/tools/tools-privider/built-in-tools';
+import { builtInTools } from '@/modules/tools/tools-provider/built-in-tools';
 import { RedisService } from '@/services/redis/redis.service';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { BadGatewayException, Logger } from '@nestjs/common';
@@ -91,12 +91,12 @@ export class JobResultProcessor extends WorkerHost {
         completedAt: new Date(),
       });
 
-      // Decrement counter and check completion
-      await this.jobsRegistryService.decrementAndCheckCompletion(
-        job.jobHistory.id,
-      );
+      const nextStepJobCount =
+        await this.jobsRegistryService.getNextStepForJob(completedJob);
 
-      await this.jobsRegistryService.getNextStepForJob(completedJob);
+      if (nextStepJobCount === 0) {
+        await this.jobsRegistryService.markWorkflowDone(job.jobHistory.id);
+      }
 
       if (job.isPublishEvent) {
         await this.redis.publish(
@@ -107,7 +107,7 @@ export class JobResultProcessor extends WorkerHost {
 
       // Success case: delete the result file
       try {
-        this.storageService.deleteFile(fileName, bucket);
+        await this.storageService.deleteFile(fileName, bucket);
       } catch (error) {
         this.logger.error(
           `Failed to delete result file on success ${resultRef}:`,
@@ -127,7 +127,7 @@ export class JobResultProcessor extends WorkerHost {
 
         // Final failure: delete the result file
         try {
-          this.storageService.deleteFile(fileName, bucket);
+          await this.storageService.deleteFile(fileName, bucket);
         } catch (error) {
           this.logger.error(
             `Failed to delete result file on final failure ${resultRef}:`,

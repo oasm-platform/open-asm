@@ -4,8 +4,8 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 export const statusCodeAssetsColumn: ColumnDef<GetStatusCodeAssetsDTO>[] = [
   {
-    accessorKey: 'port',
-    header: 'Port',
+    accessorKey: 'statusCode',
+    header: 'Status Code',
     enableHiding: false,
     size: 500,
     cell: ({ row }) => {

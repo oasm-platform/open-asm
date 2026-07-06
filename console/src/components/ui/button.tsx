@@ -2,8 +2,16 @@ import { Slot } from '@radix-ui/react-slot';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
-import { buttonVariants } from './button-variants';
+import { useNavigate } from '@tanstack/react-router';
+import { buttonVariants, type VariantProps } from './button-variants';
+
+export interface ButtonProps
+  extends
+    React.ComponentPropsWithRef<'button'>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+  href?: string;
+}
 
 function Button({
   className,
@@ -11,11 +19,7 @@ function Button({
   size,
   asChild = false,
   ...props
-}: React.ComponentProps<'button'> &
-  React.ComponentProps<typeof buttonVariants> & {
-    asChild?: boolean;
-    href?: string;
-  }) {
+}: ButtonProps) {
   const Comp = asChild ? Slot : 'button';
   const navigate = useNavigate();
   return (
@@ -23,7 +27,7 @@ function Button({
       onClick={(e) => {
         if (props.href) {
           e.preventDefault();
-          navigate(props.href);
+          navigate({ to: props.href });
         }
       }}
       data-slot="button"

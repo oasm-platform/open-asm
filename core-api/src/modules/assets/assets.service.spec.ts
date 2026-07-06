@@ -4,12 +4,15 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
+import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { AssetsService } from './assets.service';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
+import { TlsAssetsView } from './entities/tls-assets.entity';
+import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 
 describe('AssetsService', () => {
   let service: AssetsService;
@@ -19,6 +22,8 @@ describe('AssetsService', () => {
   let mockEventEmitter: Partial<EventEmitter2>;
   let mockTechnologyForwarderService: Partial<TechnologyForwarderService>;
   let mockWorkspacesService: Partial<WorkspacesService>;
+  let mockGeoIpService: Partial<GeoIpService>;
+  let mockLlmConfigRepository: Partial<Repository<AgentLLMConfig>>;
   let mockDataSource: Partial<DataSource>;
 
   beforeEach(async () => {
@@ -27,7 +32,7 @@ describe('AssetsService', () => {
       findOne: jest.fn(),
       save: jest.fn(),
       update: jest.fn(),
-    } as any;
+    };
 
     mockAssetServiceRepository = {
       find: jest.fn(),
@@ -52,20 +57,28 @@ describe('AssetsService', () => {
     mockTargetRepository = {
       findOne: jest.fn(),
       update: jest.fn(),
-    } as any;
+    };
 
     mockEventEmitter = {
       emit: jest.fn(),
-    } as any;
+    };
 
     mockTechnologyForwarderService = {
       enrichTechnologies: jest.fn(),
-    } as any;
+    };
 
     mockWorkspacesService = {
       getWorkspaceIdByTargetId: jest.fn(),
       getWorkspaceConfigValue: jest.fn(),
+    };
+
+    mockGeoIpService = {
+      lookup: jest.fn(),
     } as any;
+
+    mockLlmConfigRepository = {
+      findOne: jest.fn(),
+    };
 
     mockDataSource = {
       createQueryBuilder: jest.fn().mockReturnThis(),
@@ -97,6 +110,14 @@ describe('AssetsService', () => {
           useValue: mockTargetRepository,
         },
         {
+          provide: getRepositoryToken(TlsAssetsView),
+          useValue: {},
+        },
+        {
+          provide: getRepositoryToken(AgentLLMConfig),
+          useValue: mockLlmConfigRepository,
+        },
+        {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
         },
@@ -107,6 +128,10 @@ describe('AssetsService', () => {
         {
           provide: WorkspacesService,
           useValue: mockWorkspacesService,
+        },
+        {
+          provide: GeoIpService,
+          useValue: mockGeoIpService,
         },
         {
           provide: DataSource,

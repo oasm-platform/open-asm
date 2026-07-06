@@ -1,11 +1,11 @@
-import { LIMIT_WORKSPACE_CREATE } from '@/common/constants/app.constants';
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
-  ApiKeyType,
-  NotificationScope,
-  NotificationType,
-} from '@/common/enums/enum';
+  LIMIT_WORKSPACE_CREATE,
+  WORKSPACE_COOKIE_NAME,
+} from '@/common/constants/app.constants';
+import { getWorkspaceIdFromRequest } from '@/common/decorators/workspace-id.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { SortOrder } from '@/common/dtos/get-many-base.dto';
+import { ApiKeyType, WorkspaceRole } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import getSwaggerMetadata, {
@@ -14,17 +14,18 @@ import getSwaggerMetadata, {
 import {
   BadRequestException,
   ForbiddenException,
-  Inject,
   Injectable,
   NotFoundException,
   OnModuleInit,
-  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
+import { Request, Response } from 'express';
 import { In, Repository } from 'typeorm';
+import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
+import { Target } from '../targets/entities/target.entity';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
@@ -44,15 +45,12 @@ export class WorkspacesService implements OnModuleInit {
     private readonly repo: Repository<Workspace>,
     @InjectRepository(WorkspaceMembers)
     private readonly workspaceMembersRepository: Repository<WorkspaceMembers>,
-    @InjectRepository(WorkspaceTarget)
-    private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private apiKeyService: ApiKeysService,
     private notificationsService: NotificationsService,
-    @Inject(forwardRef(() => WorkflowsService))
     private workflowsService: WorkflowsService,
-  ) { }
+  ) {}
 
-  async onModuleInit() { }
+  async onModuleInit() {}
 
   /**
    * Creates a new workspace, and adds the requesting user as a member.
@@ -76,7 +74,10 @@ export class WorkspacesService implements OnModuleInit {
       throw new BadRequestException('You have reached the limit of workspaces');
     }
 
+    const newWorkspaceId = randomUUID();
+
     const newWorkspace = await this.repo.save({
+      id: newWorkspaceId,
       name: dto.name,
       description: dto?.description,
       owner: { id },
@@ -86,15 +87,6 @@ export class WorkspacesService implements OnModuleInit {
     await this.workspaceMembersRepository.save({
       workspace: newWorkspace,
       user: { id },
-    });
-
-    await this.notificationsService.createNotification({
-      recipients: [id],
-      scope: NotificationScope.USER,
-      type: NotificationType.WORKSPACE_CREATED,
-      metadata: {
-        name: newWorkspace.name,
-      },
     });
 
     await this.workflowsService.createDefaultWorkflows(newWorkspace.id);
@@ -126,33 +118,115 @@ export class WorkspacesService implements OnModuleInit {
   public async getWorkspaces(
     query: GetManyWorkspacesDto,
     userContextPayload: UserContextPayload,
-  ): Promise<GetManyBaseResponseDto<Workspace>> {
+    req: Request,
+    res: Response,
+  ) {
     const { limit, page, sortOrder, isArchived } = query;
     let { sortBy } = query;
     const { id } = userContextPayload;
-
     if (!(sortBy in Workspace)) {
       sortBy = 'createdAt';
     }
 
-    const queryBuilder = this.repo
-      .createQueryBuilder('workspace')
-      .where('workspace.ownerId = :id', { id });
-    if (isArchived !== undefined) {
-      if (isArchived) {
-        queryBuilder.andWhere('workspace.archivedAt IS NOT NULL');
-      } else {
-        queryBuilder.andWhere('workspace.archivedAt IS NULL');
-      }
+    // Validate sortBy to prevent SQL injection
+    const allowedSortFields = [
+      'id',
+      'name',
+      'createdAt',
+      'updatedAt',
+      'archivedAt',
+    ];
+    if (!allowedSortFields.includes(sortBy)) {
+      sortBy = 'createdAt';
     }
 
-    const [data, total] = await queryBuilder
-      .orderBy(`workspace.${sortBy}`, sortOrder)
-      .take(limit)
-      .skip((page - 1) * limit)
-      .getManyAndCount();
+    // Build WHERE clause based on isArchived
+    const archivedCondition =
+      isArchived === true
+        ? 'AND w."archivedAt" IS NOT NULL'
+        : isArchived === false
+          ? 'AND w."archivedAt" IS NULL'
+          : '';
 
-    return getManyResponse({ query, data, total });
+    // Get total count - count workspaces where user is a member
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM workspaces w
+      INNER JOIN workspace_members wm ON wm."workspaceId" = w.id AND wm."userId" = $1
+      WHERE 1=1 ${archivedCondition}
+    `;
+    const countResult: { total: string }[] = await this.repo.query(countQuery, [
+      id,
+    ]);
+    const total = parseInt(countResult[0]?.total || '0', 10);
+
+    // Get paginated data with target and member counts
+    const offset = (page - 1) * limit;
+    const validSortOrder: 'ASC' | 'DESC' =
+      sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
+
+    const dataQuery = `
+      SELECT
+        w."id" as workspace_id,
+        w."name" as workspace_name,
+        w."description" as workspace_description,
+        w."createdAt" as workspace_createdAt,
+        w."updatedAt" as workspace_updatedAt,
+        w."archivedAt" as workspace_archivedAt,
+        w."isAssetsDiscovery" as workspace_isAssetsDiscovery,
+        w."isAutoEnableAssetAfterDiscovered" as workspace_isAutoEnableAssetAfterDiscovered,
+        w."ownerId" as workspace_ownerId,
+        COALESCE(t.target_count, 0)::integer as targetcount,
+        COALESCE(m.member_count, 0)::integer as membercount,
+        wm.role as member_role
+      FROM workspaces w
+      INNER JOIN workspace_members wm ON wm."workspaceId" = w.id AND wm."userId" = $1
+      LEFT JOIN (
+        SELECT "workspaceId", COUNT(*) as target_count
+        FROM targets
+        GROUP BY "workspaceId"
+      ) t ON t."workspaceId" = w."id"
+      LEFT JOIN (
+        SELECT "workspaceId", COUNT(*) as member_count
+        FROM workspace_members
+        GROUP BY "workspaceId"
+      ) m ON m."workspaceId" = w."id"
+      WHERE 1=1 ${archivedCondition}
+      ORDER BY w."${sortBy}" ${validSortOrder}
+      LIMIT $2 OFFSET $3
+    `;
+
+    const rawData: Record<string, unknown>[] = await this.repo.query(
+      dataQuery,
+      [id, limit, offset],
+    );
+
+    // Map raw data to expected format
+    const mappedData = rawData.map((row) => ({
+      id: row.workspace_id as string,
+      name: row.workspace_name as string,
+      description: row.workspace_description as string | null,
+      createdAt: row.workspace_createdAt as Date,
+      updatedAt: row.workspace_updatedAt as Date,
+      archivedAt: row.workspace_archivedAt as Date | null,
+      isAssetsDiscovery: row.workspace_isAssetsDiscovery as boolean,
+      isAutoEnableAssetAfterDiscovered:
+        row.workspace_isAutoEnableAssetAfterDiscovered as boolean,
+      ownerId: row.workspace_ownerId as string,
+      targetCount: Number(row.targetcount) || 0,
+      memberCount: Number(row.membercount) || 0,
+      role: row.member_role as WorkspaceRole,
+    }));
+    const defaultWorkspace = mappedData[0]?.id;
+    const workspaceId = getWorkspaceIdFromRequest(req);
+    const selectedWorkspaceId =
+      mappedData.findIndex((workspace) => workspace.id === workspaceId) >= 0
+        ? workspaceId
+        : defaultWorkspace;
+
+    // Set default
+    res.cookie(WORKSPACE_COOKIE_NAME, selectedWorkspaceId);
+    return getManyResponse({ query, data: mappedData, total });
   }
 
   /**
@@ -177,6 +251,36 @@ export class WorkspacesService implements OnModuleInit {
   }
 
   /**
+   * Deletes all targets associated with a specific workspace.
+   * Uses transaction and createQueryBuilder for atomic operation.
+   *
+   * @param workspaceId - The ID of the workspace whose targets will be deleted.
+   * @returns An object containing the list of deleted target IDs.
+   */
+  public async deleteAllTargetsFromWorkspace(
+    workspaceId: string,
+  ): Promise<{ deletedTargetIds: string[] }> {
+    const result = await this.repo.manager.transaction(
+      async (transactionalEntityManager) => {
+        const result = await transactionalEntityManager
+          .getRepository(Target)
+          .createQueryBuilder()
+          .delete()
+          .where('"workspaceId" = :workspaceId', { workspaceId })
+          .returning('id')
+          .execute();
+
+        const raw = result.raw as { id: string }[] | undefined;
+        const targetIds = (raw ?? []).map((r) => r.id);
+
+        return { deletedTargetIds: targetIds };
+      },
+    );
+
+    return result;
+  }
+
+  /**
    * Deletes a workspace by its ID, but only if the requesting user is the owner.
    * The workspace is soft deleted, meaning it is not actually removed from the
    * database, but its `deletedAt` field is set to the current timestamp.
@@ -192,7 +296,10 @@ export class WorkspacesService implements OnModuleInit {
   ): Promise<DefaultMessageResponseDto> {
     await this.getWorkspaceByIdAndOwner(id, userContext);
 
-    await this.repo.softDelete({ id });
+    // Delete all targets associated with the workspace first
+    await this.deleteAllTargetsFromWorkspace(id);
+
+    await this.repo.delete({ id });
 
     return {
       message: 'Workspace deleted successfully',
@@ -259,23 +366,22 @@ export class WorkspacesService implements OnModuleInit {
   }
 
   /**
-   * Retrieves the workspace ID associated with a target ID by joining through the workspace_targets table.
+   * Retrieves the workspace ID associated with a target ID.
    * @param targetId - The ID of the target to look up.
    * @returns The workspace ID associated with the target, or null if not found.
    */
   public async getWorkspaceIdByTargetId(
     targetId: string,
   ): Promise<string | null> {
-    const workspaceTarget = await this.workspaceTargetRepository
-      .createQueryBuilder('workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
-      .innerJoin('workspaceTarget.target', 'target')
-      .select('workspace.id', 'workspaceId')
+    const target = await this.repo.manager
+      .getRepository(Target)
+      .createQueryBuilder('target')
+      .select('target.workspaceId', 'workspaceId')
       .where('target.id = :targetId', { targetId })
       .cache(60000)
       .getRawOne<{ workspaceId: string }>();
 
-    return workspaceTarget ? workspaceTarget.workspaceId : null;
+    return target ? target.workspaceId : null;
   }
 
   /**
@@ -459,6 +565,37 @@ export class WorkspacesService implements OnModuleInit {
         workspace: { id: workspaceId },
       },
       relations: ['user'],
+    });
+  }
+
+  public async getMemberOfWorkspaceByJobId(
+    jobId: string,
+  ): Promise<WorkspaceMembers[]> {
+    const job = await this.repo.manager.getRepository(Job).findOne({
+      where: { id: jobId },
+      relations: ['asset'],
+    });
+
+    if (!job || !job.asset?.targetId) {
+      return [];
+    }
+
+    const targetId = job.asset.targetId;
+
+    const target = await this.repo.manager.getRepository(Target).findOne({
+      where: { id: targetId },
+      select: ['workspaceId'],
+    });
+
+    if (!target) {
+      return [];
+    }
+
+    const workspaceIds = [target.workspaceId];
+
+    return this.workspaceMembersRepository.find({
+      where: { workspace: { id: In(workspaceIds) } },
+      relations: ['user', 'workspace'],
     });
   }
 }

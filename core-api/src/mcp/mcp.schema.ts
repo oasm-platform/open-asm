@@ -1,34 +1,26 @@
 import z from 'zod';
 
-export const workspaceParamSchema = z.object({
-  workspaceId: z
-    .string()
-    .describe('The unique identifier of the workspace to query data from.'),
-});
-
 /**
  * The base request schema for get many resources.
  */
-export const getManyBaseRequestSchema = z
-  .object({
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .default(100)
-      .describe(
-        'Maximum number of items to return in a single page (pagination).',
-      ),
-    page: z
-      .number()
-      .int()
-      .nonnegative()
-      .optional()
-      .default(1)
-      .describe('The page number to retrieve for paginated results.'),
-  })
-  .extend(workspaceParamSchema.shape);
+export const getManyBaseRequestSchema = z.object({
+  limit: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .default(100)
+    .describe(
+      'Maximum number of items to return in a single page (pagination).',
+    ),
+  page: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .default(1)
+    .describe('The page number to retrieve for paginated results.'),
+});
 
 /**
  * The base response schema for get many resources.
@@ -56,6 +48,83 @@ export const getAssetsSchema = z
       .describe(
         'Filter assets by value (e.g., searching for a specific domain or IP).',
       ),
+    targetIds: z
+      .array(z.string().uuid())
+      .optional()
+      .describe('Filter assets by specific target IDs (UUID format).'),
+    ipAddresses: z
+      .array(z.string())
+      .optional()
+      .describe('Filter assets by specific IP addresses.'),
+    ports: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Filter assets by specific port numbers (e.g., ["80", "443"]).',
+      ),
+    hosts: z
+      .array(z.string())
+      .optional()
+      .describe('Filter assets by specific host names.'),
+    techs: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Filter assets by specific technologies (e.g., ["Nginx", "React"]).',
+      ),
+    statusCodes: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Filter assets by HTTP status codes (e.g., ["200", "404", "500"]).',
+      ),
+    tlsHosts: z
+      .array(z.string())
+      .optional()
+      .describe('Filter assets by TLS certificate host names.'),
+  })
+  .extend(getManyBaseRequestSchema.shape);
+
+export const getPortsSchema = z
+  .object({
+    value: z
+      .string()
+      .optional()
+      .describe(
+        'Filter ports by number (e.g., searching for port 80, 443, 8080).',
+      ),
+  })
+  .extend(getManyBaseRequestSchema.shape);
+
+export const getTechnologiesSchema = z
+  .object({
+    value: z
+      .string()
+      .optional()
+      .describe(
+        'Filter technologies by name (e.g., searching for Nginx, WordPress, React).',
+      ),
+  })
+  .extend(getManyBaseRequestSchema.shape);
+
+export const getTlsSchema = z
+  .object({
+    search: z
+      .string()
+      .optional()
+      .describe(
+        'Filter TLS certificates by host name (e.g., searching for example.com).',
+      ),
+    hosts: z
+      .array(z.string())
+      .optional()
+      .describe('Filter TLS certificates by specific host names.'),
+    targetIds: z
+      .array(z.string().uuid())
+      .optional()
+      .describe(
+        'Filter TLS certificates by specific target IDs (UUID format).',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);
 
@@ -67,6 +136,30 @@ export const getVulnerabilitiesSchema = z
       .describe(
         'Search query to filter vulnerabilities by their name or title.',
       ),
+    targetIds: z
+      .array(z.string().uuid())
+      .optional()
+      .describe('Filter vulnerabilities by specific target IDs (UUID format).'),
+    status: z
+      .enum(['open', 'dismissed', 'all'])
+      .optional()
+      .describe('Filter by vulnerability status: open, dismissed, or all.'),
+    severity: z
+      .array(z.enum(['info', 'low', 'medium', 'high', 'critical']))
+      .optional()
+      .describe('Filter by severity levels (e.g., ["critical", "high"]).'),
+    createdFrom: z
+      .string()
+      .optional()
+      .describe(
+        'Filter by creation date from (ISO 8601 format, e.g., "2026-01-01").',
+      ),
+    createdTo: z
+      .string()
+      .optional()
+      .describe(
+        'Filter by creation date to (ISO 8601 format, e.g., "2026-01-31").',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);
 
@@ -77,6 +170,16 @@ export const getTargetsSchema = z
       .optional()
       .describe(
         'Filter targets by value (e.g., searching for a specific root domain or IP range).',
+      ),
+    type: z
+      .enum(['DOMAIN', 'CIDR', 'IP'])
+      .optional()
+      .describe('Filter by target type: DOMAIN, CIDR, or IP.'),
+    status: z
+      .enum(['pending', 'in_progress', 'completed', 'failed', 'cancelled'])
+      .optional()
+      .describe(
+        'Filter by scan status: pending, in_progress, completed, failed, or cancelled.',
       ),
   })
   .extend(getManyBaseRequestSchema.shape);
@@ -117,15 +220,13 @@ export const getStatisticOutPutSchema = z.object({
     ),
 });
 
-export const detailAssetSchema = z
-  .object({
-    assetId: z
-      .string()
-      .describe(
-        'The unique identifier (ID) of the asset to retrieve detailed information for.',
-      ),
-  })
-  .extend(workspaceParamSchema.shape);
+export const detailAssetSchema = z.object({
+  assetId: z
+    .string()
+    .describe(
+      'The unique identifier (ID) of the asset to retrieve detailed information for.',
+    ),
+});
 
 export const listAssetsInTargetSchema = z
   .object({
@@ -143,15 +244,19 @@ export const listAssetsInTargetSchema = z
   })
   .extend(getManyBaseRequestSchema.shape);
 
-export const detailVulnSchema = z
-  .object({
-    vulnId: z
-      .string()
-      .describe(
-        'The unique identifier (ID) of the vulnerability to retrieve technical details for.',
-      ),
-  })
-  .extend(workspaceParamSchema.shape);
+export const detailVulnSchema = z.object({
+  id: z
+    .string()
+    .describe(
+      'The unique identifier (ID) of the vulnerability to retrieve technical details for.',
+    ),
+  vulnId: z
+    .string()
+    .optional()
+    .describe(
+      'The unique identifier (ID) of the vulnerability to retrieve technical details for. Alternative to `id`.',
+    ),
+});
 
 export const listIssuesSchema = z
   .object({
@@ -168,15 +273,13 @@ export const listIssuesSchema = z
   })
   .extend(getManyBaseRequestSchema.shape);
 
-export const detailIssueSchema = z
-  .object({
-    issueId: z
-      .string()
-      .describe(
-        'The unique identifier (ID) of the issue to retrieve full details for.',
-      ),
-  })
-  .extend(workspaceParamSchema.shape);
+export const detailIssueSchema = z.object({
+  issueId: z
+    .string()
+    .describe(
+      'The unique identifier (ID) of the issue to retrieve full details for.',
+    ),
+});
 
 export const listToolsSchema = z
   .object({

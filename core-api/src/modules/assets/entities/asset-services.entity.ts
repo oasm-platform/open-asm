@@ -9,12 +9,14 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  Relation,
   Unique,
 } from 'typeorm';
 import { AssetTag } from './asset-tags.entity';
 import { Asset } from './assets.entity';
 import { HttpResponse } from './http-response.entity';
 import { StatusCodeAssetsView } from './status-code-assets.entity';
+import { TlsAssetsView } from './tls-assets.entity';
 
 @Entity('asset_services')
 @Unique(['assetId', 'port'])
@@ -37,28 +39,31 @@ export class AssetService extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'assetId' })
-  asset: Asset;
+  asset: Relation<Asset>;
 
   @OneToMany(() => HttpResponse, (httpResponse) => httpResponse.assetService, {
     onDelete: 'CASCADE',
   })
-  httpResponses?: HttpResponse[];
+  httpResponses?: Relation<HttpResponse[]>;
 
   @OneToMany(() => Job, (job) => job.assetService, {
     onDelete: 'CASCADE',
   })
-  jobs?: Job[];
+  jobs?: Relation<Job[]>;
 
   @OneToMany(
     () => StatusCodeAssetsView,
     (statusCodeAssets) => statusCodeAssets.assetService,
   )
-  statusCodeAssets?: StatusCodeAssetsView[];
+  statusCodeAssets?: Relation<StatusCodeAssetsView[]>;
+
+  @OneToMany(() => TlsAssetsView, (tlsAssets) => tlsAssets.assetService)
+  tlsAssets?: Relation<TlsAssetsView[]>;
 
   @OneToMany(() => AssetTag, (assetTag) => assetTag.assetService, {
     onDelete: 'CASCADE',
   })
-  tags: AssetTag[];
+  tags: Relation<AssetTag[]>;
 
   @ApiProperty()
   @Index({ where: '"isErrorPage" = false' })

@@ -1,21 +1,30 @@
 import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import {
-  GetManyBaseResponseDto,
-  SortOrder,
-} from '@/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as Mustache from 'mustache';
+import { decrypt } from '@/common/utils/encryption.util';
+import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { generateText } from 'ai';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
+import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
+import { LLMProvider } from '../agents/enums/agent.enums';
+import {
+  getLLMProviderConfig,
+} from '../agents/llm-provider-supported';
 import { Target } from '../targets/entities/target.entity';
-import { TechnologyDetailDTO } from '../technology/dto/technology-detail.dto';
+
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
@@ -24,30 +33,34 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
-import { GetTlsResponseDto } from './dto/tls.dto';
+import { GetTlsQueryDto, GetTlsResponseDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { AssetService } from './entities/asset-services.entity';
 import { AssetTag } from './entities/asset-tags.entity';
 import { Asset } from './entities/assets.entity';
+import { TlsAssetsView } from './entities/tls-assets.entity';
 
 // Type cho raw database response từ TLS query
-interface TlsRawData {
-  host: string;
-  sni: string;
-  subject_dn: string;
-  subject_an: string[];
-  not_after: string;
-  not_before: string;
-  tls_connection: string;
-}
+// interface TlsRawData {
+//   host: string;
+//   sni: string;
+//   subject_dn: string;
+//   subject_an: string[];
+//   not_after: string;
+//   not_before: string;
+//   tls_connection: string;
+// }
 
 // Type cho item từ raw query result
-interface TlsRawQueryItem {
-  tls: TlsRawData;
-}
+// interface TlsRawQueryItem {
+//   tls: TlsRawData;
+// }
 
 @Injectable()
 export class AssetsService {
+  private readonly logger = new Logger(AssetsService.name);
+  private readonly prompts = new Map<string, string>();
+
   constructor(
     @InjectRepository(Asset)
     public readonly assetRepo: Repository<Asset>,
@@ -55,12 +68,115 @@ export class AssetsService {
     public readonly assetServiceRepo: Repository<AssetService>,
     @InjectRepository(Target)
     public readonly targetRepo: Repository<Target>,
+    @InjectRepository(TlsAssetsView)
+    public readonly tlsAssetsViewRepo: Repository<TlsAssetsView>,
+    @InjectRepository(AgentLLMConfig)
+    private readonly llmConfigRepository: Repository<AgentLLMConfig>,
     private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
     private workspaceService: WorkspacesService,
-
+    private geoIpService: GeoIpService,
     private dataSource: DataSource,
-  ) {}
+  ) {
+    this.loadPrompts();
+  }
+
+  private loadPrompts(): void {
+    const promptsDir = path.join(__dirname, '../agents/prompts');
+    try {
+      const entries = fs.readdirSync(promptsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.name.endsWith('.md')) {
+          const key = entry.name.toLowerCase();
+          const content = fs.readFileSync(
+            path.join(promptsDir, entry.name),
+            'utf-8',
+          );
+          this.prompts.set(key, content);
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to load prompts directory', error);
+    }
+  }
+
+  private getPrompt(fileName: string, data?: Record<string, unknown>): string {
+    const key = fileName.toLowerCase();
+    const template = this.prompts.get(key) ?? '';
+    if (!template) {
+      this.logger.warn(`Prompt not found: ${fileName}`);
+    }
+    if (data) {
+      return Mustache.render(template, data);
+    }
+    return template;
+  }
+
+  private async generateTagsWithAI(
+    serviceData: string,
+    workspaceId: string,
+  ): Promise<string[]> {
+    const llmConfig = await this.llmConfigRepository.findOne({
+      where: { workspaceId, isPreferred: true },
+    });
+
+    if (!llmConfig) {
+      throw new BadRequestException(
+        'No preferred LLM config found. Please create and set a preferred LLM config first.',
+      );
+    }
+
+    const providerConfig = getLLMProviderConfig(llmConfig.provider);
+    if (!providerConfig) {
+      throw new BadRequestException(
+        `Unsupported LLM provider: ${String(llmConfig.provider)}`,
+      );
+    }
+
+    const apiKey = llmConfig.apiKey ? decrypt(llmConfig.apiKey) : '';
+    const baseURL =
+      llmConfig.provider === LLMProvider.CUSTOM
+        ? llmConfig.apiUrl
+        : undefined;
+    const model = providerConfig.handler(apiKey, llmConfig.model, baseURL);
+
+    const prompt = this.getPrompt('GENERATE_SERVICE_TAGS.md', {
+      SERVICE_DATA: serviceData,
+    });
+
+    const result = await generateText({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    let textContent = '';
+    if (typeof result.content === 'string') {
+      textContent = result.content;
+    } else if (Array.isArray(result.content)) {
+      const textPart = result.content.find((part) => part.type === 'text');
+      textContent = textPart?.type === 'text' ? textPart.text : '';
+    }
+
+    this.logger.log(`AI response: ${textContent.slice(0, 500)}`);
+
+    const jsonMatch = textContent.match(/\[[\s\S]*?\]/);
+    if (!jsonMatch) {
+      this.logger.warn(
+        `Failed to parse tags from AI response: ${textContent.slice(0, 200)}`,
+      );
+      return [];
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((item): item is string => typeof item === 'string')
+      .map((tag) => tag.trim().toLowerCase())
+      .filter((tag) => tag.length > 0 && tag.length <= 100);
+  }
 
   /**
    * Retrieves all assets services associated with a specified target.
@@ -77,7 +193,15 @@ export class AssetsService {
   }
 
   private buildBaseQuery(query: GetAssetsQueryDto, workspaceId: string) {
-    const { targetIds, hosts, ipAddresses, ports, techs, statusCodes } = query;
+    const {
+      targetIds,
+      hosts,
+      ipAddresses,
+      ports,
+      techs,
+      statusCodes,
+      tlsHosts,
+    } = query;
 
     const whereBuilder = {
       targetIds: {
@@ -104,26 +228,27 @@ export class AssetsService {
         value: statusCodes,
         whereClause: `"statusCodeAssets"."statusCode" = ANY(:param)`,
       },
+      tlsHosts: {
+        value: tlsHosts,
+        whereClause: `"tlsAssets"."host" = ANY(:param)`,
+      },
     };
 
     const queryBuilder = this.assetServiceRepo
       .createQueryBuilder('asset_service')
-      .leftJoin('asset_service.asset', 'asset')
+      .leftJoinAndSelect('asset_service.asset', 'asset')
       .leftJoin('asset.target', 'targets')
       .leftJoinAndSelect(
         'asset_service.httpResponses',
         'latest_http_response',
         'latest_http_response.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = asset_service.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
-      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .leftJoin('asset.ipAssets', 'ipAssets')
+      .leftJoinAndSelect('asset.ipAssets', 'ipAssets')
       .leftJoin('asset_service.statusCodeAssets', 'statusCodeAssets')
-      .where('asset_service."isErrorPage" = false')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+      .leftJoin('asset_service.tlsAssets', 'tlsAssets')
+      .where('targets.workspaceId = :workspaceId', {
         workspaceId,
-      })
-      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
-      .andWhere('"statusCodeAssets"."statusCode" != 0');
+      });
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -135,6 +260,18 @@ export class AssetsService {
           [key]: value.value,
         });
       }
+    }
+
+    if (query.startDate) {
+      queryBuilder.andWhere('asset_service."createdAt" >= :startDate', {
+        startDate: query.startDate,
+      });
+    }
+
+    if (query.endDate) {
+      queryBuilder.andWhere('asset_service."createdAt" <= :endDate', {
+        endDate: `${query.endDate} 23:59:59.999`,
+      });
     }
 
     return queryBuilder;
@@ -181,7 +318,6 @@ export class AssetsService {
       asset.isEnabled = item.asset?.isEnabled;
       asset.screenshotPath =
         item.screenshotPath && `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
-
       // asset.tags = item.asset.tags || [];
       asset.ipAddresses = item.asset?.ipAssets
         ? item.asset.ipAssets.map((e) => e.ipAddress)
@@ -298,7 +434,7 @@ export class AssetsService {
       lastDiscoveredAt: new Date(),
     });
 
-    this.eventEmitter.emit('target.re-scan', target);
+    this.eventEmitter.emit('target.domain.re-scan', target);
 
     return {
       message: 'Scan started',
@@ -319,9 +455,7 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(
       new GetAssetsQueryDto(),
       workspaceId,
-    )
-      .andWhere('"statusCodeAssets"."statusCode" != 0')
-      .andWhere('asset_service.id = :id', { id });
+    ).andWhere('asset_service.id = :id', { id });
 
     const item = await queryBuilder.getOneOrFail();
 
@@ -333,7 +467,9 @@ export class AssetsService {
     asset.dnsRecords = item.asset?.dnsRecords;
     asset.isEnabled = item.asset?.isEnabled;
     asset.port = item.port;
-    asset.screenshotPath = `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
+    asset.screenshotPath = item.screenshotPath
+      ? `${STORAGE_BASE_PATH}/${item.screenshotPath}`
+      : null;
 
     // Load tags separately - tags belong to AssetService, not Asset
     const tagsResult = await this.dataSource
@@ -344,7 +480,7 @@ export class AssetsService {
       .getRawMany<{ tag: string; id: string }>();
 
     asset.tags = tagsResult.map(
-      (t) => ({ id: t.id, tag: t.tag }) as Partial<AssetTag>,
+      (t) => ({ id: t.id, tag: t.tag }),
     ) as AssetTag[];
 
     asset.ipAddresses = item.asset?.ipAssets
@@ -425,10 +561,15 @@ export class AssetsService {
 
     const total = totalInDb?.count ?? 0;
 
-    const data = list.map((item: GetIpAssetsDTO) => {
+    const ips = list.map((item: { ip: string }) => item.ip);
+    const geoIps = ips.length > 0 ? await this.geoIpService.getGeoIp(ips) : [];
+    const geoIpMap = new Map(geoIps.map((geoIp) => [geoIp.query, geoIp]));
+
+    const data = list.map((item: { ip: string; assetCount: number }) => {
       const obj = new GetIpAssetsDTO();
       obj.ip = item.ip;
       obj.assetCount = item.assetCount;
+      obj.geoIp = geoIpMap.get(item.ip) ?? null;
       return obj;
     });
 
@@ -620,7 +761,7 @@ export class AssetsService {
             categoryNames: [],
             categories: [],
             version,
-          } as TechnologyDetailDTO;
+          };
         }
 
         return obj;
@@ -654,16 +795,9 @@ export class AssetsService {
         '"statusCodeAssets"."statusCode"',
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
-      .groupBy('"statusCodeAssets"."statusCode"');
-
-    if (query.value) {
-      queryBuilder.andWhere(
-        '"statusCodeAssets"."statusCode"::text ILIKE :value',
-        {
-          value: `%${query.value}%`,
-        },
-      );
-    }
+      .groupBy('"statusCodeAssets"."statusCode"')
+      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
+      .andWhere('"statusCodeAssets"."statusCode" != 0');
 
     if (query.value) {
       queryBuilder.andWhere(
@@ -718,9 +852,8 @@ export class AssetsService {
       .createQueryBuilder('assetService')
       .leftJoinAndSelect('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'workspaceTargets')
       .where('assetService.id = :id', { id })
-      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('target.workspaceId = :workspaceId', { workspaceId })
       .getOne();
 
     if (!assetService) {
@@ -760,124 +893,198 @@ export class AssetsService {
   }
 
   /**
-   * Toggle the enabled/disabled status of an asset
-   *
-   * @param assetId - The ID of the asset to toggle
-   * @param isEnabled - The new enabled status
-   * @returns A promise that resolves to the updated asset
-   * @throws NotFoundException if the asset with the given ID is not found
-   */
-  /**
-   * Retrieves TLS certificates expiring soonest (for warning notifications)
-   * Returns top 10 certificates with earliest expiry dates within ±30 days from now
+   * Retrieves a paginated list of TLS certificates.
+   * Built on top of buildBaseQuery so workspace isolation, and all other
+   * filters (targetIds, hosts, …) come for free via the tlsAssets left-join
+   * that is already wired into the base query.
    */
   public async getManyTls(
+    query: GetTlsQueryDto,
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetTlsResponseDto>> {
-    // Hard-coded pagination for notification purposes
-    const page = 1;
-    const limit = 10;
+    const allowedSortColumns = [
+      'host',
+      'sni',
+      'not_after',
+      'not_before',
+      'subject_dn',
+      'tls_version',
+    ];
+    if (!allowedSortColumns.includes(query.sortBy)) {
+      query.sortBy = 'not_after';
+    }
 
-    // Calculate date range: 30 days before and 30 days after current date
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now);
-    thirtyDaysAgo.setDate(now.getDate() - 30);
-    const thirtyDaysFromNow = new Date(now);
-    thirtyDaysFromNow.setDate(now.getDate() + 30);
+    const offset = (query.page - 1) * query.limit;
 
-    // Query to get total count with date range filter
+    // Re-use the base query (workspace isolation + all standard filters).
+    // Cast to GetAssetsQueryDto so we can forward targetIds / hosts filters.
+    const baseQuery: GetAssetsQueryDto = { ...query, tlsHosts: query.hosts };
+    const qb = this.buildBaseQuery(baseQuery, workspaceId).select([
+      '"tlsAssets"."host"              AS host',
+      '"tlsAssets"."sni"               AS sni',
+      '"tlsAssets"."subject_dn"        AS subject_dn',
+      '"tlsAssets"."subject_cn"        AS subject_cn',
+      '"tlsAssets"."issuer_dn"         AS issuer_dn',
+      '"tlsAssets"."not_before"        AS not_before',
+      '"tlsAssets"."not_after"         AS not_after',
+      '"tlsAssets"."tls_version"       AS tls_version',
+      '"tlsAssets"."cipher"            AS cipher',
+      '"tlsAssets"."tls_connection"    AS tls_connection',
+      '"tlsAssets"."subject_an"        AS subject_an',
+    ]);
+
+    // Only rows that actually have TLS data
+    qb.andWhere('"tlsAssets"."host" IS NOT NULL');
+
+    // Deduplicate: same TLS cert can be joined via multiple asset_service rows
+    // (e.g. same host on different ports). Group by all TLS columns so each
+    // distinct certificate appears only once.
+    qb.groupBy('"tlsAssets"."host"')
+      .addGroupBy('"tlsAssets"."sni"')
+      .addGroupBy('"tlsAssets"."subject_dn"')
+      .addGroupBy('"tlsAssets"."subject_cn"')
+      .addGroupBy('"tlsAssets"."issuer_dn"')
+      .addGroupBy('"tlsAssets"."not_before"')
+      .addGroupBy('"tlsAssets"."not_after"')
+      .addGroupBy('"tlsAssets"."tls_version"')
+      .addGroupBy('"tlsAssets"."cipher"')
+      .addGroupBy('"tlsAssets"."tls_connection"')
+      .addGroupBy('"tlsAssets"."subject_an"');
+
+    // Text search on host
+    if (query.search) {
+      qb.andWhere('"tlsAssets"."host" ILIKE :tlsSearch', {
+        tlsSearch: `%${query.search}%`,
+      });
+    }
+
+    // Faceted host filter (query.hosts maps to tlsHosts in buildBaseQuery
+    // via the whereBuilder, but GetTlsQueryDto uses `hosts` directly)
+    if (query.hosts && query.hosts.length > 0) {
+      qb.andWhere('"tlsAssets"."host" = ANY(:tlsHostFilter)', {
+        tlsHostFilter: query.hosts,
+      });
+    }
+
+    // Date filtering on not_after field
+    if (query.startDate) {
+      qb.andWhere('"tlsAssets"."not_after"::timestamp >= :startDate', {
+        startDate: query.startDate,
+      });
+    }
+    if (query.endDate) {
+      qb.andWhere('"tlsAssets"."not_after"::timestamp <= :endDate', {
+        endDate: `${query.endDate} 23:59:59.999`,
+      });
+    }
+
     const totalResult = await this.dataSource
       .createQueryBuilder()
-      .select('COUNT(DISTINCT("httpResponses"."tls"))', 'count')
-      .from('http_responses', 'httpResponses')
-      .innerJoin(
-        'asset_services',
-        'assetServices',
-        '"httpResponses"."assetServiceId" = "assetServices"."id"',
-      )
-      .innerJoin(
-        'assets',
-        'assets',
-        '"assetServices"."assetId" = "assets"."id"',
-      )
-      .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
-      .innerJoin(
-        'workspace_targets',
-        'workspaceTargets',
-        '"targets"."id" = "workspaceTargets"."targetId"',
-      )
-      .where('"httpResponses"."tls" IS NOT NULL')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
-        workspaceId,
-      })
-      .andWhere(
-        '("httpResponses"."tls"->>\'not_after\')::timestamp BETWEEN :thirtyDaysAgo AND :thirtyDaysFromNow',
-        { thirtyDaysAgo, thirtyDaysFromNow },
-      )
-      .getRawOne<{ count: number }>();
+      .select('COUNT(*)')
+      .from('(' + qb.getQuery() + ')', 'cnt_sub')
+      .setParameters(qb.getParameters())
+      .getRawOne<{ count: string }>();
+    const total = Number(totalResult?.count ?? 0);
 
-    // Main query ordered by expiry date (earliest first) with date range filter
-    const queryResult = await this.dataSource
-      .createQueryBuilder()
-      .select(['"httpResponses"."tls"'])
-      .from('http_responses', 'httpResponses')
-      .innerJoin(
-        'asset_services',
-        'assetServices',
-        '"httpResponses"."assetServiceId" = "assetServices"."id"',
-      )
-      .innerJoin(
-        'assets',
-        'assets',
-        '"assetServices"."assetId" = "assets"."id"',
-      )
-      .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
-      .innerJoin(
-        'workspace_targets',
-        'workspaceTargets',
-        '"targets"."id" = "workspaceTargets"."targetId"',
-      )
-      .where('"httpResponses"."tls" IS NOT NULL')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
-        workspaceId,
-      })
-      .andWhere(
-        '("httpResponses"."tls"->>\'not_after\')::timestamp BETWEEN :thirtyDaysAgo AND :thirtyDaysFromNow',
-        { thirtyDaysAgo, thirtyDaysFromNow },
-      )
-      .groupBy('"httpResponses"."tls"')
-      .orderBy('("httpResponses"."tls"->>\'not_after\')::timestamp', 'ASC')
-      .limit(limit)
-      .getRawMany<TlsRawQueryItem>();
+    type TlsRaw = {
+      host: string;
+      sni: string;
+      subject_dn: string;
+      subject_cn: string;
+      issuer_dn: string;
+      not_before: string;
+      not_after: string;
+      tls_version: string;
+      cipher: string;
+      tls_connection: string;
+      subject_an: string;
+    };
 
-    const data = queryResult.map((item): GetTlsResponseDto => {
+    const list = await qb
+      .orderBy(`"tlsAssets"."${query.sortBy}"`, query.sortOrder)
+      .limit(query.limit)
+      .offset(offset)
+      .getRawMany<TlsRaw>();
+
+    const data = list.map((item): GetTlsResponseDto => {
       const obj = new GetTlsResponseDto();
-
-      if (item.tls) {
-        obj.host = item.tls.host;
-        obj.sni = item.tls.sni;
-        obj.subject_dn = item.tls.subject_dn;
-        obj.subject_an = item.tls.subject_an;
-        obj.not_after = item.tls.not_after;
-        obj.not_before = item.tls.not_before;
-        obj.tls_connection = item.tls.tls_connection;
+      obj.host = item.host;
+      obj.sni = item.sni;
+      obj.subject_dn = item.subject_dn;
+      obj.subject_cn = item.subject_cn;
+      obj.issuer_dn = item.issuer_dn;
+      obj.not_after = item.not_after;
+      obj.not_before = item.not_before;
+      obj.tls_version = item.tls_version;
+      obj.cipher = item.cipher;
+      obj.tls_connection = item.tls_connection;
+      try {
+        obj.subject_an = item.subject_an
+          ? (JSON.parse(item.subject_an) as string[])
+          : [];
+      } catch {
+        obj.subject_an = [];
       }
       return obj;
     });
 
-    // Create query object with proper typing
-    const queryObj = {
-      page,
-      limit,
-      sortBy: 'not_after',
-      sortOrder: SortOrder.ASC,
+    return getManyResponse({ query, data, total });
+  }
+
+  public async generateServiceTags(
+    assetServiceId: string,
+    workspaceId: string,
+  ): Promise<string[]> {
+    const assetService = await this.assetServiceRepo
+      .createQueryBuilder('assetService')
+      .leftJoinAndSelect('assetService.asset', 'asset')
+      .leftJoinAndSelect('assetService.httpResponses', 'httpResponse')
+      .innerJoin('asset.target', 'target')
+      .where('assetService.id = :assetServiceId', { assetServiceId })
+      .andWhere('target.workspaceId = :workspaceId', { workspaceId })
+      .getOne();
+
+    if (!assetService) {
+      throw new NotFoundException('Asset service not found');
+    }
+
+    const latestHttpResponse = assetService.httpResponses?.[0];
+
+    const serviceContext = {
+      service: {
+        value: assetService.value,
+        port: assetService.port,
+      },
+      host: assetService.asset?.value,
+      ...(latestHttpResponse && {
+        http: {
+          title: latestHttpResponse.title,
+          webserver: latestHttpResponse.webserver,
+          tech: latestHttpResponse.tech,
+          status_code: latestHttpResponse.status_code,
+          scheme: latestHttpResponse.scheme,
+          host: latestHttpResponse.host,
+          path: latestHttpResponse.path,
+          content_type: latestHttpResponse.content_type,
+          words: latestHttpResponse.words,
+          lines: latestHttpResponse.lines,
+          tls: latestHttpResponse.tls,
+        },
+      }),
     };
 
-    return getManyResponse({
-      query: queryObj,
-      data,
-      total: totalResult?.count ?? 0,
-    });
+    const tags = await this.generateTagsWithAI(
+      JSON.stringify(serviceContext, null, 2),
+      workspaceId,
+    );
+
+    if (tags.length === 0) {
+      throw new BadRequestException(
+        'AI model did not generate any tags. Ensure an LLM config is set up in your workspace.',
+      );
+    }
+
+    return tags;
   }
 
   public async switchAsset(

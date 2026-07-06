@@ -8,10 +8,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { AnalyzeStatusButton } from '@/components/vulnerabilities/analyze-status-button';
 import type { Vulnerability } from '@/services/apis/gen/queries';
+import { Link } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
-import { BellOff, CircleCheck, ExternalLink, Info } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { BellOff, CircleCheck, Info } from 'lucide-react';
+import BadgeList from '../assets/components/badge-list';
 
 export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
   {
@@ -72,13 +74,9 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
         <div className="flex flex-col gap-2 py-2 justify-center min-h-[60px]">
           <div className="flex items-center gap-2">
             <div className="font-medium">{value}</div>
-            {Array.isArray(cveIds) &&
-              cveIds.length > 0 &&
-              cveIds.map((id, idx) => (
-                <Badge key={id || idx} variant="outline" className="text-xs">
-                  {id}
-                </Badge>
-              ))}
+            {Array.isArray(cveIds) && cveIds.length > 0 && (
+              <BadgeList list={cveIds} maxDisplay={2} />
+            )}
             {data.description && (
               <TooltipProvider>
                 <Tooltip>
@@ -100,56 +98,13 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
     },
   },
   {
-    accessorKey: 'affectedUrl',
-    header: 'Affected URL',
+    accessorKey: 'asset',
+    header: 'Asset',
     size: 200,
     cell: ({ row }) => {
-      const value: string = row.getValue('affectedUrl');
-      return (
-        <div className="flex items-center min-h-[60px]">
-          {value ? (
-            <div className="flex items-center gap-1">
-              <a
-                href={value}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 shrink-0 flex items-center gap-1"
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="truncate max-w-[200px]">{value}</span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{value}</p>
-                  </TooltipContent>
-                </Tooltip>
-                <ExternalLink size={14} />
-              </a>
-            </div>
-          ) : (
-            <div className="text-muted-foreground">Not matched</div>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: 'cvssScore',
-    header: 'CVSS Score',
-    size: 120,
-    cell: ({ row }) => {
-      const value: string = row.getValue('cvssScore');
-      return (
-        <div className="min-h-[60px] flex items-center">
-          {value ? (
-            <Badge variant="outline" className="font-medium">
-              {value}
-            </Badge>
-          ) : (
-            <div className="text-muted-foreground">Not matched</div>
-          )}
-        </div>
-      );
+      const data = row.original;
+      const value: string = data.asset?.value || data.affectedUrl;
+      return <div className="flex items-center min-h-[60px]">{value}</div>;
     },
   },
   {
@@ -187,17 +142,34 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
     },
   },
   {
-    accessorKey: 'createdAt',
-    header: 'Created At',
+    accessorKey: 'firstDetectedDate',
+    header: 'First Seen',
     size: 120,
     cell: ({ row }) => {
-      const value: string = row.getValue('createdAt');
+      const value: string = row.getValue('firstDetectedDate');
       return (
         <div className="min-h-[60px] flex items-center">
           {value ? (
             <div>{new Date(value).toLocaleDateString()}</div>
           ) : (
-            <div className="text-muted-foreground">Not matched</div>
+            <div className="text-muted-foreground">-</div>
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: 'lastSeenDate',
+    header: 'Last Seen',
+    size: 120,
+    cell: ({ row }) => {
+      const value: string = row.getValue('lastSeenDate');
+      return (
+        <div className="min-h-[60px] flex items-center">
+          {value ? (
+            <div>{new Date(value).toLocaleDateString()}</div>
+          ) : (
+            <div className="text-muted-foreground">-</div>
           )}
         </div>
       );
@@ -214,7 +186,11 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
         );
       return (
         <div className="min-h-[60px] flex items-center">
-          <Link to={`/tools/${tool.id}`} className="flex items-center gap-2">
+          <Link
+            to="/tools/$id"
+            params={{ id: tool.id }}
+            className="flex items-center gap-2"
+          >
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -268,7 +244,7 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
                 <TooltipTrigger asChild>
                   <Badge
                     variant="secondary"
-                    className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1"
+                    className="bg-amber-500/10 h-7 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1"
                   >
                     <BellOff size={12} />
                     Dismissed
@@ -296,12 +272,30 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
           ) : (
             <Badge
               variant="secondary"
-              className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1"
+              className="bg-emerald-500/10 h-7 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1"
             >
               <CircleCheck size={12} />
               Open
             </Badge>
           )}
+        </div>
+      );
+    },
+    enableSorting: false,
+  },
+  {
+    id: 'analyzeStatus',
+    header: 'Analyze',
+    size: 100,
+    cell: ({ row }) => {
+      const { id, analyzeStatus, analyzeResult } = row.original;
+      return (
+        <div className="min-h-15 flex items-center">
+          <AnalyzeStatusButton
+            id={id}
+            status={analyzeStatus}
+            result={analyzeResult}
+          />
         </div>
       );
     },

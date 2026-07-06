@@ -1,5 +1,5 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory } from '@/common/enums/enum';
+import { JobRunType, JobStatus, ToolCategory } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
@@ -76,6 +76,12 @@ export class JobHistoryResponseDto {
 
   @ApiProperty()
   workflowName?: string;
+
+  @ApiProperty()
+  jobHistoryName?: string;
+
+  @ApiProperty({ enum: JobRunType })
+  jobRunType?: JobRunType;
 }
 
 export class GetManyJobHistoriesResponseDto extends GetManyBaseResponseDto<JobHistoryResponseDto> {}

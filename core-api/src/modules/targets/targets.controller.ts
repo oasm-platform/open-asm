@@ -20,7 +20,8 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
-  CreateTargetDto,
+  BulkTargetResultDto,
+  CreateMultipleTargetsDto,
   GetManyTargetResponseDto,
   GetManyWorkspaceQueryParamsDto,
   UpdateTargetDto,
@@ -33,19 +34,27 @@ export class TargetsController {
   constructor(private readonly targetsService: TargetsService) {}
 
   @Doc({
-    summary: 'Create a target',
+    summary: 'Create multiple targets in bulk',
     description:
-      'Registers a new security testing target such as a domain, IP address, or network range for vulnerability assessment and continuous monitoring.',
+      'Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Supports both DOMAIN (root domain) and CIDR (/24 range only) types. Returns detailed results including created targets and skipped values.',
     response: {
-      serialization: Target,
+      serialization: BulkTargetResultDto,
+    },
+    request: {
+      getWorkspaceId: true,
     },
   })
-  @Post()
-  createTarget(
-    @Body() dto: CreateTargetDto,
+  @Post('bulk')
+  createMultipleTargets(
+    @Body() dto: CreateMultipleTargetsDto,
     @UserContext() userContext: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.targetsService.createTarget(dto, userContext);
+    return this.targetsService.createMultipleTargets(
+      dto,
+      workspaceId,
+      userContext,
+    );
   }
 
   @Doc({
@@ -70,7 +79,7 @@ export class TargetsController {
   @Doc({
     summary: 'Export targets to CSV',
     description:
-      'Exports all targets in a workspace to a CSV file containing value, last discovered date, and creation date for reporting and analysis purposes.',
+      'Exports all targets in a workspace to a CSV file containing value, type (DOMAIN or CIDR), last discovered date, and creation date for reporting and analysis purposes.',
     response: {
       description: 'CSV file containing targets data',
     },
@@ -98,7 +107,7 @@ export class TargetsController {
     // Create CSV content
     const csvRows: string[] = [];
     // Add header row
-    csvRows.push('value,lastDiscoveredAt,createdAt');
+    csvRows.push('value,type,lastDiscoveredAt,createdAt');
 
     // Add data rows
     for (const target of targets) {
@@ -108,7 +117,7 @@ export class TargetsController {
       const createdAtFormatted = target.createdAt
         ? formatDate(target.createdAt)
         : '';
-      const row = `"${target.value.replace(/"/g, '""')}","${lastDiscoveredAtFormatted}","${createdAtFormatted}"`;
+      const row = `"${target.value.replace(/"/g, '""')}","${target.type}","${lastDiscoveredAtFormatted}","${createdAtFormatted}"`;
       csvRows.push(row);
     }
 
@@ -131,31 +140,34 @@ export class TargetsController {
     response: {
       serialization: Target,
     },
-    request:{
-      getWorkspaceId: true
-    }
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get(':id')
-  getTargetById(@Param() { id }: IdQueryParamDto, @WorkspaceId() workspaceId: string) {
+  getTargetById(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.targetsService.getTargetById(id, workspaceId);
   }
 
   @Doc({
-    summary: 'Delete a target from a workspace',
+    summary: 'Delete a target permanently',
     description:
-      'Removes a security testing target from the specified workspace, terminating all associated monitoring and assessment activities.',
+      'Permanently deletes a security testing target and all its associated data (assets, vulnerabilities, jobs, and related records) from the specified workspace.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
   })
   @Delete(':id/workspace/:workspaceId')
-  deleteTargetFromWorkspace(
+  deleteTarget(
     @Param() { id }: IdQueryParamDto,
     @Param('workspaceId', new ParseUUIDPipe({ version: '4' }))
     workspaceId: string,
     @UserContext() userContext: UserContextPayload,
   ) {
-    return this.targetsService.deleteTargetFromWorkspace(
+    return this.targetsService.deleteTarget(
       id,
       workspaceId,
       userContext,

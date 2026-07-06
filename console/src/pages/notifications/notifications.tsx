@@ -65,7 +65,7 @@ export default function NotificationsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <NotificationList variant="page" />
+          <NotificationList />
         </CardContent>
       </Card>
     </div>

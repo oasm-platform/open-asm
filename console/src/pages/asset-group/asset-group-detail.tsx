@@ -6,14 +6,14 @@ import {
   useAssetGroupControllerGetById,
 } from '@/services/apis/gen/queries';
 import { Trash } from 'lucide-react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import AssetGroupWorkflow from './components/asset-group-workflow';
 import { AssetSection } from './components/asset-section';
 import { EditAssetGroupDialog } from './components/edit-asset-group-dialog';
 
 export default function AssetGroupDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const { data, refetch } = useAssetGroupControllerGetById(id!);
   const { mutate, isPending } = useAssetGroupControllerDelete();
 
@@ -38,23 +38,25 @@ export default function AssetGroupDetail() {
   return (
     <Page
       isShowButtonGoBack
+      title={
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-xl">{data?.name}</span>
+          <div
+            className={`h-4 w-4 rounded-full`}
+            style={{ background: data?.hexColor }}
+          />
+        </div>
+      }
       header={
-        <div className="flex items-center gap-2 justify-between w-full">
-          <div className="flex items-center gap-2">
-            <div
-              className={`h-4 w-4 rounded-full`}
-              style={{ background: data?.hexColor }}
-            ></div>
-            <span className="font-bold capitalize text-2xl">{data?.name}</span>
-            <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
-          </div>
+        <div className="flex items-center gap-2 w-full">
+          <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
           <ConfirmDialog
             title="Delete asset group"
             description={`Are you sure you want to delete "${data?.name}"? This action cannot be undone.`}
             onConfirm={handleDelete}
             typeToConfirm="delete"
             trigger={
-              <Button variant="ghost">
+              <Button size="icon" variant="ghost">
                 <Trash color="red" />
               </Button>
             }

@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   type NotificationResponseDto,
   useNotificationsControllerGetNotificationsInfinite,
@@ -8,10 +7,10 @@ import { Loader2 } from 'lucide-react';
 import { NotificationItem } from './notification-item';
 
 interface NotificationListProps {
-  variant?: 'popup' | 'page';
+  onClose?: () => void;
 }
 
-export function NotificationList({ variant = 'popup' }: NotificationListProps) {
+export function NotificationList({ onClose }: NotificationListProps) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useNotificationsControllerGetNotificationsInfinite(
       { limit: 10 },
@@ -43,13 +42,13 @@ export function NotificationList({ variant = 'popup' }: NotificationListProps) {
     );
   }
 
-  const content = (
+  return (
     <div className="flex flex-col">
       {notifications.map((notification: NotificationResponseDto) => (
         <NotificationItem
           key={notification.id}
           notification={notification}
-          variant={variant}
+          onClose={onClose}
         />
       ))}
       {hasNextPage && (
@@ -73,10 +72,4 @@ export function NotificationList({ variant = 'popup' }: NotificationListProps) {
       )}
     </div>
   );
-
-  if (variant === 'page') {
-    return content;
-  }
-
-  return <ScrollArea className="h-[400px]">{content}</ScrollArea>;
 }

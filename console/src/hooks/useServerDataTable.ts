@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 
 /**
  * Custom hook for server-side data table with pagination, sorting, and filtering
@@ -29,7 +29,8 @@ export function useServerDataTable({
    */
   isUpdateSearchQueryParam = true,
 } = {}) {
-  const [urlParams, setUrlParams] = useSearchParams();
+  const search = useSearch({ strict: false }) as Record<string, string>;
+  const navigate = useNavigate();
   const [internalParams, setInternalParams] = useState(() => ({
     page: defaultPage,
     pageSize: defaultPageSize,
@@ -37,8 +38,9 @@ export function useServerDataTable({
     sortOrder: defaultSortOrder,
     filter: '',
   }));
+
   const getNumberParam = (key: string, fallback: number) => {
-    const val = parseInt(urlParams.get(key) || '');
+    const val = parseInt(search[key] || '');
     return isNaN(val) ? fallback : val;
   };
 
@@ -49,38 +51,40 @@ export function useServerDataTable({
     ? getNumberParam('pageSize', defaultPageSize)
     : internalParams.pageSize;
   const sortBy = isUpdateSearchQueryParam
-    ? urlParams.get('sortBy') || defaultSortBy
+    ? search.sortBy || defaultSortBy
     : internalParams.sortBy;
   const sortOrder = isUpdateSearchQueryParam
-    ? (urlParams.get('sortOrder') as 'ASC' | 'DESC') || defaultSortOrder
+    ? (search.sortOrder as 'ASC' | 'DESC') || defaultSortOrder
     : internalParams.sortOrder;
   const filter = isUpdateSearchQueryParam
-    ? urlParams.get('filter') || ''
+    ? search.filter || ''
     : internalParams.filter;
 
-  const setParam = useCallback(
-    (key: string, value: string | number | undefined) => {
+  const setParams = useCallback(
+    (newParams: Partial<typeof internalParams>) => {
       if (isUpdateSearchQueryParam) {
-        setUrlParams(
-          (prev) => {
-            const next = new URLSearchParams(prev);
-            if (!value) {
-              next.delete(key);
-            } else {
-              next.set(key, value.toString());
-            }
+        navigate({
+          search: ((prev: Record<string, unknown>) => {
+            const next = { ...prev } as Record<string, unknown>;
+            Object.entries(newParams).forEach(([key, value]) => {
+              if (value === undefined || value === null || value === '') {
+                delete next[key];
+              } else {
+                next[key] = value;
+              }
+            });
             return next;
-          },
-          { replace: true },
-        );
+          }) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+          replace: true,
+        });
       } else {
         setInternalParams((prev) => ({
           ...prev,
-          [key]: value ?? '',
+          ...newParams,
         }));
       }
     },
-    [isUpdateSearchQueryParam, setUrlParams],
+    [isUpdateSearchQueryParam, navigate],
   );
 
   return {
@@ -92,36 +96,29 @@ export function useServerDataTable({
       filter,
     },
     tableHandlers: {
-      setPage: useCallback((v: number) => setParam('page', v), [setParam]),
+      setParams,
+      setPage: useCallback((v: number) => setParams({ page: v }), [setParams]),
       setPageSize: useCallback(
-        (v: number) => setParam('pageSize', v),
-        [setParam],
+        (v: number) => setParams({ pageSize: v, page: 1 }),
+        [setParams],
       ),
-      setSortBy: useCallback((v: string) => setParam('sortBy', v), [setParam]),
+      setSortBy: useCallback(
+        (v: string) => setParams({ sortBy: v, page: 1 }),
+        [setParams],
+      ),
       setSortOrder: useCallback(
-        (v: 'ASC' | 'DESC') => setParam('sortOrder', v),
-        [setParam],
+        (v: 'ASC' | 'DESC') => setParams({ sortOrder: v, page: 1 }),
+        [setParams],
       ),
       setFilter: useCallback(
         (v: string) => {
-          if (isUpdateSearchQueryParam) {
-            setUrlParams(
-              (prev) => {
-                const next = new URLSearchParams(prev);
-                if (next.get('filter') === v) return prev;
-                next.set('page', '1');
-                next.set('filter', v);
-                return next;
-              },
-              { replace: true },
-            );
-          } else {
-            if (internalParams.filter === v) return;
-            setParam('page', 1);
-            setParam('filter', v);
-          }
+          if (filter === v) return;
+          setParams({
+            filter: v,
+            page: 1,
+          });
         },
-        [isUpdateSearchQueryParam, setUrlParams, setParam, internalParams.filter],
+        [filter, setParams],
       ),
     },
   };
