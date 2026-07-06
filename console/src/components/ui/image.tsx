@@ -14,14 +14,11 @@ export const Image: React.FC<ImageProps> = ({
   height,
   className,
 }) => {
-  // Check if URL is a complete HTTP URL
-  const isHttpUrl = url?.startsWith('http://') || url?.startsWith('https://');
+  if (!url) return <ImageIcon width={width} height={height} className={className} />;
 
-  // If not a complete URL, prepend with API storage path
+  const isHttpUrl = url.startsWith('http://') || url.startsWith('https://');
   const imageUrl = isHttpUrl ? url : `/api${url}`;
-  if (!imageUrl)
-    return <ImageIcon width={width} height={height} className={className} />;
-  // if (!url || url === '') return <></>;
+
   return (
     <img
       src={imageUrl}
@@ -33,8 +30,8 @@ export const Image: React.FC<ImageProps> = ({
         height: height,
         objectFit: 'cover',
       }}
-      onError={() => {
-        console.error('Failed to load image:', imageUrl);
+      onError={(e) => {
+        (e.target as HTMLImageElement).style.display = 'none';
       }}
       className={className}
     />

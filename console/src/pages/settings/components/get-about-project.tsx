@@ -1,7 +1,6 @@
 import { Card, CardTitle } from '@/components/ui/card';
 import { useRootControllerGetLatestVersion } from '@/services/apis/gen/queries';
 import { CircleCheckBig, MonitorUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 export default function GetAboutProject() {
   const { data } = useRootControllerGetLatestVersion();
@@ -29,15 +28,15 @@ export default function GetAboutProject() {
           </div>
         )}
       </Card>
-      <Link
+      <a
         target="_blank"
-        to="https://github.com/oasm-platform/open-asm/blob/main/LICENSE"
+        href="https://github.com/oasm-platform/open-asm/blob/main/LICENSE"
       >
         <Card className="p-4">
           <CardTitle>License</CardTitle>
           <span>GPL-3.0 license</span>
         </Card>
-      </Link>
+      </a>
     </>
   );
 }

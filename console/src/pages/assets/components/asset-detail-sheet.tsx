@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Maximize2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import AssetDetail from './asset-detail';
 
 dayjs.extend(relativeTime);
@@ -25,7 +25,7 @@ export default function AssetDetailSheet({ open, setOpen, id }: Props) {
 
   const handleViewDetail = () => {
     setOpen(false);
-    navigate(`/assets/${id}`);
+    navigate({ to: `/assets/${id}` });
   };
 
   return (

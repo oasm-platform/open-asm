@@ -1,5 +1,5 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { BullMQName, CronSchedule, JobStatus } from '@/common/enums/enum';
+import { BullMQName, CronSchedule, JobStatus, TargetScopeType } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -24,15 +24,12 @@ import {
   UpdateTargetDto,
 } from './dto/targets.dto';
 import { Target, TargetType } from './entities/target.entity';
-import { WorkspaceTarget } from './entities/workspace-target.entity';
 
 @Injectable()
 export class TargetsService implements OnModuleInit {
   constructor(
     @InjectRepository(Target)
     private readonly repo: Repository<Target>,
-    @InjectRepository(WorkspaceTarget)
-    private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private readonly workspacesService: WorkspacesService,
     public assetService: AssetsService,
     private eventEmitter: EventEmitter2,
@@ -224,20 +221,19 @@ export class TargetsService implements OnModuleInit {
   public async getTargetById(id: string, workspaceId: string): Promise<Target> {
     const result = (await this.repo
       .createQueryBuilder('targets')
-      .leftJoin('targets.workspaceTargets', 'workspaceTarget')
-      .leftJoin('workspaceTarget.workspace', 'workspace')
+      .leftJoin('targets.workspace', 'workspace')
       .leftJoin('workspace.workspaceMembers', 'workspaceMember')
       .leftJoin('targets.assets', 'asset')
       .leftJoin('asset.assetServices', 'assetService')
       .leftJoin('asset.jobs', 'job')
       .where('targets.id = :id', { id })
-      .andWhere('workspace.id = :workspaceId', { workspaceId })
+      .andWhere('targets.workspaceId = :workspaceId', { workspaceId })
       .select([
         'targets.id as id',
         'targets.value as value',
         'targets.type as type',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
-        `COALESCE(COUNT(DISTINCT CASE WHEN "assetService"."isErrorPage" = false THEN "assetService"."id" END), 0) AS "totalAssetServices"`,
+        `COALESCE(COUNT(DISTINCT "assetService"."id"), 0) AS "totalAssetServices"`,
         'targets.scanSchedule as "scanSchedule"',
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -288,11 +284,10 @@ export class TargetsService implements OnModuleInit {
     const result = await this.repo.manager.transaction(
       async (transactionalEntityManager) => {
         // Query all existing workspace targets for the given values in one query
-        const existingWorkspaceTargets = await transactionalEntityManager
-          .getRepository(WorkspaceTarget)
-          .createQueryBuilder('wt')
-          .innerJoin('wt.target', 'target')
-          .where('wt.workspace = :workspaceId', { workspaceId })
+        const existingTargets = await transactionalEntityManager
+          .getRepository(Target)
+          .createQueryBuilder('target')
+          .where('target.workspaceId = :workspaceId', { workspaceId })
           .andWhere('target.value IN (:...values)', { values: targetValues })
           .select([
             'target.value AS value',
@@ -301,25 +296,40 @@ export class TargetsService implements OnModuleInit {
           .getRawMany<{ value: string; internalNetworkId: string | null }>();
 
         const existingTargetsMap = new Map<string, Set<string | null>>();
-        existingWorkspaceTargets.forEach((et) => {
+        existingTargets.forEach((et) => {
           if (!existingTargetsMap.has(et.value)) {
             existingTargetsMap.set(et.value, new Set());
           }
           existingTargetsMap.get(et.value)!.add(et.internalNetworkId);
         });
 
-        // Filter out duplicates (same value AND same internalNetworkId)
+        // Check for duplicates and throw error immediately if any found
+        const duplicateValues: string[] = [];
         const newTargets = targets.filter((t) => {
           const networks = existingTargetsMap.get(t.value);
           if (!networks) return true;
-          return !networks.has(internalNetworkId || null);
+
+          // External target: check if value exists in ANY network or as external
+          if (!internalNetworkId) {
+            duplicateValues.push(t.value);
+            return false;
+          }
+
+          // Internal target: only skip if same value AND same network
+          const isDuplicate = networks.has(internalNetworkId);
+          if (isDuplicate) {
+            duplicateValues.push(t.value);
+          }
+          return !isDuplicate;
         });
-        const skippedValues = targets
-          .filter((t) => {
-            const networks = existingTargetsMap.get(t.value);
-            return networks && networks.has(internalNetworkId || null);
-          })
-          .map((t) => t.value);
+
+        if (duplicateValues.length > 0) {
+          throw new BadRequestException(
+            `Target already exists: ${duplicateValues.join(', ')}`,
+          );
+        }
+
+        const skippedValues: string[] = [];
 
         const createdTargets: Target[] = [];
 
@@ -343,6 +353,7 @@ export class TargetsService implements OnModuleInit {
               value: t.value,
               type: t.type || TargetType.DOMAIN,
               internalNetworkId: internalNetworkId,
+              workspaceId: workspaceId,
             })),
           )
           .execute();
@@ -354,16 +365,6 @@ export class TargetsService implements OnModuleInit {
         const createdTargetEntities = await transactionalEntityManager
           .getRepository(Target)
           .findByIds(targetIds);
-
-        // Create workspace target associations in batch
-        const workspaceTargetValues = createdTargetEntities.map((target) => ({
-          workspace: { id: workspaceId },
-          target: { id: target.id },
-        }));
-
-        await transactionalEntityManager
-          .getRepository(WorkspaceTarget)
-          .save(workspaceTargetValues);
 
         // Create primary assets for all new targets using batch UPSERT
         const assetValues: Array<{
@@ -446,19 +447,18 @@ export class TargetsService implements OnModuleInit {
       Target & { totalAssetServices: number; status: string; duration: number }
     >
   > {
-    const { limit, page, sortBy, sortOrder, value, type, status } = query;
+    const { limit, page, sortBy, sortOrder, value, type, status, scope } = query;
 
     const offset = (page - 1) * limit;
 
     const queryBuilder = this.repo
       .createQueryBuilder('targets')
-      .innerJoin('targets.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('targets.workspace', 'workspace')
       .innerJoin('workspace.workspaceMembers', 'workspaceMember')
       .leftJoin('targets.assets', 'asset')
       .leftJoin('asset.assetServices', 'assetService')
       .leftJoin('asset.jobs', 'job')
-      .where('workspace.id = :workspaceId', { workspaceId })
+      .where('targets.workspaceId = :workspaceId', { workspaceId })
       .select([
         'targets.id as id',
         'targets.value as value',
@@ -466,7 +466,8 @@ export class TargetsService implements OnModuleInit {
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'targets.reScanCount as "reScanCount"',
         'targets.scanSchedule as "scanSchedule"',
-        `CAST(COUNT(DISTINCT CASE WHEN "assetService"."isErrorPage" = false THEN "assetService"."id" END) AS INTEGER) AS "totalAssetServices"`,
+        'targets.internalNetworkId as "internalNetworkId"',
+        `CAST(COUNT(DISTINCT "assetService"."id") AS INTEGER) AS "totalAssetServices"`,
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
@@ -486,7 +487,7 @@ export class TargetsService implements OnModuleInit {
       queryBuilder.andWhere('targets.type = :type', { type });
     }
 
-    if (status) {
+if (status) {
       // Filter by computed status using HAVING clause
       const statusCase = `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -496,13 +497,20 @@ export class TargetsService implements OnModuleInit {
       END`;
 
       if (status === JobStatus.COMPLETED) {
-        // For completed status, match both explicit COMPLETED and default (no jobs)
         queryBuilder.having(
           `(${statusCase}) = :status OR (COUNT(job.id) = 0 AND :status = '${JobStatus.COMPLETED}')`,
           { status },
         );
       } else {
         queryBuilder.having(`(${statusCase}) = :status`, { status });
+      }
+    }
+
+if (scope !== undefined) {
+      if (scope === TargetScopeType.INTERNAL) {
+        queryBuilder.andWhere('targets.internalNetworkId IS NOT NULL');
+      } else {
+        queryBuilder.andWhere('targets.internalNetworkId IS NULL');
       }
     }
 
@@ -522,15 +530,16 @@ export class TargetsService implements OnModuleInit {
   }
 
   /**
-   * Deletes a target from a workspace, but only if the requesting user is the owner of the workspace.
+   * Permanently deletes a target and all its associated data (assets, vulnerabilities, jobs).
+   * The target must belong to the specified workspace, and the requesting user must be the owner.
    *
    * @param id - The ID of the target to be deleted.
-   * @param workspaceId - The ID of the workspace from which the target will be deleted.
+   * @param workspaceId - The ID of the workspace that the target belongs to.
    * @param userContext - The user's context data, which includes the user's ID.
    * @throws NotFoundException if the target is not found in the workspace.
    * @returns A response indicating the target was successfully deleted.
    */
-  public async deleteTargetFromWorkspace(
+  public async deleteTarget(
     id: string,
     workspaceId: string,
     userContext: UserContextPayload,
@@ -540,21 +549,13 @@ export class TargetsService implements OnModuleInit {
       userContext,
     );
 
-    const workspaceTarget = await this.workspaceTargetRepository.findOneBy({
-      target: { id },
-      workspace: { id: workspaceId },
-    });
+    const target = await this.repo.findOneBy({ id, workspaceId });
 
-    await this.repo.delete(id);
-
-    if (!workspaceTarget) {
+    if (!target) {
       throw new NotFoundException('Target not found in workspace');
     }
 
-    await this.workspaceTargetRepository.delete({
-      target: { id },
-      workspace: { id: workspaceId },
-    });
+    await this.repo.delete(id);
 
     return { message: 'Target deleted successfully' };
   }
@@ -665,9 +666,7 @@ export class TargetsService implements OnModuleInit {
   > {
     const targets = await this.repo
       .createQueryBuilder('targets')
-      .innerJoin('targets.workspaceTargets', 'workspaceTarget')
-      .innerJoin('workspaceTarget.workspace', 'workspace')
-      .where('workspace.id = :workspaceId', { workspaceId })
+      .where('targets.workspaceId = :workspaceId', { workspaceId })
       .select([
         'targets.value as value',
         'targets.type as type',

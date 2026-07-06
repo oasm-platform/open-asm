@@ -14,8 +14,11 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Request, Response } from 'express';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
 import {
@@ -124,8 +127,15 @@ export class WorkspacesController {
   getWorkspaces(
     @Query() query: GetManyWorkspacesDto,
     @UserContext() userContextPayload: UserContextPayload,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.workspacesService.getWorkspaces(query, userContextPayload);
+    return this.workspacesService.getWorkspaces(
+      query,
+      userContextPayload,
+      req,
+      res,
+    );
   }
 
   @Doc({

@@ -4,11 +4,18 @@ import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, Relation } from 'typeorm';
 import { JobErrorLog } from './job-error-log.entity';
 import { JobHistory } from './job-history.entity';
 
 @Entity('jobs')
+@Index('IDX_jobs_status_priority_createdAt', ['status', 'priority', 'createdAt'])
+@Index('IDX_jobs_asset_status', ['asset', 'status'])
+@Index('IDX_jobs_tool', ['tool'])
+@Index('IDX_jobs_workerId_status', ['workerId', 'status'])
+@Index('IDX_jobs_jobHistoryId', ['jobHistory'])
+@Index('IDX_jobs_assetServiceId', ['assetService'])
+@Index('IDX_jobs_category_status', ['category', 'status'])
 export class Job extends BaseEntity {
   /**
    * The asset this job belongs to.
@@ -17,7 +24,7 @@ export class Job extends BaseEntity {
   @ManyToOne(() => Asset, (asset) => asset.jobs, {
     onDelete: 'CASCADE',
   })
-  asset: Asset;
+  asset: Relation<Asset>;
 
   /**
    * The category of the tool used in the job.
@@ -59,7 +66,7 @@ export class Job extends BaseEntity {
   @ManyToOne(() => Tool, (tool) => tool.jobs, {
     onDelete: 'CASCADE',
   })
-  tool: Tool;
+  tool: Relation<Tool>;
 
   /**
    * The raw result from the tool execution.
@@ -80,7 +87,7 @@ export class Job extends BaseEntity {
   @ManyToOne(() => JobHistory, (jobHistory) => jobHistory.jobs, {
     onDelete: 'CASCADE',
   })
-  jobHistory: JobHistory;
+  jobHistory: Relation<JobHistory>;
 
   /**
    * Flag to indicate if the raw result should be saved.
@@ -125,7 +132,7 @@ export class Job extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'assetServiceId' })
-  assetService?: AssetService;
+  assetService?: Relation<AssetService>;
 
   @Column({ default: 0 })
   retryCount: number;
@@ -134,5 +141,5 @@ export class Job extends BaseEntity {
   @OneToMany(() => JobErrorLog, (jobErrorLog) => jobErrorLog.job, {
     onDelete: 'CASCADE',
   })
-  errorLogs: JobErrorLog[];
+  errorLogs: Relation<JobErrorLog[]>;
 }

@@ -2,6 +2,7 @@ import { UserContextPayload } from '@/common/interfaces/app.interface';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -15,7 +16,7 @@ import { NotificationsService } from './notifications.service';
 import { I18nLang } from 'nestjs-i18n';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { CreateNotificationDto } from './dto/create-notification.dto';
-import { UserContext } from '@/common/decorators/app.decorator';
+import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { NotificationResponseDto } from './dto/notification.dto';
@@ -34,14 +35,23 @@ export class NotificationsController {
     response: {
       serialization: GetManyResponseDto(NotificationResponseDto),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get()
   async getNotifications(
     @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
     @Query() query: GetManyBaseQueryParams,
     @I18nLang() lang: string,
   ) {
-    return this.notificationsService.getNotifications(user.id, query, lang);
+    return this.notificationsService.getNotifications(
+      user.id,
+      workspaceId,
+      query,
+      lang,
+    );
   }
 
   @Doc({
@@ -99,5 +109,18 @@ export class NotificationsController {
   @Patch(':id/read')
   markAsRead(@Param('id') id: string, @UserContext() user: UserContextPayload) {
     return this.notificationsService.markAsRead(id, user.id);
+  }
+
+  @Doc({
+    summary: 'Delete a notification',
+    description:
+      'Delete a notification recipient record for the current user. The notification itself is preserved for other recipients.',
+  })
+  @Delete(':id')
+  deleteNotification(
+    @Param('id') id: string,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.notificationsService.deleteNotification(id, user.id);
   }
 }

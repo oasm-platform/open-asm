@@ -19,6 +19,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Res,
   UseGuards,
@@ -28,6 +29,8 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
+import { AgentsSkillsService } from './agents.skills';
+import { GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
   ConversationResponseDto,
   UpdateConversationDto,
@@ -39,7 +42,21 @@ import {
   ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
+import {
+  MCPConfigResponseDto,
+  MCPServerConfigDto,
+  MCPServerPingResponseDto,
+  MCPServerResponseDto,
+  ToggleMCPServerDto,
+} from './dto/mcp-config.dto';
 import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
+import {
+  CreateSkillDto,
+  SkillResponseDto,
+  ToggleSkillDto,
+  UpdateSkillDto,
+} from './dto/skill.dto';
+import { WorkspaceMemoryResponseDto } from './dto/workspace-memory.dto';
 
 @ApiTags('Agents')
 @Controller('agents')
@@ -48,7 +65,21 @@ export class AgentsController {
   constructor(
     private readonly agentsService: AgentsService,
     private readonly agentsCompletionsService: AgentsCompletionsService,
+    private readonly agentsSkillsService: AgentsSkillsService,
   ) {}
+
+  @Get('modes')
+  @Doc({
+    summary: 'Get agent modes',
+    description: 'Get all available modes for AI chat box and enabled workers',
+    request: { getWorkspaceId: true },
+    response: { serialization: GetAgentModesResponseDto },
+  })
+  getAgentModes(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetAgentModesResponseDto> {
+    return this.agentsService.getAgentModesWithWorkers(workspaceId);
+  }
 
   @Post('llm-configs')
   @Doc({
@@ -154,6 +185,23 @@ export class AgentsController {
   // Conversation Endpoints
   // ==========================================
 
+  @Get('conversations/:id')
+  @Doc({
+    summary: 'Get conversation detail',
+    description: 'Get a single conversation with full details including todos',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Conversation ID' }],
+    },
+    response: { serialization: ConversationResponseDto },
+  })
+  async getConversation(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<ConversationResponseDto> {
+    return this.agentsService.getConversation(id, workspaceId);
+  }
+
   @Get('conversations')
   @Doc({
     summary: 'List conversations',
@@ -256,32 +304,96 @@ export class AgentsController {
     @UserId() userId: string,
     @Res() res: Response,
   ): Promise<void> {
+    // Create an AbortController that will be triggered when client disconnects
+    const abortController = new AbortController();
+
+    // Detect client disconnect via req.on('close')
+    const req = res.req;
+    const onClientDisconnect = () => {
+      if (!res.writableEnded) {
+        abortController.abort();
+      }
+    };
+    if (req?.on) {
+      req.on('close', onClientDisconnect);
+    }
+
     try {
       const { stream, conversationId } =
         await this.agentsCompletionsService.streamMessage(
           dto,
           workspaceId,
           userId,
+          abortController.signal,
         );
 
       res.socket?.setNoDelay(true);
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
-      res.setHeader('Content-Encoding', 'none');
+      res.setHeader('Content-Encoding', 'identity');
+      res.setHeader('Connection', 'keep-alive');
       res.setHeader(
         'X-Conversation-Id',
         conversationId || dto.conversationId || '',
       );
       res.flushHeaders();
 
-      const reader = stream.getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(`data: ${JSON.stringify(value)}\n\n`);
+      // Headers are now committed — from this point on we can only write SSE events
+
+      // SSE keepalive heartbeat: emit comment every 15s to prevent
+      // proxy/load-balancer timeouts on long-running streams.
+      const keepaliveInterval = setInterval(() => {
+        if (!res.writableEnded) {
+          res.write(':keepalive\n\n');
+        }
+      }, 15_000);
+
+      try {
+        const reader = stream.getReader();
+        while (true) {
+          if (abortController.signal.aborted) {
+            await reader.cancel();
+            break;
+          }
+
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(`data: ${JSON.stringify(value)}\n\n`);
+        }
+        // Send [DONE] marker to properly terminate the SSE stream
+        if (!res.writableEnded) {
+          res.write('data: [DONE]\n\n');
+          res.end();
+        }
+      } catch (streamError) {
+        if (abortController.signal.aborted) {
+          if (!res.writableEnded) {
+            res.end();
+          }
+          return;
+        }
+        const message =
+          streamError instanceof Error
+            ? streamError.message
+            : typeof streamError === 'string'
+              ? streamError
+              : 'Stream error';
+        if (!res.writableEnded) {
+          res.write(
+            `data: ${JSON.stringify({ type: 'error', error: { message } })}\n\n`,
+          );
+          res.end();
+        }
+      } finally {
+        clearInterval(keepaliveInterval);
       }
-      res.end();
     } catch (error) {
+      if (abortController.signal.aborted) {
+        if (!res.writableEnded) {
+          res.end();
+        }
+        return;
+      }
       if (error instanceof BadRequestException) {
         res.status(400).json({
           message: error.message,
@@ -295,6 +407,10 @@ export class AgentsController {
           error: 'Internal Server Error',
           statusCode: 500,
         });
+      }
+    } finally {
+      if (req?.off) {
+        req.off('close', onClientDisconnect);
       }
     }
   }
@@ -323,5 +439,226 @@ export class AgentsController {
       workspaceId,
     );
     return { message: 'Message deleted successfully' };
+  }
+
+  @Get('mcp-configs')
+  @Doc({
+    summary: 'Get MCP configs',
+    description: 'Get all MCP server configurations for the workspace',
+    request: { getWorkspaceId: true },
+    response: { serialization: MCPConfigResponseDto },
+  })
+  getMCPConfig(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<MCPConfigResponseDto> {
+    return this.agentsService.getMCPConfig(workspaceId);
+  }
+
+  @Put('mcp-configs/:name')
+  @Doc({
+    summary: 'Upsert MCP server',
+    description: 'Add or update an MCP server configuration',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'name', description: 'MCP server name' }],
+    },
+    response: { serialization: MCPServerResponseDto },
+  })
+  upsertMCPServer(
+    @Param('name') name: string,
+    @Body() dto: MCPServerConfigDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<MCPServerResponseDto> {
+    return this.agentsService.upsertMCPServer(workspaceId, name, dto);
+  }
+
+  @Delete('mcp-configs/:name')
+  @Doc({
+    summary: 'Delete MCP server',
+    description: 'Remove an MCP server configuration',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'name', description: 'MCP server name' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteMCPServer(
+    @Param('name') name: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsService.deleteMCPServer(workspaceId, name);
+    return { message: 'MCP server deleted successfully' };
+  }
+
+  @Patch('mcp-configs/:name/toggle')
+  @Doc({
+    summary: 'Toggle MCP server',
+    description: 'Enable or disable an MCP server',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'name', description: 'MCP server name' }],
+    },
+    response: { serialization: MCPServerResponseDto },
+  })
+  toggleMCPServer(
+    @Param('name') name: string,
+    @Body() dto: ToggleMCPServerDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<MCPServerResponseDto> {
+    return this.agentsService.toggleMCPServer(workspaceId, name, dto.disabled);
+  }
+
+  @Get('mcp-configs/:name/ping')
+  @Doc({
+    summary: 'Ping MCP server',
+    description: 'Check connectivity status of an MCP server',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'name', description: 'MCP server name' }],
+    },
+    response: { serialization: MCPServerPingResponseDto },
+  })
+  pingMCPServer(
+    @Param('name') name: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<MCPServerPingResponseDto> {
+    return this.agentsService.pingMCPServer(workspaceId, name);
+  }
+
+  // ==========================================
+  // Workspace Memory Endpoints
+  // ==========================================
+
+  @Get('workspace-memory')
+  @Doc({
+    summary: 'Get workspace memory',
+    description:
+      'Get long-term memory records for the workspace (paginated, per user)',
+    request: { getWorkspaceId: true },
+    response: { serialization: GetManyResponseDto(WorkspaceMemoryResponseDto) },
+  })
+  getWorkspaceMemory(
+    @Query() query: GetManyBaseQueryParams,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<GetManyBaseResponseDto<WorkspaceMemoryResponseDto>> {
+    return this.agentsService.getWorkspaceMemory(workspaceId, userId, query);
+  }
+
+  @Delete('workspace-memory/:id')
+  @Doc({
+    summary: 'Delete workspace memory',
+    description: 'Delete a long-term memory record by ID',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Memory record ID' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteWorkspaceMemory(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsService.deleteWorkspaceMemory(id, workspaceId, userId);
+    return { message: 'Memory deleted successfully' };
+  }
+
+  // ==========================================
+  // Skills Endpoints
+  // ==========================================
+
+  @Get('skills')
+  @Doc({
+    summary: 'List skills',
+    description: 'Get all available skills (builtin + user) for the workspace',
+    request: { getWorkspaceId: true },
+    response: { serialization: SkillResponseDto, isArray: true },
+  })
+  getSkills(@WorkspaceId() workspaceId: string): Promise<SkillResponseDto[]> {
+    return this.agentsSkillsService.getSkills(workspaceId);
+  }
+
+  @Post('skills')
+  @Doc({
+    summary: 'Create skill',
+    description:
+      'Create a new user skill for the workspace (workspace owner only)',
+    request: { getWorkspaceId: true },
+    response: { serialization: SkillResponseDto },
+  })
+  async createSkill(
+    @Body() dto: CreateSkillDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<SkillResponseDto> {
+    return this.agentsSkillsService.createUserSkill(workspaceId, userId, dto);
+  }
+
+  @Patch('skills/:id')
+  @Doc({
+    summary: 'Update skill',
+    description: 'Update a user skill (workspace owner only)',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Skill ID' }],
+    },
+    response: { serialization: SkillResponseDto },
+  })
+  async updateSkill(
+    @Param('id') id: string,
+    @Body() dto: UpdateSkillDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<SkillResponseDto> {
+    return this.agentsSkillsService.updateUserSkill(
+      workspaceId,
+      id,
+      dto,
+      userId,
+    );
+  }
+
+  @Delete('skills/:id')
+  @Doc({
+    summary: 'Delete skill',
+    description: 'Delete a user skill (workspace owner only)',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Skill ID' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteSkill(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsSkillsService.deleteUserSkill(workspaceId, id, userId);
+    return { message: 'Skill deleted successfully' };
+  }
+
+  @Patch('skills/:id/toggle')
+  @Doc({
+    summary: 'Toggle skill',
+    description: 'Enable or disable a user skill (workspace owner only)',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Skill ID' }],
+    },
+    response: { serialization: SkillResponseDto },
+  })
+  async toggleSkill(
+    @Param('id') id: string,
+    @Body() dto: ToggleSkillDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<SkillResponseDto> {
+    return this.agentsSkillsService.toggleUserSkill(
+      workspaceId,
+      id,
+      dto.isEnabled,
+      userId,
+    );
   }
 }

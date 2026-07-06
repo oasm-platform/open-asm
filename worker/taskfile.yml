@@ -1,33 +1,78 @@
-version: '3'
+version: "3"
 
 vars:
-  replicas: '{{.replicas | default 1}}'
-  apiKey: '{{.apiKey | default .API_KEY}}'
-  maxJobs: '{{.maxJobs | default .MAX_JOBS}}'
+  replicas: "{{.replicas | default 1}}"
+  apiKey: "{{.apiKey | default .API_KEY}}"
+  maxJobs: "{{.maxJobs | default .MAX_JOBS}}"
   network: '{{.network | default ""}}'
 
 tasks:
-  # Run worker in development mode
-  # Usage: task dev replicas=1 maxJobs=10 apiKey=your_api_key network=your_network_id
+  # ==========================================
+  # DEVELOPMENT TASKS
+  # ==========================================
   dev:
     cmds:
       - |
-        for i in $(seq 1 {{.replicas}}); do
-           echo "Starting worker instance $i"
-           CMD="go run ./cmd/oasm-worker --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}"
-           {{- if .network}}
-           CMD="$CMD --network {{.network}}"
-           {{- end}}
-           $CMD &
-        done
-        wait
+        if [ "{{.replicas}}" = "1" ]; then
+          exec go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}{{if .network}} --network {{.network}}{{end}}
+        else
+          trap 'wait; exit 0' INT TERM
+          for i in $(seq 1 {{.replicas}}); do
+            echo "Starting CLI worker instance $i"
+            CMD="go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}"
+            {{- if .network}}
+            CMD="$CMD --network {{.network}}"
+            {{- end}}
+            $CMD &
+          done
+          wait
+        fi
     silent: false
 
-  # Build the worker project
-  # Creates optimized production build
-  build:
+  dev-app:
     cmds:
-      - go build -o oasm-worker ./cmd/oasm-worker
+      - |
+        if [ "{{.replicas}}" = "1" ]; then
+          ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}}{{if .network}} WORKER_NETWORK={{.network}}{{end}}"
+          exec env $ENV_VARS go run ./cmd/app
+        else
+          trap 'wait; exit 0' INT TERM
+          for i in $(seq 1 {{.replicas}}); do
+            echo "Starting App worker instance $i"
+            ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}}"
+            {{- if .network}}
+            ENV_VARS="$ENV_VARS WORKER_NETWORK={{.network}}"
+            {{- end}}
+            env $ENV_VARS go run ./cmd/app &
+          done
+          wait
+        fi
+    silent: false
+
+  # ==========================================
+  # BUILD TASKS
+  # ==========================================
+
+  build:
+    deps: [build-cli, build-app]
+
+  build-cli:
+    cmds:
+      - echo "Building OASM CLI Worker..."
+      - go build -o bin/oasm-cli ./cmd/cli
+
+  build-app:
+    cmds:
+      - echo "Building OASM App Worker..."
+      - CGO_ENABLED=0 go build -o bin/oasm-app ./cmd/app
+
+  clean:
+    cmds:
+      - rm -rf bin/
+
+  # ==========================================
+  # UTILITY TASKS
+  # ==========================================
 
   # Install dependencies (Go modules)
   install:

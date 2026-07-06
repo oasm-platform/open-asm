@@ -3,7 +3,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2Icon } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
 
 export type FormData = {
   name: string;
@@ -30,7 +29,6 @@ export function ProviderForm({
   initialData = {},
   submitButtonText
 }: ProviderFormProps) {
-  const navigate = useNavigate();
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       name: initialData.name || '',
@@ -142,7 +140,7 @@ export function ProviderForm({
         <Button
           type="button"
           variant="outline"
-          onClick={() => navigate(-1)}
+          onClick={() => window.history.back()}
           disabled={isPending}
         >
           Cancel

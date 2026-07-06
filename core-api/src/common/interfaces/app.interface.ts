@@ -53,6 +53,7 @@ export interface RequestWithMetadata extends Request {
     image?: string | null | undefined;
     role: Role;
   };
+  workspaceId: string;
 }
 
 export interface Technology {

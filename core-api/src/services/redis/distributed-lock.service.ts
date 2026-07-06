@@ -20,12 +20,12 @@ export class RedisLockService {
    * @returns A promise that resolves to true if the lock was acquired, otherwise false.
    */
   public async lockWithTimeOut(key: string, ttl: number): Promise<boolean> {
-    const lockValue = Date.now().toString();
     const result = await this.redisService.client.set(
       `${this.prefix}:${key}`,
-      lockValue,
+      Date.now().toString(),
       'PX',
       ttl,
+      'NX',
     );
     return result === 'OK';
   }
@@ -57,7 +57,10 @@ export class RedisLockService {
    * @param ttl - The TTL for the lock in milliseconds.
    * @returns A promise that resolves to true if the lock was acquired, otherwise false.
    */
-  private async acquireLock(key: string, ttl: number): Promise<boolean> {
+  private async acquireLock(
+    key: string,
+    ttl: number,
+  ): Promise<string | null> {
     const lockValue = Date.now().toString();
     const result = await this.redisService.client.set(
       `${this.prefix}:${key}`,
@@ -66,21 +69,31 @@ export class RedisLockService {
       ttl,
       'NX',
     );
-    return result === 'OK';
+    return result === 'OK' ? lockValue : null;
   }
 
   /**
-   * Releases the lock associated with the given key.
-   *
-   * This method deletes the lock entry from Redis, effectively releasing
-   * the lock. It ensures that the key is no longer marked as locked, allowing
-   * other operations to acquire the lock if necessary.
+   * Releases the lock associated with the given key using a Lua script
+   * that verifies ownership before deleting. This prevents a process from
+   * releasing another process's lock after the original TTL expired.
    *
    * @param key - The key for which the lock is to be released.
-   * @returns A promise that resolves once the lock has been released.
+   * @param lockValue - The value that was set when the lock was acquired (ownership proof).
+   * @returns A promise that resolves once the lock has been released (or skipped if not owner).
    */
-  private async releaseLock(key: string): Promise<void> {
-    await this.redisService.client.del(`${this.prefix}:${key}`);
+  private async releaseLock(key: string, lockValue: string): Promise<void> {
+    const script = `
+      if redis.call("GET", KEYS[1]) == ARGV[1] then
+        return redis.call("DEL", KEYS[1])
+      end
+      return 0
+    `;
+    await this.redisService.client.eval(
+      script,
+      1,
+      `${this.prefix}:${key}`,
+      lockValue,
+    );
   }
 
   /**
@@ -101,23 +114,21 @@ export class RedisLockService {
     ttl: number,
     action: () => Promise<T>,
   ): Promise<T | null> {
-    const acquired = await this.acquireLock(key, ttl);
+    const lockValue = await this.acquireLock(key, ttl);
 
-    if (!acquired) {
+    if (!lockValue) {
       this.logger.warn(`Failed to acquire lock for key: ${key}`);
       return null;
     }
 
     try {
       this.logger.debug(`Lock acquired for key: ${key}`);
-      const result = await action();
-      this.logger.debug(`Lock released for key: ${key}`);
-      return result;
+      return await action();
     } catch (error) {
       this.logger.error(`Error executing action for lock key: ${key}`, error);
       throw error;
     } finally {
-      await this.releaseLock(key);
+      await this.releaseLock(key, lockValue);
     }
   }
 }

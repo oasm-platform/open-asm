@@ -1,33 +1,30 @@
-// Package worker
 package worker
 
 import (
 	"context"
 	"fmt"
-	"log"
+	"oasm-worker/internal/config"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
-
-	"oasm-worker/internal/config"
 
 	"github.com/go-co-op/gocron"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	"github.com/oasm-platform/open-asm/grpc-client/go/workers"
-	"google.golang.org/grpc/metadata"
 )
 
-// Track active jobs for logging
 var (
-	activeJobsMu sync.Mutex
+	activeJobsMu sync.RWMutex
 	activeJobs   = make(map[string]struct{})
 )
 
-func connectInternalNetwork(client *oasm.Client, network string, workerID string, token string) error {
+func connectInternalNetwork(client *oasm.Client, network string) error {
 	networkInfos, err := GetNetworkInfos()
 	if err != nil {
-		return fmt.Errorf("failed to get network infos: %v", err)
+		return fmt.Errorf("failed to get network infos: %w", err)
 	}
 
 	var networkInterfaces []*workers.NetworkInterfaceMessage
@@ -42,125 +39,179 @@ func connectInternalNetwork(client *oasm.Client, network string, workerID string
 	}
 
 	req := &workers.ConnectInternalNetworkRequest{
-		WorkerId:         workerID,
-		NetworkId:        network,
+		WorkerId:          client.WorkerID(),
+		NetworkId:         network,
 		NetworkInterfaces: networkInterfaces,
 	}
 
-	ctx := context.Background()
-	md := metadata.Pairs("worker-token", token)
-	ctx = metadata.NewOutgoingContext(ctx, md)
-	_, err = client.Workers().ConnectInternalNetwork(ctx, req)
+	_, err = client.Workers().ConnectInternalNetwork(client.WithAuth(context.Background()), req)
 	if err != nil {
-		return fmt.Errorf("error connecting internal network: %v", err)
+		return fmt.Errorf("error connecting internal network: %w", err)
 	}
 
 	return nil
 }
 
-func Start(ctx context.Context, cfg *config.Config, network string) {
+func Start(ctx context.Context, cfg *config.Config) {
+	sysLog := oasm.NewLogger("System")
+	jobLog := oasm.NewLogger("Jobs")
+	netLog := oasm.NewLogger("Network")
+	shutLog := oasm.NewLogger("Shutdown")
+
 	client, err := oasm.NewClient(
 		oasm.WithApiKey(cfg.ApiKey),
 		oasm.WithGRPCHost(fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort)),
 		oasm.WithToolPath(cfg.ToolPath),
 	)
 	if err != nil {
-		log.Printf("Error creating OASM client: %v", err)
+		sysLog.ErrorE("Failed to create OASM client", err)
 		return
 	}
 
-	// Get worker ID by joining first
-	joinResp, err := client.WorkerJoin(context.Background())
+	jobLog.Info("Initializing headless browser...")
+	l := launcher.New().Leakless(false).Headless(true)
+
+	if _, err := os.Stat("/usr/bin/chromium"); err == nil {
+		jobLog.Verbose("Using system chromium at /usr/bin/chromium")
+		l = l.Bin("/usr/bin/chromium")
+	} else if _, err := os.Stat("/usr/bin/chromium-browser"); err == nil {
+		jobLog.Verbose("Using system chromium at /usr/bin/chromium-browser")
+		l = l.Bin("/usr/bin/chromium-browser")
+	} else if _, err := os.Stat("/usr/bin/google-chrome"); err == nil {
+		jobLog.Verbose("Using system chromium at /usr/bin/google-chrome")
+		l = l.Bin("/usr/bin/google-chrome")
+	} else {
+		jobLog.Verbose("No system chromium found, go-rod will download Chrome automatically")
+	}
+
+	browser := rod.New().ControlURL(l.MustLaunch()).MustConnect()
+
+	workspaceRoot, err := filepath.Abs(cfg.WorkspaceRoot)
 	if err != nil {
-		log.Printf("Error joining worker: %v", err)
+		sysLog.ErrorE("Failed to resolve workspace root", err)
 		return
 	}
-	workerID := joinResp.WorkerId
-	token := joinResp.WorkerToken
 
-	oasm.Logger("Jobs").Verbose("Initializing headless browser...")
-	l := launcher.New().
-		Leakless(false). // Disable leakless to avoid Windows Defender false positive
-		Headless(true)   // Explicit headless mode
+	if err := os.MkdirAll(workspaceRoot, 0o755); err != nil {
+		sysLog.ErrorE("Failed to create workspace root", err)
+		return
+	}
 
-	browser := rod.New().
-		ControlURL(l.MustLaunch()).
-		MustConnect()
-	defer browser.MustClose()
-	defer l.Cleanup() // Remove user data directory
+	toolPath, err := filepath.Abs(cfg.ToolPath)
+	if err != nil {
+		sysLog.ErrorE("Failed to resolve tool path", err)
+		return
+	}
 
 	ready := make(chan bool, 1)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 
-	go client.WorkerConnect(workerCtx, ready)
-
-	// Wait for worker connection result
-	isConnected, ok := <-ready
-	if !ok || !isConnected {
-		log.Println("Worker failed to join. Shutting down...")
-		workerCancel()
-		return
-	}
-
-	// Handle network connection if network is specified
-	if network != "" {
-		if err := connectInternalNetwork(client, network, workerID, token); err != nil {
-			log.Printf("Failed to connect internal network: %v", err)
-			workerCancel()
-			return
-		}
-		log.Printf("Connected internal network successfully")
-	}
-
-	oasm.Logger("Sync").Verbose("Core is ready, syncing tools...")
-	if err := client.WorkerDownloadTools(ctx); err != nil {
-		oasm.Logger("Sync").Error(fmt.Sprintf("Download tools error: %v", err))
-		workerCancel()
-		return
-	}
+	var (
+		stateMu          sync.Mutex
+		sessionCtx       context.Context
+		sessionCancel    context.CancelFunc
+		schedulerStarted bool
+	)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
 	scheduler := gocron.NewScheduler(time.UTC)
-
 	var wg sync.WaitGroup
-	var lastLogged int // Track last logged running count for change detection
-
-	// Helper function to log job status
-	logJobStatus := func(running, maxConcurrency int) {
-		oasm.Logger("Jobs").Verbose(fmt.Sprintf("Jobs running: %d/%d", running, maxConcurrency))
-	}
-
-	// Log initial state before starting scheduler
-	logJobStatus(0, cfg.MaxConcurrency)
-	lastLogged = 0
 
 	_, err = scheduler.Every(1).Second().Do(func() {
+		stateMu.Lock()
+		currentCtx := sessionCtx
+		stateMu.Unlock()
+
+		if currentCtx == nil || currentCtx.Err() != nil {
+			return
+		}
+
 		select {
 		case semaphore <- struct{}{}:
 			wg.Go(func() {
 				defer func() { <-semaphore }()
-				processJob(workerCtx, client, browser, cfg.ToolPath, &activeJobsMu, &activeJobs)
+				processJob(currentCtx, client, browser, toolPath)
 			})
 		default:
 		}
 	})
 	if err != nil {
-		log.Fatalf("Failed to schedule job: %v", err)
+		sysLog.ErrorE("Failed to schedule job", err)
+		return
 	}
 
-	scheduler.StartAsync()
-	oasm.Logger("Jobs").Verbose(fmt.Sprintf("Gocron poller started (Max Concurrency: %d)\n", cfg.MaxConcurrency))
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				stateMu.Lock()
+				if sessionCancel != nil {
+					sessionCancel()
+				}
+				stateMu.Unlock()
+				return
+			case isConnected, ok := <-ready:
+				if !ok {
+					return
+				}
+
+				stateMu.Lock()
+				if sessionCancel != nil {
+					sessionCancel()
+				}
+
+				if isConnected {
+					sysLog.Success("Worker connected/reconnected. Initializing sub-systems...")
+					sessionCtx, sessionCancel = context.WithCancel(ctx)
+
+					if cfg.Network != "" {
+						if err := connectInternalNetwork(client, cfg.Network); err != nil {
+							netLog.ErrorE("Failed to connect internal network", err)
+							stateMu.Unlock()
+							continue
+						}
+						netLog.Success("Connected to internal network: %s", cfg.Network)
+					}
+
+					if err := client.WorkerDownloadTools(sessionCtx); err != nil {
+						sysLog.ErrorE("Download tools failed", err)
+						stateMu.Unlock()
+						continue
+					}
+
+					go startRemoteExecuteHandler(sessionCtx, client, workspaceRoot, toolPath)
+
+					if !schedulerStarted {
+						scheduler.StartAsync()
+						jobLog.Success("Gocron poller started (Max Concurrency: %d)", cfg.MaxConcurrency)
+						schedulerStarted = true
+					}
+				} else {
+					sysLog.Warning("Worker disconnected from core. Suspending job poller and streams...")
+					sessionCtx = nil
+					sessionCancel = nil
+				}
+				stateMu.Unlock()
+			}
+		}
+	}()
+
+	go client.WorkerConnect(workerCtx, ready)
 
 	ticker := time.NewTicker(time.Second)
 	go func() {
 		defer ticker.Stop()
+		var lastLogged int
 		for {
 			select {
 			case <-ticker.C:
-				running := len(semaphore)
+				activeJobsMu.RLock()
+				running := len(activeJobs)
+				activeJobsMu.RUnlock()
+
 				if running != lastLogged {
-					logJobStatus(running, cfg.MaxConcurrency)
+					jobLog.Verbose("Jobs running: %d/%d", running, cfg.MaxConcurrency)
 					lastLogged = running
 				}
 			case <-ctx.Done():
@@ -170,15 +221,27 @@ func Start(ctx context.Context, cfg *config.Config, network string) {
 	}()
 
 	<-ctx.Done()
-	log.Println("Received shutdown signal. Initiating graceful shutdown...")
+	shutLog.Info("Signal received. Stopping scheduler...")
 
 	scheduler.Stop()
-	log.Println("Job scheduler stopped.")
+	shutLog.Info("Scheduler stopped. Waiting for running jobs to finish...")
 
-	log.Println("Waiting for running jobs to finish...")
 	wg.Wait()
-	workerCancel()
+	shutLog.Info("All jobs completed. Cancelling session contexts...")
 
-	log.Println("All running jobs have completed successfully.")
-	log.Println("Worker shut down safely.")
+	stateMu.Lock()
+	if sessionCancel != nil {
+		sessionCancel()
+	}
+	stateMu.Unlock()
+
+	if err := browser.Close(); err != nil {
+		shutLog.Warning("Browser close warning: %v", err)
+	}
+	l.Kill()
+	l.Cleanup()
+	shutLog.Success("Browser killed safely")
+
+	workerCancel()
+	shutLog.Success("Worker shut down safely")
 }

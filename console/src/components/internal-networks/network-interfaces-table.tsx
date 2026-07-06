@@ -20,7 +20,7 @@ import type { AxiosError } from 'axios';
 import { format } from 'date-fns';
 import { TargetIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 interface NetworkInterfaceItem extends GetManyNetworkInterfacesResponseDtoDataItem {
@@ -146,7 +146,7 @@ export function NetworkInterfacesTable({
                     item.targetId ? 'cursor-pointer hover:bg-muted/50' : ''
                   }
                   onClick={() =>
-                    item.targetId && navigate(`/targets/${item.targetId}`)
+                    item.targetId && navigate({ to: `/targets/${item.targetId}` })
                   }
                 >
                   <TableCell>

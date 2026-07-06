@@ -8,9 +8,9 @@ export function NewBadge({ className = "" }: NewBadgeProps) {
     return (
         <Badge
             variant="default"
-            className={`px-1 py-0.5 text-[8px] leading-none h-4 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white border-red-500 ${className}`}
+            className={`h-4 rounded-md border-transparent bg-primary/12 px-1.5 text-[9px] font-semibold uppercase leading-none tracking-wider text-primary hover:bg-primary/18 ${className}`}
         >
-            NEW
+            New
         </Badge>
     );
 }

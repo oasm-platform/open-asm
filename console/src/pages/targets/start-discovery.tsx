@@ -11,7 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
@@ -22,6 +22,18 @@ const targetTypeColor: Record<string, string> = {
   DOMAIN: 'border-blue-500 text-blue-500',
   CIDR: 'border-green-500 text-green-500',
   IP: 'border-orange-500 text-orange-500',
+};
+
+const targetTypeBg: Record<string, string> = {
+  DOMAIN: 'bg-blue-500/10',
+  CIDR: 'bg-green-500/10',
+  IP: 'bg-orange-500/10',
+};
+
+const targetTypeButton: Record<string, string> = {
+  DOMAIN: 'bg-blue-500 hover:bg-blue-600 text-white',
+  CIDR: 'bg-green-500 hover:bg-green-600 text-white',
+  IP: 'bg-orange-500 hover:bg-orange-600 text-white',
 };
 
 const textareaBorderColor: Record<string, string> = {
@@ -196,7 +208,7 @@ export default function StartDiscovery() {
             queryClient.refetchQueries({
               queryKey: ['targets'],
             });
-            navigate(`/targets?page=1&pageSize=100`);
+            navigate({ to: '/targets', search: { page: 1, pageSize: 100 } });
           }
 
           if (res.totalSkipped > 0) {
@@ -212,7 +224,7 @@ export default function StartDiscovery() {
   return (
     <Page title="Start discovery" isShowButtonGoBack>
       <div className="max-w-4xl mx-auto py-6">
-        <div className="bg-card rounded-lg border p-4">
+        <div className={`bg-card rounded-lg border ${targetTypeBg[targetType]} p-4`}>
           <div className="mb-6">
             <p className="text-muted-foreground mt-2">
               Enter one or more targets to scan, separated by commas or new
@@ -332,11 +344,11 @@ export default function StartDiscovery() {
               <Button
                 variant="outline"
                 type="button"
-                onClick={() => navigate('/targets')}
+                onClick={() => navigate({ to: '/targets' })}
               >
                 Cancel
               </Button>
-              <Button disabled={isPending} type="submit">
+              <Button disabled={isPending} type="submit" className={targetTypeButton[targetType]}>
                 {isPending && <Loader2Icon className="animate-spin" />}
                 Start Discovery
               </Button>

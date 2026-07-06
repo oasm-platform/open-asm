@@ -1,18 +1,10 @@
-import {
-  PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputTools,
-  type PromptInputMessage,
-} from '@/components/ai-elements/prompt-input';
-import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 import Page from '@/components/common/page';
 import LlmConnect from '@/components/llm-connect';
 import TypewriterText from '@/components/typewriter-text';
-import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
+import AgentPromptInput from '@/components/agent-prompt-input';
+import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type {
   ConversationResponseDto,
   LLMConfigWithProviderDto,
@@ -23,8 +15,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
 
@@ -65,16 +56,21 @@ const ALL_QUICK_SUGGESTIONS = [
   'What services are running with excessive permissions?',
 ];
 
+const routeApi = getRouteApi('/_authed/agents/');
+
 export default function AgentsLandingPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [input, setInput] = useState('');
+  const { text: queryText } = routeApi.useSearch();
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
     provider: string;
     model: string;
     configId: string;
   } | null>(null);
+  const [agentMode, setAgentMode] = useState('ask');
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(
+    null,
+  );
 
   const {
     state: { selectedWorkspaceId },
@@ -119,41 +115,37 @@ export default function AgentsLandingPage() {
     return shuffled.slice(0, 5);
   }, []);
 
-  const queryText = searchParams.get('text');
-
   const handleSendMessage = useCallback(
-    (content: string) => {
+    (content: string, options?: { agentMode?: string }) => {
       if (!content.trim() || isSending) return;
 
       setIsSending(true);
 
       // Generate UUID v7 for new conversation and navigate immediately
       const newConversationId = uuidv7();
-      void navigate(`/agents/conversations/${newConversationId}`, {
-        state: {
-          pendingMessage: content.trim(),
-          ...(selectedModel && { selectedModel }),
-        },
+      const navState: Record<string, unknown> = {
+        pendingMessage: content.trim(),
+        ...(selectedModel && { selectedModel }),
+        agentMode: options?.agentMode ?? agentMode,
+        workerId: selectedWorkerId,
+      };
+      void navigate({
+        to: '/agents/conversations/$conversationId',
+        params: { conversationId: newConversationId },
+        state: navState,
       });
     },
-    [isSending, navigate, selectedModel],
+    [isSending, navigate, selectedModel, agentMode, selectedWorkerId],
   );
 
   useEffect(() => {
-    if (queryText && !isSending && !input) {
+    if (queryText && !isSending) {
       handleSendMessage(queryText);
       const url = new URL(window.location.href);
       url.searchParams.delete('text');
       window.history.replaceState({}, '', url.toString());
     }
-  }, [queryText, isSending, input, handleSendMessage]);
-
-  const handleSubmit = (message: PromptInputMessage) => {
-    if (message.text.trim()) {
-      handleSendMessage(message.text);
-      setInput('');
-    }
-  };
+  }, [queryText, isSending, handleSendMessage]);
 
   const handleSuggestionClick = (suggestion: string) => {
     handleSendMessage(suggestion);
@@ -161,7 +153,7 @@ export default function AgentsLandingPage() {
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
-      void navigate(`/agents/conversations/${conversationId}`);
+      void navigate({ to: `/agents/conversations/${conversationId}` });
     },
     [navigate],
   );
@@ -208,31 +200,18 @@ export default function AgentsLandingPage() {
 
         {/* Input area */}
         <div className="w-full max-w-2xl flex flex-col gap-3">
-          <PromptInput onSubmit={handleSubmit} className="w-full shadow-sm">
-            <PromptInputBody>
-              <PromptInputTextarea
-                value={input}
-                placeholder="Ask anything about security..."
-                onChange={(e) => setInput(e.currentTarget.value)}
-                disabled={isSending}
-              />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <PromptInputTools>
-                <ChatModelSwitcher
-                  selectedProvider={selectedModel?.provider ?? null}
-                  selectedModel={selectedModel?.model ?? null}
-                  onSelectModel={(provider, model, configId) => {
-                    setSelectedModel({ provider, model, configId });
-                  }}
-                />
-              </PromptInputTools>
-              <PromptInputSubmit
-                status={isSending ? 'streaming' : 'ready'}
-                disabled={!input.trim() || isSending}
-              />
-            </PromptInputFooter>
-          </PromptInput>
+          <AgentPromptInput
+            onSubmit={handleSendMessage}
+            isSending={isSending}
+            selectedModel={selectedModel}
+            onSelectModel={(provider, model, configId) => {
+              setSelectedModel({ provider, model, configId });
+            }}
+            agentMode={agentMode}
+            onAgentModeChange={setAgentMode}
+            selectedWorkerId={selectedWorkerId}
+            onWorkerSelect={setSelectedWorkerId}
+          />
 
           {/* Quick suggestions */}
           <Suggestions>
@@ -265,7 +244,7 @@ export default function AgentsLandingPage() {
               </button>
             ))}
             <button
-              onClick={() => void navigate('/agents/conversations')}
+              onClick={() => void navigate({ to: '/agents/conversations' })}
               className="text-xs text-muted-foreground hover:text-accent-foreground transition-colors mt-1 py-1 px-3 text-left"
             >
               View all conversations →

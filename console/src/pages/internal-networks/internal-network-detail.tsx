@@ -1,27 +1,33 @@
 import Page from '@/components/common/page';
 import { NetworkInterfacesTable } from '@/components/internal-networks/network-interfaces-table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConnectWorker } from '@/components/ui/connect-worker';
+import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
 import {
   useInternalNetworksControllerDeleteInternalNetwork,
   useInternalNetworksControllerGetInternalNetworkById,
 } from '@/services/apis/gen/queries';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { EditInternalNetworkDialog } from './components/edit-internal-network-dialog';
 import { Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@tanstack/react-router';
 
 export default function InternalNetworkDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const navigate = useNavigate();
-  const { data: network, isLoading: networkLoading } =
-    useInternalNetworksControllerGetInternalNetworkById(id!);
+
+  const { data: network, isLoading: networkLoading, refetch } =
+    useInternalNetworksControllerGetInternalNetworkById(id!, {
+      query: {
+        queryKey: ['internalNetwork', id],
+      },
+    });
 
   const deleteMutation = useInternalNetworksControllerDeleteInternalNetwork({
     mutation: {
       onSuccess: () => {
-        navigate('/internal-networks');
+        navigate({ to: '/internal-networks' });
       },
     },
   });
@@ -39,18 +45,24 @@ export default function InternalNetworkDetail() {
       title={network.name}
       isShowButtonGoBack
       action={
-        <ConfirmDialog
-          title="Delete Internal Network"
-          description={`Are you sure you want to delete "${network.name}"? This action cannot be undone.`}
-          onConfirm={() => deleteMutation.mutate({ id: network.id })}
-          confirmText="Delete"
-          trigger={
-            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800">
-              <Trash2 className="h-4 w-4 mr-2" />
-              <span>Delete</span>
-            </Button>
-          }
-        />
+        <div className="flex items-center gap-2">
+          <EditInternalNetworkDialog
+            internalNetwork={network}
+            onSuccess={() => refetch()}
+          />
+          <ConfirmDialog
+            title="Delete Internal Network"
+            description={`All targets and assets associated with this network will be permanently deleted. This action cannot be undone.`}
+            onConfirm={() => deleteMutation.mutate({ id: network.id })}
+            confirmText="Delete"
+            typeToConfirm={network.name}
+            trigger={
+              <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-800">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            }
+          />
+        </div>
       }
     >
       <div className="space-y-6">
@@ -80,7 +92,7 @@ export default function InternalNetworkDetail() {
           </CardContent>
         </Card>
 
-        <ConnectWorker networkId={network.id} />
+        <ConnectWorkerTrigger networkId={network.id} />
 
         <NetworkInterfacesTable networkId={network.id} />
       </div>

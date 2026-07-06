@@ -133,7 +133,7 @@ describe('WorkflowsService', () => {
         name: 'Test Workflow',
         on: { event: 'test' },
       });
-      jest.spyOn(workflowRepository, 'findOne').mockResolvedValue(null as any);
+      jest.spyOn(workflowRepository, 'findOne').mockResolvedValue(null);
       jest.spyOn(workflowRepository, 'insert').mockResolvedValue({} as any);
 
       await service.createDefaultWorkflows('workspace-1');

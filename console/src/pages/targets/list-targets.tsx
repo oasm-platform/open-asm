@@ -9,6 +9,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import {
   JobStatus,
+  TargetScopeType,
   TargetType,
   useTargetsControllerGetTargetsInWorkspace,
 } from '@/services/apis/gen/queries';
@@ -21,14 +22,15 @@ import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { GetManyTargetResponseDto } from '@/services/apis/gen/queries';
 import { Target } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { TargetTypeFilter } from './components/target-type-filter';
+import { ScopeFilter } from './components/scope-filter';
 
 const targetTypeColor: Record<string, string> = {
-  DOMAIN: 'border-blue-500 text-blue-500',
-  CIDR: 'border-green-500 text-green-500',
-  IP: 'border-orange-500 text-orange-500',
+  DOMAIN: 'border-blue-400 text-blue-400',
+  CIDR: 'border-emerald-400 text-emerald-400',
+  IP: 'border-amber-400 text-amber-400',
 };
 
 const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
@@ -36,7 +38,14 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     accessorKey: 'value',
     header: 'Target',
     cell: ({ row }) => (
-      <div className="font-medium">{row.getValue('value')}</div>
+      <div className="flex items-center gap-2">
+        <span className="font-medium">{row.getValue('value')}</span>
+        {row.original.internalNetworkId && (
+          <Badge variant="secondary" className="text-xs">
+            Internal
+          </Badge>
+        )}
+      </div>
     ),
   },
   {
@@ -57,8 +66,8 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     cell: ({ row }) => {
       const value: string = row.getValue('totalAssetServices');
       return (
-        <div>
-          <b>{value}</b> services
+        <div className="text-muted-foreground font-medium">
+          {value} services
         </div>
       );
     },
@@ -93,7 +102,7 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     cell: ({ row }) => {
       const value: string = row.getValue('lastDiscoveredAt');
       return (
-        <div className="text-gray-400 font-semibold">
+        <div className="text-muted-foreground font-medium">
           {dayjs(value).fromNow()}
         </div>
       );
@@ -109,49 +118,58 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   },
 ];
 
+const routeApi = getRouteApi('/_authed/targets/');
+
 export function ListTargets() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate({ from: '/targets/' });
+  const search = routeApi.useSearch();
 
   // Initialize type filter from URL params
-  const urlType = searchParams.get('type') as TargetType | null;
+  const urlType = search.type as TargetType | undefined;
   const [typeFilter, setTypeFilter] = useState<TargetType | undefined>(
     urlType ?? undefined,
   );
 
   // Initialize status filter from URL params
-  const urlStatus = searchParams.get('status') as JobStatus | null;
+  const urlStatus = search.status as JobStatus | undefined;
   const [statusFilter, setStatusFilter] = useState<JobStatus | undefined>(
     urlStatus ?? undefined,
+  );
+
+  // Initialize scope filter from URL params
+  const urlScope = search.scope as TargetScopeType | undefined;
+  const [scopeFilter, setScopeFilter] = useState<TargetScopeType | undefined>(
+    (urlScope as TargetScopeType) ?? undefined,
   );
 
   /** Sync type filter to URL search params */
   const handleTypeFilterChange = (newType: TargetType | undefined) => {
     setTypeFilter(newType);
-
-    const newParams = new URLSearchParams(searchParams);
-    if (newType) {
-      newParams.set('type', newType);
-    } else {
-      newParams.delete('type');
-    }
-    setSearchParams(newParams, { replace: true });
+    navigate({
+      search: ((prev: Record<string, unknown>) => ({ ...prev, type: newType || undefined })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      replace: true,
+    });
   };
 
   /** Sync status filter to URL search params */
   const handleStatusFilterChange = (newStatus: JobStatus | undefined) => {
     setStatusFilter(newStatus);
+    navigate({
+      search: ((prev: Record<string, unknown>) => ({ ...prev, status: newStatus || undefined })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      replace: true,
+    });
+  };
 
-    const newParams = new URLSearchParams(searchParams);
-    if (newStatus) {
-      newParams.set('status', newStatus);
-    } else {
-      newParams.delete('status');
-    }
-    setSearchParams(newParams, { replace: true });
+  /** Sync scope filter to URL search params */
+  const handleScopeFilterChange = (newValue: TargetScopeType | undefined) => {
+    setScopeFilter(newValue);
+    navigate({
+      search: ((prev: Record<string, unknown>) => ({ ...prev, scope: newValue || undefined })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      replace: true,
+    });
   };
 
   const {
@@ -169,6 +187,7 @@ export function ListTargets() {
         value: filter,
         type: typeFilter,
         status: statusFilter,
+        scope: scopeFilter,
       },
       {
         query: {
@@ -183,6 +202,7 @@ export function ListTargets() {
             filter,
             typeFilter,
             statusFilter,
+            scopeFilter,
           ],
         },
       },
@@ -197,7 +217,10 @@ export function ListTargets() {
     );
 
   const handleRowClick = (target: GetManyTargetResponseDto) => {
-    navigate(`/targets/${target.id}/asset-services`);
+    navigate({
+      to: '/targets/$id/$tab',
+      params: { id: target.id, tab: 'asset-services' },
+    });
   };
 
   return (
@@ -228,11 +251,16 @@ export function ListTargets() {
           value={statusFilter}
           onValueChange={handleStatusFilterChange}
         />,
+        <ScopeFilter
+          key="scope-filter"
+          value={scopeFilter}
+          onValueChange={handleScopeFilterChange}
+        />,
         // <ExportDataButton api="api/targets/export" prefix="targets" />,
         <Button
           variant="outline"
           className="gap-2"
-          onClick={() => navigate('/targets/start-discovery')}
+          onClick={() => navigate({ to: '/targets/start-discovery' })}
         >
           <Target className="shrink-0" />
           <span>Start discovery</span>

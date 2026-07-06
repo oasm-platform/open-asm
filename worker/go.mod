@@ -7,11 +7,12 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-rod/rod v0.116.2
-	github.com/oasm-platform/oasm-sdk-go v0.1.1-0.20260428114300-b30669a4e6d6
-	github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260428111953-044d56938cef
+	github.com/go-rod/stealth v0.4.9
+	github.com/joho/godotenv v1.5.1
+	github.com/oasm-platform/oasm-sdk-go v0.1.11
+	github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260618004722-4483b4b84523
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
-	google.golang.org/grpc v1.80.0
 )
 
 require (
@@ -36,9 +37,10 @@ require (
 	github.com/ysmood/leakless v0.9.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
+	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

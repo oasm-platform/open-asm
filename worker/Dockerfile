@@ -1,5 +1,7 @@
-# Stage 1: Build
-FROM golang:1.26-alpine AS builder
+# Stage 1: Build — always runs on the native build platform for fast cross-compilation
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -15,31 +17,38 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build static binary with optimizations
-RUN CGO_ENABLED=0 GOOS=linux go build \
+# Cross-compile for the target architecture; CGO_ENABLED=0 makes this dependency-free
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build \
     -ldflags='-w -s -extldflags "-static"' \
-    -o oasm-worker ./cmd/oasm-worker
+    -o oasm-worker ./cmd/app
 
 # Stage 2: Runtime
-FROM alpine:3.20
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install ca-certificates for TLS, bash for entrypoint, and chromium for browser tasks
-RUN apk add --no-cache ca-certificates bash chromium nss freetype harfbuzz ttf-freefont
+# Install ca-certificates for TLS, bash, chromium for browser tasks, and libpcap for naabu
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    bash \
+    chromium \
+    libpcap0.8 \
+    curl \
+    iputils-ping \
+    dnsutils \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy binary and entrypoint from builder
-    COPY --from=builder /app/oasm-worker .
-    COPY --from=builder /app/entrypoint.sh .
+# Create tool directory
+RUN mkdir -p /app/oasm-tools
 
-# Make entrypoint executable
-RUN chmod +x /app/entrypoint.sh
+# Copy binary from builder
+COPY --from=builder /app/oasm-worker .
 
 # Create non-root user for security
-RUN addgroup -g 1000 -S worker && \
-    adduser -u 1000 -S worker -G worker
+RUN groupadd -g 1000 worker && \
+    useradd -u 1000 -g worker -s /bin/bash -m worker
 
-# Change ownership
+# Change ownership of app directory
 RUN chown -R worker:worker /app
 
 USER worker
@@ -62,5 +71,5 @@ LABEL org.opencontainers.image.title="OASM Worker"
 LABEL org.opencontainers.image.description="Attack Surface Management worker agent"
 LABEL org.opencontainers.image.vendor="OASM Platform"
 
-# Entrypoint - automatically starts worker with environment configuration
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Entrypoint
+ENTRYPOINT ["/app/oasm-worker"]

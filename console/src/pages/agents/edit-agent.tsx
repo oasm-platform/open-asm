@@ -3,15 +3,16 @@ import {
   useAgentsControllerGetLLMConfigs,
   useAgentsControllerUpdateLLMConfig,
   type UpdateLLMConfigDto,
+  type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { Loader2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { AgentForm, type AgentFormData } from './agent-form';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 export default function EditAgentPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const navigate = useNavigate();
   const {
     state: { selectedWorkspaceId },
@@ -26,7 +27,9 @@ export default function EditAgentPage() {
 
   const { mutate, isPending } = useAgentsControllerUpdateLLMConfig();
 
-  const agent = data?.data?.find((a) => a.configId === id);
+  const agent = (data as LLMConfigWithProviderDto[] | undefined)?.find(
+    (a) => a.configId === id,
+  );
 
   const onSubmit = (formData: AgentFormData) => {
     const updateData: UpdateLLMConfigDto = {
@@ -49,7 +52,7 @@ export default function EditAgentPage() {
       {
         onSuccess: () => {
           toast.success('Provider updated successfully');
-          navigate(`/agents/${id}`);
+          navigate({ to: `/agents/${id}` });
         },
         onError: (error) => {
           toast.error('Failed to update provider');
@@ -77,7 +80,7 @@ export default function EditAgentPage() {
         </p>
         <button
           className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded"
-          onClick={() => navigate(-1)}
+          onClick={() => window.history.back()}
         >
           Go back
         </button>

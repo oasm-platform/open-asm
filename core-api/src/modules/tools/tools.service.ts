@@ -1,3 +1,4 @@
+import type { WrapperType } from '@/common/types/app.types';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import {
   ApiKeyType,
@@ -50,7 +51,7 @@ export class ToolsService implements OnModuleInit {
     private readonly apiKeysService: ApiKeysService,
 
     @Inject(forwardRef(() => WorkersService))
-    private readonly workersService: WorkersService,
+    private readonly workersService: WrapperType<WorkersService>,
   ) {}
 
   /**

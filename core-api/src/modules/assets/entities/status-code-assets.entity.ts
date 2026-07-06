@@ -1,4 +1,4 @@
-import { JoinColumn, ManyToOne, ViewColumn, ViewEntity } from 'typeorm';
+import { JoinColumn, ManyToOne, Relation, ViewColumn, ViewEntity } from 'typeorm';
 import { Asset } from './assets.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { AssetService } from './asset-services.entity';
@@ -26,5 +26,5 @@ export class StatusCodeAssetsView {
 
   @ManyToOne(() => Asset, (asset) => asset.ipAssets)
   @JoinColumn({ name: 'assetServiceId' })
-  assetService: AssetService;
+  assetService: Relation<AssetService>;
 }

@@ -1,3 +1,4 @@
+import { ConnectWorkerDialog } from '@/components/ui/connect-worker-dialog';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import type { ReactNode } from 'react';
@@ -16,8 +17,9 @@ export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
       {isHasWorkspace && <AppSidebar />}
       <SidebarInset>
         <HeaderBar />
-        <main className="flex flex-1 flex-col gap-4 p-4">{children}</main>
+        <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">{children}</main>
       </SidebarInset>
+      <ConnectWorkerDialog />
     </SidebarProvider>
   );
 }

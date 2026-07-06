@@ -80,7 +80,7 @@ export function ListUsers() {
         onSortChange={(col, order) => {
           setParams({ sortBy: col, sortOrder: order });
         }}
-        toolbarComponents={[<AddUserDialog />]}
+        toolbarComponents={[<AddUserDialog key="add-user" />]}
         filterColumnKey="value"
         filterValue={filter}
         onFilterChange={setFilter}

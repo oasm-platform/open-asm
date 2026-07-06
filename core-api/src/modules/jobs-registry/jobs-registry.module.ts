@@ -11,7 +11,6 @@ import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryController } from './jobs-registry.controller';
 import { JobsRegistryService } from './jobs-registry.service';
-import { IssueCreationProcessor } from './processors/issue-creation.processor';
 import { JobResultProcessor } from './processors/job-result.processor';
 import {
   AssetGroupsScheduleConsumer,
@@ -33,9 +32,9 @@ import {
     BullModule.registerQueue({
       name: BullMQName.JOB_RESULT,
     }),
-    BullModule.registerQueue({
-      name: BullMQName.ISSUE_CREATION,
-    }),
+    // BullModule.registerQueue({
+    //   name: BullMQName.ISSUE_CREATION,
+    // }),
   ],
   controllers: [JobsRegistryController],
   providers: [
@@ -43,7 +42,7 @@ import {
     AssetsDiscoveryScheduleConsumer,
     AssetGroupsScheduleConsumer,
     JobResultProcessor,
-    IssueCreationProcessor,
+    // IssueCreationProcessor,
   ],
   exports: [JobsRegistryService],
 })

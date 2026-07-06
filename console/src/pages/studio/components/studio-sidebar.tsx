@@ -323,7 +323,7 @@ function Tree({ search }: { search: string }) {
 
   const [folderName, items] = [
     'Workspace templates',
-    data?.data.map((e) => ({
+    data?.data?.map((e) => ({
       fileName: e.fileName,
       templateId: e.id,
     })) || [],

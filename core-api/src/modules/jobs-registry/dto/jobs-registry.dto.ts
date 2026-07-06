@@ -67,7 +67,7 @@ export class DataPayloadResult {
         if (typeof field === 'object' && 'values' in field) {
           return field.values;
         }
-        return field as T;
+        return field;
       };
 
       return (

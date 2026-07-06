@@ -1,4 +1,3 @@
-import { getGlobalWorkspaceId } from '@/utils/workspaceState';
 import Axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 import Qs from 'qs';
 
@@ -8,6 +7,8 @@ export const axiosInstance = Axios.create({
   paramsSerializer: (params) => Qs.stringify(params, { arrayFormat: 'repeat' }),
   withCredentials: true,
 });
+
+import { getGlobalWorkspaceId } from '@/utils/workspaceState';
 
 axiosInstance.interceptors.request.use((config) => {
   const workspaceId = getGlobalWorkspaceId();
@@ -41,13 +42,13 @@ axiosInstance.interceptors.request.use((config) => {
     for (const key of keys) {
       const values = searchParams.getAll(key);
       const filtered = values.filter(cleanValue);
-      
+
       if (filtered.length === 0) {
         searchParams.delete(key);
         modified = true;
       } else if (filtered.length !== values.length) {
         searchParams.delete(key);
-        filtered.forEach(v => searchParams.append(key, v));
+        filtered.forEach((v) => searchParams.append(key, v));
         modified = true;
       }
     }
@@ -64,9 +65,9 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
-      window.location.href = '/login';
-    }
+    // if (error.response?.status === 401) {
+    //   window.location.href = '/login';
+    // }
     return Promise.reject(error);
   },
 );
@@ -84,7 +85,9 @@ export const orvalClient = <T>(
   const promise = axiosInstance<T>({
     ...finalConfig,
     ...options,
-    ...(options?.body || options?.data ? { data: options?.body ?? options?.data } : {}),
+    ...(options?.body || options?.data
+      ? { data: options?.body ?? options?.data }
+      : {}),
     cancelToken: source.token,
   });
 
