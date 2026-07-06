@@ -26,7 +26,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -83,7 +83,7 @@ export default function WorkspaceSettings() {
       {
         onSuccess: () => {
           toast.success('Workspace updated successfully');
-          queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] });
           refetch();
         },
         onError: () => {
@@ -103,8 +103,8 @@ export default function WorkspaceSettings() {
       {
         onSuccess: () => {
           toast.success('Workspace deleted successfully');
-          queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-          navigate('/');
+          queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] });
+          navigate({ to: '/' });
         },
         onError: () => {
           toast.error('Failed to delete workspace');

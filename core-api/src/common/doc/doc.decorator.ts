@@ -11,6 +11,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 
+import { WORKSPACE_HEADER_NAME } from '../constants/app.constants';
 import type { IDocOptions, IDocResponseOptions } from './doc.interface';
 import { AppResponseSerialization } from './response.serialization';
 
@@ -42,9 +43,8 @@ function applyParamDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
   if (options?.request?.getWorkspaceId) {
     decorators.push(
       ApiHeader({
-        name: 'X-Workspace-Id',
+        name: WORKSPACE_HEADER_NAME,
         description: 'Workspace ID',
-        required: true,
       }),
     );
   }
@@ -140,12 +140,8 @@ function DocDefault<T>({
     decorators.push(ApiExtraModels(serialization));
     if (isArray) {
       Object.assign(schema, {
-        properties: {
-          data: {
-            type: 'array',
-            items: { $ref: getSchemaPath(serialization) },
-          },
-        },
+        type: 'array',
+        items: { $ref: getSchemaPath(serialization) },
       });
     } else {
       Object.assign(schema, {

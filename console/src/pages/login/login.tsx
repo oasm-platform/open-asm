@@ -1,6 +1,5 @@
-import AuthHeader from '@/components/common/auth-header';
+import AuthLayout from '@/components/common/layout/auth-layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -12,10 +11,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { authClient } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useLocation } from 'react-router-dom';
 import { z } from 'zod';
 
 const formSchema = z.object({
@@ -23,10 +22,10 @@ const formSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+const routeApi = getRouteApi('/login');
+
 export default function Login() {
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const redirectUrl = searchParams.get('redirect');
+  const { redirect: redirectUrl } = routeApi.useSearch();
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -36,30 +35,46 @@ export default function Login() {
   });
 
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
     const res = await authClient.signIn.email({
       email: values.email,
       password: values.password,
-      callbackURL: redirectUrl || '/',
+      fetchOptions: {
+        onSuccess: async () => {
+          await navigate({ to: redirectUrl || '/', replace: true });
+        },
+        onError: (ctx) => {
+          form.setError('password', {
+            message: ctx.error?.message || 'Invalid email or password',
+          });
+        },
+      },
     });
-    if (!res.data) {
-      form.setError('password', { message: 'Invalid email or password' });
+    if (res.error) {
+      form.setError('password', {
+        message: res.error?.message || 'Invalid email or password',
+      });
     }
     setLoading(false);
   }
 
   return (
-    <div className="flex h-screen items-center justify-center flex-col gap-4">
-      <AuthHeader />
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <AuthLayout>
+      <div className="flex w-full items-center justify-center bg-background px-6 py-12 lg:w-1/2">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="space-y-2 text-center lg:text-left">
+            <h1 className="text-balance text-2xl font-semibold tracking-tight">
+              Welcome back
+            </h1>
+            <p className="text-pretty text-sm text-muted-foreground">
+              Sign in to access your workspace.
+            </p>
+          </div>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <FormField
                 control={form.control}
                 name="email"
@@ -90,14 +105,19 @@ export default function Login() {
                   </FormItem>
                 )}
               />
-              <Button disabled={loading} type="submit" className="w-full">
+              <Button
+                disabled={loading}
+                type="submit"
+                className="w-full"
+                size="lg"
+              >
                 {loading && <Loader2Icon className="animate-spin" />}
-                Sign In
+                Sign in
               </Button>
             </form>
           </Form>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </AuthLayout>
   );
 }

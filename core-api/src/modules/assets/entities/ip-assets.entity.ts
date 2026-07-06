@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { JoinColumn, ManyToOne, ViewColumn, ViewEntity } from 'typeorm';
+import { JoinColumn, ManyToOne, Relation, ViewColumn, ViewEntity } from 'typeorm';
 import { Asset } from './assets.entity';
 
 @ViewEntity({
@@ -31,5 +31,5 @@ export class IpAssetsView {
 
   @ManyToOne(() => Asset, (asset) => asset.ipAssets)
   @JoinColumn({ name: 'assetId' })
-  asset: Asset;
+  asset: Relation<Asset>;
 }

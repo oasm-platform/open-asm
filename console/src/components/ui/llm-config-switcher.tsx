@@ -17,7 +17,7 @@ import {
   useAgentsControllerSetPreferredLLMConfig,
 } from '@/services/apis/gen/queries';
 import { Check, ChevronsUpDown, Settings } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import Image from './image';
 import { Separator } from './separator';
@@ -56,7 +56,7 @@ export function LlmConfigSwitcher() {
   };
 
   const handleConnect = () => {
-    void navigate('/agents/providers/connect');
+    void navigate({ to: '/agents/providers/connect' });
   };
 
   if (isLoading) {
@@ -79,7 +79,7 @@ export function LlmConfigSwitcher() {
           <Image
             url={selectedProvider?.logo}
             height={20}
-            className="dark:bg-white bg-gray-500 rounded p-1"
+            className="bg-white rounded p-1"
           />
           <div className="flex gap-0.5 leading-none">
             <span className="hidden md:inline font-semibold mr-2">
@@ -121,7 +121,7 @@ export function LlmConfigSwitcher() {
                   <Image
                     url={provider?.logo}
                     height={30}
-                    className="dark:bg-white bg-gray-500 rounded p-1"
+                    className="bg-white rounded p-1"
                   />
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">

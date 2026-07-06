@@ -1,111 +1,145 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { GeoIp } from '@/services/geo-ip/geo-ip.service';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
-import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
+import {
+  GetStatisticQueryDto,
+  StatisticResponseDto,
+} from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
+import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
 import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
+import { AssetLocationDto } from './dto/asset-location.dto';
 import { StatisticService } from './statistic.service';
 
 @ApiTags('Statistic')
 @Controller('statistic')
 export class StatisticController {
-  constructor(private readonly statisticService: StatisticService) { }
+  constructor(private readonly statisticService: StatisticService) {}
 
   @Doc({
     summary: 'Get workspace statistics',
-    description: 'Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.',
+    description:
+      'Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.',
     response: {
       serialization: StatisticResponseDto,
     },
   })
   @Get()
-  getStatistics(@Query() query: GetStatisticQueryDto): Promise<StatisticResponseDto> {
+  getStatistics(
+    @Query() query: GetStatisticQueryDto,
+  ): Promise<StatisticResponseDto> {
     return this.statisticService.getStatistics(query);
   }
 
   @Doc({
     summary: 'Get timeline statistics for a workspace',
-    description: 'Retrieves statistics for a workspace over the last 3 months, showing trends and changes over time.',
+    description:
+      'Retrieves statistics for a workspace over the last 3 months, showing trends and changes over time.',
     response: {
       serialization: TimelineResponseDto,
     },
     request: {
-      getWorkspaceId: true
-    }
+      getWorkspaceId: true,
+    },
   })
   @Get('timeline')
-  getTimelineStatistics(@WorkspaceId() workspaceId: string): Promise<TimelineResponseDto> {
+  getTimelineStatistics(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<TimelineResponseDto> {
     return this.statisticService.getTimelineStatistics(workspaceId);
   }
 
   @Doc({
     summary: 'Get issues timeline statistics for a workspace',
-    description: 'Retrieves issues timeline statistics for a workspace, showing the number of vulnerabilities over time.',
+    description:
+      'Retrieves issues timeline statistics for a workspace, showing the number of vulnerabilities over time.',
     response: {
       serialization: IssuesTimelineResponseDto,
     },
     request: {
-      getWorkspaceId: true
-    }
+      getWorkspaceId: true,
+    },
   })
   @Get('issues-timeline')
-  getIssuesTimeline(@WorkspaceId() workspaceId: string): Promise<IssuesTimelineResponseDto> {
+  getIssuesTimeline(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<IssuesTimelineResponseDto> {
     return this.statisticService.getIssuesTimeline(workspaceId);
   }
 
   @Doc({
     summary: 'Get top 10 tags with the most assets in a workspace',
-    description: 'Retrieves the top 10 tags with the most assets in a workspace.',
+    description:
+      'Retrieves the top 10 tags with the most assets in a workspace.',
     response: {
       extraModels: [TopTagAsset],
       dataSchema: {
         type: 'array',
         items: { $ref: getSchemaPath(TopTagAsset) },
-      }
+      },
     },
     request: {
       getWorkspaceId: true,
     },
   })
   @Get('top-tags-assets')
-  getTopTagsAssets(
-    @WorkspaceId() workspaceId: string,
-  ): Promise<TopTagAsset[]> {
+  getTopTagsAssets(@WorkspaceId() workspaceId: string): Promise<TopTagAsset[]> {
     return this.statisticService.getTopTagsAssets(workspaceId);
   }
 
   @Doc({
-    summary: 'Get assets location',
-    description: 'Retrieves the location of assets in a workspace.',
+    summary: 'Get asset locations',
+    description:
+      'Retrieves the top 10 countries by IP count for a workspace. Batches IP lookups to the geo IP service and aggregates results by country.',
     response: {
-      extraModels: [GeoIp],
+      extraModels: [AssetLocationDto],
       dataSchema: {
         type: 'array',
-        items: { $ref: getSchemaPath(GeoIp) },
-      }
+        items: { $ref: getSchemaPath(AssetLocationDto) },
+      },
     },
     request: {
       getWorkspaceId: true,
     },
   })
   @Get('asset-locations')
-  getAssetLocations(@WorkspaceId() workspaceId: string) {
+  getAssetLocations(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<AssetLocationDto[]> {
     return this.statisticService.getAssetLocations(workspaceId);
   }
 
   @Doc({
+    summary: 'Get TLS certificate statistics for a workspace',
+    description:
+      'Retrieves TLS certificate statistics grouped by expiration status using not_after field, and counts newly discovered certificates within the last 30 days.',
+    response: {
+      serialization: TlsStatisticResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('tls')
+  getTlsStatistics(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<TlsStatisticResponseDto> {
+    return this.statisticService.getTlsStatistics(workspaceId);
+  }
+
+  @Doc({
     summary: 'Get top 10 assets with the most vulnerabilities in a workspace',
-    description: 'Retrieves the top 10 assets with the most vulnerabilities in a workspace.',
+    description:
+      'Retrieves the top 10 assets with the most vulnerabilities in a workspace.',
     response: {
       extraModels: [TopAssetVulnerabilities],
       dataSchema: {
         type: 'array',
         items: { $ref: getSchemaPath(TopAssetVulnerabilities) },
-      }
+      },
     },
     request: {
       getWorkspaceId: true,
@@ -115,6 +149,8 @@ export class StatisticController {
   getTopAssetsWithMostVulnerabilities(
     @WorkspaceId() workspaceId: string,
   ): Promise<TopAssetVulnerabilities[]> {
-    return this.statisticService.getTopAssetsWithMostVulnerabilities(workspaceId);
+    return this.statisticService.getTopAssetsWithMostVulnerabilities(
+      workspaceId,
+    );
   }
 }

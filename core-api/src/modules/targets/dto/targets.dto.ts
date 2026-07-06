@@ -1,5 +1,5 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { CronSchedule, JobStatus, ScanStatus } from '@/common/enums/enum';
+import { CronSchedule, JobStatus, ScanStatus, TargetScopeType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -120,6 +120,9 @@ export class GetManyTargetResponseDto {
 
   @ApiProperty()
   lastDiscoveredAt: Date;
+
+  @ApiProperty()
+  internalNetworkId: string;
 }
 
 export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
@@ -142,11 +145,22 @@ export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
     required: false,
     enum: JobStatus,
     enumName: 'JobStatus',
-    description: 'Filter by scan status (pending, in_progress, completed, failed, cancelled)',
+    description:
+      'Filter by scan status (pending, in_progress, completed, failed, cancelled)',
   })
   @IsEnum(JobStatus)
   @IsOptional()
   status?: JobStatus;
+
+  @ApiProperty({
+    required: false,
+    enum: TargetScopeType,
+    enumName: 'TargetScopeType',
+    description: 'Filter by target scope (INTERNAL or EXTERNAL)',
+  })
+  @IsEnum(TargetScopeType)
+  @IsOptional()
+  scope?: TargetScopeType;
 }
 
 export class UpdateTargetDto {

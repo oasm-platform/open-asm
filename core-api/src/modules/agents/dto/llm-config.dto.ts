@@ -39,8 +39,14 @@ export class CreateLLMConfigDto {
   @IsEnum(LLMProvider)
   provider: LLMProvider;
 
+  @ApiProperty({ required: false, example: 'My OpenAI key' })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
   @ApiProperty({})
   @IsString()
+  @IsOptional()
   apiKey: string;
 
   @ApiProperty({ required: false })
@@ -52,6 +58,14 @@ export class CreateLLMConfigDto {
   @IsOptional()
   @IsString()
   apiUrl?: string;
+
+  @ApiProperty({
+    example: 8192,
+    description: 'Custom context window size in tokens. Overrides API-provided value.',
+    required: false,
+  })
+  @IsOptional()
+  contextWindow?: number;
 }
 
 export class UpdateLLMConfigDto extends PartialType(CreateLLMConfigDto) {
@@ -68,6 +82,9 @@ export class LLMConfigResponseDto {
   @ApiProperty({ enum: LLMProvider })
   provider: LLMProvider;
 
+  @ApiProperty({ required: false })
+  name?: string;
+
   @ApiProperty()
   @IsString()
   @IsOptional()
@@ -75,6 +92,9 @@ export class LLMConfigResponseDto {
 
   @ApiProperty({ required: false })
   apiUrl?: string;
+
+  @ApiProperty({ required: false })
+  contextWindow?: number;
 
   @ApiProperty()
   isPreferred: boolean;
@@ -110,8 +130,14 @@ export class LLMConfigWithProviderDto {
   @ApiProperty({ description: 'Connection status' })
   isConnected: boolean;
 
+  @ApiProperty({ description: 'Whether provider accepts custom API URL' })
+  isAcceptCustomApiUrl?: boolean;
+
   @ApiProperty({ description: 'LLM config ID if connected', required: false })
   configId?: string;
+
+  @ApiProperty({ description: 'User-defined label for this config', required: false })
+  name?: string;
 
   @ApiProperty({ description: 'Model name if connected', required: false })
   model?: string;

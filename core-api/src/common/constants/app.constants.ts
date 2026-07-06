@@ -12,12 +12,14 @@ export const DEFAULT_ADMIN_ID = '00bd7b24-2f88-4e2f-84e0-835bf28e7905';
 export const WORKER_TIMEOUT = 60000; // milliseconds
 export const LIMIT_WORKSPACE_CREATE = 5;
 export const API_KEY_LENGTH = 36;
-export const MCP_API_KEY_HEADER = 'api-key';
+export const MCP_API_KEY_HEADER = 'x-oasm-api-key';
 export const WORKER_TOKEN_HEADER = 'worker-token';
 export const AUTH_IGNORE_ROUTERS = ['mcp', 'messages'];
 export const WEBAPP_ANALYZER_SRC_URL =
   'https://raw.githubusercontent.com/oasm-platform/webappanalyzer/main/src';
 export const GET_WORKSPACE_MCP_TOOL_NAME = 'get_workspaces';
+export const WORKSPACE_COOKIE_NAME = 'wid';
+export const WORKSPACE_HEADER_NAME = 'X-Workspace-Id';
 export const CACHE_STATIC_RESOURCE = 14 * 24 * 60 * 60; // 14 days in seconds
 export const BOT_ID = '019b3ae4-189e-7dfe-b10e-20d847717733';
 export const BOT_EMAIL = 'bot@oasm.local';

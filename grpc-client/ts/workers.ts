@@ -94,27 +94,23 @@ export interface GetManifestRequest {
  */
 export interface GetManifestResponse {
     /**
-     * @generated from protobuf field: string download_tools_url = 1
-     */
-    downloadToolsUrl: string;
-    /**
-     * @generated from protobuf field: repeated string init_commands = 2
+     * @generated from protobuf field: repeated string init_commands = 1
      */
     initCommands: string[];
 }
 /**
- * @generated from protobuf message workers.DownloadToolsRequest
+ * @generated from protobuf message workers.StorageRequest
  */
-export interface DownloadToolsRequest {
+export interface StorageRequest {
     /**
-     * @generated from protobuf field: string url = 1
+     * @generated from protobuf field: string path = 1
      */
-    url: string;
+    path: string;
 }
 /**
- * @generated from protobuf message workers.DownloadToolsResponse
+ * @generated from protobuf message workers.StorageResponse
  */
-export interface DownloadToolsResponse {
+export interface StorageResponse {
     /**
      * @generated from protobuf field: bytes chunk = 1
      */
@@ -127,6 +123,189 @@ export interface DownloadToolsResponse {
      * @generated from protobuf field: bool eof = 3
      */
     eof: boolean;
+}
+/**
+ * @generated from protobuf message workers.NetworkInterfaceMessage
+ */
+export interface NetworkInterfaceMessage {
+    /**
+     * @generated from protobuf field: string interface_name = 1
+     */
+    interfaceName: string;
+    /**
+     * @generated from protobuf field: string ip_address = 2
+     */
+    ipAddress: string;
+    /**
+     * @generated from protobuf field: string cidr = 3
+     */
+    cidr: string;
+    /**
+     * @generated from protobuf field: string gateway_ip = 4
+     */
+    gatewayIp: string;
+    /**
+     * @generated from protobuf field: string gateway_mac = 5
+     */
+    gatewayMac: string;
+}
+/**
+ * @generated from protobuf message workers.ConnectInternalNetworkRequest
+ */
+export interface ConnectInternalNetworkRequest {
+    /**
+     * @generated from protobuf field: string worker_id = 1
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: string network_id = 2
+     */
+    networkId: string;
+    /**
+     * @generated from protobuf field: repeated workers.NetworkInterfaceMessage network_interfaces = 3
+     */
+    networkInterfaces: NetworkInterfaceMessage[];
+}
+/**
+ * @generated from protobuf message workers.ConnectInternalNetworkResponse
+ */
+export interface ConnectInternalNetworkResponse {
+    /**
+     * @generated from protobuf field: string message = 1
+     */
+    message: string;
+}
+/**
+ * @generated from protobuf message workers.BuiltinToolRegistryRequest
+ */
+export interface BuiltinToolRegistryRequest {
+    /**
+     * @generated from protobuf field: string os = 1
+     */
+    os: string; // worker sends: runtime.GOOS (e.g., "linux")
+    /**
+     * @generated from protobuf field: string arch = 2
+     */
+    arch: string; // worker sends: runtime.GOARCH (e.g., "arm64")
+}
+/**
+ * @generated from protobuf message workers.BuiltinToolRegistryResponse
+ */
+export interface BuiltinToolRegistryResponse {
+    /**
+     * @generated from protobuf field: repeated string tool_paths = 1
+     */
+    toolPaths: string[];
+}
+/**
+ * @generated from protobuf message workers.RemoteExecuteSubscribeRequest
+ */
+export interface RemoteExecuteSubscribeRequest {
+}
+/**
+ * @generated from protobuf message workers.RemoteExecuteSubscribeResponse
+ */
+export interface RemoteExecuteSubscribeResponse {
+    /**
+     * @generated from protobuf field: string id = 1
+     */
+    id: string;
+    /**
+     * @generated from protobuf field: string worker_id = 2
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: workers.RemoteExecuteSubscribeEventType type = 3
+     */
+    type: RemoteExecuteSubscribeEventType;
+    /**
+     * @generated from protobuf field: string session_id = 4
+     */
+    sessionId: string;
+    /**
+     * @generated from protobuf field: string command = 5
+     */
+    command: string;
+}
+/**
+ * @generated from protobuf message workers.RemoteExecuteResultStream
+ */
+export interface RemoteExecuteResultStream {
+    /**
+     * @generated from protobuf field: string id = 1
+     */
+    id: string;
+    /**
+     * @generated from protobuf field: string session_id = 2
+     */
+    sessionId: string;
+    /**
+     * @generated from protobuf field: workers.RemoteExecuteResultEventType type = 3
+     */
+    type: RemoteExecuteResultEventType;
+    /**
+     * @generated from protobuf field: bytes data = 4
+     */
+    data: Uint8Array;
+    /**
+     * @generated from protobuf field: int32 exit_code = 5
+     */
+    exitCode: number;
+}
+/**
+ * @generated from protobuf message workers.RemoteExecuteResultAck
+ */
+export interface RemoteExecuteResultAck {
+    /**
+     * @generated from protobuf field: bool success = 1
+     */
+    success: boolean;
+    /**
+     * @generated from protobuf field: string message = 2
+     */
+    message: string;
+}
+/**
+ * @generated from protobuf enum workers.RemoteExecuteSubscribeEventType
+ */
+export enum RemoteExecuteSubscribeEventType {
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN = 0;
+     */
+    REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN = 0,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED = 1;
+     */
+    REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED = 1,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND = 2;
+     */
+    REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND = 2
+}
+/**
+ * @generated from protobuf enum workers.RemoteExecuteResultEventType
+ */
+export enum RemoteExecuteResultEventType {
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_UNKNOWN = 0;
+     */
+    REMOTE_EXECUTE_RESULT_UNKNOWN = 0,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_STDOUT = 1;
+     */
+    REMOTE_EXECUTE_RESULT_STDOUT = 1,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_STDERR = 2;
+     */
+    REMOTE_EXECUTE_RESULT_STDERR = 2,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_EXIT = 3;
+     */
+    REMOTE_EXECUTE_RESULT_EXIT = 3,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_ERROR = 4;
+     */
+    REMOTE_EXECUTE_RESULT_ERROR = 4
 }
 // @generated message type with reflection information, may provide speed optimized methods
 class JoinRequest$Type extends MessageType<JoinRequest> {
@@ -457,13 +636,11 @@ export const GetManifestRequest = new GetManifestRequest$Type();
 class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
     constructor() {
         super("workers.GetManifestResponse", [
-            { no: 1, name: "download_tools_url", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "init_commands", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ }
+            { no: 1, name: "init_commands", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ }
         ]);
     }
     create(value?: PartialMessage<GetManifestResponse>): GetManifestResponse {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.downloadToolsUrl = "";
         message.initCommands = [];
         if (value !== undefined)
             reflectionMergePartial<GetManifestResponse>(this, message, value);
@@ -474,10 +651,7 @@ class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string download_tools_url */ 1:
-                    message.downloadToolsUrl = reader.string();
-                    break;
-                case /* repeated string init_commands */ 2:
+                case /* repeated string init_commands */ 1:
                     message.initCommands.push(reader.string());
                     break;
                 default:
@@ -492,12 +666,9 @@ class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
         return message;
     }
     internalBinaryWrite(message: GetManifestResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string download_tools_url = 1; */
-        if (message.downloadToolsUrl !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.downloadToolsUrl);
-        /* repeated string init_commands = 2; */
+        /* repeated string init_commands = 1; */
         for (let i = 0; i < message.initCommands.length; i++)
-            writer.tag(2, WireType.LengthDelimited).string(message.initCommands[i]);
+            writer.tag(1, WireType.LengthDelimited).string(message.initCommands[i]);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -509,26 +680,26 @@ class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
  */
 export const GetManifestResponse = new GetManifestResponse$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class DownloadToolsRequest$Type extends MessageType<DownloadToolsRequest> {
+class StorageRequest$Type extends MessageType<StorageRequest> {
     constructor() {
-        super("workers.DownloadToolsRequest", [
-            { no: 1, name: "url", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        super("workers.StorageRequest", [
+            { no: 1, name: "path", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
         ]);
     }
-    create(value?: PartialMessage<DownloadToolsRequest>): DownloadToolsRequest {
+    create(value?: PartialMessage<StorageRequest>): StorageRequest {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.url = "";
+        message.path = "";
         if (value !== undefined)
-            reflectionMergePartial<DownloadToolsRequest>(this, message, value);
+            reflectionMergePartial<StorageRequest>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DownloadToolsRequest): DownloadToolsRequest {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StorageRequest): StorageRequest {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string url */ 1:
-                    message.url = reader.string();
+                case /* string path */ 1:
+                    message.path = reader.string();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -541,10 +712,10 @@ class DownloadToolsRequest$Type extends MessageType<DownloadToolsRequest> {
         }
         return message;
     }
-    internalBinaryWrite(message: DownloadToolsRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string url = 1; */
-        if (message.url !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.url);
+    internalBinaryWrite(message: StorageRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string path = 1; */
+        if (message.path !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.path);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -552,28 +723,28 @@ class DownloadToolsRequest$Type extends MessageType<DownloadToolsRequest> {
     }
 }
 /**
- * @generated MessageType for protobuf message workers.DownloadToolsRequest
+ * @generated MessageType for protobuf message workers.StorageRequest
  */
-export const DownloadToolsRequest = new DownloadToolsRequest$Type();
+export const StorageRequest = new StorageRequest$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class DownloadToolsResponse$Type extends MessageType<DownloadToolsResponse> {
+class StorageResponse$Type extends MessageType<StorageResponse> {
     constructor() {
-        super("workers.DownloadToolsResponse", [
+        super("workers.StorageResponse", [
             { no: 1, name: "chunk", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
             { no: 2, name: "offset", kind: "scalar", T: 5 /*ScalarType.INT32*/ },
             { no: 3, name: "eof", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
         ]);
     }
-    create(value?: PartialMessage<DownloadToolsResponse>): DownloadToolsResponse {
+    create(value?: PartialMessage<StorageResponse>): StorageResponse {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.chunk = new Uint8Array(0);
         message.offset = 0;
         message.eof = false;
         if (value !== undefined)
-            reflectionMergePartial<DownloadToolsResponse>(this, message, value);
+            reflectionMergePartial<StorageResponse>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DownloadToolsResponse): DownloadToolsResponse {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StorageResponse): StorageResponse {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
@@ -598,7 +769,7 @@ class DownloadToolsResponse$Type extends MessageType<DownloadToolsResponse> {
         }
         return message;
     }
-    internalBinaryWrite(message: DownloadToolsResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+    internalBinaryWrite(message: StorageResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
         /* bytes chunk = 1; */
         if (message.chunk.length)
             writer.tag(1, WireType.LengthDelimited).bytes(message.chunk);
@@ -615,9 +786,551 @@ class DownloadToolsResponse$Type extends MessageType<DownloadToolsResponse> {
     }
 }
 /**
- * @generated MessageType for protobuf message workers.DownloadToolsResponse
+ * @generated MessageType for protobuf message workers.StorageResponse
  */
-export const DownloadToolsResponse = new DownloadToolsResponse$Type();
+export const StorageResponse = new StorageResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class NetworkInterfaceMessage$Type extends MessageType<NetworkInterfaceMessage> {
+    constructor() {
+        super("workers.NetworkInterfaceMessage", [
+            { no: 1, name: "interface_name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "ip_address", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "cidr", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 4, name: "gateway_ip", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "gateway_mac", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<NetworkInterfaceMessage>): NetworkInterfaceMessage {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.interfaceName = "";
+        message.ipAddress = "";
+        message.cidr = "";
+        message.gatewayIp = "";
+        message.gatewayMac = "";
+        if (value !== undefined)
+            reflectionMergePartial<NetworkInterfaceMessage>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: NetworkInterfaceMessage): NetworkInterfaceMessage {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string interface_name */ 1:
+                    message.interfaceName = reader.string();
+                    break;
+                case /* string ip_address */ 2:
+                    message.ipAddress = reader.string();
+                    break;
+                case /* string cidr */ 3:
+                    message.cidr = reader.string();
+                    break;
+                case /* string gateway_ip */ 4:
+                    message.gatewayIp = reader.string();
+                    break;
+                case /* string gateway_mac */ 5:
+                    message.gatewayMac = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: NetworkInterfaceMessage, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string interface_name = 1; */
+        if (message.interfaceName !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.interfaceName);
+        /* string ip_address = 2; */
+        if (message.ipAddress !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.ipAddress);
+        /* string cidr = 3; */
+        if (message.cidr !== "")
+            writer.tag(3, WireType.LengthDelimited).string(message.cidr);
+        /* string gateway_ip = 4; */
+        if (message.gatewayIp !== "")
+            writer.tag(4, WireType.LengthDelimited).string(message.gatewayIp);
+        /* string gateway_mac = 5; */
+        if (message.gatewayMac !== "")
+            writer.tag(5, WireType.LengthDelimited).string(message.gatewayMac);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.NetworkInterfaceMessage
+ */
+export const NetworkInterfaceMessage = new NetworkInterfaceMessage$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ConnectInternalNetworkRequest$Type extends MessageType<ConnectInternalNetworkRequest> {
+    constructor() {
+        super("workers.ConnectInternalNetworkRequest", [
+            { no: 1, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "network_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "network_interfaces", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => NetworkInterfaceMessage }
+        ]);
+    }
+    create(value?: PartialMessage<ConnectInternalNetworkRequest>): ConnectInternalNetworkRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.workerId = "";
+        message.networkId = "";
+        message.networkInterfaces = [];
+        if (value !== undefined)
+            reflectionMergePartial<ConnectInternalNetworkRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ConnectInternalNetworkRequest): ConnectInternalNetworkRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string worker_id */ 1:
+                    message.workerId = reader.string();
+                    break;
+                case /* string network_id */ 2:
+                    message.networkId = reader.string();
+                    break;
+                case /* repeated workers.NetworkInterfaceMessage network_interfaces */ 3:
+                    message.networkInterfaces.push(NetworkInterfaceMessage.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ConnectInternalNetworkRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string worker_id = 1; */
+        if (message.workerId !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.workerId);
+        /* string network_id = 2; */
+        if (message.networkId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.networkId);
+        /* repeated workers.NetworkInterfaceMessage network_interfaces = 3; */
+        for (let i = 0; i < message.networkInterfaces.length; i++)
+            NetworkInterfaceMessage.internalBinaryWrite(message.networkInterfaces[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.ConnectInternalNetworkRequest
+ */
+export const ConnectInternalNetworkRequest = new ConnectInternalNetworkRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ConnectInternalNetworkResponse$Type extends MessageType<ConnectInternalNetworkResponse> {
+    constructor() {
+        super("workers.ConnectInternalNetworkResponse", [
+            { no: 1, name: "message", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<ConnectInternalNetworkResponse>): ConnectInternalNetworkResponse {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.message = "";
+        if (value !== undefined)
+            reflectionMergePartial<ConnectInternalNetworkResponse>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ConnectInternalNetworkResponse): ConnectInternalNetworkResponse {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string message */ 1:
+                    message.message = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ConnectInternalNetworkResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string message = 1; */
+        if (message.message !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.message);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.ConnectInternalNetworkResponse
+ */
+export const ConnectInternalNetworkResponse = new ConnectInternalNetworkResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class BuiltinToolRegistryRequest$Type extends MessageType<BuiltinToolRegistryRequest> {
+    constructor() {
+        super("workers.BuiltinToolRegistryRequest", [
+            { no: 1, name: "os", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "arch", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<BuiltinToolRegistryRequest>): BuiltinToolRegistryRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.os = "";
+        message.arch = "";
+        if (value !== undefined)
+            reflectionMergePartial<BuiltinToolRegistryRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: BuiltinToolRegistryRequest): BuiltinToolRegistryRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string os */ 1:
+                    message.os = reader.string();
+                    break;
+                case /* string arch */ 2:
+                    message.arch = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: BuiltinToolRegistryRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string os = 1; */
+        if (message.os !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.os);
+        /* string arch = 2; */
+        if (message.arch !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.arch);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.BuiltinToolRegistryRequest
+ */
+export const BuiltinToolRegistryRequest = new BuiltinToolRegistryRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class BuiltinToolRegistryResponse$Type extends MessageType<BuiltinToolRegistryResponse> {
+    constructor() {
+        super("workers.BuiltinToolRegistryResponse", [
+            { no: 1, name: "tool_paths", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<BuiltinToolRegistryResponse>): BuiltinToolRegistryResponse {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.toolPaths = [];
+        if (value !== undefined)
+            reflectionMergePartial<BuiltinToolRegistryResponse>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: BuiltinToolRegistryResponse): BuiltinToolRegistryResponse {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* repeated string tool_paths */ 1:
+                    message.toolPaths.push(reader.string());
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: BuiltinToolRegistryResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* repeated string tool_paths = 1; */
+        for (let i = 0; i < message.toolPaths.length; i++)
+            writer.tag(1, WireType.LengthDelimited).string(message.toolPaths[i]);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.BuiltinToolRegistryResponse
+ */
+export const BuiltinToolRegistryResponse = new BuiltinToolRegistryResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RemoteExecuteSubscribeRequest$Type extends MessageType<RemoteExecuteSubscribeRequest> {
+    constructor() {
+        super("workers.RemoteExecuteSubscribeRequest", []);
+    }
+    create(value?: PartialMessage<RemoteExecuteSubscribeRequest>): RemoteExecuteSubscribeRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<RemoteExecuteSubscribeRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RemoteExecuteSubscribeRequest): RemoteExecuteSubscribeRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RemoteExecuteSubscribeRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.RemoteExecuteSubscribeRequest
+ */
+export const RemoteExecuteSubscribeRequest = new RemoteExecuteSubscribeRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RemoteExecuteSubscribeResponse$Type extends MessageType<RemoteExecuteSubscribeResponse> {
+    constructor() {
+        super("workers.RemoteExecuteSubscribeResponse", [
+            { no: 1, name: "id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "type", kind: "enum", T: () => ["workers.RemoteExecuteSubscribeEventType", RemoteExecuteSubscribeEventType] },
+            { no: 4, name: "session_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "command", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RemoteExecuteSubscribeResponse>): RemoteExecuteSubscribeResponse {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.id = "";
+        message.workerId = "";
+        message.type = 0;
+        message.sessionId = "";
+        message.command = "";
+        if (value !== undefined)
+            reflectionMergePartial<RemoteExecuteSubscribeResponse>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RemoteExecuteSubscribeResponse): RemoteExecuteSubscribeResponse {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string id */ 1:
+                    message.id = reader.string();
+                    break;
+                case /* string worker_id */ 2:
+                    message.workerId = reader.string();
+                    break;
+                case /* workers.RemoteExecuteSubscribeEventType type */ 3:
+                    message.type = reader.int32();
+                    break;
+                case /* string session_id */ 4:
+                    message.sessionId = reader.string();
+                    break;
+                case /* string command */ 5:
+                    message.command = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RemoteExecuteSubscribeResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string id = 1; */
+        if (message.id !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.id);
+        /* string worker_id = 2; */
+        if (message.workerId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.workerId);
+        /* workers.RemoteExecuteSubscribeEventType type = 3; */
+        if (message.type !== 0)
+            writer.tag(3, WireType.Varint).int32(message.type);
+        /* string session_id = 4; */
+        if (message.sessionId !== "")
+            writer.tag(4, WireType.LengthDelimited).string(message.sessionId);
+        /* string command = 5; */
+        if (message.command !== "")
+            writer.tag(5, WireType.LengthDelimited).string(message.command);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.RemoteExecuteSubscribeResponse
+ */
+export const RemoteExecuteSubscribeResponse = new RemoteExecuteSubscribeResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RemoteExecuteResultStream$Type extends MessageType<RemoteExecuteResultStream> {
+    constructor() {
+        super("workers.RemoteExecuteResultStream", [
+            { no: 1, name: "id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "session_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "type", kind: "enum", T: () => ["workers.RemoteExecuteResultEventType", RemoteExecuteResultEventType] },
+            { no: 4, name: "data", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
+            { no: 5, name: "exit_code", kind: "scalar", T: 5 /*ScalarType.INT32*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RemoteExecuteResultStream>): RemoteExecuteResultStream {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.id = "";
+        message.sessionId = "";
+        message.type = 0;
+        message.data = new Uint8Array(0);
+        message.exitCode = 0;
+        if (value !== undefined)
+            reflectionMergePartial<RemoteExecuteResultStream>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RemoteExecuteResultStream): RemoteExecuteResultStream {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string id */ 1:
+                    message.id = reader.string();
+                    break;
+                case /* string session_id */ 2:
+                    message.sessionId = reader.string();
+                    break;
+                case /* workers.RemoteExecuteResultEventType type */ 3:
+                    message.type = reader.int32();
+                    break;
+                case /* bytes data */ 4:
+                    message.data = reader.bytes();
+                    break;
+                case /* int32 exit_code */ 5:
+                    message.exitCode = reader.int32();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RemoteExecuteResultStream, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string id = 1; */
+        if (message.id !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.id);
+        /* string session_id = 2; */
+        if (message.sessionId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.sessionId);
+        /* workers.RemoteExecuteResultEventType type = 3; */
+        if (message.type !== 0)
+            writer.tag(3, WireType.Varint).int32(message.type);
+        /* bytes data = 4; */
+        if (message.data.length)
+            writer.tag(4, WireType.LengthDelimited).bytes(message.data);
+        /* int32 exit_code = 5; */
+        if (message.exitCode !== 0)
+            writer.tag(5, WireType.Varint).int32(message.exitCode);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.RemoteExecuteResultStream
+ */
+export const RemoteExecuteResultStream = new RemoteExecuteResultStream$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RemoteExecuteResultAck$Type extends MessageType<RemoteExecuteResultAck> {
+    constructor() {
+        super("workers.RemoteExecuteResultAck", [
+            { no: 1, name: "success", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 2, name: "message", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RemoteExecuteResultAck>): RemoteExecuteResultAck {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.success = false;
+        message.message = "";
+        if (value !== undefined)
+            reflectionMergePartial<RemoteExecuteResultAck>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RemoteExecuteResultAck): RemoteExecuteResultAck {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* bool success */ 1:
+                    message.success = reader.bool();
+                    break;
+                case /* string message */ 2:
+                    message.message = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RemoteExecuteResultAck, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* bool success = 1; */
+        if (message.success !== false)
+            writer.tag(1, WireType.Varint).bool(message.success);
+        /* string message = 2; */
+        if (message.message !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.message);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.RemoteExecuteResultAck
+ */
+export const RemoteExecuteResultAck = new RemoteExecuteResultAck$Type();
 /**
  * @generated ServiceType for protobuf service workers.WorkersService
  */
@@ -625,5 +1338,9 @@ export const WorkersService = new ServiceType("workers.WorkersService", [
     { name: "Join", options: {}, I: JoinRequest, O: JoinResponse },
     { name: "Alive", serverStreaming: true, options: {}, I: AliveRequest, O: AliveResponse },
     { name: "GetManifest", options: {}, I: GetManifestRequest, O: GetManifestResponse },
-    { name: "DownloadTools", serverStreaming: true, options: {}, I: DownloadToolsRequest, O: DownloadToolsResponse }
+    { name: "Storage", serverStreaming: true, options: {}, I: StorageRequest, O: StorageResponse },
+    { name: "ConnectInternalNetwork", options: {}, I: ConnectInternalNetworkRequest, O: ConnectInternalNetworkResponse },
+    { name: "BuiltinToolRegistry", options: {}, I: BuiltinToolRegistryRequest, O: BuiltinToolRegistryResponse },
+    { name: "RemoteExecuteSubscribe", serverStreaming: true, options: {}, I: RemoteExecuteSubscribeRequest, O: RemoteExecuteSubscribeResponse },
+    { name: "RemoteExecuteResult", options: {}, I: RemoteExecuteResultStream, O: RemoteExecuteResultAck }
 ]);

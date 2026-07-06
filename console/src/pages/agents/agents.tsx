@@ -1,267 +1,142 @@
-import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
-import type { UIMessage } from 'ai';
-import {
-  useAgentsControllerGetLLMConfigs,
-  useAgentsControllerGetMessagesInfinite,
-  type LLMConfigWithProviderDto,
-} from '@/services/apis/gen/queries';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { AgentTodoPanel } from '@/components/agents/agent-todo-panel';
+import { useAgentChat } from '@/hooks/use-agent-chat';
+import { useParams } from '@tanstack/react-router';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import { useCallback, useEffect, useState } from 'react';
 import { ChatConversation } from './chat-conversation';
-import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { ToolCallHistoryPanel } from './tool-call-history-panel';
 
-interface SelectedModel {
-  provider: string;
-  model: string;
-  configId: string;
+dayjs.extend(relativeTime);
+
+// ---------------------------------------------------------------------------
+// useMediaQuery — responsive breakpoint detection
+// ---------------------------------------------------------------------------
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [query]);
+
+  return matches;
 }
 
-interface LocationState {
-  pendingMessage?: string;
-  selectedModel?: SelectedModel;
-}
+// ---------------------------------------------------------------------------
+// AgentsChatPage
+// ---------------------------------------------------------------------------
 
 export default function AgentsChatPage() {
-  const { conversationId } = useParams<{ conversationId: string }>();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const hasAutoSentRef = useRef(false);
-  const chatMessagesRef = useRef<UIMessage[]>([]);
-  const isStreamingRef = useRef(false);
-  const [streamError, setStreamError] = useState<string | null>(null);
-  const { data: providers } =
-    useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
-  const prefer = providers?.find((item) => item.isPreferred);
-  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>({
-    provider: prefer?.providerId || '',
-    model: prefer?.model || '',
-    configId: prefer?.configId || '',
-  });
-  const selectedModelRef = useRef<SelectedModel | null>(selectedModel);
-
-  // Keep ref in sync with state
-  useEffect(() => {
-    selectedModelRef.current = selectedModel;
-  }, [selectedModel]);
+  const { conversationId } = useParams({ strict: false });
+  const isLargeScreen = useMediaQuery('(min-width: 1024px)');
 
   const {
-    state: { selectedWorkspaceId },
-  } = useWorkspaceState();
+    messages,
+    isStreaming,
+    isLoadingHistory,
+    streamError,
+    isRetrying,
+    retryAttempt,
+    todos,
+    title,
+    createdAt,
+    selectedModel,
+    agentMode,
+    selectedWorkerId,
+    hasSentFirstMessage,
+    hasMoreMessages,
+    isLoadingMoreMessages,
+    remoteExecuteEvents,
+    onSendMessage,
+    onRetry,
+    onStop,
+    onSelectModel,
+    onDismissError,
+    onLoadMore,
+    onAgentModeChange,
+    onWorkerSelect,
+  } = useAgentChat({ conversationId });
 
-  // Fetch messages with infinite scroll
-  const {
-    data: messagesData,
-    isLoading: isLoadingHistory,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useAgentsControllerGetMessagesInfinite(
-    conversationId!,
-    { page: 1, limit: 10, sortOrder: 'DESC' },
-    {
-      query: {
-        queryKey: ['/api/agents/conversations', conversationId, 'messages'],
-        enabled: !!conversationId && !isStreamingRef.current,
-        // maxPages: 5, // limit re-fetch pages on F5/focus; page 1 is evicted when page 2+ fetches with maxPages:1
-        getNextPageParam: (lastPage) => {
-          const page = lastPage.page ?? 1;
-          const limit = lastPage.limit ?? 10;
-          const total = lastPage.total ?? 0;
-          const hasMore = page * limit < total;
-          return hasMore ? page + 1 : undefined;
-        },
-        initialPageParam: 1,
-      },
-    },
+  const [selectedToolCallId, setSelectedToolCallId] = useState<string | null>(
+    null,
   );
-
-  // Convert history messages to UIMessage format
-  const savedMessages: UIMessage[] = useMemo(() => {
-    const pages = messagesData?.pages;
-    if (!pages || !Array.isArray(pages)) {
-      return [];
-    }
-
-    const dataArray = pages
-      .flatMap((p) => {
-        // Each page can be either an array of messages or an object with data/items/messages property
-        if (Array.isArray(p)) {
-          return p;
-        }
-        const pageData = p as Record<string, unknown>;
-        const rawData =
-          pageData?.data ?? pageData?.items ?? pageData?.messages ?? [];
-        return Array.isArray(rawData) ? rawData : [];
-      })
-      .reverse();
-
-    if (dataArray.length === 0) {
-      return [];
-    }
-
-    return dataArray.map((msg) => {
-      const m = msg as Record<string, unknown>;
-      return {
-        id: String(m.id ?? ''),
-        role: String(m.role ?? 'user').toLowerCase() as 'user' | 'assistant',
-        parts: [{ type: 'text' as const, text: String(m.content ?? '') }],
-        createdAt: m.createdAt ? new Date(String(m.createdAt)) : new Date(),
-      };
-    });
-  }, [messagesData]);
-
-  const {
-    messages: chatMessages,
-    status,
-    sendMessage,
-    setMessages,
-    regenerate,
-  } = useChat({
-    transport: new DefaultChatTransport({
-      api: '/api/agents/messages/stream',
-      headers: selectedWorkspaceId
-        ? { 'x-workspace-id': selectedWorkspaceId }
-        : {},
-      prepareSendMessagesRequest: ({ messages }) => {
-        const lastMessage = messages[messages.length - 1];
-        const textContent =
-          lastMessage?.parts
-            .filter((p) => p.type === 'text')
-            .map((p) => ('text' in p ? p.text : ''))
-            .join('') || '';
-
-        const modelInfo = selectedModelRef.current;
-
-        // For existing conversations, use the ID from URL
-        const convId = conversationId;
-
-        return {
-          body: {
-            question: textContent,
-            ...(convId && { conversationId: convId }),
-            ...(modelInfo && {
-              model: modelInfo.model,
-              provider: modelInfo.provider,
-            }),
-          },
-        };
-      },
-    }),
-    // Use conversationId as chat ID so each conversation has its own message state
-    id: conversationId || 'agent-new-chat',
-    onError: (error) => {
-      console.error('[Chat] Error:', error);
-      setStreamError(error.message ?? 'An error occurred while streaming');
-    },
-  });
-
-  // Keep ref in sync
-  useEffect(() => {
-    chatMessagesRef.current = chatMessages;
-    isStreamingRef.current = status === 'submitted' || status === 'streaming';
-  }, [chatMessages, status]);
-
-  const isLoading = status === 'submitted' || status === 'streaming';
-
-  // Sync history whenever savedMessages changes (new pages loaded) but not while streaming
-  useEffect(() => {
-    if (!conversationId || isLoadingHistory || isStreamingRef.current) return;
-    if (savedMessages.length > 0) {
-      setMessages(savedMessages);
-    }
-  }, [conversationId, isLoadingHistory, savedMessages, setMessages]);
-
-  // Display savedMessages (history) when chatMessages is empty, otherwise use chatMessages (includes new messages)
-  // This ensures messages show immediately after loading, without waiting for sync to complete
-  const displayMessages: UIMessage[] =
-    chatMessages.length > 0 ? chatMessages : savedMessages;
-
-  const lastAssistantIdx = useMemo(() => {
-    for (let i = displayMessages.length - 1; i >= 0; i--) {
-      if (displayMessages[i].role === 'assistant') {
-        return i;
-      }
-    }
-    return -1;
-  }, [displayMessages]);
-
-  const handleSendMessage = useCallback(
-    async (content: string) => {
-      setStreamError(null);
-      await sendMessage({ text: content });
-    },
-    [sendMessage],
-  );
-
-  const handleSelectModel = useCallback(
-    (provider: string, model: string, configId: string) => {
-      setSelectedModel({ provider, model, configId });
-    },
-    [],
-  );
-
-  const handleRetry = useCallback(async () => {
-    if (lastAssistantIdx !== -1 && chatMessages.length > 0) {
-      setStreamError(null);
-      await regenerate();
-    }
-  }, [lastAssistantIdx, chatMessages, regenerate]);
-
-  const onRetryAction = useMemo(() => {
-    return lastAssistantIdx !== -1 && !isLoading ? handleRetry : undefined;
-  }, [lastAssistantIdx, isLoading, handleRetry]);
-
-  const hasSentFirstMessage = useMemo(() => {
-    return isLoading || chatMessages.length > 0;
-  }, [isLoading, chatMessages.length]);
-
-  const onLoadMoreAction = useMemo(() => {
-    return hasNextPage && !isFetchingNextPage ? fetchNextPage : undefined;
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  const handleDismissError = useCallback(() => {
-    setStreamError(null);
+  const handleSelectToolCall = useCallback((id: string) => {
+    setSelectedToolCallId(id);
+    // Reset after scroll animation completes
+    setTimeout(() => setSelectedToolCallId(null), 2500);
   }, []);
-
-  // Auto-send pending message from landing page
-  useEffect(() => {
-    const state = location.state as LocationState | null;
-    if (state?.pendingMessage && !hasAutoSentRef.current) {
-      hasAutoSentRef.current = true;
-      if (state.selectedModel) {
-        setSelectedModel(state.selectedModel);
-        selectedModelRef.current = state.selectedModel;
-      }
-      void handleSendMessage(state.pendingMessage);
-      void navigate(location.pathname, {
-        replace: true,
-        state: null,
-      });
-    }
-  }, [location.state, navigate, location.pathname, handleSendMessage]);
 
   return (
     <div
-      className="-m-4 flex flex-col overflow-hidden"
+      className="-m-4 md:-m-6 flex flex-col lg:flex-row overflow-hidden"
       style={{ height: 'calc(100vh - 4rem)' }}
     >
-      <ChatConversation
-        messages={displayMessages}
-        onSendMessage={handleSendMessage}
-        onRetry={onRetryAction}
-        isStreaming={isLoading}
-        isLoadingMessages={isLoadingHistory}
-        streamError={streamError}
-        onDismissError={handleDismissError}
-        selectedProvider={selectedModel?.provider ?? null}
-        selectedModel={selectedModel?.model ?? null}
-        onSelectModel={handleSelectModel}
-        hasSentFirstMessage={hasSentFirstMessage}
-        onLoadMore={onLoadMoreAction}
-        hasMoreMessages={hasNextPage ?? false}
-        isLoadingMoreMessages={isFetchingNextPage}
-      />
+      {/* Left sidebar: Todo — large screens only */}
+      <div className="hidden lg:flex lg:w-72 shrink-0 flex-col overflow-y-auto p-3">
+        {todos && todos.length > 0 && (
+          <>
+            {title && (
+              <div className="mb-2 p-1">
+                <span className="block text-sm font-medium truncate max-w-full" title={title}>
+                  {title}
+                </span>
+                {createdAt && (
+                  <span className="block text-xs text-muted-foreground mt-1">
+                    {dayjs(createdAt).fromNow()}
+                  </span>
+                )}
+              </div>
+            )}
+            <AgentTodoPanel todos={todos} />
+          </>
+        )}
+      </div>
+
+      {/* Center: Chat conversation */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <ChatConversation
+          messages={messages}
+          onSendMessage={onSendMessage}
+          onRetry={onRetry}
+          onStop={onStop}
+          isStreaming={isStreaming}
+          isLoadingMessages={isLoadingHistory}
+          streamError={streamError}
+          isRetrying={isRetrying}
+          retryAttempt={retryAttempt}
+          onDismissError={onDismissError}
+          selectedConfigId={selectedModel?.configId ?? null}
+          selectedModel={selectedModel?.model ?? null}
+          onSelectModel={onSelectModel}
+          hasSentFirstMessage={hasSentFirstMessage}
+          onLoadMore={onLoadMore}
+          hasMoreMessages={hasMoreMessages}
+          isLoadingMoreMessages={isLoadingMoreMessages}
+          agentMode={agentMode}
+          onAgentModeChange={onAgentModeChange}
+          selectedWorkerId={selectedWorkerId}
+          onWorkerSelect={onWorkerSelect}
+          todos={todos}
+          showTodoAboveInput={!isLargeScreen}
+          selectedToolCallId={selectedToolCallId}
+          remoteExecuteEvents={remoteExecuteEvents}
+        />
+      </div>
+
+      {/* Right sidebar: Tool call history — large screens only */}
+      <div className="hidden lg:flex lg:w-80 shrink-0 flex-col overflow-y-auto">
+        <ToolCallHistoryPanel
+          messages={messages}
+          onSelectToolCall={handleSelectToolCall}
+        />
+      </div>
     </div>
   );
 }

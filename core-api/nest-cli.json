@@ -3,14 +3,23 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
+    "builder": {
+      "type": "swc",
+      "options": {
+        "swcrcPath": ".swcrc",
+        "extensions": [".ts", ".tsx", ".js", ".jsx"]
+      }
+    },
+    "typeCheck": true,
     "deleteOutDir": true,
     "assets": [
       "**/*.json",
       "**/*.yaml",
       "**/*.yml",
       "**/*.proto",
-      "**/*.hbs",
-      "**/*.md"
+      "**/*.md",
+      "**/*.ttf",
+      "src/modules/agents/skills/**/*.md"
     ]
   }
 }

@@ -106,6 +106,8 @@ export class VulnerabilitiesService {
       severity,
       createdFrom,
       createdTo,
+      tags,
+      targetId,
     } = query;
 
     const { sortBy } = query;
@@ -113,9 +115,9 @@ export class VulnerabilitiesService {
     const queryBuilder = this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')
       .leftJoin('vulnerabilities.asset', 'assets')
+      .addSelect(['assets.id', 'assets.value'])
       .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspaceTargets', 'workspace_targets')
-      .leftJoin('workspace_targets.workspace', 'workspaces')
+      .leftJoin('targets.workspace', 'workspaces')
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
       .leftJoinAndSelect('vulnerabilities.vulnerabilityDismissal', 'dismissal')
@@ -133,6 +135,10 @@ export class VulnerabilitiesService {
 
     if (targetIds) {
       queryBuilder.andWhere('targets.id IN (:...targetIds)', { targetIds });
+    }
+
+    if (targetId) {
+      queryBuilder.andWhere('targets.id = :targetId', { targetId });
     }
 
     // Add search query if provided
@@ -172,6 +178,16 @@ export class VulnerabilitiesService {
       });
     }
 
+    // Filter by tags (using overlap operator with raw SQL)
+    if (Array.isArray(tags) && tags.length > 0) {
+      const conditions = tags.map((_, i) => `:tag${i} = ANY(vulnerabilities.tags)`).join(' OR ');
+      const params: Record<string, string> = {};
+      tags.forEach((tag, i) => {
+        params[`tag${i}`] = tag;
+      });
+      queryBuilder.andWhere(`(${conditions})`, params);
+    }
+
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
 
     return getManyResponse({ query, data: vulnerabilities, total });
@@ -188,9 +204,9 @@ export class VulnerabilitiesService {
     const queryBuilder = this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')
       .leftJoin('vulnerabilities.asset', 'assets')
+      .addSelect(['assets.id', 'assets.value'])
       .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspaceTargets', 'workspace_targets')
-      .leftJoin('workspace_targets.workspace', 'workspaces')
+      .leftJoin('targets.workspace', 'workspaces')
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
       .leftJoinAndSelect('vulnerabilities.vulnerabilityDismissal', 'dismissal')
@@ -220,8 +236,7 @@ export class VulnerabilitiesService {
       .addSelect('COUNT(vulnerabilities.severity)', 'count')
       .leftJoin('vulnerabilities.asset', 'assets')
       .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspaceTargets', 'workspace_targets')
-      .leftJoin('workspace_targets.workspace', 'workspaces')
+      .leftJoin('targets.workspace', 'workspaces')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
       .leftJoin('vulnerabilities.vulnerabilityDismissal', 'dismissal')
       .where('workspaces.id = :workspaceId', { workspaceId })
@@ -303,7 +318,7 @@ export class VulnerabilitiesService {
       where: {
         id: In(ids),
         asset: {
-          target: { workspaceTargets: { workspace: { id: workspaceId } } },
+          target: { workspaceId },
         },
       },
     });
@@ -349,13 +364,7 @@ export class VulnerabilitiesService {
         id: In(ids),
         vulnerability: {
           asset: {
-            target: {
-              workspaceTargets: {
-                workspace: {
-                  id: workspaceId,
-                },
-              },
-            },
+            target: { workspaceId },
           },
         },
       },
@@ -383,8 +392,6 @@ export class VulnerabilitiesService {
       relations: [
         'asset',
         'asset.target',
-        'asset.target.workspaceTargets',
-        'asset.target.workspaceTargets.workspace',
       ],
     });
 
@@ -393,7 +400,7 @@ export class VulnerabilitiesService {
     }
 
     const workspace =
-      vulnerability.asset?.target?.workspaceTargets?.[0]?.workspace;
+      vulnerability.asset?.target?.workspace;
     if (!workspace || workspace.id !== workspaceId) {
       throw new NotFoundException(
         `Vulnerability with id ${id} not found in workspace`,
@@ -586,8 +593,6 @@ export class VulnerabilitiesService {
       relations: [
         'asset',
         'asset.target',
-        'asset.target.workspaceTargets',
-        'asset.target.workspaceTargets.workspace',
       ],
     });
 
@@ -596,7 +601,7 @@ export class VulnerabilitiesService {
     }
 
     return (
-      vulnerability.asset?.target?.workspaceTargets?.[0]?.workspace ?? null
+      vulnerability.asset?.target?.workspace ?? null
     );
   }
 
@@ -609,8 +614,6 @@ export class VulnerabilitiesService {
       relations: [
         'asset',
         'asset.target',
-        'asset.target.workspaceTargets',
-        'asset.target.workspaceTargets.workspace',
       ],
     });
 
@@ -619,7 +622,7 @@ export class VulnerabilitiesService {
     }
 
     const workspace =
-      vulnerability.asset?.target?.workspaceTargets?.[0]?.workspace;
+      vulnerability.asset?.target?.workspace;
     if (!workspace || workspace.id !== workspaceId) {
       throw new NotFoundException(
         `Vulnerability with id ${id} not found in workspace`,

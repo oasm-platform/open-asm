@@ -13,7 +13,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 dayjs.extend(relativeTime);
 
@@ -70,7 +70,7 @@ export default function AgentConversationsPage() {
 
   const handleSelect = useCallback(
     (conversationId: string) => {
-      void navigate(`/agents/conversations/${conversationId}`);
+      void navigate({ to: `/agents/conversations/${conversationId}` });
     },
     [navigate],
   );

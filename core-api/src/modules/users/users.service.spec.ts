@@ -22,7 +22,7 @@ describe('UsersService', () => {
         signUpEmail: jest.fn(),
         signInEmail: jest.fn(),
       } as any,
-    } as Partial<AuthService>;
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

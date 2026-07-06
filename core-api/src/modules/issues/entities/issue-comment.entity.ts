@@ -6,12 +6,15 @@ import {
   Column,
   DeleteDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
+  Relation,
 } from 'typeorm';
 import { Issue } from './issue.entity';
 
 @Entity('issue_comments')
+@Index('IDX_issue_comments_issueId', ['issue', 'createdAt'])
 export class IssueComment extends BaseEntity {
   @ApiProperty()
   @Column()
@@ -20,7 +23,7 @@ export class IssueComment extends BaseEntity {
   @ApiProperty({ type: () => User })
   @ManyToOne(() => User)
   @JoinColumn({ name: 'createdById' })
-  createdBy: User;
+  createdBy: Relation<User>;
 
   @Column({ nullable: true })
   createdById: string;
@@ -29,7 +32,7 @@ export class IssueComment extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'issueId' })
-  issue: Issue;
+  issue: Relation<Issue>;
 
   @Column({ nullable: false })
   issueId: string;
@@ -46,7 +49,7 @@ export class IssueComment extends BaseEntity {
     enum: IssueCommentType,
     default: IssueCommentType.CONTENT,
   })
-  @Column({ default: IssueCommentType.CONTENT })
+  @Column({ type: 'enum', enum: IssueCommentType, default: IssueCommentType.CONTENT })
   type: IssueCommentType;
 
   @ApiProperty({ required: false })
@@ -56,7 +59,7 @@ export class IssueComment extends BaseEntity {
   @ManyToOne(() => IssueComment)
   @JoinColumn({ name: 'repCommentId' })
   @ApiProperty({ type: () => IssueComment })
-  repComment: IssueComment;
+  repComment: Relation<IssueComment>;
 
   @DeleteDateColumn()
   deletedAt: Date;

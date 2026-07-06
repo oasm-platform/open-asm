@@ -674,7 +674,7 @@ export class AssetGroupService {
           { assetGroupId },
         )
         .where(
-          'aga.assetId IS NULL AND asset."targetId" IN (SELECT t.id FROM targets t JOIN workspace_targets wt ON t.id = wt."targetId" WHERE wt."workspaceId" = :workspaceId)',
+          'aga.assetId IS NULL AND asset."targetId" IN (SELECT t.id FROM targets t WHERE t."workspaceId" = :workspaceId)',
           {
             assetGroupId,
             workspaceId,

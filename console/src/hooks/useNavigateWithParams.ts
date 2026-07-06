@@ -1,11 +1,14 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from '@tanstack/react-router';
 
 export function useNavigateWithParams() {
   const navigate = useNavigate();
   const location = useLocation();
 
   return (path: string, options?: { replace?: boolean }) => {
-    const search = location.search;
-    navigate(path + search, options);
+    navigate({
+      to: path,
+      search: location.search,
+      replace: options?.replace,
+    });
   };
 }

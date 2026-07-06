@@ -91,12 +91,12 @@ export class JobResultProcessor extends WorkerHost {
         completedAt: new Date(),
       });
 
-      // Decrement counter and check completion
-      await this.jobsRegistryService.decrementAndCheckCompletion(
-        job.jobHistory.id,
-      );
+      const nextStepJobCount =
+        await this.jobsRegistryService.getNextStepForJob(completedJob);
 
-      await this.jobsRegistryService.getNextStepForJob(completedJob);
+      if (nextStepJobCount === 0) {
+        await this.jobsRegistryService.markWorkflowDone(job.jobHistory.id);
+      }
 
       if (job.isPublishEvent) {
         await this.redis.publish(
@@ -107,7 +107,7 @@ export class JobResultProcessor extends WorkerHost {
 
       // Success case: delete the result file
       try {
-        this.storageService.deleteFile(fileName, bucket);
+        await this.storageService.deleteFile(fileName, bucket);
       } catch (error) {
         this.logger.error(
           `Failed to delete result file on success ${resultRef}:`,
@@ -127,7 +127,7 @@ export class JobResultProcessor extends WorkerHost {
 
         // Final failure: delete the result file
         try {
-          this.storageService.deleteFile(fileName, bucket);
+          await this.storageService.deleteFile(fileName, bucket);
         } catch (error) {
           this.logger.error(
             `Failed to delete result file on final failure ${resultRef}:`,
