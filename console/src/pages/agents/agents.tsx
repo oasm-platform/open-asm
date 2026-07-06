@@ -49,6 +49,7 @@ export default function AgentsChatPage() {
     createdAt,
     selectedModel,
     agentMode,
+    selectedWorkerId,
     hasSentFirstMessage,
     hasMoreMessages,
     isLoadingMoreMessages,
@@ -60,6 +61,7 @@ export default function AgentsChatPage() {
     onDismissError,
     onLoadMore,
     onAgentModeChange,
+    onWorkerSelect,
   } = useAgentChat({ conversationId });
 
   const [selectedToolCallId, setSelectedToolCallId] = useState<string | null>(
@@ -119,6 +121,8 @@ export default function AgentsChatPage() {
           isLoadingMoreMessages={isLoadingMoreMessages}
           agentMode={agentMode}
           onAgentModeChange={onAgentModeChange}
+          selectedWorkerId={selectedWorkerId}
+          onWorkerSelect={onWorkerSelect}
           todos={todos}
           showTodoAboveInput={!isLargeScreen}
           selectedToolCallId={selectedToolCallId}

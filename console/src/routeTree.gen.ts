@@ -26,7 +26,6 @@ import { Route as AuthedToolsIndexRouteImport } from './routes/_authed/tools/ind
 import { Route as AuthedTargetsIndexRouteImport } from './routes/_authed/targets/index'
 import { Route as AuthedProvidersIndexRouteImport } from './routes/_authed/providers/index'
 import { Route as AuthedJobsIndexRouteImport } from './routes/_authed/jobs/index'
-import { Route as AuthedIssuesIndexRouteImport } from './routes/_authed/issues/index'
 import { Route as AuthedInternalNetworksIndexRouteImport } from './routes/_authed/internal-networks/index'
 import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
@@ -138,11 +137,6 @@ const AuthedProvidersIndexRoute = AuthedProvidersIndexRouteImport.update({
 const AuthedJobsIndexRoute = AuthedJobsIndexRouteImport.update({
   id: '/jobs/',
   path: '/jobs/',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedIssuesIndexRoute = AuthedIssuesIndexRouteImport.update({
-  id: '/issues/',
-  path: '/issues/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedInternalNetworksIndexRoute =
@@ -316,7 +310,6 @@ export interface FileRoutesByFullPath {
   '/assets/': typeof AuthedAssetsIndexRoute
   '/groups/': typeof AuthedGroupsIndexRoute
   '/internal-networks/': typeof AuthedInternalNetworksIndexRoute
-  '/issues/': typeof AuthedIssuesIndexRoute
   '/jobs/': typeof AuthedJobsIndexRoute
   '/providers/': typeof AuthedProvidersIndexRoute
   '/targets/': typeof AuthedTargetsIndexRoute
@@ -361,7 +354,6 @@ export interface FileRoutesByTo {
   '/assets': typeof AuthedAssetsIndexRoute
   '/groups': typeof AuthedGroupsIndexRoute
   '/internal-networks': typeof AuthedInternalNetworksIndexRoute
-  '/issues': typeof AuthedIssuesIndexRoute
   '/jobs': typeof AuthedJobsIndexRoute
   '/providers': typeof AuthedProvidersIndexRoute
   '/targets': typeof AuthedTargetsIndexRoute
@@ -409,7 +401,6 @@ export interface FileRoutesById {
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
   '/_authed/groups/': typeof AuthedGroupsIndexRoute
   '/_authed/internal-networks/': typeof AuthedInternalNetworksIndexRoute
-  '/_authed/issues/': typeof AuthedIssuesIndexRoute
   '/_authed/jobs/': typeof AuthedJobsIndexRoute
   '/_authed/providers/': typeof AuthedProvidersIndexRoute
   '/_authed/targets/': typeof AuthedTargetsIndexRoute
@@ -457,7 +448,6 @@ export interface FileRouteTypes {
     | '/assets/'
     | '/groups/'
     | '/internal-networks/'
-    | '/issues/'
     | '/jobs/'
     | '/providers/'
     | '/targets/'
@@ -502,7 +492,6 @@ export interface FileRouteTypes {
     | '/assets'
     | '/groups'
     | '/internal-networks'
-    | '/issues'
     | '/jobs'
     | '/providers'
     | '/targets'
@@ -549,7 +538,6 @@ export interface FileRouteTypes {
     | '/_authed/assets/'
     | '/_authed/groups/'
     | '/_authed/internal-networks/'
-    | '/_authed/issues/'
     | '/_authed/jobs/'
     | '/_authed/providers/'
     | '/_authed/targets/'
@@ -695,13 +683,6 @@ declare module '@tanstack/react-router' {
       path: '/jobs'
       fullPath: '/jobs/'
       preLoaderRoute: typeof AuthedJobsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/issues/': {
-      id: '/_authed/issues/'
-      path: '/issues'
-      fullPath: '/issues/'
-      preLoaderRoute: typeof AuthedIssuesIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/internal-networks/': {
@@ -918,7 +899,6 @@ interface AuthedRouteChildren {
   AuthedAssetsIndexRoute: typeof AuthedAssetsIndexRoute
   AuthedGroupsIndexRoute: typeof AuthedGroupsIndexRoute
   AuthedInternalNetworksIndexRoute: typeof AuthedInternalNetworksIndexRoute
-  AuthedIssuesIndexRoute: typeof AuthedIssuesIndexRoute
   AuthedJobsIndexRoute: typeof AuthedJobsIndexRoute
   AuthedProvidersIndexRoute: typeof AuthedProvidersIndexRoute
   AuthedTargetsIndexRoute: typeof AuthedTargetsIndexRoute
@@ -959,7 +939,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAssetsIndexRoute: AuthedAssetsIndexRoute,
   AuthedGroupsIndexRoute: AuthedGroupsIndexRoute,
   AuthedInternalNetworksIndexRoute: AuthedInternalNetworksIndexRoute,
-  AuthedIssuesIndexRoute: AuthedIssuesIndexRoute,
   AuthedJobsIndexRoute: AuthedJobsIndexRoute,
   AuthedProvidersIndexRoute: AuthedProvidersIndexRoute,
   AuthedTargetsIndexRoute: AuthedTargetsIndexRoute,

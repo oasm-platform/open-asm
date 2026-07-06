@@ -243,11 +243,10 @@ export class AssetsService {
         'latest_http_response',
         'latest_http_response.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = asset_service.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
-      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoinAndSelect('asset.ipAssets', 'ipAssets')
       .leftJoin('asset_service.statusCodeAssets', 'statusCodeAssets')
       .leftJoin('asset_service.tlsAssets', 'tlsAssets')
-      .where('"workspaceTargets"."workspaceId" = :workspaceId', {
+      .where('targets.workspaceId = :workspaceId', {
         workspaceId,
       });
 
@@ -853,9 +852,8 @@ export class AssetsService {
       .createQueryBuilder('assetService')
       .leftJoinAndSelect('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'workspaceTargets')
       .where('assetService.id = :id', { id })
-      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('target.workspaceId = :workspaceId', { workspaceId })
       .getOne();
 
     if (!assetService) {
@@ -1042,9 +1040,8 @@ export class AssetsService {
       .leftJoinAndSelect('assetService.asset', 'asset')
       .leftJoinAndSelect('assetService.httpResponses', 'httpResponse')
       .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'workspaceTargets')
       .where('assetService.id = :assetServiceId', { assetServiceId })
-      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('target.workspaceId = :workspaceId', { workspaceId })
       .getOne();
 
     if (!assetService) {

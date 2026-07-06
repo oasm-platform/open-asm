@@ -2,7 +2,7 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsUUID } from 'class-validator';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 
 @Entity('agent_workspace_memories')
 @Index(['workspaceId', 'userId'], { unique: true })
@@ -19,7 +19,7 @@ export class AgentWorkspaceMemory extends BaseEntity {
 
   @ManyToOne(() => User, { eager: false })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user: Relation<User>;
 
   @ApiProperty({
     description: 'Long-term memory content in Markdown format',

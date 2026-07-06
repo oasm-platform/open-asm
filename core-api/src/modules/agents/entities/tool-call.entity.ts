@@ -1,5 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { AgentConversation } from './agent-conversation.entity';
 import { AgentMessage } from './agent-message.entity';
 
@@ -37,9 +37,9 @@ export class AgentMessageToolCall extends BaseEntity {
 
   @ManyToOne(() => AgentMessage, (msg) => msg.toolCalls, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'messageId' })
-  message: AgentMessage;
+  message: Relation<AgentMessage>;
 
   @ManyToOne(() => AgentConversation, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'conversationId' })
-  conversation: AgentConversation;
+  conversation: Relation<AgentConversation>;
 }

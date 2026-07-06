@@ -405,6 +405,7 @@ export class AgentsService {
       updatedAt: conversation.updatedAt,
       todos,
       summary: conversation.summary,
+      workerId: conversation.workerId,
     };
   }
 

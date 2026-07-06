@@ -1,9 +1,10 @@
 import { HttpModule } from '@nestjs/axios';
 import { Global, Module } from '@nestjs/common';
 import { GeoIpService } from './geo-ip/geo-ip.service';
+import { RedisLockService } from './redis/distributed-lock.service';
 import { RedisService } from './redis/redis.service';
 
-const services = [RedisService, GeoIpService];
+const services = [RedisService, RedisLockService, GeoIpService];
 
 @Global()
 @Module({

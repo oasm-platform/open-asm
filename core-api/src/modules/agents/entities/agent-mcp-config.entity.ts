@@ -2,7 +2,7 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 
 export type MCPServerTransport = 'sse' | 'streamable-http';
 
@@ -30,7 +30,7 @@ export class AgentMCPConfig extends BaseEntity {
 
   @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @Column({ type: 'jsonb', default: () => `'{"mcpServers":{}}'` })
   configJson: MCPConfigJson;

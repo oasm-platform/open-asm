@@ -2,6 +2,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { StatisticCronService } from './statistic-cron.service';
 import { StatisticService } from './statistic.service';
+import { RedisLockService } from '@/services/redis/distributed-lock.service';
 
 describe('StatisticCronService', () => {
   let service: StatisticCronService;
@@ -11,6 +12,20 @@ describe('StatisticCronService', () => {
     calculateAndStoreStatistics: jest.fn(),
   };
 
+  const mockRedisLockService = {
+    withLock: jest
+      .fn()
+      .mockImplementation(
+        async <T>(_key: string, _ttl: number, action: () => Promise<T>) => {
+          return action();
+        },
+      ),
+    acquireLock: jest.fn(),
+    releaseLock: jest.fn(),
+    lockWithTimeOut: jest.fn(),
+    isWithoutLock: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -18,6 +33,10 @@ describe('StatisticCronService', () => {
         {
           provide: StatisticService,
           useValue: mockStatisticService,
+        },
+        {
+          provide: RedisLockService,
+          useValue: mockRedisLockService,
         },
       ],
     }).compile();

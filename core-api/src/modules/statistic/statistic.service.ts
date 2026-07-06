@@ -11,7 +11,6 @@ import {
   Severity,
 } from '@/common/enums/enum';
 import { GeoIp, GeoIpService } from '@/services/geo-ip/geo-ip.service';
-import { AssetLocationDto } from './dto/asset-location.dto';
 import { RedisService } from '@/services/redis/redis.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AssetService } from '../assets/entities/asset-services.entity';
@@ -21,7 +20,8 @@ import { CreateJobs } from '../jobs-registry/dto/jobs-registry.dto';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
-import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
+import { AssetLocationDto } from './dto/asset-location.dto';
+
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -86,8 +86,8 @@ export class StatisticService {
    */
   private async countTargets(workspaceId: string): Promise<number> {
     return this.dataSource
-      .getRepository(WorkspaceTarget)
-      .count({ where: { workspace: { id: workspaceId } } });
+      .getRepository(Target)
+      .count({ where: { workspaceId } });
   }
 
   /**
@@ -101,8 +101,7 @@ export class StatisticService {
       .getRepository(Asset)
       .createQueryBuilder('asset')
       .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'workspaceTarget')
-      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
+      .where('target.workspaceId = :workspaceId', { workspaceId })
       .getCount();
   }
 
@@ -227,8 +226,7 @@ export class StatisticService {
       .innerJoin('asset_tag.assetService', 'assetService')
       .innerJoin('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'workspaceTarget')
-      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
+      .where('target.workspaceId = :workspaceId', { workspaceId })
       .groupBy('asset_tag.tag')
       .orderBy('count', 'DESC')
       .limit(10)
@@ -272,8 +270,7 @@ export class StatisticService {
       .leftJoin('asset.vulnerabilities', 'v')
       .leftJoin('v.vulnerabilityDismissal', 'dismissal')
       .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'workspaceTarget')
-      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
+      .where('target.workspaceId = :workspaceId', { workspaceId })
       .andWhere('dismissal.vulnerabilityId IS NULL')
       .groupBy('asset.id, asset.value')
       .orderBy('total', 'DESC')
@@ -316,9 +313,8 @@ export class StatisticService {
        FROM "asset_services" assvc
        INNER JOIN "assets" a ON a.id = assvc."assetId"
        INNER JOIN "targets" t ON t.id = a."targetId"
-       INNER JOIN "workspace_targets" wt ON wt."targetId" = t.id
        INNER JOIN "ip_assets_view" ipa ON ipa."assetId" = a.id
-       WHERE wt."workspaceId" = $1 AND ipa."ip" IS NOT NULL`,
+       WHERE t."workspaceId" = $1 AND ipa."ip" IS NOT NULL`,
       [workspaceId],
     );
 
@@ -385,13 +381,14 @@ export class StatisticService {
       .getRepository(Asset)
       .createQueryBuilder('asset')
       .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .select('wt.workspaceId', 'workspaceId')
+      .select('target.workspaceId', 'workspaceId')
       .addSelect('COUNT(asset.id)', 'count')
       .where('1=1');
 
     if (workspaceIds?.length) {
-      query.andWhere('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+      query.andWhere('target.workspaceId IN (:...workspaceIds)', {
+        workspaceIds,
+      });
     }
     if (targetId) {
       query.andWhere('target.id = :targetId', { targetId });
@@ -404,7 +401,7 @@ export class StatisticService {
     }
 
     return query
-      .groupBy('wt.workspaceId')
+      .groupBy('target.workspaceId')
       .getRawMany<{ workspaceId: string; count: string }>();
   }
 
@@ -418,13 +415,14 @@ export class StatisticService {
     const query = this.dataSource
       .getRepository(Target)
       .createQueryBuilder('target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .select('wt.workspaceId', 'workspaceId')
+      .select('target.workspaceId', 'workspaceId')
       .addSelect('COUNT(target.id)', 'count')
       .where('1=1');
 
     if (workspaceIds?.length) {
-      query.andWhere('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+      query.andWhere('target.workspaceId IN (:...workspaceIds)', {
+        workspaceIds,
+      });
     }
     if (targetId) {
       query.andWhere('target.id = :targetId', { targetId });
@@ -437,7 +435,7 @@ export class StatisticService {
     }
 
     return query
-      .groupBy('wt.workspaceId')
+      .groupBy('target.workspaceId')
       .getRawMany<{ workspaceId: string; count: string }>();
   }
 
@@ -454,15 +452,16 @@ export class StatisticService {
       .leftJoin('vuln.asset', 'asset')
       .leftJoin('vuln.vulnerabilityDismissal', 'dismissal')
       .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .select('wt.workspaceId', 'workspaceId')
+      .select('target.workspaceId', 'workspaceId')
       .addSelect('vuln.severity', 'severity')
       .addSelect('COUNT(vuln.id)', 'count')
       .where('1=1')
       .andWhere('dismissal.vulnerabilityId IS NULL');
 
     if (workspaceIds?.length) {
-      query.andWhere('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+      query.andWhere('target.workspaceId IN (:...workspaceIds)', {
+        workspaceIds,
+      });
     }
     if (targetId) {
       query.andWhere('target.id = :targetId', { targetId });
@@ -475,7 +474,7 @@ export class StatisticService {
     }
 
     return query
-      .groupBy('wt.workspaceId, vuln.severity')
+      .groupBy('target.workspaceId, vuln.severity')
       .getRawMany<{ workspaceId: string; severity: string; count: string }>();
   }
 
@@ -490,12 +489,11 @@ export class StatisticService {
     // Subquery to unnest the 'tech' array from latest HttpResponse and link to workspaceId
     const subQuery = this.dataSource
       .createQueryBuilder()
-      .select('wt.workspaceId', 'workspaceId')
+      .select('target.workspaceId', 'workspaceId')
       .addSelect('unnest(latest_http.tech)', 'tech') // Unnest the 'tech' array from latest response
       .from(AssetService, 'assetService')
       .innerJoin('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'wt')
       .innerJoin(
         'assetService.httpResponses',
         'latest_http',
@@ -505,7 +503,7 @@ export class StatisticService {
       .andWhere('latest_http.tech IS NOT NULL');
 
     if (workspaceIds?.length) {
-      subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
+      subQuery.andWhere('target.workspaceId IN (:...workspaceIds)', {
         workspaceIds,
       });
     }
@@ -539,17 +537,16 @@ export class StatisticService {
     const { workspaceIds, targetId, startDate, endDate } = filter;
     const subQuery = this.dataSource
       .createQueryBuilder()
-      .select('wt.workspaceId', 'workspaceId')
+      .select('target.workspaceId', 'workspaceId')
       .addSelect('asset.value', 'host')
       .from(AssetService, 'assetService')
       .innerJoin('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'wt')
       .where('1=1')
       .andWhere('asset.value IS NOT NULL');
 
     if (workspaceIds?.length) {
-      subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
+      subQuery.andWhere('target.workspaceId IN (:...workspaceIds)', {
         workspaceIds,
       });
     }
@@ -588,16 +585,15 @@ export class StatisticService {
     // Subquery to get AssetService linked to workspaceId
     const subQuery = this.dataSource
       .createQueryBuilder()
-      .select('wt.workspaceId', 'workspaceId')
+      .select('target.workspaceId', 'workspaceId')
       .addSelect('assetService.id', 'serviceId')
       .from(AssetService, 'assetService')
       .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
       .where('1=1');
 
     if (workspaceIds?.length) {
-      subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
+      subQuery.andWhere('target.workspaceId IN (:...workspaceIds)', {
         workspaceIds,
       });
     }
@@ -605,7 +601,9 @@ export class StatisticService {
       subQuery.andWhere('target.id = :targetId', { targetId });
     }
     if (startDate) {
-      subQuery.andWhere('"assetService"."createdAt" >= :startDate', { startDate });
+      subQuery.andWhere('"assetService"."createdAt" >= :startDate', {
+        startDate,
+      });
     }
     if (endDate) {
       subQuery.andWhere('"assetService"."createdAt" <= :endDate', { endDate });
@@ -633,16 +631,15 @@ export class StatisticService {
     // Subquery to unnest the 'ports' array from Port and link to workspaceId
     const subQuery = this.dataSource
       .createQueryBuilder()
-      .select('wt.workspaceId', 'workspaceId')
+      .select('target.workspaceId', 'workspaceId')
       .addSelect('assetService.port', 'port')
       .from(AssetService, 'assetService')
       .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
       .where('1=1');
 
     if (workspaceIds?.length) {
-      subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
+      subQuery.andWhere('target.workspaceId IN (:...workspaceIds)', {
         workspaceIds,
       });
     }
@@ -650,7 +647,9 @@ export class StatisticService {
       subQuery.andWhere('target.id = :targetId', { targetId });
     }
     if (startDate) {
-      subQuery.andWhere('"assetService"."createdAt" >= :startDate', { startDate });
+      subQuery.andWhere('"assetService"."createdAt" >= :startDate', {
+        startDate,
+      });
     }
     if (endDate) {
       subQuery.andWhere('"assetService"."createdAt" <= :endDate', { endDate });
@@ -667,7 +666,9 @@ export class StatisticService {
       .getRawMany<{ workspaceId: string; count: string }>();
   }
 
-  async getTlsStatistics(workspaceId: string): Promise<TlsStatisticResponseDto> {
+  async getTlsStatistics(
+    workspaceId: string,
+  ): Promise<TlsStatisticResponseDto> {
     const rawSubQuery = `
       SELECT DISTINCT ON (hr.tls->>'host', hr."assetServiceId")
         NULLIF(hr.tls->>'not_after', '')::timestamp AS not_after,
@@ -676,9 +677,8 @@ export class StatisticService {
       INNER JOIN "asset_services" assvc ON assvc.id = hr."assetServiceId"
       INNER JOIN "assets" a ON a.id = assvc."assetId"
       INNER JOIN "targets" t ON t.id = a."targetId"
-      INNER JOIN "workspace_targets" wt ON wt."targetId" = t.id
       WHERE hr.tls IS NOT NULL
-        AND wt."workspaceId" = :workspaceId
+        AND t."workspaceId" = :workspaceId
       ORDER BY hr.tls->>'host', hr."assetServiceId", hr."createdAt" DESC
     `;
 
@@ -904,11 +904,9 @@ export class StatisticService {
       .createQueryBuilder('v')
       .leftJoin('v.asset', 'asset')
       .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
       .select("TO_CHAR(v.createdAt, 'YYYY-MM-DD')", 'date')
       .addSelect('COUNT(*)', 'count')
-      .where('workspace.id = :workspaceId', { workspaceId })
+      .where('target.workspaceId = :workspaceId', { workspaceId })
       .andWhere('v.createdAt >= :startDate', { startDate })
       .andWhere('v.createdAt <= :endDate', { endDate })
       .andWhere('v.isArchived = :isArchived', { isArchived: false })
@@ -924,7 +922,9 @@ export class StatisticService {
     const results = await qb.getRawMany<{ date: string; count: string }>();
 
     // Fill in missing days with 0 counts
-    const dateMap = new Map(results.map((r) => [r.date, parseInt(r.count, 10)]));
+    const dateMap = new Map(
+      results.map((r) => [r.date, parseInt(r.count, 10)]),
+    );
     const dates: { date: string; count: number }[] = [];
 
     const current = new Date(startDate);
@@ -1000,15 +1000,15 @@ export class StatisticService {
       .createQueryBuilder('v')
       .leftJoin('v.asset', 'asset')
       .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
       .select('v.severity', 'severity')
       .addSelect('COUNT(*)', 'count')
-      .where('workspace.id = :workspaceId', { workspaceId })
+      .where('target.workspaceId = :workspaceId', { workspaceId })
       .andWhere('v.isArchived = :isArchived', { isArchived: false });
 
     if (options?.startDate) {
-      qb.andWhere('v.createdAt >= :startDate', { startDate: options.startDate });
+      qb.andWhere('v.createdAt >= :startDate', {
+        startDate: options.startDate,
+      });
     }
     if (options?.endDate) {
       qb.andWhere('v.createdAt <= :endDate', { endDate: options.endDate });
@@ -1053,38 +1053,29 @@ export class StatisticService {
       .createQueryBuilder('v')
       .leftJoin('v.asset', 'asset')
       .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
       .select('asset.value', 'assetValue')
       .addSelect('COUNT(*)', 'totalCount')
       .addSelect(
         `SUM(CASE WHEN v.severity = 'critical' THEN 1 ELSE 0 END)`,
         'critical',
       )
-      .addSelect(
-        `SUM(CASE WHEN v.severity = 'high' THEN 1 ELSE 0 END)`,
-        'high',
-      )
+      .addSelect(`SUM(CASE WHEN v.severity = 'high' THEN 1 ELSE 0 END)`, 'high')
       .addSelect(
         `SUM(CASE WHEN v.severity = 'medium' THEN 1 ELSE 0 END)`,
         'medium',
       )
-      .addSelect(
-        `SUM(CASE WHEN v.severity = 'low' THEN 1 ELSE 0 END)`,
-        'low',
-      )
-      .addSelect(
-        `SUM(CASE WHEN v.severity = 'info' THEN 1 ELSE 0 END)`,
-        'info',
-      )
-      .where('workspace.id = :workspaceId', { workspaceId })
+      .addSelect(`SUM(CASE WHEN v.severity = 'low' THEN 1 ELSE 0 END)`, 'low')
+      .addSelect(`SUM(CASE WHEN v.severity = 'info' THEN 1 ELSE 0 END)`, 'info')
+      .where('target.workspaceId = :workspaceId', { workspaceId })
       .andWhere('v.isArchived = :isArchived', { isArchived: false })
       .groupBy('asset.value')
       .orderBy('"totalCount"', 'DESC')
       .limit(limit);
 
     if (options?.startDate) {
-      qb.andWhere('v.createdAt >= :startDate', { startDate: options.startDate });
+      qb.andWhere('v.createdAt >= :startDate', {
+        startDate: options.startDate,
+      });
     }
     if (options?.endDate) {
       qb.andWhere('v.createdAt <= :endDate', { endDate: options.endDate });
@@ -1128,8 +1119,6 @@ export class StatisticService {
     const qb = this.dataSource
       .getRepository(Target)
       .createQueryBuilder('t')
-      .leftJoin('t.workspaceTargets', 'wt')
-      .leftJoin('wt.workspace', 'workspace')
       .leftJoin('t.assets', 'asset')
       .leftJoin('asset.vulnerabilities', 'v')
       .select('t.value', 'targetValue')
@@ -1138,24 +1127,15 @@ export class StatisticService {
         `SUM(CASE WHEN v.severity = 'critical' THEN 1 ELSE 0 END)`,
         'critical',
       )
-      .addSelect(
-        `SUM(CASE WHEN v.severity = 'high' THEN 1 ELSE 0 END)`,
-        'high',
-      )
+      .addSelect(`SUM(CASE WHEN v.severity = 'high' THEN 1 ELSE 0 END)`, 'high')
       .addSelect(
         `SUM(CASE WHEN v.severity = 'medium' THEN 1 ELSE 0 END)`,
         'medium',
       )
-      .addSelect(
-        `SUM(CASE WHEN v.severity = 'low' THEN 1 ELSE 0 END)`,
-        'low',
-      )
-      .addSelect(
-        `SUM(CASE WHEN v.severity = 'info' THEN 1 ELSE 0 END)`,
-        'info',
-      )
+      .addSelect(`SUM(CASE WHEN v.severity = 'low' THEN 1 ELSE 0 END)`, 'low')
+      .addSelect(`SUM(CASE WHEN v.severity = 'info' THEN 1 ELSE 0 END)`, 'info')
       .addSelect('COUNT(v.id)', 'total')
-      .where('workspace.id = :workspaceId', { workspaceId })
+      .where('t.workspaceId = :workspaceId', { workspaceId })
       .andWhere('v.isArchived = :isArchived', { isArchived: false })
       .groupBy('t.id')
       .addGroupBy('t.value')
@@ -1164,7 +1144,9 @@ export class StatisticService {
       .orderBy('total', 'DESC');
 
     if (options?.startDate) {
-      qb.andWhere('v.createdAt >= :startDate', { startDate: options.startDate });
+      qb.andWhere('v.createdAt >= :startDate', {
+        startDate: options.startDate,
+      });
     }
     if (options?.endDate) {
       qb.andWhere('v.createdAt <= :endDate', { endDate: options.endDate });
@@ -1201,17 +1183,32 @@ export class StatisticService {
    * Convenience wrapper for report services that need a single numeric count.
    */
   async getCountForWorkspace(
-    countType: 'assets' | 'targets' | 'vulnerabilities' | 'services' | 'ports' | 'techs',
+    countType:
+      | 'assets'
+      | 'targets'
+      | 'vulnerabilities'
+      | 'services'
+      | 'ports'
+      | 'techs',
     workspaceId: string,
     options?: { startDate?: Date; endDate?: Date },
   ): Promise<number> {
     const methodMap = {
-      assets: () => this.getAssetCounts({ workspaceIds: [workspaceId], ...options }),
-      targets: () => this.getTargetCounts({ workspaceIds: [workspaceId], ...options }),
-      vulnerabilities: () => this.getVulnerabilityCounts({ workspaceIds: [workspaceId], ...options }),
-      services: () => this.getServiceCounts({ workspaceIds: [workspaceId], ...options }),
-      ports: () => this.getPortCounts({ workspaceIds: [workspaceId], ...options }),
-      techs: () => this.getTechCounts({ workspaceIds: [workspaceId], ...options }),
+      assets: () =>
+        this.getAssetCounts({ workspaceIds: [workspaceId], ...options }),
+      targets: () =>
+        this.getTargetCounts({ workspaceIds: [workspaceId], ...options }),
+      vulnerabilities: () =>
+        this.getVulnerabilityCounts({
+          workspaceIds: [workspaceId],
+          ...options,
+        }),
+      services: () =>
+        this.getServiceCounts({ workspaceIds: [workspaceId], ...options }),
+      ports: () =>
+        this.getPortCounts({ workspaceIds: [workspaceId], ...options }),
+      techs: () =>
+        this.getTechCounts({ workspaceIds: [workspaceId], ...options }),
     };
 
     const results = await methodMap[countType]();
@@ -1258,9 +1255,60 @@ export class StatisticService {
   async calculateAndStoreStatistics() {
     const workspaceIds = await this.getWorkspaceIds();
     const statistics = await this.calculateStatistics(workspaceIds);
-    if (statistics.length > 0) {
-      await this.saveStatistics(statistics);
+    if (statistics.length === 0) return;
+
+    const toSave = await this.filterChangedStatistics(statistics);
+    if (toSave.length > 0) {
+      await this.saveStatistics(toSave);
     }
+  }
+
+  /**
+   * Filters statistics, keeping only those where at least one numeric field
+   * differs from the latest saved record for that workspace.
+   * If no previous record exists, the statistic is always kept.
+   * Uses DISTINCT ON for a single-query lookup per workspace — efficient
+   * even with thousands of workspaces.
+   */
+  private async filterChangedStatistics(
+    statistics: Statistic[],
+  ): Promise<Statistic[]> {
+    const repo = this.dataSource.getRepository(Statistic);
+    const workspaceIds = statistics.map((s) => s.workspace.id);
+
+    if (workspaceIds.length === 0) return [];
+
+    const latestRecords = await repo
+      .createQueryBuilder('s')
+      .leftJoin('s.workspace', 'workspace')
+      .addSelect(['workspace.id'])
+      .distinctOn(['s.workspaceId'])
+      .where('s.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .orderBy('s.workspaceId', 'ASC')
+      .addOrderBy('s.createdAt', 'DESC')
+      .getMany();
+
+    const latestMap = new Map(latestRecords.map((r) => [r.workspace.id, r]));
+
+    return statistics.filter((stat) => {
+      const latest = latestMap.get(stat.workspace.id);
+      if (!latest) return true;
+
+      return (
+        latest.assets !== stat.assets ||
+        latest.targets !== stat.targets ||
+        latest.vuls !== stat.vuls ||
+        latest.criticalVuls !== stat.criticalVuls ||
+        latest.highVuls !== stat.highVuls ||
+        latest.mediumVuls !== stat.mediumVuls ||
+        latest.lowVuls !== stat.lowVuls ||
+        latest.infoVuls !== stat.infoVuls ||
+        latest.techs !== stat.techs ||
+        latest.ports !== stat.ports ||
+        latest.services !== stat.services ||
+        Number(latest.score) !== Number(stat.score)
+      );
+    });
   }
 
   async takeSnapshotStatisticTarget(
@@ -1321,11 +1369,24 @@ export class StatisticService {
     ) {
       const redisKey = `snapshot:${job.jobHistory.workflow.filePath}:${job.asset.target.id}`;
 
-      const beforeSnapshot = await this.redisService
-        .get(redisKey)
-        .then((res) => JSON.parse(res || '{}') as StatisticSnapshot);
+      let beforeSnapshot: StatisticSnapshot = {
+        hosts: 0,
+        ports: 0,
+        services: 0,
+        techs: 0,
+      };
+      try {
+        const raw = await this.redisService.get(redisKey);
+        if (raw) {
+          beforeSnapshot = JSON.parse(raw) as StatisticSnapshot;
+        }
+      } catch {
+        // Corrupted or missing snapshot data — proceed with empty baseline
+      }
       await this.redisService.del(redisKey);
-      const afterSnapshot = await this.takeSnapshotStatisticTarget(job.asset.target.id);
+      const afterSnapshot = await this.takeSnapshotStatisticTarget(
+        job.asset.target.id,
+      );
 
       const diffs: Partial<StatisticSnapshot> = {};
       for (const key in afterSnapshot) {
@@ -1340,9 +1401,11 @@ export class StatisticService {
         job.id,
       );
 
+      if (members.length === 0) return;
+
       if (Object.keys(diffs).length > 0) {
         const recipientIds = members.map((m) => m.user.id);
-        const workspaceId = members[0]?.workspace.id;
+        const workspaceId = members[0].workspace.id;
 
         if (recipientIds.length > 0) {
           await this.notificationsService.createNotification({

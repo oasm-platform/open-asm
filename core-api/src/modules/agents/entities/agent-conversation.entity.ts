@@ -8,6 +8,7 @@ import {
   Index,
   OneToMany,
   PrimaryColumn,
+  Relation,
   UpdateDateColumn,
 } from 'typeorm';
 import { AgentConversationTodo } from './agent-conversation-todo.entity';
@@ -51,14 +52,14 @@ export class AgentConversation {
   createdBy: string;
 
   @OneToMany(() => AgentMessage, (message) => message.conversation)
-  messages: AgentMessage[];
+  messages: Relation<AgentMessage[]>;
 
   @OneToMany(() => AgentConversationTodo, (todo) => todo.conversation)
-  todoItems: AgentConversationTodo[];
+  todoItems: Relation<AgentConversationTodo[]>;
 
   @ApiProperty({ example: AgentMode.ASK })
   @IsEnum(AgentMode)
-  @Column({ default: AgentMode.ASK })
+  @Column({ type: 'enum', enum: AgentMode, default: AgentMode.ASK })
   agentMode: AgentMode;
 
   @ApiProperty({
@@ -70,7 +71,10 @@ export class AgentConversation {
   @Column({ type: 'text', nullable: true })
   summary?: string;
 
-  @ApiProperty({ description: 'Pinned worker for remote execution', required: false })
+  @ApiProperty({
+    description: 'Pinned worker for remote execution',
+    required: false,
+  })
   @IsOptional()
   @IsUUID()
   @Column({ type: 'uuid', nullable: true })
