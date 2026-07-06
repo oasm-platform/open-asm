@@ -153,21 +153,21 @@ export class TargetsController {
   }
 
   @Doc({
-    summary: 'Delete a target from a workspace',
+    summary: 'Delete a target permanently',
     description:
-      'Removes a security testing target from the specified workspace, terminating all associated monitoring and assessment activities.',
+      'Permanently deletes a security testing target and all its associated data (assets, vulnerabilities, jobs, and related records) from the specified workspace.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
   })
   @Delete(':id/workspace/:workspaceId')
-  deleteTargetFromWorkspace(
+  deleteTarget(
     @Param() { id }: IdQueryParamDto,
     @Param('workspaceId', new ParseUUIDPipe({ version: '4' }))
     workspaceId: string,
     @UserContext() userContext: UserContextPayload,
   ) {
-    return this.targetsService.deleteTargetFromWorkspace(
+    return this.targetsService.deleteTarget(
       id,
       workspaceId,
       userContext,

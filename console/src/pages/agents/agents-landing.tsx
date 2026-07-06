@@ -68,6 +68,9 @@ export default function AgentsLandingPage() {
     configId: string;
   } | null>(null);
   const [agentMode, setAgentMode] = useState('ask');
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(
+    null,
+  );
 
   const {
     state: { selectedWorkspaceId },
@@ -124,6 +127,7 @@ export default function AgentsLandingPage() {
         pendingMessage: content.trim(),
         ...(selectedModel && { selectedModel }),
         agentMode: options?.agentMode ?? agentMode,
+        workerId: selectedWorkerId,
       };
       void navigate({
         to: '/agents/conversations/$conversationId',
@@ -131,7 +135,7 @@ export default function AgentsLandingPage() {
         state: navState,
       });
     },
-    [isSending, navigate, selectedModel, agentMode],
+    [isSending, navigate, selectedModel, agentMode, selectedWorkerId],
   );
 
   useEffect(() => {
@@ -205,6 +209,8 @@ export default function AgentsLandingPage() {
             }}
             agentMode={agentMode}
             onAgentModeChange={setAgentMode}
+            selectedWorkerId={selectedWorkerId}
+            onWorkerSelect={setSelectedWorkerId}
           />
 
           {/* Quick suggestions */}
