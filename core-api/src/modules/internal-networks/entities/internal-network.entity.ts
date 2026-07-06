@@ -6,7 +6,7 @@ import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { NetworkInterface } from '@/modules/internal-networks/entities/network-interface.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import { Column, Entity, Index, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany, JoinColumn, Relation } from 'typeorm';
 
 @Entity('internal_networks')
 @Index('IDX_inetwork_workspaceId', ['workspace'])
@@ -26,7 +26,7 @@ export class InternalNetwork extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @Column({ type: 'uuid' })
   createdBy: string;
@@ -35,14 +35,14 @@ export class InternalNetwork extends BaseEntity {
     nullable: true,
   })
   @JoinColumn({ name: 'createdBy' })
-  creator?: User;
+  creator?: Relation<User>;
 
   @OneToMany(() => Target, (target) => target.internalNetwork)
-  targets: Target[];
+  targets: Relation<Target[]>;
 
   @OneToMany(() => WorkerInstance, (worker) => worker.internalNetwork)
-  workers: WorkerInstance[];
+  workers: Relation<WorkerInstance[]>;
 
   @OneToMany(() => NetworkInterface, (ni) => ni.internalNetwork)
-  networkInterfaces: NetworkInterface[];
+  networkInterfaces: Relation<NetworkInterface[]>;
 }

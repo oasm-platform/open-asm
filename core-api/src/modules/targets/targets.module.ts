@@ -6,14 +6,14 @@ import { Asset } from '../assets/entities/assets.entity';
 import { TriggerWorkflowService } from '../workflows/trigger-workflow.service';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { Target } from './entities/target.entity';
-import { WorkspaceTarget } from './entities/workspace-target.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { TargetsController } from './targets.controller';
 import { TargetsService } from './targets.service';
 
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Target, WorkspaceTarget, Asset]),
+    TypeOrmModule.forFeature([Target, Workspace, Asset]),
     WorkspacesModule,
     BullModule.registerQueue({
       name: BullMQName.ASSETS_DISCOVERY_SCHEDULE,
