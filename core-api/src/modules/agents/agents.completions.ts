@@ -487,6 +487,7 @@ export class AgentsCompletionsService {
         title: dto.question.slice(0, 500),
         createdBy: userId,
         agentMode: dto.agentMode,
+        workerId: dto.workerId,
       });
       return this.conversationRepository.save(newConversation);
     }
@@ -503,6 +504,7 @@ export class AgentsCompletionsService {
       title: dto.question.slice(0, 500),
       createdBy: userId,
       agentMode: dto.agentMode,
+      workerId: dto.workerId,
     });
     return this.conversationRepository.save(newConversation);
   }

@@ -68,6 +68,8 @@ interface ChatConversationProps {
   isLoadingMoreMessages?: boolean;
   agentMode?: string;
   onAgentModeChange?: (mode: string) => void;
+  selectedWorkerId?: string | null;
+  onWorkerSelect?: (workerId: string | null) => void;
   todos?: AgentTodoItem[];
   showTodoAboveInput?: boolean;
   selectedToolCallId?: string | null;
@@ -586,6 +588,8 @@ export const ChatConversation = memo(function ChatConversation({
   isLoadingMoreMessages = false,
   agentMode = 'false',
   onAgentModeChange,
+  selectedWorkerId,
+  onWorkerSelect,
   todos,
   showTodoAboveInput = true,
   selectedToolCallId,
@@ -844,6 +848,8 @@ export const ChatConversation = memo(function ChatConversation({
             onSelectModel={onSelectModel}
             agentMode={agentMode}
             onAgentModeChange={onAgentModeChange}
+            selectedWorkerId={selectedWorkerId}
+            onWorkerSelect={onWorkerSelect}
             placeholder={
               isStreaming
                 ? 'Waiting for response…'
