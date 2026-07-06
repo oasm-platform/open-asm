@@ -217,14 +217,27 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     callback: MessageCallback,
   ): Promise<void> {
     try {
-      await this.subscriber.subscribe(channel);
-
+      // Register the listener BEFORE subscribe to prevent race condition:
+      // messages published between subscribe ack and listener registration
+      // would otherwise be lost.
       if (!this.channelCallbacks.has(channel)) {
         this.channelCallbacks.set(channel, new Set());
       }
       this.channelCallbacks.get(channel)!.add(callback);
       this.subscriber.on('message', callback);
+
+      await this.subscriber.subscribe(channel);
     } catch (error) {
+      // Rollback: remove the listener we just registered
+      this.subscriber.removeListener('message', callback);
+      const callbacks = this.channelCallbacks.get(channel);
+      if (callbacks) {
+        callbacks.delete(callback);
+        if (callbacks.size === 0) {
+          this.channelCallbacks.delete(channel);
+        }
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       throw new Error(

@@ -1,3 +1,4 @@
+import type { WrapperType } from '@/common/types/app.types';
 import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
@@ -59,14 +60,14 @@ export class WorkersService {
     private networkInterfaceRepo: Repository<NetworkInterface>,
 
     @Inject(forwardRef(() => JobsRegistryService))
-    private jobsRegistryService: JobsRegistryService,
+    private jobsRegistryService: WrapperType<JobsRegistryService>,
 
     private apiKeyService: ApiKeysService,
 
     private configService: ConfigService,
 
     @Inject(forwardRef(() => ToolsService))
-    private toolsService: ToolsService,
+    private toolsService: WrapperType<ToolsService>,
 
     private redisService: RedisService,
 

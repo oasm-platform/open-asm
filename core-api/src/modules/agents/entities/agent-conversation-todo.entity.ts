@@ -7,6 +7,7 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  Relation,
   VersionColumn,
 } from 'typeorm';
 import { AgentConversation } from './agent-conversation.entity';
@@ -26,7 +27,7 @@ export class AgentConversationTodo extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'conversationId' })
-  conversation: AgentConversation;
+  conversation: Relation<AgentConversation>;
 
   @ApiProperty({ example: 'Enumerate subdomains for target' })
   @IsString()

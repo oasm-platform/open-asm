@@ -57,6 +57,15 @@ export class ConversationResponseDto {
   @IsOptional()
   @IsString()
   summary?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'The worker ID currently assigned to this conversation',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsOptional()
+  @IsUUID()
+  workerId?: string;
 }
 
 export class GetConversationsResponseDto {

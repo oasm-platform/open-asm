@@ -20,6 +20,28 @@ import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
+// Local type definitions for workflow data accessed in this component
+// The AssetGroupWorkflowWorkflow type from the API is opaque ({ [key: string]: unknown })
+// but we know the actual shape based on the Workflow and WorkflowContent types
+interface WorkflowJob {
+  name: string;
+  run: string;
+}
+
+interface WorkflowWithContent {
+  id: string;
+  content?: {
+    on?: { schedule?: string; target?: string[] };
+    jobs?: WorkflowJob[];
+    name?: string;
+  };
+}
+
+/** Cast an opaque AssetGroupWorkflowWorkflow to a usable WorkflowWithContent */
+function toWorkflow(w: unknown): WorkflowWithContent {
+  return w as WorkflowWithContent;
+}
+
 export default function AssetGroupWorkflow({
   assetGroupId,
 }: {
@@ -55,7 +77,7 @@ export default function AssetGroupWorkflow({
     // Get all jobs from all workflows in the group
     const allJobs =
       groupWorkflows?.data?.flatMap(
-        (groupWorkflow) => groupWorkflow.workflow.content?.jobs || [],
+        (groupWorkflow) => toWorkflow(groupWorkflow.workflow).content?.jobs || [],
       ) || [];
 
     // Extract all run values from jobs
@@ -68,7 +90,7 @@ export default function AssetGroupWorkflow({
   // Get the workflow that contains a specific tool
   const getWorkflowContainingTool = (toolName: string) => {
     return groupWorkflows?.data?.find((groupWorkflow) => {
-      const jobs = groupWorkflow.workflow.content?.jobs || [];
+      const jobs = toWorkflow(groupWorkflow.workflow).content?.jobs || [];
       const toolsName = jobs.map((job: { run: string }) => job.run) || [];
       return toolsName.includes(toolName);
     });
@@ -85,9 +107,10 @@ export default function AssetGroupWorkflow({
 
     if (isInGroup) {
       // If tool is in group, find the workflow containing it and remove the tool
-      const workflow = getWorkflowContainingTool(tool.name)?.workflow;
+      const groupWorkflow = getWorkflowContainingTool(tool.name)?.workflow;
+      const wf = groupWorkflow ? toWorkflow(groupWorkflow) : null;
 
-      if (!workflow) {
+      if (!wf) {
         toast.error('Workflow not found');
         return;
       }
@@ -97,19 +120,19 @@ export default function AssetGroupWorkflow({
 
         // Filter out the tool from the workflow's jobs
         const updatedJobs =
-          workflow.content?.jobs?.filter((job) => job.run !== tool.name) || [];
+          wf.content?.jobs?.filter((job) => job.run !== tool.name) || [];
 
         if (updatedJobs.length === 0) {
           // If no jobs left, remove workflow from asset group and delete it
           await removeWorkflowsMutation.mutateAsync({
             groupId: assetGroupId,
             data: {
-              workflowIds: [workflow.id],
+              workflowIds: [wf.id],
             },
           });
 
           await deleteWorkflowMutation.mutateAsync({
-            id: workflow.id,
+            id: wf.id,
           });
 
           toast.success(
@@ -118,14 +141,14 @@ export default function AssetGroupWorkflow({
         } else {
           // Update the workflow with the remaining jobs
           const updatedWorkflowContent = {
-            ...workflow.content,
+            ...wf.content,
             jobs: updatedJobs,
           };
 
           await updateWorkflowMutation.mutateAsync({
-            id: workflow.id,
+            id: wf.id,
             data: {
-              content: updatedWorkflowContent,
+              content: updatedWorkflowContent as import('@/services/apis/gen/queries').WorkflowContent,
             },
           });
 
@@ -144,7 +167,8 @@ export default function AssetGroupWorkflow({
       }
     } else {
       // If tool is not in group, check if group already has a workflow
-      const existingWorkflow = getCurrentWorkflow()?.workflow;
+      const groupWf = getCurrentWorkflow()?.workflow;
+      const existingWorkflow = groupWf ? toWorkflow(groupWf) : null;
 
       try {
         setIsProcessing(true);
@@ -167,7 +191,7 @@ export default function AssetGroupWorkflow({
           await updateWorkflowMutation.mutateAsync({
             id: existingWorkflow.id,
             data: {
-              content: updatedWorkflowContent,
+              content: updatedWorkflowContent as import('@/services/apis/gen/queries').WorkflowContent,
             },
           });
 

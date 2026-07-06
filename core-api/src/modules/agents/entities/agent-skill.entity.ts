@@ -3,7 +3,7 @@ import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsString, IsUUID } from 'class-validator';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 
 @Entity('agent_skills')
 @Index(['workspaceId', 'name'], { unique: true })
@@ -15,7 +15,7 @@ export class AgentSkill extends BaseEntity {
 
   @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspaceId' })
-  workspace: Workspace;
+  workspace: Relation<Workspace>;
 
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()
@@ -24,7 +24,7 @@ export class AgentSkill extends BaseEntity {
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'createdBy' })
-  creator?: User;
+  creator?: Relation<User>;
 
   @ApiProperty({ example: 'web-research' })
   @IsString()

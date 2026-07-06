@@ -23,6 +23,8 @@ interface AgentPromptInputProps {
   onSelectModel?: (provider: string, model: string, configId: string) => void;
   agentMode?: string;
   onAgentModeChange?: (mode: string) => void;
+  selectedWorkerId?: string | null;
+  onWorkerSelect?: (workerId: string | null) => void;
   placeholder?: string;
   className?: string;
 }
@@ -35,6 +37,8 @@ export default function AgentPromptInput({
   onSelectModel,
   agentMode = 'ask',
   onAgentModeChange,
+  selectedWorkerId,
+  onWorkerSelect,
   placeholder = 'Ask anything about security...',
   className,
 }: AgentPromptInputProps) {
@@ -73,6 +77,8 @@ export default function AgentPromptInput({
               <AgentModeSelect
                 value={agentMode}
                 onChange={onAgentModeChange}
+                selectedWorkerId={selectedWorkerId}
+                onWorkerChange={onWorkerSelect}
               />
             )}
             <PromptInputSubmit
