@@ -44,13 +44,11 @@ tasks:
       # - console:test
 
   # Install dependencies
-  # Installs all project dependencies from package.json files
-  # Sets up husky for git hooks and installs dependencies for all services
+  # Installs all project dependencies via pnpm workspace
+  # Installs Go modules for the worker service
   install:
     cmds:
-      - npm install -D husky
-      - task: api:install
-      - task: console:install
+      - pnpm install
       - task: worker:install
 
   # Run linter
@@ -80,7 +78,7 @@ tasks:
       - mkdir -p grpc-client/go grpc-client/ts
       - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
       - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-      - cd core-api && npx protoc -I src/proto src/proto/*.proto --go_out=../grpc-client/go --go-grpc_out=../grpc-client/go --ts_out=../grpc-client/ts
+      - cd core-api && pnpm exec protoc -I src/proto src/proto/*.proto --go_out=../grpc-client/go --go-grpc_out=../grpc-client/go --ts_out=../grpc-client/ts
 
   # Project initialization
   # Sets up environment files and initializes the development environment

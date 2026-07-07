@@ -26,6 +26,7 @@ Before you begin, ensure you have the following installed:
 
 - **Task (taskfile)** - [Installation Guide](https://taskfile.dev/#/installation)
 - **Node.js v22+** - [Installation Guide](https://nodejs.org/en/download/package-manager)
+- **pnpm** - [Installation Guide](https://pnpm.io/installation) (corepack recommended: `corepack enable && corepack prepare pnpm@latest --activate`)
 - **Go 1.26+** - [Installation Guide](https://go.dev/doc/install)
 - **PostgreSQL v17+** (with pgvector extension)
 - **Docker & Docker Compose** (recommended for database and full stack)
@@ -97,7 +98,7 @@ task api:dev
 Or directly:
 
 ```bash
-cd core-api && npm run start:dev
+cd core-api && pnpm run start:dev
 ```
 
 The API runs on port `6276` with gRPC server on port `16276`.
@@ -111,7 +112,7 @@ task console:dev
 Or directly:
 
 ```bash
-cd console && npm run dev
+cd console && pnpm run dev
 ```
 
 ### Workers
@@ -247,14 +248,14 @@ The `--rm` flag ensures the container is removed after it stops.
 - **Core API:** Uses Jest for testing.
   ```bash
   task api:test           # Unit tests
-  cd core-api && npm run test:watch    # Watch mode
-  cd core-api && npm run test:e2e      # End-to-end tests
+  cd core-api && pnpm run test:watch    # Watch mode
+  cd core-api && pnpm run test:e2e      # End-to-end tests
   ```
 
 - **Console:** Uses Vitest for unit tests and Playwright for e2e tests.
   ```bash
   task console:test       # Unit tests
-  cd console && npm run e2e           # E2E tests
+  cd console && pnpm run e2e           # E2E tests
   ```
 
 - **Workers:** Uses Go testing.
@@ -342,7 +343,7 @@ Some workflows can be tested faster by running the commands directly:
 | `check-lint.yml` | `task lint` |
 | `check-test.yml` | `task api:test` |
 | `check-build.yml` | `task build` (requires Docker) |
-| `frontend-tests.yml` | `cd console && npm run test:run` |
+| `frontend-tests.yml` | `cd console && pnpm run test:run` |
 | `worker-ci.yml` | `task worker:lint && task worker:check` |
 
 ### Notes

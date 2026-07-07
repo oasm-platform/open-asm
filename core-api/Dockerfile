@@ -1,4 +1,5 @@
 FROM node:26-alpine AS base
+RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN apk add --no-cache curl
 
 # Build stage
@@ -9,10 +10,10 @@ ENV APP_VERSION=$APP_VERSION
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+COPY pnpm-lock.yaml package.json ./
+RUN pnpm install
 COPY . .
-RUN npm run build
+RUN pnpm run build
 RUN mkdir -p /tmp/proto && cp -r src/proto/* /tmp/proto/
 RUN rm -rf src test node_modules/.cache
 

@@ -87,6 +87,7 @@
     "react-hook-form": "^7.59.0",
     "react-hotkeys-hook": "^5.1.0",
     "react-jsx-parser": "^2.4.1",
+    "leaflet": "^1.9.4",
     "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0",
     "recharts": "3.8.0",

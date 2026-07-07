@@ -54,7 +54,15 @@ task migration:revert
 task docker-compose  # Full stack (API, Console, 3 workers, DB, Redis, geo-ip)
 ```
 
-**Important**: `task gen-api` must be run after **any** API contract change. It regenerates `console/src/services/apis/gen/queries.ts` from `.open-api/open-api.json`. The worker uses a separate Go SDK (`oasm-sdk-go`) — update that independently.
+**Important**: `task gen-api` must be run after **any** API contract change. It regenerates `console/src/services/apis/gen/queries.ts` from `.open-api/open-api.json`.
+
+### pnpm Workspace
+
+The project uses pnpm workspaces for managing `core-api` and `console` packages:
+- `pnpm install` at root installs all workspace dependencies
+- `pnpm run <script>` runs scripts in the current package
+- `pnpm run <script> --filter=<package>` runs scripts in a specific package
+- Dependencies are managed via `pnpm-workspace.yaml` at the project root The worker uses a separate Go SDK (`oasm-sdk-go`) — update that independently.
 
 ## Local Dev Setup
 
@@ -74,7 +82,7 @@ task docker-compose  # Full stack (API, Console, 3 workers, DB, Redis, geo-ip)
   - `@typescript-eslint/consistent-type-imports: error`
 - `.prettierrc` — Single quotes, semicolons, 2-space indent.
 - `tsconfig.json` — `@/` alias maps to `src/`. Jest `moduleNameMapper` mirrors this.
-- Lint command: `npm run lint` (includes `--fix`).
+  - Lint command: `pnpm run lint` (includes `--fix`).
 
 ### console (React/TypeScript)
 - `eslint.config.js` — React hooks + refresh plugin rules.
@@ -124,10 +132,10 @@ Each service has its own `.env` (not committed, gitignored):
 ## Testing
 
 - **core-api**: Jest, `*.spec.ts` alongside source. Mock all external deps. `moduleNameMapper` for `@/` alias.
-  - `npm run test` — unit tests
-  - `npm run test:e2e` — e2e tests (separate config)
-  - `npm run test:watch` — watch mode
-- **console**: Tests exist but `task test` skips them (commented in root taskfile). Run `cd console && npm run test` explicitly.
+  - `pnpm run test` — unit tests
+  - `pnpm run test:e2e` — e2e tests (separate config)
+  - `pnpm run test:watch` — watch mode
+- **console**: Tests exist but `task test` skips them (commented in root taskfile). Run `cd console && pnpm run test` explicitly.
 - **worker**: `go test ./...` or `task worker:test`.
 - CI: Node.js 22. Runs lint (both services) + test (core-api only) on all PRs/pushes.
 
@@ -150,7 +158,7 @@ MCP server provides AI context over core-api. Config in `core-api/.env`:
 ## Common Gotchas
 
 1. **API contract changes** → Run `task gen-api` or console hooks will be stale.
-2. **Console tests disabled** in root `task test` — run `cd console && npm run test` explicitly.
+2. **Console tests disabled** in root `task test` — run `cd console && pnpm run test` explicitly.
 3. **Migrations** use TypeORM CLI via `task migration:*`. DB config in `core-api/src/database/database-config.ts`.
 4. **Worker API key** must match core-api expected key (set in both `.env` files).
 5. **Generated code** in `console/src/services/apis/gen/` — edit via regeneration, not manually.

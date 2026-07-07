@@ -17,15 +17,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - run: npm ci
-      - run: npm run test:run --workspace=console
-      - run: npm run test:coverage --workspace=console
+      - run: pnpm install
+      - run: pnpm run test:run --filter=console
+      - run: pnpm run test:coverage --filter=console
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
