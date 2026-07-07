@@ -96,7 +96,7 @@
     "@types/node": "^22.19.2",
     "@types/react": "^19.2.0",
     "@types/supertest": "^6.0.3",
-    "eslint": "^9.39.1",
+    "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "globals": "^16.5.0",
