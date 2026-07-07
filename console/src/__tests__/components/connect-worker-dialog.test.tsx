@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, waitFor } from '@testing-library/react';
 import { ConnectWorkerDialog } from '@/components/ui/connect-worker-dialog';
 import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
-import React from 'react';
+import { renderWithProviders, screen } from '@/test/utils';
 
 vi.mock('@/hooks/useConnectWorkerState', () => ({
   useConnectWorkerState: vi.fn(),
@@ -32,15 +31,6 @@ const mockUseWorkspaceState = vi.mocked(useWorkspaceState);
 const { useWorkspacesControllerGetWorkspaceApiKey, useWorkspacesControllerRotateApiKey } = await import('@/services/apis/gen/queries');
 const mockUseApiKey = vi.mocked(useWorkspacesControllerGetWorkspaceApiKey);
 const mockUseRotateApiKey = vi.mocked(useWorkspacesControllerRotateApiKey);
-
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-  });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(QueryClientProvider, { client: queryClient }, children);
-  };
-}
 
 describe('ConnectWorkerDialog', () => {
   const mockCloseDialog = vi.fn();
@@ -74,13 +64,12 @@ describe('ConnectWorkerDialog', () => {
   });
 
   it('does not render dialog when isOpen is false', () => {
-    const Wrapper = createWrapper();
-    const { container } = render(<ConnectWorkerDialog />, { wrapper: Wrapper });
+    const { container } = renderWithProviders(<ConnectWorkerDialog />);
 
     expect(container.querySelector('[role="dialog"]')).not.toBeInTheDocument();
   });
 
-  it('renders dialog when isOpen is true', () => {
+  it('renders dialog when isOpen is true', async () => {
     mockUseConnectWorkerState.mockReturnValue({
       state: { isOpen: true, networkId: undefined },
       openDialog: vi.fn(),
@@ -88,14 +77,15 @@ describe('ConnectWorkerDialog', () => {
       closeDialog: mockCloseDialog,
     });
 
-    const Wrapper = createWrapper();
-    render(<ConnectWorkerDialog />, { wrapper: Wrapper });
+    renderWithProviders(<ConnectWorkerDialog />);
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Connect worker')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('Connect worker')).toBeInTheDocument();
+    });
   });
 
-  it('displays API key in command for dev mode', () => {
+  it('displays API key in command for dev mode', async () => {
     mockUseConnectWorkerState.mockReturnValue({
       state: { isOpen: true, networkId: undefined },
       openDialog: vi.fn(),
@@ -103,13 +93,14 @@ describe('ConnectWorkerDialog', () => {
       closeDialog: mockCloseDialog,
     });
 
-    const Wrapper = createWrapper();
-    render(<ConnectWorkerDialog />, { wrapper: Wrapper });
+    renderWithProviders(<ConnectWorkerDialog />);
 
-    expect(screen.getByText(/test-api-key-123/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/test-api-key-123/)).toBeInTheDocument();
+    });
   });
 
-  it('includes networkId in command when provided', () => {
+  it('includes networkId in command when provided', async () => {
     mockUseConnectWorkerState.mockReturnValue({
       state: { isOpen: true, networkId: 'network-456' },
       openDialog: vi.fn(),
@@ -117,13 +108,14 @@ describe('ConnectWorkerDialog', () => {
       closeDialog: mockCloseDialog,
     });
 
-    const Wrapper = createWrapper();
-    render(<ConnectWorkerDialog />, { wrapper: Wrapper });
+    renderWithProviders(<ConnectWorkerDialog />);
 
-    expect(screen.getByText(/network=network-456/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/network=network-456/)).toBeInTheDocument();
+    });
   });
 
-  it('calls closeDialog when close button is clicked', () => {
+  it('calls closeDialog when close button is clicked', async () => {
     mockUseConnectWorkerState.mockReturnValue({
       state: { isOpen: true, networkId: undefined },
       openDialog: vi.fn(),
@@ -131,19 +123,22 @@ describe('ConnectWorkerDialog', () => {
       closeDialog: mockCloseDialog,
     });
 
-    const Wrapper = createWrapper();
-    render(<ConnectWorkerDialog />, { wrapper: Wrapper });
+    renderWithProviders(<ConnectWorkerDialog />);
 
-    const closeButtons = screen.getAllByRole('button', { name: /close/i });
-    const closeButton = closeButtons.find(
-      (btn) => btn.textContent?.trim() === 'Close',
-    );
+    let closeButton: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole('button', { name: /close/i });
+      closeButton = buttons.find(
+        (btn) => btn.textContent?.trim() === 'Close',
+      );
+      expect(closeButton).toBeInTheDocument();
+    });
+
     fireEvent.click(closeButton!);
-
     expect(mockCloseDialog).toHaveBeenCalled();
   });
 
-  it('renders rotate API key button', () => {
+  it('renders rotate API key button', async () => {
     mockUseConnectWorkerState.mockReturnValue({
       state: { isOpen: true, networkId: undefined },
       openDialog: vi.fn(),
@@ -151,9 +146,10 @@ describe('ConnectWorkerDialog', () => {
       closeDialog: mockCloseDialog,
     });
 
-    const Wrapper = createWrapper();
-    render(<ConnectWorkerDialog />, { wrapper: Wrapper });
+    renderWithProviders(<ConnectWorkerDialog />);
 
-    expect(screen.getByRole('button', { name: /rotate api key/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /rotate api key/i })).toBeInTheDocument();
+    });
   });
 });
