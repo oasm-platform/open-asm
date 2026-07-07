@@ -71,10 +71,10 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
 		if err != nil {
 			Emit(events, TuiEvent{
-				Type:    EventActivity,
-				Source:  "Jobs",
+				Type:          EventActivity,
+				Source:        "Jobs",
 				ActivityLevel: "warning",
-				Message: fmt.Sprintf("Screenshot failed: %v", err),
+				Message:       fmt.Sprintf("Screenshot failed: %v", err),
 			})
 		}
 		resultData := struct {
