@@ -69,7 +69,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 	}
 
 	jobLog.Info("Initializing headless browser...")
-	l := launcher.New().Leakless(false).Headless(true)
+	l := launcher.New().Leakless(false).HeadlessNew(true)
 
 	if _, err := os.Stat("/usr/bin/chromium"); err == nil {
 		jobLog.Verbose("Using system chromium at /usr/bin/chromium")
