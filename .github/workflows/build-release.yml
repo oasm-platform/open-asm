@@ -60,7 +60,7 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v5
+        uses: mikepenz/release-changelog-builder-action@v6
         if: startsWith(github.ref, 'refs/tags/')
         with:
           configuration: '.github/changelog-config.json'
