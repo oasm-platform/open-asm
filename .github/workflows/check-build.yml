@@ -54,7 +54,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image (Console)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./console
           push: false
@@ -76,7 +76,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image (Core API)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./core-api
           push: false
@@ -98,7 +98,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image (Worker)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./worker
           push: false
