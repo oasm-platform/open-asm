@@ -34,7 +34,7 @@ jobs:
       - run: pnpm run test:coverage --filter=console
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: console/coverage/
