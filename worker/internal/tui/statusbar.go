@@ -1,9 +1,6 @@
 package tui
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 type statusBarModel struct {
 	focus focusTarget
@@ -18,22 +15,14 @@ func (s *statusBarModel) setFocus(f focusTarget) {
 }
 
 func (s statusBarModel) View(width int) string {
-	panelNames := []string{"Jobs", "Output", "Events"}
-	focusIdx := int(s.focus)
+	left := statusKeyStyle.Render("[F1]") + " Help  " +
+		statusKeyStyle.Render("[F2]") + " Settings  " +
+		statusKeyStyle.Render("[F3]") + " Job List  " +
+		statusKeyStyle.Render("[F4]") + " Log View"
 
-	var hints []string
-	for i, name := range panelNames {
-		if i == focusIdx {
-			hints = append(hints, statusKeyStyle.Render(fmt.Sprintf("[%s]", name)))
-		} else {
-			hints = append(hints, name)
-		}
-	}
-
-	left := strings.Join(hints, "  ")
-	right := statusKeyStyle.Render("tab") + " switch  " +
-		statusKeyStyle.Render("↑↓") + " navigate  " +
-		statusKeyStyle.Render("q") + " quit"
+	right := statusKeyStyle.Render("[TAB]") + " Switch  " +
+		statusKeyStyle.Render("[↑↓]") + " Navigate  " +
+		statusKeyStyle.Render("[ESC]") + " Quit"
 
 	gap := width - len(left) - len(right) - 4
 	if gap < 0 {
