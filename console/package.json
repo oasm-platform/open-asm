@@ -106,7 +106,7 @@
     "@rollup/rollup-linux-x64-gnu": "^4.60.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.25.0",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@tanstack/devtools-vite": "^0.7.0",
     "@tanstack/react-devtools": "^0.10.5",
