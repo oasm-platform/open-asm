@@ -84,7 +84,7 @@ jobs:
             --cache-to=type=registry,ref=${{ env.IMAGE_NAME }}-${{ matrix.service }}:buildcache,mode=max \
             --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:dev \
             --file ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}/Dockerfile \
-            ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}
+            ${{ matrix.service == 'worker' && './worker' || '.' }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master

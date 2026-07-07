@@ -56,7 +56,8 @@ jobs:
       - name: Build Docker image (Console)
         uses: docker/build-push-action@v5
         with:
-          context: ./console
+          context: .
+          file: ./console/Dockerfile
           push: false
           load: true
           tags: oasm/oasm-console:test
@@ -78,7 +79,8 @@ jobs:
       - name: Build Docker image (Core API)
         uses: docker/build-push-action@v5
         with:
-          context: ./core-api
+          context: .
+          file: ./core-api/Dockerfile
           push: false
           load: true
           tags: oasm/oasm-api:test

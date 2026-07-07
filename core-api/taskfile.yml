@@ -3,25 +3,25 @@ version: '3'
 tasks:
   dev:
     cmds:
-      - npm run start:dev
+      - pnpm run start:dev
     env:
       NODE_ENV: 'development'
   build:
     cmds:
-      - npm run build
+      - pnpm run build
   prod:
     cmds:
-      - npm run start:prod
+      - pnpm run start:prod
     env:
       NODE_ENV: 'production'
-  install: npm install
-  lint: npm run lint
-  proto: npm run proto:generate
+  install: pnpm install
+  lint: pnpm run lint
+  proto: pnpm run proto:generate
   # Run tests
   # Executes unit and integration tests for the core-api application
   test:
     cmds:
-      - npm run test
+      - pnpm run test
   clean:
     cmds:
       - rm -rf ./husky
@@ -31,14 +31,14 @@ tasks:
   # Usage: task migration:generate MIGRATION_NAME=AddUserType
   migration:generate:
     cmds:
-      - npx ts-node --project tsconfig.json -r tsconfig-paths/register -- ../node_modules/typeorm/cli.js migration:generate -d src/database/database-config.ts src/database/migrations/{{.name}}
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:generate -d src/database/database-config.ts src/database/migrations/{{.name}}
   # Run all pending migrations
   # Executes all pending database migrations
   migration:run:
     cmds:
-      - npx ts-node --project tsconfig.json -r tsconfig-paths/register -- ../node_modules/typeorm/cli.js migration:run -d src/database/database-config.ts
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:run -d src/database/database-config.ts
   # Revert the last migration
   # Rolls back the most recently executed migration
   migration:revert:
     cmds:
-      - npx ts-node --project tsconfig.json -r tsconfig-paths/register -- ../node_modules/typeorm/cli.js migration:revert -d src/database/database-config.ts
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:revert -d src/database/database-config.ts

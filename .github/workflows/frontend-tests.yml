@@ -3,10 +3,10 @@ name: Frontend Tests
 on:
   push:
     branches: [main]
-    paths: ['console/**']
+    paths: ['console/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']
   pull_request:
     branches: [main]
-    paths: ['console/**']
+    paths: ['console/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']
 
 permissions:
   contents: read
@@ -17,15 +17,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache: 'pnpm'
 
-      - run: npm ci
-      - run: npm run test:run --workspace=console
-      - run: npm run test:coverage --workspace=console
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:run --filter console
+      - run: pnpm run test:coverage --filter console
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4

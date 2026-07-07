@@ -3,8 +3,8 @@ services:
     container_name: console
     image: oasm/oasm-console:latest
     build:
-      context: ./console
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./console/Dockerfile
     networks:
       - oasm
     env_file:
@@ -26,8 +26,8 @@ services:
     container_name: oasm-api
     image: oasm/oasm-api:latest
     build:
-      context: ./core-api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./core-api/Dockerfile
     networks:
       - oasm
     env_file:

@@ -12,10 +12,7 @@
     "url": "https://github.com/oasm-platform/open-asm/issues"
   },
   "homepage": "https://github.com/oasm-platform/open-asm#readme",
-  "workspaces": [
-    "core-api",
-    "console"
-  ],
+  "packageManager": "pnpm@11.4.0",
   "devDependencies": {
     "husky": "^9.1.7",
     "shadcn": "^4.1.2"

@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "gen:api": "npx orval",
+    "gen:api": "orval",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -17,8 +17,7 @@
     "e2e:ui": "playwright test --config=e2e/playwright.config.ts --ui",
     "e2e:headed": "playwright test --config=e2e/playwright.config.ts --headed",
     "e2e:debug": "playwright test --config=e2e/playwright.config.ts --debug",
-    "test:all": "npm run test:run && npm run e2e",
-    "prepare": "husky"
+    "test:all": "npm run test:run && npm run e2e"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.146",
@@ -72,6 +71,7 @@
     "echarts-for-react": "^3.0.6",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.12",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.14.0",
     "media-chrome": "^4.18.3",
     "motion": "^12.38.0",

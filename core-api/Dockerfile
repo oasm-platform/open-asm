@@ -1,5 +1,8 @@
 FROM node:26-alpine AS base
 RUN apk add --no-cache curl
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME/bin:$PATH"
+RUN corepack enable
 
 # Build stage
 FROM base AS builder
@@ -9,10 +12,19 @@ ENV APP_VERSION=$APP_VERSION
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
+# Copy root workspace config and core-api package.json
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+COPY core-api/package.json ./core-api/package.json
+
+# Install all dependencies (including devDependencies for build)
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# Copy core-api source code
+COPY core-api/ ./core-api/
+
+WORKDIR /app/core-api
+
+RUN pnpm run build
 RUN mkdir -p /tmp/proto && cp -r src/proto/* /tmp/proto/
 RUN rm -rf src test node_modules/.cache
 
@@ -22,13 +34,12 @@ FROM base
 ARG APP_VERSION
 ENV APP_VERSION=$APP_VERSION
 
-WORKDIR /app
+WORKDIR /app/core-api
 
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/core-api/dist ./dist
+COPY --from=builder /app/core-api/public ./public
 COPY --from=builder /tmp/proto ./proto
-
 
 EXPOSE 6276
 

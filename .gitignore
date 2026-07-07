@@ -80,6 +80,7 @@ core-api/public/tools/*
 worker/.configs.json
 worker/agent-sessions/*
 console/sw.js
+console/workbox-*.js
 .omo
 
 # Test coverage

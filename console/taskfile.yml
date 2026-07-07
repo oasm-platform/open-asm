@@ -6,7 +6,7 @@ tasks:
   # Environment: development mode
   dev:
     cmds:
-      - npm run dev
+      - pnpm run dev
     env:
       NODE_ENV: 'development'
   # Production build
@@ -14,24 +14,24 @@ tasks:
   # Includes minification and bundling
   build:
     cmds:
-      - npm run build
+      - pnpm run build
   # Install dependencies
   # Installs all project dependencies from package.json
   install:
     cmds:
-      - npm install
-  lint: npm run lint
+      - pnpm install
+  lint: pnpm run lint
   # Run tests
   # Executes unit and integration tests for the console application
   test:
     cmds:
-      - npm run test
+      - pnpm run test
   # API documentation generation
   # Generates API documentation after ensuring API server is ready
   # Waits for API server health check before generating docs
   gen-api:
     cmds:
-      - npm run gen:api
+      - pnpm run gen:api
   clean:
     cmds:
       - rm -rf ./husky
