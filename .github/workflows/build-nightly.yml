@@ -75,6 +75,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Prepare build context (api)
+        if: matrix.service == 'api'
+        run: cp pnpm-lock.yaml core-api/pnpm-lock.yaml
+
       - name: Build and push
         run: |
           docker buildx build \

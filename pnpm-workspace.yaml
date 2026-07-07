@@ -1,3 +1,18 @@
 packages:
   - 'core-api'
   - 'console'
+
+# PNPM v11 supply-chain security configuration
+# minimumReleaseAge: 0 disables the release age check for all packages
+minimumReleaseAge: 0
+
+# allowBuilds replaces onlyBuiltDependencies in pnpm v11
+# Lists packages that are allowed to run post-install scripts
+allowBuilds:
+  - '@scarf/scarf'
+  - '@swc/core'
+  - 'esbuild'
+  - 'grpc-tools'
+  - 'msgpackr-extract'
+  - 'msw'
+  - 'protobufjs'

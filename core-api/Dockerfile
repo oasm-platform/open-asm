@@ -1,5 +1,5 @@
 FROM node:26-alpine AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm@latest
 RUN apk add --no-cache curl
 
 # Build stage

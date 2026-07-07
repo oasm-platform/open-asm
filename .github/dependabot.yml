@@ -1,39 +1,43 @@
 version: 2
 updates:
-  - package-ecosystem: 'npm'
-    directories:
-      - '/'
-      - '/core-api'
-      - '/console'
+  # Root workspace — pnpm lockfile
+  - package-ecosystem: "npm"
+    directory: "/"
     schedule:
-      interval: 'weekly'
-      day: 'monday'
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     open-pull-requests-limit: 10
-    groups:
-      nestjs:
-        patterns: ['@nestjs/*']
-      react:
-        patterns: ['react', 'react-dom', '@types/react*']
-      eslint:
-        patterns: ['eslint', '@eslint/*', 'typescript-eslint']
-    commit-message:
-      prefix: 'chore'
+    versioning-strategy: increase
 
-  - package-ecosystem: 'docker'
-    directories:
-      - '/core-api'
-      - '/console'
-      - '/worker'
+  # core-api workspace
+  - package-ecosystem: "npm"
+    directory: "/core-api"
     schedule:
-      interval: 'daily'
-    open-pull-requests-limit: 5
+      interval: "weekly"
     commit-message:
-      prefix: 'chore'
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
 
-  - package-ecosystem: 'github-actions'
-    directory: '/'
+  # console workspace
+  - package-ecosystem: "npm"
+    directory: "/console"
     schedule:
-      interval: 'daily'
-    open-pull-requests-limit: 5
+      interval: "weekly"
     commit-message:
-      prefix: 'chore'
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"

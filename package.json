@@ -26,16 +26,5 @@
   "dependencies": {
     "@tanstack/intent": "^0.0.41",
     "@tanstack/router-core": "^1.171.8"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@scarf/scarf",
-      "@swc/core",
-      "esbuild",
-      "grpc-tools",
-      "msgpackr-extract",
-      "msw",
-      "protobufjs"
-    ]
   }
 }
