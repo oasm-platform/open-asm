@@ -87,7 +87,7 @@
     "@protobuf-ts/plugin": "^2.11.1",
     "@protobuf-ts/runtime": "^2.11.1",
     "@protobuf-ts/runtime-rpc": "^2.11.1",
-    "@swc/cli": "^0.7.9",
+    "@swc/cli": "^0.8.1",
     "@swc/core": "^1.15.3",
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.6",
