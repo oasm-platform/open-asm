@@ -105,7 +105,7 @@
     "@rollup/rollup-linux-x64-gnu": "^4.60.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.25.0",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@tanstack/devtools-vite": "^0.7.0",
     "@tanstack/react-devtools": "^0.10.5",
@@ -126,7 +126,7 @@
     "@vitest/ui": "^4.1.7",
     "ajv": "^8.18.0",
     "dotenv": "^16.4.7",
-    "eslint": "^9.25.0",
+    "eslint": "^10.6.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
@@ -137,7 +137,7 @@
     "react-router-dom": "^7.6.2",
     "tw-animate-css": "^1.3.4",
     "typescript": "~5.8.3",
-    "typescript-eslint": "^8.30.1",
+    "typescript-eslint": "^8.63.0",
     "vite": "^8.1.3",
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^4.1.7"
