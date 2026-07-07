@@ -46,6 +46,16 @@ export class SendMessageDto {
   @IsOptional()
   @IsEnum(AgentMode)
   agentMode: AgentMode;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Preferred worker ID for remote command execution. Only respected when agentMode is "agent".',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsOptional()
+  @IsUUID()
+  workerId?: string;
 }
 
 export class ToolCallResponseDto {

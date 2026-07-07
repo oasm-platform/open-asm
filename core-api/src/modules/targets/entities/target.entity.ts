@@ -2,12 +2,21 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { CronSchedule, JobStatus } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, Relation } from 'typeorm';
-import { WorkspaceTarget } from './workspace-target.entity';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  Relation,
+  Unique,
+} from 'typeorm';
 
 /**
  * Enum representing the type of target
@@ -22,6 +31,8 @@ export enum TargetType {
 @Index('IDX_targets_value', ['value'])
 @Index('IDX_targets_internalNetworkId', ['internalNetwork'])
 @Index('IDX_targets_scanSchedule_jobId', ['scanSchedule', 'jobId'])
+@Index('IDX_targets_workspaceId', ['workspaceId'])
+@Unique(['workspaceId', 'value'])
 export class Target extends BaseEntity {
   @ApiProperty({
     example: 'example.com',
@@ -79,9 +90,6 @@ export class Target extends BaseEntity {
   @Column({ default: 0 })
   reScanCount: number;
 
-  @OneToMany(() => WorkspaceTarget, (workspaceTarget) => workspaceTarget.target)
-  workspaceTargets: Relation<WorkspaceTarget[]>;
-
   @OneToMany(() => Asset, (asset) => asset.target)
   assets: Relation<Asset[]>;
 
@@ -115,4 +123,11 @@ export class Target extends BaseEntity {
   )
   @JoinColumn({ name: 'internalNetworkId' })
   internalNetwork: Relation<InternalNetwork>;
+
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
+  @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'workspaceId' })
+  workspace: Relation<Workspace>;
 }

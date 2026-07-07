@@ -5,21 +5,22 @@ import { server } from '@/test/mocks/node';
 import { http, HttpResponse } from 'msw';
 
 vi.mock('recharts', () => {
-  const Mock = ({ children }: { children?: React.ReactNode }) => (
+  const Mock = () => <div />;
+  const MockWithChildren = ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   );
   return {
-    ResponsiveContainer: Mock,
-    AreaChart: Mock,
+    ResponsiveContainer: MockWithChildren,
+    AreaChart: MockWithChildren,
     Area: Mock,
-    LineChart: Mock,
+    LineChart: MockWithChildren,
     Line: Mock,
     CartesianGrid: Mock,
     XAxis: Mock,
     YAxis: Mock,
     Tooltip: Mock,
     Legend: Mock,
-    PieChart: Mock,
+    PieChart: MockWithChildren,
     Pie: Mock,
     Cell: Mock,
   };

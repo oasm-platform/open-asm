@@ -1,7 +1,7 @@
 import { useTheme } from '@/components/ui/theme-provider';
 import countriesData from '@/data/countries.json';
 import type { IpLocationData } from '@/hooks/useIpLocationData';
-import ReactEChartsCore from 'echarts-for-react/lib/core';
+import ReactEChartsCore from 'echarts-for-react/esm/core';
 import { MapChart } from 'echarts/charts';
 import { TooltipComponent, VisualMapComponent } from 'echarts/components';
 import * as echarts from 'echarts/core';

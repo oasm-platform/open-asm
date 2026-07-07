@@ -64,14 +64,11 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 		AcceptLanguage: "en-US,en;q=0.9",
 	})
 
-	_, _ = page.SetExtraHeaders([]string{
-		"Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-		"Upgrade-Insecure-Requests", "1",
-		"Sec-Fetch-Dest", "document",
-		"Sec-Fetch-Mode", "navigate",
-		"Sec-Fetch-Site", "none",
-		"Sec-Fetch-User", "?1",
-	})
+	// Note: we intentionally do NOT set Accept / Sec-Fetch-* headers globally
+	// via SetExtraHeaders because those vary per resource type (CSS needs
+	// Accept: text/css, images need Accept: image/*, etc.). Overriding them
+	// globally would break CSS/font/image loading. Chrome sets appropriate
+	// per-request headers automatically.
 
 	err = rod.Try(func() {
 		page.Timeout(30 * time.Second).MustNavigate(url)
@@ -83,6 +80,13 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 		}
 		return "", fmt.Errorf("failed to load page %s: %w", url, err)
 	}
+
+	// Wait for web fonts to finish loading (best-effort, 5s timeout)
+	// Without this, @font-face fonts may not be rendered in the screenshot.
+	_, _ = page.Timeout(5 * time.Second).Eval(`document.fonts.ready`)
+
+	// Wait for next render frame to ensure CSS/font changes are painted
+	_ = page.WaitRepaint()
 
 	quality := 80
 	imgBytes, err := page.Timeout(10*time.Second).Screenshot(true, &proto.PageCaptureScreenshot{
