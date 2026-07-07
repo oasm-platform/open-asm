@@ -2,7 +2,7 @@ FROM node:26-alpine AS base
 RUN apk add --no-cache curl
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME/bin:$PATH"
-RUN corepack enable
+RUN npm install -g corepack && corepack enable
 
 # Build stage
 FROM base AS builder
