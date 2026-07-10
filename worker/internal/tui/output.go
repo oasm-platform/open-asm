@@ -67,7 +67,7 @@ func (o *outputModel) setDimensions(width, height int) {
 
 func (o outputModel) View() string {
 	if o.selectedID == "" {
-		return lipgloss.NewStyle().Foreground(ColorMuted).Render("Select a job to view output")
+		return lipgloss.NewStyle().Foreground(ColorGray).Render("Select a job to view output")
 	}
 	return o.viewport.View()
 }

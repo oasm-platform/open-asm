@@ -98,7 +98,7 @@ func (j jobsModel) selectedID() string {
 
 func (j jobsModel) View(width int) string {
 	if len(j.jobs) == 0 {
-		return lipgloss.NewStyle().Foreground(ColorMuted).Render("No active jobs")
+		return lipgloss.NewStyle().Foreground(ColorGray).Render("No active jobs")
 	}
 	return j.table.View()
 }

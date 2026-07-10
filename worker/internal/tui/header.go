@@ -17,6 +17,14 @@ type headerModel struct {
 	duration    time.Duration
 	activeJobs  int
 	maxSlots    int
+
+	// System metrics
+	cpuUsage    float64
+	memoryUsed  uint64
+	memoryTotal uint64
+	memoryPct   float64
+	goRoutines  int
+	heapAlloc   uint64
 }
 
 func newHeaderModel() headerModel {
@@ -36,6 +44,13 @@ func (h *headerModel) update(msg tea.Msg) {
 	case metricsMsg:
 		h.activeJobs = msg.activeJobs
 		h.maxSlots = msg.maxConcurrency
+	case systemMetricsMsg:
+		h.cpuUsage = msg.cpuUsage
+		h.memoryUsed = msg.memoryUsed
+		h.memoryTotal = msg.memoryTotal
+		h.memoryPct = msg.memoryPct
+		h.goRoutines = msg.goRoutines
+		h.heapAlloc = msg.heapAlloc
 	case tickMsg:
 		if h.connected {
 			h.duration = time.Since(h.connectedAt)
@@ -82,7 +97,59 @@ func (h headerModel) renderFull(width int) string {
 		)
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, line1, connDetail)
+	// System metrics line
+	sysMetrics := h.renderSystemMetrics()
+
+	return lipgloss.JoinVertical(lipgloss.Left, line1, connDetail, sysMetrics)
+}
+
+func (h headerModel) renderSystemMetrics() string {
+	if h.memoryTotal == 0 {
+		return ""
+	}
+
+	cpuStyle := headerMetricValue
+	if h.cpuUsage > 80 {
+		cpuStyle = headerMetricHigh
+	} else if h.cpuUsage > 50 {
+		cpuStyle = headerMetricMedium
+	}
+
+	memStyle := headerMetricValue
+	if h.memoryPct > 80 {
+		memStyle = headerMetricHigh
+	} else if h.memoryPct > 50 {
+		memStyle = headerMetricMedium
+	}
+
+	cpuStr := cpuStyle.Render(fmt.Sprintf("%.1f%%", h.cpuUsage))
+	memStr := memStyle.Render(fmt.Sprintf("%.1f%%", h.memoryPct))
+	memUsed := headerMetricLabel.Render(fmt.Sprintf(" (%s/%s)",
+		formatBytes(h.memoryUsed), formatBytes(h.memoryTotal)))
+	goroutines := headerMetricLabel.Render(fmt.Sprintf("  Go: %d", h.goRoutines))
+	heap := headerMetricLabel.Render(fmt.Sprintf("  Heap: %s", formatBytes(h.heapAlloc)))
+
+	return headerMetricLabel.Render("CPU: ") + cpuStr +
+		headerMetricLabel.Render("  MEM: ") + memStr + memUsed +
+		goroutines + heap
+}
+
+func formatBytes(bytes uint64) string {
+	const (
+		KB = 1024
+		MB = 1024 * KB
+		GB = 1024 * MB
+	)
+	switch {
+	case bytes >= GB:
+		return fmt.Sprintf("%.1fGB", float64(bytes)/float64(GB))
+	case bytes >= MB:
+		return fmt.Sprintf("%.1fMB", float64(bytes)/float64(MB))
+	case bytes >= KB:
+		return fmt.Sprintf("%.1fKB", float64(bytes)/float64(KB))
+	default:
+		return fmt.Sprintf("%dB", bytes)
+	}
 }
 
 func formatDuration(d time.Duration) string {
