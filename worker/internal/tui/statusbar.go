@@ -15,10 +15,19 @@ func (s *statusBarModel) setFocus(f focusTarget) {
 }
 
 func (s statusBarModel) View(width int) string {
-	left := statusKeyStyle.Render("[F1]") + " Help  " +
-		statusKeyStyle.Render("[F2]") + " Settings  " +
-		statusKeyStyle.Render("[F3]") + " Job List  " +
-		statusKeyStyle.Render("[F4]") + " Log View"
+	panel := ""
+	switch s.focus {
+	case focusSessions:
+		panel = statusKeyStyle.Render("[1]●Sessions") + " [2] Jobs"
+	case focusJobs:
+		panel = "[1] Sessions " + statusKeyStyle.Render("[2]●Jobs")
+	case focusOutput:
+		panel = "[1] Sessions [2] Jobs " + statusKeyStyle.Render("●Output")
+	case focusEvents:
+		panel = "[1] Sessions [2] Jobs " + statusKeyStyle.Render("●Events")
+	}
+
+	left := panel
 
 	right := statusKeyStyle.Render("[TAB]") + " Switch  " +
 		statusKeyStyle.Render("[↑↓]") + " Navigate  " +
