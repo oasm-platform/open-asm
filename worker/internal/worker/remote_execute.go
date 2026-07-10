@@ -115,6 +115,13 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 
 			activeSessions[sessionID] = sb
 			log.Info("Session sandbox: %s -> %s", sessionID, sb.rootPath)
+
+			Emit(events, TuiEvent{
+				Type:          EventSessionCreated,
+				SessionID:     sessionID,
+				SessionActive: true,
+			})
+
 			return sb, nil
 		}
 
@@ -151,6 +158,11 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 					continue
 				}
 
+				Emit(events, TuiEvent{
+					Type:      EventSessionCommand,
+					SessionID: sessionID,
+				})
+
 				go executeRemoteCommand(ctx, handler, sessionID, command, sb, events, toolPath)
 
 			default:
@@ -167,6 +179,12 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 					log.Info("Cleaned up session sandbox: %s", sessionID)
 				}
 			}
+
+			Emit(events, TuiEvent{
+				Type:      EventSessionClosed,
+				SessionID: sessionID,
+			})
+
 			delete(activeSessions, sessionID)
 		}
 		sessionsMu.Unlock()
