@@ -249,24 +249,26 @@ func (m *Model) resize() {
 		return
 	}
 
-	// Layout: header(3) + gap(1) + jobs(10) + gap(1) + bottom(rest) + statusbar(1)
-	// Total borders: 4 horizontal lines between sections
+	// Layout: header(3) + gap(1) + top(10) + gap(1) + bottom(rest) + statusbar(1)
 	headerLines := 3
 	gapLines := 1
-	jobsLines := 10
+	topLines := 10
 	statusBarLines := 1
-	bottomLines := m.height - headerLines - gapLines*2 - jobsLines - statusBarLines
+	bottomLines := m.height - headerLines - gapLines*2 - topLines - statusBarLines
 	if bottomLines < 4 {
 		bottomLines = 4
 	}
 
-	eventsW := m.width * 35 / 100
-	outputW := m.width - eventsW
+	// Split width: left 55%, right 45%
+	leftW := m.width * 55 / 100
+	rightW := m.width - leftW
 
-	m.jobsTable.table.SetHeight(jobsLines - 2)
-	m.jobsTable.table.SetWidth(m.width - 4)
-	m.outputVP.setDimensions(outputW-2, bottomLines-2)
-	m.eventsList.setDimensions(eventsW-2, bottomLines-2)
+	m.sessionsTable.table.SetHeight(topLines - 2)
+	m.sessionsTable.table.SetWidth(leftW - 4)
+	m.jobsTable.table.SetHeight(topLines - 2)
+	m.jobsTable.table.SetWidth(rightW - 4)
+	m.outputVP.setDimensions(leftW-2, bottomLines-2)
+	m.eventsList.setDimensions(rightW-2, bottomLines-2)
 }
 
 func (m Model) View() tea.View {
@@ -277,49 +279,58 @@ func (m Model) View() tea.View {
 		return tea.NewView(fmt.Sprintf("Terminal too small (%dx%d). Need 80x20.", m.width, m.height))
 	}
 
-	// Recalculate
+	// Layout: header(3) + gap(1) + top(10) + gap(1) + bottom(rest) + statusbar(1)
 	headerLines := 3
 	gapLines := 1
-	jobsLines := 10
+	topLines := 10
 	statusBarLines := 1
-	bottomLines := m.height - headerLines - gapLines*2 - jobsLines - statusBarLines
+	bottomLines := m.height - headerLines - gapLines*2 - topLines - statusBarLines
 	if bottomLines < 4 {
 		bottomLines = 4
 	}
 
-	eventsW := m.width * 35 / 100
-	outputW := m.width - eventsW
+	// Split width: left 55%, right 45%
+	leftW := m.width * 55 / 100
+	rightW := m.width - leftW
 
-	m.outputVP.setDimensions(outputW-2, bottomLines-2)
-	m.eventsList.setDimensions(eventsW-2, bottomLines-2)
+	// Update component dimensions
+	m.sessionsTable.table.SetHeight(topLines - 2)
+	m.sessionsTable.table.SetWidth(leftW - 4)
+	m.jobsTable.table.SetHeight(topLines - 2)
+	m.jobsTable.table.SetWidth(rightW - 4)
+	m.outputVP.setDimensions(leftW-2, bottomLines-2)
+	m.eventsList.setDimensions(rightW-2, bottomLines-2)
 
-	// Style for bordered panels
+	// Border helper
 	bordered := func(content string, w, h int) string {
 		return lipgloss.NewStyle().
 			Width(w).
 			Height(h).
 			Border(lipgloss.NormalBorder()).
+			BorderForeground(ColorDarkGray).
 			Render(content)
 	}
 
-	// === Header (2 lines) ===
+	// Header
 	header := bordered(m.headerComp.View(m.width-4), m.width, headerLines)
 
-	// === Jobs table (10 lines) ===
-	jobs := bordered(m.jobsTable.View(m.width-4), m.width, jobsLines)
+	// Top row: sessions (left) + jobs (right)
+	sessions := bordered(m.sessionsTable.View(), leftW, topLines)
+	jobs := bordered(m.jobsTable.View(rightW), rightW, topLines)
+	top := lipgloss.JoinHorizontal(lipgloss.Top, sessions, jobs)
 
-	// === Bottom: output + events side by side ===
-	output := bordered(m.outputVP.View(), outputW, bottomLines)
-	events := bordered(m.eventsList.View(), eventsW, bottomLines)
+	// Bottom row: output (left) + events (right)
+	output := bordered(m.outputVP.View(), leftW, bottomLines)
+	events := bordered(m.eventsList.View(), rightW, bottomLines)
 	bottom := lipgloss.JoinHorizontal(lipgloss.Top, output, events)
 
-	// === Status bar ===
+	// Status bar
 	statusBar := m.statusBar.View(m.width)
 
-	// === Assemble ===
+	// Assemble
 	return tea.NewView(strings.Join([]string{
 		header,
-		jobs,
+		top,
 		bottom,
 		statusBar,
 	}, "\n"))
