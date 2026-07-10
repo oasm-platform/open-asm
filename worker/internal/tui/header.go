@@ -103,6 +103,20 @@ func (h headerModel) renderFull(width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, line1, connDetail, sysMetrics)
 }
 
+func renderBar(percent float64, width int) string {
+	filled := int(percent / 100 * float64(width))
+	empty := width - filled
+
+	bar := ""
+	for i := 0; i < filled; i++ {
+		bar += headerBarFilled.Render("█")
+	}
+	for i := 0; i < empty; i++ {
+		bar += headerBarEmpty.Render("░")
+	}
+	return bar
+}
+
 func (h headerModel) renderSystemMetrics() string {
 	if h.memoryTotal == 0 {
 		return ""
@@ -122,16 +136,16 @@ func (h headerModel) renderSystemMetrics() string {
 		memStyle = headerMetricMedium
 	}
 
-	cpuStr := cpuStyle.Render(fmt.Sprintf("%.1f%%", h.cpuUsage))
-	memStr := memStyle.Render(fmt.Sprintf("%.1f%%", h.memoryPct))
-	memUsed := headerMetricLabel.Render(fmt.Sprintf(" (%s/%s)",
-		formatBytes(h.memoryUsed), formatBytes(h.memoryTotal)))
+	cpuBar := renderBar(h.cpuUsage, 10)
+	memBar := renderBar(h.memoryPct, 10)
+
+	cpuStr := headerMetricLabel.Render("CPU: ") + cpuBar + " " + cpuStyle.Render(fmt.Sprintf("%.1f%%", h.cpuUsage))
+	memStr := headerMetricLabel.Render("MEM: ") + memBar + " " + memStyle.Render(fmt.Sprintf("%.1f%%", h.memoryPct))
+	memDetail := headerMetricLabel.Render(fmt.Sprintf(" (%s/%s)", formatBytes(h.memoryUsed), formatBytes(h.memoryTotal)))
 	goroutines := headerMetricLabel.Render(fmt.Sprintf("  Go: %d", h.goRoutines))
 	heap := headerMetricLabel.Render(fmt.Sprintf("  Heap: %s", formatBytes(h.heapAlloc)))
 
-	return headerMetricLabel.Render("CPU: ") + cpuStr +
-		headerMetricLabel.Render("  MEM: ") + memStr + memUsed +
-		goroutines + heap
+	return cpuStr + "  " + memStr + memDetail + goroutines + heap
 }
 
 func formatBytes(bytes uint64) string {
