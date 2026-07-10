@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,9 +21,19 @@ type SystemMetrics struct {
 	Timestamp   time.Time
 }
 
-type cpuSample struct {
+type cpuJiffies struct {
 	user, nice, system, idle, iowait, irq, softirq, steal uint64
 }
+
+func (j cpuJiffies) total() uint64 {
+	return j.user + j.nice + j.system + j.idle + j.iowait + j.irq + j.softirq + j.steal
+}
+
+var (
+	prevCPU    cpuJiffies
+	prevCPUSet bool
+	cpuMu      sync.Mutex
+)
 
 func GetSystemMetrics() SystemMetrics {
 	metrics := SystemMetrics{
@@ -34,8 +45,6 @@ func GetSystemMetrics() SystemMetrics {
 	runtime.ReadMemStats(&m)
 	metrics.HeapAlloc = m.HeapAlloc
 	metrics.HeapSys = m.HeapSys
-	metrics.MemoryUsed = m.Sys
-	metrics.MemoryTotal = 0
 
 	readCPUMetrics(&metrics)
 	readMemoryMetrics(&metrics)
@@ -60,15 +69,24 @@ func readCPUMetrics(m *SystemMetrics) {
 		return
 	}
 
-	var vals [8]uint64
+	var cur cpuJiffies
+	vals := [8]*uint64{&cur.user, &cur.nice, &cur.system, &cur.idle, &cur.iowait, &cur.irq, &cur.softirq, &cur.steal}
 	for i := 0; i < 8; i++ {
-		vals[i], _ = strconv.ParseUint(fields[i+1], 10, 64)
+		*vals[i], _ = strconv.ParseUint(fields[i+1], 10, 64)
 	}
 
-	// Use a simple instantaneous reading - not accurate but shows activity
-	total := vals[0] + vals[1] + vals[2] + vals[3] + vals[4] + vals[5] + vals[6] + vals[7]
-	idle := vals[3]
-	m.CPUUsage = float64(total-idle) / float64(total) * 100
+	cpuMu.Lock()
+	defer cpuMu.Unlock()
+
+	if prevCPUSet {
+		dTotal := cur.total() - prevCPU.total()
+		dIdle := cur.idle - prevCPU.idle
+		if dTotal > 0 {
+			m.CPUUsage = float64(dTotal-dIdle) / float64(dTotal) * 100
+		}
+	}
+	prevCPU = cur
+	prevCPUSet = true
 }
 
 func readMemoryMetrics(m *SystemMetrics) {

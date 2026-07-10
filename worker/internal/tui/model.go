@@ -20,6 +20,32 @@ const (
 	focusEvents
 )
 
+type layout struct {
+	headerLines  int
+	gapLines     int
+	topLines     int
+	statusBar    int
+	bottomLines  int
+	leftW        int
+	rightW       int
+}
+
+func computeLayout(w, h int) layout {
+	l := layout{
+		headerLines: 3,
+		gapLines:    1,
+		topLines:    10,
+		statusBar:   1,
+	}
+	l.bottomLines = h - l.headerLines - l.gapLines*2 - l.topLines - l.statusBar
+	if l.bottomLines < 4 {
+		l.bottomLines = 4
+	}
+	l.leftW = w * 55 / 100
+	l.rightW = w - l.leftW
+	return l
+}
+
 type Model struct {
 	cfg    *config.Config
 	events <-chan worker.TuiEvent
@@ -51,9 +77,6 @@ type Model struct {
 	outputVP     outputModel
 	eventsList    eventsModel
 	statusBar     statusBarModel
-
-	// System metrics timer
-	metricsTicker *time.Ticker
 }
 
 type activityEntry struct {
@@ -104,6 +127,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "shift+tab":
 			m.focus = (m.focus + 3) % 4
+			m.statusBar.setFocus(m.focus)
+			return m, nil
+		case "left":
+			m.focus = (m.focus + 3) % 4
+			m.statusBar.setFocus(m.focus)
+			return m, nil
+		case "right":
+			m.focus = (m.focus + 1) % 4
 			m.statusBar.setFocus(m.focus)
 			return m, nil
 		case "1":
@@ -249,26 +280,14 @@ func (m *Model) resize() {
 		return
 	}
 
-	// Layout: header(3) + gap(1) + top(10) + gap(1) + bottom(rest) + statusbar(1)
-	headerLines := 3
-	gapLines := 1
-	topLines := 10
-	statusBarLines := 1
-	bottomLines := m.height - headerLines - gapLines*2 - topLines - statusBarLines
-	if bottomLines < 4 {
-		bottomLines = 4
-	}
+	l := computeLayout(m.width, m.height)
 
-	// Split width: left 55%, right 45%
-	leftW := m.width * 55 / 100
-	rightW := m.width - leftW
-
-	m.sessionsTable.table.SetHeight(topLines - 2)
-	m.sessionsTable.table.SetWidth(leftW - 4)
-	m.jobsTable.table.SetHeight(topLines - 2)
-	m.jobsTable.table.SetWidth(rightW - 4)
-	m.outputVP.setDimensions(leftW-2, bottomLines-2)
-	m.eventsList.setDimensions(rightW-2, bottomLines-2)
+	m.sessionsTable.table.SetHeight(l.topLines - 2)
+	m.sessionsTable.table.SetWidth(l.leftW - 4)
+	m.jobsTable.table.SetHeight(l.topLines - 2)
+	m.jobsTable.table.SetWidth(l.rightW - 4)
+	m.outputVP.setDimensions(l.leftW-2, l.bottomLines-2)
+	m.eventsList.setDimensions(l.rightW-2, l.bottomLines-2)
 }
 
 func (m Model) View() tea.View {
@@ -279,27 +298,7 @@ func (m Model) View() tea.View {
 		return tea.NewView(fmt.Sprintf("Terminal too small (%dx%d). Need 80x20.", m.width, m.height))
 	}
 
-	// Layout: header(3) + gap(1) + top(10) + gap(1) + bottom(rest) + statusbar(1)
-	headerLines := 3
-	gapLines := 1
-	topLines := 10
-	statusBarLines := 1
-	bottomLines := m.height - headerLines - gapLines*2 - topLines - statusBarLines
-	if bottomLines < 4 {
-		bottomLines = 4
-	}
-
-	// Split width: left 55%, right 45%
-	leftW := m.width * 55 / 100
-	rightW := m.width - leftW
-
-	// Update component dimensions
-	m.sessionsTable.table.SetHeight(topLines - 2)
-	m.sessionsTable.table.SetWidth(leftW - 4)
-	m.jobsTable.table.SetHeight(topLines - 2)
-	m.jobsTable.table.SetWidth(rightW - 4)
-	m.outputVP.setDimensions(leftW-2, bottomLines-2)
-	m.eventsList.setDimensions(rightW-2, bottomLines-2)
+	l := computeLayout(m.width, m.height)
 
 	// Border helper
 	bordered := func(content string, w, h int) string {
@@ -312,16 +311,16 @@ func (m Model) View() tea.View {
 	}
 
 	// Header
-	header := bordered(m.headerComp.View(m.width-4), m.width, headerLines)
+	header := bordered(m.headerComp.View(m.width-4), m.width, l.headerLines)
 
 	// Top row: sessions (left) + jobs (right)
-	sessions := bordered(m.sessionsTable.View(), leftW, topLines)
-	jobs := bordered(m.jobsTable.View(rightW), rightW, topLines)
+	sessions := bordered(m.sessionsTable.View(), l.leftW, l.topLines)
+	jobs := bordered(m.jobsTable.View(l.rightW), l.rightW, l.topLines)
 	top := lipgloss.JoinHorizontal(lipgloss.Top, sessions, jobs)
 
 	// Bottom row: output (left) + events (right)
-	output := bordered(m.outputVP.View(), leftW, bottomLines)
-	events := bordered(m.eventsList.View(), rightW, bottomLines)
+	output := bordered(m.outputVP.View(), l.leftW, l.bottomLines)
+	events := bordered(m.eventsList.View(), l.rightW, l.bottomLines)
 	bottom := lipgloss.JoinHorizontal(lipgloss.Top, output, events)
 
 	// Status bar

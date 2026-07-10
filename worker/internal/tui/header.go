@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/bubbletea/v2"
@@ -107,14 +108,15 @@ func renderBar(percent float64, width int) string {
 	filled := int(percent / 100 * float64(width))
 	empty := width - filled
 
-	bar := ""
+	var b strings.Builder
+	b.Grow(filled*8 + empty*8) // pre-allocate rough estimate
 	for i := 0; i < filled; i++ {
-		bar += headerBarFilled.Render("█")
+		b.WriteString(headerBarFilled.Render("█"))
 	}
 	for i := 0; i < empty; i++ {
-		bar += headerBarEmpty.Render("░")
+		b.WriteString(headerBarEmpty.Render("░"))
 	}
-	return bar
+	return b.String()
 }
 
 func (h headerModel) renderSystemMetrics() string {
