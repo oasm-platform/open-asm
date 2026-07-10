@@ -14,7 +14,8 @@ import (
 type focusTarget int
 
 const (
-	focusJobs focusTarget = iota
+	focusSessions focusTarget = iota
+	focusJobs
 	focusOutput
 	focusEvents
 )
@@ -44,11 +45,15 @@ type Model struct {
 	width  int
 	height int
 
-	headerComp headerModel
-	jobsTable  jobsModel
-	outputVP   outputModel
-	eventsList eventsModel
-	statusBar  statusBarModel
+	headerComp   headerModel
+	sessionsTable sessionsModel
+	jobsTable     jobsModel
+	outputVP     outputModel
+	eventsList    eventsModel
+	statusBar     statusBarModel
+
+	// System metrics timer
+	metricsTicker *time.Ticker
 }
 
 type activityEntry struct {
@@ -66,6 +71,7 @@ func NewModel(cfg *config.Config, events <-chan worker.TuiEvent) Model {
 	}
 
 	m.headerComp = newHeaderModel()
+	m.sessionsTable = newSessionsModel()
 	m.jobsTable = newJobsModel()
 	m.outputVP = newOutputModel()
 	m.eventsList = newEventsModel()
@@ -75,7 +81,7 @@ func NewModel(cfg *config.Config, events <-chan worker.TuiEvent) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(waitForEvent(m.events))
+	return tea.Batch(waitForEvent(m.events), collectSystemMetrics())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -93,15 +99,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc", "ctrl+c":
 			return m, tea.Quit
 		case "tab":
-			m.focus = (m.focus + 1) % 3
+			m.focus = (m.focus + 1) % 4
 			m.statusBar.setFocus(m.focus)
 			return m, nil
 		case "shift+tab":
-			m.focus = (m.focus + 2) % 3
+			m.focus = (m.focus + 3) % 4
+			m.statusBar.setFocus(m.focus)
+			return m, nil
+		case "1":
+			m.focus = focusSessions
+			m.statusBar.setFocus(m.focus)
+			return m, nil
+		case "2":
+			m.focus = focusJobs
 			m.statusBar.setFocus(m.focus)
 			return m, nil
 		case "up", "k":
-			if m.focus == focusJobs {
+			if m.focus == focusSessions {
+				cmd := m.sessionsTable.update(msg)
+				cmds = append(cmds, cmd)
+				if id := m.sessionsTable.selectedID(); id != m.outputVP.selectedID {
+					m.outputVP.setSelected(id)
+				}
+				return m, tea.Batch(cmds...)
+			} else if m.focus == focusJobs {
 				cmd := m.jobsTable.update(msg)
 				cmds = append(cmds, cmd)
 				if id := m.jobsTable.selectedID(); id != m.outputVP.selectedID {
@@ -110,7 +131,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(cmds...)
 			}
 		case "down", "j":
-			if m.focus == focusJobs {
+			if m.focus == focusSessions {
+				cmd := m.sessionsTable.update(msg)
+				cmds = append(cmds, cmd)
+				if id := m.sessionsTable.selectedID(); id != m.outputVP.selectedID {
+					m.outputVP.setSelected(id)
+				}
+				return m, tea.Batch(cmds...)
+			} else if m.focus == focusJobs {
 				cmd := m.jobsTable.update(msg)
 				cmds = append(cmds, cmd)
 				if id := m.jobsTable.selectedID(); id != m.outputVP.selectedID {
@@ -120,7 +148,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		if m.focus == focusJobs {
+		if m.focus == focusSessions {
+			cmds = append(cmds, m.sessionsTable.update(msg))
+		} else if m.focus == focusJobs {
 			cmds = append(cmds, m.jobsTable.update(msg))
 		} else if m.focus == focusOutput {
 			cmds = append(cmds, m.outputVP.update(msg))
@@ -169,6 +199,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			level:     level,
 			timestamp: msg.completedAt,
 		})
+	case sessionCreatedMsg:
+		m.sessionsTable.handleSessionCreated(msg)
+		m.eventsList.addEvent(activityEntry{
+			text:      fmt.Sprintf("Session %s created", msg.id[:min(len(msg.id), 8)]),
+			level:     "info",
+			timestamp: msg.createdAt,
+		})
+		if len(m.sessionsTable.sessions) == 1 {
+			m.outputVP.setSelected(msg.id)
+		}
+	case sessionCommandMsg:
+		m.sessionsTable.handleSessionCommand(msg)
+		m.eventsList.addEvent(activityEntry{
+			text:      fmt.Sprintf("Session %s executing command", msg.id[:min(len(msg.id), 8)]),
+			level:     "info",
+			timestamp: time.Now(),
+		})
+	case sessionClosedMsg:
+		m.sessionsTable.handleSessionClosed(msg)
+		m.eventsList.addEvent(activityEntry{
+			text:      fmt.Sprintf("Session %s closed", msg.id[:min(len(msg.id), 8)]),
+			level:     "warning",
+			timestamp: time.Now(),
+		})
 	case jobOutputMsg:
 		m.outputVP.appendLine(msg.id, msg.line)
 	case activityMsg:
@@ -181,6 +235,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 	case metricsMsg:
 		m.headerComp.update(msg)
+	case systemMetricsMsg:
+		m.headerComp.update(msg)
+		cmds = append(cmds, collectSystemMetrics())
 	}
 
 	cmds = append(cmds, waitForEvent(m.events))
@@ -192,9 +249,9 @@ func (m *Model) resize() {
 		return
 	}
 
-	// Layout: header(2) + gap(1) + jobs(10) + gap(1) + bottom(rest) + statusbar(1)
+	// Layout: header(3) + gap(1) + jobs(10) + gap(1) + bottom(rest) + statusbar(1)
 	// Total borders: 4 horizontal lines between sections
-	headerLines := 2
+	headerLines := 3
 	gapLines := 1
 	jobsLines := 10
 	statusBarLines := 1
@@ -221,7 +278,7 @@ func (m Model) View() tea.View {
 	}
 
 	// Recalculate
-	headerLines := 2
+	headerLines := 3
 	gapLines := 1
 	jobsLines := 10
 	statusBarLines := 1
@@ -278,6 +335,20 @@ func waitForEvent(events <-chan worker.TuiEvent) tea.Cmd {
 	}
 }
 
+func collectSystemMetrics() tea.Cmd {
+	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+		metrics := GetSystemMetrics()
+		return systemMetricsMsg{
+			cpuUsage:    metrics.CPUUsage,
+			memoryUsed:  metrics.MemoryUsed,
+			memoryTotal: metrics.MemoryTotal,
+			memoryPct:   metrics.MemoryPct,
+			goRoutines:  metrics.GoRoutines,
+			heapAlloc:   metrics.HeapAlloc,
+		}
+	})
+}
+
 func eventToMsg(event worker.TuiEvent) tea.Msg {
 	switch event.Type {
 	case worker.EventConnected:
@@ -296,6 +367,12 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 		return errorMsg{source: event.Source, message: event.Message, timestamp: event.Timestamp}
 	case worker.EventMetrics:
 		return metricsMsg{activeJobs: event.ActiveJobs, maxConcurrency: event.MaxConcurrency}
+	case worker.EventSessionCreated:
+		return sessionCreatedMsg{id: event.SessionID, createdAt: event.Timestamp}
+	case worker.EventSessionCommand:
+		return sessionCommandMsg{id: event.SessionID, cmdNum: event.SessionCmdCount}
+	case worker.EventSessionClosed:
+		return sessionClosedMsg{id: event.SessionID}
 	}
 	return nil
 }
