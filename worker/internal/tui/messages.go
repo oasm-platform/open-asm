@@ -55,6 +55,30 @@ type metricsMsg struct {
 	maxConcurrency int
 }
 
+type sessionCreatedMsg struct {
+	id        string
+	createdAt time.Time
+}
+
+type sessionCommandMsg struct {
+	id     string
+	cmdNum int
+}
+
+type sessionClosedMsg struct {
+	id string
+}
+
+type systemMetricsMsg struct {
+	cpuUsage    float64
+	memoryUsed  uint64
+	memoryTotal uint64
+	memoryPct   float64
+	goRoutines  int
+	heapAlloc   uint64
+	heapSys     uint64
+}
+
 // tickMsg drives the event channel reader
 type tickMsg struct{}
 

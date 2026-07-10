@@ -16,6 +16,9 @@ const (
 	EventActivity
 	EventError
 	EventMetrics
+	EventSessionCreated
+	EventSessionCommand
+	EventSessionClosed
 )
 
 type TuiEvent struct {
@@ -49,6 +52,20 @@ type TuiEvent struct {
 	// Metrics
 	ActiveJobs     int
 	MaxConcurrency int
+
+	// Session events
+	SessionID       string
+	SessionCmdCount int
+	SessionActive   bool
+
+	// System metrics
+	CPUUsage    float64
+	MemoryUsed  uint64
+	MemoryTotal uint64
+	MemoryPct   float64
+	GoRoutines  int
+	HeapAlloc   uint64
+	HeapSys     uint64
 }
 
 // Emit sends an event to the TUI channel without blocking.
