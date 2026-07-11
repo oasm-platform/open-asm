@@ -3,8 +3,8 @@ package tui
 import (
 	"strings"
 
-	"charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/viewport"
+	"charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 

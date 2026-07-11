@@ -3,14 +3,15 @@ package tui
 import (
 	"time"
 
-	"charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/table"
+	"charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
 type jobsModel struct {
-	table table.Model
-	jobs  []activeJob
+	table      table.Model
+	jobs       []activeJob
+	tableWidth int
 }
 
 func newJobsModel() jobsModel {
@@ -80,9 +81,18 @@ func (j *jobsModel) refreshTable() {
 		})
 	}
 
+	totalWidth := j.tableWidth
+	if totalWidth == 0 {
+		totalWidth = 80
+	}
 	columns := j.table.Columns()
-	totalFixed := 10 + 20 + 12 + 10 + 4
-	cmdWidth := max(20, 60-totalFixed)
+	totalFixed := 0
+	for _, col := range columns {
+		if col.Title != "Command" {
+			totalFixed += col.Width + 2 // column padding
+		}
+	}
+	cmdWidth := max(20, totalWidth-totalFixed-4)
 	columns[1] = table.Column{Title: "Command", Width: cmdWidth}
 	j.table.SetColumns(columns)
 	j.table.SetRows(rows)

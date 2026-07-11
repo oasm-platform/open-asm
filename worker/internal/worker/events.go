@@ -2,6 +2,7 @@ package worker
 
 import (
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -68,16 +69,28 @@ type TuiEvent struct {
 	HeapSys     uint64
 }
 
-// Emit sends an event to the TUI channel without blocking.
-// If the channel is full, the event is dropped.
+// Emit sends an event to the TUI channel.
+// Critical events (completion, connection, error) are always delivered.
+// High-volume events (output, activity) are dropped when the channel is full.
 func Emit(events chan<- TuiEvent, event TuiEvent) {
 	if events == nil {
 		return
 	}
 	event.Timestamp = time.Now()
-	select {
-	case events <- event:
+	switch event.Type {
+	case EventJobCompleted, EventConnected, EventDisconnected, EventError:
+		select {
+		case events <- event:
+		default:
+			// Critical event dropped — channel full. This should not happen
+			// in normal operation; log to stderr for diagnostics.
+			fmt.Fprintf(os.Stderr, "warning: critical TUI event dropped (type=%d)\n", event.Type)
+		}
 	default:
+		select {
+		case events <- event:
+		default:
+		}
 	}
 }
 

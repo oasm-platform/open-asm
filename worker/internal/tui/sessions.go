@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/table"
+	"charm.land/bubbletea/v2"
 )
 
 type activeSession struct {
@@ -73,7 +73,7 @@ func (s *sessionsModel) handleSessionCommand(msg sessionCommandMsg) {
 func (s *sessionsModel) handleSessionClosed(msg sessionClosedMsg) {
 	for i := range s.sessions {
 		if s.sessions[i].id == msg.id {
-			s.sessions[i].active = false
+			s.sessions = append(s.sessions[:i], s.sessions[i+1:]...)
 			break
 		}
 	}

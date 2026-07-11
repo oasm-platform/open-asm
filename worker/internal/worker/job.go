@@ -39,19 +39,24 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 	activeJobs[job.Id] = struct{}{}
 	activeJobsMu.Unlock()
 
+	var completed bool
 	defer func() {
 		activeJobsMu.Lock()
 		delete(activeJobs, job.Id)
 		activeJobsMu.Unlock()
-		Emit(events, TuiEvent{
-			Type:     EventJobCompleted,
-			JobID:    job.Id,
-			Success:  true,
-			Duration: time.Since(startTime),
-		})
+		if !completed {
+			completed = true
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  true,
+				Duration: time.Since(startTime),
+			})
+		}
 	}()
 
 	if cmdStr == "" {
+		completed = true
 		Emit(events, TuiEvent{
 			Type:     EventJobCompleted,
 			JobID:    job.Id,
@@ -106,6 +111,7 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {
+			completed = true
 			Emit(events, TuiEvent{
 				Type:     EventJobCompleted,
 				JobID:    job.Id,
@@ -123,7 +129,7 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 						Type:         EventJobOutput,
 						JobID:        job.Id,
 						OutputLine:   line,
-						OutputStream: "stdout",
+						OutputStream: "output",
 					})
 				}
 			}

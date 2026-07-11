@@ -1,6 +1,10 @@
 package tui
 
-import "strings"
+import (
+	"strings"
+
+	"charm.land/lipgloss/v2"
+)
 
 type statusBarModel struct {
 	focus focusTarget
@@ -33,7 +37,7 @@ func (s statusBarModel) View(width int) string {
 		statusKeyStyle.Render("[↑↓]") + " Navigate  " +
 		statusKeyStyle.Render("[ESC]") + " Quit"
 
-	gap := width - len(left) - len(right) - 4
+	gap := width - lipgloss.Width(left) - lipgloss.Width(right) - 4
 	if gap < 0 {
 		gap = 0
 	}

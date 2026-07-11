@@ -61,10 +61,10 @@ var (
 				Bold(true)
 
 	headerBarFilled = lipgloss.NewStyle().
-				Foreground(ColorCyan)
+			Foreground(ColorCyan)
 
 	headerBarEmpty = lipgloss.NewStyle().
-				Foreground(ColorDarkGray)
+			Foreground(ColorDarkGray)
 )
 
 // Table styles

@@ -21,13 +21,13 @@ const (
 )
 
 type layout struct {
-	headerLines  int
-	gapLines     int
-	topLines     int
-	statusBar    int
-	bottomLines  int
-	leftW        int
-	rightW       int
+	headerLines int
+	gapLines    int
+	topLines    int
+	statusBar   int
+	bottomLines int
+	leftW       int
+	rightW      int
 }
 
 func computeLayout(w, h int) layout {
@@ -71,10 +71,10 @@ type Model struct {
 	width  int
 	height int
 
-	headerComp   headerModel
+	headerComp    headerModel
 	sessionsTable sessionsModel
 	jobsTable     jobsModel
-	outputVP     outputModel
+	outputVP      outputModel
 	eventsList    eventsModel
 	statusBar     statusBarModel
 }
@@ -115,7 +115,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.resize()
-		return m, nil
 
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -124,27 +123,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			m.focus = (m.focus + 1) % 4
 			m.statusBar.setFocus(m.focus)
-			return m, nil
 		case "shift+tab":
 			m.focus = (m.focus + 3) % 4
 			m.statusBar.setFocus(m.focus)
-			return m, nil
 		case "left":
 			m.focus = (m.focus + 3) % 4
 			m.statusBar.setFocus(m.focus)
-			return m, nil
 		case "right":
 			m.focus = (m.focus + 1) % 4
 			m.statusBar.setFocus(m.focus)
-			return m, nil
 		case "1":
 			m.focus = focusSessions
 			m.statusBar.setFocus(m.focus)
-			return m, nil
 		case "2":
 			m.focus = focusJobs
 			m.statusBar.setFocus(m.focus)
-			return m, nil
 		case "up", "k":
 			if m.focus == focusSessions {
 				cmd := m.sessionsTable.update(msg)
@@ -152,14 +145,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if id := m.sessionsTable.selectedID(); id != m.outputVP.selectedID {
 					m.outputVP.setSelected(id)
 				}
-				return m, tea.Batch(cmds...)
 			} else if m.focus == focusJobs {
 				cmd := m.jobsTable.update(msg)
 				cmds = append(cmds, cmd)
 				if id := m.jobsTable.selectedID(); id != m.outputVP.selectedID {
 					m.outputVP.setSelected(id)
 				}
-				return m, tea.Batch(cmds...)
 			}
 		case "down", "j":
 			if m.focus == focusSessions {
@@ -168,14 +159,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if id := m.sessionsTable.selectedID(); id != m.outputVP.selectedID {
 					m.outputVP.setSelected(id)
 				}
-				return m, tea.Batch(cmds...)
 			} else if m.focus == focusJobs {
 				cmd := m.jobsTable.update(msg)
 				cmds = append(cmds, cmd)
 				if id := m.jobsTable.selectedID(); id != m.outputVP.selectedID {
 					m.outputVP.setSelected(id)
 				}
-				return m, tea.Batch(cmds...)
 			}
 		}
 
@@ -286,6 +275,7 @@ func (m *Model) resize() {
 	m.sessionsTable.table.SetWidth(l.leftW - 4)
 	m.jobsTable.table.SetHeight(l.topLines - 2)
 	m.jobsTable.table.SetWidth(l.rightW - 4)
+	m.jobsTable.tableWidth = l.rightW
 	m.outputVP.setDimensions(l.leftW-2, l.bottomLines-2)
 	m.eventsList.setDimensions(l.rightW-2, l.bottomLines-2)
 }
@@ -339,7 +329,7 @@ func waitForEvent(events <-chan worker.TuiEvent) tea.Cmd {
 	return func() tea.Msg {
 		event, ok := <-events
 		if !ok {
-			return tea.Quit
+			return tea.QuitMsg{}
 		}
 		return eventToMsg(event)
 	}
