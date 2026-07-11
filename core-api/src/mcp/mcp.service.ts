@@ -73,7 +73,7 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
     const messageEndpoint = `/${API_GLOBAL_PREFIX}/mcp/message`;
     const transport = new SSEServerTransport(
       messageEndpoint,
-      res as unknown as ServerResponse,
+      res,
     );
 
     const server = this.createMcpServer(workspaceId);
@@ -123,8 +123,8 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
 
     // Body is parsed by express.json() middleware (configured in McpServerModule)
     await session.transport.handlePostMessage(
-      req as unknown as IncomingMessage,
-      res as unknown as ServerResponse,
+      req,
+      res,
       (req as unknown as Record<string, unknown>).body,
     );
   }

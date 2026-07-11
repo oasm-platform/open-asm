@@ -1,0 +1,152 @@
+import {
+  encryptSensitiveConfigFields,
+  decryptSensitiveConfigFields,
+  maskSensitiveConfigFields,
+  validateConfigOrThrow,
+} from './validators/integration.validator';
+
+import { getManyResponse } from '@/utils/getManyResponse';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
+import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
+import { GetIntegrationDto } from './dto/get-integration.dto';
+import { Integration } from './entities/integration.entity';
+import { universalIntegrationSchema } from './schemas';
+
+@Injectable()
+export class IntegrationsService {
+  constructor(
+    @InjectRepository(Integration)
+    private readonly integrationRepository: Repository<Integration>,
+  ) {}
+
+  /**
+   * Returns the universal JSON Schema for console form rendering.
+   * No workspace context needed — schema is global.
+   */
+  getSchemas(): Record<string, unknown> {
+    return universalIntegrationSchema;
+  }
+
+  /**
+   * Creates a new integration in the specified workspace.
+   * Validates config against JSON Schema, encrypts sensitive fields, then persists.
+   */
+  async createIntegration(args: {
+    name: string;
+    description?: string;
+    appType: string;
+    category: string;
+    config: Record<string, unknown>;
+    workspaceId: string;
+    userId: string;
+  }): Promise<GetIntegrationDto> {
+    validateConfigOrThrow(args);
+
+    const encryptedConfig = encryptSensitiveConfigFields(args.config);
+
+    const entity = this.integrationRepository.create({
+      name: args.name,
+      description: args.description,
+      appType: args.appType,
+      category: args.category,
+      config: encryptedConfig,
+      workspaceId: args.workspaceId,
+      createdById: args.userId,
+    });
+
+    const saved = await this.integrationRepository.save(entity);
+    return this.toResponse(saved);
+  }
+
+  /**
+   * Fetches a paginated list of integrations for a workspace.
+   * Supports search, filtering by appType/category, and standard pagination.
+   */
+  async getManyIntegrations(
+    query: GetManyIntegrationsDto,
+    workspaceId: string,
+  ) {
+    const { page, limit, sortBy, sortOrder, search, appType, category } = query;
+
+    const qb = this.integrationRepository
+      .createQueryBuilder('integration')
+      .where('integration.workspaceId = :workspaceId', { workspaceId });
+
+    if (search) {
+      qb.andWhere(
+        '(integration.name ILIKE :search OR integration.description ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    if (appType) {
+      qb.andWhere('integration.appType = :appType', { appType });
+    }
+
+    if (category) {
+      qb.andWhere('integration.category = :category', { category });
+    }
+
+    // Guard against invalid sort columns
+    const allowedSortFields = [
+      'createdAt',
+      'updatedAt',
+      'name',
+      'appType',
+      'category',
+    ];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    qb.orderBy(`integration.${sortField}`, sortOrder);
+    qb.skip((page - 1) * limit).take(limit);
+
+    const [integrations, total] = await qb.getManyAndCount();
+
+    const data = integrations.map((i) => this.toResponse(i));
+
+    return getManyResponse({ query, data, total });
+  }
+
+  /**
+   * Fetches a single integration by ID within the workspace.
+   * Throws NotFoundException if not found or not in this workspace.
+   */
+  async getIntegrationById(
+    id: string,
+    workspaceId: string,
+  ): Promise<GetIntegrationDto> {
+    const integration = await this.integrationRepository.findOne({
+      where: { id, workspaceId },
+    });
+
+    if (!integration) {
+      throw new NotFoundException('Integration not found');
+    }
+
+    return this.toResponse(integration);
+  }
+
+  /**
+   * Maps an Integration entity to a response DTO.
+   * Decrypts then masks sensitive config fields.
+   */
+  private toResponse(integration: Integration): GetIntegrationDto {
+    const decryptedConfig = decryptSensitiveConfigFields(integration.config);
+    const maskedConfig = maskSensitiveConfigFields(decryptedConfig);
+
+    return {
+      id: integration.id,
+      name: integration.name,
+      description: integration.description,
+      appType: integration.appType,
+      category: integration.category,
+      config: maskedConfig,
+      workspaceId: integration.workspaceId,
+      createdById: integration.createdById,
+      createdAt: integration.createdAt,
+      updatedAt: integration.updatedAt,
+    };
+  }
+}

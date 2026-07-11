@@ -27,6 +27,7 @@ import { Route as AuthedTargetsIndexRouteImport } from './routes/_authed/targets
 import { Route as AuthedProvidersIndexRouteImport } from './routes/_authed/providers/index'
 import { Route as AuthedJobsIndexRouteImport } from './routes/_authed/jobs/index'
 import { Route as AuthedInternalNetworksIndexRouteImport } from './routes/_authed/internal-networks/index'
+import { Route as AuthedIntegrationsIndexRouteImport } from './routes/_authed/integrations/index'
 import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
 import { Route as AuthedAgentsIndexRouteImport } from './routes/_authed/agents/index'
@@ -145,6 +146,11 @@ const AuthedInternalNetworksIndexRoute =
     path: '/internal-networks/',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedIntegrationsIndexRoute = AuthedIntegrationsIndexRouteImport.update({
+  id: '/integrations/',
+  path: '/integrations/',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedGroupsIndexRoute = AuthedGroupsIndexRouteImport.update({
   id: '/groups/',
   path: '/groups/',
@@ -309,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/agents/': typeof AuthedAgentsIndexRoute
   '/assets/': typeof AuthedAssetsIndexRoute
   '/groups/': typeof AuthedGroupsIndexRoute
+  '/integrations/': typeof AuthedIntegrationsIndexRoute
   '/internal-networks/': typeof AuthedInternalNetworksIndexRoute
   '/jobs/': typeof AuthedJobsIndexRoute
   '/providers/': typeof AuthedProvidersIndexRoute
@@ -353,6 +360,7 @@ export interface FileRoutesByTo {
   '/agents': typeof AuthedAgentsIndexRoute
   '/assets': typeof AuthedAssetsIndexRoute
   '/groups': typeof AuthedGroupsIndexRoute
+  '/integrations': typeof AuthedIntegrationsIndexRoute
   '/internal-networks': typeof AuthedInternalNetworksIndexRoute
   '/jobs': typeof AuthedJobsIndexRoute
   '/providers': typeof AuthedProvidersIndexRoute
@@ -400,6 +408,7 @@ export interface FileRoutesById {
   '/_authed/agents/': typeof AuthedAgentsIndexRoute
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
   '/_authed/groups/': typeof AuthedGroupsIndexRoute
+  '/_authed/integrations/': typeof AuthedIntegrationsIndexRoute
   '/_authed/internal-networks/': typeof AuthedInternalNetworksIndexRoute
   '/_authed/jobs/': typeof AuthedJobsIndexRoute
   '/_authed/providers/': typeof AuthedProvidersIndexRoute
@@ -447,6 +456,7 @@ export interface FileRouteTypes {
     | '/agents/'
     | '/assets/'
     | '/groups/'
+    | '/integrations/'
     | '/internal-networks/'
     | '/jobs/'
     | '/providers/'
@@ -491,6 +501,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/assets'
     | '/groups'
+    | '/integrations'
     | '/internal-networks'
     | '/jobs'
     | '/providers'
@@ -537,6 +548,7 @@ export interface FileRouteTypes {
     | '/_authed/agents/'
     | '/_authed/assets/'
     | '/_authed/groups/'
+    | '/_authed/integrations/'
     | '/_authed/internal-networks/'
     | '/_authed/jobs/'
     | '/_authed/providers/'
@@ -690,6 +702,13 @@ declare module '@tanstack/react-router' {
       path: '/internal-networks'
       fullPath: '/internal-networks/'
       preLoaderRoute: typeof AuthedInternalNetworksIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/integrations/': {
+      id: '/_authed/integrations/'
+      path: '/integrations'
+      fullPath: '/integrations/'
+      preLoaderRoute: typeof AuthedIntegrationsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/groups/': {
@@ -898,6 +917,7 @@ interface AuthedRouteChildren {
   AuthedAgentsIndexRoute: typeof AuthedAgentsIndexRoute
   AuthedAssetsIndexRoute: typeof AuthedAssetsIndexRoute
   AuthedGroupsIndexRoute: typeof AuthedGroupsIndexRoute
+  AuthedIntegrationsIndexRoute: typeof AuthedIntegrationsIndexRoute
   AuthedInternalNetworksIndexRoute: typeof AuthedInternalNetworksIndexRoute
   AuthedJobsIndexRoute: typeof AuthedJobsIndexRoute
   AuthedProvidersIndexRoute: typeof AuthedProvidersIndexRoute
@@ -938,6 +958,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAgentsIndexRoute: AuthedAgentsIndexRoute,
   AuthedAssetsIndexRoute: AuthedAssetsIndexRoute,
   AuthedGroupsIndexRoute: AuthedGroupsIndexRoute,
+  AuthedIntegrationsIndexRoute: AuthedIntegrationsIndexRoute,
   AuthedInternalNetworksIndexRoute: AuthedInternalNetworksIndexRoute,
   AuthedJobsIndexRoute: AuthedJobsIndexRoute,
   AuthedProvidersIndexRoute: AuthedProvidersIndexRoute,
