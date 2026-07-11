@@ -223,6 +223,13 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 			log.ErrorE("Failed to stream output", sendErr)
 			return
 		}
+
+		Emit(events, TuiEvent{
+			Type:          EventSessionOutput,
+			SessionID:     sessionID,
+			SessionOutput: string(line),
+			SessionStream: "stdout",
+		})
 	}
 
 	if err := scanner.Err(); err != nil {

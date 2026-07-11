@@ -117,6 +117,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize()
 
 	case tea.KeyPressMsg:
+		var handled bool
 		switch msg.String() {
 		case "esc", "ctrl+c":
 			return m, tea.Quit
@@ -139,6 +140,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.focus = focusJobs
 			m.statusBar.setFocus(m.focus)
 		case "up", "k":
+			handled = true
 			if m.focus == focusSessions {
 				cmd := m.sessionsTable.update(msg)
 				cmds = append(cmds, cmd)
@@ -153,6 +155,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "down", "j":
+			handled = true
 			if m.focus == focusSessions {
 				cmd := m.sessionsTable.update(msg)
 				cmds = append(cmds, cmd)
@@ -168,14 +171,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		if m.focus == focusSessions {
-			cmds = append(cmds, m.sessionsTable.update(msg))
-		} else if m.focus == focusJobs {
-			cmds = append(cmds, m.jobsTable.update(msg))
-		} else if m.focus == focusOutput {
-			cmds = append(cmds, m.outputVP.update(msg))
-		} else if m.focus == focusEvents {
-			cmds = append(cmds, m.eventsList.update(msg))
+		if !handled {
+			if m.focus == focusSessions {
+				cmds = append(cmds, m.sessionsTable.update(msg))
+			} else if m.focus == focusJobs {
+				cmds = append(cmds, m.jobsTable.update(msg))
+			} else if m.focus == focusOutput {
+				cmds = append(cmds, m.outputVP.update(msg))
+			} else if m.focus == focusEvents {
+				cmds = append(cmds, m.eventsList.update(msg))
+			}
 		}
 	}
 
@@ -243,6 +248,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			level:     "warning",
 			timestamp: time.Now(),
 		})
+	case sessionOutputMsg:
+		m.outputVP.appendLine(msg.id, msg.line)
 	case jobOutputMsg:
 		m.outputVP.appendLine(msg.id, msg.line)
 	case activityMsg:
@@ -373,6 +380,8 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 		return sessionCommandMsg{id: event.SessionID, cmdNum: event.SessionCmdCount}
 	case worker.EventSessionClosed:
 		return sessionClosedMsg{id: event.SessionID}
+	case worker.EventSessionOutput:
+		return sessionOutputMsg{id: event.SessionID, line: event.SessionOutput, stream: event.SessionStream}
 	}
 	return nil
 }

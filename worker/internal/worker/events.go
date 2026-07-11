@@ -20,6 +20,7 @@ const (
 	EventSessionCreated
 	EventSessionCommand
 	EventSessionClosed
+	EventSessionOutput
 )
 
 type TuiEvent struct {
@@ -58,6 +59,8 @@ type TuiEvent struct {
 	SessionID       string
 	SessionCmdCount int
 	SessionActive   bool
+	SessionOutput   string
+	SessionStream   string
 
 	// System metrics
 	CPUUsage    float64

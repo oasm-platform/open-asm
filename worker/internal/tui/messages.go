@@ -69,6 +69,12 @@ type sessionClosedMsg struct {
 	id string
 }
 
+type sessionOutputMsg struct {
+	id     string
+	line   string
+	stream string
+}
+
 type systemMetricsMsg struct {
 	cpuUsage    float64
 	memoryUsed  uint64
