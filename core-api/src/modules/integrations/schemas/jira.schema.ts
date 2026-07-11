@@ -7,7 +7,7 @@ export const jiraSchema = {
   type: 'object',
   title: 'Jira',
   description:
-    'Configuration for connecting a Jira instance as a ticketing integration.',
+    'Connects to a Jira instance as a ticketing integration.',
   properties: {
     app_type: { const: 'jira', title: 'App Type' },
     category: { const: 'ticketing', title: 'Category' },

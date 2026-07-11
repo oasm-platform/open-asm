@@ -30340,6 +30340,94 @@ export const useIntegrationsControllerCreateIntegration = <
 };
 
 /**
+ * Permanently removes an integration from the specified workspace.
+ * @summary Delete an integration
+ */
+export const integrationsControllerDeleteIntegration = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/integrations/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerDeleteIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerDeleteIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return integrationsControllerDeleteIntegration(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerDeleteIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>
+>;
+
+export type IntegrationsControllerDeleteIntegrationMutationError = unknown;
+
+/**
+ * @summary Delete an integration
+ */
+export const useIntegrationsControllerDeleteIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerDeleteIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Returns a paginated list of integrations in the specified workspace. Supports search and filters.
  * @summary Get all integrations for a workspace
  */

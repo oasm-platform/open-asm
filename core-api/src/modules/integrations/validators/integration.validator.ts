@@ -6,17 +6,37 @@ import addFormats from 'ajv-formats';
 import { universalIntegrationSchema } from '../schemas';
 
 /**
- * Sensitive config field names that should be masked in responses.
- * These keys match the `ui:widget: password` fields defined in the JSON schemas.
+ * Dynamically extracts sensitive field names from the integration JSON schemas.
+ * Any property with `ui:widget: password` in its schema definition is treated
+ * as sensitive — its value is encrypted at rest and masked in API responses.
  */
-const SENSITIVE_FIELDS = [
-  'apiToken',
-  'password',
-  'secret',
-  'apiKey',
-  'accessToken',
-  'refreshToken',
-];
+function getSensitiveFieldsFromSchema(): string[] {
+  const fields = new Set<string>();
+  const oneOf = (universalIntegrationSchema as Record<string, unknown>)
+    .oneOf as Record<string, unknown>[] | undefined;
+  if (!oneOf) return [];
+
+  for (const subSchema of oneOf) {
+    const properties = subSchema.properties as
+      | Record<string, unknown>
+      | undefined;
+    if (!properties) continue;
+
+    for (const [key, value] of Object.entries(properties)) {
+      if (
+        value &&
+        typeof value === 'object' &&
+        (value as Record<string, unknown>)['ui:widget'] === 'password'
+      ) {
+        fields.add(key);
+      }
+    }
+  }
+
+  return [...fields];
+}
+
+const SENSITIVE_FIELDS = getSensitiveFieldsFromSchema();
 
 /**
  * Fields to inject into the config before validation.

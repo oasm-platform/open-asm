@@ -1,14 +1,14 @@
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import {
   useIntegrationsControllerCreateIntegration,
@@ -16,7 +16,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface SchemaProperty {
@@ -30,11 +30,11 @@ interface SchemaProperty {
   default?: unknown;
 }
 
-interface ConnectIntegrationDialogProps {
+interface ConnectIntegrationSheetProps {
   schema: {
     title?: string;
     description?: string;
-    properties?: Record<string, SchemaProperty>;
+    properties?: Record<string, unknown>;
     required?: string[];
     [key: string]: unknown;
   };
@@ -131,21 +131,30 @@ function renderField(
   );
 }
 
-export function ConnectIntegrationDialog({
+export function ConnectIntegrationSheet({
   schema,
   open,
   onOpenChange,
-}: ConnectIntegrationDialogProps) {
+}: ConnectIntegrationSheetProps) {
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [integrationName, setIntegrationName] = useState('');
 
-  const appType = (schema.properties?.app_type as SchemaProperty)?.const ?? '';
-  const category = (schema.properties?.category as SchemaProperty)?.const ?? '';
+  // Reset form when sheet opens
+  useEffect(() => {
+    if (open) {
+      setIntegrationName(schema.title ?? '');
+      setFormValues({});
+    }
+  }, [open, schema.title]);
+
+  const appType = (schema.properties?.app_type as SchemaProperty | undefined)?.const ?? '';
+  const category = (schema.properties?.category as SchemaProperty | undefined)?.const ?? '';
 
   // All properties except the hidden discriminator fields
   const formProperties = Object.entries(schema.properties ?? {}).filter(
     ([key]) => key !== 'app_type' && key !== 'category',
-  );
+  ) as [string, SchemaProperty][];
 
   const { mutate: createIntegration, isPending } =
     useIntegrationsControllerCreateIntegration({
@@ -174,10 +183,14 @@ export function ConnectIntegrationDialog({
       toast.error('Invalid integration schema');
       return;
     }
+    if (!integrationName.trim()) {
+      toast.error('Integration name is required');
+      return;
+    }
 
     createIntegration({
       data: {
-        name: schema.title ?? appType,
+        name: integrationName.trim(),
         appType,
         category,
         config: formValues as Record<string, unknown>,
@@ -186,22 +199,34 @@ export function ConnectIntegrationDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Connect {schema.title ?? appType}</DialogTitle>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle>Connect {schema.title ?? appType}</SheetTitle>
           {schema.description && (
-            <DialogDescription>{schema.description}</DialogDescription>
+            <SheetDescription>{schema.description}</SheetDescription>
           )}
-        </DialogHeader>
+        </SheetHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="integration-name">
+              Integration name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="integration-name"
+              placeholder="My Integration"
+              value={integrationName}
+              onChange={(e) => setIntegrationName(e.target.value)}
+            />
+          </div>
+
           {formProperties.length === 0 && (
             <p className="text-sm text-muted-foreground">
               No configuration required.
             </p>
           )}
-          {formProperties.map(([key, prop]) => {
+          {formProperties.map(([key, prop]: [string, SchemaProperty]) => {
             const label = prop.title ?? key;
             const required = schema.required?.includes(key);
 
@@ -226,7 +251,7 @@ export function ConnectIntegrationDialog({
           })}
         </div>
 
-        <DialogFooter>
+        <SheetFooter>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -238,8 +263,8 @@ export function ConnectIntegrationDialog({
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Connect
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

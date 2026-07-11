@@ -13,9 +13,13 @@ export const universalIntegrationSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'https://oasm.io/schemas/integration-config.json',
   title: 'Integration Configuration',
-  description: 'Discriminated union of all supported integration configurations.',
+  description:
+    'Discriminated union of all supported integration configurations.',
   oneOf: [
+    // cloudflareSchema,
+    // githubSchema,
     jiraSchema,
+    // linearSchema,
     // Add more integration schemas here as they are implemented:
     // slackSchema, linearSchema, awsSchema, etc.
   ],

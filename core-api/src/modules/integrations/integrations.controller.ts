@@ -2,11 +2,13 @@ import {
   WorkspaceId,
   UserId,
 } from '@/common/decorators/app.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -104,5 +106,24 @@ export class IntegrationsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.integrationsService.getIntegrationById(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Delete an integration',
+    description:
+      'Permanently removes an integration from the specified workspace.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete(':id')
+  deleteIntegration(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.integrationsService.deleteIntegration(id, workspaceId);
   }
 }

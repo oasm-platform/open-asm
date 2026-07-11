@@ -5,6 +5,7 @@ import {
   validateConfigOrThrow,
 } from './validators/integration.validator';
 
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -126,6 +127,29 @@ export class IntegrationsService {
     }
 
     return this.toResponse(integration);
+  }
+
+  /**
+   * Permanently removes an integration by ID within the workspace.
+   * Throws NotFoundException if not found or not in this workspace.
+   */
+  async deleteIntegration(
+    id: string,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const integration = await this.integrationRepository.findOne({
+      where: { id, workspaceId },
+    });
+
+    if (!integration) {
+      throw new NotFoundException('Integration not found');
+    }
+
+    await this.integrationRepository.remove(integration);
+
+    return {
+      message: `Integration "${id}" successfully deleted`,
+    };
   }
 
   /**
