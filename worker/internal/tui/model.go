@@ -236,6 +236,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case sessionCommandMsg:
 		m.sessionsTable.handleSessionCommand(msg)
+		m.outputVP.appendLine(msg.id, "")
+		m.outputVP.appendLine(msg.id, fmt.Sprintf("$ %s", msg.command))
 		m.eventsList.addEvent(activityEntry{
 			text:      fmt.Sprintf("Session %s executing command", msg.id[:min(len(msg.id), 8)]),
 			level:     "info",
@@ -377,7 +379,7 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 	case worker.EventSessionCreated:
 		return sessionCreatedMsg{id: event.SessionID, createdAt: event.Timestamp}
 	case worker.EventSessionCommand:
-		return sessionCommandMsg{id: event.SessionID, cmdNum: event.SessionCmdCount}
+		return sessionCommandMsg{id: event.SessionID, cmdNum: event.SessionCmdCount, command: event.SessionCommand}
 	case worker.EventSessionClosed:
 		return sessionClosedMsg{id: event.SessionID}
 	case worker.EventSessionOutput:

@@ -61,6 +61,7 @@ type TuiEvent struct {
 	SessionActive   bool
 	SessionOutput   string
 	SessionStream   string
+	SessionCommand  string
 
 	// System metrics
 	CPUUsage    float64

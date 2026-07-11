@@ -159,8 +159,9 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 				}
 
 				Emit(events, TuiEvent{
-					Type:      EventSessionCommand,
-					SessionID: sessionID,
+					Type:           EventSessionCommand,
+					SessionID:      sessionID,
+					SessionCommand: command,
 				})
 
 				go executeRemoteCommand(ctx, handler, sessionID, command, sb, events, toolPath)

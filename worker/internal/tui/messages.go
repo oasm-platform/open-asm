@@ -61,8 +61,9 @@ type sessionCreatedMsg struct {
 }
 
 type sessionCommandMsg struct {
-	id     string
-	cmdNum int
+	id      string
+	cmdNum  int
+	command string
 }
 
 type sessionClosedMsg struct {
