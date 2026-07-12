@@ -1,7 +1,8 @@
 import { IntegrationType } from '@/common/enums/enum';
-import { severityProperties } from './severity.schema';
-import { TelegramConnector } from '../connectors/telegram.connector';
 import { registerConnector } from '../connectors/connector.registry';
+import { TelegramConnector } from '../connectors/telegram.connector';
+import { notificationTypeProperties } from './notification-type.schema';
+import { severityProperties } from './severity.schema';
 
 // Register connector class so the factory can resolve it by appType
 registerConnector('telegram', TelegramConnector);
@@ -15,7 +16,7 @@ export const telegramSchema = {
   connector: TelegramConnector,
   type: 'object',
   title: 'Telegram',
-  isAvailable: true,
+  isAvailable: false,
   description: 'Sends alerts to a Telegram chat via a bot.',
   properties: {
     app_type: { const: 'telegram', title: 'App Type' },
@@ -42,6 +43,7 @@ export const telegramSchema = {
       },
       minItems: 1,
     },
+    ...notificationTypeProperties,
     ...severityProperties,
   },
   required: ['app_type', 'category', 'botToken', 'chats'],

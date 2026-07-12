@@ -1,4 +1,5 @@
 import { IntegrationType } from '@/common/enums/enum';
+import { notificationTypeProperties } from './notification-type.schema';
 import { severityProperties } from './severity.schema';
 import { SlackConnector } from '../connectors/slack.connector';
 import { registerConnector } from '../connectors/connector.registry';
@@ -35,6 +36,7 @@ export const slackSchema = {
         'Optional display name for the bot sending the alert. Defaults to the webhook-appointed name if omitted.',
       'ui:placeholder': 'OpenASM Alert',
     },
+    ...notificationTypeProperties,
     ...severityProperties,
   },
   required: ['category', 'webhookUrl'],

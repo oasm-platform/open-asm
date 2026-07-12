@@ -19,6 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { IntegrationLogo } from './integration-logo';
 
 interface SchemaProperty {
   type?: string;
@@ -335,7 +336,10 @@ export function ConnectIntegrationSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>Connect {schema.title ?? appType}</SheetTitle>
+          <div className="flex items-center gap-2">
+            <IntegrationLogo url={`/static/images/integrations/${appType}.svg`} />
+            <SheetTitle>Connect {schema.title ?? appType}</SheetTitle>
+          </div>
           {schema.description && (
             <SheetDescription>{schema.description}</SheetDescription>
           )}

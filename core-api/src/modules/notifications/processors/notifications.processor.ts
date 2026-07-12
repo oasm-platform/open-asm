@@ -104,13 +104,18 @@ export class NotificationsConsumer extends WorkerHost {
 
       if (integrations.length === 0) return;
 
+      // Only push to integrations with this notification type enabled.
+      const enabledIntegrations = integrations
+        .map((integration) => ({
+          integration,
+          config: decryptSensitiveConfigFields(integration.config),
+        }))
+        .filter(({ config }) => config[type] === true);
+
       const results = await Promise.allSettled(
-        integrations.map(async (integration) => {
-          const decryptedConfig = decryptSensitiveConfigFields(
-            integration.config,
-          );
+        enabledIntegrations.map(async ({ integration, config }) => {
           await runConnector(integration.appType, integration.category, {
-            ...decryptedConfig,
+            ...config,
             text: message,
           });
         }),

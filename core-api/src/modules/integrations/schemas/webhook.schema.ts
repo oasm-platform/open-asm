@@ -1,4 +1,5 @@
 import { IntegrationType } from '@/common/enums/enum';
+import { notificationTypeProperties } from './notification-type.schema';
 import { severityProperties } from './severity.schema';
 import { WebhookConnector } from '../connectors/webhook.connector';
 import { registerConnector } from '../connectors/connector.registry';
@@ -27,6 +28,7 @@ export const webhookSchema = {
       description: 'Target webhook endpoint URL.',
       'ui:placeholder': 'https://hooks.example.com/webhook',
     },
+    ...notificationTypeProperties,
     ...severityProperties,
   },
   required: ['app_type', 'category', 'url'],

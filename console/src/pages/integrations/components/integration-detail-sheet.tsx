@@ -14,6 +14,7 @@ import type { GetIntegrationDto } from '@/services/apis/gen/queries';
 import { Loader2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import type { SchemaOneOfItem } from '../index';
+import { IntegrationLogo } from './integration-logo';
 
 interface SchemaProperty {
   type?: string;
@@ -95,7 +96,10 @@ export function IntegrationDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>{integration.name}</SheetTitle>
+          <div className="flex items-center gap-2">
+            <IntegrationLogo url={`/static/images/integrations/${integration.appType}.svg`} />
+            <SheetTitle>{integration.name}</SheetTitle>
+          </div>
         </SheetHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
