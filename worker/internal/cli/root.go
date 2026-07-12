@@ -5,27 +5,18 @@ import (
 	"context"
 	"fmt"
 	"oasm-worker/internal/config"
+	"oasm-worker/internal/tui"
 	"oasm-worker/internal/worker"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/common-nighthawk/go-figure"
-	"github.com/fatih/color"
-	"github.com/oasm-platform/oasm-sdk-go/oasm"
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-func printBanner() {
-	green := color.New(color.FgHiCyan).SprintFunc()
-	myFigure := figure.NewFigure("OASM Agent", "slant", true)
-	fmt.Print(green(myFigure.String()))
-}
-
 func App() error {
-	printBanner()
-
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("fail to load config: %v", err)
@@ -35,13 +26,42 @@ func App() error {
 		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
 	}
 
-	oasm.NewLogger("CLI").Verbose("Config loaded | MaxConcurrency: %d | Host: %s:%d | Network: %s",
-		cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort, cfg.Network)
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	worker.Start(ctx, cfg)
+	// Save real stdout/stderr for Bubbletea, redirect to /dev/null
+	// so oasm-sdk-go internal logs don't interfere with TUI rendering
+	realStdout := os.Stdout
+	realStderr := os.Stderr
+	if devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0); err == nil {
+		os.Stdout = devNull
+		os.Stderr = devNull
+	}
+
+	events := make(chan worker.TuiEvent, 100)
+	go func() {
+		worker.Start(ctx, cfg, events)
+		close(events)
+	}()
+
+	// TUI renders to the real stdout, SDK logs go to /dev/null
+	m := tui.NewModel(cfg, events)
+	p := tea.NewProgram(m, tea.WithOutput(realStdout))
+
+	// Wire ctx cancellation into the TUI so SIGTERM quits the program
+	go func() {
+		<-ctx.Done()
+		p.Quit()
+	}()
+
+	if _, err := p.Run(); err != nil {
+		os.Stdout = realStdout
+		os.Stderr = realStderr
+		return fmt.Errorf("TUI error: %v", err)
+	}
+
+	os.Stdout = realStdout
+	os.Stderr = realStderr
 	return nil
 }
 
