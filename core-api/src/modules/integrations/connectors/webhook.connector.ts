@@ -3,18 +3,22 @@ import type { ConnectorConfig } from './connector.abstract';
 import { NotificationConnector } from './connector.abstract';
 
 /**
- * Expected shape of the push config for Webhook notifications.
+ * Expected shape push config Webhook notifications.
  */
 interface WebhookPushConfig {
   /** Target webhook endpoint URL. */
   url: string;
-  /** Payload to send — sent as JSON body. */
+  /** Payload send — sent as JSON body. */
   text: string;
   /**
-   * Optional custom HTTP headers merged into the request.
-   * Useful for auth tokens, content-type overrides, etc.
+   * Optional custom HTTP headers merged into request.
+   * Useful auth tokens, content-type overrides, etc.
    */
   headers?: Record<string, string>;
+  /** Raw metadata included as-is in the webhook body. */
+  metadata?: Record<string, string>;
+  /** Workspace ID the notification belongs to. */
+  workspaceId?: string;
 }
 
 /**
@@ -58,7 +62,8 @@ export class WebhookConnector extends NotificationConnector {
    * @throws Error if the webhook endpoint returns a non-2xx status.
    */
   async push(config: ConnectorConfig): Promise<void> {
-    const { url, text, headers } = config as unknown as WebhookPushConfig;
+    const { url, text, headers, metadata, workspaceId } =
+      config as unknown as WebhookPushConfig;
 
     if (!url || !text) {
       throw new Error(
@@ -76,7 +81,9 @@ export class WebhookConnector extends NotificationConnector {
       },
       body: JSON.stringify({
         text,
-        // Include a timestamp for the receiver to deduplicate if needed
+        metadata,
+        workspaceId,
+        // Include timestamp receiver deduplicate if needed
         timestamp: new Date().toISOString(),
       }),
     });

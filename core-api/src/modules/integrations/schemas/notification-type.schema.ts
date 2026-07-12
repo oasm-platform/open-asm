@@ -40,10 +40,20 @@ type NotificationTypeProperty = {
   readonly 'ui:form:group': 'Event';
 };
 
+const ignoredNotificationTypes: NotificationType[] = [
+  NotificationType.WORKSPACE_CREATED,
+  NotificationType.VULNERABILITY_ANALYSIS_COMPLETED,
+];
+
 export const notificationTypeProperties: Record<
   NotificationType,
   NotificationTypeProperty
-> = Object.values(NotificationType).reduce(
+> = Object.values(NotificationType)
+  .filter(
+    (type): type is NotificationType =>
+      !ignoredNotificationTypes.includes(type),
+  )
+  .reduce(
     (acc, type) => {
       acc[type] = {
         type: 'boolean' as const,

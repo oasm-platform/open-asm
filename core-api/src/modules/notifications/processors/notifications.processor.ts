@@ -117,6 +117,9 @@ export class NotificationsConsumer extends WorkerHost {
           await runConnector(integration.appType, integration.category, {
             ...config,
             text: message,
+            metadata,
+            workspaceId,
+            type,
           });
         }),
       );

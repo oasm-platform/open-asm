@@ -6,8 +6,9 @@ import {
 } from './validators/integration.validator';
 
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { IntegrationType } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -21,6 +22,8 @@ import { universalIntegrationSchema } from './schemas';
 
 @Injectable()
 export class IntegrationsService {
+  private readonly logger = new Logger(IntegrationsService.name);
+
   constructor(
     @InjectRepository(Integration)
     private readonly integrationRepository: Repository<Integration>,
@@ -62,6 +65,16 @@ export class IntegrationsService {
     });
 
     const saved = await this.integrationRepository.save(entity);
+
+    // Fire welcome message for notification integrations (best-effort)
+    if (args.category === (IntegrationType.NOTIFICATION as string)) {
+      this.sendConnectedMessage(saved).catch((err: Error) => {
+        this.logger.warn(
+          `Failed to send connected message for integration ${saved.id}: ${err.message}`,
+        );
+      });
+    }
+
     return this.toResponse(saved);
   }
 
@@ -237,5 +250,30 @@ export class IntegrationsService {
       createdAt: integration.createdAt,
       updatedAt: integration.updatedAt,
     };
+  }
+
+  /**
+   * Sends a welcome "connected" message to the integration after first setup.
+   * Best-effort — failures are logged but never propagated.
+   */
+  private async sendConnectedMessage(integration: Integration): Promise<void> {
+    const config = decryptSensitiveConfigFields(integration.config);
+
+    const text = `🔗 OpenASM has been successfully connected! You'll receive security alerts and notifications here.`;
+
+    const result = await runConnector(
+      integration.appType,
+      integration.category,
+      {
+        ...config,
+        text,
+      },
+    );
+
+    if (!result.success) {
+      this.logger.warn(
+        `Connected message failed for integration ${integration.id}: ${result.message}${result.error ? ` — ${result.error}` : ''}`,
+      );
+    }
   }
 }
