@@ -18,6 +18,7 @@ import { TemplatesModule } from './templates/templates.module';
 import { ToolsModule } from './tools/tools.module';
 import { UsersModule } from './users/users.module';
 import { VulnerabilitiesModule } from './vulnerabilities/vulnerabilities.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { WorkersModule } from './workers/workers.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
@@ -54,6 +55,7 @@ import { ReportsModule } from './reports/reports.module';
     AgentsModule,
     RemoteExecuteModule,
     ReportsModule,
+    IntegrationsModule,
   ],
 })
 export class CombineModule {}

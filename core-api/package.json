@@ -51,6 +51,8 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/multer": "^2.0.0",
     "ai": "^6.0.137",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
     "axios": "^1.18.1",
     "better-auth": "^1.6.1",
     "bullmq": "^5.65.1",
