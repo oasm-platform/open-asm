@@ -1,6 +1,6 @@
 import {
-  encryptSensitiveConfigFields,
   decryptSensitiveConfigFields,
+  encryptSensitiveConfigFields,
   maskSensitiveConfigFields,
   validateConfigOrThrow,
 } from './validators/integration.validator';
@@ -11,13 +11,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
+import type { ConnectorTestResult } from './connectors/connector.factory';
+import { runConnector } from './connectors/connector.factory';
 import { GetIntegrationDto } from './dto/get-integration.dto';
+import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
+import type { TestIntegrationDto } from './dto/test-integration.dto';
 import { Integration } from './entities/integration.entity';
 import { universalIntegrationSchema } from './schemas';
-import { testConnector } from './connectors/connector.factory';
-import type { ConnectorTestResult } from './connectors/connector.factory';
-import type { TestIntegrationDto } from './dto/test-integration.dto';
 
 @Injectable()
 export class IntegrationsService {
@@ -158,14 +158,12 @@ export class IntegrationsService {
     // Merge stored config with a test message text
     const testConfig = {
       ...decryptedConfig,
-      text: dto?.text ?? `🧪 OpenASM test notification — sent at ${new Date().toISOString()}`,
+      text:
+        dto?.text ??
+        `🧪 OpenASM test notification — sent at ${new Date().toISOString()}`,
     };
 
-    return testConnector(
-      integration.appType,
-      integration.category,
-      testConfig,
-    );
+    return runConnector(integration.appType, integration.category, testConfig);
   }
 
   /**
@@ -189,6 +187,34 @@ export class IntegrationsService {
     return {
       message: `Integration "${id}" successfully deleted`,
     };
+  }
+
+  /**
+   * Fetches all integrations for a workspace filtered by category.
+   * Returns decrypted & masked integration DTOs.
+   */
+  async getIntegrationByWorkspaceId(
+    workspaceId: string,
+    category: string,
+  ): Promise<GetIntegrationDto[]> {
+    const integrations = await this.integrationRepository.find({
+      where: { workspaceId, category },
+    });
+
+    return integrations.map((i) => this.toResponse(i));
+  }
+
+  /**
+   * Returns raw Integration entities for a workspace + category with decrypted config.
+   * Intended for internal service-to-service use (e.g. notification processor).
+   */
+  async getIntegrationEntitiesByCategory(
+    workspaceId: string,
+    category: string,
+  ): Promise<Integration[]> {
+    return this.integrationRepository.find({
+      where: { workspaceId, category },
+    });
   }
 
   /**

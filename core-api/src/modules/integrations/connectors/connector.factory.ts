@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
 import { IntegrationType } from '@/common/enums/enum';
+import { Logger } from '@nestjs/common';
 import type { BaseConnector, ConnectorConfig } from './connector.abstract';
 import { getConnectorClass } from './connector.registry';
 
@@ -40,7 +40,7 @@ const logger = new Logger('ConnectorFactory');
  * @param config   - Merged config (stored integration config + runtime test params)
  * @returns Test result indicating success or failure
  */
-export async function testConnector(
+export async function runConnector(
   appType: string,
   category: string,
   config: ConnectorConfig,
@@ -74,10 +74,17 @@ export async function testConnector(
 
   try {
     // 4. Execute lifecycle: beforeExecute → method → afterExecute
-    logger.log(`Executing ${appType}.${String(methodName)}() for category ${category}`);
+    logger.log(
+      `Executing ${appType}.${String(methodName)}() for category ${category}`,
+    );
 
     await connector.beforeExecute?.(config);
-    await (connector as unknown as Record<string, (cfg: ConnectorConfig) => Promise<void>>)[methodName](config);
+    await (
+      connector as unknown as Record<
+        string,
+        (cfg: ConnectorConfig) => Promise<void>
+      >
+    )[methodName](config);
     await connector.afterExecute?.(config);
 
     return {
