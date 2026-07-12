@@ -238,3 +238,9 @@ export enum EventTriggerType {
   WORKFLOW_START = 'WORKFLOW_START',
   WORKFLOW_END = 'WORKFLOW_END',
 }
+
+export enum IntegrationType {
+  TICKETING = 'TICKETING',
+  NOTIFICATION = 'NOTIFICATION',
+  CLOUD_PROVIDER = 'CLOUD_PROVIDER',
+}

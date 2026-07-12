@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../auth/entities/user.entity';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
 import { Notification } from './entities/notification.entity';
 import { NotificationsService } from './notifications.service';
@@ -17,6 +18,7 @@ import { NotificationsController } from './notifications.controller';
     BullModule.registerQueue({
       name: BullMQName.NOTIFICATION,
     }),
+    IntegrationsModule,
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsConsumer],
