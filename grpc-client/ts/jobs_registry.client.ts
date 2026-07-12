@@ -4,6 +4,13 @@
 import type { RpcTransport } from "@protobuf-ts/runtime-rpc";
 import type { ServiceInfo } from "@protobuf-ts/runtime-rpc";
 import { JobsRegistryService } from "./jobs_registry";
+import type { AssistantResultRequest } from "./jobs_registry";
+import type { ClassifierResultRequest } from "./jobs_registry";
+import type { ScreenshotResultRequest } from "./jobs_registry";
+import type { VulnerabilitiesResultRequest } from "./jobs_registry";
+import type { PortsResultRequest } from "./jobs_registry";
+import type { HttpProbeResultRequest } from "./jobs_registry";
+import type { SubdomainResultRequest } from "./jobs_registry";
 import type { JobResponse } from "./jobs_registry";
 import type { JobResultRequest } from "./jobs_registry";
 import { stackIntercept } from "@protobuf-ts/runtime-rpc";
@@ -22,9 +29,41 @@ export interface IJobsRegistryServiceClient {
      */
     next(input: Worker, options?: RpcOptions): UnaryCall<Worker, Job>;
     /**
+     * DEPRECATED: Use category-specific RPCs
+     *
      * @generated from protobuf rpc: Result
      */
     result(input: JobResultRequest, options?: RpcOptions): UnaryCall<JobResultRequest, JobResponse>;
+    /**
+     * Category-specific result RPCs
+     *
+     * @generated from protobuf rpc: ResultSubdomains
+     */
+    resultSubdomains(input: SubdomainResultRequest, options?: RpcOptions): UnaryCall<SubdomainResultRequest, JobResponse>;
+    /**
+     * @generated from protobuf rpc: ResultHttpProbe
+     */
+    resultHttpProbe(input: HttpProbeResultRequest, options?: RpcOptions): UnaryCall<HttpProbeResultRequest, JobResponse>;
+    /**
+     * @generated from protobuf rpc: ResultPorts
+     */
+    resultPorts(input: PortsResultRequest, options?: RpcOptions): UnaryCall<PortsResultRequest, JobResponse>;
+    /**
+     * @generated from protobuf rpc: ResultVulnerabilities
+     */
+    resultVulnerabilities(input: VulnerabilitiesResultRequest, options?: RpcOptions): UnaryCall<VulnerabilitiesResultRequest, JobResponse>;
+    /**
+     * @generated from protobuf rpc: ResultScreenshot
+     */
+    resultScreenshot(input: ScreenshotResultRequest, options?: RpcOptions): UnaryCall<ScreenshotResultRequest, JobResponse>;
+    /**
+     * @generated from protobuf rpc: ResultClassifier
+     */
+    resultClassifier(input: ClassifierResultRequest, options?: RpcOptions): UnaryCall<ClassifierResultRequest, JobResponse>;
+    /**
+     * @generated from protobuf rpc: ResultAssistant
+     */
+    resultAssistant(input: AssistantResultRequest, options?: RpcOptions): UnaryCall<AssistantResultRequest, JobResponse>;
 }
 /**
  * Service Definition
@@ -45,10 +84,63 @@ export class JobsRegistryServiceClient implements IJobsRegistryServiceClient, Se
         return stackIntercept<Worker, Job>("unary", this._transport, method, opt, input);
     }
     /**
+     * DEPRECATED: Use category-specific RPCs
+     *
      * @generated from protobuf rpc: Result
      */
     result(input: JobResultRequest, options?: RpcOptions): UnaryCall<JobResultRequest, JobResponse> {
         const method = this.methods[1], opt = this._transport.mergeOptions(options);
         return stackIntercept<JobResultRequest, JobResponse>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * Category-specific result RPCs
+     *
+     * @generated from protobuf rpc: ResultSubdomains
+     */
+    resultSubdomains(input: SubdomainResultRequest, options?: RpcOptions): UnaryCall<SubdomainResultRequest, JobResponse> {
+        const method = this.methods[2], opt = this._transport.mergeOptions(options);
+        return stackIntercept<SubdomainResultRequest, JobResponse>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: ResultHttpProbe
+     */
+    resultHttpProbe(input: HttpProbeResultRequest, options?: RpcOptions): UnaryCall<HttpProbeResultRequest, JobResponse> {
+        const method = this.methods[3], opt = this._transport.mergeOptions(options);
+        return stackIntercept<HttpProbeResultRequest, JobResponse>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: ResultPorts
+     */
+    resultPorts(input: PortsResultRequest, options?: RpcOptions): UnaryCall<PortsResultRequest, JobResponse> {
+        const method = this.methods[4], opt = this._transport.mergeOptions(options);
+        return stackIntercept<PortsResultRequest, JobResponse>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: ResultVulnerabilities
+     */
+    resultVulnerabilities(input: VulnerabilitiesResultRequest, options?: RpcOptions): UnaryCall<VulnerabilitiesResultRequest, JobResponse> {
+        const method = this.methods[5], opt = this._transport.mergeOptions(options);
+        return stackIntercept<VulnerabilitiesResultRequest, JobResponse>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: ResultScreenshot
+     */
+    resultScreenshot(input: ScreenshotResultRequest, options?: RpcOptions): UnaryCall<ScreenshotResultRequest, JobResponse> {
+        const method = this.methods[6], opt = this._transport.mergeOptions(options);
+        return stackIntercept<ScreenshotResultRequest, JobResponse>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: ResultClassifier
+     */
+    resultClassifier(input: ClassifierResultRequest, options?: RpcOptions): UnaryCall<ClassifierResultRequest, JobResponse> {
+        const method = this.methods[7], opt = this._transport.mergeOptions(options);
+        return stackIntercept<ClassifierResultRequest, JobResponse>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: ResultAssistant
+     */
+    resultAssistant(input: AssistantResultRequest, options?: RpcOptions): UnaryCall<AssistantResultRequest, JobResponse> {
+        const method = this.methods[8], opt = this._transport.mergeOptions(options);
+        return stackIntercept<AssistantResultRequest, JobResponse>("unary", this._transport, method, opt, input);
     }
 }

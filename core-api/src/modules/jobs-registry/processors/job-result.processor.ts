@@ -31,7 +31,7 @@ export class JobResultProcessor extends WorkerHost {
   }
 
   async process(
-    bullJob: BullJob<{ workerId: string; jobId: string; resultRef: string }>,
+    bullJob: BullJob<{ workerId: string; jobId: string; resultRef: string; category?: string }>,
   ): Promise<void> {
     const { workerId, jobId, resultRef } = bullJob.data;
 
