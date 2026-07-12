@@ -26,9 +26,13 @@ export function ConnectedTabContent({
     );
   }
 
+  const sorted = [...connectedIntegrations].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-      {connectedIntegrations.map((integration) => (
+      {sorted.map((integration) => (
         <ConnectedCard
           key={integration.id}
           integration={integration}

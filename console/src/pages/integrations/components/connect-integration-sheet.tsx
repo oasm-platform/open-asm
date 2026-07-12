@@ -258,7 +258,7 @@ export function ConnectIntegrationSheet({
       }
       setFormValues(defaults);
     }
-  }, [open, schema.title]);
+  }, [open, schema.title, schema.properties]);
 
   const appType = (schema.properties?.app_type as SchemaProperty | undefined)?.const ?? schema.$id ?? '';
   const category = (schema.properties?.category as SchemaProperty | undefined)?.const ?? '';
