@@ -1,4 +1,8 @@
+import { cloudflareSchema } from './cloudflare.schema';
 import { jiraSchema } from './jira.schema';
+import { slackSchema } from './slack.schema';
+import { telegramSchema } from './telegram.schema';
+import { webhookSchema } from './webhook.schema';
 
 /**
  * Universal JSON Schema (Draft 2020-12) for all integration configurations.
@@ -16,12 +20,15 @@ export const universalIntegrationSchema = {
   description:
     'Discriminated union of all supported integration configurations.',
   oneOf: [
-    // cloudflareSchema,
+    cloudflareSchema,
     // githubSchema,
     jiraSchema,
+    slackSchema,
+    telegramSchema,
+    webhookSchema,
     // linearSchema,
     // Add more integration schemas here as they are implemented:
-    // slackSchema, linearSchema, awsSchema, etc.
+    // awsSchema, etc.
   ],
 } as const;
 

@@ -1,3 +1,5 @@
+import { IntegrationType } from '@/common/enums/enum';
+
 /**
  * JSON Schema for Linear integration configuration.
  * Part of the discriminated union in universal-integration.schema.ts.
@@ -6,11 +8,9 @@ export const linearSchema = {
   $id: 'linear',
   type: 'object',
   title: 'Linear',
-  description:
-    'Connects to Linear API for issue and project management.',
+  description: 'Connects to Linear API for issue and project management.',
   properties: {
-    app_type: { const: 'linear', title: 'App Type' },
-    category: { const: 'ticketing', title: 'Category' },
+    category: { const: IntegrationType.TICKETING, title: 'Category' },
     apiKey: {
       type: 'string',
       title: 'Linear API Key',
@@ -27,11 +27,10 @@ export const linearSchema = {
     openStateId: {
       type: 'string',
       title: 'Open State ID',
-      description:
-        'Workflow state ID representing "open" issues for this team',
+      description: 'Workflow state ID representing "open" issues for this team',
       'ui:placeholder': '00000000-0000-0000-0000-000000000000',
     },
   },
-  required: ['app_type', 'category', 'apiKey', 'teamId'],
+  required: ['category', 'apiKey', 'teamId'],
   additionalProperties: false,
 } as const;

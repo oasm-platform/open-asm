@@ -1,3 +1,5 @@
+import { IntegrationType } from '@/common/enums/enum';
+
 /**
  * JSON Schema for Cloudflare integration configuration.
  * Part of the discriminated union in universal-integration.schema.ts.
@@ -6,10 +8,11 @@ export const cloudflareSchema = {
   $id: 'cloudflare',
   type: 'object',
   title: 'Cloudflare',
+  isAvailable: false,
   description: 'Connects to Cloudflare API for DNS and security management.',
   properties: {
     app_type: { const: 'cloudflare', title: 'App Type' },
-    category: { const: 'Cloud provider', title: 'Category' },
+    category: { const: IntegrationType.CLOUD_PROVIDER, title: 'Category' },
     apiToken: {
       type: 'string',
       title: 'Cloudflare API Token',

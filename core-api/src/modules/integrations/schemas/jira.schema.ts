@@ -1,3 +1,6 @@
+import { IntegrationType } from '@/common/enums/enum';
+import { severityProperties } from './severity.schema';
+
 /**
  * JSON Schema for Jira (Ticketing) integration configuration.
  * Part of the discriminated union in universal-integration.schema.ts.
@@ -6,11 +9,11 @@ export const jiraSchema = {
   $id: 'jira',
   type: 'object',
   title: 'Jira',
-  description:
-    'Connects to a Jira instance as a ticketing integration.',
+  isAvailable: false,
+  description: 'Connects to a Jira instance as a ticketing integration.',
   properties: {
     app_type: { const: 'jira', title: 'App Type' },
-    category: { const: 'ticketing', title: 'Category' },
+    category: { const: IntegrationType.TICKETING, title: 'Category' },
     instanceUrl: {
       type: 'string',
       format: 'uri',
@@ -39,14 +42,8 @@ export const jiraSchema = {
       'ui:widget': 'password',
       'ui:placeholder': 'your-api-token',
     },
+    ...severityProperties,
   },
-  required: [
-    'app_type',
-    'category',
-    'instanceUrl',
-    'accountId',
-    'email',
-    'apiToken',
-  ],
+  required: ['app_type', 'category', 'instanceUrl', 'accountId', 'email', 'apiToken'],
   additionalProperties: false,
 } as const;
