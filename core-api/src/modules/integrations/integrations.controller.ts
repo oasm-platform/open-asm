@@ -10,6 +10,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Post,
   Query,
@@ -21,6 +22,7 @@ import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { GetIntegrationDto } from './dto/get-integration.dto';
 import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import { SchemasResponseDto } from './dto/schemas-response.dto';
+import { TestIntegrationDto } from './dto/test-integration.dto';
 import { IntegrationsService } from './integrations.service';
 
 @ApiTags('Integrations')
@@ -125,5 +127,23 @@ export class IntegrationsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.integrationsService.deleteIntegration(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Test an integration',
+    description:
+      'Sends a test payload using the integration connector. The connector class is resolved by appType and the correct method is dispatched by category — no if/else chains.',
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post(':id/test')
+  @HttpCode(200)
+  testIntegration(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: TestIntegrationDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.integrationsService.testIntegration(id, workspaceId, dto);
   }
 }

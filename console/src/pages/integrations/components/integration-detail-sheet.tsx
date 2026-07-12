@@ -1,13 +1,18 @@
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   Sheet,
   SheetContent,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import { useIntegrationsControllerTestIntegration } from '@/services/apis/gen/queries';
 import type { GetIntegrationDto } from '@/services/apis/gen/queries';
+import { Loader2, Play } from 'lucide-react';
+import { toast } from 'sonner';
 import type { SchemaOneOfItem } from '../index';
 
 interface SchemaProperty {
@@ -33,6 +38,27 @@ export function IntegrationDetailSheet({
   open,
   onOpenChange,
 }: IntegrationDetailSheetProps) {
+  const { mutate: testIntegration, isPending: isTesting } =
+    useIntegrationsControllerTestIntegration({
+      mutation: {
+        onSuccess: (data) => {
+          const result = data as unknown as {
+            success: boolean;
+            message: string;
+            error?: string;
+          };
+          if (result.success) {
+            toast.success(result.message);
+          } else {
+            toast.error(result.error ?? result.message);
+          }
+        },
+        onError: () => {
+          toast.error('Failed to test integration');
+        },
+      },
+    });
+
   const formProperties = Object.entries(schema.properties ?? {}).filter(
     ([key]) => key !== 'app_type' && key !== 'category',
   ) as [string, SchemaProperty][];
@@ -160,6 +186,24 @@ export function IntegrationDetailSheet({
             );
           })}
         </div>
+
+        <SheetFooter className="border-t px-4 py-3">
+          <Button
+            variant="default"
+            className="w-full gap-2"
+            disabled={isTesting}
+            onClick={() =>
+              testIntegration({ id: integration.id, data: {} })
+            }
+          >
+            {isTesting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Play className="size-4" />
+            )}
+            {isTesting ? 'Testing...' : 'Test Integration'}
+          </Button>
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   );

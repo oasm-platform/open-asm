@@ -2318,6 +2318,11 @@ export type GetManyGetIntegrationDtoDto = {
   pageCount: number;
 };
 
+export type TestIntegrationDto = {
+  /** Optional custom test message text. Defaults to a standard test message per category. */
+  text?: string;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   search?: string;
   page?: number;
@@ -30340,94 +30345,6 @@ export const useIntegrationsControllerCreateIntegration = <
 };
 
 /**
- * Permanently removes an integration from the specified workspace.
- * @summary Delete an integration
- */
-export const integrationsControllerDeleteIntegration = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    { url: `/api/integrations/${id}`, method: 'DELETE', signal },
-    options,
-  );
-};
-
-export const getIntegrationsControllerDeleteIntegrationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-    TError,
-    { id: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['integrationsControllerDeleteIntegration'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
-
-    return integrationsControllerDeleteIntegration(id, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type IntegrationsControllerDeleteIntegrationMutationResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>
->;
-
-export type IntegrationsControllerDeleteIntegrationMutationError = unknown;
-
-/**
- * @summary Delete an integration
- */
-export const useIntegrationsControllerDeleteIntegration = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-      TError,
-      { id: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  return useMutation(
-    getIntegrationsControllerDeleteIntegrationMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
  * Returns a paginated list of integrations in the specified workspace. Supports search and filters.
  * @summary Get all integrations for a workspace
  */
@@ -30968,6 +30885,190 @@ export function useIntegrationsControllerGetIntegrationById<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Permanently removes an integration from the specified workspace.
+ * @summary Delete an integration
+ */
+export const integrationsControllerDeleteIntegration = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/integrations/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerDeleteIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerDeleteIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return integrationsControllerDeleteIntegration(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerDeleteIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>
+>;
+
+export type IntegrationsControllerDeleteIntegrationMutationError = unknown;
+
+/**
+ * @summary Delete an integration
+ */
+export const useIntegrationsControllerDeleteIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerDeleteIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Sends a test payload using the integration connector. The connector class is resolved by appType and the correct method is dispatched by category — no if/else chains.
+ * @summary Test an integration
+ */
+export const integrationsControllerTestIntegration = (
+  id: string,
+  testIntegrationDto: TestIntegrationDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/integrations/${id}/test`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: testIntegrationDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerTestIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+    TError,
+    { id: string; data: TestIntegrationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+  TError,
+  { id: string; data: TestIntegrationDto },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerTestIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+    { id: string; data: TestIntegrationDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return integrationsControllerTestIntegration(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerTestIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerTestIntegration>>
+>;
+export type IntegrationsControllerTestIntegrationMutationBody =
+  TestIntegrationDto;
+export type IntegrationsControllerTestIntegrationMutationError = unknown;
+
+/**
+ * @summary Test an integration
+ */
+export const useIntegrationsControllerTestIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+      TError,
+      { id: string; data: TestIntegrationDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+  TError,
+  { id: string; data: TestIntegrationDto },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerTestIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * @summary Upload app logo to system bucket

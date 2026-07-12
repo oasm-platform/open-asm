@@ -15,6 +15,9 @@ import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import { GetIntegrationDto } from './dto/get-integration.dto';
 import { Integration } from './entities/integration.entity';
 import { universalIntegrationSchema } from './schemas';
+import { testConnector } from './connectors/connector.factory';
+import type { ConnectorTestResult } from './connectors/connector.factory';
+import type { TestIntegrationDto } from './dto/test-integration.dto';
 
 @Injectable()
 export class IntegrationsService {
@@ -127,6 +130,42 @@ export class IntegrationsService {
     }
 
     return this.toResponse(integration);
+  }
+
+  /**
+   * Tests an integration by executing its connector with the stored config.
+   *
+   * Decrypts sensitive config, injects a test payload, looks up the correct
+   * connector class by appType, and dispatches the appropriate method by category.
+   * No if/else chains — all dispatch is data-driven via the connector factory.
+   */
+  async testIntegration(
+    id: string,
+    workspaceId: string,
+    dto?: TestIntegrationDto,
+  ): Promise<ConnectorTestResult> {
+    const integration = await this.integrationRepository.findOne({
+      where: { id, workspaceId },
+    });
+
+    if (!integration) {
+      throw new NotFoundException('Integration not found');
+    }
+
+    // Decrypt sensitive fields for the connector to use
+    const decryptedConfig = decryptSensitiveConfigFields(integration.config);
+
+    // Merge stored config with a test message text
+    const testConfig = {
+      ...decryptedConfig,
+      text: dto?.text ?? `🧪 OpenASM test notification — sent at ${new Date().toISOString()}`,
+    };
+
+    return testConnector(
+      integration.appType,
+      integration.category,
+      testConfig,
+    );
   }
 
   /**

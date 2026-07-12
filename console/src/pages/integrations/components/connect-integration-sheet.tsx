@@ -193,7 +193,7 @@ function ArrayField({
   return (
     <div className="space-y-2">
       {items.map((item, index) => (
-        <div key={index} className="flex items-center gap-2">
+        <div key={index} className="relative">
           <Input
             type="text"
             name={`${fieldKey}[${index}]`}
@@ -202,7 +202,7 @@ function ArrayField({
             placeholder={placeholder}
             value={item}
             onChange={(e) => handleItemChange(index, e.target.value)}
-            className="flex-1"
+            className="w-full pr-9"
           />
           {items.length > 1 && (
             <Button
@@ -211,6 +211,7 @@ function ArrayField({
               size="icon-sm"
               onClick={() => removeItem(index)}
               aria-label={`Remove ${fieldKey} item ${index + 1}`}
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
             >
               <X className="size-4" />
             </Button>

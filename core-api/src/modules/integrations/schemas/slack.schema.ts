@@ -1,11 +1,18 @@
 import { IntegrationType } from '@/common/enums/enum';
 import { severityProperties } from './severity.schema';
+import { SlackConnector } from '../connectors/slack.connector';
+import { registerConnector } from '../connectors/connector.registry';
+
+// Register connector class so the factory can resolve it by appType
+registerConnector('slack', SlackConnector);
+
 /**
  * JSON Schema for Slack (Alert) integration configuration.
  * Part of the discriminated union in universal-integration.schema.ts.
  */
 export const slackSchema = {
   $id: 'slack',
+  connector: SlackConnector,
   type: 'object',
   title: 'Slack',
   isAvailable: true,

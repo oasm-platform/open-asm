@@ -1,5 +1,10 @@
 import { IntegrationType } from '@/common/enums/enum';
 import { severityProperties } from './severity.schema';
+import { WebhookConnector } from '../connectors/webhook.connector';
+import { registerConnector } from '../connectors/connector.registry';
+
+// Register connector class so the factory can resolve it by appType
+registerConnector('webhook', WebhookConnector);
 
 /**
  * JSON Schema for Webhook integration configuration.
@@ -7,6 +12,7 @@ import { severityProperties } from './severity.schema';
  */
 export const webhookSchema = {
   $id: 'webhook',
+  connector: WebhookConnector,
   type: 'object',
   title: 'Webhook',
   isAvailable: true,
