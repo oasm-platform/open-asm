@@ -110,7 +110,7 @@ export class NotificationsConsumer extends WorkerHost {
           integration,
           config: decryptSensitiveConfigFields(integration.config),
         }))
-        .filter(({ config }) => config[type] === true);
+        .filter(({ config }) => config[type] !== false);
 
       const results = await Promise.allSettled(
         enabledIntegrations.map(async ({ integration, config }) => {

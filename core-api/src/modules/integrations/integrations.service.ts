@@ -18,7 +18,11 @@ import { GetIntegrationDto } from './dto/get-integration.dto';
 import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import type { TestIntegrationDto } from './dto/test-integration.dto';
 import { Integration } from './entities/integration.entity';
-import { universalIntegrationSchema } from './schemas';
+import {
+  notificationTypeProperties,
+  severityProperties,
+  universalIntegrationSchema,
+} from './schemas';
 
 @Injectable()
 export class IntegrationsService {
@@ -238,13 +242,30 @@ export class IntegrationsService {
     const decryptedConfig = decryptSensitiveConfigFields(integration.config);
     const maskedConfig = maskSensitiveConfigFields(decryptedConfig);
 
+    // For NOTIFICATION integrations, auto-enable any toggle keys missing from
+    // the stored config. This ensures newly added notification type / severity
+    // toggles work for existing integrations without requiring re-configuration.
+    let config = maskedConfig;
+    if (integration.category === (IntegrationType.NOTIFICATION as string)) {
+      const toggleKeys = new Set([
+        ...Object.keys(notificationTypeProperties),
+        ...Object.keys(severityProperties),
+      ]);
+      config = { ...maskedConfig };
+      for (const key of toggleKeys) {
+        if (!(key in maskedConfig)) {
+          config[key] = true;
+        }
+      }
+    }
+
     return {
       id: integration.id,
       name: integration.name,
       description: integration.description,
       appType: integration.appType,
       category: integration.category,
-      config: maskedConfig,
+      config,
       workspaceId: integration.workspaceId,
       createdById: integration.createdById,
       createdAt: integration.createdAt,

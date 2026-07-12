@@ -1,28 +1,4 @@
 import Page from '@/components/common/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import useDebounce from '@/hooks/use-debounce';
 import type { GetIntegrationDto } from '@/services/apis/gen/queries';
@@ -34,16 +10,12 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-import { MoreHorizontal, Search, Unplug } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { AppsTabContent } from './components/apps-tab-content';
 import { ConnectIntegrationSheet } from './components/connect-integration-sheet';
+import { ConnectedTabContent } from './components/connected-tab-content';
 import { IntegrationDetailSheet } from './components/integration-detail-sheet';
-import { IntegrationLogo } from './components/integration-logo';
-
-dayjs.extend(relativeTime);
 
 const TABS: { value: string; label: string }[] = [
   { value: 'applications', label: 'Applications' },
@@ -73,7 +45,6 @@ export default function Integrations() {
     null,
   );
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [disconnectTarget, setDisconnectTarget] = useState<string | null>(null);
   const [detailTarget, setDetailTarget] = useState<GetIntegrationDto | null>(
     null,
   );
@@ -102,7 +73,7 @@ export default function Integrations() {
   const { data: connectedData } =
     useIntegrationsControllerGetManyIntegrations();
 
-  const { mutate: deleteIntegration, isPending: isDeleting } =
+  const { mutate: deleteIntegration } =
     useIntegrationsControllerDeleteIntegration({
       mutation: {
         onSuccess: () => {
@@ -169,7 +140,6 @@ export default function Integrations() {
   const handleDialogClose = (open: boolean) => {
     setDialogOpen(open);
     if (!open) {
-      // Small delay so the dialog close animation finishes before state resets
       setTimeout(() => setSelectedSchema(null), 200);
     }
   };
@@ -197,184 +167,27 @@ export default function Integrations() {
         </TabsList>
 
         <TabsContent value="applications" className="py-4">
-          {appSchemas.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-muted-foreground">
-              No applications available
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="relative flex-1 max-w-xs">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search applications..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-9 pl-8 text-xs"
-                  />
-                </div>
-                <Select
-                  value={categoryFilter ?? 'ALL'}
-                  onValueChange={(val) =>
-                    setCategoryFilter(val === 'ALL' ? undefined : val)
-                  }
-                >
-                  <SelectTrigger className="border-dashed text-xs py-0 focus:ring-0 focus:ring-offset-0 focus:outline-none w-[150px]">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">All categories</SelectItem>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {formatCategory(cat)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                {filteredSchemas.map((appSchema, index) => {
-                  const category = (
-                    appSchema.properties?.category as { const?: string }
-                  )?.const;
-
-                  const available = appSchema.isAvailable !== false;
-
-                  return (
-                    <button
-                      key={index}
-                      type="button"
-                      disabled={!available}
-                      onClick={() => handleCardClick(appSchema)}
-                      className={`flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors ${
-                        available
-                          ? 'hover:border-primary hover:bg-accent/50 cursor-pointer'
-                          : 'opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <IntegrationLogo
-                          url={`/static/images/integrations/${appSchema.$id}.svg`}
-                        />
-                        <h3 className="text-base font-semibold capitalize">
-                          {appSchema.title ?? 'Unknown App'}
-                        </h3>
-                        {category && (
-                          <Badge variant="secondary">
-                            <span>{formatCategory(category)}</span>
-                          </Badge>
-                        )}
-                        {!available && (
-                          <Badge className="hidden 2xl:block" variant="outline">
-                            Coming soon
-                          </Badge>
-                        )}
-                      </div>
-                      {appSchema.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {appSchema.description}
-                        </p>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
+          <AppsTabContent
+            appSchemas={appSchemas}
+            filteredSchemas={filteredSchemas}
+            categories={categories}
+            categoryFilter={categoryFilter}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onCategoryChange={setCategoryFilter}
+            onCardClick={handleCardClick}
+            formatCategory={formatCategory}
+          />
         </TabsContent>
 
         <TabsContent value="connected" className="py-4">
-          {connectedIntegrations.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-muted-foreground">
-              {connectedTotal === 0
-                ? 'No integrations connected yet. Go to the Applications tab to connect one.'
-                : 'Loading...'}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-              {connectedIntegrations.map((integration) => (
-                <div
-                  key={integration.id}
-                  className="flex items-start justify-between gap-2 rounded-lg border p-5 transition-colors hover:border-primary hover:bg-accent/50"
-                >
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-col items-start gap-2 text-left"
-                    onClick={() => setDetailTarget(integration)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <IntegrationLogo
-                        url={`/static/images/integrations/${integration.appType}.svg`}
-                      />
-                      <h3 className="text-base font-semibold capitalize truncate">
-                        {integration.name}
-                      </h3>
-                      <Badge variant="secondary" className="shrink-0">
-                        <span>{formatCategory(integration.category)}</span>
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      Connected {dayjs(integration.createdAt).fromNow()}
-                    </p>
-                  </button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0"
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => setDisconnectTarget(integration.id)}
-                      >
-                        <Unplug className="size-4 text-destructive" />
-                        Disconnect
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <Dialog
-                    open={disconnectTarget === integration.id}
-                    onOpenChange={(open) => {
-                      if (!open) setDisconnectTarget(null);
-                    }}
-                  >
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Disconnect Integration</DialogTitle>
-                        <DialogDescription>
-                          Are you sure you want to disconnect &quot;
-                          {integration.name}
-                          &quot;? This action cannot be undone.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter>
-                        <Button
-                          variant="outline"
-                          onClick={() => setDisconnectTarget(null)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            deleteIntegration({ id: integration.id });
-                            setDisconnectTarget(null);
-                          }}
-                        >
-                          Disconnect
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              ))}
-            </div>
-          )}
+          <ConnectedTabContent
+            connectedIntegrations={connectedIntegrations}
+            connectedTotal={connectedTotal}
+            onCardClick={setDetailTarget}
+            onDisconnect={(id) => deleteIntegration({ id })}
+            formatCategory={formatCategory}
+          />
         </TabsContent>
       </Tabs>
 
