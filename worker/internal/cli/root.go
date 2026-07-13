@@ -65,6 +65,29 @@ func App() error {
 	return nil
 }
 
+// AppHeadless runs the worker without a TUI (headless mode).
+// Intended for Docker / production deployments where no TTY is available.
+// Log output goes to stderr via TuiLogger's headless fallback.
+func AppHeadless() error {
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("fail to load config: %v", err)
+	}
+
+	if cfg.ApiKey == "" {
+		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Headless mode: no TUI. Pass nil events channel.
+	// TuiLogger falls back to writing formatted logs to stderr.
+	// oasm-sdk-go internal logs also go to stderr — fine for Docker.
+	worker.Start(ctx, cfg, nil)
+	return nil
+}
+
 func Execute() {
 	rootCmd := &cobra.Command{
 		Use:   "oasm-worker",

@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	if err := cli.App(); err != nil {
+	if err := cli.AppHeadless(); err != nil {
 		log.Fatalf("Worker failed to start: %v", err)
 	}
 }
