@@ -8,6 +8,7 @@ import type { Asset } from '../assets/entities/assets.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
 import { IssuesService } from '../issues/issues.service';
 import type { Job } from '../jobs-registry/entities/job.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -59,6 +60,7 @@ describe('DataAdapterService', () => {
     mockWorkspacesService = {
       getWorkspaceIdByTargetId: jest.fn(),
       getWorkspaceConfigValue: jest.fn(),
+      getMemberOfWorkspaceByJobId: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -89,6 +91,12 @@ describe('DataAdapterService', () => {
             deleteFile: jest.fn(),
             forwardImage: jest.fn(),
             readJsonFile: jest.fn(),
+          },
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            createNotification: jest.fn(),
           },
         },
       ],

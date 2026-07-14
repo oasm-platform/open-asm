@@ -5,13 +5,19 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { DataSource, InsertResult } from 'typeorm';
-import { Severity, ToolCategory } from '../../common/enums/enum';
+import {
+  NotificationScope,
+  NotificationType,
+  Severity,
+  ToolCategory,
+} from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { IssuesService } from '../issues/issues.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -25,6 +31,7 @@ export class DataAdapterService {
     private workspaceService: WorkspacesService,
     private issuesService: IssuesService,
     private storageService: StorageService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   public async validateData<T extends object>(
@@ -274,47 +281,25 @@ export class DataAdapterService {
       );
 
       if (vulsForAlert.length > 0) {
-        const workspaceId = job.jobHistory.workflow?.workspace.id;
+        const members =
+          await this.workspaceService.getMemberOfWorkspaceByJobId(job.id);
 
-        if (!workspaceId) {
-          this.logger.warn(
-            'Workspace ID is missing from job history workflow, skipping issue creation',
-          );
-          return;
-        }
+        if (members.length === 0) return;
 
-        // const vulnsWithoutExistingIssue = await Promise.all(
-        //   vulsForAlert.map(async (v) => {
-        //     const existing =
-        //       await this.issuesService.findExistingOpenIssueBySource(
-        //         v.id,
-        //         IssueSourceType.VULNERABILITY,
-        //         workspaceId,
-        //       );
-        //     return existing ? null : v;
-        //   }),
-        // );
+        const recipientIds = members.map((m) => m.user.id);
+        const workspaceId = members[0].workspace.id;
 
-        // const newVulsForAlert = vulnsWithoutExistingIssue.filter(
-        //   (v): v is Vulnerability => v !== null,
-        // );
-
-        // if (newVulsForAlert.length > 0) {
-        //   await Promise.all(
-        //     newVulsForAlert.map((v) =>
-        //       this.issuesService.createIssue(
-        //         {
-        //           title: `[${v.severity.charAt(0).toUpperCase() + v.severity.slice(1).toLowerCase()}] ${v.name}`,
-        //           description: v.description,
-        //           sourceId: v.id,
-        //           sourceType: IssueSourceType.VULNERABILITY,
-        //         },
-        //         workspaceId,
-        //         BOT_ID,
-        //       ),
-        //     ),
-        //   );
-        // }
+        await this.notificationsService.createNotification({
+          recipients: recipientIds,
+          scope: NotificationScope.GROUP,
+          type: NotificationType.NEW_VULNERABILITY_FOUND,
+          metadata: {
+            count: String(vulsForAlert.length),
+            assetValue: job.asset.value,
+            targetId: job.asset.target.id,
+          },
+          workspaceId,
+        });
       }
     });
   }
