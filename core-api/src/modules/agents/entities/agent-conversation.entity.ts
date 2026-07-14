@@ -59,7 +59,7 @@ export class AgentConversation {
 
   @ApiProperty({ example: AgentMode.ASK })
   @IsEnum(AgentMode)
-  @Column({ type: 'enum', enum: AgentMode, default: AgentMode.ASK })
+  @Column({ type: 'varchar', default: AgentMode.ASK })
   agentMode: AgentMode;
 
   @ApiProperty({

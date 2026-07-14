@@ -28,7 +28,7 @@ export class User extends BaseEntity {
   image?: string;
 
   @ApiProperty({ enum: Role })
-  @Column({ type: 'enum', enum: Role, default: Role.USER })
+  @Column({ type: 'varchar', default: Role.USER })
   role: Role;
 
   @Column({ type: 'text', default: 'en' })

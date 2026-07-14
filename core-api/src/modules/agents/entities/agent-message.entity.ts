@@ -23,7 +23,7 @@ export class AgentMessage extends BaseEntity {
 
   @ApiProperty({ enum: MessageRole, example: MessageRole.USER })
   @IsEnum(MessageRole)
-  @Column({ type: 'enum', enum: MessageRole })
+  @Column({ type: 'varchar' })
   role: MessageRole;
 
   @ApiProperty({ example: 'Hello, how can you help me?' })
@@ -37,7 +37,7 @@ export class AgentMessage extends BaseEntity {
     default: MessageType.TEXT,
   })
   @IsEnum(MessageType)
-  @Column({ type: 'enum', enum: MessageType, default: MessageType.TEXT })
+  @Column({ type: 'varchar', default: MessageType.TEXT })
   messageType: MessageType;
 
   @ApiProperty({

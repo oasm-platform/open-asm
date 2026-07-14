@@ -20,6 +20,6 @@ export class WorkspaceMembers extends BaseEntity {
   })
   user: Relation<User>;
 
-  @Column({ type: 'enum', enum: WorkspaceRole, default: WorkspaceRole.OWNER })
+  @Column({ type: 'varchar', default: WorkspaceRole.OWNER })
   role: WorkspaceRole;
 }

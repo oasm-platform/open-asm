@@ -24,16 +24,14 @@ export class Issue extends BaseEntity {
 
   @ApiProperty()
   @Column({
-    type: 'enum',
-    enum: IssueStatus,
+    type: 'varchar',
     default: IssueStatus.OPEN,
   })
   status: IssueStatus;
 
   @ApiProperty()
   @Column({
-    type: 'enum',
-    enum: IssueSourceType,
+    type: 'varchar',
     nullable: true,
   })
   sourceType: IssueSourceType;

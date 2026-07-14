@@ -30,14 +30,14 @@ export class Job extends BaseEntity {
    * The category of the tool used in the job.
    */
   @ApiProperty()
-  @Column({ type: 'enum', enum: ToolCategory })
+  @Column({ type: 'varchar' })
   category: ToolCategory;
 
   /**
    * The current status of the job.
    */
   @ApiProperty()
-  @Column({ type: 'enum', enum: JobStatus, default: JobStatus.PENDING })
+  @Column({ type: 'varchar', default: JobStatus.PENDING })
   status?: JobStatus;
 
   /**
@@ -50,7 +50,7 @@ export class Job extends BaseEntity {
   /**
    * The priority of the job.
    */
-  @Column({ type: 'enum', enum: JobPriority, default: JobPriority.BACKGROUND })
+  @Column({ type: 'varchar', default: JobPriority.BACKGROUND })
   priority?: JobPriority;
 
   /**
