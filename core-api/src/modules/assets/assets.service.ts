@@ -288,7 +288,10 @@ export class AssetsService {
     query: GetAssetsQueryDto,
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
-    if (!(query.sortBy in Asset)) {
+    const assetServiceColumns = this.assetServiceRepo.metadata.columns.map(
+      (col) => col.propertyName,
+    );
+    if (!assetServiceColumns.includes(query.sortBy)) {
       query.sortBy = 'createdAt';
     }
 

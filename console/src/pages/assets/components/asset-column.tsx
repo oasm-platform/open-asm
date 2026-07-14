@@ -62,9 +62,9 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
+    accessorKey: 'screenshotPath',
     header: 'Screenshot',
     enableHiding: false,
-    enableSorting: false,
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
