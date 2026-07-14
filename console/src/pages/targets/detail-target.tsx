@@ -18,6 +18,7 @@ import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
 import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
 import AssetsDiscovering from './assets-discovering';
 import SettingTarget from './setting-target';
+import { TargetSwitcher } from './components/target-switcher';
 
 // Define tabs configuration
 const TABS = [
@@ -74,7 +75,7 @@ export function DetailTarget() {
 
   return (
     <Page
-      title={target.value}
+      title={<TargetSwitcher currentTargetId={target.id} currentTargetValue={target.value} />}
       isShowButtonGoBack
       header={
         <div className="flex items-center gap-3 justify-between">
