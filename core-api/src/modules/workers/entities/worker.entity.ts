@@ -38,11 +38,11 @@ export class WorkerInstance extends BaseEntity {
   currentJobsCount?: number;
 
   @ApiProperty()
-  @Column({ type: 'enum', enum: WorkerType, default: WorkerType.BUILT_IN })
+  @Column({ type: 'varchar', default: WorkerType.BUILT_IN })
   type: WorkerType;
 
   @ApiProperty()
-  @Column({ type: 'enum', enum: WorkerScope, default: WorkerScope.WORKSPACE })
+  @Column({ type: 'varchar', default: WorkerScope.WORKSPACE })
   scope: WorkerScope;
 
   @Column({ type: 'uuid', nullable: true })

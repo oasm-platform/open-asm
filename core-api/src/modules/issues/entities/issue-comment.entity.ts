@@ -49,7 +49,7 @@ export class IssueComment extends BaseEntity {
     enum: IssueCommentType,
     default: IssueCommentType.CONTENT,
   })
-  @Column({ type: 'enum', enum: IssueCommentType, default: IssueCommentType.CONTENT })
+  @Column({ type: 'varchar', default: IssueCommentType.CONTENT })
   type: IssueCommentType;
 
   @ApiProperty({ required: false })

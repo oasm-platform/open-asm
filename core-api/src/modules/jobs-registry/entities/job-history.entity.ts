@@ -50,8 +50,7 @@ export class JobHistory extends BaseEntity {
   jobHistoryName?: string;
 
   @Column({
-    type: 'enum',
-    enum: JobRunType,
+    type: 'varchar',
     default: JobRunType.MANUAL,
   })
   jobRunType: JobRunType;

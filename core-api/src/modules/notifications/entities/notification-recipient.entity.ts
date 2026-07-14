@@ -23,8 +23,7 @@ export class NotificationRecipient extends BaseEntity {
   user: Relation<User>;
 
   @Column({
-    type: 'enum',
-    enum: NotificationStatus,
+    type: 'varchar',
     default: NotificationStatus.SENT,
   })
   status: NotificationStatus;

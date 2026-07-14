@@ -25,7 +25,7 @@ export class AssetGroupWorkflow extends BaseEntity {
   workflow: Relation<Workflow>;
 
   @ApiProperty({ enum: CronSchedule })
-  @Column({ type: 'enum', enum: CronSchedule, default: CronSchedule.DISABLED })
+  @Column({ type: 'varchar', default: CronSchedule.DISABLED })
   @IsEnum(CronSchedule)
   schedule: CronSchedule;
 

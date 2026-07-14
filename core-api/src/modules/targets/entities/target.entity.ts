@@ -73,8 +73,7 @@ export class Target extends BaseEntity {
   })
   @IsEnum(TargetType)
   @Column({
-    type: 'enum',
-    enum: TargetType,
+    type: 'varchar',
     default: TargetType.DOMAIN,
   })
   type: TargetType;
@@ -103,8 +102,7 @@ export class Target extends BaseEntity {
   @IsOptional()
   @IsEnum(CronSchedule)
   @Column({
-    type: 'enum',
-    enum: CronSchedule,
+    type: 'varchar',
     default: CronSchedule.DISABLED,
     nullable: true,
   })
