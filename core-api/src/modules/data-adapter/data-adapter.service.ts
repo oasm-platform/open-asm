@@ -8,7 +8,6 @@ import { DataSource, InsertResult } from 'typeorm';
 import {
   NotificationScope,
   NotificationType,
-  Severity,
   ToolCategory,
 } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
@@ -254,6 +253,21 @@ export class DataAdapterService {
         new Map(values.map((v) => [v.fingerprint, v])).values(),
       );
 
+      // Pre-check: find which fingerprints already exist
+      // to avoid sending notifications for updated vulns
+      const existingRows = await manager
+        .createQueryBuilder()
+        .select('v.fingerprint', 'fingerprint')
+        .from(Vulnerability, 'v')
+        .where('v.fingerprint IN (:...fingerprints)', {
+          fingerprints: uniqueValues.map((v) => v.fingerprint),
+        })
+        .getRawMany();
+
+      const existingFingerprints = new Set<string>(
+        (existingRows as { fingerprint: string }[]).map((r) => r.fingerprint),
+      );
+
       const result = await manager
         .createQueryBuilder()
         .insert()
@@ -268,23 +282,33 @@ export class DataAdapterService {
 
       const insertedVulnerabilities = result.raw as Vulnerability[];
 
-      const uniqueVulnerabilities = Array.from(
-        new Map(
-          insertedVulnerabilities.map((vuln) => [vuln.fingerprint, vuln]),
-        ).values(),
-      );
-
-      const vulsForAlert = uniqueVulnerabilities.filter(
+      // Only send notifications for truly new vulnerabilities,
+      // not for existing ones that were just updated
+      const vulsForAlert = insertedVulnerabilities.filter(
         (vuln) =>
-          vuln.severity &&
-          [Severity.HIGH, Severity.CRITICAL].includes(vuln.severity),
+          vuln.fingerprint &&
+          !existingFingerprints.has(vuln.fingerprint) &&
+          vuln.severity,
       );
 
       if (vulsForAlert.length > 0) {
+        this.logger.log(
+          `Found ${vulsForAlert.length} new vulns for job ${job.id}, looking up workspace members`,
+        );
+
         const members =
           await this.workspaceService.getMemberOfWorkspaceByJobId(job.id);
 
-        if (members.length === 0) return;
+        if (members.length === 0) {
+          this.logger.warn(
+            `No workspace members found for job ${job.id}, skipping notification`,
+          );
+          return;
+        }
+
+        this.logger.log(
+          `Found ${members.length} workspace members for job ${job.id}, creating notification`,
+        );
 
         const recipientIds = members.map((m) => m.user.id);
         const workspaceId = members[0].workspace.id;
@@ -300,6 +324,14 @@ export class DataAdapterService {
           },
           workspaceId,
         });
+
+        this.logger.log(
+          `Notification created for ${vulsForAlert.length} vulns in workspace ${workspaceId}`,
+        );
+      } else {
+        this.logger.log(
+          `No new vulns to alert for job ${job.id} (${uniqueValues.length} total deduped, ${existingFingerprints.size} already existed)`,
+        );
       }
     });
   }
