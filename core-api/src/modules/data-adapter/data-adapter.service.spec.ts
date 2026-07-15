@@ -2,12 +2,17 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import type { InsertResult } from 'typeorm';
 import { DataSource } from 'typeorm';
-import { Severity, ToolCategory } from '../../common/enums/enum';
+import {
+  NotificationType,
+  Severity,
+  ToolCategory,
+} from '../../common/enums/enum';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import type { Asset } from '../assets/entities/assets.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
 import { IssuesService } from '../issues/issues.service';
 import type { Job } from '../jobs-registry/entities/job.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -18,6 +23,7 @@ describe('DataAdapterService', () => {
   let mockQueryRunner: any;
   let mockDataSource: any;
   let mockWorkspacesService: any;
+  let mockNotificationsService: any;
 
   beforeEach(async () => {
     mockQueryRunner = {
@@ -59,6 +65,7 @@ describe('DataAdapterService', () => {
     mockWorkspacesService = {
       getWorkspaceIdByTargetId: jest.fn(),
       getWorkspaceConfigValue: jest.fn(),
+      getMemberOfWorkspaceByJobId: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -91,10 +98,17 @@ describe('DataAdapterService', () => {
             readJsonFile: jest.fn(),
           },
         },
+        {
+          provide: NotificationsService,
+          useValue: {
+            createNotification: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<DataAdapterService>(DataAdapterService);
+    mockNotificationsService = module.get(NotificationsService);
 
     // Mock validateData method to return true for valid data and false for invalid data
     jest.spyOn(service, 'validateData').mockImplementation((data, cls) => {
@@ -536,6 +550,10 @@ describe('DataAdapterService', () => {
 
       // Mock the full query builder chain for vulnerabilities
       const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
@@ -557,6 +575,13 @@ describe('DataAdapterService', () => {
       });
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith(
+        'v.fingerprint',
+        'fingerprint',
+      );
+      expect(mockQueryBuilder.from).toHaveBeenCalledWith(Vulnerability, 'v');
+      expect(mockQueryBuilder.where).toHaveBeenCalled();
+      expect(mockQueryBuilder.getRawMany).toHaveBeenCalled();
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(mockQueryBuilder.into).toHaveBeenCalledWith(Vulnerability);
       expect(mockQueryBuilder.values).toHaveBeenCalled();
@@ -581,6 +606,10 @@ describe('DataAdapterService', () => {
       );
 
       const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
@@ -622,6 +651,180 @@ describe('DataAdapterService', () => {
       });
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
+    });
+
+    it('should send notification for all new vulnerabilities (all severities)', async () => {
+      const newFingerprint = 'new-fingerprint-123';
+      const newVuln = {
+        ...mockVulnerabilities[0],
+        fingerprint: newFingerprint,
+      };
+      const existingFingerprint = 'existing-fingerprint-456';
+      const existingVuln = {
+        ...mockVulnerabilities[0],
+        fingerprint: existingFingerprint,
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      // Mock workspace members so notification can be sent
+      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([
+        { user: { id: 'user-1' }, workspace: { id: 'workspace-id' } },
+      ]);
+
+      // getRawMany returns existing fingerprints on first call
+      const getRawManyMock = jest
+        .fn()
+        .mockResolvedValueOnce([{ fingerprint: existingFingerprint }])
+        .mockResolvedValue([]);
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: getRawManyMock,
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: [newVuln, existingVuln],
+          identifiers: [],
+        }),
+      };
+
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.vulnerabilities({
+        data: [newVuln, existingVuln],
+        job: mockJob,
+      });
+
+      // Should have called createNotification with count=1 (only new vuln)
+      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.NEW_VULNERABILITY_FOUND,
+          metadata: expect.objectContaining({
+            count: '1',
+          }),
+        }),
+      );
+    });
+
+    it('should NOT send notification when all vulnerabilities already exist (updated only)', async () => {
+      const existingFingerprint = 'existing-fingerprint-789';
+      const existingVuln = {
+        ...mockVulnerabilities[0],
+        fingerprint: existingFingerprint,
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      // getRawMany returns the fingerprint as existing
+      const getRawManyMock = jest
+        .fn()
+        .mockResolvedValueOnce([{ fingerprint: existingFingerprint }])
+        .mockResolvedValue([]);
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: getRawManyMock,
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: [existingVuln],
+          identifiers: [],
+        }),
+      };
+
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.vulnerabilities({
+        data: [existingVuln],
+        job: mockJob,
+      });
+
+      // Should NOT have called createNotification
+      expect(
+        mockNotificationsService.createNotification,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should send notification for new LOW/MEDIUM severity vulnerabilities too', async () => {
+      const lowVuln = {
+        ...mockVulnerabilities[0],
+        fingerprint: 'low-vuln-fingerprint',
+        severity: Severity.LOW,
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      // Mock workspace members so notification can be sent
+      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([
+        { user: { id: 'user-1' }, workspace: { id: 'workspace-id' } },
+      ]);
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]), // no existing fingerprints
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: [lowVuln],
+          identifiers: [],
+        }),
+      };
+
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.vulnerabilities({
+        data: [lowVuln],
+        job: mockJob,
+      });
+
+      // Should have called createNotification (low severity now triggers notification)
+      expect(
+        mockNotificationsService.createNotification,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.NEW_VULNERABILITY_FOUND,
+          metadata: expect.objectContaining({
+            count: '1',
+          }),
+        }),
+      );
     });
   });
 
