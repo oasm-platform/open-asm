@@ -321,6 +321,7 @@ export class DataAdapterService {
             count: String(vulsForAlert.length),
             assetValue: job.asset.value,
             targetId: job.asset.target.id,
+            assetId: job.asset.id,
           },
           workspaceId,
         });
