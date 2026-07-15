@@ -1982,6 +1982,24 @@ export type TestIntegrationDto = {
   text?: string;
 };
 
+export type TelegramConnectDto = {
+  id: string;
+  telegramChatId?: string;
+  telegramUsername?: string;
+  telegramFirstName?: string;
+  telegramLastName?: string;
+  connectToken: string;
+  tokenExpiredAt?: string;
+  status: string;
+  isActive: boolean;
+  integrationId: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Bot username from Telegram API, e.g. "MyAwesomeBot" */
+  botUsername?: string;
+};
+
 export type RunCommandDto = {
   /** Command to execute */
   command: string;
@@ -2766,6 +2784,10 @@ export type IntegrationsControllerGetManyIntegrationsParams = {
    * Filter by category
    */
   category?: string;
+};
+
+export type IntegrationsControllerCreateTelegramPairingParams = {
+  force: string;
 };
 
 export type RemoteExecuteControllerStreamParams = {
@@ -23412,6 +23434,474 @@ export const useIntegrationsControllerTestIntegration = <
 > => {
   return useMutation(
     getIntegrationsControllerTestIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Generates a unique 48-char connect token for the given Telegram integration. The user sends this token to the bot via /start <token> to pair their Telegram chat.
+ * @summary Create a Telegram pairing token
+ */
+export const integrationsControllerCreateTelegramPairing = (
+  id: string,
+  params: IntegrationsControllerCreateTelegramPairingParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TelegramConnectDto>(
+    {
+      url: `/api/integrations/${id}/telegram/pairing`,
+      method: 'POST',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerCreateTelegramPairingMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerCreateTelegramPairing>>,
+    TError,
+    { id: string; params: IntegrationsControllerCreateTelegramPairingParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerCreateTelegramPairing>>,
+  TError,
+  { id: string; params: IntegrationsControllerCreateTelegramPairingParams },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerCreateTelegramPairing'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerCreateTelegramPairing>>,
+    { id: string; params: IntegrationsControllerCreateTelegramPairingParams }
+  > = (props) => {
+    const { id, params } = props ?? {};
+
+    return integrationsControllerCreateTelegramPairing(
+      id,
+      params,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerCreateTelegramPairingMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof integrationsControllerCreateTelegramPairing>>
+  >;
+
+export type IntegrationsControllerCreateTelegramPairingMutationError = unknown;
+
+/**
+ * @summary Create a Telegram pairing token
+ */
+export const useIntegrationsControllerCreateTelegramPairing = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerCreateTelegramPairing>>,
+      TError,
+      { id: string; params: IntegrationsControllerCreateTelegramPairingParams },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerCreateTelegramPairing>>,
+  TError,
+  { id: string; params: IntegrationsControllerCreateTelegramPairingParams },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerCreateTelegramPairingMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Receives incoming updates from Telegram via webhook. Each integration has a unique webhook URL including the integration ID. Parses /start <token> messages to pair chats.
+ * @summary Telegram bot webhook
+ */
+export const integrationsControllerTelegramWebhook = (
+  integrationId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/integrations/telegram/webhook/${integrationId}`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerTelegramWebhookMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerTelegramWebhook>>,
+    TError,
+    { integrationId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerTelegramWebhook>>,
+  TError,
+  { integrationId: string },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerTelegramWebhook'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerTelegramWebhook>>,
+    { integrationId: string }
+  > = (props) => {
+    const { integrationId } = props ?? {};
+
+    return integrationsControllerTelegramWebhook(integrationId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerTelegramWebhookMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerTelegramWebhook>>
+>;
+
+export type IntegrationsControllerTelegramWebhookMutationError = unknown;
+
+/**
+ * @summary Telegram bot webhook
+ */
+export const useIntegrationsControllerTelegramWebhook = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerTelegramWebhook>>,
+      TError,
+      { integrationId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerTelegramWebhook>>,
+  TError,
+  { integrationId: string },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerTelegramWebhookMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Returns all Telegram chat connections (paired users) for the given integration.
+ * @summary List Telegram connects for an integration
+ */
+export const integrationsControllerGetTelegramConnects = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TelegramConnectDto[]>(
+    { url: `/api/integrations/${id}/telegram/connects`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerGetTelegramConnectsQueryKey = (
+  id: string,
+) => {
+  return [`/api/integrations/${id}/telegram/connects`] as const;
+};
+
+export const getIntegrationsControllerGetTelegramConnectsQueryOptions = <
+  TData = Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getIntegrationsControllerGetTelegramConnectsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>
+  > = ({ signal }) =>
+    integrationsControllerGetTelegramConnects(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IntegrationsControllerGetTelegramConnectsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>
+>;
+export type IntegrationsControllerGetTelegramConnectsQueryError = unknown;
+
+export function useIntegrationsControllerGetTelegramConnects<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetTelegramConnects<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetTelegramConnects<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List Telegram connects for an integration
+ */
+
+export function useIntegrationsControllerGetTelegramConnects<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetTelegramConnects>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getIntegrationsControllerGetTelegramConnectsQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Disconnects a specific Telegram chat from the integration.
+ * @summary Disconnect a Telegram connect
+ */
+export const integrationsControllerDisconnectTelegramConnect = (
+  id: string,
+  connectId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/integrations/${id}/telegram/connects/${connectId}`,
+      method: 'DELETE',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerDisconnectTelegramConnectMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof integrationsControllerDisconnectTelegramConnect>
+      >,
+      TError,
+      { id: string; connectId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerDisconnectTelegramConnect>>,
+    TError,
+    { id: string; connectId: string },
+    TContext
+  > => {
+    const mutationKey = ['integrationsControllerDisconnectTelegramConnect'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof integrationsControllerDisconnectTelegramConnect>
+      >,
+      { id: string; connectId: string }
+    > = (props) => {
+      const { id, connectId } = props ?? {};
+
+      return integrationsControllerDisconnectTelegramConnect(
+        id,
+        connectId,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type IntegrationsControllerDisconnectTelegramConnectMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof integrationsControllerDisconnectTelegramConnect>>
+  >;
+
+export type IntegrationsControllerDisconnectTelegramConnectMutationError =
+  unknown;
+
+/**
+ * @summary Disconnect a Telegram connect
+ */
+export const useIntegrationsControllerDisconnectTelegramConnect = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof integrationsControllerDisconnectTelegramConnect>
+      >,
+      TError,
+      { id: string; connectId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerDisconnectTelegramConnect>>,
+  TError,
+  { id: string; connectId: string },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerDisconnectTelegramConnectMutationOptions(options),
     queryClient,
   );
 };

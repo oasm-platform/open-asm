@@ -35,6 +35,46 @@ export class IntegrationsService {
   ) {}
 
   /**
+   * Auto-configures a Telegram bot webhook when running in production (BASE_URL set).
+   * Called after create/update so each bot points to its unique webhook URL.
+   */
+  async autoConfigureTelegramWebhook(integration: Integration): Promise<void> {
+    const baseUrl = process.env.BASE_URL;
+    if (!baseUrl) return; // polling mode — no webhook needed
+
+    const config = decryptSensitiveConfigFields(integration.config);
+    const botToken = config.botToken as string | undefined;
+    if (!botToken) return;
+
+    const webhookUrl = `${baseUrl}/api/integrations/telegram/webhook/${integration.id}`;
+
+    try {
+      const res = await fetch(
+        `https://api.telegram.org/bot${botToken}/setWebhook`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: webhookUrl }),
+        },
+      );
+      const data = (await res.json()) as { ok: boolean; description?: string };
+      if (!data.ok) {
+        this.logger.warn(
+          `setWebhook failed for integration ${integration.id}: ${data.description}`,
+        );
+      } else {
+        this.logger.log(
+          `Telegram webhook configured for integration ${integration.id} → ${webhookUrl}`,
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `setWebhook HTTP error for integration ${integration.id}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /**
    * Returns the universal JSON Schema for console form rendering.
    * No workspace context needed — schema is global.
    */
@@ -76,6 +116,15 @@ export class IntegrationsService {
       this.sendConnectedMessage(saved).catch((err: Error) => {
         this.logger.warn(
           `Failed to send connected message for integration ${saved.id}: ${err.message}`,
+        );
+      });
+    }
+
+    // Auto-configure Telegram webhook if BASE_URL is set
+    if (saved.appType === 'telegram') {
+      this.autoConfigureTelegramWebhook(saved).catch((err: Error) => {
+        this.logger.warn(
+          `Failed to configure Telegram webhook for ${saved.id}: ${err.message}`,
         );
       });
     }
@@ -151,6 +200,47 @@ export class IntegrationsService {
   }
 
   /**
+   * Returns a single Integration entity with decrypted config.
+   * Throws NotFoundException if not found or not in this workspace.
+   * Intended for internal service-to-service use where decrypted config is needed.
+   */
+  async getIntegrationWithDecryptedConfig(
+    id: string,
+    workspaceId: string,
+  ): Promise<{ integration: Integration; decryptedConfig: Record<string, unknown> }> {
+    const integration = await this.integrationRepository.findOne({
+      where: { id, workspaceId },
+    });
+    if (!integration) {
+      throw new NotFoundException('Integration not found');
+    }
+    return {
+      integration,
+      decryptedConfig: decryptSensitiveConfigFields(integration.config),
+    };
+  }
+
+  /**
+   * Returns a single Integration entity with decrypted config by id only.
+   * Does NOT check workspace — for internal service-to-service use where
+   * context has already been verified (e.g. confirming a connect token).
+   */
+  async getDecryptedIntegrationById(
+    id: string,
+  ): Promise<{ integration: Integration; decryptedConfig: Record<string, unknown> }> {
+    const integration = await this.integrationRepository.findOne({
+      where: { id },
+    });
+    if (!integration) {
+      throw new NotFoundException('Integration not found');
+    }
+    return {
+      integration,
+      decryptedConfig: decryptSensitiveConfigFields(integration.config),
+    };
+  }
+
+  /**
    * Tests an integration by executing its connector with the stored config.
    *
    * Decrypts sensitive config, injects a test payload, looks up the correct
@@ -174,11 +264,12 @@ export class IntegrationsService {
     const decryptedConfig = decryptSensitiveConfigFields(integration.config);
 
     // Merge stored config with a test message text
-    const testConfig = {
+    const testConfig: Record<string, unknown> = {
       ...decryptedConfig,
       text:
         dto?.text ??
         `🧪 OpenASM test notification — sent at ${new Date().toISOString()}`,
+      integrationId: integration.id,
     };
 
     return runConnector(integration.appType, integration.category, testConfig);
@@ -244,6 +335,15 @@ export class IntegrationsService {
     }
 
     const saved = await this.integrationRepository.save(integration);
+
+    // Re-configure Telegram webhook if config was updated (bot token might have changed)
+    if (saved.appType === 'telegram' && dto.config !== undefined) {
+      this.autoConfigureTelegramWebhook(saved).catch((err: Error) => {
+        this.logger.warn(
+          `Failed to reconfigure Telegram webhook for ${saved.id}: ${err.message}`,
+        );
+      });
+    }
 
     return this.toResponse(saved);
   }
@@ -330,6 +430,7 @@ export class IntegrationsService {
       {
         ...config,
         text,
+        integrationId: integration.id,
       },
     );
 

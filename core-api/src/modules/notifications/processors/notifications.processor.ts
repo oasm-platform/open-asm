@@ -81,6 +81,7 @@ export class NotificationsConsumer extends WorkerHost {
   /**
    * Translates the notification via i18n (lang=en) and pushes to every
    * connected NOTIFICATION integration in the workspace.
+   * Each connector (e.g. Telegram) resolves its own destinations internally.
    * Failures are logged but never thrown — integrations are best-effort.
    */
   private async pushToIntegrations(
@@ -114,13 +115,16 @@ export class NotificationsConsumer extends WorkerHost {
 
       const results = await Promise.allSettled(
         enabledIntegrations.map(async ({ integration, config }) => {
-          await runConnector(integration.appType, integration.category, {
+          const pushConfig: Record<string, unknown> = {
             ...config,
             text: message,
             metadata,
             workspaceId,
             type,
-          });
+            integrationId: integration.id,
+          };
+
+          await runConnector(integration.appType, integration.category, pushConfig);
         }),
       );
 

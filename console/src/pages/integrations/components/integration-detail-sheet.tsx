@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { SchemaOneOfItem } from '../index';
 import { IntegrationLogo } from './integration-logo';
+import { TelegramConnect } from './telegram-connect';
 
 interface SchemaProperty {
   type?: string;
@@ -527,6 +528,19 @@ export function IntegrationDetailSheet({
               </div>
             );
           })}
+
+          {/* Telegram pairing section — only for telegram integrations */}
+          {integration.appType === 'telegram' && !isEditing && (
+            <div className="pt-2">
+              <TelegramConnect
+                integrationId={integration.id}
+                botUsername={
+                  (integration.config as Record<string, unknown>)
+                    ?.botUsername as string | undefined
+                }
+              />
+            </div>
+          )}
         </div>
 
         <SheetFooter className="border-t px-4 py-3">

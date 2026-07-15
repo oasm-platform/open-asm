@@ -245,3 +245,8 @@ export enum IntegrationType {
   NOTIFICATION = 'NOTIFICATION',
   CLOUD_PROVIDER = 'CLOUD_PROVIDER',
 }
+
+export enum TelegramConnectStatus {
+  PENDING = 'PENDING',
+  CONNECTED = 'CONNECTED',
+}
