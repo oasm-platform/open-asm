@@ -12,6 +12,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ import { GetIntegrationDto } from './dto/get-integration.dto';
 import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import { SchemasResponseDto } from './dto/schemas-response.dto';
 import { TestIntegrationDto } from './dto/test-integration.dto';
+import { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { IntegrationsService } from './integrations.service';
 
 @ApiTags('Integrations')
@@ -108,6 +110,26 @@ export class IntegrationsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.integrationsService.getIntegrationById(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Update an integration',
+    description:
+      'Updates the name, description, or config of an existing integration. If config is provided, it is validated against the JSON Schema. Empty body returns the current state unchanged.',
+    response: {
+      serialization: GetIntegrationDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Patch(':id')
+  updateIntegration(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: UpdateIntegrationDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.integrationsService.updateIntegration(id, workspaceId, dto);
   }
 
   @Doc({

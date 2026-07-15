@@ -1888,6 +1888,7 @@ export const CreateNotificationDtoType = {
   WORKSPACE_CREATED: 'WORKSPACE_CREATED',
   VULNERABILITY_ANALYSIS_COMPLETED: 'VULNERABILITY_ANALYSIS_COMPLETED',
   ASSET_NEW_DETECT: 'ASSET_NEW_DETECT',
+  NEW_VULNERABILITY_FOUND: 'NEW_VULNERABILITY_FOUND',
 } as const;
 
 /**
@@ -1904,6 +1905,81 @@ export type CreateNotificationDto = {
   type: CreateNotificationDtoType;
   /** Metadata for the notification content (variables for translation) */
   metadata?: CreateNotificationDtoMetadata;
+};
+
+/**
+ * JSON Schema (Draft 2020-12) with oneOf discriminated union by app_type + category
+ */
+export type SchemasResponseDtoSchema = { [key: string]: unknown };
+
+export type SchemasResponseDto = {
+  /** JSON Schema (Draft 2020-12) with oneOf discriminated union by app_type + category */
+  schema: SchemasResponseDtoSchema;
+};
+
+/**
+ * Configuration with sensitive fields masked
+ */
+export type GetIntegrationDtoConfig = { [key: string]: unknown };
+
+export type GetIntegrationDto = {
+  id: string;
+  name: string;
+  description?: string;
+  appType: string;
+  category: string;
+  /** Configuration with sensitive fields masked */
+  config: GetIntegrationDtoConfig;
+  workspaceId: string;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * App-specific configuration validated via JSON Schema
+ */
+export type CreateIntegrationDtoConfig = { [key: string]: unknown };
+
+export type CreateIntegrationDto = {
+  /** Human-readable name */
+  name: string;
+  /** Optional description */
+  description?: string;
+  /** Third-party app identifier */
+  appType: string;
+  /** Integration category */
+  category: string;
+  /** App-specific configuration validated via JSON Schema */
+  config: CreateIntegrationDtoConfig;
+};
+
+export type GetManyGetIntegrationDtoDto = {
+  data: GetIntegrationDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+/**
+ * App-specific configuration validated via JSON Schema
+ */
+export type UpdateIntegrationDtoConfig = { [key: string]: unknown };
+
+export type UpdateIntegrationDto = {
+  /** Human-readable name */
+  name?: string;
+  /** Optional description */
+  description?: string;
+  /** App-specific configuration validated via JSON Schema */
+  config?: UpdateIntegrationDtoConfig;
+};
+
+export type TestIntegrationDto = {
+  /** Optional custom test message text. Defaults to a standard test message per category. */
+  text?: string;
 };
 
 export type RunCommandDto = {
@@ -2260,67 +2336,6 @@ export type GenerateVulReportBodyDto = {
   vulnIds?: string[];
   /** Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO) */
   minSeverity?: GenerateVulReportBodyDtoMinSeverity;
-};
-
-/**
- * JSON Schema (Draft 2020-12) with oneOf discriminated union by app_type + category
- */
-export type SchemasResponseDtoSchema = { [key: string]: unknown };
-
-export type SchemasResponseDto = {
-  /** JSON Schema (Draft 2020-12) with oneOf discriminated union by app_type + category */
-  schema: SchemasResponseDtoSchema;
-};
-
-/**
- * Configuration with sensitive fields masked
- */
-export type GetIntegrationDtoConfig = { [key: string]: unknown };
-
-export type GetIntegrationDto = {
-  id: string;
-  name: string;
-  description?: string;
-  appType: string;
-  category: string;
-  /** Configuration with sensitive fields masked */
-  config: GetIntegrationDtoConfig;
-  workspaceId: string;
-  createdById: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-/**
- * App-specific configuration validated via JSON Schema
- */
-export type CreateIntegrationDtoConfig = { [key: string]: unknown };
-
-export type CreateIntegrationDto = {
-  /** Human-readable name */
-  name: string;
-  /** Optional description */
-  description?: string;
-  /** Third-party app identifier */
-  appType: string;
-  /** Integration category */
-  category: string;
-  /** App-specific configuration validated via JSON Schema */
-  config: CreateIntegrationDtoConfig;
-};
-
-export type GetManyGetIntegrationDtoDto = {
-  data: GetIntegrationDto[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
-};
-
-export type TestIntegrationDto = {
-  /** Optional custom test message text. Defaults to a standard test message per category. */
-  text?: string;
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
@@ -2737,6 +2752,22 @@ export type NotificationsControllerGetNotificationsParams = {
   sortOrder?: string;
 };
 
+export type IntegrationsControllerGetManyIntegrationsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * Filter by app type
+   */
+  appType?: string;
+  /**
+   * Filter by category
+   */
+  category?: string;
+};
+
 export type RemoteExecuteControllerStreamParams = {
   sessionId: string;
 };
@@ -2884,22 +2915,6 @@ export const ReportsControllerPreviewVulReportMinSeverity = {
   LOW: 'LOW',
   INFO: 'INFO',
 } as const;
-
-export type IntegrationsControllerGetManyIntegrationsParams = {
-  search?: string;
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: string;
-  /**
-   * Filter by app type
-   */
-  appType?: string;
-  /**
-   * Filter by category
-   */
-  category?: string;
-};
 
 export type StorageControllerUploadLogoBody = {
   file: Blob;
@@ -22331,6 +22346,1077 @@ export const useNotificationsControllerDeleteNotification = <
 };
 
 /**
+ * Returns the JSON Schema (Draft 2020-12) for all supported integration configurations. Used by the console to render dynamic forms.
+ * @summary Get all integration schemas
+ */
+export const integrationsControllerGetSchemas = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SchemasResponseDto>(
+    { url: `/api/integrations/schemas`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerGetSchemasQueryKey = () => {
+  return [`/api/integrations/schemas`] as const;
+};
+
+export const getIntegrationsControllerGetSchemasQueryOptions = <
+  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getIntegrationsControllerGetSchemasQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof integrationsControllerGetSchemas>>
+  > = ({ signal }) => integrationsControllerGetSchemas(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IntegrationsControllerGetSchemasQueryResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerGetSchemas>>
+>;
+export type IntegrationsControllerGetSchemasQueryError = unknown;
+
+export function useIntegrationsControllerGetSchemas<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetSchemas>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetSchemas<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetSchemas>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetSchemas<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all integration schemas
+ */
+
+export function useIntegrationsControllerGetSchemas<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getIntegrationsControllerGetSchemasQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Connects a third-party application to the specified workspace. Config is validated against the JSON Schema for the given appType + category.
+ * @summary Create a new integration
+ */
+export const integrationsControllerCreateIntegration = (
+  createIntegrationDto: CreateIntegrationDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetIntegrationDto>(
+    {
+      url: `/api/integrations`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createIntegrationDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerCreateIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
+    TError,
+    { data: CreateIntegrationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
+  TError,
+  { data: CreateIntegrationDto },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerCreateIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
+    { data: CreateIntegrationDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return integrationsControllerCreateIntegration(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerCreateIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>
+>;
+export type IntegrationsControllerCreateIntegrationMutationBody =
+  CreateIntegrationDto;
+export type IntegrationsControllerCreateIntegrationMutationError = unknown;
+
+/**
+ * @summary Create a new integration
+ */
+export const useIntegrationsControllerCreateIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
+      TError,
+      { data: CreateIntegrationDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
+  TError,
+  { data: CreateIntegrationDto },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerCreateIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Returns a paginated list of integrations in the specified workspace. Supports search and filters.
+ * @summary Get all integrations for a workspace
+ */
+export const integrationsControllerGetManyIntegrations = (
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetIntegrationDtoDto>(
+    { url: `/api/integrations`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerGetManyIntegrationsInfiniteQueryKey = (
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+) => {
+  return [
+    'infinite',
+    `/api/integrations`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getIntegrationsControllerGetManyIntegrationsQueryKey = (
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+) => {
+  return [`/api/integrations`, ...(params ? [params] : [])] as const;
+};
+
+export const getIntegrationsControllerGetManyIntegrationsInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+      IntegrationsControllerGetManyIntegrationsParams['page']
+    >,
+    TError = unknown,
+  >(
+    params?: IntegrationsControllerGetManyIntegrationsParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+          TError,
+          TData,
+          QueryKey,
+          IntegrationsControllerGetManyIntegrationsParams['page']
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getIntegrationsControllerGetManyIntegrationsInfiniteQueryKey(params);
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+      QueryKey,
+      IntegrationsControllerGetManyIntegrationsParams['page']
+    > = ({ signal, pageParam }) =>
+      integrationsControllerGetManyIntegrations(
+        { ...params, page: pageParam ?? params?.['page'] },
+        requestOptions,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+      TError,
+      TData,
+      QueryKey,
+      IntegrationsControllerGetManyIntegrationsParams['page']
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type IntegrationsControllerGetManyIntegrationsInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
+  >;
+export type IntegrationsControllerGetManyIntegrationsInfiniteQueryError =
+  unknown;
+
+export function useIntegrationsControllerGetManyIntegrationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+    IntegrationsControllerGetManyIntegrationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | IntegrationsControllerGetManyIntegrationsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+        TError,
+        TData,
+        QueryKey,
+        IntegrationsControllerGetManyIntegrationsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetManyIntegrationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+    IntegrationsControllerGetManyIntegrationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+        TError,
+        TData,
+        QueryKey,
+        IntegrationsControllerGetManyIntegrationsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetManyIntegrationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+    IntegrationsControllerGetManyIntegrationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+        TError,
+        TData,
+        QueryKey,
+        IntegrationsControllerGetManyIntegrationsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all integrations for a workspace
+ */
+
+export function useIntegrationsControllerGetManyIntegrationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+    IntegrationsControllerGetManyIntegrationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+        TError,
+        TData,
+        QueryKey,
+        IntegrationsControllerGetManyIntegrationsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getIntegrationsControllerGetManyIntegrationsInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getIntegrationsControllerGetManyIntegrationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+  TError = unknown,
+>(
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getIntegrationsControllerGetManyIntegrationsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
+  > = ({ signal }) =>
+    integrationsControllerGetManyIntegrations(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IntegrationsControllerGetManyIntegrationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
+>;
+export type IntegrationsControllerGetManyIntegrationsQueryError = unknown;
+
+export function useIntegrationsControllerGetManyIntegrations<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+  TError = unknown,
+>(
+  params: undefined | IntegrationsControllerGetManyIntegrationsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetManyIntegrations<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+  TError = unknown,
+>(
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetManyIntegrations<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+  TError = unknown,
+>(
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all integrations for a workspace
+ */
+
+export function useIntegrationsControllerGetManyIntegrations<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+  TError = unknown,
+>(
+  params?: IntegrationsControllerGetManyIntegrationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getIntegrationsControllerGetManyIntegrationsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns the configuration for a specific integration in the workspace. Sensitive fields are masked.
+ * @summary Get an integration by ID
+ */
+export const integrationsControllerGetIntegrationById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetIntegrationDto>(
+    { url: `/api/integrations/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerGetIntegrationByIdQueryKey = (
+  id: string,
+) => {
+  return [`/api/integrations/${id}`] as const;
+};
+
+export const getIntegrationsControllerGetIntegrationByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getIntegrationsControllerGetIntegrationByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>
+  > = ({ signal }) =>
+    integrationsControllerGetIntegrationById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IntegrationsControllerGetIntegrationByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>
+>;
+export type IntegrationsControllerGetIntegrationByIdQueryError = unknown;
+
+export function useIntegrationsControllerGetIntegrationById<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetIntegrationById<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerGetIntegrationById<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get an integration by ID
+ */
+
+export function useIntegrationsControllerGetIntegrationById<
+  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getIntegrationsControllerGetIntegrationByIdQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Updates the name, description, or config of an existing integration. If config is provided, it is validated against the JSON Schema. Empty body returns the current state unchanged.
+ * @summary Update an integration
+ */
+export const integrationsControllerUpdateIntegration = (
+  id: string,
+  updateIntegrationDto: UpdateIntegrationDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetIntegrationDto>(
+    {
+      url: `/api/integrations/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateIntegrationDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerUpdateIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerUpdateIntegration>>,
+    TError,
+    { id: string; data: UpdateIntegrationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerUpdateIntegration>>,
+  TError,
+  { id: string; data: UpdateIntegrationDto },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerUpdateIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerUpdateIntegration>>,
+    { id: string; data: UpdateIntegrationDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return integrationsControllerUpdateIntegration(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerUpdateIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerUpdateIntegration>>
+>;
+export type IntegrationsControllerUpdateIntegrationMutationBody =
+  UpdateIntegrationDto;
+export type IntegrationsControllerUpdateIntegrationMutationError = unknown;
+
+/**
+ * @summary Update an integration
+ */
+export const useIntegrationsControllerUpdateIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerUpdateIntegration>>,
+      TError,
+      { id: string; data: UpdateIntegrationDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerUpdateIntegration>>,
+  TError,
+  { id: string; data: UpdateIntegrationDto },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerUpdateIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Permanently removes an integration from the specified workspace.
+ * @summary Delete an integration
+ */
+export const integrationsControllerDeleteIntegration = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/integrations/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerDeleteIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerDeleteIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return integrationsControllerDeleteIntegration(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerDeleteIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>
+>;
+
+export type IntegrationsControllerDeleteIntegrationMutationError = unknown;
+
+/**
+ * @summary Delete an integration
+ */
+export const useIntegrationsControllerDeleteIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerDeleteIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Sends a test payload using the integration connector. The connector class is resolved by appType and the correct method is dispatched by category — no if/else chains.
+ * @summary Test an integration
+ */
+export const integrationsControllerTestIntegration = (
+  id: string,
+  testIntegrationDto: TestIntegrationDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/integrations/${id}/test`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: testIntegrationDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerTestIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+    TError,
+    { id: string; data: TestIntegrationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+  TError,
+  { id: string; data: TestIntegrationDto },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerTestIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+    { id: string; data: TestIntegrationDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return integrationsControllerTestIntegration(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerTestIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerTestIntegration>>
+>;
+export type IntegrationsControllerTestIntegrationMutationBody =
+  TestIntegrationDto;
+export type IntegrationsControllerTestIntegrationMutationError = unknown;
+
+/**
+ * @summary Test an integration
+ */
+export const useIntegrationsControllerTestIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+      TError,
+      { id: string; data: TestIntegrationDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
+  TError,
+  { id: string; data: TestIntegrationDto },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerTestIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Publishes a command to the remote-execute channel via Redis pub/sub. The command is enriched with an id (nanoid) and sessionId (uuid) before publishing.
  * @summary Run a remote command
  */
@@ -30091,981 +31177,6 @@ export const useReportsControllerDeleteReport = <
 > => {
   return useMutation(
     getReportsControllerDeleteReportMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Returns the JSON Schema (Draft 2020-12) for all supported integration configurations. Used by the console to render dynamic forms.
- * @summary Get all integration schemas
- */
-export const integrationsControllerGetSchemas = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<SchemasResponseDto>(
-    { url: `/api/integrations/schemas`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getIntegrationsControllerGetSchemasQueryKey = () => {
-  return [`/api/integrations/schemas`] as const;
-};
-
-export const getIntegrationsControllerGetSchemasQueryOptions = <
-  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getIntegrationsControllerGetSchemasQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof integrationsControllerGetSchemas>>
-  > = ({ signal }) => integrationsControllerGetSchemas(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type IntegrationsControllerGetSchemasQueryResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerGetSchemas>>
->;
-export type IntegrationsControllerGetSchemasQueryError = unknown;
-
-export function useIntegrationsControllerGetSchemas<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-          TError,
-          Awaited<ReturnType<typeof integrationsControllerGetSchemas>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIntegrationsControllerGetSchemas<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-          TError,
-          Awaited<ReturnType<typeof integrationsControllerGetSchemas>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIntegrationsControllerGetSchemas<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get all integration schemas
- */
-
-export function useIntegrationsControllerGetSchemas<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetSchemas>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getIntegrationsControllerGetSchemasQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * Connects a third-party application to the specified workspace. Config is validated against the JSON Schema for the given appType + category.
- * @summary Create a new integration
- */
-export const integrationsControllerCreateIntegration = (
-  createIntegrationDto: CreateIntegrationDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetIntegrationDto>(
-    {
-      url: `/api/integrations`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createIntegrationDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getIntegrationsControllerCreateIntegrationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
-    TError,
-    { data: CreateIntegrationDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
-  TError,
-  { data: CreateIntegrationDto },
-  TContext
-> => {
-  const mutationKey = ['integrationsControllerCreateIntegration'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
-    { data: CreateIntegrationDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return integrationsControllerCreateIntegration(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type IntegrationsControllerCreateIntegrationMutationResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>
->;
-export type IntegrationsControllerCreateIntegrationMutationBody =
-  CreateIntegrationDto;
-export type IntegrationsControllerCreateIntegrationMutationError = unknown;
-
-/**
- * @summary Create a new integration
- */
-export const useIntegrationsControllerCreateIntegration = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
-      TError,
-      { data: CreateIntegrationDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof integrationsControllerCreateIntegration>>,
-  TError,
-  { data: CreateIntegrationDto },
-  TContext
-> => {
-  return useMutation(
-    getIntegrationsControllerCreateIntegrationMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Returns a paginated list of integrations in the specified workspace. Supports search and filters.
- * @summary Get all integrations for a workspace
- */
-export const integrationsControllerGetManyIntegrations = (
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyGetIntegrationDtoDto>(
-    { url: `/api/integrations`, method: 'GET', params, signal },
-    options,
-  );
-};
-
-export const getIntegrationsControllerGetManyIntegrationsInfiniteQueryKey = (
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-) => {
-  return [
-    'infinite',
-    `/api/integrations`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getIntegrationsControllerGetManyIntegrationsQueryKey = (
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-) => {
-  return [`/api/integrations`, ...(params ? [params] : [])] as const;
-};
-
-export const getIntegrationsControllerGetManyIntegrationsInfiniteQueryOptions =
-  <
-    TData = InfiniteData<
-      Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-      IntegrationsControllerGetManyIntegrationsParams['page']
-    >,
-    TError = unknown,
-  >(
-    params?: IntegrationsControllerGetManyIntegrationsParams,
-    options?: {
-      query?: Partial<
-        UseInfiniteQueryOptions<
-          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-          TError,
-          TData,
-          QueryKey,
-          IntegrationsControllerGetManyIntegrationsParams['page']
-        >
-      >;
-      request?: SecondParameter<typeof orvalClient>;
-    },
-  ) => {
-    const { query: queryOptions, request: requestOptions } = options ?? {};
-
-    const queryKey =
-      queryOptions?.queryKey ??
-      getIntegrationsControllerGetManyIntegrationsInfiniteQueryKey(params);
-
-    const queryFn: QueryFunction<
-      Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-      QueryKey,
-      IntegrationsControllerGetManyIntegrationsParams['page']
-    > = ({ signal, pageParam }) =>
-      integrationsControllerGetManyIntegrations(
-        { ...params, page: pageParam ?? params?.['page'] },
-        requestOptions,
-        signal,
-      );
-
-    return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-      TError,
-      TData,
-      QueryKey,
-      IntegrationsControllerGetManyIntegrationsParams['page']
-    > & { queryKey: DataTag<QueryKey, TData, TError> };
-  };
-
-export type IntegrationsControllerGetManyIntegrationsInfiniteQueryResult =
-  NonNullable<
-    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
-  >;
-export type IntegrationsControllerGetManyIntegrationsInfiniteQueryError =
-  unknown;
-
-export function useIntegrationsControllerGetManyIntegrationsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-    IntegrationsControllerGetManyIntegrationsParams['page']
-  >,
-  TError = unknown,
->(
-  params: undefined | IntegrationsControllerGetManyIntegrationsParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-        TError,
-        TData,
-        QueryKey,
-        IntegrationsControllerGetManyIntegrationsParams['page']
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-          TError,
-          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIntegrationsControllerGetManyIntegrationsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-    IntegrationsControllerGetManyIntegrationsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-        TError,
-        TData,
-        QueryKey,
-        IntegrationsControllerGetManyIntegrationsParams['page']
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-          TError,
-          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIntegrationsControllerGetManyIntegrationsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-    IntegrationsControllerGetManyIntegrationsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-        TError,
-        TData,
-        QueryKey,
-        IntegrationsControllerGetManyIntegrationsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get all integrations for a workspace
- */
-
-export function useIntegrationsControllerGetManyIntegrationsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-    IntegrationsControllerGetManyIntegrationsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-        TError,
-        TData,
-        QueryKey,
-        IntegrationsControllerGetManyIntegrationsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getIntegrationsControllerGetManyIntegrationsInfiniteQueryOptions(
-      params,
-      options,
-    );
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-export const getIntegrationsControllerGetManyIntegrationsQueryOptions = <
-  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-  TError = unknown,
->(
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getIntegrationsControllerGetManyIntegrationsQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
-  > = ({ signal }) =>
-    integrationsControllerGetManyIntegrations(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type IntegrationsControllerGetManyIntegrationsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
->;
-export type IntegrationsControllerGetManyIntegrationsQueryError = unknown;
-
-export function useIntegrationsControllerGetManyIntegrations<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-  TError = unknown,
->(
-  params: undefined | IntegrationsControllerGetManyIntegrationsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-          TError,
-          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIntegrationsControllerGetManyIntegrations<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-  TError = unknown,
->(
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-          TError,
-          Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIntegrationsControllerGetManyIntegrations<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-  TError = unknown,
->(
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get all integrations for a workspace
- */
-
-export function useIntegrationsControllerGetManyIntegrations<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-  TError = unknown,
->(
-  params?: IntegrationsControllerGetManyIntegrationsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetManyIntegrations>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getIntegrationsControllerGetManyIntegrationsQueryOptions(
-    params,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * Returns the configuration for a specific integration in the workspace. Sensitive fields are masked.
- * @summary Get an integration by ID
- */
-export const integrationsControllerGetIntegrationById = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetIntegrationDto>(
-    { url: `/api/integrations/${id}`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getIntegrationsControllerGetIntegrationByIdQueryKey = (
-  id: string,
-) => {
-  return [`/api/integrations/${id}`] as const;
-};
-
-export const getIntegrationsControllerGetIntegrationByIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getIntegrationsControllerGetIntegrationByIdQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>
-  > = ({ signal }) =>
-    integrationsControllerGetIntegrationById(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type IntegrationsControllerGetIntegrationByIdQueryResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>
->;
-export type IntegrationsControllerGetIntegrationByIdQueryError = unknown;
-
-export function useIntegrationsControllerGetIntegrationById<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-          TError,
-          Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIntegrationsControllerGetIntegrationById<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-          TError,
-          Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useIntegrationsControllerGetIntegrationById<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get an integration by ID
- */
-
-export function useIntegrationsControllerGetIntegrationById<
-  TData = Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof integrationsControllerGetIntegrationById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getIntegrationsControllerGetIntegrationByIdQueryOptions(
-    id,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * Permanently removes an integration from the specified workspace.
- * @summary Delete an integration
- */
-export const integrationsControllerDeleteIntegration = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    { url: `/api/integrations/${id}`, method: 'DELETE', signal },
-    options,
-  );
-};
-
-export const getIntegrationsControllerDeleteIntegrationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-    TError,
-    { id: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['integrationsControllerDeleteIntegration'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
-
-    return integrationsControllerDeleteIntegration(id, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type IntegrationsControllerDeleteIntegrationMutationResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>
->;
-
-export type IntegrationsControllerDeleteIntegrationMutationError = unknown;
-
-/**
- * @summary Delete an integration
- */
-export const useIntegrationsControllerDeleteIntegration = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-      TError,
-      { id: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof integrationsControllerDeleteIntegration>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  return useMutation(
-    getIntegrationsControllerDeleteIntegrationMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Sends a test payload using the integration connector. The connector class is resolved by appType and the correct method is dispatched by category — no if/else chains.
- * @summary Test an integration
- */
-export const integrationsControllerTestIntegration = (
-  id: string,
-  testIntegrationDto: TestIntegrationDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/integrations/${id}/test`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: testIntegrationDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getIntegrationsControllerTestIntegrationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
-    TError,
-    { id: string; data: TestIntegrationDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
-  TError,
-  { id: string; data: TestIntegrationDto },
-  TContext
-> => {
-  const mutationKey = ['integrationsControllerTestIntegration'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
-    { id: string; data: TestIntegrationDto }
-  > = (props) => {
-    const { id, data } = props ?? {};
-
-    return integrationsControllerTestIntegration(id, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type IntegrationsControllerTestIntegrationMutationResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerTestIntegration>>
->;
-export type IntegrationsControllerTestIntegrationMutationBody =
-  TestIntegrationDto;
-export type IntegrationsControllerTestIntegrationMutationError = unknown;
-
-/**
- * @summary Test an integration
- */
-export const useIntegrationsControllerTestIntegration = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
-      TError,
-      { id: string; data: TestIntegrationDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof integrationsControllerTestIntegration>>,
-  TError,
-  { id: string; data: TestIntegrationDto },
-  TContext
-> => {
-  return useMutation(
-    getIntegrationsControllerTestIntegrationMutationOptions(options),
     queryClient,
   );
 };

@@ -17,6 +17,7 @@ import { runConnector } from './connectors/connector.factory';
 import { GetIntegrationDto } from './dto/get-integration.dto';
 import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import type { TestIntegrationDto } from './dto/test-integration.dto';
+import type { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { Integration } from './entities/integration.entity';
 import {
   notificationTypeProperties,
@@ -204,6 +205,47 @@ export class IntegrationsService {
     return {
       message: `Integration "${id}" successfully deleted`,
     };
+  }
+
+  /**
+   * Updates an existing integration's name, description, or config.
+   * If config is provided, it is validated against JSON Schema and sensitive fields are re-encrypted.
+   * Throws NotFoundException if not found or not in this workspace.
+   */
+  async updateIntegration(
+    id: string,
+    workspaceId: string,
+    dto: UpdateIntegrationDto,
+  ): Promise<GetIntegrationDto> {
+    const integration = await this.integrationRepository.findOne({
+      where: { id, workspaceId },
+    });
+
+    if (!integration) {
+      throw new NotFoundException('Integration not found');
+    }
+
+    if (dto.name !== undefined) {
+      integration.name = dto.name;
+    }
+
+    if (dto.description !== undefined) {
+      integration.description = dto.description;
+    }
+
+    if (dto.config !== undefined) {
+      validateConfigOrThrow({
+        appType: integration.appType,
+        category: integration.category,
+        config: dto.config,
+      });
+
+      integration.config = encryptSensitiveConfigFields(dto.config);
+    }
+
+    const saved = await this.integrationRepository.save(integration);
+
+    return this.toResponse(saved);
   }
 
   /**
