@@ -257,7 +257,8 @@ export class IntegrationsController {
     @Param('id') id: string,
     @Param('connectId') connectId: string,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ) {
-    return this.telegramConnectService.disconnect(connectId, id, workspaceId);
+    return this.telegramConnectService.disconnect(connectId, id, workspaceId, userId);
   }
 }

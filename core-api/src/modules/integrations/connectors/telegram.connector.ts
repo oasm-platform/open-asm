@@ -118,6 +118,8 @@ export class TelegramConnector extends NotificationConnector {
 
     const url = `${TELEGRAM_API_BASE}/bot${botToken}/sendMessage`;
 
+    const errors: Array<{ chatId: string; error: string }> = [];
+
     for (const chatId of chatIds) {
       const body: Record<string, unknown> = {
         chat_id: chatId,
@@ -126,37 +128,45 @@ export class TelegramConnector extends NotificationConnector {
         disable_web_page_preview: disableWebPagePreview ?? true,
       };
 
-      this.logger.log(`Sending Telegram message to chat ${chatId}`);
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(10_000),
+          body: JSON.stringify(body),
+        });
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+        if (!response.ok) {
+          const errorBody = await response.text();
+          const msg = `Telegram API error (HTTP ${response.status}) — ${errorBody}`;
+          this.logger.error(`Telegram push to chat ${chatId}: ${msg}`);
+          errors.push({ chatId, error: msg });
+          continue;
+        }
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        this.logger.error(
-          `Telegram API error (${chatId}): ${response.status} — ${errorBody}`,
-        );
-        throw new Error(
-          `Telegram API returned ${response.status} for chat ${chatId}: ${errorBody}`,
-        );
+        const result = (await response.json()) as {
+          ok: boolean;
+          result?: unknown;
+          description?: string;
+        };
+
+        if (!result.ok) {
+          const msg = `Telegram API returned ok=false: ${result.description ?? 'unknown error'}`;
+          this.logger.error(`Telegram push to chat ${chatId}: ${msg}`);
+          errors.push({ chatId, error: msg });
+          continue;
+        }
+      } catch (err) {
+        const msg = (err as Error).message;
+        this.logger.error(`Telegram push to chat ${chatId}: ${msg}`);
+        errors.push({ chatId, error: msg });
       }
+    }
 
-      const result = (await response.json()) as {
-        ok: boolean;
-        result?: unknown;
-        description?: string;
-      };
-
-      if (!result.ok) {
-        throw new Error(
-          `Telegram API returned ok=false for chat ${chatId}: ${result.description ?? 'unknown error'}`,
-        );
-      }
-
-      this.logger.log(`Telegram message sent to chat ${chatId}`);
+    if (errors.length > 0) {
+      throw new Error(
+        `Telegram push failed for ${errors.length}/${chatIds.length} chats: ${errors.map((e) => `${e.chatId}: ${e.error}`).join('; ')}`,
+      );
     }
   }
 }

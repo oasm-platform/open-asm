@@ -1,7 +1,8 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { TelegramConnectStatus } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import type { Relation } from 'typeorm';
 import { Integration } from './integration.entity';
 
 @Entity('telegram_connects')

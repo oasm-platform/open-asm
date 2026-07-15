@@ -151,7 +151,7 @@ function PairingDialog({
 
   const deepLink =
     pairingToken && effectiveBotUsername
-      ? `https://t.me/${effectiveBotUsername}?text=${encodeURIComponent('/start ' + pairingToken)}`
+      ? `https://t.me/${effectiveBotUsername}?start=${pairingToken}`
       : null;
 
   return (
@@ -410,7 +410,7 @@ export function TelegramConnect({
           )}
 
           {/* Empty state */}
-          {!connectsQuery.isLoading && activeConnects.length === 0 && (
+          {!connectsQuery.isLoading && !connectsQuery.isError && activeConnects.length === 0 && (
             <div className="flex flex-col items-center gap-2 rounded-md border border-dashed py-6">
               <Smartphone className="size-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">

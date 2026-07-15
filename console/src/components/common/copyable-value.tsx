@@ -19,10 +19,14 @@ export function CopyableValue({ value, disabled = false }: CopyableValueProps) {
 
   const handleCopy = async () => {
     if (!value) return;
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    toast.success('Copied to clipboard');
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      toast.success('Copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy to clipboard');
+    }
   };
 
   return (

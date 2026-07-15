@@ -67,7 +67,7 @@ export class TelegramWebhookService {
       });
 
       this.logger.log(
-        `Telegram chat ${chatId} connected via token (first ${token.substring(0, 8)}...)`,
+        `Telegram chat ${chatId} connected via token`,
       );
     } catch (error: unknown) {
       const err = error as Error;

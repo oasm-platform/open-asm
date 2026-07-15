@@ -123,7 +123,7 @@ export class TelegramConnectService implements OnModuleInit {
    */
   private async fetchBotUsername(botToken: string): Promise<string> {
     const url = `${TELEGRAM_API_BASE}/bot${botToken}/getMe`;
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) {
       throw new InternalServerErrorException(
         `Telegram bot token is invalid or the bot does not exist (HTTP ${response.status})`,
@@ -174,7 +174,7 @@ export class TelegramConnectService implements OnModuleInit {
         await this.sendTelegramMessage(
           botToken,
           chatInfo.chatId,
-          '❌ *Connection Failed*\n\nThe pairing token is invalid or has expired. Please generate a new pairing code in OpenASM and try again.',
+          '❌ <b>Connection Failed</b>\n\nThe pairing token is invalid or has expired. Please generate a new pairing code in OpenASM and try again.',
         );
       }
       throw new NotFoundException('Invalid or expired connect token');
@@ -211,7 +211,7 @@ export class TelegramConnectService implements OnModuleInit {
         await this.sendTelegramMessage(
           botToken,
           chatInfo.chatId,
-          '❌ *Connection Failed*\n\nThis pairing token has expired. Please generate a new pairing code in OpenASM and try again.',
+          '❌ <b>Connection Failed</b>\n\nThis pairing token has expired. Please generate a new pairing code in OpenASM and try again.',
         );
       }
       await this.connectRepo.delete(connect.id);
@@ -301,6 +301,7 @@ You'll now receive security alerts and notifications here. Stay safe! 🔒`,
     connectId: string,
     integrationId: string,
     workspaceId: string,
+    userId: string,
   ): Promise<void> {
     const integration = await this.integrationRepo.findOne({
       where: { id: integrationId, workspaceId },
@@ -309,7 +310,7 @@ You'll now receive security alerts and notifications here. Stay safe! 🔒`,
 
     // Fetch connect BEFORE deleting so we can send a final message
     const connect = await this.connectRepo.findOne({
-      where: { id: connectId, integrationId },
+      where: { id: connectId, integrationId, userId },
       select: ['id', 'telegramChatId'],
     });
     if (!connect) {
@@ -381,6 +382,7 @@ You'll now receive security alerts and notifications here. Stay safe! 🔒`,
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(10_000),
         body: JSON.stringify({
           chat_id: chatId,
           text,
