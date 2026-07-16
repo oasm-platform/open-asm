@@ -95,22 +95,21 @@ export class TelegramPollingService implements OnApplicationBootstrap {
       ),
     );
   }
-
   private async pollBot(integration: Integration): Promise<void> {
-    const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);
-    const config = decryptSensitiveConfigFields(integration.config, dek);
-    const botToken = config.botToken as string | undefined;
-    if (!botToken) return;
-
-    // Use getUpdates with a long timeout — Telegram holds the connection
-    // open for up to POLL_TIMEOUT seconds if no new messages.
-    const offset = this.getOffset(botToken);
-    const params = new URLSearchParams({
-      timeout: String(POLL_TIMEOUT),
-      offset: String(offset),
-    });
-
     try {
+      const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);
+      const config = decryptSensitiveConfigFields(integration.config, dek);
+      const botToken = config.botToken as string | undefined;
+      if (!botToken) return;
+
+      // Use getUpdates with a long timeout — Telegram holds the connection
+      // open for up to POLL_TIMEOUT seconds if no new messages.
+      const offset = this.getOffset(botToken);
+      const params = new URLSearchParams({
+        timeout: String(POLL_TIMEOUT),
+        offset: String(offset),
+      });
+
       const signal = this.abortController?.signal;
       if (signal?.aborted) return;
 
@@ -137,10 +136,7 @@ export class TelegramPollingService implements OnApplicationBootstrap {
         if (signal?.aborted) return;
 
         try {
-          await this.telegramWebhookService.processUpdate(
-             
-            update,
-          );
+          await this.telegramWebhookService.processUpdate(update);
         } catch (err) {
           this.logger.error('Error processing polling update', err);
         }
