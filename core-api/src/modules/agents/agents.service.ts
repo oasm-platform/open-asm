@@ -4,7 +4,7 @@ import {
   SortOrder,
 } from '@/common/dtos/get-many-base.dto';
 import { AgentMode } from '@/common/enums/enum';
-import { decrypt, encrypt } from '@/common/utils/encryption.util';
+import { encrypt } from '@/common/utils/encryption.util';
 import {
   decryptWithDEK,
   encryptWithDEK,
@@ -134,9 +134,7 @@ export class AgentsService {
     dek: Buffer | null,
   ): LLMConfigResponseDto {
     const apiKeyMasked = config.apiKey
-      ? this.maskApiKey(
-          dek ? decryptWithDEK(config.apiKey, dek) : decrypt(config.apiKey),
-        )
+      ? this.maskApiKey(decryptWithDEK(config.apiKey, dek))
       : '****';
     return {
       id: config.id,
@@ -243,9 +241,7 @@ export class AgentsService {
       const providerMeta = llmProviderSupported.find(
         (p) => p.id === config.provider,
       );
-      const apiKey = dek
-        ? decryptWithDEK(config.apiKey, dek)
-        : decrypt(config.apiKey);
+      const apiKey = decryptWithDEK(config.apiKey, dek);
       const apiKeyMasked = config.apiKey
         ? this.maskApiKey(apiKey)
         : '****';
@@ -384,10 +380,10 @@ export class AgentsService {
       return [];
     }
 
-    const dek = await this.workspaceEncryption.getDEK(workspaceId);
-    const apiKey = dek
-      ? decryptWithDEK(config.apiKey, dek)
-      : decrypt(config.apiKey);
+    const apiKey = await this.workspaceEncryption.decrypt(
+      workspaceId,
+      config.apiKey,
+    );
     const models = await provider.fetchModels(apiKey, config.apiUrl);
 
     // Cache the result for 1 hour (3600 seconds)

@@ -14,8 +14,6 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 
 import { AgentMode } from '@/common/enums/enum';
-import { decrypt } from '@/common/utils/encryption.util';
-import { decryptWithDEK } from '@/common/utils/workspace-encryption.util';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsMemoriesService } from './agents.memories';
@@ -236,8 +234,7 @@ export class AgentsCompletionsService {
   ): Promise<LanguageModel> {
     let apiKey = '';
     if (config.apiKey) {
-      const dek = await this.workspaceEncryption.getDEK(workspaceId);
-      apiKey = dek ? decryptWithDEK(config.apiKey, dek) : decrypt(config.apiKey);
+      apiKey = await this.workspaceEncryption.decrypt(workspaceId, config.apiKey);
     }
     const providerConfig = getLLMProviderConfig(config.provider);
 

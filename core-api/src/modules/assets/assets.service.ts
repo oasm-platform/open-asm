@@ -4,8 +4,6 @@ import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Mustache from 'mustache';
-import { decrypt } from '@/common/utils/encryption.util';
-import { decryptWithDEK } from '@/common/utils/workspace-encryption.util';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { getManyResponse } from '@/utils/getManyResponse';
@@ -136,9 +134,8 @@ export class AssetsService {
       );
     }
 
-    const dek = await this.workspaceEncryption.getDEK(workspaceId);
     const apiKey = llmConfig.apiKey
-      ? (dek ? decryptWithDEK(llmConfig.apiKey, dek) : decrypt(llmConfig.apiKey))
+      ? await this.workspaceEncryption.decrypt(workspaceId, llmConfig.apiKey)
       : '';
     const baseURL =
       llmConfig.provider === LLMProvider.CUSTOM

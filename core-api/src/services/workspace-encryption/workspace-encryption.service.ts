@@ -2,7 +2,10 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 
+import { encrypt } from '@/common/utils/encryption.util';
 import {
+  decryptWithDEK,
+  encryptWithDEK,
   generateDEK,
   unwrapDEK,
   wrapDEK,
@@ -22,6 +25,17 @@ import { RedisLockService } from '@/services/redis/distributed-lock.service';
 @Injectable()
 export class WorkspaceEncryptionService implements OnModuleInit {
   private readonly logger = new Logger(WorkspaceEncryptionService.name);
+  private readonly dekCache = new Map<string, Buffer>();
+  private readonly encryptCache = new Map<string, string>();
+  private readonly decryptCache = new Map<string, string>();
+  private static readonly MAX_CACHE_SIZE = 1024;
+
+  private evictIfNeeded<K, V>(map: Map<K, V>): void {
+    if (map.size >= WorkspaceEncryptionService.MAX_CACHE_SIZE) {
+      const oldest = map.keys().next().value;
+      if (oldest !== undefined) map.delete(oldest);
+    }
+  }
 
   constructor(
     @InjectRepository(Workspace)
@@ -41,9 +55,7 @@ export class WorkspaceEncryptionService implements OnModuleInit {
     );
 
     if (ran === null) {
-      this.logger.log(
-        'Another instance holds the DEK backfill lock, skipping',
-      );
+      this.logger.log('Another instance holds the DEK backfill lock, skipping');
     }
   }
 
@@ -62,9 +74,7 @@ export class WorkspaceEncryptionService implements OnModuleInit {
       return;
     }
 
-    this.logger.log(
-      `Backfilling DEK for ${workspaces.length} workspace(s)...`,
-    );
+    this.logger.log(`Backfilling DEK for ${workspaces.length} workspace(s)...`);
 
     let success = 0;
     for (const ws of workspaces) {
@@ -72,10 +82,7 @@ export class WorkspaceEncryptionService implements OnModuleInit {
         await this.ensureDEK(ws.id);
         success++;
       } catch (err) {
-        this.logger.error(
-          `Failed to generate DEK for workspace ${ws.id}`,
-          err,
-        );
+        this.logger.error(`Failed to generate DEK for workspace ${ws.id}`, err);
       }
     }
 
@@ -94,6 +101,10 @@ export class WorkspaceEncryptionService implements OnModuleInit {
       dek: wrappedDEK,
       dekAt: new Date(),
     });
+    this.dekCache.set(workspaceId, dek);
+    // Ciphertexts encrypted with old DEK won't decrypt with the new one
+    this.encryptCache.clear();
+    this.decryptCache.clear();
   }
 
   /**
@@ -109,11 +120,52 @@ export class WorkspaceEncryptionService implements OnModuleInit {
    * Returns null for old/pre-envelope-encryption workspaces (backward compat).
    */
   async getDEK(workspaceId: string): Promise<Buffer | null> {
+    const cached = this.dekCache.get(workspaceId);
+    if (cached) return cached;
+
     const workspace = await this.workspaceRepo.findOne({
       where: { id: workspaceId },
       select: ['dek'],
     });
+
     if (!workspace?.dek) return null;
-    return unwrapDEK(workspace.dek);
+
+    const dek = unwrapDEK(workspace.dek);
+    this.evictIfNeeded(this.dekCache);
+    this.dekCache.set(workspaceId, dek);
+    return dek;
+  }
+
+  /**
+   * Encrypt text using the workspace's DEK.
+   * Fetches the DEK automatically. Falls back to KEK encryption
+   * for legacy workspaces without a DEK.
+   */
+  async encrypt(workspaceId: string, text: string): Promise<string> {
+    const cacheKey = `${workspaceId}\0${text}`;
+    const cached = this.encryptCache.get(cacheKey);
+    if (cached) return cached;
+
+    const dek = await this.getDEK(workspaceId);
+    const result = dek ? encryptWithDEK(text, dek) : encrypt(text);
+    this.evictIfNeeded(this.encryptCache);
+    this.encryptCache.set(cacheKey, result);
+    return result;
+  }
+
+  /**
+   * Decrypt text using the workspace's DEK.
+   * Fetches the DEK automatically. Falls back through DEK → KEK
+   * for legacy encrypted data and pre-envelope-encryption workspaces.
+   */
+  async decrypt(workspaceId: string, encryptedText: string): Promise<string> {
+    const cached = this.decryptCache.get(encryptedText);
+    if (cached) return cached;
+
+    const dek = await this.getDEK(workspaceId);
+    const result = decryptWithDEK(encryptedText, dek);
+    this.evictIfNeeded(this.decryptCache);
+    this.decryptCache.set(encryptedText, result);
+    return result;
   }
 }
