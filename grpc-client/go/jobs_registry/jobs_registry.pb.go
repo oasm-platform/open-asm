@@ -127,6 +127,7 @@ type Job struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Asset         *Asset                 `protobuf:"bytes,2,opt,name=asset,proto3" json:"asset,omitempty"`
 	Command       *string                `protobuf:"bytes,3,opt,name=command,proto3,oneof" json:"command,omitempty"`
+	Category      string                 `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -178,6 +179,13 @@ func (x *Job) GetAsset() *Asset {
 func (x *Job) GetCommand() string {
 	if x != nil && x.Command != nil {
 		return *x.Command
+	}
+	return ""
+}
+
+func (x *Job) GetCategory() string {
+	if x != nil {
+		return x.Category
 	}
 	return ""
 }
@@ -1958,11 +1966,12 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\n" +
 	"\x13jobs_registry.proto\x12\rjobs_registry\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\x18\n" +
 	"\x06Worker\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"l\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x88\x01\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x05asset\x18\x02 \x01(\v2\x14.jobs_registry.AssetR\x05asset\x12\x1d\n" +
-	"\acommand\x18\x03 \x01(\tH\x00R\acommand\x88\x01\x01B\n" +
+	"\acommand\x18\x03 \x01(\tH\x00R\acommand\x88\x01\x01\x12\x1a\n" +
+	"\bcategory\x18\x04 \x01(\tR\bcategoryB\n" +
 	"\n" +
 	"\b_command\"'\n" +
 	"\vJobResponse\x12\x18\n" +

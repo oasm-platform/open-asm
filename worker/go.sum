@@ -52,8 +52,12 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/oasm-platform/oasm-sdk-go v0.1.11 h1:zdI1jMcBqsJWAk8hmWj8tdLt9U88WBIp3r2DT4miEXo=
 github.com/oasm-platform/oasm-sdk-go v0.1.11/go.mod h1:nR1a/kuO8kxq4hBM8C4aD4QNdWXesfrSh+PZGt2ETTs=
+github.com/oasm-platform/oasm-sdk-go v0.1.12-0.20260716081022-ad209a0a91ed h1:OafAZdtdSDyMQDXGkW5j894T6/4SmaW12+LghTLdv6E=
+github.com/oasm-platform/oasm-sdk-go v0.1.12-0.20260716081022-ad209a0a91ed/go.mod h1:L1aa4Rs9sckH4+SH/8zX1SPE44JJYogXK0gC1+v07nU=
 github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260618004722-4483b4b84523 h1:LLHrDyWzMjSesqZyEdA1aNCzePToOm00KP1IJWGLyHA=
 github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260618004722-4483b4b84523/go.mod h1:dHyOVfH7p+2EP+eQo7zQKu7Aj1c1b4uZv1BzzOijsZg=
+github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260716025954-6167316b678b h1:NBZuYy/UnnJPlpH0FkQL35c4KxEwguzLqkVbdRn/yD8=
+github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260716025954-6167316b678b/go.mod h1:dHyOVfH7p+2EP+eQo7zQKu7Aj1c1b4uZv1BzzOijsZg=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
 github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=

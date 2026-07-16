@@ -36,6 +36,7 @@ message Job {
   string id = 1;
   Asset asset = 2;
   optional string command = 3;
+  string category = 4;
 }
 
 message JobResponse {
