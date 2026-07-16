@@ -4,7 +4,7 @@ import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Mustache from 'mustache';
-import { decrypt } from '@/common/utils/encryption.util';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { generateText } from 'ai';
@@ -75,6 +75,7 @@ export class AssetsService {
     private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
     private workspaceService: WorkspacesService,
+    private workspaceEncryption: WorkspaceEncryptionService,
     private geoIpService: GeoIpService,
     private dataSource: DataSource,
   ) {
@@ -133,7 +134,9 @@ export class AssetsService {
       );
     }
 
-    const apiKey = llmConfig.apiKey ? decrypt(llmConfig.apiKey) : '';
+    const apiKey = llmConfig.apiKey
+      ? await this.workspaceEncryption.decrypt(workspaceId, llmConfig.apiKey)
+      : '';
     const baseURL =
       llmConfig.provider === LLMProvider.CUSTOM
         ? llmConfig.apiUrl

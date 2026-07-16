@@ -1,4 +1,8 @@
-import { encrypt, decrypt } from '@/common/utils/encryption.util';
+import { encrypt } from '@/common/utils/encryption.util';
+import {
+  decryptWithDEK,
+  encryptWithDEK,
+} from '@/common/utils/workspace-encryption.util';
 import { BadRequestException } from '@nestjs/common';
 import Ajv from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
@@ -111,14 +115,17 @@ export function maskSensitiveConfigFields(
 
 /**
  * Encrypts sensitive fields in config before storage.
+ * @param dek - Workspace DEK (cleartext) or null for pre-envelope-encryption workspaces
  */
 export function encryptSensitiveConfigFields(
   config: Record<string, unknown>,
+  dek: Buffer | null,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...config };
   for (const field of SENSITIVE_FIELDS) {
     if (field in result && typeof result[field] === 'string') {
-      result[field] = encrypt(result[field]);
+      const val = result[field];
+      result[field] = dek ? encryptWithDEK(val, dek) : encrypt(val);
     }
   }
   return result;
@@ -126,15 +133,18 @@ export function encryptSensitiveConfigFields(
 
 /**
  * Decrypts sensitive fields in config after retrieval.
+ * Fallback chain: DEK → KEK → plain text (backward compatible).
+ * @param dek - Workspace DEK (cleartext) or null for pre-envelope-encryption workspaces
  */
 export function decryptSensitiveConfigFields(
   config: Record<string, unknown>,
+  dek: Buffer | null,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...config };
   for (const field of SENSITIVE_FIELDS) {
     if (field in result && typeof result[field] === 'string') {
       try {
-        result[field] = decrypt(result[field]);
+        result[field] = decryptWithDEK(result[field], dek);
       } catch {
         // Value was not encrypted (plain text stored in earlier versions)
       }
