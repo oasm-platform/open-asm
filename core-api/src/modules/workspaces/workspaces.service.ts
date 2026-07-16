@@ -22,6 +22,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { In, Repository } from 'typeorm';
+import { generateDEK, wrapDEK } from '@/common/utils/workspace-encryption.util';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -76,11 +77,17 @@ export class WorkspacesService implements OnModuleInit {
 
     const newWorkspaceId = randomUUID();
 
+    // Generate DEK (Data Encryption Key) for this workspace
+    const dek = generateDEK();
+    const wrappedDEK = wrapDEK(dek);
+
     const newWorkspace = await this.repo.save({
       id: newWorkspaceId,
       name: dto.name,
       description: dto?.description,
       owner: { id },
+      dek: wrappedDEK,
+      dekAt: new Date(),
       // apiKey: generateToken(API_KEY_LENGTH),
     });
 
