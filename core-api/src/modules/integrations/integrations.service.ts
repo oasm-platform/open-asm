@@ -249,6 +249,47 @@ export class IntegrationsService {
   }
 
   /**
+   * Returns a single Integration entity with decrypted config.
+   * Throws NotFoundException if not found or not in this workspace.
+   * Intended for internal service-to-service use where decrypted config is needed.
+   */
+  async getIntegrationWithDecryptedConfig(
+    id: string,
+    workspaceId: string,
+  ): Promise<{ integration: Integration; decryptedConfig: Record<string, unknown> }> {
+    const integration = await this.integrationRepository.findOne({
+      where: { id, workspaceId },
+    });
+    if (!integration) {
+      throw new NotFoundException('Integration not found');
+    }
+    return {
+      integration,
+      decryptedConfig: decryptSensitiveConfigFields(integration.config),
+    };
+  }
+
+  /**
+   * Returns a single Integration entity with decrypted config by id only.
+   * Does NOT check workspace — for internal service-to-service use where
+   * context has already been verified (e.g. confirming a connect token).
+   */
+  async getDecryptedIntegrationById(
+    id: string,
+  ): Promise<{ integration: Integration; decryptedConfig: Record<string, unknown> }> {
+    const integration = await this.integrationRepository.findOne({
+      where: { id },
+    });
+    if (!integration) {
+      throw new NotFoundException('Integration not found');
+    }
+    return {
+      integration,
+      decryptedConfig: decryptSensitiveConfigFields(integration.config),
+    };
+  }
+
+  /**
    * Tests an integration by executing its connector with the stored config.
    *
    * Decrypts sensitive config, injects a test payload, looks up the correct
