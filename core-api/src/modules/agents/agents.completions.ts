@@ -15,6 +15,8 @@ import { Repository } from 'typeorm';
 
 import { AgentMode } from '@/common/enums/enum';
 import { decrypt } from '@/common/utils/encryption.util';
+import { decryptWithDEK } from '@/common/utils/workspace-encryption.util';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentsSkillsService } from './agents.skills';
@@ -98,6 +100,7 @@ export class AgentsCompletionsService {
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly agentsMcpService: AgentsMcpService,
     private readonly agentsSkillsService: AgentsSkillsService,
+    private readonly workspaceEncryption: WorkspaceEncryptionService,
   ) {
     this.loadAllPrompts();
   }
@@ -227,8 +230,15 @@ export class AgentsCompletionsService {
     }
   }
 
-  private createLanguageModel(config: AgentLLMConfig): LanguageModel {
-    const apiKey = config.apiKey ? decrypt(config.apiKey) : '';
+  private async createLanguageModel(
+    config: AgentLLMConfig,
+    workspaceId: string,
+  ): Promise<LanguageModel> {
+    let apiKey = '';
+    if (config.apiKey) {
+      const dek = await this.workspaceEncryption.getDEK(workspaceId);
+      apiKey = dek ? decryptWithDEK(config.apiKey, dek) : decrypt(config.apiKey);
+    }
     const providerConfig = getLLMProviderConfig(config.provider);
 
     if (!providerConfig) {
@@ -266,7 +276,7 @@ export class AgentsCompletionsService {
         CONVERSATION_CONTENT: conversationContent,
       });
 
-      const model = this.createLanguageModel(llmConfig);
+      const model = await this.createLanguageModel(llmConfig, llmConfig.workspaceId);
 
       const titleResult = await generateText({
         model,
@@ -418,7 +428,7 @@ export class AgentsCompletionsService {
         VULNERABILITY_JSON: vulnerabilityJson,
       });
 
-      const model = this.createLanguageModel(llmConfig);
+      const model = await this.createLanguageModel(llmConfig, workspaceId);
       const tools = this.agentTool.getTools(workspaceId, AgentMode.AGENT);
 
       let accumulatedText = '';
@@ -734,7 +744,7 @@ export class AgentsCompletionsService {
         CONVERSATION_CONTENT: conversationContent,
       });
 
-      const model = this.createLanguageModel(llmConfig);
+      const model = await this.createLanguageModel(llmConfig, llmConfig.workspaceId);
 
       const result = await generateText({
         model,
@@ -948,7 +958,7 @@ export class AgentsCompletionsService {
       });
 
       // Create a model instance for summarization
-      const model = this.createLanguageModel(llmConfig);
+      const model = await this.createLanguageModel(llmConfig, llmConfig.workspaceId);
 
       // Generate the summary
       const result = await generateText({
@@ -1742,7 +1752,7 @@ export class AgentsCompletionsService {
     await this.validateToolSupport(llmConfig);
 
     // Step 7: Create a LanguageModel instance from the config
-    const model = this.createLanguageModel(llmConfig);
+    const model = await this.createLanguageModel(llmConfig, workspaceId);
 
     // Check if request was aborted before creating assistant message
     if (abortSignal?.aborted) {
