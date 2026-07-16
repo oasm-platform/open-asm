@@ -96,6 +96,22 @@ export class TelegramPollingService implements OnApplicationBootstrap {
     );
   }
   private async pollBot(integration: Integration): Promise<void> {
+<<<<<<< HEAD
+=======
+    const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);
+    const config = decryptSensitiveConfigFields(integration.config, dek);
+    const botToken = config.botToken as string | undefined;
+    if (!botToken) return;
+
+    // Use getUpdates with a long timeout — Telegram holds the connection
+    // open for up to POLL_TIMEOUT seconds if no new messages.
+    const offset = this.getOffset(botToken);
+    const params = new URLSearchParams({
+      timeout: String(POLL_TIMEOUT),
+      offset: String(offset),
+    });
+
+>>>>>>> b1971b62ab769592fa3b8078b4aea17200eeebfc
     try {
       const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);
       const config = decryptSensitiveConfigFields(integration.config, dek);
