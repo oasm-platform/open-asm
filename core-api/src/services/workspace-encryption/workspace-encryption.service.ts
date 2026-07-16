@@ -32,7 +32,7 @@ export class WorkspaceEncryptionService implements OnModuleInit {
 
   private evictIfNeeded<K, V>(map: Map<K, V>): void {
     if (map.size >= WorkspaceEncryptionService.MAX_CACHE_SIZE) {
-      const oldest = map.keys().next().value;
+      const oldest = map.keys().next().value as K | undefined;
       if (oldest !== undefined) map.delete(oldest);
     }
   }
