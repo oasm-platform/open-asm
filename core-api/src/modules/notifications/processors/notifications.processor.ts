@@ -5,6 +5,7 @@ import {
 } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { RedisService } from '@/services/redis/redis.service';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -23,6 +24,7 @@ export class NotificationsConsumer extends WorkerHost {
   constructor(
     private readonly redisService: RedisService,
     private readonly integrationsService: IntegrationsService,
+    private readonly workspaceEncryption: WorkspaceEncryptionService,
     private readonly i18n: I18nService,
     @InjectRepository(Notification)
     private notificationRepo: Repository<Notification>,
@@ -106,10 +108,11 @@ export class NotificationsConsumer extends WorkerHost {
       if (integrations.length === 0) return;
 
       // Only push to integrations with this notification type enabled.
+      const dek = await this.workspaceEncryption.getDEK(workspaceId);
       const enabledIntegrations = integrations
         .map((integration) => ({
           integration,
-          config: decryptSensitiveConfigFields(integration.config),
+          config: decryptSensitiveConfigFields(integration.config, dek),
         }))
         .filter(({ config }) => config[type] !== false);
 

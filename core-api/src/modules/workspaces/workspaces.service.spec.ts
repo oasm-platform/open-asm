@@ -7,6 +7,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import type { Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WorkflowsService } from '../workflows/workflows.service';
@@ -161,6 +162,8 @@ describe('WorkspacesService', () => {
       createNotification: jest.fn(),
     };
 
+    const mockWorkspaceEncryptionService = {};
+
     mockDataSource = {};
 
     const module: TestingModule = await Test.createTestingModule({
@@ -191,6 +194,10 @@ describe('WorkspacesService', () => {
         {
           provide: DataSource,
           useValue: mockDataSource,
+        },
+        {
+          provide: WorkspaceEncryptionService,
+          useValue: mockWorkspaceEncryptionService,
         },
       ],
     }).compile();

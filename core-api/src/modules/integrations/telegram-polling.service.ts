@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { decryptSensitiveConfigFields } from './validators/integration.validator';
 import { Integration } from './entities/integration.entity';
 import { TelegramWebhookService } from './telegram-webhook.service';
@@ -26,6 +27,7 @@ export class TelegramPollingService implements OnApplicationBootstrap {
     private readonly integrationRepo: Repository<Integration>,
     private readonly redisLockService: RedisLockService,
     private readonly telegramWebhookService: TelegramWebhookService,
+    private readonly workspaceEncryption: WorkspaceEncryptionService,
   ) {}
 
   /**
@@ -95,7 +97,8 @@ export class TelegramPollingService implements OnApplicationBootstrap {
   }
 
   private async pollBot(integration: Integration): Promise<void> {
-    const config = decryptSensitiveConfigFields(integration.config);
+    const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);
+    const config = decryptSensitiveConfigFields(integration.config, dek);
     const botToken = config.botToken as string | undefined;
     if (!botToken) return;
 

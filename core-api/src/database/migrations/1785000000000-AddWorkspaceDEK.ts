@@ -10,6 +10,8 @@ export class AddWorkspaceDEK1785000000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "workspaces" ADD COLUMN "dekAt" timestamp`,
     );
+    // Clear LLM configs encrypted with unrecoverable old keys
+    await queryRunner.query(`DELETE FROM "agent_llm_configs"`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

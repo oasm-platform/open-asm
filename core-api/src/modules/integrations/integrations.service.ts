@@ -19,6 +19,7 @@ import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import type { TestIntegrationDto } from './dto/test-integration.dto';
 import type { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { Integration } from './entities/integration.entity';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
   notificationTypeProperties,
   severityProperties,
@@ -32,6 +33,7 @@ export class IntegrationsService {
   constructor(
     @InjectRepository(Integration)
     private readonly integrationRepository: Repository<Integration>,
+    private readonly workspaceEncryption: WorkspaceEncryptionService,
   ) {}
 
   /**
@@ -42,7 +44,8 @@ export class IntegrationsService {
     const baseUrl = process.env.BASE_URL;
     if (!baseUrl) return; // polling mode — no webhook needed
 
-    const config = decryptSensitiveConfigFields(integration.config);
+    const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);
+    const config = decryptSensitiveConfigFields(integration.config, dek);
     const botToken = config.botToken as string | undefined;
     if (!botToken) return;
 
@@ -97,7 +100,8 @@ export class IntegrationsService {
   }): Promise<GetIntegrationDto> {
     validateConfigOrThrow(args);
 
-    const encryptedConfig = encryptSensitiveConfigFields(args.config);
+    const dek = await this.workspaceEncryption.getDEK(args.workspaceId);
+    const encryptedConfig = encryptSensitiveConfigFields(args.config, dek);
 
     const entity = this.integrationRepository.create({
       name: args.name,
@@ -129,7 +133,7 @@ export class IntegrationsService {
       });
     }
 
-    return this.toResponse(saved);
+    return this.toResponse(saved, dek);
   }
 
   /**
@@ -175,7 +179,8 @@ export class IntegrationsService {
 
     const [integrations, total] = await qb.getManyAndCount();
 
-    const data = integrations.map((i) => this.toResponse(i));
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    const data = integrations.map((i) => this.toResponse(i, dek));
 
     return getManyResponse({ query, data, total });
   }
@@ -196,7 +201,8 @@ export class IntegrationsService {
       throw new NotFoundException('Integration not found');
     }
 
-    return this.toResponse(integration);
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    return this.toResponse(integration, dek);
   }
 
   /**
@@ -214,9 +220,10 @@ export class IntegrationsService {
     if (!integration) {
       throw new NotFoundException('Integration not found');
     }
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
     return {
       integration,
-      decryptedConfig: decryptSensitiveConfigFields(integration.config),
+      decryptedConfig: decryptSensitiveConfigFields(integration.config, dek),
     };
   }
 
@@ -234,9 +241,10 @@ export class IntegrationsService {
     if (!integration) {
       throw new NotFoundException('Integration not found');
     }
+    const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);
     return {
       integration,
-      decryptedConfig: decryptSensitiveConfigFields(integration.config),
+      decryptedConfig: decryptSensitiveConfigFields(integration.config, dek),
     };
   }
 
@@ -261,7 +269,8 @@ export class IntegrationsService {
     }
 
     // Decrypt sensitive fields for the connector to use
-    const decryptedConfig = decryptSensitiveConfigFields(integration.config);
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    const decryptedConfig = decryptSensitiveConfigFields(integration.config, dek);
 
     // Merge stored config with a test message text
     const testConfig: Record<string, unknown> = {
@@ -324,6 +333,8 @@ export class IntegrationsService {
       integration.description = dto.description;
     }
 
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+
     if (dto.config !== undefined) {
       validateConfigOrThrow({
         appType: integration.appType,
@@ -331,7 +342,7 @@ export class IntegrationsService {
         config: dto.config,
       });
 
-      integration.config = encryptSensitiveConfigFields(dto.config);
+      integration.config = encryptSensitiveConfigFields(dto.config, dek);
     }
 
     const saved = await this.integrationRepository.save(integration);
@@ -345,7 +356,7 @@ export class IntegrationsService {
       });
     }
 
-    return this.toResponse(saved);
+    return this.toResponse(saved, dek);
   }
 
   /**
@@ -360,7 +371,8 @@ export class IntegrationsService {
       where: { workspaceId, category },
     });
 
-    return integrations.map((i) => this.toResponse(i));
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    return integrations.map((i) => this.toResponse(i, dek));
   }
 
   /**
@@ -380,8 +392,8 @@ export class IntegrationsService {
    * Maps an Integration entity to a response DTO.
    * Decrypts then masks sensitive config fields.
    */
-  private toResponse(integration: Integration): GetIntegrationDto {
-    const decryptedConfig = decryptSensitiveConfigFields(integration.config);
+  private toResponse(integration: Integration, dek: Buffer | null): GetIntegrationDto {
+    const decryptedConfig = decryptSensitiveConfigFields(integration.config, dek);
     const maskedConfig = maskSensitiveConfigFields(decryptedConfig);
 
     // For NOTIFICATION integrations, auto-enable any toggle keys missing from
@@ -420,7 +432,8 @@ export class IntegrationsService {
    * Best-effort — failures are logged but never propagated.
    */
   private async sendConnectedMessage(integration: Integration): Promise<void> {
-    const config = decryptSensitiveConfigFields(integration.config);
+    const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);
+    const config = decryptSensitiveConfigFields(integration.config, dek);
 
     const text = `🔗 OpenASM has been successfully connected! You'll receive security alerts and notifications here.`;
 

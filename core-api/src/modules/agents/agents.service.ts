@@ -5,9 +5,14 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import { AgentMode } from '@/common/enums/enum';
 import { decrypt, encrypt } from '@/common/utils/encryption.util';
+import {
+  decryptWithDEK,
+  encryptWithDEK,
+} from '@/common/utils/workspace-encryption.util';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { WorkersService } from '@/modules/workers/workers.service';
 import { RedisService } from '@/services/redis/redis.service';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { HttpService } from '@nestjs/axios';
 import {
@@ -69,6 +74,7 @@ export class AgentsService {
     private readonly toolCallRepository: Repository<AgentMessageToolCall>,
     @InjectRepository(AgentConversationTodo)
     private readonly todoRepository: Repository<AgentConversationTodo>,
+    private readonly workspaceEncryption: WorkspaceEncryptionService,
     private readonly redisService: RedisService,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly httpService: HttpService,
@@ -123,9 +129,14 @@ export class AgentsService {
     };
   }
 
-  private toLLMConfigResponse(config: AgentLLMConfig): LLMConfigResponseDto {
+  private toLLMConfigResponse(
+    config: AgentLLMConfig,
+    dek: Buffer | null,
+  ): LLMConfigResponseDto {
     const apiKeyMasked = config.apiKey
-      ? this.maskApiKey(decrypt(config.apiKey))
+      ? this.maskApiKey(
+          dek ? decryptWithDEK(config.apiKey, dek) : decrypt(config.apiKey),
+        )
       : '****';
     return {
       id: config.id,
@@ -175,11 +186,16 @@ export class AgentsService {
       dto.apiKey = 'not_set';
     }
 
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    const apiKey = dek
+      ? encryptWithDEK(dto.apiKey, dek)
+      : encrypt(dto.apiKey);
+
     const config = this.llmConfigRepository.create({
       workspaceId,
       provider: dto.provider,
       name: dto.name,
-      apiKey: encrypt(dto.apiKey),
+      apiKey,
       model: dto.model || defaultModel,
       apiUrl: dto.apiUrl,
       createdBy: userId,
@@ -187,7 +203,7 @@ export class AgentsService {
     });
 
     const saved = await this.llmConfigRepository.save(config);
-    return this.toLLMConfigResponse(saved);
+    return this.toLLMConfigResponse(saved, dek);
   }
 
   async getLLMProvidersStatus(
@@ -197,8 +213,9 @@ export class AgentsService {
       where: { workspaceId },
     });
 
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
     const configMap = new Map(
-      configs.map((c) => [c.provider, this.toLLMConfigResponse(c)]),
+      configs.map((c) => [c.provider, this.toLLMConfigResponse(c, dek)]),
     );
 
     return llmProviderSupported.map((provider) => ({
@@ -218,6 +235,7 @@ export class AgentsService {
       order: { createdAt: 'ASC' },
     });
 
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
     const result: LLMConfigWithProviderDto[] = [];
 
     // One row per connected config
@@ -225,8 +243,11 @@ export class AgentsService {
       const providerMeta = llmProviderSupported.find(
         (p) => p.id === config.provider,
       );
+      const apiKey = dek
+        ? decryptWithDEK(config.apiKey, dek)
+        : decrypt(config.apiKey);
       const apiKeyMasked = config.apiKey
-        ? this.maskApiKey(decrypt(config.apiKey))
+        ? this.maskApiKey(apiKey)
         : '****';
       result.push({
         providerId: config.provider,
@@ -275,8 +296,11 @@ export class AgentsService {
       throw new NotFoundException('LLM config not found');
     }
 
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
     if (dto.apiKey) {
-      config.apiKey = encrypt(dto.apiKey);
+      config.apiKey = dek
+        ? encryptWithDEK(dto.apiKey, dek)
+        : encrypt(dto.apiKey);
     }
     if (dto.provider !== undefined) config.provider = dto.provider;
     if (dto.model !== undefined) config.model = dto.model;
@@ -284,7 +308,7 @@ export class AgentsService {
     if (dto.isPreferred !== undefined) config.isPreferred = dto.isPreferred;
 
     const saved = await this.llmConfigRepository.save(config);
-    return this.toLLMConfigResponse(saved);
+    return this.toLLMConfigResponse(saved, dek);
   }
 
   async deleteLLMConfig(id: string, workspaceId: string): Promise<void> {
@@ -319,7 +343,8 @@ export class AgentsService {
 
     config.isPreferred = true;
     const saved = await this.llmConfigRepository.save(config);
-    return this.toLLMConfigResponse(saved);
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    return this.toLLMConfigResponse(saved, dek);
   }
 
   async getPreferredLLMConfig(
@@ -359,7 +384,10 @@ export class AgentsService {
       return [];
     }
 
-    const apiKey = decrypt(config.apiKey);
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    const apiKey = dek
+      ? decryptWithDEK(config.apiKey, dek)
+      : decrypt(config.apiKey);
     const models = await provider.fetchModels(apiKey, config.apiUrl);
 
     // Cache the result for 1 hour (3600 seconds)

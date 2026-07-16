@@ -5,6 +5,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -24,6 +25,7 @@ describe('AssetsService', () => {
   let mockWorkspacesService: Partial<WorkspacesService>;
   let mockGeoIpService: Partial<GeoIpService>;
   let mockLlmConfigRepository: Partial<Repository<AgentLLMConfig>>;
+  let mockWorkspaceEncryptionService: Partial<WorkspaceEncryptionService>;
   let mockDataSource: Partial<DataSource>;
 
   beforeEach(async () => {
@@ -75,6 +77,8 @@ describe('AssetsService', () => {
     mockGeoIpService = {
       lookup: jest.fn(),
     } as any;
+
+    mockWorkspaceEncryptionService = {};
 
     mockLlmConfigRepository = {
       findOne: jest.fn(),
@@ -132,6 +136,10 @@ describe('AssetsService', () => {
         {
           provide: GeoIpService,
           useValue: mockGeoIpService,
+        },
+        {
+          provide: WorkspaceEncryptionService,
+          useValue: mockWorkspaceEncryptionService,
         },
         {
           provide: DataSource,

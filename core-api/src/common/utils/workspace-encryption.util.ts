@@ -4,6 +4,7 @@ import {
   randomBytes,
 } from 'crypto';
 import {
+  decrypt,
   getActiveEncryptionKey,
   parseEncryptionKeys,
 } from './encryption.util';
@@ -56,7 +57,7 @@ export function unwrapDEK(wrappedDEK: string): Buffer {
         `Invalid key index in wrapped DEK: ${keyIndex} (have ${allKeys.length} keys)`,
       );
     }
-    keys = [allKeys[keyIndex]];
+    keys = allKeys; // try all keys for backward compat
     ivHex = parts[1];
     encryptedHex = parts.slice(2).join(':');
   } else {
@@ -122,6 +123,5 @@ export function decryptWithDEK(encryptedText: string, dek: Buffer | null): strin
   }
 
   // Layer 2: KEK — leverage shared decrypt() which handles both formats
-  const { decrypt } = require('./encryption.util');
   return decrypt(encryptedText);
 }

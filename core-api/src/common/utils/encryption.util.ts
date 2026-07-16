@@ -78,7 +78,7 @@ export function decrypt(encryptedText: string): string {
     if (keyIndex < 0 || keyIndex >= allKeys.length) {
       throw new Error(`Invalid key index: ${keyIndex}`);
     }
-    keys = [allKeys[keyIndex]]; // O(1) — single key
+    keys = allKeys; // O(1) on match, O(n) fallback — try all keys for backward compat
   } else {
     // Old format: no prefix, try all keys
     ivHex = parts[0];
