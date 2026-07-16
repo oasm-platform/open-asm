@@ -1,9 +1,6 @@
-import {
-  WorkspaceId,
-  UserId,
-} from '@/common/decorators/app.decorator';
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -18,19 +15,27 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
+import { Public } from '@/common/decorators/app.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { GetIntegrationDto } from './dto/get-integration.dto';
 import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import { SchemasResponseDto } from './dto/schemas-response.dto';
+import { TelegramConnectDto } from './dto/telegram-connect.dto';
 import { TestIntegrationDto } from './dto/test-integration.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { IntegrationsService } from './integrations.service';
+import { TelegramConnectService } from './telegram-connect.service';
+import { TelegramWebhookService } from './telegram-webhook.service';
 
 @ApiTags('Integrations')
 @Controller('integrations')
 export class IntegrationsController {
-  constructor(private readonly integrationsService: IntegrationsService) {}
+  constructor(
+    private readonly integrationsService: IntegrationsService,
+    private readonly telegramConnectService: TelegramConnectService,
+    private readonly telegramWebhookService: TelegramWebhookService,
+  ) {}
 
   @Doc({
     summary: 'Get all integration schemas',
@@ -167,5 +172,93 @@ export class IntegrationsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.integrationsService.testIntegration(id, workspaceId, dto);
+  }
+
+  // ─── Telegram-specific endpoints ───────────────────────────────
+
+  @Doc({
+    summary: 'Create a Telegram pairing token',
+    description:
+      'Generates a unique 48-char connect token for the given Telegram integration. The user sends this token to the bot via /start <token> to pair their Telegram chat.',
+    response: {
+      serialization: TelegramConnectDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post(':id/telegram/pairing')
+  createTelegramPairing(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+    @Query('force') forceParam?: string,
+  ) {
+    const force = forceParam === 'true';
+    return this.telegramConnectService.createPairing(
+      id,
+      workspaceId,
+      userId,
+      force,
+    );
+  }
+
+  @Doc({
+    summary: 'Telegram bot webhook',
+    description:
+      'Receives incoming updates from Telegram via webhook. Each integration has a unique webhook URL including the integration ID. Parses /start <token> messages to pair chats.',
+  })
+  @Public()
+  @HttpCode(200)
+  @Post('telegram/webhook/:integrationId')
+  async telegramWebhook(
+    @Param('integrationId') integrationId: string,
+    @Body() update: unknown,
+  ) {
+    await this.telegramWebhookService.processUpdate(
+      update as Parameters<TelegramWebhookService['processUpdate']>[0],
+    );
+    return { ok: true };
+  }
+
+  @Doc({
+    summary: 'List Telegram connects for an integration',
+    description:
+      'Returns all Telegram chat connections (paired users) for the given integration.',
+    response: {
+      serialization: TelegramConnectDto,
+      isArray: true,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get(':id/telegram/connects')
+  getTelegramConnects(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ) {
+    return this.telegramConnectService.getConnects(id, workspaceId, userId);
+  }
+
+  @Doc({
+    summary: 'Disconnect a Telegram connect',
+    description: 'Disconnects a specific Telegram chat from the integration.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete(':id/telegram/connects/:connectId')
+  disconnectTelegramConnect(
+    @Param('id') id: string,
+    @Param('connectId') connectId: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ) {
+    return this.telegramConnectService.disconnect(connectId, id, workspaceId, userId);
   }
 }

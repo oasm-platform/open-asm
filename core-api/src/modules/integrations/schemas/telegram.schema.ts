@@ -16,7 +16,7 @@ export const telegramSchema = {
   connector: TelegramConnector,
   type: 'object',
   title: 'Telegram',
-  isAvailable: false,
+  isAvailable: true,
   description: 'Sends alerts to a Telegram chat via a bot.',
   properties: {
     app_type: { const: 'telegram', title: 'App Type' },
@@ -29,23 +29,9 @@ export const telegramSchema = {
       'ui:widget': 'password',
       'ui:placeholder': '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz-1234',
     },
-    chats: {
-      type: 'array',
-      title: 'Chat Destinations',
-      description:
-        'List of Telegram chat IDs. Optionally append |topicId for forum topics (e.g., -1001234567890 or -1001234567890|18951).',
-      items: {
-        type: 'string',
-        title: 'Chat ID',
-        description:
-          'Telegram chat, group, or channel ID — optionally with |topicId for forum supergroups',
-        'ui:placeholder': '-1001234567890 or -1001234567890|18951',
-      },
-      minItems: 1,
-    },
     ...notificationTypeProperties,
     ...severityProperties,
   },
-  required: ['app_type', 'category', 'botToken', 'chats'],
+  required: ['app_type', 'category', 'botToken'],
   additionalProperties: false,
 } as const;

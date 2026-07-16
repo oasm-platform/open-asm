@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
+import { TelegramConnect } from './telegram-connect.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import {
@@ -9,6 +10,7 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   Relation,
 } from 'typeorm';
 
@@ -65,4 +67,10 @@ export class Integration extends BaseEntity {
 
   @Column('uuid', { nullable: true })
   createdById: string;
+
+  @OneToMany(
+    () => TelegramConnect,
+    (telegramConnect) => telegramConnect.integration,
+  )
+  telegramConnects: Relation<TelegramConnect[]>;
 }

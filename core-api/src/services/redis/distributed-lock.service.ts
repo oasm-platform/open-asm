@@ -117,7 +117,6 @@ export class RedisLockService {
     const lockValue = await this.acquireLock(key, ttl);
 
     if (!lockValue) {
-      this.logger.warn(`Failed to acquire lock for key: ${key}`);
       return null;
     }
 
