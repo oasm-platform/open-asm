@@ -109,15 +109,14 @@ export class NotificationsConsumer extends WorkerHost {
 
       // Only push to integrations with this notification type enabled.
       const dek = await this.workspaceEncryption.getDEK(workspaceId);
-      const enabledIntegrations = integrations
-        .map((integration) => ({
-          integration,
-          config: decryptSensitiveConfigFields(integration.config, dek),
-        }))
-        .filter(({ config }) => config[type] !== false);
 
       const results = await Promise.allSettled(
-        enabledIntegrations.map(async ({ integration, config }) => {
+        integrations.map(async (integration) => {
+          const config = decryptSensitiveConfigFields(integration.config, dek);
+
+          // Skip integrations with this notification type disabled.
+          if (config[type] === false) return;
+
           const pushConfig: Record<string, unknown> = {
             ...config,
             text: message,
