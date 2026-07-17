@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  InternalServerErrorException,
   Logger,
   NotFoundException,
   OnModuleInit,
@@ -16,9 +15,9 @@ import { TelegramConnector } from './connectors/telegram.connector';
 import { Integration } from './entities/integration.entity';
 import { TelegramConnect } from './entities/telegram-connect.entity';
 import { IntegrationsService } from './integrations.service';
+import { TelegramBotService } from './telegram-bot.service';
 import type { TelegramConnectDto } from './dto/telegram-connect.dto';
 
-const TELEGRAM_API_BASE = 'https://api.telegram.org';
 const CONNECT_TOKEN_LENGTH = 48;
 const TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -35,6 +34,7 @@ export class TelegramConnectService implements OnModuleInit {
     private readonly userRepo: Repository<User>,
     private readonly integrationsService: IntegrationsService,
     private readonly workspacesService: WorkspacesService,
+    private readonly telegramBotService: TelegramBotService,
   ) {}
 
   /**
@@ -122,20 +122,8 @@ export class TelegramConnectService implements OnModuleInit {
    * Throws if the bot token is invalid or the API call fails.
    */
   private async fetchBotUsername(botToken: string): Promise<string> {
-    const url = `${TELEGRAM_API_BASE}/bot${botToken}/getMe`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-    if (!response.ok) {
-      throw new InternalServerErrorException(
-        `Telegram bot token is invalid or the bot does not exist (HTTP ${response.status})`,
-      );
-    }
-    const data = (await response.json()) as { ok: boolean; result?: { username?: string } };
-    if (!data.ok || !data.result?.username) {
-      throw new InternalServerErrorException(
-        'Telegram API returned an unexpected response for getMe',
-      );
-    }
-    return data.result.username;
+    const { username } = await this.telegramBotService.getMe(botToken);
+    return username;
   }
 
   /**
@@ -171,7 +159,7 @@ export class TelegramConnectService implements OnModuleInit {
     if (!connect) {
       // Try to notify the user even without a valid connect record
       if (botToken) {
-        await this.sendTelegramMessage(
+        await this.telegramBotService.sendMessage(
           botToken,
           chatInfo.chatId,
           '❌ <b>Connection Failed</b>\n\nThe pairing token is invalid or has expired. Please generate a new pairing code in OpenASM and try again.',
@@ -195,7 +183,7 @@ export class TelegramConnectService implements OnModuleInit {
       await this.connectRepo.delete(connect.id);
 
       if (botToken) {
-        await this.sendTelegramMessage(
+        await this.telegramBotService.sendMessage(
           botToken,
           chatInfo.chatId,
           '🔁 <b>Already Connected</b>\n\nThis Telegram account is already linked to your workspace. You are already receiving notifications here.\n\nIf you want to reconnect, please disconnect first from the OpenASM dashboard.',
@@ -208,7 +196,7 @@ export class TelegramConnectService implements OnModuleInit {
 
     if (connect.tokenExpiredAt && connect.tokenExpiredAt < new Date()) {
       if (botToken) {
-        await this.sendTelegramMessage(
+        await this.telegramBotService.sendMessage(
           botToken,
           chatInfo.chatId,
           '❌ <b>Connection Failed</b>\n\nThis pairing token has expired. Please generate a new pairing code in OpenASM and try again.',
@@ -260,7 +248,7 @@ export class TelegramConnectService implements OnModuleInit {
       const escapedWs = this.escapeHtml(workspaceName);
       const escapedName = this.escapeHtml(displayName);
       const escapedUser = this.escapeHtml(appUserName);
-      await this.sendTelegramMessage(
+      await this.telegramBotService.sendMessage(
         botToken,
         chatInfo.chatId,
         `🎉 <b>Connected to ${escapedWs}!</b>
@@ -342,7 +330,7 @@ You'll now receive security alerts and notifications here. Stay safe! 🔒`,
       }
       if (botToken) {
         const escapedWs = this.escapeHtml(workspaceName);
-        await this.sendTelegramMessage(
+        await this.telegramBotService.sendMessage(
           botToken,
           connect.telegramChatId,
           `🔌 <b>Disconnected from ${escapedWs}</b>\n\nThis chat has been disconnected from <b>${escapedWs}</b>. You will no longer receive security alerts here.\n\nIf you'd like to reconnect, generate a new pairing code in OpenASM.`,
@@ -370,36 +358,24 @@ You'll now receive security alerts and notifications here. Stay safe! 🔒`,
   }
 
   /**
-   * Sends an HTML-formatted message to a Telegram chat via the Bot API.
+   * Disconnects a Telegram chat by chat ID and integration ID.
+   * Returns true if a connection was found and deleted, false otherwise.
    */
-  private async sendTelegramMessage(
-    botToken: string,
+  async disconnectByChatId(
     chatId: string,
-    text: string,
-  ): Promise<void> {
-    const url = `${TELEGRAM_API_BASE}/bot${botToken}/sendMessage`;
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10_000),
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-        }),
-      });
-      if (!response.ok) {
-        this.logger.warn(
-          `Failed to send Telegram message to ${chatId}: HTTP ${response.status}`,
-        );
-      }
-    } catch (err) {
-      this.logger.warn(
-        `Failed to send Telegram message to ${chatId}: ${(err as Error).message}`,
-      );
-    }
+    integrationId: string,
+  ): Promise<boolean> {
+    const connect = await this.connectRepo.findOne({
+      where: {
+        telegramChatId: chatId,
+        integrationId,
+        status: TelegramConnectStatus.CONNECTED,
+        isActive: true,
+      },
+    });
+    if (!connect) return false;
+    await this.connectRepo.delete(connect.id);
+    return true;
   }
 
   /**
