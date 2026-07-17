@@ -139,7 +139,7 @@ export class TelegramPollingService implements OnApplicationBootstrap {
         if (signal?.aborted) return;
 
         try {
-          await this.telegramWebhookService.processUpdate(update);
+          await this.telegramWebhookService.processUpdate(update, { botToken, integrationId: integration.id });
         } catch (err) {
           this.logger.error('Error processing polling update', err);
         }

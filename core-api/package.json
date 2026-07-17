@@ -71,6 +71,7 @@
     "mustache": "^4.2.0",
     "nanoid": "^3.3.8",
     "nestjs-i18n": "^10.6.0",
+    "node-telegram-bot-api": "^1.2.0",
     "pg": "^8.16.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
