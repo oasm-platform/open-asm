@@ -23,11 +23,11 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
-  PlugZap,
+  Plus,
   Star,
   Unplug,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -38,6 +38,7 @@ import {
   CommandItem,
   CommandList,
 } from './ui/command';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import Image from './ui/image';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
@@ -66,10 +67,11 @@ function getConnectSchema(
 
 type ConnectFormData = z.infer<ReturnType<typeof getConnectSchema>>;
 
-// Key used as React key and expand state: configId for existing, providerId for unconnected
 function rowKey(item: LLMConfigWithProviderDto): string {
   return item.configId ?? item.providerId;
 }
+
+// ─── Model select form ─────────────────────────────────────────────────────
 
 function ModelSelectForm({
   provider,
@@ -182,6 +184,8 @@ function ModelSelectForm({
   );
 }
 
+// ─── Connect form ──────────────────────────────────────────────────────────
+
 function ConnectForm({
   provider,
   onSubmit,
@@ -210,7 +214,11 @@ function ConnectForm({
     formState: { errors },
   } = useForm<ConnectFormData>({
     resolver: zodResolver(schema),
-    defaultValues: { name: '', apiUrl: '', apiKey: '' },
+    defaultValues: {
+      name: provider.providerName ?? '',
+      apiUrl: '',
+      apiKey: '',
+    },
   });
 
   const isApiKeyOptional = isCustomProvider || provider.isAcceptCustomApiUrl;
@@ -224,6 +232,8 @@ function ConnectForm({
         {...register('name')}
         placeholder="Label (optional, e.g. My Work Key)"
         autoComplete="off"
+        autoFocus
+        onFocus={(e) => e.target.select()}
       />
 
       {provider.isAcceptCustomApiUrl && (
@@ -258,97 +268,195 @@ function ConnectForm({
   );
 }
 
+// ─── All providers constant ────────────────────────────────────────────────
+
 const ALL_PROVIDERS = Object.values(
   LLMConfigWithProviderDtoProviderId,
 ) as string[];
 
-function AddConfigPanel({
+// ─── Dialog LLM Connect ─────────────────────────────────────────────────────
+
+function DialogLLMConnect({
   providersList,
   onSubmit,
-  onCancel,
-  isSubmitting,
 }: {
   providersList: LLMConfigWithProviderDto[];
-  onSubmit: (data: ConnectFormData, providerId: string) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
+  onSubmit: (data: ConnectFormData, providerId: string) => Promise<void>;
 }) {
-  const [selectedProviderId, setSelectedProviderId] = useState<string>(
-    ALL_PROVIDERS[0] ?? '',
+  const [dialogProvider, setDialogProvider] =
+    useState<LLMConfigWithProviderDto | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleDialogClose = useCallback(() => setDialogProvider(null), []);
+
+  const handleProviderClick = useCallback(
+    (pid: string) => {
+      const entry = providersList.find(
+        (p) => p.providerId === pid && !p.isConnected,
+      ) ??
+        providersList.find((p) => p.providerId === pid) ?? {
+          providerId: pid as LLMConfigWithProviderDto['providerId'],
+          providerName: pid,
+          isConnected: false,
+          isAcceptCustomApiUrl: false,
+        };
+      setDialogProvider(entry);
+    },
+    [providersList],
   );
 
-  // Find the provider entry (connected or unconnected) to get metadata
-  const providerEntry = useMemo(
-    () =>
-      providersList.find(
-        (p) => p.providerId === selectedProviderId && !p.isConnected,
-      ) ??
-      providersList.find((p) => p.providerId === selectedProviderId) ?? {
-        providerId:
-          selectedProviderId as LLMConfigWithProviderDto['providerId'],
-        providerName: selectedProviderId,
-        isConnected: false,
-        isAcceptCustomApiUrl: false,
-      },
-    [providersList, selectedProviderId],
+  const handleConnectSubmit = useCallback(
+    async (data: ConnectFormData, providerId: string) => {
+      setIsSubmitting(true);
+      try {
+        await onSubmit(data, providerId);
+        handleDialogClose();
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [onSubmit, handleDialogClose],
   );
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <div className="p-3 border-b bg-muted/30">
-        <p className="text-sm font-medium mb-2">Connect provider</p>
-        <div className="flex flex-wrap gap-1.5">
-          {ALL_PROVIDERS.map((pid) => {
-            const meta = providersList.find((p) => p.providerId === pid);
-            return (
-              <button
-                key={pid}
-                type="button"
-                onClick={() => setSelectedProviderId(pid)}
-                className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors',
-                  selectedProviderId === pid
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border hover:bg-accent',
-                )}
-              >
+    <>
+      <div className="flex flex-col gap-1 w-full">
+        {ALL_PROVIDERS.map((pid) => {
+          const meta = providersList.find((p) => p.providerId === pid);
+          return (
+            <div
+              key={pid}
+              className="flex items-center justify-between px-3 py-2 transition-colors"
+            >
+              <div className="flex items-center gap-2">
                 {meta?.logo && (
-                  <span className="inline-flex size-3.5 items-center justify-center rounded bg-white/10">
-                    <Image width={12} height={12} url={meta.logo} />
-                  </span>
+                  <div className="flex items-center justify-center w-9 h-9 rounded-md bg-white shrink-0">
+                    <Image width={24} height={24} url={meta.logo} />
+                  </div>
                 )}
-                {meta?.providerName ?? pid}
-              </button>
-            );
-          })}
-        </div>
+                <span className="text-sm">{meta?.providerName ?? pid}</span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => handleProviderClick(pid)}
+                className="gap-1"
+              >
+                <Plus size={14} />
+                Connect
+              </Button>
+            </div>
+          );
+        })}
       </div>
-      <div className="p-3">
-        <ConnectForm
-          provider={providerEntry}
-          onSubmit={onSubmit}
-          onCancel={onCancel}
-          isSubmitting={isSubmitting}
-        />
-      </div>
-    </div>
+
+      <Dialog open={!!dialogProvider} onOpenChange={handleDialogClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect {dialogProvider?.providerName}</DialogTitle>
+          </DialogHeader>
+          {dialogProvider && (
+            <ConnectForm
+              key={dialogProvider.providerId}
+              provider={dialogProvider}
+              onSubmit={handleConnectSubmit}
+              onCancel={handleDialogClose}
+              isSubmitting={isSubmitting}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-// ─── Main component ─────────────────────────────────────────────────────────
+// ─── Connected config row ──────────────────────────────────────────────────
+
+const ConnectedConfigRow = memo(function ConnectedConfigRow({
+  item,
+  isExpanded,
+  onToggle,
+  onModelChange,
+  onDelete,
+  onSetPreferred,
+  isUpdating,
+}: {
+  item: LLMConfigWithProviderDto;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onModelChange: (configId: string, modelId: string) => Promise<void>;
+  onDelete: (configId: string) => void;
+  onSetPreferred: (configId: string) => void;
+  isUpdating: boolean;
+}) {
+  return (
+    <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="flex items-center justify-between p-3">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center w-9 h-9 rounded-md bg-white shrink-0">
+            <Image width={24} height={24} url={item.logo} />
+          </div>
+          <div className="flex flex-col justify-start items-start">
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium text-foreground">
+                {item.providerName}
+              </span>
+              {item.isPreferred && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 font-medium leading-none">
+                  default
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {item.name ? `${item.name} · ` : ''}
+              {item.model ?? ''}
+            </span>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onToggle}
+          className="gap-1 border border-green-600 text-green-600 hover:bg-green-50"
+        >
+          <Check size={16} />
+          Connected
+          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </Button>
+      </div>
+
+      {isExpanded && (
+        <div className="border-t p-4 flex flex-col gap-3 bg-muted/30">
+          <ModelSelectForm
+            provider={item}
+            onModelChange={onModelChange}
+            onDelete={onDelete}
+            onSetPreferred={onSetPreferred}
+            isUpdating={isUpdating}
+          />
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ─── Main component ────────────────────────────────────────────────────────
 
 export default function LlmConnect() {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [showAddPanel, setShowAddPanel] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
   const { data: providers, isLoading } =
     useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
 
-  const providersList = providers ?? [];
-  const connectedConfigs = providersList.filter((p) => p.isConnected);
+  const providersList = useMemo(() => providers ?? [], [providers]);
+  const connectedConfigs = useMemo(
+    () => providersList.filter((p) => p.isConnected),
+    [providersList],
+  );
 
   const createLLMConfig = useAgentsControllerCreateLLMConfig();
   const updateLLMConfig = useAgentsControllerUpdateLLMConfig();
@@ -363,78 +471,86 @@ export default function LlmConnect() {
     [queryClient],
   );
 
-  const handleSetPreferred = async (configId: string) => {
-    setIsSubmitting(true);
-    try {
-      await setPreferredLLMConfig.mutateAsync({ id: configId });
-      invalidate();
-      toast.success('Default model updated');
-    } catch {
-      toast.error('Failed to set default model');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const handleSetPreferred = useCallback(
+    async (configId: string) => {
+      setUpdatingId(configId);
+      try {
+        await setPreferredLLMConfig.mutateAsync({ id: configId });
+        invalidate();
+        toast.success('Default model updated');
+      } catch {
+        toast.error('Failed to set default model');
+      } finally {
+        setUpdatingId(null);
+      }
+    },
+    [setPreferredLLMConfig, invalidate],
+  );
 
-  const handleModelChange = async (configId: string, modelId: string) => {
-    setIsSubmitting(true);
-    try {
-      await updateLLMConfig.mutateAsync({
-        id: configId,
-        data: { model: modelId },
-      });
-      invalidate();
-      toast.success('Model updated');
-    } catch {
-      toast.error('Failed to update model');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const handleModelChange = useCallback(
+    async (configId: string, modelId: string) => {
+      setUpdatingId(configId);
+      try {
+        await updateLLMConfig.mutateAsync({
+          id: configId,
+          data: { model: modelId },
+        });
+        invalidate();
+        toast.success('Model updated');
+      } catch {
+        toast.error('Failed to update model');
+      } finally {
+        setUpdatingId(null);
+      }
+    },
+    [updateLLMConfig, invalidate],
+  );
 
-  const handleConnect = async (data: ConnectFormData, providerId: string) => {
-    const hasApiKey = data.apiKey?.trim();
-    const hasApiUrl = data.apiUrl?.trim();
-    if (!hasApiUrl && !hasApiKey) return;
+  const handleConnect = useCallback(
+    async (data: ConnectFormData, providerId: string) => {
+      const apiKey = data.apiKey?.trim() || '';
+      const apiUrl = data.apiUrl?.trim() || '';
+      if (!apiUrl && !apiKey) return;
 
-    setIsSubmitting(true);
-    try {
-      await createLLMConfig.mutateAsync({
-        data: {
-          provider: providerId as CreateLLMConfigDtoProvider,
-          name: data.name?.trim() || undefined,
-          apiKey: hasApiKey || '',
-          apiUrl: hasApiUrl || undefined,
-        },
-      });
-      invalidate();
-      setShowAddPanel(false);
-      toast.success('Provider connected successfully');
-    } catch (err) {
-      const axiosError = err as AxiosError<{ message: string | string[] }>;
-      const raw = axiosError.response?.data?.message;
-      const message = Array.isArray(raw)
-        ? raw.join(', ')
-        : (raw ?? 'Failed to connect provider');
-      toast.error(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+      try {
+        await createLLMConfig.mutateAsync({
+          data: {
+            provider: providerId as CreateLLMConfigDtoProvider,
+            name: data.name?.trim() || undefined,
+            apiKey,
+            apiUrl: apiUrl || undefined,
+          },
+        });
+        invalidate();
+        toast.success('Provider connected successfully');
+      } catch (err) {
+        const axiosError = err as AxiosError<{ message: string | string[] }>;
+        const raw = axiosError.response?.data?.message;
+        const message = Array.isArray(raw)
+          ? raw.join(', ')
+          : (raw ?? 'Failed to connect provider');
+        toast.error(message);
+      }
+    },
+    [createLLMConfig, invalidate],
+  );
 
-  const handleDelete = async (configId: string) => {
-    await deleteLLMConfig.mutateAsync(
-      { id: configId },
-      {
-        onSuccess: () => {
-          toast.success('Disconnected successfully');
-          invalidate();
-          setExpandedKey(null);
-        },
-        onError: () => toast.error('Failed to disconnect'),
-      },
-    );
-  };
+  const handleDelete = useCallback(
+    async (configId: string) => {
+      setUpdatingId(configId);
+      try {
+        await deleteLLMConfig.mutateAsync({ id: configId });
+        toast.success('Disconnected successfully');
+        invalidate();
+        setExpandedKey(null);
+      } catch {
+        toast.error('Failed to disconnect');
+      } finally {
+        setUpdatingId(null);
+      }
+    },
+    [deleteLLMConfig, invalidate],
+  );
 
   if (isLoading) {
     return (
@@ -446,87 +562,26 @@ export default function LlmConnect() {
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Connected configs */}
       {connectedConfigs.map((item) => {
         const key = rowKey(item);
-        const isExpanded = expandedKey === key;
-
         return (
-          <div key={key} className="rounded-lg border bg-card overflow-hidden">
-            <div className="flex items-center justify-between p-3">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center justify-center w-9 h-9 rounded-md bg-white shrink-0">
-                  <Image width={24} height={24} url={item.logo} />
-                </div>
-                <div className="flex flex-col justify-start items-start">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-medium text-foreground">
-                      {item.providerName}
-                    </span>
-                    {item.isPreferred && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 font-medium leading-none">
-                        default
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {item.name ? `${item.name} · ` : ''}
-                    {item.model ?? ''}
-                  </span>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setExpandedKey(isExpanded ? null : key)}
-                className="gap-1 border border-green-600 text-green-600 hover:bg-green-50"
-              >
-                <Check size={16} />
-                Connected
-                {isExpanded ? (
-                  <ChevronUp size={16} />
-                ) : (
-                  <ChevronDown size={16} />
-                )}
-              </Button>
-            </div>
-
-            {isExpanded && (
-              <div className="border-t p-4 flex flex-col gap-3 bg-muted/30">
-                <ModelSelectForm
-                  provider={item}
-                  onModelChange={handleModelChange}
-                  onDelete={handleDelete}
-                  onSetPreferred={handleSetPreferred}
-                  isUpdating={isSubmitting}
-                />
-              </div>
-            )}
-          </div>
+          <ConnectedConfigRow
+            key={key}
+            item={item}
+            isExpanded={expandedKey === key}
+            onToggle={() => setExpandedKey(expandedKey === key ? null : key)}
+            onModelChange={handleModelChange}
+            onDelete={handleDelete}
+            onSetPreferred={handleSetPreferred}
+            isUpdating={updatingId === key}
+          />
         );
       })}
 
-      <div className="flex justify-center items-center w-full">
-        {/* Add new config panel */}
-        {showAddPanel ? (
-          <AddConfigPanel
-            providersList={providersList}
-            onSubmit={handleConnect}
-            onCancel={() => setShowAddPanel(false)}
-            isSubmitting={isSubmitting}
-          />
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAddPanel(true)}
-            className="gap-2 self-start"
-          >
-            <PlugZap size={16} />
-            Connect provider
-          </Button>
-        )}
-      </div>
+      <DialogLLMConnect
+        providersList={providersList}
+        onSubmit={handleConnect}
+      />
     </div>
   );
 }

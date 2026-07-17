@@ -1,6 +1,6 @@
 import { useTheme } from '@/components/ui/theme-provider';
 import type { GeoIp } from '@/services/apis/gen/queries';
-import 'leaflet/dist/leaflet.css';
+// import 'leaflet/dist/leaflet.css';
 import { MapPin } from 'lucide-react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 

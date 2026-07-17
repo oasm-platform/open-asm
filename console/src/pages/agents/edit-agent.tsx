@@ -8,7 +8,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import { AgentForm, type AgentFormData } from './agent-form';
+import { AgentForm, type AgentFormData } from './components/agent-form';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 export default function EditAgentPage() {

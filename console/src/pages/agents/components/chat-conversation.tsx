@@ -1,6 +1,6 @@
 import AgentPromptInput from '@/components/agent-prompt-input';
-import type { AgentTodoItem } from '@/components/agents/agent-todo-panel';
-import { AgentTodoPanel } from '@/components/agents/agent-todo-panel';
+import type { AgentTodoItem } from './agent-todo-panel';
+import { AgentTodoPanel } from './agent-todo-panel';
 import {
   Conversation,
   ConversationContent,

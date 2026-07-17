@@ -17,7 +17,7 @@ import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { v7 as uuidv7 } from 'uuid';
-// import AgentIcon from './agent-icon';
+// import AgentIcon from './components/agent-icon';
 
 const CONVERSATION_STARTERS = [
   'How can I help secure your application today?',

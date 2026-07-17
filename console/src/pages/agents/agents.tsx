@@ -1,11 +1,11 @@
-import { AgentTodoPanel } from '@/components/agents/agent-todo-panel';
+import { AgentTodoPanel } from './components/agent-todo-panel';
 import { useAgentChat } from '@/hooks/use-agent-chat';
 import { useParams } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useCallback, useEffect, useState } from 'react';
-import { ChatConversation } from './chat-conversation';
-import { ToolCallHistoryPanel } from './tool-call-history-panel';
+import { ChatConversation } from './components/chat-conversation';
+import { ToolCallHistoryPanel } from './components/tool-call-history-panel';
 
 dayjs.extend(relativeTime);
 

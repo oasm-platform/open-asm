@@ -1,7 +1,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
-import type { AgentTodoItem } from '@/components/agents/agent-todo-panel';
+import type { AgentTodoItem } from '@/pages/agents/components/agent-todo-panel';
 import {
   useAgentsControllerGetLLMConfigs,
   useAgentsControllerGetMessagesInfinite,

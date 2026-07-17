@@ -2,7 +2,7 @@ import Page from '@/components/common/page';
 import { useAgentsControllerCreateLLMConfig } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import { AgentForm, type AgentFormData } from './agent-form';
+import { AgentForm, type AgentFormData } from './components/agent-form';
 
 export default function CreateAgentPage() {
   const { mutate, isPending } = useAgentsControllerCreateLLMConfig();
