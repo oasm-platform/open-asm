@@ -3,31 +3,12 @@ import { useAgentChat } from '@/hooks/use-agent-chat';
 import { useParams } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ChatConversation } from './components/chat-conversation';
 import { ToolCallHistoryPanel } from './components/tool-call-history-panel';
+import { useMediaQuery } from './components/use-media-query';
 
 dayjs.extend(relativeTime);
-
-// ---------------------------------------------------------------------------
-// useMediaQuery — responsive breakpoint detection
-// ---------------------------------------------------------------------------
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia(query).matches;
-  });
-
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, [query]);
-
-  return matches;
-}
 
 // ---------------------------------------------------------------------------
 // AgentsChatPage

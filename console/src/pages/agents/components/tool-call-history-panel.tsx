@@ -8,6 +8,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef } from 'react';
+import { getToolStatus } from './chat-helpers';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,19 +25,6 @@ interface ToolCallEntry {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function getToolStatus(state?: string): ToolCallEntry['status'] {
-  if (!state) return 'pending';
-  if (state === 'output-available' || state === 'result') return 'completed';
-  if (state === 'output-error') return 'error';
-  if (
-    state === 'call' ||
-    state === 'input-available' ||
-    state === 'input-streaming'
-  )
-    return 'executing';
-  return 'pending';
-}
 
 function extractToolCalls(messages: UIMessage[]): ToolCallEntry[] {
   const entries: ToolCallEntry[] = [];
