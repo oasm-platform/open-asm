@@ -327,7 +327,7 @@ export class JobsRegistryController {
   @GrpcMethod('JobsRegistryService', 'Next')
   async next(worker: {
     id: string;
-  }): Promise<{ id: string; asset: Asset; command?: string }> {
+  }): Promise<{ id: string; asset: Asset; command?: string; category?: string }> {
     const job = await this.jobsRegistryService.getNextJob(worker.id);
 
     if (!job) {
@@ -338,6 +338,7 @@ export class JobsRegistryController {
       id: job.id,
       asset: job.asset,
       command: job.command,
+      category: job.category,
     };
   }
 

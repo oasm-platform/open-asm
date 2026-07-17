@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
-	"github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
+	pb "github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
 )
 
 var jobLogGlobal = oasm.NewLogger("Worker.Job")
@@ -36,13 +36,15 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 	}()
 
 	cmdStr := job.GetCommand()
+	category := job.GetCategory()
+
 	if cmdStr == "" {
 		jobLogGlobal.Warning("[%s] Empty command", job.Id)
-		_ = client.JobsScreenshotResult(ctx, job.Id, true, "No command provided by Core")
+		submitCategoryError(ctx, client, job.Id, category, "No command provided by Core")
 		return
 	}
 
-	jobLogGlobal.Info("[%s] Executing: %s", job.Id, cmdStr)
+	jobLogGlobal.Info("[%s] Executing: %s (category: %s)", job.Id, cmdStr, category)
 
 	if after, ok := strings.CutPrefix(cmdStr, "screenshot "); ok {
 		url := strings.TrimSpace(after)
@@ -79,10 +81,6 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 			return
 		}
 	} else {
-		// TODO: The Job proto doesn't include a category field, so we can't route to
-		// category-specific result endpoints (JobsSubdomainsResult, JobsPortsResult, etc.).
-		// Once the proto adds a category field, update this to use the appropriate method.
-		// For now, use the deprecated generic Result endpoint which accepts raw output.
 		var cmd *exec.Cmd
 		if runtime.GOOS == "windows" {
 			cmd = exec.CommandContext(ctx, "cmd", "/C", cmdStr)
@@ -98,16 +96,48 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		}
 
 		outStr := string(output)
-		payload := &jobs_registry.DataPayloadResult{
-			Error: false,
-			Raw:   &outStr,
-		}
+		isError := err != nil
 
-		if err := client.JobsResult(ctx, job.Id, payload); err != nil {
-			jobLogGlobal.ErrorE(fmt.Sprintf("[%s] Failed to submit result", job.Id), err)
+		if submitErr := submitCategoryResult(ctx, client, job.Id, category, isError, outStr); submitErr != nil {
+			jobLogGlobal.ErrorE(fmt.Sprintf("[%s] Failed to submit result", job.Id), submitErr)
 			return
 		}
 	}
 
 	jobLogGlobal.Success("[%s] Completed", job.Id)
+}
+
+// submitCategoryResult submits the command output to the appropriate category-specific endpoint.
+// Falls back to the deprecated generic endpoint for unknown categories.
+func submitCategoryResult(ctx context.Context, client *oasm.Client, jobID, category string, isError bool, raw string) error {
+	switch category {
+	case "subdomains":
+		return client.JobsSubdomainsResult(ctx, jobID, isError, raw, nil)
+	case "http_probe":
+		return client.JobsHttpProbeResult(ctx, jobID, isError, raw, nil)
+	case "ports_scanner":
+		return client.JobsPortsResult(ctx, jobID, isError, raw, nil)
+	case "vulnerabilities":
+		return client.JobsVulnerabilitiesResult(ctx, jobID, isError, raw, nil)
+	case "screenshot":
+		return client.JobsScreenshotResult(ctx, jobID, isError, raw)
+	case "classifier":
+		return client.JobsClassifierResult(ctx, jobID, isError, raw, nil)
+	case "assistant":
+		return client.JobsAssistantResult(ctx, jobID, isError, raw)
+	default:
+		// Unknown category — use the deprecated generic endpoint
+		payload := &pb.DataPayloadResult{
+			Error: isError,
+			Raw:   &raw,
+		}
+		return client.JobsResult(ctx, jobID, payload)
+	}
+}
+
+// submitCategoryError submits an error to the appropriate category-specific endpoint.
+func submitCategoryError(ctx context.Context, client *oasm.Client, jobID, category, errMsg string) {
+	if submitErr := submitCategoryResult(ctx, client, jobID, category, true, errMsg); submitErr != nil {
+		jobLogGlobal.ErrorE(fmt.Sprintf("[%s] Failed to submit error", jobID), submitErr)
+	}
 }
