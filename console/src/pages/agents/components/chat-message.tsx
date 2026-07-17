@@ -9,13 +9,18 @@ import {
   ReasoningTrigger,
 } from '@/components/ai-elements/reasoning';
 import { Markdown } from '@/components/common/markdown';
-import { Markdown } from '@/components/common/markdown';
 import { ToolCallDisplay } from '@/components/common/tool-call-display';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import type { UIMessage } from 'ai';
 import { motion } from 'framer-motion';
 import { memo, useMemo } from 'react';
-import { getTextContent, getToolStatus, CopyButton, ThinkingLabel, TypingDots } from './chat-helpers';
+import {
+  CopyButton,
+  getTextContent,
+  getToolStatus,
+  ThinkingLabel,
+  TypingDots,
+} from './chat-helpers';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -186,7 +191,9 @@ export const ChatMessage = memo(function ChatMessage({
                           | 'executing'
                           | 'completed'
                           | 'error',
-                        input: item.input as Record<string, unknown> | undefined,
+                        input: item.input as
+                          | Record<string, unknown>
+                          | undefined,
                         output: item.output,
                       }}
                       streamEvents={remoteExecuteEvents?.get(item.toolCallId)}

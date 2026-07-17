@@ -1,5 +1,5 @@
 import Page from '@/components/common/page';
-import LlmConnect from '@/components/llm-connect';
+import LlmConnect from '@/pages/agents/components/llm-connect';
 import TypewriterText from '@/components/typewriter-text';
 import AgentPromptInput from '@/components/agent-prompt-input';
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';

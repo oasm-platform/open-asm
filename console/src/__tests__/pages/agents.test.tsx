@@ -21,7 +21,7 @@ vi.mock('@/services/apis/gen/queries', async () => {
   };
 });
 
-vi.mock('@/components/llm-connect', () => ({
+vi.mock('@/pages/agents/components/llm-connect', () => ({
   default: () => <div data-testid="llm-connect">LlmConnect</div>,
 }));
 

@@ -1,4 +1,4 @@
-import LlmConnect from '@/components/llm-connect';
+import LlmConnect from '@/pages/agents/components/llm-connect';
 import { MemoryManager } from '@/components/memory-manager';
 import { SkillsManager } from '@/components/skills-manager';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
