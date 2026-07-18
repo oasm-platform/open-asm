@@ -180,7 +180,9 @@ export class VulnerabilitiesService {
 
     // Filter by tags (using overlap operator with raw SQL)
     if (Array.isArray(tags) && tags.length > 0) {
-      const conditions = tags.map((_, i) => `:tag${i} = ANY(vulnerabilities.tags)`).join(' OR ');
+      const conditions = tags
+        .map((_, i) => `:tag${i} = ANY(vulnerabilities.tags)`)
+        .join(' OR ');
       const params: Record<string, string> = {};
       tags.forEach((tag, i) => {
         params[`tag${i}`] = tag;
@@ -214,7 +216,13 @@ export class VulnerabilitiesService {
       .where('workspaces.id = :workspaceId', { workspaceId })
       .andWhere('vulnerabilities.id = :id', { id });
 
-    const vulnerability = await queryBuilder.getOneOrFail();
+    const vulnerability = await queryBuilder.getOne();
+
+    if (!vulnerability) {
+      throw new NotFoundException(
+        `Vulnerability with id ${id} not found in workspace`,
+      );
+    }
 
     return vulnerability;
   }
@@ -387,24 +395,18 @@ export class VulnerabilitiesService {
     userId: string,
     forceRerun: boolean = false,
   ): Promise<DefaultMessageResponseDto> {
-    const vulnerability = await this.vulnerabilitiesRepository.findOne({
-      where: { id },
-      relations: [
-        'asset',
-        'asset.target',
-      ],
-    });
+    // Lightweight query: only verify workspace, no JOINs to tool/dismissal/user/jobHistory
+    const vulnerability = await this.vulnerabilitiesRepository
+      .createQueryBuilder('v')
+      .leftJoin('v.asset', 'asset')
+      .leftJoin('asset.target', 'target')
+      .leftJoin('target.workspace', 'workspace')
+      .where('v.id = :id', { id })
+      .andWhere('workspace.id = :workspaceId', { workspaceId })
+      .getOne();
 
     if (!vulnerability) {
       throw new NotFoundException(`Vulnerability with id ${id} not found`);
-    }
-
-    const workspace =
-      vulnerability.asset?.target?.workspace;
-    if (!workspace || workspace.id !== workspaceId) {
-      throw new NotFoundException(
-        `Vulnerability with id ${id} not found in workspace`,
-      );
     }
 
     if (!forceRerun) {
@@ -432,43 +434,11 @@ export class VulnerabilitiesService {
     );
     this.logger.log(`Starting analysis for vulnerability ${id}`);
 
-    const vulnerabilityData = {
-      id: vulnerability.id,
-      name: vulnerability.name,
-      description: vulnerability.description,
-      synopsis: vulnerability.synopsis,
-      severity: vulnerability.severity,
-      tags: vulnerability.tags,
-      references: vulnerability.references,
-      authors: vulnerability.authors,
-      affectedUrl: vulnerability.affectedUrl,
-      ipAddress: vulnerability.ipAddress,
-      host: vulnerability.host,
-      ports: vulnerability.ports,
-      cvssMetric: vulnerability.cvssMetric,
-      cvssScore: vulnerability.cvssScore,
-      epssScore: vulnerability.epssScore,
-      vprScore: vulnerability.vprScore,
-      cveId: vulnerability.cveId,
-      bidId: vulnerability.bidId,
-      cweId: vulnerability.cweId,
-      ceaId: vulnerability.ceaId,
-      iava: vulnerability.iava,
-      cveUrl: vulnerability.cveUrl,
-      cweUrl: vulnerability.cweUrl,
-      solution: vulnerability.solution,
-      extractorName: vulnerability.extractorName,
-      extractedResults: vulnerability.extractedResults,
-      publicationDate: vulnerability.publicationDate,
-      modificationDate: vulnerability.modificationDate,
-      filePath: vulnerability.filePath,
-      isArchived: vulnerability.isArchived,
-      fingerprint: vulnerability.fingerprint,
+    await this.vulnerabilityAnalysisQueue.add(id, {
+      ...this.toAnalysisPayload(vulnerability),
       workspaceId,
       userId,
-    };
-
-    await this.vulnerabilityAnalysisQueue.add(id, vulnerabilityData);
+    });
 
     return {
       message: 'Analysis started',
@@ -477,6 +447,7 @@ export class VulnerabilitiesService {
 
   async processVulnerabilityAnalysis(
     jobId: string,
+    workspaceId: string,
   ): Promise<Vulnerability | undefined> {
     const vulnerability = await this.vulnerabilitiesRepository.findOne({
       where: { id: jobId },
@@ -488,50 +459,11 @@ export class VulnerabilitiesService {
     }
 
     try {
-      const vulnerabilityData = {
-        id: vulnerability.id,
-        name: vulnerability.name,
-        description: vulnerability.description,
-        synopsis: vulnerability.synopsis,
-        severity: vulnerability.severity,
-        tags: vulnerability.tags,
-        references: vulnerability.references,
-        authors: vulnerability.authors,
-        affectedUrl: vulnerability.affectedUrl,
-        ipAddress: vulnerability.ipAddress,
-        host: vulnerability.host,
-        ports: vulnerability.ports,
-        cvssMetric: vulnerability.cvssMetric,
-        cvssScore: vulnerability.cvssScore,
-        epssScore: vulnerability.epssScore,
-        vprScore: vulnerability.vprScore,
-        cveId: vulnerability.cveId,
-        bidId: vulnerability.bidId,
-        cweId: vulnerability.cweId,
-        ceaId: vulnerability.ceaId,
-        iava: vulnerability.iava,
-        cveUrl: vulnerability.cveUrl,
-        cweUrl: vulnerability.cweUrl,
-        solution: vulnerability.solution,
-        extractorName: vulnerability.extractorName,
-        extractedResults: vulnerability.extractedResults,
-        publicationDate: vulnerability.publicationDate,
-        modificationDate: vulnerability.modificationDate,
-        filePath: vulnerability.filePath,
-        isArchived: vulnerability.isArchived,
-        fingerprint: vulnerability.fingerprint,
-      };
-
-      const workspace = await this.getWorkspaceForVulnerability(
-        vulnerability.id,
+      const vulnerabilityJson = JSON.stringify(
+        this.toAnalysisPayload(vulnerability),
+        null,
+        2,
       );
-      const workspaceId = workspace?.id;
-
-      if (!workspaceId) {
-        throw new Error('Workspace not found for vulnerability');
-      }
-
-      const vulnerabilityJson = JSON.stringify(vulnerabilityData, null, 2);
       const analyzeResult = await this.agentsCompletionsService.vulAnalyze(
         vulnerabilityJson,
         workspaceId,
@@ -585,24 +517,42 @@ export class VulnerabilitiesService {
     }
   }
 
-  private async getWorkspaceForVulnerability(
-    vulnerabilityId: string,
-  ): Promise<{ id: string } | null> {
-    const vulnerability = await this.vulnerabilitiesRepository.findOne({
-      where: { id: vulnerabilityId },
-      relations: [
-        'asset',
-        'asset.target',
-      ],
-    });
-
-    if (!vulnerability) {
-      return null;
-    }
-
-    return (
-      vulnerability.asset?.target?.workspace ?? null
-    );
+  private toAnalysisPayload(
+    vulnerability: Vulnerability,
+  ): Record<string, unknown> {
+    return {
+      id: vulnerability.id,
+      name: vulnerability.name,
+      description: vulnerability.description,
+      synopsis: vulnerability.synopsis,
+      severity: vulnerability.severity,
+      tags: vulnerability.tags,
+      references: vulnerability.references,
+      authors: vulnerability.authors,
+      affectedUrl: vulnerability.affectedUrl,
+      ipAddress: vulnerability.ipAddress,
+      host: vulnerability.host,
+      ports: vulnerability.ports,
+      cvssMetric: vulnerability.cvssMetric,
+      cvssScore: vulnerability.cvssScore,
+      epssScore: vulnerability.epssScore,
+      vprScore: vulnerability.vprScore,
+      cveId: vulnerability.cveId,
+      bidId: vulnerability.bidId,
+      cweId: vulnerability.cweId,
+      ceaId: vulnerability.ceaId,
+      iava: vulnerability.iava,
+      cveUrl: vulnerability.cveUrl,
+      cweUrl: vulnerability.cweUrl,
+      solution: vulnerability.solution,
+      extractorName: vulnerability.extractorName,
+      extractedResults: vulnerability.extractedResults,
+      publicationDate: vulnerability.publicationDate,
+      modificationDate: vulnerability.modificationDate,
+      filePath: vulnerability.filePath,
+      isArchived: vulnerability.isArchived,
+      fingerprint: vulnerability.fingerprint,
+    };
   }
 
   async deleteVulnerabilityAnalysis(
@@ -611,18 +561,14 @@ export class VulnerabilitiesService {
   ): Promise<DefaultMessageResponseDto> {
     const vulnerability = await this.vulnerabilitiesRepository.findOne({
       where: { id },
-      relations: [
-        'asset',
-        'asset.target',
-      ],
+      relations: ['asset', 'asset.target'],
     });
 
     if (!vulnerability) {
       throw new NotFoundException(`Vulnerability with id ${id} not found`);
     }
 
-    const workspace =
-      vulnerability.asset?.target?.workspace;
+    const workspace = vulnerability.asset?.target?.workspace;
     if (!workspace || workspace.id !== workspaceId) {
       throw new NotFoundException(
         `Vulnerability with id ${id} not found in workspace`,
