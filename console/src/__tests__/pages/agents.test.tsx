@@ -8,15 +8,22 @@ vi.mock('@/hooks/useWorkspaceSelector', () => ({
   })),
 }));
 
+vi.mock('@/hooks/use-llm-configs', () => ({
+  useLLMConfigs: vi.fn(() => ({
+    providers: [],
+    connectedProviders: [],
+    preferredProvider: undefined,
+    hasProviderConnected: false,
+    isLoading: false,
+  })),
+}));
+
 vi.mock('@/services/apis/gen/queries', async () => {
   const actual = await vi.importActual('@/services/apis/gen/queries');
   return {
     ...actual,
     useAgentsControllerGetConversations: vi.fn(() => ({
       data: { data: [] },
-    })),
-    useAgentsControllerGetLLMConfigs: vi.fn(() => ({
-      data: [],
     })),
   };
 });
@@ -50,12 +57,14 @@ describe('Agents Page', () => {
   });
 
   it('renders agents landing page', async () => {
-    const { useAgentsControllerGetLLMConfigs } = await import(
-      '@/services/apis/gen/queries'
-    );
-    vi.mocked(useAgentsControllerGetLLMConfigs).mockReturnValue({
-      data: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
-    } as ReturnType<typeof useAgentsControllerGetLLMConfigs>);
+    const { useLLMConfigs } = await import('@/hooks/use-llm-configs');
+    vi.mocked(useLLMConfigs).mockReturnValue({
+      providers: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      connectedProviders: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      preferredProvider: undefined,
+      hasProviderConnected: true,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useLLMConfigs>);
 
     renderWithProviders(<AgentsLandingPage />, {
       routePath: '/_authed/agents/',
@@ -69,12 +78,14 @@ describe('Agents Page', () => {
   });
 
   it('shows connect provider when no LLM provider connected', async () => {
-    const { useAgentsControllerGetLLMConfigs } = await import(
-      '@/services/apis/gen/queries'
-    );
-    vi.mocked(useAgentsControllerGetLLMConfigs).mockReturnValue({
-      data: [],
-    } as ReturnType<typeof useAgentsControllerGetLLMConfigs>);
+    const { useLLMConfigs } = await import('@/hooks/use-llm-configs');
+    vi.mocked(useLLMConfigs).mockReturnValue({
+      providers: [],
+      connectedProviders: [],
+      preferredProvider: undefined,
+      hasProviderConnected: false,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useLLMConfigs>);
 
     renderWithProviders(<AgentsLandingPage />, {
       routePath: '/_authed/agents/',
@@ -88,12 +99,18 @@ describe('Agents Page', () => {
   });
 
   it('shows recent conversations when available', async () => {
-    const { useAgentsControllerGetConversations, useAgentsControllerGetLLMConfigs } =
-      await import('@/services/apis/gen/queries');
+    const { useLLMConfigs } = await import('@/hooks/use-llm-configs');
+    const { useAgentsControllerGetConversations } = await import(
+      '@/services/apis/gen/queries'
+    );
 
-    vi.mocked(useAgentsControllerGetLLMConfigs).mockReturnValue({
-      data: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
-    } as ReturnType<typeof useAgentsControllerGetLLMConfigs>);
+    vi.mocked(useLLMConfigs).mockReturnValue({
+      providers: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      connectedProviders: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      preferredProvider: undefined,
+      hasProviderConnected: true,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useLLMConfigs>);
 
     vi.mocked(useAgentsControllerGetConversations).mockReturnValue({
       data: {

@@ -50,7 +50,7 @@ export function ConnectForm({
       className="flex flex-col gap-3"
     >
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-foreground">Label</label>
+        <label className="text-sm font-medium text-foreground">Name</label>
         <Input
           {...register('name')}
           placeholder="e.g. My Work Key"
@@ -90,7 +90,7 @@ export function ConnectForm({
         <Input
           {...register('apiKey')}
           type="password"
-          placeholder={isApiKeyOptional ? 'sk-... (optional)' : 'sk-...'}
+          placeholder={isApiKeyOptional ? '(optional)' : ''}
           autoComplete="new-password"
           error={errors.apiKey?.message}
         />

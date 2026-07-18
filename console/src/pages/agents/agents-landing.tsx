@@ -4,15 +4,10 @@ import TypewriterText from '@/components/typewriter-text';
 import AgentPromptInput from '@/components/agent-prompt-input';
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
-import type {
-  ConversationResponseDto,
-  LLMConfigWithProviderDto,
-} from '@/services/apis/gen/queries';
-import {
-  useAgentsControllerGetConversations,
-  useAgentsControllerGetLLMConfigs,
-} from '@/services/apis/gen/queries';
+import type { ConversationResponseDto } from '@/services/apis/gen/queries';
+import { useAgentsControllerGetConversations } from '@/services/apis/gen/queries';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
@@ -51,28 +46,14 @@ export default function AgentsLandingPage() {
     },
   );
 
-  const { data: llmProviders } = useAgentsControllerGetLLMConfigs<
-    LLMConfigWithProviderDto[]
-  >({
-    query: {
-      queryKey: ['/api/agents/llm-configs', selectedWorkspaceId],
-      enabled: !!selectedWorkspaceId,
-    },
+  const { hasProviderConnected } = useLLMConfigs({
+    enabled: !!selectedWorkspaceId,
   });
 
   const conversations: ConversationResponseDto[] = useMemo(
     () => conversationsData?.data ?? [],
     [conversationsData],
   );
-
-  const hasProviderConnected = useMemo(() => {
-    const list = Array.isArray(llmProviders)
-      ? llmProviders
-      : (llmProviders as unknown as { data?: LLMConfigWithProviderDto[] })
-          ?.data;
-    const providersArray = Array.isArray(list) ? list : [];
-    return providersArray.some((p) => p.isConnected);
-  }, [llmProviders]);
 
   // Randomly select 5 suggestions from the pool and shuffle them
   const quickSuggestions = useMemo(() => {

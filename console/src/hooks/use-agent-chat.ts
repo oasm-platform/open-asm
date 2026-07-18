@@ -2,11 +2,10 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
 import type { AgentTodoItem } from '@/pages/agents/components/agent-todo-panel';
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
-  useAgentsControllerGetLLMConfigs,
   useAgentsControllerGetMessagesInfinite,
   type ConversationResponseDto,
-  type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { orvalClient } from '@/services/apis/axios-client';
 import { useRemoteExecuteStream } from '@/hooks/use-remote-execute-stream';
@@ -229,12 +228,10 @@ export function useAgentChat({
   const [title, setTitle] = useState<string | null>(null);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
-  const { data: providers } =
-    useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
-  const prefer = providers?.find((item) => item.isPreferred);
+  const { preferredProvider } = useLLMConfigs();
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
-    prefer?.configId
-      ? { provider: prefer.providerId, model: prefer.model ?? '', configId: prefer.configId }
+    preferredProvider?.configId
+      ? { provider: preferredProvider.providerId, model: preferredProvider.model ?? '', configId: preferredProvider.configId }
       : null,
   );
   const selectedModelRef = useRef<SelectedModel | null>(selectedModel);

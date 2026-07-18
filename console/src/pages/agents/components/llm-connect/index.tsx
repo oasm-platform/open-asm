@@ -1,15 +1,9 @@
-import type { LLMConfigWithProviderDto } from '@/services/apis/gen/queries';
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
   CreateLLMConfigDtoProvider,
-  useAgentsControllerCreateLLMConfig,
-  useAgentsControllerDeleteLLMConfig,
-  useAgentsControllerGetLLMConfigs,
-  useAgentsControllerSetPreferredLLMConfig,
-  useAgentsControllerUpdateLLMConfig,
 } from '@/services/apis/gen/queries';
-import { useQueryClient } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import type { ConnectFormData } from './schema';
 import { rowKey } from './schema';
@@ -20,35 +14,22 @@ export default function LlmConnect() {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  const queryClient = useQueryClient();
-
-  const { data: providers, isLoading } =
-    useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
-
-  const providersList = useMemo(() => providers ?? [], [providers]);
-  const connectedConfigs = useMemo(
-    () => providersList.filter((p) => p.isConnected),
-    [providersList],
-  );
-
-  const createLLMConfig = useAgentsControllerCreateLLMConfig();
-  const updateLLMConfig = useAgentsControllerUpdateLLMConfig();
-  const deleteLLMConfig = useAgentsControllerDeleteLLMConfig();
-  const setPreferredLLMConfig = useAgentsControllerSetPreferredLLMConfig();
-
-  const invalidate = useCallback(
-    () =>
-      void queryClient.invalidateQueries({
-        queryKey: ['/api/agents/llm-configs'],
-      }),
-    [queryClient],
-  );
+  const {
+    providers,
+    connectedProviders,
+    isLoading,
+    invalidate,
+    createConfig,
+    updateConfig,
+    deleteConfig,
+    setPreferredConfig,
+  } = useLLMConfigs();
 
   const handleSetPreferred = useCallback(
     async (configId: string) => {
       setUpdatingId(configId);
       try {
-        await setPreferredLLMConfig.mutateAsync({ id: configId });
+        await setPreferredConfig.mutateAsync({ id: configId });
         invalidate();
         toast.success('Default model updated');
       } catch {
@@ -57,14 +38,14 @@ export default function LlmConnect() {
         setUpdatingId(null);
       }
     },
-    [setPreferredLLMConfig, invalidate],
+    [setPreferredConfig, invalidate],
   );
 
   const handleModelChange = useCallback(
     async (configId: string, modelId: string) => {
       setUpdatingId(configId);
       try {
-        await updateLLMConfig.mutateAsync({
+        await updateConfig.mutateAsync({
           id: configId,
           data: { model: modelId },
         });
@@ -76,7 +57,7 @@ export default function LlmConnect() {
         setUpdatingId(null);
       }
     },
-    [updateLLMConfig, invalidate],
+    [updateConfig, invalidate],
   );
 
   const handleConnect = useCallback(
@@ -86,7 +67,7 @@ export default function LlmConnect() {
       if (!apiUrl && !apiKey) return;
 
       try {
-        await createLLMConfig.mutateAsync({
+        await createConfig.mutateAsync({
           data: {
             provider: providerId as CreateLLMConfigDtoProvider,
             name: data.name?.trim() || undefined,
@@ -105,14 +86,14 @@ export default function LlmConnect() {
         toast.error(message);
       }
     },
-    [createLLMConfig, invalidate],
+    [createConfig, invalidate],
   );
 
   const handleDelete = useCallback(
     async (configId: string) => {
       setUpdatingId(configId);
       try {
-        await deleteLLMConfig.mutateAsync({ id: configId });
+        await deleteConfig.mutateAsync({ id: configId });
         toast.success('Disconnected successfully');
         invalidate();
         setExpandedKey(null);
@@ -122,7 +103,7 @@ export default function LlmConnect() {
         setUpdatingId(null);
       }
     },
-    [deleteLLMConfig, invalidate],
+    [deleteConfig, invalidate],
   );
 
   if (isLoading) {
@@ -135,7 +116,7 @@ export default function LlmConnect() {
 
   return (
     <div className="flex flex-col gap-2">
-      {connectedConfigs.map((item) => {
+      {connectedProviders.map((item) => {
         const key = rowKey(item);
         return (
           <ConnectedConfigRow
@@ -152,7 +133,7 @@ export default function LlmConnect() {
       })}
 
       <DialogLLMConnect
-        providersList={providersList}
+        providersList={providers}
         onSubmit={handleConnect}
       />
     </div>

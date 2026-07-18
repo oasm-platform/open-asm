@@ -1,9 +1,8 @@
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import Page from '@/components/common/page';
 import {
-  useAgentsControllerGetLLMConfigs,
   useAgentsControllerUpdateLLMConfig,
   type UpdateLLMConfigDto,
-  type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from '@tanstack/react-router';
@@ -18,18 +17,13 @@ export default function EditAgentPage() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
 
-  const { data, isLoading } = useAgentsControllerGetLLMConfigs({
-    query: {
-      queryKey: ['agents', selectedWorkspaceId],
-      enabled: !!id && !!selectedWorkspaceId,
-    },
+  const { providers, isLoading } = useLLMConfigs({
+    enabled: !!id && !!selectedWorkspaceId,
   });
 
   const { mutate, isPending } = useAgentsControllerUpdateLLMConfig();
 
-  const agent = (data as LLMConfigWithProviderDto[] | undefined)?.find(
-    (a) => a.configId === id,
-  );
+  const agent = providers.find((a) => a.configId === id);
 
   const onSubmit = (formData: AgentFormData) => {
     const updateData: UpdateLLMConfigDto = {

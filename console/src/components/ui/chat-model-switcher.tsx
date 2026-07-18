@@ -1,10 +1,9 @@
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
 import type {
-  LLMConfigWithProviderDto,
   ProviderModelDto,
 } from '@/services/apis/gen/queries';
 import {
-  useAgentsControllerGetLLMConfigs,
   useAgentsControllerGetProviderModels,
   useAgentsControllerUpdateLLMConfig,
 } from '@/services/apis/gen/queries';
@@ -123,12 +122,11 @@ export function ChatModelSwitcher({
   const [isUpdating, setIsUpdating] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: providers } =
-    useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
+  const { connectedProviders } = useLLMConfigs();
 
   const connectedConfigs = useMemo(
-    () => (providers ?? []).filter((p) => p.isConnected && p.configId),
-    [providers],
+    () => connectedProviders.filter((p) => p.configId),
+    [connectedProviders],
   );
 
   const preferredConfig = useMemo(

@@ -1,10 +1,10 @@
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { type ColumnDef } from '@tanstack/react-table';
 import { useNavigate } from '@tanstack/react-router';
 
 import { DataTable } from '@/components/ui/data-table';
-import {
-  useAgentsControllerGetLLMConfigs,
-  type LLMConfigWithProviderDto,
+import type {
+  LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 
 import { Badge } from '@/components/ui/badge';
@@ -80,14 +80,11 @@ export function ListAgents() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
 
-  const { data, isLoading } = useAgentsControllerGetLLMConfigs({
-    query: {
-      queryKey: ['agents', selectedWorkspaceId],
-      enabled: !!selectedWorkspaceId,
-    },
+  const { providers, isLoading } = useLLMConfigs({
+    enabled: !!selectedWorkspaceId,
   });
 
-  const agents = (data as LLMConfigWithProviderDto[] | undefined) ?? [];
+  const agents = providers;
   const total = agents.length;
 
   const handleRowClick = (row: LLMConfigWithProviderDto) => {
