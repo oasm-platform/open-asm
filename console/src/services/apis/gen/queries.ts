@@ -1504,10 +1504,11 @@ export type LLMConfigResponseDtoProvider =
 
 export const LLMConfigResponseDtoProvider = {
   openai: 'openai',
-  openrouter: 'openrouter',
-  deepseek: 'deepseek',
-  gemini: 'gemini',
   anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
   kilo_code: 'kilo_code',
   opencode_go: 'opencode_go',
   custom: 'custom',
@@ -1532,10 +1533,11 @@ export type CreateLLMConfigDtoProvider =
 
 export const CreateLLMConfigDtoProvider = {
   openai: 'openai',
-  openrouter: 'openrouter',
-  deepseek: 'deepseek',
-  gemini: 'gemini',
   anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
   kilo_code: 'kilo_code',
   opencode_go: 'opencode_go',
   custom: 'custom',
@@ -1559,10 +1561,11 @@ export type LLMProviderSupportedDtoId =
 
 export const LLMProviderSupportedDtoId = {
   openai: 'openai',
-  openrouter: 'openrouter',
-  deepseek: 'deepseek',
-  gemini: 'gemini',
   anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
   kilo_code: 'kilo_code',
   opencode_go: 'opencode_go',
   custom: 'custom',
@@ -1587,10 +1590,11 @@ export type LLMConfigWithProviderDtoProviderId =
 
 export const LLMConfigWithProviderDtoProviderId = {
   openai: 'openai',
-  openrouter: 'openrouter',
-  deepseek: 'deepseek',
-  gemini: 'gemini',
   anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
   kilo_code: 'kilo_code',
   opencode_go: 'opencode_go',
   custom: 'custom',
@@ -1637,10 +1641,11 @@ export type UpdateLLMConfigDtoProvider =
 
 export const UpdateLLMConfigDtoProvider = {
   openai: 'openai',
-  openrouter: 'openrouter',
-  deepseek: 'deepseek',
-  gemini: 'gemini',
   anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
   kilo_code: 'kilo_code',
   opencode_go: 'opencode_go',
   custom: 'custom',

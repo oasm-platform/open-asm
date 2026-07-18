@@ -112,6 +112,16 @@ const fetchAnthropicModels: LLMModelsFetcher = () =>
     { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
   ]);
 
+const fetchVercelModels: LLMModelsFetcher = async (apiKey) => {
+  const json = await fetchJson<{ data: Array<{ id: string; name?: string }> }>(
+    'https://ai-gateway.vercel.sh/v/models',
+    { headers: { Authorization: `Bearer ${apiKey}` } },
+  );
+  return json
+    ? sorted(json.data.map((m) => ({ id: m.id, name: m.name ?? m.id })))
+    : [];
+};
+
 const fetchOpenCodeGoModels: LLMModelsFetcher = async (apiKey) => {
   const json = await fetchJson<{
     data: Array<{ id: string; name?: string }>;
@@ -204,6 +214,16 @@ export const llmProviderSupported: LLMProviderSupported[] = [
     fetchModels: fetchAnthropicModels,
   },
   {
+    id: LLMProvider.VERCEL,
+    name: 'Vercel AI Gateway',
+    logo: '/static/images/vercel.svg',
+    handler: (apiKey, model) =>
+      createOpenAI({ apiKey, baseURL: 'https://ai-gateway.vercel.sh/v' }).chat(
+        model,
+      ),
+    fetchModels: fetchVercelModels,
+  },
+  {
     id: LLMProvider.CUSTOM,
     name: 'Custom provider (OpenAI-compatible)',
     logo: '/static/images/llm.svg',
@@ -242,6 +262,9 @@ const REASONING_OPTIONS: Partial<Record<LLMProvider, Record<string, any>>> = {
     openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
   },
   [LLMProvider.OPENCODE_GO]: {
+    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
+  },
+  [LLMProvider.VERCEL]: {
     openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
   },
   [LLMProvider.GEMINI]: {
