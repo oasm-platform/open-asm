@@ -80,7 +80,7 @@ export function DialogLLMConnect({
                 className="gap-1"
               >
                 <Plus size={14} />
-                Connect
+                <span className="hidden sm:inline">Connect</span>
               </Button>
             </div>
           );

@@ -53,7 +53,7 @@ export const ConnectedConfigRow = memo(function ConnectedConfigRow({
           className="gap-1 border border-green-600 text-green-600 hover:bg-green-50"
         >
           <Check size={16} />
-          Connected
+          <span className="hidden sm:inline">Connected</span>
           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </Button>
       </div>

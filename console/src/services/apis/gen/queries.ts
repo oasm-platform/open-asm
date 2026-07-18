@@ -171,6 +171,18 @@ export type UpdateTargetDto = {
 
 export type WorkspaceArchivedAt = { [key: string]: unknown };
 
+/**
+ * Encrypted Data Encryption Key (DEK) for this workspace. Encrypted with system KEK. Null for workspaces created before envelope encryption.
+ * @nullable
+ */
+export type WorkspaceDek = { [key: string]: unknown } | null;
+
+/**
+ * Timestamp when DEK was generated
+ * @nullable
+ */
+export type WorkspaceDekAt = { [key: string]: unknown } | null;
+
 export type Workspace = {
   id: string;
   createdAt: string;
@@ -184,6 +196,16 @@ export type Workspace = {
   isAssetsDiscovery: boolean;
   /** Assets are automatically enabled after discovery */
   isAutoEnableAssetAfterDiscovered: boolean;
+  /**
+   * Encrypted Data Encryption Key (DEK) for this workspace. Encrypted with system KEK. Null for workspaces created before envelope encryption.
+   * @nullable
+   */
+  dek?: WorkspaceDek;
+  /**
+   * Timestamp when DEK was generated
+   * @nullable
+   */
+  dekAt?: WorkspaceDekAt;
 };
 
 export type CreateWorkspaceDtoArchivedAt = { [key: string]: unknown };
@@ -1483,9 +1505,11 @@ export type LLMConfigResponseDtoProvider =
 export const LLMConfigResponseDtoProvider = {
   openai: 'openai',
   openrouter: 'openrouter',
+  deepseek: 'deepseek',
   gemini: 'gemini',
   anthropic: 'anthropic',
   kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
   custom: 'custom',
 } as const;
 
@@ -1509,9 +1533,11 @@ export type CreateLLMConfigDtoProvider =
 export const CreateLLMConfigDtoProvider = {
   openai: 'openai',
   openrouter: 'openrouter',
+  deepseek: 'deepseek',
   gemini: 'gemini',
   anthropic: 'anthropic',
   kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
   custom: 'custom',
 } as const;
 
@@ -1534,9 +1560,11 @@ export type LLMConfigWithProviderDtoProviderId =
 export const LLMConfigWithProviderDtoProviderId = {
   openai: 'openai',
   openrouter: 'openrouter',
+  deepseek: 'deepseek',
   gemini: 'gemini',
   anthropic: 'anthropic',
   kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
   custom: 'custom',
 } as const;
 
@@ -1582,9 +1610,11 @@ export type UpdateLLMConfigDtoProvider =
 export const UpdateLLMConfigDtoProvider = {
   openai: 'openai',
   openrouter: 'openrouter',
+  deepseek: 'deepseek',
   gemini: 'gemini',
   anthropic: 'anthropic',
   kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
   custom: 'custom',
 } as const;
 
@@ -1982,6 +2012,14 @@ export type TestIntegrationDto = {
   text?: string;
 };
 
+export type TelegramConnectDtoStatus =
+  (typeof TelegramConnectDtoStatus)[keyof typeof TelegramConnectDtoStatus];
+
+export const TelegramConnectDtoStatus = {
+  PENDING: 'PENDING',
+  CONNECTED: 'CONNECTED',
+} as const;
+
 export type TelegramConnectDto = {
   id: string;
   telegramChatId?: string;
@@ -1990,7 +2028,7 @@ export type TelegramConnectDto = {
   telegramLastName?: string;
   connectToken: string;
   tokenExpiredAt?: string;
-  status: string;
+  status: TelegramConnectDtoStatus;
   isActive: boolean;
   integrationId: string;
   userId: string;
