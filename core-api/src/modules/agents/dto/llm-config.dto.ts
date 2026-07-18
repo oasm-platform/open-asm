@@ -11,6 +11,12 @@ export class LLMProviderSupportedDto {
 
   @ApiProperty({ description: 'Provider logo path' })
   logo: string;
+
+  @ApiProperty({
+    description: 'Whether provider accepts custom API URL',
+    required: false,
+  })
+  isAcceptCustomApiUrl?: boolean;
 }
 
 export class LLMProviderStatusDto {

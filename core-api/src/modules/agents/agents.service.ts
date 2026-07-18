@@ -35,6 +35,7 @@ import {
   LLMConfigResponseDto,
   LLMConfigWithProviderDto,
   LLMProviderStatusDto,
+  LLMProviderSupportedDto,
   ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
@@ -225,7 +226,16 @@ export class AgentsService {
     }));
   }
 
-  async getLLMConfigsWithProviders(
+  getProviders(): LLMProviderSupportedDto[] {
+    return llmProviderSupported.map((p) => ({
+      id: p.id,
+      name: p.name,
+      logo: p.logo,
+      isAcceptCustomApiUrl: p.isAcceptCustomApiUrl ?? false,
+    }));
+  }
+
+  async getConnectedProviders(
     workspaceId: string,
   ): Promise<LLMConfigWithProviderDto[]> {
     const configs = await this.llmConfigRepository.find({
@@ -234,10 +244,8 @@ export class AgentsService {
     });
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
-    const result: LLMConfigWithProviderDto[] = [];
 
-    // One row per connected config
-    for (const config of configs) {
+    return configs.map((config) => {
       const providerMeta = llmProviderSupported.find(
         (p) => p.id === config.provider,
       );
@@ -245,7 +253,7 @@ export class AgentsService {
       const apiKeyMasked = config.apiKey
         ? this.maskApiKey(apiKey)
         : '****';
-      result.push({
+      return {
         providerId: config.provider,
         providerName: providerMeta?.name ?? config.provider,
         logo: providerMeta?.logo,
@@ -259,24 +267,8 @@ export class AgentsService {
         createdAt: config.createdAt,
         updatedAt: config.updatedAt,
         isAcceptCustomApiUrl: providerMeta?.isAcceptCustomApiUrl ?? false,
-      });
-    }
-
-    // One row per provider that has NO configs yet (for the "Connect" UI)
-    const connectedProviderIds = new Set(configs.map((c) => c.provider));
-    for (const provider of llmProviderSupported) {
-      if (!connectedProviderIds.has(provider.id)) {
-        result.push({
-          providerId: provider.id,
-          providerName: provider.name,
-          logo: provider.logo,
-          isConnected: false,
-          isAcceptCustomApiUrl: provider.isAcceptCustomApiUrl ?? false,
-        });
-      }
-    }
-
-    return result;
+      };
+    });
   }
 
   async updateLLMConfig(

@@ -39,6 +39,7 @@ import {
   CreateLLMConfigDto,
   LLMConfigResponseDto,
   LLMConfigWithProviderDto,
+  LLMProviderSupportedDto,
   ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
@@ -96,18 +97,28 @@ export class AgentsController {
     return this.agentsService.createLLMConfig(dto, workspaceId, userId);
   }
 
-  @Get('llm-configs')
+  @Get('providers')
   @Doc({
-    summary: 'List LLM configs with provider info',
+    summary: 'Get supported providers',
+    description: 'Get all supported LLM providers with their metadata',
+    response: { serialization: LLMProviderSupportedDto, isArray: true },
+  })
+  getProviders(): LLMProviderSupportedDto[] {
+    return this.agentsService.getProviders();
+  }
+
+  @Get('providers/connected')
+  @Doc({
+    summary: 'Get connected providers',
     description:
-      'Get all LLM providers with their configuration status for the workspace',
+      'Get all connected LLM provider configurations for the workspace',
     request: { getWorkspaceId: true },
     response: { serialization: LLMConfigWithProviderDto, isArray: true },
   })
-  getLLMConfigs(
+  getConnectedProviders(
     @WorkspaceId() workspaceId: string,
   ): Promise<LLMConfigWithProviderDto[]> {
-    return this.agentsService.getLLMConfigsWithProviders(workspaceId);
+    return this.agentsService.getConnectedProviders(workspaceId);
   }
 
   @Get('llm-configs/:id/models')
