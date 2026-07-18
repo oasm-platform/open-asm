@@ -1,20 +1,25 @@
-import Page from '@/components/common/page';
-import LlmConnect from '@/pages/agents/components/llm-connect';
-import TypewriterText from '@/components/typewriter-text';
 import AgentPromptInput from '@/components/agent-prompt-input';
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
+import Page from '@/components/common/page';
+import TypewriterText from '@/components/typewriter-text';
 
+import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
+import { Button } from '@/components/ui/button';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { ConversationResponseDto } from '@/services/apis/gen/queries';
 import { useAgentsControllerGetConversations } from '@/services/apis/gen/queries';
-import { MessageSquare, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
+import { MessageSquare, Plus, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './components/agent-icon';
 
-import { CONVERSATION_STARTERS, ALL_QUICK_SUGGESTIONS } from './components/landing-constants';
+import {
+  ALL_QUICK_SUGGESTIONS,
+  CONVERSATION_STARTERS,
+} from './components/landing-constants';
 
 const routeApi = getRouteApi('/_authed/agents/');
 
@@ -28,9 +33,9 @@ export default function AgentsLandingPage() {
     configId: string;
   } | null>(null);
   const [agentMode, setAgentMode] = useState('ask');
-  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(
-    null,
-  );
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
+
+  const { setState: openSettings } = useAgentSettingsDialog();
 
   const {
     state: { selectedWorkspaceId },
@@ -122,10 +127,12 @@ export default function AgentsLandingPage() {
               </p>
             </div>
           </div>
-          <div className="w-full max-w-md">
-            <LlmConnect />
-          </div>
+          <Button variant="outline" onClick={() => openSettings(true)}>
+            <Plus className="h-4 w-4" />
+            Connect
+          </Button>
         </div>
+        <AgentSettingsDialog />
       </Page>
     );
   }
