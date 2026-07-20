@@ -308,7 +308,7 @@ export const ChatConversation = ({
               error={streamError ?? ''}
               isRetrying={isRetrying}
               retryAttempt={retryAttempt}
-              onRetry={lastUserMessage ? handleRetry : () => {}}
+              onRetry={lastUserMessage && onRetry ? handleRetry : undefined}
               onDismiss={onDismissError ?? (() => {})}
             />
           )}

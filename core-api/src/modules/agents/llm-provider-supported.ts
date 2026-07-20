@@ -30,16 +30,42 @@ export interface LLMProviderSupported {
 const sorted = (models: ProviderModelDto[]) =>
   models.sort((a, b) => a.name.localeCompare(b.name));
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 async function fetchJson<T>(
   url: string,
   init?: RequestInit,
 ): Promise<T | null> {
   try {
-    const res = await fetch(url, init);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const res = await fetch(url, {
+      ...init,
+      signal: init?.signal
+        ? combineAbortSignals(init.signal, controller.signal)
+        : controller.signal,
+    });
+    clearTimeout(timeout);
     return res.ok ? ((await res.json()) as T) : null;
   } catch {
     return null;
   }
+}
+
+function combineAbortSignals(
+  ...signals: AbortSignal[]
+): AbortSignal {
+  const controller = new AbortController();
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      return controller.signal;
+    }
+    signal.addEventListener('abort', () => controller.abort(signal.reason), {
+      once: true,
+    });
+  }
+  return controller.signal;
 }
 
 // --- Model fetchers ---
@@ -124,17 +150,62 @@ const fetchVercelModels: LLMModelsFetcher = async (apiKey) => {
 
 const fetchOpenCodeGoModels: LLMModelsFetcher = async (apiKey) => {
   const json = await fetchJson<{
-    data: Array<{ id: string; name?: string }>;
+    data: Array<{ id: string; name?: string; type?: string; transport?: string }>;
   }>('https://opencode.ai/zen/go/v1/models', {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
-  return json
-    ? sorted(json.data.map((m) => ({ id: m.id, name: m.name ?? m.id })))
-    : [];
+  if (!json) return [];
+  // If the API returns transport/type metadata, filter to chat-compatible models.
+  // Otherwise return all models (runtime error handling will catch incompatible ones).
+  let models = json.data;
+  if (models.some((m) => m.transport || m.type)) {
+    models = models.filter(
+      (m) =>
+        (m.transport ?? '').toLowerCase().includes('chat') ||
+        (m.transport ?? '').toLowerCase().includes('openai') ||
+        !m.transport,
+    );
+  }
+  return sorted(models.map((m) => ({ id: m.id, name: m.name ?? m.id })));
 };
+
+/** Known private / loopback / link-local address prefixes. */
+const PRIVATE_IP_PATTERNS = [
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^0\./,
+  /^169\.254\./,
+  /^::1$/,
+  /^fc00:/i,
+  /^fe80:/i,
+];
+
+function isPrivateHost(hostname: string): boolean {
+  return PRIVATE_IP_PATTERNS.some((pattern) => pattern.test(hostname));
+}
 
 const fetchCustomProviderModels: LLMModelsFetcher = async (apiKey, baseURL) => {
   if (!baseURL) return [];
+
+  let parsed: URL;
+  try {
+    parsed = new URL(baseURL);
+  } catch {
+    return [];
+  }
+
+  // Only allow HTTP(S) schemes
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return [];
+  }
+
+  // Block SSRF: reject private, loopback, link-local hosts
+  if (isPrivateHost(parsed.hostname)) {
+    return [];
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -143,7 +214,7 @@ const fetchCustomProviderModels: LLMModelsFetcher = async (apiKey, baseURL) => {
   }
   const json = await fetchJson<{ data: Array<{ id: string; name?: string }> }>(
     `${baseURL.replace(/\/$/, '')}/models`,
-    { headers },
+    { headers, redirect: 'manual' },
   );
   return json
     ? sorted(json.data.map((m) => ({ id: m.id, name: m.name ?? m.id })))
@@ -242,10 +313,26 @@ export const getLLMProviderConfig = (
 ): LLMProviderSupported | undefined =>
   llmProviderSupported.find((p) => p.id === provider);
 
+type AnthropicReasoningOptions = {
+  anthropic: { thinking: { type: 'enabled'; budgetTokens: number } };
+};
+
+type OpenAIReasoningOptions = {
+  openai: { reasoningEffort: string; reasoningSummary: string };
+};
+
+type GoogleReasoningOptions = {
+  google: { thinkingConfig: { thinkingBudget: number; includeThoughts: boolean } };
+};
+
+type ProviderReasoningOptions =
+  | AnthropicReasoningOptions
+  | OpenAIReasoningOptions
+  | GoogleReasoningOptions;
+
 // --- Reasoning / thinking options per provider ---
 
-const REASONING_OPTIONS: Partial<Record<LLMProvider, Record<string, any>>> = {
-   
+const REASONING_OPTIONS: Partial<Record<LLMProvider, ProviderReasoningOptions>> = {
   [LLMProvider.ANTHROPIC]: {
     anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } },
   },
@@ -281,4 +368,4 @@ const REASONING_OPTIONS: Partial<Record<LLMProvider, Record<string, any>>> = {
  */
 export const getReasoningProviderOptions = (
   provider: LLMProvider,
-): Record<string, any> | undefined => REASONING_OPTIONS[provider]; // eslint-disable-line @typescript-eslint/no-explicit-any
+): ProviderReasoningOptions | undefined => REASONING_OPTIONS[provider];

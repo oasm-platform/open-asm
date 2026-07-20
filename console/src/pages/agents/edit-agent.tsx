@@ -1,9 +1,6 @@
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import Page from '@/components/common/page';
-import {
-  useAgentsControllerUpdateLLMConfig,
-  type UpdateLLMConfigDto,
-} from '@/services/apis/gen/queries';
+import type { UpdateLLMConfigDto } from '@/services/apis/gen/queries';
 import { Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
@@ -17,11 +14,16 @@ export default function EditAgentPage() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
 
-  const { providers, isLoading } = useLLMConfigs({
+  const {
+    providers,
+    isLoading,
+    invalidate,
+    updateConfig,
+  } = useLLMConfigs({
     enabled: !!id && !!selectedWorkspaceId,
   });
 
-  const { mutate, isPending } = useAgentsControllerUpdateLLMConfig();
+  const { mutate, isPending } = updateConfig;
 
   const agent = providers.find((a) => a.configId === id);
 
@@ -45,6 +47,7 @@ export default function EditAgentPage() {
       },
       {
         onSuccess: () => {
+          invalidate();
           toast.success('Provider updated successfully');
           navigate({ to: `/agents/${id}` });
         },

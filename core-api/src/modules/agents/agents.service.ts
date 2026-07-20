@@ -249,7 +249,7 @@ export class AgentsService {
       const providerMeta = llmProviderSupported.find(
         (p) => p.id === config.provider,
       );
-      const apiKey = decryptWithDEK(config.apiKey, dek);
+      const apiKey = config.apiKey ? decryptWithDEK(config.apiKey, dek) : '';
       const apiKeyMasked = config.apiKey
         ? this.maskApiKey(apiKey)
         : '****';

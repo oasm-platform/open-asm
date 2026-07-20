@@ -19,9 +19,22 @@ export function getConnectSchema(
         ? z.string().min(1, 'API key is required')
         : z.string().optional(),
     })
-    .refine((data) => requiresApiKey || data.apiUrl || data.apiKey, {
-      message: 'API key or URL is required',
-    });
+    .refine(
+      (data) => {
+        const trimmedUrl = data.apiUrl?.trim() ?? '';
+        const trimmedKey = data.apiKey?.trim() ?? '';
+        return requiresApiKey || trimmedUrl || trimmedKey;
+      },
+      {
+        message: 'API key or URL is required',
+        path: ['apiKey'],
+      },
+    )
+    .transform((data) => ({
+      ...data,
+      apiUrl: data.apiUrl?.trim() || undefined,
+      apiKey: data.apiKey?.trim() || undefined,
+    }));
 }
 
 export type ConnectFormData = z.infer<ReturnType<typeof getConnectSchema>>;

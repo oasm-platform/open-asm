@@ -35,6 +35,7 @@ export function useLLMConfigs(options?: UseLLMConfigsOptions) {
   const {
     data: rawProviders,
     isLoading: providersLoading,
+    isError: providersError,
     refetch: refetchProviders,
   } = useAgentsControllerGetProviders<LLMProviderSupportedDto[]>({
     query: {
@@ -45,6 +46,7 @@ export function useLLMConfigs(options?: UseLLMConfigsOptions) {
   const {
     data: rawConnected,
     isLoading: connectedLoading,
+    isError: connectedError,
     refetch: refetchConnected,
   } = useAgentsControllerGetConnectedProviders<LLMConfigWithProviderDto[]>({
     query: {
@@ -53,6 +55,7 @@ export function useLLMConfigs(options?: UseLLMConfigsOptions) {
   });
 
   const isLoading = providersLoading || connectedLoading;
+  const isError = providersError || connectedError;
   const refetch = useCallback(() => {
     void refetchProviders();
     void refetchConnected();
@@ -136,6 +139,8 @@ export function useLLMConfigs(options?: UseLLMConfigsOptions) {
     hasProviderConnected,
     /** Loading state from the underlying query. */
     isLoading,
+    /** Error state from underlying queries. */
+    isError,
     /** Re-fetch the providers list. */
     refetch,
     /** Invalidate the query cache (call after mutations to refresh). */

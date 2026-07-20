@@ -10,15 +10,44 @@ import { rowKey } from './schema';
 import { ConnectedConfigRow } from './connected-config-row';
 import { DialogLLMConnect } from './dialog-llm-connect';
 
+function usePendingIds() {
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+
+  const addPending = useCallback((id: string) => {
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const removePending = useCallback((id: string) => {
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const isPending = useCallback(
+    (id: string) => pendingIds.has(id),
+    [pendingIds],
+  );
+
+  return { addPending, removePending, isPending };
+}
+
 export default function LlmConnect() {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const { addPending, removePending, isPending } = usePendingIds();
 
   const {
     providers,
     connectedProviders,
     isLoading,
+    isError,
     invalidate,
+    refetch,
     createConfig,
     updateConfig,
     deleteConfig,
@@ -27,7 +56,7 @@ export default function LlmConnect() {
 
   const handleSetPreferred = useCallback(
     async (configId: string) => {
-      setUpdatingId(configId);
+      addPending(configId);
       try {
         await setPreferredConfig.mutateAsync({ id: configId });
         invalidate();
@@ -35,15 +64,15 @@ export default function LlmConnect() {
       } catch {
         toast.error('Failed to set default model');
       } finally {
-        setUpdatingId(null);
+        removePending(configId);
       }
     },
-    [setPreferredConfig, invalidate],
+    [setPreferredConfig, invalidate, addPending, removePending],
   );
 
   const handleModelChange = useCallback(
     async (configId: string, modelId: string) => {
-      setUpdatingId(configId);
+      addPending(configId);
       try {
         await updateConfig.mutateAsync({
           id: configId,
@@ -54,17 +83,17 @@ export default function LlmConnect() {
       } catch {
         toast.error('Failed to update model');
       } finally {
-        setUpdatingId(null);
+        removePending(configId);
       }
     },
-    [updateConfig, invalidate],
+    [updateConfig, invalidate, addPending, removePending],
   );
 
   const handleConnect = useCallback(
-    async (data: ConnectFormData, providerId: string) => {
+    async (data: ConnectFormData, providerId: string): Promise<boolean> => {
       const apiKey = data.apiKey?.trim() || '';
       const apiUrl = data.apiUrl?.trim() || '';
-      if (!apiUrl && !apiKey) return;
+      if (!apiUrl && !apiKey) return false;
 
       try {
         await createConfig.mutateAsync({
@@ -77,6 +106,7 @@ export default function LlmConnect() {
         });
         invalidate();
         toast.success('Provider connected successfully');
+        return true;
       } catch (err) {
         const axiosError = err as AxiosError<{ message: string | string[] }>;
         const raw = axiosError.response?.data?.message;
@@ -84,6 +114,7 @@ export default function LlmConnect() {
           ? raw.join(', ')
           : (raw ?? 'Failed to connect provider');
         toast.error(message);
+        return false;
       }
     },
     [createConfig, invalidate],
@@ -91,7 +122,7 @@ export default function LlmConnect() {
 
   const handleDelete = useCallback(
     async (configId: string) => {
-      setUpdatingId(configId);
+      addPending(configId);
       try {
         await deleteConfig.mutateAsync({ id: configId });
         toast.success('Disconnected successfully');
@@ -100,16 +131,31 @@ export default function LlmConnect() {
       } catch {
         toast.error('Failed to disconnect');
       } finally {
-        setUpdatingId(null);
+        removePending(configId);
       }
     },
-    [deleteConfig, invalidate],
+    [deleteConfig, invalidate, addPending, removePending],
   );
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="text-sm text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 gap-3">
+        <div className="text-sm text-destructive">Failed to load providers</div>
+        <button
+          type="button"
+          className="text-sm text-primary underline hover:no-underline"
+          onClick={() => refetch()}
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -127,7 +173,7 @@ export default function LlmConnect() {
             onModelChange={handleModelChange}
             onDelete={handleDelete}
             onSetPreferred={handleSetPreferred}
-            isUpdating={updatingId === key}
+            isUpdating={isPending(key)}
           />
         );
       })}

@@ -17,7 +17,7 @@ export function DialogLLMConnect({
   onSubmit,
 }: {
   providersList: LLMConfigWithProviderDto[];
-  onSubmit: (data: ConnectFormData, providerId: string) => Promise<void>;
+  onSubmit: (data: ConnectFormData, providerId: string) => Promise<boolean>;
 }) {
   const [dialogProvider, setDialogProvider] =
     useState<LLMConfigWithProviderDto | null>(null);
@@ -45,8 +45,8 @@ export function DialogLLMConnect({
     async (data: ConnectFormData, providerId: string) => {
       setIsSubmitting(true);
       try {
-        await onSubmit(data, providerId);
-        handleDialogClose();
+        const success = await onSubmit(data, providerId);
+        if (success) handleDialogClose();
       } finally {
         setIsSubmitting(false);
       }

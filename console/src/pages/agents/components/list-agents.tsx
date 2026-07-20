@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { format } from 'date-fns';
+import { useMemo } from 'react';
 
 const providerLabels: Record<string, string> = {
   openai: 'OpenAI',
@@ -47,6 +48,9 @@ const agentColumns: ColumnDef<LLMConfigWithProviderDto>[] = [
     accessorKey: 'isPreferred',
     header: 'Status',
     cell: ({ row }) => {
+      if (!row.original.isConnected) {
+        return <Badge variant="outline">Disconnected</Badge>;
+      }
       const isPreferred: boolean = row.getValue('isPreferred');
       return (
         <Badge variant={isPreferred ? 'default' : 'secondary'}>
@@ -60,6 +64,7 @@ const agentColumns: ColumnDef<LLMConfigWithProviderDto>[] = [
     header: 'Connected',
     cell: ({ row }) => {
       const value: string = row.getValue('createdAt');
+      if (!value) return <div className="text-muted-foreground text-sm">-</div>;
       return (
         <div className="text-muted-foreground text-sm">
           {format(new Date(value), 'MMM dd, yyyy')}
@@ -87,6 +92,23 @@ export function ListAgents() {
   const agents = providers;
   const total = agents.length;
 
+  const processedAgents = useMemo(() => {
+    const result = [...agents];
+    if (sortBy) {
+      result.sort((a, b) => {
+        const aVal = a[sortBy as keyof LLMConfigWithProviderDto];
+        const bVal = b[sortBy as keyof LLMConfigWithProviderDto];
+        if (aVal === bVal) return 0;
+        if (aVal === undefined || aVal === null) return 1;
+        if (bVal === undefined || bVal === null) return -1;
+        const comp = aVal < bVal ? -1 : 1;
+        return sortOrder === 'ASC' ? comp : -comp;
+      });
+    }
+    const start = (page - 1) * pageSize;
+    return result.slice(start, start + pageSize);
+  }, [agents, sortBy, sortOrder, page, pageSize]);
+
   const handleRowClick = (row: LLMConfigWithProviderDto) => {
     if (row.configId) {
       navigate({ to: `/agents/${row.configId}` });
@@ -95,7 +117,7 @@ export function ListAgents() {
 
   return (
     <DataTable
-      data={agents}
+      data={processedAgents}
       columns={agentColumns}
       isLoading={isLoading}
       page={page}
