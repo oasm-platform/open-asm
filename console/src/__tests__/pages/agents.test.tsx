@@ -28,8 +28,8 @@ vi.mock('@/services/apis/gen/queries', async () => {
   };
 });
 
-vi.mock('@/pages/agents/components/llm-connect', () => ({
-  default: () => <div data-testid="llm-connect">LlmConnect</div>,
+vi.mock('@/components/agent-settings-dialog', () => ({
+  AgentSettingsDialog: () => <div data-testid="agent-settings-dialog">AgentSettingsDialog</div>,
 }));
 
 vi.mock('@/components/typewriter-text', () => ({
@@ -94,7 +94,7 @@ describe('Agents Page', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Connect an AI Provider')).toBeInTheDocument();
-      expect(screen.getByTestId('llm-connect')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Connect' })).toBeInTheDocument();
     });
   });
 

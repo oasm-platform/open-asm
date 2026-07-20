@@ -219,7 +219,7 @@ export function ChatModelSwitcher({
       <>
         <button
           type="button"
-          onClick={openDialog}
+          onClick={() => openDialog(true)}
           className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
         >
           <Settings className="h-3.5 w-3.5" />
@@ -280,7 +280,7 @@ export function ChatModelSwitcher({
         </div>
         <button
           type="button"
-          onClick={openDialog}
+          onClick={() => openDialog(true)}
           className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
         >
           <Settings className="h-3.5 w-3.5" />
