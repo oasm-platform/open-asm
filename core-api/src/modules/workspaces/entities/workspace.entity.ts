@@ -105,4 +105,25 @@ export class Workspace extends BaseEntity {
   @IsBoolean()
   @Column({ default: true })
   isAutoEnableAssetAfterDiscovered: boolean;
+
+  @ApiProperty({
+    description:
+      'Encrypted Data Encryption Key (DEK) for this workspace. ' +
+      'Encrypted with system KEK. Null for workspaces created before envelope encryption.',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @Column('text', { nullable: true })
+  dek?: string | null;
+
+  @ApiProperty({
+    description: 'Timestamp when DEK was generated',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @Column({ type: 'timestamp', nullable: true })
+  dekAt?: Date | null;
 }

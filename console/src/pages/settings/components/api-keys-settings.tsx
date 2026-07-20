@@ -1,3 +1,4 @@
+import { CopyableValue } from '@/components/common/copyable-value';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -5,8 +6,7 @@ import {
   useWorkspacesControllerGetWorkspaceApiKey,
   useWorkspacesControllerRotateApiKey,
 } from '@/services/apis/gen/queries';
-import { Copy, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 /**
@@ -16,8 +16,6 @@ export default function ApiKeysSettings() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
-  const [copied, setCopied] = useState(false);
-
   const {
     data: apiKeyData,
     isLoading,
@@ -41,15 +39,6 @@ export default function ApiKeysSettings() {
         },
       },
     });
-
-  const handleCopy = async () => {
-    if (apiKeyData?.apiKey) {
-      await navigator.clipboard.writeText(apiKeyData.apiKey);
-      setCopied(true);
-      toast.success('API key copied to clipboard');
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   const handleRotate = () => {
     if (!selectedWorkspaceId) return;
@@ -85,19 +74,11 @@ export default function ApiKeysSettings() {
           ) : (
             <>
               <div className="flex min-w-0 flex-col gap-2">
-                <div className="overflow-x-auto h-10 flex justify-center items-center  rounded border">
-                  <code>{apiKeyData?.apiKey || 'No API key available'}</code>
-                </div>
-                <div className="flex gap-2 justify-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopy}
-                    disabled={!apiKeyData?.apiKey}
-                  >
-                    <Copy className="h-4 w-4" />
-                    {copied ? 'Copied!' : 'Copy'}
-                  </Button>
+                <CopyableValue
+                  value={apiKeyData?.apiKey ?? 'No API key available'}
+                  disabled={!apiKeyData?.apiKey}
+                />
+                <div className="flex justify-center gap-2">
                   <Button
                     variant="secondary"
                     size="sm"

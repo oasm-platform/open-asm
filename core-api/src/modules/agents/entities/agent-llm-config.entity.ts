@@ -33,7 +33,7 @@ export class AgentLLMConfig extends BaseEntity {
 
   @ApiProperty({ enum: LLMProvider, example: LLMProvider.OPENAI })
   @IsEnum(LLMProvider)
-  @Column({ type: 'enum', enum: LLMProvider })
+  @Column({ type: 'varchar' })
   provider: LLMProvider;
 
   @Column('text')

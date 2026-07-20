@@ -7,55 +7,84 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	pb "github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
 )
 
-var jobLogGlobal = oasm.NewLogger("Worker.Job")
-
-func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string) {
+func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string, events chan<- TuiEvent) {
 	job, err := client.JobsNext(ctx)
 	if err != nil {
-		jobLogGlobal.ErrorE("Failed to pull job", err)
+		NewTuiLogger(events, "Jobs").ErrorE("Failed to pull job", err)
 		return
 	}
 	if job == nil || job.Id == "" {
 		return
 	}
 
+	startTime := time.Now()
+	cmdStr := job.GetCommand()
+
+	Emit(events, TuiEvent{
+		Type:       EventJobStarted,
+		JobID:      job.Id,
+		Command:    cmdStr,
+		AssetID:    job.GetAsset().GetId(),
+		AssetValue: job.GetAsset().GetValue(),
+	})
+
 	activeJobsMu.Lock()
 	activeJobs[job.Id] = struct{}{}
 	activeJobsMu.Unlock()
 
+	var completed bool
 	defer func() {
 		activeJobsMu.Lock()
 		delete(activeJobs, job.Id)
 		activeJobsMu.Unlock()
+		if !completed {
+			completed = true
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  true,
+				Duration: time.Since(startTime),
+			})
+		}
 	}()
 
-	cmdStr := job.GetCommand()
 	category := job.GetCategory()
 
 	if cmdStr == "" {
-		jobLogGlobal.Warning("[%s] Empty command", job.Id)
-		submitCategoryError(ctx, client, job.Id, category, "No command provided by Core")
+		completed = true
+		Emit(events, TuiEvent{
+			Type:     EventJobCompleted,
+			JobID:    job.Id,
+			Success:  false,
+			ErrorMsg: "No command provided by Core",
+			Duration: time.Since(startTime),
+		})
+		submitCategoryError(ctx, client, events, job.Id, category, "No command provided by Core")
 		return
 	}
 
-	jobLogGlobal.Info("[%s] Executing: %s (category: %s)", job.Id, cmdStr, category)
+	NewTuiLogger(events, "Jobs").Info("[%s] Executing: %s (category: %s)", job.Id, cmdStr, category)
 
 	if after, ok := strings.CutPrefix(cmdStr, "screenshot "); ok {
 		url := strings.TrimSpace(after)
-		jobLogGlobal.Debug("[%s] Capturing screenshot: %s", job.Id, url)
 
 		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
 		if err != nil {
-			jobLogGlobal.Warning("[%s] Screenshot capture failed: %v", job.Id, err)
-			if submitErr := client.JobsScreenshotResult(ctx, job.Id, true, fmt.Sprintf("Screenshot error: %v", err)); submitErr != nil {
-				jobLogGlobal.ErrorE(fmt.Sprintf("[%s] Failed to submit screenshot error", job.Id), submitErr)
-			}
+			completed = true
+			Emit(events, TuiEvent{
+				Type:          EventActivity,
+				Source:        "Jobs",
+				ActivityLevel: "warning",
+				Message:       fmt.Sprintf("Screenshot failed: %v", err),
+			})
+			submitCategoryError(ctx, client, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", err))
 			return
 		}
 
@@ -67,19 +96,24 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 			URL:        formatURL(url),
 		}
 
+		completed = true
 		jsonBytes, err := json.Marshal(resultData)
 		if err != nil {
-			jobLogGlobal.ErrorE(fmt.Sprintf("[%s] JSON marshal failed", job.Id), err)
-			if submitErr := client.JobsScreenshotResult(ctx, job.Id, true, fmt.Sprintf("JSON error: %v", err)); submitErr != nil {
-				jobLogGlobal.ErrorE(fmt.Sprintf("[%s] Failed to submit screenshot error", job.Id), submitErr)
-			}
+			Emit(events, TuiEvent{
+				Type:          EventActivity,
+				Source:        "Jobs",
+				ActivityLevel: "error",
+				Message:       fmt.Sprintf("JSON marshal failed: %v", err),
+			})
+			submitCategoryError(ctx, client, events, job.Id, category, fmt.Sprintf("JSON error: %v", err))
 			return
 		}
 
-		if err := client.JobsScreenshotResult(ctx, job.Id, false, string(jsonBytes)); err != nil {
-			jobLogGlobal.ErrorE(fmt.Sprintf("[%s] Failed to submit screenshot result", job.Id), err)
+		if submitErr := submitCategoryResult(ctx, client, job.Id, category, false, string(jsonBytes)); submitErr != nil {
+			NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit screenshot result", job.Id), submitErr)
 			return
 		}
+		return
 	} else {
 		var cmd *exec.Cmd
 		if runtime.GOOS == "windows" {
@@ -92,19 +126,37 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			jobLogGlobal.Verbose("[%s] Process exited with error: %v", job.Id, err)
+			completed = true
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  false,
+				ErrorMsg: err.Error(),
+				Duration: time.Since(startTime),
+			})
 		}
 
 		outStr := string(output)
 		isError := err != nil
 
+		if outStr != "" {
+			for _, line := range strings.Split(outStr, "\n") {
+				if line != "" {
+					Emit(events, TuiEvent{
+						Type:         EventJobOutput,
+						JobID:        job.Id,
+						OutputLine:   line,
+						OutputStream: "output",
+					})
+				}
+			}
+		}
+
 		if submitErr := submitCategoryResult(ctx, client, job.Id, category, isError, outStr); submitErr != nil {
-			jobLogGlobal.ErrorE(fmt.Sprintf("[%s] Failed to submit result", job.Id), submitErr)
+			NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit result", job.Id), submitErr)
 			return
 		}
 	}
-
-	jobLogGlobal.Success("[%s] Completed", job.Id)
 }
 
 // submitCategoryResult submits the command output to the appropriate category-specific endpoint.
@@ -136,8 +188,8 @@ func submitCategoryResult(ctx context.Context, client *oasm.Client, jobID, categ
 }
 
 // submitCategoryError submits an error to the appropriate category-specific endpoint.
-func submitCategoryError(ctx context.Context, client *oasm.Client, jobID, category, errMsg string) {
+func submitCategoryError(ctx context.Context, client *oasm.Client, events chan<- TuiEvent, jobID, category, errMsg string) {
 	if submitErr := submitCategoryResult(ctx, client, jobID, category, true, errMsg); submitErr != nil {
-		jobLogGlobal.ErrorE(fmt.Sprintf("[%s] Failed to submit error", jobID), submitErr)
+		NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit error", jobID), submitErr)
 	}
 }

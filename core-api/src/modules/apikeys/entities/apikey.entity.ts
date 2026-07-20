@@ -15,7 +15,7 @@ export class ApiKey extends BaseEntity {
   key: string;
 
   @ApiProperty({ enum: ApiKeyType })
-  @Column({ type: 'enum', enum: ApiKeyType })
+  @Column({ type: 'varchar' })
   type: ApiKeyType;
 
   @Column({ nullable: true })

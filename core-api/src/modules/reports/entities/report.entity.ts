@@ -16,8 +16,7 @@ export class Report extends BaseEntity {
   user: Relation<User>;
 
   @Column({
-    type: 'enum',
-    enum: ['SUMMARY', 'VULNERABILITY'],
+    type: 'varchar',
     default: 'SUMMARY',
   })
   type: 'SUMMARY' | 'VULNERABILITY';

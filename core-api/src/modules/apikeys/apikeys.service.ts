@@ -81,6 +81,7 @@ export class ApiKeysService {
         ref: createApiKeyDto.ref,
         isRevoked: false,
       })
+      .updateEntity(false)
       .execute();
     return this.apiKeysRepository.save(apiKey);
   }

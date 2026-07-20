@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { Role } from '@/common/enums/enum';
 import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
+import { TelegramConnect } from '@/modules/integrations/entities/telegram-connect.entity';
 import { ToolProvider } from '@/modules/providers/entities/provider.entity';
 import { SearchHistory } from '@/modules/search/entities/search-history.entity';
 import { VulnerabilityDismissal } from '@/modules/vulnerabilities/entities/vulnerability-dismissal.entity';
@@ -28,7 +29,7 @@ export class User extends BaseEntity {
   image?: string;
 
   @ApiProperty({ enum: Role })
-  @Column({ type: 'enum', enum: Role, default: Role.USER })
+  @Column({ type: 'varchar', default: Role.USER })
   role: Role;
 
   @Column({ type: 'text', default: 'en' })
@@ -78,4 +79,10 @@ export class User extends BaseEntity {
     (vulnerabilityDismissal) => vulnerabilityDismissal.user,
   )
   vulnerabilityDismissals: Relation<VulnerabilityDismissal[]>;
+
+  @OneToMany(
+    () => TelegramConnect,
+    (telegramConnect) => telegramConnect.user,
+  )
+  telegramConnects: Relation<TelegramConnect[]>;
 }

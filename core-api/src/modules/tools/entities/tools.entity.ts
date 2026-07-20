@@ -61,7 +61,7 @@ export class Tool {
 
   @ApiProperty({ enum: ToolCategory })
   @IsEnum(ToolCategory)
-  @Column({ type: 'enum', enum: ToolCategory })
+  @Column({ type: 'varchar' })
   category?: ToolCategory;
 
   @ApiProperty()
@@ -91,7 +91,7 @@ export class Tool {
   isOfficialSupport?: boolean;
 
   @ApiProperty()
-  @Column({ type: 'enum', enum: WorkerType, default: WorkerType.BUILT_IN })
+  @Column({ type: 'varchar', default: WorkerType.BUILT_IN })
   @IsEnum(WorkerType)
   type?: WorkerType;
 
@@ -127,7 +127,7 @@ export class Tool {
   @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.tool)
   workers?: Relation<WorkerInstance[]>;
 
-  @Column({ type: 'enum', enum: JobPriority, default: JobPriority.BACKGROUND })
+  @Column({ type: 'varchar', default: JobPriority.BACKGROUND })
   priority?: JobPriority;
 
   @ApiProperty({ required: false })

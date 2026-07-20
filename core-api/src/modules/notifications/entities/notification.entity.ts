@@ -6,10 +6,10 @@ import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm'
 @Entity('notifications')
 @Index('IDX_notifications_workspaceId', ['workspace'])
 export class Notification extends BaseEntity {
-  @Column({ type: 'enum', enum: NotificationScope })
+  @Column({ type: 'varchar' })
   scope: NotificationScope;
 
-  @Column({ type: 'enum', enum: NotificationType })
+  @Column({ type: 'varchar' })
   type: NotificationType;
 
   @Column('jsonb')

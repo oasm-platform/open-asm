@@ -148,6 +148,7 @@ export enum NotificationType {
   WORKSPACE_CREATED = 'WORKSPACE_CREATED',
   VULNERABILITY_ANALYSIS_COMPLETED = 'VULNERABILITY_ANALYSIS_COMPLETED',
   ASSET_NEW_DETECT = 'ASSET_NEW_DETECT',
+  NEW_VULNERABILITY_FOUND = 'NEW_VULNERABILITY_FOUND',
 }
 
 export enum Language {
@@ -237,4 +238,15 @@ export enum DefaultWorkflow {
 export enum EventTriggerType {
   WORKFLOW_START = 'WORKFLOW_START',
   WORKFLOW_END = 'WORKFLOW_END',
+}
+
+export enum IntegrationType {
+  TICKETING = 'TICKETING',
+  NOTIFICATION = 'NOTIFICATION',
+  CLOUD_PROVIDER = 'CLOUD_PROVIDER',
+}
+
+export enum TelegramConnectStatus {
+  PENDING = 'PENDING',
+  CONNECTED = 'CONNECTED',
 }
