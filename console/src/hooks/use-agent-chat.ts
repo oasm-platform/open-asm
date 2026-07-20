@@ -1,12 +1,11 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
-import type { AgentTodoItem } from '@/components/agents/agent-todo-panel';
+import type { AgentTodoItem } from '@/pages/agents/components/agent-todo-panel';
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
-  useAgentsControllerGetLLMConfigs,
   useAgentsControllerGetMessagesInfinite,
   type ConversationResponseDto,
-  type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { orvalClient } from '@/services/apis/axios-client';
 import { useRemoteExecuteStream } from '@/hooks/use-remote-execute-stream';
@@ -229,15 +228,23 @@ export function useAgentChat({
   const [title, setTitle] = useState<string | null>(null);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
-  const { data: providers } =
-    useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
-  const prefer = providers?.find((item) => item.isPreferred);
-  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
-    prefer?.configId
-      ? { provider: prefer.providerId, model: prefer.model ?? '', configId: prefer.configId }
-      : null,
-  );
+  const { preferredProvider } = useLLMConfigs();
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(null);
   const selectedModelRef = useRef<SelectedModel | null>(selectedModel);
+  const hasUserSelectedModel = useRef(false);
+
+  // Populate selectedModel from preferredProvider once it loads, unless user
+  // has already made an explicit selection.
+  useEffect(() => {
+    if (hasUserSelectedModel.current || !preferredProvider?.configId) return;
+    const model = {
+      provider: preferredProvider.providerId,
+      model: preferredProvider.model ?? '',
+      configId: preferredProvider.configId,
+    };
+    setSelectedModel(model);
+    selectedModelRef.current = model;
+  }, [preferredProvider]);
   const [agentMode, setAgentMode] = useState('ask');
   const agentModeRef = useRef('ask');
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(
@@ -434,6 +441,7 @@ export function useAgentChat({
 
   const handleSelectModel = useCallback(
     (provider: string, model: string, configId: string) => {
+      hasUserSelectedModel.current = true;
       setSelectedModel({ provider, model, configId });
     },
     [],
@@ -599,6 +607,7 @@ export function useAgentChat({
     if (state?.pendingMessage && !hasAutoSentRef.current) {
       hasAutoSentRef.current = true;
       if (state.selectedModel) {
+        hasUserSelectedModel.current = true;
         setSelectedModel(state.selectedModel);
         selectedModelRef.current = state.selectedModel;
       }

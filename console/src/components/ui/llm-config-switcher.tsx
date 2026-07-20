@@ -1,3 +1,4 @@
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,11 +12,6 @@ import {
 } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
-import type { LLMConfigWithProviderDto } from '@/services/apis/gen/queries';
-import {
-  useAgentsControllerGetLLMConfigs,
-  useAgentsControllerSetPreferredLLMConfig,
-} from '@/services/apis/gen/queries';
 import { Check, ChevronsUpDown, Settings } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
@@ -28,19 +24,17 @@ export function LlmConfigSwitcher() {
   const itemHeightClass = 'h-10';
 
   const {
-    data: providers,
+    connectedProviders,
+    preferredProvider,
     isLoading,
     refetch,
-  } = useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
+    setPreferredConfig: setPreferred,
+  } = useLLMConfigs();
 
-  const { mutate: setPreferred } = useAgentsControllerSetPreferredLLMConfig();
-
-  const connectedProviders = (providers ?? []).filter((p) => p.isConnected);
-  const preferredProvider = connectedProviders.find((p) => p.isPreferred);
   const selectedProvider = preferredProvider ?? connectedProviders[0];
 
   const handleSelectConfig = (configId: string, configName: string) => {
-    setPreferred(
+    setPreferred.mutate(
       { id: configId },
       {
         onSuccess: () => {

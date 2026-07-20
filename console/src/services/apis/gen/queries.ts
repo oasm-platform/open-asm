@@ -171,6 +171,18 @@ export type UpdateTargetDto = {
 
 export type WorkspaceArchivedAt = { [key: string]: unknown };
 
+/**
+ * Encrypted Data Encryption Key (DEK) for this workspace. Encrypted with system KEK. Null for workspaces created before envelope encryption.
+ * @nullable
+ */
+export type WorkspaceDek = { [key: string]: unknown } | null;
+
+/**
+ * Timestamp when DEK was generated
+ * @nullable
+ */
+export type WorkspaceDekAt = { [key: string]: unknown } | null;
+
 export type Workspace = {
   id: string;
   createdAt: string;
@@ -184,6 +196,16 @@ export type Workspace = {
   isAssetsDiscovery: boolean;
   /** Assets are automatically enabled after discovery */
   isAutoEnableAssetAfterDiscovered: boolean;
+  /**
+   * Encrypted Data Encryption Key (DEK) for this workspace. Encrypted with system KEK. Null for workspaces created before envelope encryption.
+   * @nullable
+   */
+  dek?: WorkspaceDek;
+  /**
+   * Timestamp when DEK was generated
+   * @nullable
+   */
+  dekAt?: WorkspaceDekAt;
 };
 
 export type CreateWorkspaceDtoArchivedAt = { [key: string]: unknown };
@@ -1482,10 +1504,13 @@ export type LLMConfigResponseDtoProvider =
 
 export const LLMConfigResponseDtoProvider = {
   openai: 'openai',
-  openrouter: 'openrouter',
-  gemini: 'gemini',
   anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
   kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
   custom: 'custom',
 } as const;
 
@@ -1508,10 +1533,13 @@ export type CreateLLMConfigDtoProvider =
 
 export const CreateLLMConfigDtoProvider = {
   openai: 'openai',
-  openrouter: 'openrouter',
-  gemini: 'gemini',
   anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
   kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
   custom: 'custom',
 } as const;
 
@@ -1528,15 +1556,47 @@ export type CreateLLMConfigDto = {
 /**
  * Provider identifier
  */
+export type LLMProviderSupportedDtoId =
+  (typeof LLMProviderSupportedDtoId)[keyof typeof LLMProviderSupportedDtoId];
+
+export const LLMProviderSupportedDtoId = {
+  openai: 'openai',
+  anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
+  kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
+  custom: 'custom',
+} as const;
+
+export type LLMProviderSupportedDto = {
+  /** Provider identifier */
+  id: LLMProviderSupportedDtoId;
+  /** Provider display name */
+  name: string;
+  /** Provider logo path */
+  logo: string;
+  /** Whether provider accepts custom API URL */
+  isAcceptCustomApiUrl?: boolean;
+};
+
+/**
+ * Provider identifier
+ */
 export type LLMConfigWithProviderDtoProviderId =
   (typeof LLMConfigWithProviderDtoProviderId)[keyof typeof LLMConfigWithProviderDtoProviderId];
 
 export const LLMConfigWithProviderDtoProviderId = {
   openai: 'openai',
-  openrouter: 'openrouter',
-  gemini: 'gemini',
   anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
   kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
   custom: 'custom',
 } as const;
 
@@ -1581,10 +1641,13 @@ export type UpdateLLMConfigDtoProvider =
 
 export const UpdateLLMConfigDtoProvider = {
   openai: 'openai',
-  openrouter: 'openrouter',
-  gemini: 'gemini',
   anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
   kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
   custom: 'custom',
 } as const;
 
@@ -1982,6 +2045,14 @@ export type TestIntegrationDto = {
   text?: string;
 };
 
+export type TelegramConnectDtoStatus =
+  (typeof TelegramConnectDtoStatus)[keyof typeof TelegramConnectDtoStatus];
+
+export const TelegramConnectDtoStatus = {
+  PENDING: 'PENDING',
+  CONNECTED: 'CONNECTED',
+} as const;
+
 export type TelegramConnectDto = {
   id: string;
   telegramChatId?: string;
@@ -1990,7 +2061,7 @@ export type TelegramConnectDto = {
   telegramLastName?: string;
   connectToken: string;
   tokenExpiredAt?: string;
-  status: string;
+  status: TelegramConnectDtoStatus;
   isActive: boolean;
   integrationId: string;
   userId: string;
@@ -17680,30 +17751,30 @@ export const useAgentsControllerCreateLLMConfig = <
 };
 
 /**
- * Get all LLM providers with their configuration status for the workspace
- * @summary List LLM configs with provider info
+ * Get all supported LLM providers with their metadata
+ * @summary Get supported providers
  */
-export const agentsControllerGetLLMConfigs = (
+export const agentsControllerGetProviders = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<LLMConfigWithProviderDto[]>(
-    { url: `/api/agents/llm-configs`, method: 'GET', signal },
+  return orvalClient<LLMProviderSupportedDto[]>(
+    { url: `/api/agents/providers`, method: 'GET', signal },
     options,
   );
 };
 
-export const getAgentsControllerGetLLMConfigsQueryKey = () => {
-  return [`/api/agents/llm-configs`] as const;
+export const getAgentsControllerGetProvidersQueryKey = () => {
+  return [`/api/agents/providers`] as const;
 };
 
-export const getAgentsControllerGetLLMConfigsQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+export const getAgentsControllerGetProvidersQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviders>>,
   TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+      Awaited<ReturnType<typeof agentsControllerGetProviders>>,
       TError,
       TData
     >
@@ -17713,41 +17784,41 @@ export const getAgentsControllerGetLLMConfigsQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAgentsControllerGetLLMConfigsQueryKey();
+    queryOptions?.queryKey ?? getAgentsControllerGetProvidersQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
-  > = ({ signal }) => agentsControllerGetLLMConfigs(requestOptions, signal);
+    Awaited<ReturnType<typeof agentsControllerGetProviders>>
+  > = ({ signal }) => agentsControllerGetProviders(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+    Awaited<ReturnType<typeof agentsControllerGetProviders>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AgentsControllerGetLLMConfigsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
+export type AgentsControllerGetProvidersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetProviders>>
 >;
-export type AgentsControllerGetLLMConfigsQueryError = unknown;
+export type AgentsControllerGetProvidersQueryError = unknown;
 
-export function useAgentsControllerGetLLMConfigs<
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+export function useAgentsControllerGetProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviders>>,
   TError = unknown,
 >(
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+        Awaited<ReturnType<typeof agentsControllerGetProviders>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+          Awaited<ReturnType<typeof agentsControllerGetProviders>>,
           TError,
-          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
+          Awaited<ReturnType<typeof agentsControllerGetProviders>>
         >,
         'initialData'
       >;
@@ -17757,23 +17828,23 @@ export function useAgentsControllerGetLLMConfigs<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAgentsControllerGetLLMConfigs<
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+export function useAgentsControllerGetProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviders>>,
   TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+        Awaited<ReturnType<typeof agentsControllerGetProviders>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+          Awaited<ReturnType<typeof agentsControllerGetProviders>>,
           TError,
-          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
+          Awaited<ReturnType<typeof agentsControllerGetProviders>>
         >,
         'initialData'
       >;
@@ -17783,14 +17854,14 @@ export function useAgentsControllerGetLLMConfigs<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAgentsControllerGetLLMConfigs<
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+export function useAgentsControllerGetProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviders>>,
   TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+        Awaited<ReturnType<typeof agentsControllerGetProviders>>,
         TError,
         TData
       >
@@ -17802,17 +17873,17 @@ export function useAgentsControllerGetLLMConfigs<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary List LLM configs with provider info
+ * @summary Get supported providers
  */
 
-export function useAgentsControllerGetLLMConfigs<
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+export function useAgentsControllerGetProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviders>>,
   TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+        Awaited<ReturnType<typeof agentsControllerGetProviders>>,
         TError,
         TData
       >
@@ -17823,7 +17894,164 @@ export function useAgentsControllerGetLLMConfigs<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAgentsControllerGetLLMConfigsQueryOptions(options);
+  const queryOptions = getAgentsControllerGetProvidersQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Get all connected LLM provider configurations for the workspace
+ * @summary Get connected providers
+ */
+export const agentsControllerGetConnectedProviders = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<LLMConfigWithProviderDto[]>(
+    { url: `/api/agents/providers/connected`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetConnectedProvidersQueryKey = () => {
+  return [`/api/agents/providers/connected`] as const;
+};
+
+export const getAgentsControllerGetConnectedProvidersQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetConnectedProvidersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>
+  > = ({ signal }) =>
+    agentsControllerGetConnectedProviders(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetConnectedProvidersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>
+>;
+export type AgentsControllerGetConnectedProvidersQueryError = unknown;
+
+export function useAgentsControllerGetConnectedProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConnectedProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConnectedProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get connected providers
+ */
+
+export function useAgentsControllerGetConnectedProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConnectedProviders>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAgentsControllerGetConnectedProvidersQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

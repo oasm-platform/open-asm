@@ -215,8 +215,21 @@ export class IntegrationsController {
     @Param('integrationId') integrationId: string,
     @Body() update: unknown,
   ) {
+    // Resolve bot token so /start without token can reply with instructions
+    let botToken: string | undefined;
+    try {
+      const { decryptedConfig } =
+        await this.integrationsService.getDecryptedIntegrationById(
+          integrationId,
+        );
+      botToken = decryptedConfig.botToken as string | undefined;
+    } catch {
+      // Integration not found or decryption failed — proceed without botToken
+    }
+
     await this.telegramWebhookService.processUpdate(
       update as Parameters<TelegramWebhookService['processUpdate']>[0],
+      { botToken, integrationId },
     );
     return { ok: true };
   }
@@ -259,6 +272,11 @@ export class IntegrationsController {
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
   ) {
-    return this.telegramConnectService.disconnect(connectId, id, workspaceId, userId);
+    return this.telegramConnectService.disconnect(
+      connectId,
+      id,
+      workspaceId,
+      userId,
+    );
   }
 }

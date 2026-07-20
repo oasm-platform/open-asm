@@ -1,3 +1,4 @@
+import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
 import { ConnectWorkerDialog } from '@/components/ui/connect-worker-dialog';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
@@ -20,6 +21,7 @@ export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
         <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">{children}</main>
       </SidebarInset>
       <ConnectWorkerDialog />
+      <AgentSettingsDialog />
     </SidebarProvider>
   );
 }

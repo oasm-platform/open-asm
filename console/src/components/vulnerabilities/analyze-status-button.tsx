@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
   VulnerabilityAnalyzeStatus,
-  vulnerabilitiesControllerAnalyzeVulnerability,
+  useVulnerabilitiesControllerAnalyzeVulnerability,
 } from '@/services/apis/gen/queries';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Loader2, Play, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -63,28 +64,36 @@ export function AnalyzeStatusButton({
   onAnalyze,
   onView,
 }: AnalyzeStatusButtonProps) {
-  const queryClient = useQueryClient();
+  const { hasProviderConnected, isLoading: llmLoading } = useLLMConfigs();
+  const { open: openAgentSettings } = useAgentSettingsDialog();
+  const { mutate: analyzeVulnerability } =
+    useVulnerabilitiesControllerAnalyzeVulnerability();
+
   const config =
     statusConfig[status] ||
     statusConfig[VulnerabilityAnalyzeStatus.not_analyzed];
 
-  const { mutate: analyzeVulnerability } = useMutation({
-    mutationFn: ({ id: vulnId, forceRerun }: { id: string; forceRerun?: boolean }) =>
-      vulnerabilitiesControllerAnalyzeVulnerability(vulnId, { forceRerun: forceRerun ?? false }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
-      onAnalyze?.();
-    },
-  });
-
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // If no LLM provider is connected, redirect to agent settings
+    if (!llmLoading && !hasProviderConnected) {
+      openAgentSettings();
+      return;
+    }
+
     if (status === VulnerabilityAnalyzeStatus.not_analyzed) {
-      analyzeVulnerability({ id, forceRerun: false });
+      analyzeVulnerability(
+        { id, data: { forceRerun: false } },
+        { onSuccess: () => onAnalyze?.() },
+      );
     } else if (status === VulnerabilityAnalyzeStatus.done) {
       onView?.();
     } else if (status === VulnerabilityAnalyzeStatus.failed) {
-      analyzeVulnerability({ id, forceRerun: true });
+      analyzeVulnerability(
+        { id, data: { forceRerun: true } },
+        { onSuccess: () => onAnalyze?.() },
+      );
     }
   };
 
