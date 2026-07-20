@@ -1,10 +1,10 @@
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import type {
-  LLMConfigWithProviderDto,
   ProviderModelDto,
 } from '@/services/apis/gen/queries';
 import {
-  useAgentsControllerGetLLMConfigs,
   useAgentsControllerGetProviderModels,
   useAgentsControllerUpdateLLMConfig,
 } from '@/services/apis/gen/queries';
@@ -117,18 +117,17 @@ export function ChatModelSwitcher({
   selectedModel,
   onSelectModel,
 }: ChatModelSwitcherProps) {
+  const { setState: openDialog } = useAgentSettingsDialog();
   const [open, setOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: providers } =
-    useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
+  const { connectedProviders } = useLLMConfigs();
 
   const connectedConfigs = useMemo(
-    () => (providers ?? []).filter((p) => p.isConnected && p.configId),
-    [providers],
+    () => connectedProviders.filter((p) => p.configId),
+    [connectedProviders],
   );
 
   const preferredConfig = useMemo(
@@ -220,16 +219,13 @@ export function ChatModelSwitcher({
       <>
         <button
           type="button"
-          onClick={() => setSettingsOpen(true)}
+          onClick={() => openDialog(true)}
           className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
         >
           <Settings className="h-3.5 w-3.5" />
           Connect LLM
         </button>
-        <AgentSettingsDialog
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-        />
+        <AgentSettingsDialog />
       </>
     );
   }
@@ -284,13 +280,13 @@ export function ChatModelSwitcher({
         </div>
         <button
           type="button"
-          onClick={() => setSettingsOpen(true)}
+          onClick={() => openDialog(true)}
           className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
         >
           <Settings className="h-3.5 w-3.5" />
         </button>
       </div>
-      <AgentSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <AgentSettingsDialog />
     </>
   );
 }

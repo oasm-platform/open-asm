@@ -1,60 +1,25 @@
-import Page from '@/components/common/page';
-import LlmConnect from '@/components/llm-connect';
-import TypewriterText from '@/components/typewriter-text';
 import AgentPromptInput from '@/components/agent-prompt-input';
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
+import Page from '@/components/common/page';
+import TypewriterText from '@/components/typewriter-text';
 
+import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
+import { Button } from '@/components/ui/button';
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
-import type {
-  ConversationResponseDto,
-  LLMConfigWithProviderDto,
-} from '@/services/apis/gen/queries';
-import {
-  useAgentsControllerGetConversations,
-  useAgentsControllerGetLLMConfigs,
-} from '@/services/apis/gen/queries';
-import { MessageSquare, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ConversationResponseDto } from '@/services/apis/gen/queries';
+import { useAgentsControllerGetConversations } from '@/services/apis/gen/queries';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
+import { MessageSquare, Plus, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { v7 as uuidv7 } from 'uuid';
-// import AgentIcon from './agent-icon';
+// import AgentIcon from './components/agent-icon';
 
-const CONVERSATION_STARTERS = [
-  'How can I help secure your application today?',
-  'Ready to strengthen your security posture.',
-  'What security challenge are you facing?',
-  'Let me help you find and fix vulnerabilities.',
-  'Ask me anything about application security.',
-  'Your AI security assistant is ready.',
-  'Need help with a security issue?',
-  "What's your security concern today?",
-  "I'm listening. Tell me about your security needs.",
-  'Your security matters. I am here to help.',
-  'Share your security concerns. I am all ears.',
-  'I am ready to assist with your security questions.',
-  'Tell me what is on your mind regarding security.',
-  'I am here and attentive to your security needs.',
-  'Your security questions are important to me.',
-  'I am tuned in. What security topics interest you?',
-];
-
-const ALL_QUICK_SUGGESTIONS = [
-  'What is the attack surface of my current workspace?',
-  'Are there any exposed services or ports in my project?',
-  'What security risks exist in my current environment?',
-  'How can I reduce the attack surface of my application?',
-  'What entry points need security hardening in my workspace?',
-  'Which network services are publicly accessible in my setup?',
-  'What APIs are exposed without proper authentication?',
-  'Are there unnecessary ports open in my infrastructure?',
-  'What cloud resources are vulnerable to external attacks?',
-  'How can I identify shadow IT in my organization?',
-  'What third-party integrations increase my attack surface?',
-  'Are there misconfigured security groups in my environment?',
-  'What endpoints lack proper rate limiting?',
-  'How can I discover undocumented API endpoints?',
-  'What services are running with excessive permissions?',
-];
+import {
+  ALL_QUICK_SUGGESTIONS,
+  CONVERSATION_STARTERS,
+} from './components/landing-constants';
 
 const routeApi = getRouteApi('/_authed/agents/');
 
@@ -68,9 +33,9 @@ export default function AgentsLandingPage() {
     configId: string;
   } | null>(null);
   const [agentMode, setAgentMode] = useState('ask');
-  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(
-    null,
-  );
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
+
+  const { setState: openSettings } = useAgentSettingsDialog();
 
   const {
     state: { selectedWorkspaceId },
@@ -86,28 +51,14 @@ export default function AgentsLandingPage() {
     },
   );
 
-  const { data: llmProviders } = useAgentsControllerGetLLMConfigs<
-    LLMConfigWithProviderDto[]
-  >({
-    query: {
-      queryKey: ['/api/agents/llm-configs', selectedWorkspaceId],
-      enabled: !!selectedWorkspaceId,
-    },
+  const { hasProviderConnected } = useLLMConfigs({
+    enabled: !!selectedWorkspaceId,
   });
 
   const conversations: ConversationResponseDto[] = useMemo(
     () => conversationsData?.data ?? [],
     [conversationsData],
   );
-
-  const hasProviderConnected = useMemo(() => {
-    const list = Array.isArray(llmProviders)
-      ? llmProviders
-      : (llmProviders as unknown as { data?: LLMConfigWithProviderDto[] })
-          ?.data;
-    const providersArray = Array.isArray(list) ? list : [];
-    return providersArray.some((p) => p.isConnected);
-  }, [llmProviders]);
 
   // Randomly select 5 suggestions from the pool and shuffle them
   const quickSuggestions = useMemo(() => {
@@ -176,10 +127,12 @@ export default function AgentsLandingPage() {
               </p>
             </div>
           </div>
-          <div className="w-full max-w-md">
-            <LlmConnect />
-          </div>
+          <Button variant="outline" onClick={() => openSettings(true)}>
+            <Plus className="h-4 w-4" />
+            Connect
+          </Button>
         </div>
+        <AgentSettingsDialog />
       </Page>
     );
   }

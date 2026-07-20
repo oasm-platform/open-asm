@@ -160,9 +160,11 @@ export function ChatHistory({
                               {conv.title ?? 'New conversation'}
                             </button>
                             
-                            <div className="opacity-0 group-hover:opacity-100 flex items-center shrink-0 pr-1 transition-all">
+                            <div className="flex items-center shrink-0 pr-1 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                               {onRenameConversation && (
                                 <button
+                                  type="button"
+                                  aria-label="Rename conversation"
                                   onClick={(e) => startEditing(e, conv)}
                                   className="p-1.5 rounded hover:bg-muted text-muted-foreground transition-colors"
                                   title="Rename conversation"
@@ -178,6 +180,8 @@ export function ChatHistory({
                                 confirmText="Delete"
                                 trigger={
                                   <button
+                                    type="button"
+                                    aria-label="Delete conversation"
                                     onClick={(e) => e.stopPropagation()}
                                     className="p-1.5 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
                                     title="Delete conversation"

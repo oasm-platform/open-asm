@@ -13,6 +13,8 @@ import {
   useAssetsControllerUpdateAssetById,
   type AssetTag,
 } from '@/services/apis/gen/queries';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { Loader2, Plus, Sparkles, Tag } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
@@ -31,6 +33,8 @@ const AddTagDialog = (props: AddTagDialogProps) => {
   );
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const { hasProviderConnected, isLoading: llmLoading } = useLLMConfigs();
+  const { open: openAgentSettings } = useAgentSettingsDialog();
   const { mutate } = useAssetsControllerUpdateAssetById();
   const { mutate: generateTags, isPending: isGenerating } =
     useAssetsControllerGenerateServiceTags();
@@ -47,6 +51,10 @@ const AddTagDialog = (props: AddTagDialogProps) => {
   }, [isOpen, tagList]); // Add tagList to dependency array to ensure focus when tags change
 
   const handleGenerateTags = () => {
+    if (!llmLoading && !hasProviderConnected) {
+      openAgentSettings();
+      return;
+    }
     generateTags(
       { data: { assetServiceId: id } },
       {
