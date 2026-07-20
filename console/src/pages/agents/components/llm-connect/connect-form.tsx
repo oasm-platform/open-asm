@@ -4,7 +4,7 @@ import type { LLMConfigWithProviderDto } from '@/services/apis/gen/queries';
 import { LLMConfigWithProviderDtoProviderId } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { getConnectSchema, type ConnectFormData } from './schema';
 
 export function ConnectForm({
@@ -34,7 +34,7 @@ export function ConnectForm({
     handleSubmit: handleFormSubmit,
     formState: { errors },
   } = useForm<ConnectFormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as Resolver<ConnectFormData>,
     defaultValues: {
       name: provider.providerName ?? '',
       apiUrl: '',
