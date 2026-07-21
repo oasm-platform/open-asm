@@ -1,5 +1,5 @@
 import Page from '@/components/common/page';
-import LlmConnect from '@/components/llm-connect';
+import LlmConnect from '@/pages/agents/components/llm-connect';
 
 export default function ProvidersConnectPage() {
   return (

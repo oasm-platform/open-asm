@@ -8,12 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  useAgentsControllerDeleteLLMConfig,
-  useAgentsControllerGetLLMConfigs,
-  useAgentsControllerSetPreferredLLMConfig,
-  type LLMConfigWithProviderDto,
-} from '@/services/apis/gen/queries';
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { format } from 'date-fns';
 import { Loader2, MoreHorizontal, Pencil, Star, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from '@tanstack/react-router';
@@ -33,25 +28,16 @@ export function AgentDetail() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
 
-  const { data, isLoading } = useAgentsControllerGetLLMConfigs({
-    query: {
-      queryKey: ['agents', selectedWorkspaceId],
-      enabled: !!id && !!selectedWorkspaceId,
-    },
+  const { providers, isLoading, deleteConfig, setPreferredConfig } = useLLMConfigs({
+    enabled: !!id && !!selectedWorkspaceId,
   });
 
-  const { mutate: deleteConfig, isPending: isDeleting } =
-    useAgentsControllerDeleteLLMConfig();
-
-  const { mutate: setPreferred, isPending: isSettingPreferred } =
-    useAgentsControllerSetPreferredLLMConfig();
-
-  const agent = (data as LLMConfigWithProviderDto[] | undefined)?.find(
-    (a) => a.configId === id,
-  );
+  const agent = providers.find((a) => a.configId === id);
+  const isDeleting = deleteConfig.isPending;
+  const isSettingPreferred = setPreferredConfig.isPending;
 
   const handleDelete = () => {
-    deleteConfig(
+    deleteConfig.mutate(
       { id: id || '' },
       {
         onSuccess: () => {
@@ -67,7 +53,7 @@ export function AgentDetail() {
   };
 
   const handleSetPreferred = () => {
-    setPreferred(
+    setPreferredConfig.mutate(
       { id: id || '' },
       {
         onSuccess: () => {

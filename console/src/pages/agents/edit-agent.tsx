@@ -1,14 +1,10 @@
+import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import Page from '@/components/common/page';
-import {
-  useAgentsControllerGetLLMConfigs,
-  useAgentsControllerUpdateLLMConfig,
-  type UpdateLLMConfigDto,
-  type LLMConfigWithProviderDto,
-} from '@/services/apis/gen/queries';
+import type { UpdateLLMConfigDto } from '@/services/apis/gen/queries';
 import { Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import { AgentForm, type AgentFormData } from './agent-form';
+import { AgentForm, type AgentFormData } from './components/agent-form';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 export default function EditAgentPage() {
@@ -18,18 +14,18 @@ export default function EditAgentPage() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
 
-  const { data, isLoading } = useAgentsControllerGetLLMConfigs({
-    query: {
-      queryKey: ['agents', selectedWorkspaceId],
-      enabled: !!id && !!selectedWorkspaceId,
-    },
+  const {
+    providers,
+    isLoading,
+    invalidate,
+    updateConfig,
+  } = useLLMConfigs({
+    enabled: !!id && !!selectedWorkspaceId,
   });
 
-  const { mutate, isPending } = useAgentsControllerUpdateLLMConfig();
+  const { mutate, isPending } = updateConfig;
 
-  const agent = (data as LLMConfigWithProviderDto[] | undefined)?.find(
-    (a) => a.configId === id,
-  );
+  const agent = providers.find((a) => a.configId === id);
 
   const onSubmit = (formData: AgentFormData) => {
     const updateData: UpdateLLMConfigDto = {
@@ -51,6 +47,7 @@ export default function EditAgentPage() {
       },
       {
         onSuccess: () => {
+          invalidate();
           toast.success('Provider updated successfully');
           navigate({ to: `/agents/${id}` });
         },

@@ -1,10 +1,11 @@
-import LlmConnect from '@/components/llm-connect';
+import LlmConnect from '@/pages/agents/components/llm-connect';
 import { MemoryManager } from '@/components/memory-manager';
 import { SkillsManager } from '@/components/skills-manager';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Brain, KeyRound } from 'lucide-react';
 import { type ComponentType, type SVGProps } from 'react';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 
 interface TabConfig {
   value: 'provider' | 'skills' | 'memory';
@@ -42,16 +43,13 @@ const triggerClassName =
   'data-[state=active]:bg-sidebar-accent border-sidebar-accent data-[state=active]:text-sidebar-accent-foreground text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold border-0 shadow-none';
 
 interface AgentSettingsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   defaultTab?: 'provider' | 'skills' | 'memory';
 }
 
 export function AgentSettingsDialog({
-  open,
-  onOpenChange,
   defaultTab = 'provider',
 }: AgentSettingsDialogProps) {
+  const { state: open, setState: onOpenChange } = useAgentSettingsDialog();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="inset-0 w-full h-full max-w-none rounded-none translate-x-0 translate-y-0 sm:max-w-3xl sm:w-full sm:h-[80vh] sm:rounded-xl sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] flex flex-col gap-0 px-4 py-4 overflow-hidden">

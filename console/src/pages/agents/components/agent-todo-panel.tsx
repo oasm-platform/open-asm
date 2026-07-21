@@ -53,13 +53,17 @@ function TodoStatusIcon({ status }: { status: AgentTodoItem['status'] }) {
   const config = STATUS_CONFIG[status];
   const Icon = config.icon;
   return (
-    <Icon
-      className={cn(
-        'size-4 shrink-0 mt-0.5',
-        config.className,
-        status === 'in_progress' && 'animate-spin',
-      )}
-    />
+    <>
+      <Icon
+        aria-hidden="true"
+        className={cn(
+          'size-4 shrink-0 mt-0.5',
+          config.className,
+          status === 'in_progress' && 'animate-spin',
+        )}
+      />
+      <span className="sr-only">{config.label}</span>
+    </>
   );
 }
 

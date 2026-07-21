@@ -2,6 +2,7 @@ import {
   BullMQName,
   IntegrationType,
   NotificationStatus,
+  NotificationType,
 } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { RedisService } from '@/services/redis/redis.service';
@@ -18,6 +19,15 @@ import { decryptSensitiveConfigFields } from '../../integrations/validators/inte
 import { CreateNotificationDto } from '../dto/create-notification.dto';
 import { NotificationRecipient } from '../entities/notification-recipient.entity';
 import { Notification } from '../entities/notification.entity';
+
+/**
+ * Notification types that integrations (Slack, Telegram, etc.) will receive.
+ * Types not in this list are silently ignored — no push is sent.
+ */
+const ALLOWED_INTEGRATION_NOTIFICATION_TYPES: NotificationType[] = [
+  NotificationType.ASSET_NEW_DETECT,
+  NotificationType.NEW_VULNERABILITY_FOUND,
+];
 
 @Processor(BullMQName.NOTIFICATION)
 export class NotificationsConsumer extends WorkerHost {
@@ -106,6 +116,9 @@ export class NotificationsConsumer extends WorkerHost {
         );
 
       if (integrations.length === 0) return;
+
+      // Only push notification types in the allow list.
+      if (!ALLOWED_INTEGRATION_NOTIFICATION_TYPES.includes(type as NotificationType)) return;
 
       // Only push to integrations with this notification type enabled.
       const dek = await this.workspaceEncryption.getDEK(workspaceId);
