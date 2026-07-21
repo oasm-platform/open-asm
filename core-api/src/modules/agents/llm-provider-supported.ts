@@ -131,12 +131,23 @@ const fetchDeepSeekModels: LLMModelsFetcher = async (apiKey) => {
   return json ? sorted(json.data.map((m) => ({ id: m.id, name: m.id }))) : [];
 };
 
-const fetchAnthropicModels: LLMModelsFetcher = () =>
-  Promise.resolve([
-    { id: 'claude-opus-4-6', name: 'Claude Opus 4.6' },
-    { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
-    { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
-  ]);
+const fetchAnthropicModels: LLMModelsFetcher = async (apiKey) => {
+  const json = await fetchJson<{
+    data: Array<{ id: string; display_name?: string }>;
+  }>('https://api.anthropic.com/v1/models?limit=100', {
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+  });
+  return json
+    ? sorted(
+        json.data
+          .filter((m) => m.id.startsWith('claude-'))
+          .map((m) => ({ id: m.id, name: m.display_name ?? m.id })),
+      )
+    : [];
+};
 
 const fetchVercelModels: LLMModelsFetcher = async (apiKey) => {
   const json = await fetchJson<{ data: Array<{ id: string; name?: string }> }>(
