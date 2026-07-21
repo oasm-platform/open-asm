@@ -116,6 +116,14 @@ graph TD
 
 ![JobRegistry](docs/images/job_registry.png)
 
+![Integrations1](docs/images/integrations_1.png)
+
+![Integrations2](docs/images/integrations_2.png)
+
+![Agent1](docs/images/agent_1.png)
+
+![Agent2](docs/images/agent_2.png)
+
 ## Installation
 
 ### Docker (Recommended)
