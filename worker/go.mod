@@ -11,7 +11,7 @@ require (
 	github.com/go-rod/stealth v0.4.9
 	github.com/joho/godotenv v1.5.1
 	github.com/oasm-platform/oasm-sdk-go v0.1.12-0.20260716105723-303db93cfaf0
-	github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260716090326-5d99e6f8ae21
+	github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260721032108-cb532c9df20f
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 )
