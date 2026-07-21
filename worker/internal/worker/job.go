@@ -84,6 +84,13 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 				ActivityLevel: "warning",
 				Message:       fmt.Sprintf("Screenshot failed: %v", err),
 			})
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  false,
+				ErrorMsg: fmt.Sprintf("Screenshot error: %v", err),
+				Duration: time.Since(startTime),
+			})
 			submitCategoryError(ctx, client, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", err))
 			return
 		}
@@ -96,21 +103,36 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 			URL:        formatURL(url),
 		}
 
-		completed = true
 		jsonBytes, err := json.Marshal(resultData)
 		if err != nil {
+			completed = true
 			Emit(events, TuiEvent{
 				Type:          EventActivity,
 				Source:        "Jobs",
 				ActivityLevel: "error",
 				Message:       fmt.Sprintf("JSON marshal failed: %v", err),
 			})
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  false,
+				ErrorMsg: fmt.Sprintf("JSON error: %v", err),
+				Duration: time.Since(startTime),
+			})
 			submitCategoryError(ctx, client, events, job.Id, category, fmt.Sprintf("JSON error: %v", err))
 			return
 		}
 
 		if submitErr := submitCategoryResult(ctx, client, job.Id, category, false, string(jsonBytes)); submitErr != nil {
+			completed = true
 			NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit screenshot result", job.Id), submitErr)
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  false,
+				ErrorMsg: submitErr.Error(),
+				Duration: time.Since(startTime),
+			})
 			return
 		}
 		return
