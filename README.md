@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="core-api/public/images/logo.png" alt="OASM Logo" width="150" />
+</p>
+
 # Open Attack Surface Management (OASM)
 
 [![Latest Release](https://img.shields.io/github/v/release/oasm-platform/open-asm.svg)](https://github.com/oasm-platform/open-asm/releases)
