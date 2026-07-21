@@ -1,4 +1,3 @@
-import 'leaflet/dist/leaflet.css';
 import { useTheme } from '@/components/ui/theme-provider';
 import type { GeoIp } from '@/services/apis/gen/queries';
 import { MapPin } from 'lucide-react';

@@ -112,6 +112,7 @@ export class JobsRegistryController {
     summary: 'Updates subdomain scan results',
     description: 'Submit subdomain discovery results for a job',
   })
+  @WorkerTokenAuth()
   @Public()
   @Post('/:workerId/result/subdomains')
   updateSubdomainResult(
@@ -129,6 +130,7 @@ export class JobsRegistryController {
     summary: 'Updates HTTP probe results',
     description: 'Submit HTTP probe scan results for a job',
   })
+  @WorkerTokenAuth()
   @Public()
   @Post('/:workerId/result/http-probe')
   updateHttpProbeResult(
@@ -146,6 +148,7 @@ export class JobsRegistryController {
     summary: 'Updates port scan results',
     description: 'Submit port scanner results for a job',
   })
+  @WorkerTokenAuth()
   @Public()
   @Post('/:workerId/result/ports')
   updatePortsResult(
@@ -163,6 +166,7 @@ export class JobsRegistryController {
     summary: 'Updates vulnerability scan results',
     description: 'Submit vulnerability scan results for a job',
   })
+  @WorkerTokenAuth()
   @Public()
   @Post('/:workerId/result/vulnerabilities')
   updateVulnerabilitiesResult(
@@ -180,6 +184,7 @@ export class JobsRegistryController {
     summary: 'Updates screenshot results',
     description: 'Submit screenshot capture results for a job',
   })
+  @WorkerTokenAuth()
   @Public()
   @Post('/:workerId/result/screenshot')
   updateScreenshotResult(
@@ -197,6 +202,7 @@ export class JobsRegistryController {
     summary: 'Updates classifier results',
     description: 'Submit asset classification results for a job',
   })
+  @WorkerTokenAuth()
   @Public()
   @Post('/:workerId/result/classifier')
   updateClassifierResult(
@@ -214,6 +220,7 @@ export class JobsRegistryController {
     summary: 'Updates assistant results',
     description: 'Submit AI assistant results for a job',
   })
+  @WorkerTokenAuth()
   @Public()
   @Post('/:workerId/result/assistant')
   updateAssistantResult(

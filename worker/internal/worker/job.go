@@ -175,7 +175,15 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		}
 
 		if submitErr := submitCategoryResult(ctx, client, job.Id, category, isError, outStr); submitErr != nil {
+			completed = true
 			NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit result", job.Id), submitErr)
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  false,
+				ErrorMsg: submitErr.Error(),
+				Duration: time.Since(startTime),
+			})
 			return
 		}
 	}
