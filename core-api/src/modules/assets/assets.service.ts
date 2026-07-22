@@ -422,15 +422,6 @@ export class AssetsService {
       throw new NotFoundException('Workspace not found');
     }
 
-    const workspaceConfigs =
-      await this.workspaceService.getWorkspaceConfigValue(workspaceId);
-
-    if (!workspaceConfigs.isAssetsDiscovery) {
-      throw new BadRequestException(
-        'Asset discovery is disabled for this workspace',
-      );
-    }
-
     if (!target) {
       throw new NotFoundException('Target not found');
     }

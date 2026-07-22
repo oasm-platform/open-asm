@@ -32,6 +32,7 @@ import { randomUUID } from 'crypto';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { StorageService } from '../storage/storage.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
@@ -67,6 +68,7 @@ export class JobsRegistryService {
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
     private eventEmitter: EventEmitter2,
+    private workspaceService: WorkspacesService,
   ) {}
   public async getManyJobs(
     query: GetManyJobsRequestDto,
@@ -732,7 +734,27 @@ export class JobsRegistryService {
     const indexCurrentTool = workflow?.content.jobs.findIndex(
       (j) => j.name === currentJobMetadata.name,
     );
-    const nextTool = workflow?.content.jobs[indexCurrentTool + 1]?.run;
+
+    // Determine next tool index (skip SUBDOMAINS when assets discovery is disabled)
+    let nextToolIndex = indexCurrentTool + 1;
+    if (nextToolIndex >= jobs.length) return 0;
+
+    const workspaceId = workflow.workspace?.id;
+    if (workspaceId && !(await this.workspaceService.getWorkspaceConfigValue(workspaceId)).isAssetsDiscovery) {
+      // Batch-resolve remaining tools' categories to find first non-SUBDOMAINS
+      const remainingJobNames = jobs.slice(nextToolIndex).map((j) => j.run);
+      const tools = await this.toolsService.getToolByNames({
+        names: remainingJobNames,
+      });
+      const toolCategoryMap = new Map(tools.map((t) => [t.name, t.category]));
+      const skipIndex = jobs.slice(nextToolIndex).findIndex(
+        (j) => toolCategoryMap.get(j.run) !== ToolCategory.SUBDOMAINS,
+      );
+      if (skipIndex === -1) return 0;
+      nextToolIndex = indexCurrentTool + 1 + skipIndex;
+    }
+
+    const nextTool = jobs[nextToolIndex]?.run;
     if (!nextTool) return 0;
 
     const tools = await this.toolsService.getToolByNames({

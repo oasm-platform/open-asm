@@ -154,4 +154,43 @@ describe('AssetsService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  describe('reScan', () => {
+    const targetId = 'target-uuid';
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should not throw BadRequestException when isAssetsDiscovery is false (gate removed)', async () => {
+      const mockAsset = { id: 'asset-uuid', isPrimary: true };
+      const mockTarget = {
+        id: targetId,
+        reScanCount: 0,
+        type: 'domain',
+        value: 'example.com',
+      };
+
+      mockAssetRepository.findOne = jest.fn().mockResolvedValue(mockAsset);
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
+      mockTargetRepository.update = jest.fn().mockResolvedValue({});
+      mockWorkspacesService.getWorkspaceIdByTargetId = jest
+        .fn()
+        .mockResolvedValue('workspace-uuid');
+      mockEventEmitter.emit = jest.fn();
+
+      const result = await service.reScan(targetId);
+
+      // Should succeed (not throw), even though isAssetsDiscovery would be falsy if checked
+      expect(result).toEqual({ message: 'Scan started' });
+      expect(mockTargetRepository.update).toHaveBeenCalledWith(targetId, {
+        reScanCount: 1,
+        lastDiscoveredAt: expect.any(Date),
+      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.domain.re-scan',
+        mockTarget,
+      );
+    });
+  });
 });
