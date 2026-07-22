@@ -192,9 +192,9 @@ export type Workspace = {
   /** The description of the workspace */
   description: string;
   archivedAt?: WorkspaceArchivedAt;
-  /** Asset discovery is enabled for the workspace */
+  /** Automatically scan and detect internet-facing assets (domains, IPs) in workspace networks */
   isAssetsDiscovery: boolean;
-  /** Assets are automatically enabled after discovery */
+  /** Newly discovered assets become active immediately without manual review */
   isAutoEnableAssetAfterDiscovered: boolean;
   /**
    * Encrypted Data Encryption Key (DEK) for this workspace. Encrypted with system KEK. Null for workspaces created before envelope encryption.
@@ -240,9 +240,9 @@ export type GetWorkspaceConfigsDto = {
 };
 
 export type UpdateWorkspaceConfigsDto = {
-  /** Asset discovery is enabled for the workspace */
+  /** Automatically scan and detect internet-facing assets (domains, IPs) in workspace networks */
   isAssetsDiscovery: boolean;
-  /** Assets are automatically enabled after discovery */
+  /** Newly discovered assets become active immediately without manual review */
   isAutoEnableAssetAfterDiscovered: boolean;
 };
 
@@ -300,6 +300,8 @@ export type WorkspaceResponseDto = {
   memberCount: number;
   /** Role of the current user in the workspace */
   role: WorkspaceResponseDtoRole;
+  /** Members of the workspace */
+  workspaceMembers: unknown[];
 };
 
 export type GetManyWorkspaceResponseDtoDto = {

@@ -1,4 +1,4 @@
-import { Card } from '@/components/ui/card';
+import { useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +27,13 @@ export function WorkspaceConfigs() {
   });
   const { mutate: updateWorkspaceConfigs, isPending: isUpdating } =
     useWorkspacesControllerUpdateWorkspaceConfigs();
+
+  useEffect(() => {
+    if (selectedWorkspace) {
+      refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isLoading) {
     return (
@@ -78,7 +85,7 @@ export function WorkspaceConfigs() {
   };
 
   return (
-    <Card className="space-y-4 p-4">
+    <div className="space-y-4">
       {configs &&
         Object.entries(configs).map(([key, config]) => (
           <div key={key} className="flex items-center justify-between">
@@ -126,6 +133,6 @@ export function WorkspaceConfigs() {
             )}
           </div>
         ))}
-    </Card>
+    </div>
   );
 }

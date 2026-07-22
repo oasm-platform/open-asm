@@ -73,6 +73,25 @@ export class WorkspaceResponseDto {
     example: 'owner',
   })
   role: WorkspaceRole;
+
+  @ApiProperty({
+    description: 'Members of the workspace',
+    type: 'array',
+    example: [
+      {
+        id: 'member-uuid',
+        role: 'owner',
+        user: { id: 'user-uuid', name: 'John Doe', image: null },
+      },
+    ],
+  })
+  workspaceMembers: {
+    id: string;
+    role: WorkspaceRole;
+    user: { id: string; name: string; image?: string | null };
+    createdAt: Date;
+    updatedAt: Date;
+  }[];
 }
 
 export class WorkspaceStatisticsResponseDto {

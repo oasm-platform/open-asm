@@ -22,4 +22,20 @@ export class WorkspaceMembers extends BaseEntity {
 
   @Column({ type: 'varchar', default: WorkspaceRole.OWNER })
   role: WorkspaceRole;
+
+  toJSON() {
+    return {
+      id: this.id,
+      role: this.role,
+      user: this.user
+        ? {
+            id: this.user.id,
+            name: this.user.name,
+            image: this.user.image,
+          }
+        : undefined,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+    };
+  }
 }
