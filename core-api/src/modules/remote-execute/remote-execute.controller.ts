@@ -3,7 +3,7 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import type { MessageEvent } from '@nestjs/common';
-import { Controller, Post, Query, Sse, UseGuards } from '@nestjs/common';
+import { Controller, Query, Sse, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Observable } from 'rxjs';
 import { RemoteExecuteService } from './remote-execute.service';
@@ -14,13 +14,6 @@ import { RemoteExecuteService } from './remote-execute.service';
 export class RemoteExecuteController {
   constructor(private readonly remoteExecuteService: RemoteExecuteService) {}
 
-  @Post('run')
-  @Doc({
-    summary: 'Run a remote command',
-    description:
-      'Publishes a command to the remote-execute channel via Redis pub/sub. ' +
-      'The command is enriched with an id (nanoid) and sessionId (uuid) before publishing.',
-  })
   @Sse('stream')
   @Doc({
     summary: 'Subscribe to remote-execute stream',

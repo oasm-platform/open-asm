@@ -747,9 +747,10 @@ export class JobsRegistryService {
         names: remainingJobNames,
       });
       const toolCategoryMap = new Map(tools.map((t) => [t.name, t.category]));
-      const skipIndex = jobs.slice(nextToolIndex).findIndex(
-        (j) => toolCategoryMap.get(j.run) !== ToolCategory.SUBDOMAINS,
-      );
+      const skipIndex = jobs.slice(nextToolIndex).findIndex((j) => {
+        const category = toolCategoryMap.get(j.run);
+        return category !== undefined && category !== ToolCategory.SUBDOMAINS;
+      });
       if (skipIndex === -1) return 0;
       nextToolIndex = indexCurrentTool + 1 + skipIndex;
     }
