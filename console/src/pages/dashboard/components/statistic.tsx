@@ -5,6 +5,7 @@ import {
   useTimelineTrend,
   type TimelineStatistic,
 } from '@/hooks/useTimelineTrend';
+import { useNavigate } from '@tanstack/react-router';
 import {
   CloudCheck,
   Cpu,
@@ -14,7 +15,6 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useMemo } from 'react';
-import { useNavigate } from '@tanstack/react-router';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 
 export default function Statistic() {
@@ -105,9 +105,9 @@ export default function Statistic() {
             {card.icon}
           </CardHeader>
 
-          <CardContent className="pb-0 px-0 flex-1 flex flex-col justify-between">
-            <div className="px-6 flex items-baseline justify-between">
-              <p className="text-4xl font-bold font-mono">
+          <div className="flex-1 px-0  flex flex-col justify-between">
+            <div className="px-6 flex items-center justify-between mb-3">
+              <p className="text-4xl font-bold font-mono text-left">
                 <NumberAnimate value={card.value} />
               </p>
               {card.trend && card.trend.difference !== 0 && (
@@ -133,53 +133,51 @@ export default function Statistic() {
             </div>
 
             {chartData.length >= 2 && (
-              <div className="h-[60px] w-full mt-4">
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                  initialDimension={{ width: 320, height: 60 }}
-                  minHeight={60}
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 320, height: 60 }}
+                minHeight={60}
+              >
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+                  style={{ pointerEvents: 'none' }}
                 >
-                  <AreaChart
-                    data={chartData}
-                    margin={{ top: 10, right: 0, left: 0, bottom: 5 }}
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id={`gradient-${index}`}
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="var(--chart-1)"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="100%"
-                          stopColor="var(--chart-1)"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <Area
-                      type="basis"
-                      dataKey={card.field}
-                      stroke="var(--chart-1)"
-                      fill={`url(#gradient-${index})`}
-                      strokeWidth={2}
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                      isAnimationActive={true}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+                  <defs>
+                    <linearGradient
+                      id={`gradient-${index}`}
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="0%"
+                        stopColor="var(--chart-1)"
+                        stopOpacity={0.3}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor="var(--chart-1)"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <Area
+                    type="basis"
+                    dataKey={card.field}
+                    stroke="var(--chart-1)"
+                    fill={`url(#gradient-${index})`}
+                    strokeWidth={2}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    isAnimationActive={true}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             )}
-          </CardContent>
+          </div>
         </Card>
       ))}
     </div>
