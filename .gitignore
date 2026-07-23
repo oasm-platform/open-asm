@@ -68,7 +68,6 @@ core-api/.storage/*
 /nix/
 .direnv/
 .roo/*
-.open-api/*
 .agent/*
 # .agents/*
 .windsurf/*
