@@ -49,6 +49,7 @@ import {
   JobTimelineQueryResult,
   JobTimelineResponseDto,
   UpdateResultDto,
+  BaseResultDto,
 } from './dto/jobs-registry.dto';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
@@ -587,6 +588,47 @@ export class JobsRegistryService {
         workerId,
         jobId: dto.jobId,
         resultRef,
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+
+    return { jobId: bullJob.id ?? '', queueId: bullJob.queueName };
+  }
+
+  /**
+   * Updates the result of a job by category.
+   * @param workerId the ID of the worker that ran the job
+   * @param dto the category-specific result data
+   * @param category the tool category
+   * @returns an object with the worker ID and result of the job
+   */
+  public async updateResultByCategory(
+    workerId: string,
+    dto: BaseResultDto,
+    category: ToolCategory,
+  ): Promise<{ jobId: string; queueId: string }> {
+    const fileName = `${dto.jobId}-${Date.now()}.json`;
+    const { path: resultRef } = await this.storageService.uploadFile(
+      fileName,
+      Buffer.from(JSON.stringify(dto)),
+      'job-results',
+    );
+
+    const bullJob = await this.jobResultQueue.add(
+      BullMQName.JOB_RESULT,
+      {
+        workerId,
+        jobId: dto.jobId,
+        resultRef,
+        category,
       },
       {
         attempts: 3,

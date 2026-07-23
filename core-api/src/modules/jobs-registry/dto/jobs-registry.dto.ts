@@ -9,7 +9,16 @@ import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsObject, IsOptional, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import { JobHistory } from '../entities/job-history.entity';
 import { Job } from '../entities/job.entity';
 
@@ -190,4 +199,84 @@ export class CreateJobs extends PickType(Job, [
   jobHistory?: JobHistory;
   jobName?: string;
   jobRunType?: JobRunType;
+}
+
+// --- Category-Specific Result DTOs ---
+
+export class BaseResultDto {
+  @ApiProperty({ description: 'Job ID to update' })
+  @IsUUID()
+  @Expose()
+  jobId: string;
+
+  @ApiProperty({ description: 'Indicates if result is an error' })
+  @IsOptional()
+  @IsBoolean()
+  @Expose()
+  @Transform(({ value }: { value: boolean }) => value ?? false)
+  error: boolean;
+
+  @ApiProperty({ description: 'Raw output string' })
+  @IsOptional()
+  @Expose()
+  @Transform(({ value }: { value: string }) => value ?? null)
+  raw?: string | null;
+}
+
+export class SubdomainResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Discovered subdomains', type: [Asset] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => Asset)
+  @Expose()
+  payload: Asset[];
+}
+
+export class HttpProbeResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'HTTP probe response' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => HttpResponse)
+  @Expose()
+  payload: HttpResponse;
+}
+
+export class PortsResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Open port numbers', type: [Number] })
+  @IsArray()
+  @IsNumber({}, { each: true })
+  @Expose()
+  payload: number[];
+}
+
+export class VulnerabilitiesResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Found vulnerabilities', type: [Vulnerability] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => Vulnerability)
+  @Expose()
+  payload: Vulnerability[];
+}
+
+export class ScreenshotResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Screenshot result data' })
+  @IsOptional()
+  @Expose()
+  payload?: Record<string, unknown>;
+}
+
+export class ClassifierResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Asset tags', type: [AssetTag] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AssetTag)
+  @Expose()
+  payload: AssetTag[];
+}
+
+export class AssistantResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Assistant result data' })
+  @IsOptional()
+  @Expose()
+  payload?: Record<string, unknown>;
 }

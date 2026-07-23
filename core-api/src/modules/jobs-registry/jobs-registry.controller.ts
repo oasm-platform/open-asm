@@ -7,6 +7,7 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { ToolCategory } from '@/common/enums/enum';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -22,14 +23,24 @@ import {
 } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { plainToInstance } from 'class-transformer';
+import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { HttpResponse } from '../assets/entities/http-response.entity';
+import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
+  AssistantResultDto,
+  ClassifierResultDto,
   GetNextJobResponseDto,
+  HttpProbeResultDto,
   JobTimelineResponseDto,
+  PortsResultDto,
+  ScreenshotResultDto,
+  SubdomainResultDto,
   UpdateResultDto,
+  VulnerabilitiesResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
 import { Job } from './entities/job.entity';
@@ -83,6 +94,9 @@ export class JobsRegistryController {
   }
 
   @Doc({ summary: 'Updates the result of a job with the given worker ID.' })
+  /**
+   * @deprecated Use category-specific endpoints instead
+   */
   @Public()
   @Post('/:workerId/result')
   updateResult(
@@ -90,6 +104,134 @@ export class JobsRegistryController {
     @Body() dto: UpdateResultDto,
   ) {
     return this.jobsRegistryService.updateResult(workerId, dto);
+  }
+
+  // --- Category-Specific Result Endpoints ---
+
+  @Doc({
+    summary: 'Updates subdomain scan results',
+    description: 'Submit subdomain discovery results for a job',
+  })
+  @WorkerTokenAuth()
+  @Public()
+  @Post('/:workerId/result/subdomains')
+  updateSubdomainResult(
+    @Param() { workerId }: WorkerIdParams,
+    @Body() dto: SubdomainResultDto,
+  ) {
+    return this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.SUBDOMAINS,
+    );
+  }
+
+  @Doc({
+    summary: 'Updates HTTP probe results',
+    description: 'Submit HTTP probe scan results for a job',
+  })
+  @WorkerTokenAuth()
+  @Public()
+  @Post('/:workerId/result/http-probe')
+  updateHttpProbeResult(
+    @Param() { workerId }: WorkerIdParams,
+    @Body() dto: HttpProbeResultDto,
+  ) {
+    return this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.HTTP_PROBE,
+    );
+  }
+
+  @Doc({
+    summary: 'Updates port scan results',
+    description: 'Submit port scanner results for a job',
+  })
+  @WorkerTokenAuth()
+  @Public()
+  @Post('/:workerId/result/ports')
+  updatePortsResult(
+    @Param() { workerId }: WorkerIdParams,
+    @Body() dto: PortsResultDto,
+  ) {
+    return this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.PORTS_SCANNER,
+    );
+  }
+
+  @Doc({
+    summary: 'Updates vulnerability scan results',
+    description: 'Submit vulnerability scan results for a job',
+  })
+  @WorkerTokenAuth()
+  @Public()
+  @Post('/:workerId/result/vulnerabilities')
+  updateVulnerabilitiesResult(
+    @Param() { workerId }: WorkerIdParams,
+    @Body() dto: VulnerabilitiesResultDto,
+  ) {
+    return this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.VULNERABILITIES,
+    );
+  }
+
+  @Doc({
+    summary: 'Updates screenshot results',
+    description: 'Submit screenshot capture results for a job',
+  })
+  @WorkerTokenAuth()
+  @Public()
+  @Post('/:workerId/result/screenshot')
+  updateScreenshotResult(
+    @Param() { workerId }: WorkerIdParams,
+    @Body() dto: ScreenshotResultDto,
+  ) {
+    return this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.SCREENSHOT,
+    );
+  }
+
+  @Doc({
+    summary: 'Updates classifier results',
+    description: 'Submit asset classification results for a job',
+  })
+  @WorkerTokenAuth()
+  @Public()
+  @Post('/:workerId/result/classifier')
+  updateClassifierResult(
+    @Param() { workerId }: WorkerIdParams,
+    @Body() dto: ClassifierResultDto,
+  ) {
+    return this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.CLASSIFIER,
+    );
+  }
+
+  @Doc({
+    summary: 'Updates assistant results',
+    description: 'Submit AI assistant results for a job',
+  })
+  @WorkerTokenAuth()
+  @Public()
+  @Post('/:workerId/result/assistant')
+  updateAssistantResult(
+    @Param() { workerId }: WorkerIdParams,
+    @Body() dto: AssistantResultDto,
+  ) {
+    return this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.ASSISTANT,
+    );
   }
 
   @Doc({
@@ -192,7 +334,7 @@ export class JobsRegistryController {
   @GrpcMethod('JobsRegistryService', 'Next')
   async next(worker: {
     id: string;
-  }): Promise<{ id: string; asset: Asset; command?: string }> {
+  }): Promise<{ id: string; asset: Asset; command?: string; category?: string }> {
     const job = await this.jobsRegistryService.getNextJob(worker.id);
 
     if (!job) {
@@ -203,8 +345,11 @@ export class JobsRegistryController {
       id: job.id,
       asset: job.asset,
       command: job.command,
+      category: job.category,
     };
   }
+
+  // --- Deprecated gRPC Method ---
 
   @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('JobsRegistryService', 'Result')
@@ -231,5 +376,204 @@ export class JobsRegistryController {
     return {
       success: true,
     };
+  }
+
+  // --- Category-Specific gRPC Methods ---
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'ResultSubdomains')
+  async resultSubdomains({
+    workerId,
+    jobId,
+    error,
+    raw,
+    assets,
+  }: {
+    workerId: string;
+    jobId: string;
+    error: boolean;
+    raw?: string;
+    assets?: { values: Asset[] };
+  }): Promise<{ success: boolean }> {
+    const dto = plainToInstance(SubdomainResultDto, {
+      jobId,
+      error,
+      raw,
+      payload: assets?.values,
+    });
+    const result = await this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.SUBDOMAINS,
+    );
+    return { success: !!result.jobId };
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'ResultHttpProbe')
+  async resultHttpProbe({
+    workerId,
+    jobId,
+    error,
+    raw,
+    httpResponse,
+  }: {
+    workerId: string;
+    jobId: string;
+    error: boolean;
+    raw?: string;
+    httpResponse?: HttpResponse;
+  }): Promise<{ success: boolean }> {
+    const dto = plainToInstance(HttpProbeResultDto, {
+      jobId,
+      error,
+      raw,
+      payload: httpResponse,
+    });
+    const result = await this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.HTTP_PROBE,
+    );
+    return { success: !!result.jobId };
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'ResultPorts')
+  async resultPorts({
+    workerId,
+    jobId,
+    error,
+    raw,
+    numbers,
+  }: {
+    workerId: string;
+    jobId: string;
+    error: boolean;
+    raw?: string;
+    numbers?: { values: number[] };
+  }): Promise<{ success: boolean }> {
+    const dto = plainToInstance(PortsResultDto, {
+      jobId,
+      error,
+      raw,
+      payload: numbers?.values,
+    });
+    const result = await this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.PORTS_SCANNER,
+    );
+    return { success: !!result.jobId };
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'ResultVulnerabilities')
+  async resultVulnerabilities({
+    workerId,
+    jobId,
+    error,
+    raw,
+    vulnerabilities,
+  }: {
+    workerId: string;
+    jobId: string;
+    error: boolean;
+    raw?: string;
+    vulnerabilities?: { values: Vulnerability[] };
+  }): Promise<{ success: boolean }> {
+    const dto = plainToInstance(VulnerabilitiesResultDto, {
+      jobId,
+      error,
+      raw,
+      payload: vulnerabilities?.values,
+    });
+    const result = await this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.VULNERABILITIES,
+    );
+    return { success: !!result.jobId };
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'ResultScreenshot')
+  async resultScreenshot({
+    workerId,
+    jobId,
+    error,
+    raw,
+  }: {
+    workerId: string;
+    jobId: string;
+    error: boolean;
+    raw?: string;
+  }): Promise<{ success: boolean }> {
+    const dto = plainToInstance(ScreenshotResultDto, {
+      jobId,
+      error,
+      raw,
+    });
+    const result = await this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.SCREENSHOT,
+    );
+    return { success: !!result.jobId };
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'ResultClassifier')
+  async resultClassifier({
+    workerId,
+    jobId,
+    error,
+    raw,
+    assetTags,
+  }: {
+    workerId: string;
+    jobId: string;
+    error: boolean;
+    raw?: string;
+    assetTags?: { values: AssetTag[] };
+  }): Promise<{ success: boolean }> {
+    const dto = plainToInstance(ClassifierResultDto, {
+      jobId,
+      error,
+      raw,
+      payload: assetTags?.values,
+    });
+    const result = await this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.CLASSIFIER,
+    );
+    return { success: !!result.jobId };
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'ResultAssistant')
+  async resultAssistant({
+    workerId,
+    jobId,
+    error,
+    raw,
+  }: {
+    workerId: string;
+    jobId: string;
+    error: boolean;
+    raw?: string;
+  }): Promise<{ success: boolean }> {
+    const dto = plainToInstance(AssistantResultDto, {
+      jobId,
+      error,
+      raw,
+    });
+    const result = await this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.ASSISTANT,
+    );
+    return { success: !!result.jobId };
   }
 }

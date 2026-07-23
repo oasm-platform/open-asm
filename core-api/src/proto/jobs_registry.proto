@@ -10,7 +10,18 @@ import "google/protobuf/struct.proto";
 // Service Definition
 service JobsRegistryService {
   rpc Next (Worker) returns (Job);
-  rpc Result (JobResultRequest) returns (JobResponse); 
+  
+  // DEPRECATED: Use category-specific RPCs
+  rpc Result (JobResultRequest) returns (JobResponse);
+  
+  // Category-specific result RPCs
+  rpc ResultSubdomains (SubdomainResultRequest) returns (JobResponse);
+  rpc ResultHttpProbe (HttpProbeResultRequest) returns (JobResponse);
+  rpc ResultPorts (PortsResultRequest) returns (JobResponse);
+  rpc ResultVulnerabilities (VulnerabilitiesResultRequest) returns (JobResponse);
+  rpc ResultScreenshot (ScreenshotResultRequest) returns (JobResponse);
+  rpc ResultClassifier (ClassifierResultRequest) returns (JobResponse);
+  rpc ResultAssistant (AssistantResultRequest) returns (JobResponse);
 }
 
 
@@ -25,10 +36,67 @@ message Job {
   string id = 1;
   Asset asset = 2;
   optional string command = 3;
+  string category = 4;
 }
 
 message JobResponse {
   bool success = 1;
+}
+
+// --- Category-Specific Result Requests ---
+
+message SubdomainResultRequest {
+  string worker_id = 1;
+  string job_id = 2;
+  bool error = 3;
+  optional string raw = 4;
+  AssetList assets = 5;
+}
+
+message HttpProbeResultRequest {
+  string worker_id = 1;
+  string job_id = 2;
+  bool error = 3;
+  optional string raw = 4;
+  HttpResponse http_response = 5;
+}
+
+message PortsResultRequest {
+  string worker_id = 1;
+  string job_id = 2;
+  bool error = 3;
+  optional string raw = 4;
+  NumberList numbers = 5;
+}
+
+message VulnerabilitiesResultRequest {
+  string worker_id = 1;
+  string job_id = 2;
+  bool error = 3;
+  optional string raw = 4;
+  VulnerabilityList vulnerabilities = 5;
+}
+
+message ScreenshotResultRequest {
+  string worker_id = 1;
+  string job_id = 2;
+  bool error = 3;
+  optional string raw = 4;
+}
+
+message ClassifierResultRequest {
+  string worker_id = 1;
+  string job_id = 2;
+  bool error = 3;
+  optional string raw = 4;
+  AssetTagList asset_tags = 5;
+}
+
+message AssistantResultRequest {
+  string worker_id = 1;
+  string job_id = 2;
+  bool error = 3;
+  optional string raw = 4;
 }
 
 message JobResultRequest{
