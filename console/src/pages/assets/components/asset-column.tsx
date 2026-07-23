@@ -12,6 +12,7 @@ import BadgeList from './badge-list';
 import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
+import SwitchEnableAsset from './switch-enable-asset';
 
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
@@ -136,16 +137,17 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       );
     },
   },
-  // {
-  //   header: 'Enabled',
-  //   size: 120,
-  //   cell: ({ row }) => {
-  //     return (
-  //       <SwitchEnableAsset
-  //         id={row.original.id}
-  //         currentStatus={row.original.isEnabled}
-  //       />
-  //     );
-  //   },
-  // },
+  {
+    accessorKey: 'isEnabled',
+    header: 'Enabled',
+    size: 120,
+    cell: ({ row }) => {
+      return (
+        <SwitchEnableAsset
+          id={row.original.id}
+          currentStatus={row.original.isEnabled}
+        />
+      );
+    },
+  },
 ];

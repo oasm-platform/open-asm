@@ -42,6 +42,8 @@ export enum JobStatus {
   FAILED = 'failed',
   /** Cancelled */
   CANCELLED = 'cancelled',
+  /** Skipped — tool was pending but a later tool in the pipeline has completed */
+  SKIPPED = 'skipped',
 }
 
 /**

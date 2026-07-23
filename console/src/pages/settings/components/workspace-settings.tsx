@@ -23,6 +23,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
+import { WorkspaceConfigs } from './workspace-configs';
 import { Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -133,7 +134,7 @@ export default function WorkspaceSettings() {
       {/* Workspace Information Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Workspace Information</CardTitle>
+          <CardTitle>Information</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -174,6 +175,16 @@ export default function WorkspaceSettings() {
               </div>
             </form>
           </Form>
+        </CardContent>
+      </Card>
+
+      {/* Configs */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Configs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <WorkspaceConfigs />
         </CardContent>
       </Card>
 

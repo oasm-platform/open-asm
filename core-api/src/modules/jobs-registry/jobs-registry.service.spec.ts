@@ -1,4 +1,10 @@
-import { BullMQName, JobStatus } from '@/common/enums/enum';
+import {
+  BullMQName,
+  JobPriority,
+  JobStatus,
+  ToolCategory,
+  WorkerType,
+} from '@/common/enums/enum';
 import { RedisService } from '@/services/redis/redis.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
@@ -10,6 +16,7 @@ import { DataSource } from 'typeorm';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolsService } from '../tools/tools.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
@@ -21,8 +28,13 @@ describe('JobsRegistryService', () => {
   const mockJobRepository = {
     createQueryBuilder: jest.fn().mockReturnThis(),
     innerJoin: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    addGroupBy: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn(),
     getOne: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
@@ -69,6 +81,10 @@ describe('JobsRegistryService', () => {
     getToolByNames: jest.fn(),
   };
 
+  const mockWorkspacesService = {
+    getWorkspaceConfigValue: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -103,6 +119,10 @@ describe('JobsRegistryService', () => {
         {
           provide: ToolsService,
           useValue: mockToolsService,
+        },
+        {
+          provide: WorkspacesService,
+          useValue: mockWorkspacesService,
         },
         {
           provide: getQueueToken(BullMQName.JOB_RESULT),
@@ -442,7 +462,26 @@ describe('JobsRegistryService', () => {
       jobHistoryName: 'test-job-history',
     };
 
-    it('should return job history detail with jobs', async () => {
+    it('should return job history detail with tools and their statuses', async () => {
+      const mockTool = {
+        id: 'tool-uuid',
+        name: 'test-tool',
+        description: 'A test tool',
+        command: 'test-command',
+        category: ToolCategory.SUBDOMAINS,
+        version: '1.0',
+        logoUrl: 'http://example.com/logo.png',
+        isBuiltIn: true,
+        isInstalled: true,
+        isOfficialSupport: true,
+        type: WorkerType.BUILT_IN,
+        providerId: 'provider-uuid',
+        priority: JobPriority.BACKGROUND,
+        availableWorkersCount: 2,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
         innerJoin: jest.fn().mockReturnThis(),
@@ -450,8 +489,11 @@ describe('JobsRegistryService', () => {
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
       });
+      mockJobRepository.getRawMany.mockResolvedValue([
+        { toolId: 'tool-uuid', status: JobStatus.COMPLETED },
+      ]);
       mockToolsService.getInstalledTools.mockResolvedValue({
-        data: [{ name: 'test-tool' }],
+        data: [mockTool],
       });
 
       const result = await service.getJobHistoryDetail(
@@ -463,9 +505,6 @@ describe('JobsRegistryService', () => {
         where: { id: mockHistoryId },
         relations: {
           workflow: true,
-          jobs: {
-            tool: true,
-          },
         },
       });
       expect(result).toEqual({
@@ -474,7 +513,12 @@ describe('JobsRegistryService', () => {
         jobHistoryName: 'test-job-history',
         createdAt: mockJobHistory.createdAt,
         updatedAt: mockJobHistory.updatedAt,
-        tools: [{ name: 'test-tool' }],
+        tools: [
+          {
+            ...mockTool,
+            status: JobStatus.COMPLETED,
+          },
+        ],
       });
     });
 
@@ -590,6 +634,122 @@ describe('JobsRegistryService', () => {
       const result = await service.getNextStepForJob(jobWithNextStep as any);
 
       expect(result).toBe(1);
+    });
+
+    it('should skip SUBDOMAINS and use next non-SUBDOMAINS when isAssetsDiscovery is false', async () => {
+      const jobWithSubdomainNext = {
+        id: 'job-uuid',
+        tool: { name: 'tool-a' },
+        asset: {
+          target: { id: 'target-uuid' },
+        },
+        jobHistory: {
+          workflow: {
+            content: {
+              jobs: [
+                { name: 'job-1', run: 'tool-a' },
+                { name: 'job-2', run: 'subfinder' },
+                { name: 'job-3', run: 'tool-c' },
+              ],
+            },
+            workspace: { id: 'workspace-uuid' },
+          },
+        },
+      };
+
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAssetsDiscovery: false,
+      });
+
+      // toolsService.getToolByNames called twice:
+      // 1st call (batch-resolve remaining): subfinder + tool-c
+      // 2nd call (resolve nextTool): tool-c
+      mockToolsService.getToolByNames
+        .mockResolvedValueOnce([
+          { name: 'subfinder', category: ToolCategory.SUBDOMAINS },
+          { name: 'tool-c', category: ToolCategory.HTTP_PROBE },
+        ])
+        .mockResolvedValueOnce([
+          { name: 'tool-c', category: ToolCategory.HTTP_PROBE },
+        ]);
+
+      // tool-c is HTTP_PROBE => createNewJob calls findAssetServicesForJob => needs chained query builder
+      const mockAssetQueryBuilder = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([{ id: 'asset-service-1', value: 'example.com', port: 443, asset: { id: 'asset-1', isPrimary: true } }]),
+      };
+      const mockJobQueryBuilder = {
+        leftJoinAndWhere: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([{ id: 'asset-1', isPrimary: true }]),
+      };
+      const mockAssetRepo = {
+        createQueryBuilder: jest.fn().mockReturnValue(mockAssetQueryBuilder),
+      };
+      const mockJobRepo = {
+        create: jest.fn().mockReturnValue({}),
+        save: jest.fn().mockResolvedValue([{}]),
+        createQueryBuilder: jest.fn().mockReturnValue(mockJobQueryBuilder),
+      };
+      mockDataSource.getRepository.mockImplementation((entity: any) => {
+        const name = entity?.name ?? entity;
+        if (name === 'AssetService') return mockAssetRepo;
+        return mockJobRepo;
+      });
+
+      const result = await service.getNextStepForJob(
+        jobWithSubdomainNext as any,
+      );
+
+      expect(result).toBe(1);
+      // Should have skipped subfinder and resolved tool-c
+      expect(mockToolsService.getToolByNames).toHaveBeenCalledWith({
+        names: ['subfinder', 'tool-c'],
+      });
+      expect(mockToolsService.getToolByNames).toHaveBeenLastCalledWith({
+        names: ['tool-c'],
+      });
+    });
+
+    it('should return 0 when all remaining tools are SUBDOMAINS and discovery is disabled', async () => {
+      const jobWithOnlySubdomainNext = {
+        id: 'job-uuid',
+        tool: { name: 'tool-a' },
+        asset: {
+          target: { id: 'target-uuid' },
+        },
+        jobHistory: {
+          workflow: {
+            content: {
+              jobs: [
+                { name: 'job-1', run: 'tool-a' },
+                { name: 'job-2', run: 'subfinder-1' },
+                { name: 'job-3', run: 'subfinder-2' },
+              ],
+            },
+            workspace: { id: 'workspace-uuid' },
+          },
+        },
+      };
+
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAssetsDiscovery: false,
+      });
+
+      mockToolsService.getToolByNames.mockResolvedValue([
+        { name: 'subfinder-1', category: ToolCategory.SUBDOMAINS },
+        { name: 'subfinder-2', category: ToolCategory.SUBDOMAINS },
+      ]);
+
+      const result = await service.getNextStepForJob(
+        jobWithOnlySubdomainNext as any,
+      );
+
+      expect(result).toBe(0);
     });
   });
 

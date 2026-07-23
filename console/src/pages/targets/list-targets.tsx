@@ -16,16 +16,15 @@ import {
 import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { GetManyTargetResponseDto } from '@/services/apis/gen/queries';
-import { Target } from 'lucide-react';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { ScanStatusFilter } from './components/scan-status-filter';
-import { TargetTypeFilter } from './components/target-type-filter';
 import { ScopeFilter } from './components/scope-filter';
+import { StartDiscoveryButton } from './components/start-discovery-button';
+import { TargetTypeFilter } from './components/target-type-filter';
 
 const targetTypeColor: Record<string, string> = {
   DOMAIN: 'border-blue-400 text-blue-400',
@@ -149,7 +148,10 @@ export function ListTargets() {
   const handleTypeFilterChange = (newType: TargetType | undefined) => {
     setTypeFilter(newType);
     navigate({
-      search: ((prev: Record<string, unknown>) => ({ ...prev, type: newType || undefined })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      search: ((prev: Record<string, unknown>) => ({
+        ...prev,
+        type: newType || undefined,
+      })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       replace: true,
     });
   };
@@ -158,7 +160,10 @@ export function ListTargets() {
   const handleStatusFilterChange = (newStatus: JobStatus | undefined) => {
     setStatusFilter(newStatus);
     navigate({
-      search: ((prev: Record<string, unknown>) => ({ ...prev, status: newStatus || undefined })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      search: ((prev: Record<string, unknown>) => ({
+        ...prev,
+        status: newStatus || undefined,
+      })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       replace: true,
     });
   };
@@ -167,7 +172,10 @@ export function ListTargets() {
   const handleScopeFilterChange = (newValue: TargetScopeType | undefined) => {
     setScopeFilter(newValue);
     navigate({
-      search: ((prev: Record<string, unknown>) => ({ ...prev, scope: newValue || undefined })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      search: ((prev: Record<string, unknown>) => ({
+        ...prev,
+        scope: newValue || undefined,
+      })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       replace: true,
     });
   };
@@ -256,15 +264,7 @@ export function ListTargets() {
           value={scopeFilter}
           onValueChange={handleScopeFilterChange}
         />,
-        // <ExportDataButton api="api/targets/export" prefix="targets" />,
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => navigate({ to: '/targets/start-discovery' })}
-        >
-          <Target className="shrink-0" />
-          <span>Start discovery</span>
-        </Button>,
+        <StartDiscoveryButton />,
       ]}
       totalItems={total}
       onRowClick={handleRowClick}

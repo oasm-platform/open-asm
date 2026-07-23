@@ -30,7 +30,8 @@ export const useTimelineTrend = () => {
   } = useWorkspaceState();
   const { data: timeline } = useStatisticControllerGetTimelineStatistics({
     query: {
-      queryKey: [selectedWorkspaceId],
+      queryKey: ['/api/statistics/timeline', selectedWorkspaceId],
+      enabled: !!selectedWorkspaceId,
     },
   });
 

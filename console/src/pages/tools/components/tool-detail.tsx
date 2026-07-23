@@ -27,7 +27,7 @@ export default function ToolDetail() {
     refetch,
   } = useToolsControllerGetToolById(id || '', {
     query: {
-      queryKey: [selectedWorkspaceId, id],
+      queryKey: ['tool-detail', selectedWorkspaceId, id],
     },
   });
 

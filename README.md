@@ -2,39 +2,44 @@
   <img src="core-api/public/images/logo.png" alt="OASM Logo" width="150" />
 </p>
 
-# Open Attack Surface Management (OASM)
+<h1 align="center">Open Attack Surface Management (OASM)</h1>
 
-[![Latest Release](https://img.shields.io/github/v/release/oasm-platform/open-asm.svg)](https://github.com/oasm-platform/open-asm/releases)
-[![CI](https://github.com/oasm-platform/open-asm/actions/workflows/build-nightly.yml/badge.svg)](https://github.com/oasm-platform/open-asm/actions/workflows/build-nightly.yml)
-[![Docker Build](https://img.shields.io/badge/docker-build-blue.svg)](https://github.com/oasm-platform/open-asm/actions/workflows/build-release.yml)
-[![Docker Hub](https://img.shields.io/badge/docker-oasm-blue.svg)](https://hub.docker.com/u/oasm)
-[![Docker Pulls](https://img.shields.io/docker/pulls/oasm/oasm-api)](https://hub.docker.com/r/oasm/oasm-api)
-[![Security Scanning](https://img.shields.io/badge/security-trivy-green.svg)](https://github.com/oasm-platform/open-asm/actions/workflows/build-unstable.yml)
+<p align="center">
+  <a href="https://github.com/oasm-platform/open-asm/releases"><img src="https://img.shields.io/github/v/release/oasm-platform/open-asm?style=for-the-badge&labelColor=black&color=black&logo=github&logoColor=2fc414" alt="Latest Release"></a>
+  <a href="https://github.com/oasm-platform/open-asm/actions/workflows/build-nightly.yml"><img src="https://img.shields.io/github/actions/workflow/status/oasm-platform/open-asm/build-nightly.yml?style=for-the-badge&label=CI&labelColor=black&color=black&logo=githubactions&logoColor=2088FF" alt="CI"></a>
+  <a href="https://hub.docker.com/r/oasm/oasm-api"><img src="https://img.shields.io/docker/pulls/oasm/oasm-api?style=for-the-badge&logo=docker&labelColor=black&color=black&logoColor=2496ED" alt="Docker Pulls"></a>
+  <a href="https://discord.gg/vJYq3QYph"><img src="https://img.shields.io/badge/discord-black?style=for-the-badge&logo=discord&labelColor=black&color=black&logoColor=5865F2" alt="Discord"></a>
+  <a href="https://www.linkedin.com/company/oasm-platform"><img src="https://custom-icon-badges.demolab.com/badge/LinkedIn-black?style=for-the-badge&logo=linkedin-white&logoColor=0A66C2&labelColor=black&color=black" alt="LinkedIn"></a>
+  <a href="https://x.com/OasmPlatform"><img src="https://img.shields.io/static/v1?label=&message=@OasmPlatform&color=black&style=for-the-badge&logo=x&labelColor=black&logoColor=white" alt="X"></a>
+  <a href="https://docs.oasm.dev"><img src="https://img.shields.io/badge/documentation--2fc414?style=for-the-badge&logo=gitbook&labelColor=black&color=black&logoColor=2fc414" alt="Documentation"></a>
+</p>
 
-Open-source platform for cybersecurity Attack Surface Management. Built to help security teams identify, monitor, and manage external assets and potential security exposures across their digital infrastructure.
+AI-powered, open-source Attack Surface Management platform. Discover, monitor, and secure your digital infrastructure — from assets to exposures — backed by distributed scanning, real-time monitoring, and AI-driven analytics.
 
 <p align="center">
   <a href="#features">Features</a> •
   <a href="#system-architecture">System Architecture</a> •
   <a href="#installation">Installation</a> •
-  <a href="https://docs.oasm.dev" target="_blank">Documentation</a> •
   <a href="#developer-guide">Developer Guide</a> •
   <a href="#screenshots">Screenshots</a>
 </p>
 
 ## Features
 
-- **Asset Discovery & Management**: Discover and manage internet-facing assets (domains, IPs, services) with grouping and multi-workspace support.
-- **Vulnerability Assessment**: Scan for vulnerabilities and misconfigurations with issue tracking, risk analysis, and remediation guidance.
-- **Technology Detection**: Identify technologies and services running on discovered assets.
-- **Distributed Scanning Engine**: High-performance Go-based workers with gRPC communication, designed for horizontal scaling and parallel scanning tasks.
-- **Tool Integration**: Extensible framework for integrating security scanning tools (nuclei, subfinder, httpx, naabu, dnsx).
-- **AI Assistant Integration**: MCP server and AI SDK (OpenAI, Anthropic, Google) integration for intelligent querying and analysis of asset data.
-- **Workflow Automation**: Automated scanning schedules, alerts, and remediation workflows.
-- **Real-time Monitoring**: Monitor asset changes with SSE-based instant notifications and statistics dashboard.
-- **Search & Analytics**: Full-text search and filter asset data with analytics for risk trends and reporting.
-- **Geo-IP Enrichment**: Automatic IP geolocation enrichment for discovered assets.
-- **File Storage**: S3-compatible object storage (Rustfs) for scan artifacts and reports.
+- **Asset Discovery & Management** — Automatically discover and manage internet-facing assets (IPs, ports, services, technologies) as a continuously updated inventory.
+- **Vulnerability Assessment** — Detect vulnerabilities and misconfigurations with issue tracking, risk analysis, and remediation guidance.
+- **Technology Detection** — Identify frameworks, platforms, and services running on discovered assets.
+- **Groups & Targeted Scanning** — Organize assets into groups with custom tool configurations and execution schedules for focused scans.
+- **Distributed Scanning Engine** — High-performance Go workers with gRPC communication, designed for horizontal scaling.
+- **Tool Integration** — Built-in integration with nuclei, subfinder, httpx, naabu, dnsx and an extensible framework for custom tools.
+- **Workflow Automation** — Automated scan scheduling, alerts, and remediation workflows.
+- **Real-time Monitoring** — SSE-based real-time notifications and a live statistics dashboard.
+- **Search & Analytics** — Full-text search, asset filtering, risk trend analysis, and reporting.
+- **Integrations** — Connect Slack, Telegram, and Webhooks for event-driven security alerts.
+- **AI Assistant Integration** — MCP server enabling AI assistants (OpenAI, Anthropic, Google) to query and analyze asset data via natural language.
+- **Geo-IP Enrichment** — Automatic IP geolocation enrichment for discovered assets.
+- **File Storage** — S3-compatible object storage (Rustfs) for scan artifacts and reports.
+- **Multi-workspace** — Isolated environments for different organizations, projects, or environments.
 
 ## System Architecture
 

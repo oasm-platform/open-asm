@@ -1,5 +1,5 @@
 import { Switch } from '@/components/ui/switch';
-import { useAssetsControllerSwitchAsset } from '@/services/apis/gen/queries';
+import { useAssetsControllerToggleAsset } from '@/services/apis/gen/queries';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -13,7 +13,7 @@ export default function SwitchEnableAsset({
     onUpdate?: () => void;
 }) {
     const [isEnabled, setIsEnabled] = useState(currentStatus);
-    const { mutate: switchAsset, isPending } = useAssetsControllerSwitchAsset();
+    const { mutate: toggleAsset, isPending } = useAssetsControllerToggleAsset();
 
     useEffect(() => {
         setIsEnabled(currentStatus);
@@ -23,7 +23,7 @@ export default function SwitchEnableAsset({
         if (onUpdate) {
             onUpdate();
         }
-        switchAsset({
+        toggleAsset({
             data: {
                 assetId: id,
                 isEnabled: checked,
