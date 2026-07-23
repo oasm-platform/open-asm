@@ -1,6 +1,7 @@
 import { JobStatus } from '@/services/apis/gen/queries';
 import {
   BadgeCheckIcon,
+  CircleAlert,
   ClockIcon,
   Loader2Icon,
   XCircleIcon,
@@ -44,6 +45,12 @@ const statusConfigs: Record<JobStatus, StatusConfig> = {
     icon: <XCircleIcon className="h-4 w-4" />,
     className: 'text-gray-500',
     label: 'Cancelled',
+    variant: 'outline',
+  },
+  [JobStatus.skipped]: {
+    icon: <CircleAlert className="h-4 w-4" />,
+    className: 'text-gray-400',
+    label: 'Skipped',
     variant: 'outline',
   },
 };

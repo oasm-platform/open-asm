@@ -43,89 +43,93 @@ describe('WorkspacesService', () => {
   };
 
   // Mock query results for different test scenarios
+  // NOTE: Column names match the single-window-function query in getWorkspaces
   const mockOwnerWorkspaceResult = [
     {
-      workspace_id: testWorkspaceId,
-      workspace_name: 'Test Workspace',
-      workspace_description: 'Test Description',
-      workspace_createdAt: new Date(),
-      workspace_updatedAt: new Date(),
-      workspace_archivedAt: null,
-      workspace_isAssetsDiscovery: true,
-      workspace_isAutoEnableAssetAfterDiscovered: true,
-      workspace_ownerId: testUserId,
-      targetcount: '5',
-      membercount: '3',
-      member_role: 'owner',
+      id: testWorkspaceId,
+      name: 'Test Workspace',
+      description: 'Test Description',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+      isAssetsDiscovery: true,
+      isAutoEnableAssetAfterDiscovered: true,
+      ownerId: testUserId,
+      targetCount: 5,
+      memberCount: 3,
+      role: 'owner',
+      total: '0',
     },
   ];
 
   const mockMemberWorkspaceResult = [
     {
-      workspace_id: testWorkspaceId,
-      workspace_name: 'Test Workspace',
-      workspace_description: 'Test Description',
-      workspace_createdAt: new Date(),
-      workspace_updatedAt: new Date(),
-      workspace_archivedAt: null,
-      workspace_isAssetsDiscovery: true,
-      workspace_isAutoEnableAssetAfterDiscovered: true,
-      workspace_ownerId: randomUUID(),
-      targetcount: '5',
-      membercount: '3',
-      member_role: 'member',
+      id: testWorkspaceId,
+      name: 'Test Workspace',
+      description: 'Test Description',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+      isAssetsDiscovery: true,
+      isAutoEnableAssetAfterDiscovered: true,
+      ownerId: randomUUID(),
+      targetCount: 5,
+      memberCount: 3,
+      role: 'member',
+      total: '0',
     },
   ];
 
   const mockMultipleWorkspacesResult = [
     {
-      workspace_id: testWorkspaceId,
-      workspace_name: 'Workspace 1',
-      workspace_description: 'Description 1',
-      workspace_createdAt: new Date(),
-      workspace_updatedAt: new Date(),
-      workspace_archivedAt: null,
-      workspace_isAssetsDiscovery: true,
-      workspace_isAutoEnableAssetAfterDiscovered: true,
-      workspace_ownerId: testUserId,
-      targetcount: '5',
-      membercount: '3',
-      member_role: 'owner',
+      id: testWorkspaceId,
+      name: 'Workspace 1',
+      description: 'Description 1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+      isAssetsDiscovery: true,
+      isAutoEnableAssetAfterDiscovered: true,
+      ownerId: testUserId,
+      targetCount: 5,
+      memberCount: 3,
+      role: 'owner',
+      total: '5',
     },
     {
-      workspace_id: randomUUID(),
-      workspace_name: 'Workspace 2',
-      workspace_description: 'Description 2',
-      workspace_createdAt: new Date(),
-      workspace_updatedAt: new Date(),
-      workspace_archivedAt: null,
-      workspace_isAssetsDiscovery: false,
-      workspace_isAutoEnableAssetAfterDiscovered: false,
-      workspace_ownerId: randomUUID(),
-      targetcount: '10',
-      membercount: '5',
-      member_role: 'member',
+      id: randomUUID(),
+      name: 'Workspace 2',
+      description: 'Description 2',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+      isAssetsDiscovery: false,
+      isAutoEnableAssetAfterDiscovered: false,
+      ownerId: randomUUID(),
+      targetCount: 10,
+      memberCount: 5,
+      role: 'member',
+      total: '5',
     },
   ];
 
   const mockArchivedWorkspaceResult = [
     {
-      workspace_id: testWorkspaceId,
-      workspace_name: 'Archived Workspace',
-      workspace_description: 'Archived Description',
-      workspace_createdAt: new Date(),
-      workspace_updatedAt: new Date(),
-      workspace_archivedAt: new Date(),
-      workspace_isAssetsDiscovery: true,
-      workspace_isAutoEnableAssetAfterDiscovered: true,
-      workspace_ownerId: testUserId,
-      targetcount: '2',
-      membercount: '1',
-      member_role: 'owner',
+      id: testWorkspaceId,
+      name: 'Archived Workspace',
+      description: 'Archived Description',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: new Date(),
+      isAssetsDiscovery: true,
+      isAutoEnableAssetAfterDiscovered: true,
+      ownerId: testUserId,
+      targetCount: 2,
+      memberCount: 1,
+      role: 'owner',
+      total: '1',
     },
   ];
-
-  const mockEmptyResult: { total: string }[] = [{ total: '0' }];
 
   beforeEach(async () => {
     mockWorkspaceRepository = {
@@ -150,7 +154,7 @@ describe('WorkspacesService', () => {
     mockWorkspaceMembersRepository = {
       save: jest.fn(),
       findOne: jest.fn(),
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
 
     mockApiKeysService = {
@@ -220,10 +224,9 @@ describe('WorkspacesService', () => {
         sortOrder: SortOrder.DESC,
       };
 
-      // Mock count query
+      // Mock single window-function query (now includes total in each row)
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce(mockEmptyResult) // count query
-        .mockResolvedValueOnce(mockOwnerWorkspaceResult); // data query
+        .mockResolvedValueOnce(mockOwnerWorkspaceResult);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -247,10 +250,9 @@ describe('WorkspacesService', () => {
         sortOrder: SortOrder.DESC,
       };
 
-      // Mock count query
+      // Mock single window-function query
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce(mockEmptyResult) // count query
-        .mockResolvedValueOnce(mockMemberWorkspaceResult); // data query
+        .mockResolvedValueOnce(mockMemberWorkspaceResult);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -263,7 +265,6 @@ describe('WorkspacesService', () => {
     });
 
     // Test case 3: User là admin của workspace → trả về role = 'admin'
-    // Note: WorkspaceRole enum only has OWNER and MEMBER, but we test with database value
     it('should return workspace with role from database', async () => {
       // Arrange
       const query = {
@@ -275,25 +276,25 @@ describe('WorkspacesService', () => {
 
       const adminRoleResult = [
         {
-          workspace_id: testWorkspaceId,
-          workspace_name: 'Admin Workspace',
-          workspace_description: 'Admin Description',
-          workspace_createdAt: new Date(),
-          workspace_updatedAt: new Date(),
-          workspace_archivedAt: null,
-          workspace_isAssetsDiscovery: true,
-          workspace_isAutoEnableAssetAfterDiscovered: true,
-          workspace_ownerId: randomUUID(),
-          targetcount: '5',
-          membercount: '3',
-          member_role: 'admin', // This might come from database even if not in enum
+          id: testWorkspaceId,
+          name: 'Admin Workspace',
+          description: 'Admin Description',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          archivedAt: null,
+          isAssetsDiscovery: true,
+          isAutoEnableAssetAfterDiscovered: true,
+          ownerId: randomUUID(),
+          targetCount: 5,
+          memberCount: 3,
+          role: 'admin',
+          total: '0',
         },
       ];
 
-      // Mock count query
+      // Mock single window-function query
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce(mockEmptyResult) // count query
-        .mockResolvedValueOnce(adminRoleResult); // data query
+        .mockResolvedValueOnce(adminRoleResult);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -314,10 +315,9 @@ describe('WorkspacesService', () => {
         sortOrder: SortOrder.DESC,
       };
 
-      // Mock count query returns 5 total
+      // Mock single window-function query (each row includes total from window fn)
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce([{ total: '5' }]) // count query
-        .mockResolvedValueOnce(mockMultipleWorkspacesResult); // data query
+        .mockResolvedValueOnce(mockMultipleWorkspacesResult);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -341,10 +341,9 @@ describe('WorkspacesService', () => {
         sortOrder: SortOrder.ASC,
       };
 
-      // Mock count query
+      // Mock single window-function query
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce([{ total: '5' }]) // count query
-        .mockResolvedValueOnce(mockMultipleWorkspacesResult); // data query
+        .mockResolvedValueOnce(mockMultipleWorkspacesResult);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -355,7 +354,7 @@ describe('WorkspacesService', () => {
 
       // Verify query was called with correct offset (page 2, limit 2 => offset = (2-1) * 2 = 2)
       expect(mockWorkspaceRepository.query).toHaveBeenNthCalledWith(
-        2,
+        1,
         expect.stringContaining('LIMIT $2 OFFSET $3'),
         [testUserId, 2, 2],
       );
@@ -372,10 +371,9 @@ describe('WorkspacesService', () => {
         isArchived: false,
       };
 
-      // Mock count query
+      // Mock single window-function query — empty result
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce(mockEmptyResult) // count query with isArchived filter
-        .mockResolvedValueOnce([]); // data query with isArchived filter
+        .mockResolvedValueOnce([]);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -384,9 +382,9 @@ describe('WorkspacesService', () => {
       expect(result).toBeDefined();
 
       // Verify the query contains the archived filter
-      const countQuery = (mockWorkspaceRepository.query as jest.Mock).mock
+      const sqlQuery = (mockWorkspaceRepository.query as jest.Mock).mock
         .calls[0][0];
-      expect(countQuery).toContain('AND w."archivedAt" IS NULL');
+      expect(sqlQuery).toContain('AND w."archivedAt" IS NULL');
     });
 
     // Test case 5b: Kiểm tra filter isArchived hoạt động đúng - isArchived = true
@@ -400,10 +398,9 @@ describe('WorkspacesService', () => {
         isArchived: true,
       };
 
-      // Mock count query
+      // Mock single window-function query
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce([{ total: '1' }]) // count query with isArchived filter
-        .mockResolvedValueOnce(mockArchivedWorkspaceResult); // data query with isArchived filter
+        .mockResolvedValueOnce(mockArchivedWorkspaceResult);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -414,9 +411,9 @@ describe('WorkspacesService', () => {
       expect(result.data[0].archivedAt).not.toBeNull();
 
       // Verify the query contains the archived filter
-      const countQuery = (mockWorkspaceRepository.query as jest.Mock).mock
+      const sqlQuery = (mockWorkspaceRepository.query as jest.Mock).mock
         .calls[0][0];
-      expect(countQuery).toContain('AND w."archivedAt" IS NOT NULL');
+      expect(sqlQuery).toContain('AND w."archivedAt" IS NOT NULL');
     });
 
     // Test case 5c: Kiểm tra filter isArchived không được set (undefined)
@@ -430,10 +427,9 @@ describe('WorkspacesService', () => {
         isArchived: undefined,
       };
 
-      // Mock count query
+      // Mock single window-function query — empty result
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce(mockEmptyResult) // count query without isArchived filter
-        .mockResolvedValueOnce([]); // data query without isArchived filter
+        .mockResolvedValueOnce([]);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -441,10 +437,11 @@ describe('WorkspacesService', () => {
       // Assert
       expect(result).toBeDefined();
 
-      // Verify the query does not contain archived filter
-      const countQuery = (mockWorkspaceRepository.query as jest.Mock).mock
+      // Verify the WHERE clause does not contain archived filter
+      const sqlQuery = (mockWorkspaceRepository.query as jest.Mock).mock
         .calls[0][0];
-      expect(countQuery).not.toContain('archivedAt');
+      const whereClause = sqlQuery.split('WHERE')[1]?.split('ORDER BY')[0] ?? '';
+      expect(whereClause).not.toContain('archivedAt');
     });
 
     // Test case: Kiểm tra targetCount và memberCount được map đúng
@@ -457,10 +454,9 @@ describe('WorkspacesService', () => {
         sortOrder: SortOrder.DESC,
       };
 
-      // Mock count query
+      // Mock single window-function query
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce(mockEmptyResult) // count query
-        .mockResolvedValueOnce(mockOwnerWorkspaceResult); // data query
+        .mockResolvedValueOnce(mockOwnerWorkspaceResult);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -480,10 +476,9 @@ describe('WorkspacesService', () => {
         sortOrder: SortOrder.DESC,
       };
 
-      // Mock count query
+      // Mock single window-function query — empty result
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce(mockEmptyResult) // count query
-        .mockResolvedValueOnce([]); // data query
+        .mockResolvedValueOnce([]);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -503,10 +498,9 @@ describe('WorkspacesService', () => {
         sortOrder: 'INVALID' as any,
       };
 
-      // Mock count query
+      // Mock single window-function query — empty result
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce(mockEmptyResult) // count query
-        .mockResolvedValueOnce([]); // data query
+        .mockResolvedValueOnce([]);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
@@ -526,10 +520,9 @@ describe('WorkspacesService', () => {
         sortOrder: SortOrder.DESC,
       };
 
-      // Mock count query returns 0
+      // Mock single window-function query returns empty
       (mockWorkspaceRepository.query as jest.Mock)
-        .mockResolvedValueOnce(mockEmptyResult) // count query
-        .mockResolvedValueOnce([]); // data query returns empty
+        .mockResolvedValueOnce([]);
 
       // Act
       const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);

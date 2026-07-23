@@ -89,7 +89,7 @@ export class Workspace extends BaseEntity {
     default: true,
     // name: 'Asset discovery',
     title: 'Asset discovery',
-    description: 'Asset discovery is enabled for the workspace',
+    description: 'Automatically scan and detect internet-facing assets (domains, IPs) in workspace networks',
   })
   @IsBoolean()
   @Column({ default: true })
@@ -100,7 +100,7 @@ export class Workspace extends BaseEntity {
     default: true,
     // name: 'Auto enable assets',
     title: 'Auto enable assets',
-    description: 'Assets are automatically enabled after discovery',
+    description: 'Newly discovered assets become active immediately without manual review',
   })
   @IsBoolean()
   @Column({ default: true })

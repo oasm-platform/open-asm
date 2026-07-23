@@ -2,6 +2,7 @@ import { type GetHostAssetsDTO } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { CloudCheck } from 'lucide-react';
 import BadgeList from './badge-list';
+import SwitchEnableAsset from './switch-enable-asset';
 
 export const hostAssetsColumn: ColumnDef<GetHostAssetsDTO>[] = [
   {
@@ -29,6 +30,20 @@ export const hostAssetsColumn: ColumnDef<GetHostAssetsDTO>[] = [
         <div className="flex flex-wrap gap-1 items-center">
           {data.assetCount} {data.assetCount > 1 ? 'services' : 'service'}
         </div>
+      );
+    },
+  },
+  {
+    accessorKey: 'isEnabled',
+    header: 'Enabled',
+    size: 120,
+    cell: ({ row }) => {
+      const data = row.original;
+      return (
+        <SwitchEnableAsset
+          id={data.id}
+          currentStatus={data.isEnabled}
+        />
       );
     },
   },

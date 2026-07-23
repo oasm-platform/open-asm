@@ -7,10 +7,10 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { ApiKeyType, WorkspaceRole } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
+import { Job } from '@/modules/jobs-registry/entities/job.entity';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { getManyResponse } from '@/utils/getManyResponse';
-import getSwaggerMetadata, {
-  SwaggerPropertyMetadata,
-} from '@/utils/getSwaggerMetadata';
+import { SwaggerPropertyMetadata } from '@/utils/getSwaggerMetadata';
 import {
   BadRequestException,
   ForbiddenException,
@@ -22,8 +22,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { In, Repository } from 'typeorm';
-import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
-import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
@@ -128,26 +126,23 @@ export class WorkspacesService implements OnModuleInit {
     req: Request,
     res: Response,
   ) {
-    const { limit, page, sortOrder, isArchived } = query;
-    let { sortBy } = query;
+    const { limit, page, sortOrder, isArchived, sortBy: rawSortBy } = query;
     const { id } = userContextPayload;
-    if (!(sortBy in Workspace)) {
-      sortBy = 'createdAt';
-    }
 
-    // Validate sortBy to prevent SQL injection
-    const allowedSortFields = [
-      'id',
-      'name',
-      'createdAt',
-      'updatedAt',
-      'archivedAt',
-    ];
-    if (!allowedSortFields.includes(sortBy)) {
-      sortBy = 'createdAt';
-    }
+    // Injection-safe sort column lookup via allowlist map
+    const sortColumnMap: Record<string, string> = {
+      id: 'id',
+      name: 'name',
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
+      archivedAt: 'archivedAt',
+    };
+    const sortBy = sortColumnMap[rawSortBy] ?? 'createdAt';
 
-    // Build WHERE clause based on isArchived
+    const offset = (page - 1) * limit;
+    const validSortOrder: 'ASC' | 'DESC' =
+      sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
+
     const archivedCondition =
       isArchived === true
         ? 'AND w."archivedAt" IS NOT NULL'
@@ -155,83 +150,97 @@ export class WorkspacesService implements OnModuleInit {
           ? 'AND w."archivedAt" IS NULL'
           : '';
 
-    // Get total count - count workspaces where user is a member
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM workspaces w
-      INNER JOIN workspace_members wm ON wm."workspaceId" = w.id AND wm."userId" = $1
-      WHERE 1=1 ${archivedCondition}
-    `;
-    const countResult: { total: string }[] = await this.repo.query(countQuery, [
-      id,
-    ]);
-    const total = parseInt(countResult[0]?.total || '0', 10);
-
-    // Get paginated data with target and member counts
-    const offset = (page - 1) * limit;
-    const validSortOrder: 'ASC' | 'DESC' =
-      sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
-
-    const dataQuery = `
+    // Single query with window function — eliminates separate COUNT round-trip
+    const queryText = `
       SELECT
-        w."id" as workspace_id,
-        w."name" as workspace_name,
-        w."description" as workspace_description,
-        w."createdAt" as workspace_createdAt,
-        w."updatedAt" as workspace_updatedAt,
-        w."archivedAt" as workspace_archivedAt,
-        w."isAssetsDiscovery" as workspace_isAssetsDiscovery,
-        w."isAutoEnableAssetAfterDiscovered" as workspace_isAutoEnableAssetAfterDiscovered,
-        w."ownerId" as workspace_ownerId,
-        COALESCE(t.target_count, 0)::integer as targetcount,
-        COALESCE(m.member_count, 0)::integer as membercount,
-        wm.role as member_role
+        w."id",
+        w."name",
+        w."description",
+        w."createdAt",
+        w."updatedAt",
+        w."archivedAt",
+        w."isAssetsDiscovery",
+        w."isAutoEnableAssetAfterDiscovered",
+        w."ownerId",
+        COALESCE(t.target_count, 0)::integer AS "targetCount",
+        COALESCE(m.member_count, 0)::integer AS "memberCount",
+        wm.role,
+        COUNT(*) OVER() AS total
       FROM workspaces w
       INNER JOIN workspace_members wm ON wm."workspaceId" = w.id AND wm."userId" = $1
       LEFT JOIN (
-        SELECT "workspaceId", COUNT(*) as target_count
-        FROM targets
-        GROUP BY "workspaceId"
-      ) t ON t."workspaceId" = w."id"
+        SELECT "workspaceId", COUNT(*) AS target_count
+        FROM targets GROUP BY "workspaceId"
+      ) t ON t."workspaceId" = w.id
       LEFT JOIN (
-        SELECT "workspaceId", COUNT(*) as member_count
-        FROM workspace_members
-        GROUP BY "workspaceId"
-      ) m ON m."workspaceId" = w."id"
+        SELECT "workspaceId", COUNT(*) AS member_count
+        FROM workspace_members GROUP BY "workspaceId"
+      ) m ON m."workspaceId" = w.id
       WHERE 1=1 ${archivedCondition}
       ORDER BY w."${sortBy}" ${validSortOrder}
       LIMIT $2 OFFSET $3
     `;
 
-    const rawData: Record<string, unknown>[] = await this.repo.query(
-      dataQuery,
-      [id, limit, offset],
-    );
+    const rawData: Record<string, unknown>[] = await this.repo.query(queryText, [
+      id,
+      limit,
+      offset,
+    ]);
 
-    // Map raw data to expected format
+    // Early return — skip count/members work when no results
+    if (rawData.length === 0) {
+      res.cookie(WORKSPACE_COOKIE_NAME, '');
+      return getManyResponse({ query, data: [], total: 0 });
+    }
+
+    const total = parseInt(rawData[0].total as string, 10);
+
+    // Map data — column aliases already match response field names
     const mappedData = rawData.map((row) => ({
-      id: row.workspace_id as string,
-      name: row.workspace_name as string,
-      description: row.workspace_description as string | null,
-      createdAt: row.workspace_createdAt as Date,
-      updatedAt: row.workspace_updatedAt as Date,
-      archivedAt: row.workspace_archivedAt as Date | null,
-      isAssetsDiscovery: row.workspace_isAssetsDiscovery as boolean,
+      id: row.id as string,
+      name: row.name as string,
+      description: row.description as string | null,
+      createdAt: row.createdAt as Date,
+      updatedAt: row.updatedAt as Date,
+      archivedAt: row.archivedAt as Date | null,
+      isAssetsDiscovery: row.isAssetsDiscovery as boolean,
       isAutoEnableAssetAfterDiscovered:
-        row.workspace_isAutoEnableAssetAfterDiscovered as boolean,
-      ownerId: row.workspace_ownerId as string,
-      targetCount: Number(row.targetcount) || 0,
-      memberCount: Number(row.membercount) || 0,
-      role: row.member_role as WorkspaceRole,
+        row.isAutoEnableAssetAfterDiscovered as boolean,
+      ownerId: row.ownerId as string,
+      targetCount: row.targetCount as number,
+      memberCount: row.memberCount as number,
+      role: row.role as WorkspaceRole,
     }));
-    const defaultWorkspace = mappedData[0]?.id;
+
+    const defaultWorkspace = mappedData[0].id;
     const workspaceId = getWorkspaceIdFromRequest(req);
     const selectedWorkspaceId =
-      mappedData.findIndex((workspace) => workspace.id === workspaceId) >= 0
+      mappedData.some((workspace) => workspace.id === workspaceId)
         ? workspaceId
         : defaultWorkspace;
 
-    // Set default
+    // Batch-load workspace members for all returned workspaces
+    const workspaceIds = mappedData.map((w) => w.id);
+    const members = await this.workspaceMembersRepository.find({
+      where: { workspace: { id: In(workspaceIds) } },
+      relations: ['user'],
+    });
+
+    // TypeORM adds implicit FK columns (workspaceId) on ManyToOne relations
+    const membersByWorkspace = new Map<string, WorkspaceMembers[]>();
+    for (const member of members) {
+      const wsId = (member as unknown as { workspaceId: string }).workspaceId;
+      if (!membersByWorkspace.has(wsId)) {
+        membersByWorkspace.set(wsId, []);
+      }
+      membersByWorkspace.get(wsId)!.push(member);
+    }
+
+    for (const item of mappedData) {
+      (item as unknown as { workspaceMembers: WorkspaceMembers[] }).workspaceMembers =
+        membersByWorkspace.get(item.id) ?? [];
+    }
+
     res.cookie(WORKSPACE_COOKIE_NAME, selectedWorkspaceId);
     return getManyResponse({ query, data: mappedData, total });
   }
@@ -349,8 +358,6 @@ export class WorkspacesService implements OnModuleInit {
     workspaceId: string,
     userContext: UserContextPayload,
   ): Promise<GetWorkspaceConfigsDto> {
-    const swaggerMetadata = getSwaggerMetadata(Workspace);
-
     const workspace = await this.getWorkspaceByIdAndOwner(
       workspaceId,
       userContext,
@@ -360,14 +367,54 @@ export class WorkspacesService implements OnModuleInit {
       throw new NotFoundException('Workspace not found');
     }
 
-    const result = new GetWorkspaceConfigsDto();
-    const keyConfigs = Object.keys(result);
-    keyConfigs.forEach((key) => {
+    const configKeys: (keyof GetWorkspaceConfigsDto)[] = [
+      'isAssetsDiscovery',
+      'isAutoEnableAssetAfterDiscovered',
+    ];
+
+    const result = {} as GetWorkspaceConfigsDto;
+
+    for (const key of configKeys) {
+      const meta: unknown = Reflect.getMetadata(
+        'swagger/apiModelProperties',
+        Workspace.prototype,
+        key,
+      );
+      const metaObj = meta as Record<string, unknown> | undefined;
+
+      const metaType = metaObj?.type;
+      let typeName: string | undefined;
+
+      if (typeof metaType === 'function') {
+        typeName =
+          typeof metaType.name === 'string' ? metaType.name.toLowerCase() : undefined;
+      } else if (typeof metaType === 'string') {
+        typeName = metaType.toLowerCase();
+      } else if (
+        typeof metaType === 'object' &&
+        metaType !== null &&
+        'name' in metaType &&
+        typeof (metaType as Record<string, unknown>).name === 'string'
+      ) {
+        typeName = ((metaType as Record<string, unknown>).name as string).toLowerCase();
+      } else {
+        typeName = typeof workspace[key as keyof Workspace];
+      }
+
+      const safeString = (v: unknown): string | undefined => {
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+          return String(v);
+        }
+        return undefined;
+      };
+
       result[key] = {
-        ...swaggerMetadata[key],
-        value: workspace[key] as Workspace,
-      } as SwaggerPropertyMetadata;
-    });
+        value: workspace[key as keyof Workspace] as SwaggerPropertyMetadata['value'],
+        type: typeName,
+        title: safeString(metaObj?.title) ?? key,
+        description: safeString(metaObj?.description) ?? '',
+      };
+    }
 
     return result;
   }
@@ -467,13 +514,21 @@ export class WorkspacesService implements OnModuleInit {
     userContext: UserContextPayload,
   ): Promise<Workspace> {
     const userId = userContext.id;
-    const workspace = await this.repo
-      .createQueryBuilder('workspace')
-      .leftJoinAndSelect('workspace.owner', 'owner')
-      .leftJoin('workspace.workspaceMembers', 'member')
-      .where('workspace.id = :workspaceId', { workspaceId: id })
-      .andWhere('member.user.id = :userId', { userId })
-      .getOne();
+
+    // Check if user is a member of the workspace
+    const isMember = await this.workspaceMembersRepository.findOne({
+      where: { workspace: { id }, user: { id: userId } },
+    });
+
+    if (!isMember) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    // Load workspace with owner and members
+    const workspace = await this.repo.findOne({
+      where: { id },
+      relations: ['owner', 'workspaceMembers', 'workspaceMembers.user'],
+    });
 
     if (!workspace) {
       throw new NotFoundException('Workspace not found');

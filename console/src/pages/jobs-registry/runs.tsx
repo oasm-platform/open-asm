@@ -1,5 +1,5 @@
-import type { ColumnDef } from '@tanstack/react-table';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
+import type { ColumnDef } from '@tanstack/react-table';
 
 import Page from '@/components/common/page';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -32,13 +32,14 @@ import dayjs from 'dayjs';
 import {
   ArrowRight,
   Calendar,
+  CircleAlert,
   CircleCheck,
   Clock,
   Loader2Icon,
   MoreHorizontal,
   X,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams({ strict: false });
@@ -63,76 +64,35 @@ export default function Runs() {
       },
     });
 
-  // Fetch all jobs for pipeline indicators (without pagination)
-  const {
-    data: allJobsData,
-    error: allJobsError,
-  } = useJobsRegistryControllerGetManyJobs({
-    page: 1,
-    limit: 100,
-    sortBy: 'createdAt',
-    sortOrder: 'ASC',
-    jobHistoryId: jobHistoryId || '',
-  });
-
-  // Check if any jobs are still in progress (pending or in_progress)
-  // Always poll initially, stop when no active jobs remain
-  const hasActiveJobsRef = useRef(true);
+  // Check if any tools are still active via API status
   const hasActiveJobs = useMemo(() => {
-    const jobs = allJobsData?.data || [];
-    const active = jobs.some(
-      (job) =>
-        job.status === JobStatus.pending ||
-        job.status === JobStatus.in_progress,
+    const tools = jobHistoryDetail?.tools || [];
+    return tools.some(
+      (tool) =>
+        tool.status === JobStatus.pending ||
+        tool.status === JobStatus.in_progress,
     );
-    hasActiveJobsRef.current = active;
-    return active;
-  }, [allJobsData?.data]);
+  }, [jobHistoryDetail?.tools]);
 
   const {
     data: paginatedJobsData,
     isLoading: isLoadingJobs,
     error: jobsError,
     queryKey: paginatedJobsQueryKey,
-  } = useJobsRegistryControllerGetManyJobs({
-    page: tableParams.page,
-    limit: tableParams.pageSize,
-    sortBy: tableParams.sortBy,
-    sortOrder: tableParams.sortOrder,
-    jobHistoryId: jobHistoryId || '',
-  }, {
-    query: {
-      refetchInterval: hasActiveJobs ? 1000 : false,
+  } = useJobsRegistryControllerGetManyJobs(
+    {
+      page: tableParams.page,
+      limit: tableParams.pageSize,
+      sortBy: tableParams.sortBy,
+      sortOrder: tableParams.sortOrder,
+      jobHistoryId: jobHistoryId || '',
     },
-  });
-
-  // Memoize jobs grouped by tool ID for efficient lookups, with name-based fallback
-  const jobsByToolId = useMemo(() => {
-    const jobs = allJobsData?.data || [];
-    const byId = new Map<string, Job[]>();
-    const byName = new Map<string, Job[]>();
-    jobs.forEach((job) => {
-      if (!job.tool) return;
-      const id = job.tool.id;
-      if (!byId.has(id)) byId.set(id, []);
-      byId.get(id)!.push(job);
-      const name = job.tool.name.toLowerCase();
-      if (!byName.has(name)) byName.set(name, []);
-      byName.get(name)!.push(job);
-    });
-    return { byId, byName };
-  }, [allJobsData?.data]);
-
-  // Get jobs for a tool, matching by ID first then by name as fallback
-  const getJobsForTool = useCallback((toolId: string, toolName?: string): Job[] => {
-    if (!jobsByToolId) return [];
-    const byId = jobsByToolId.byId.get(toolId);
-    if (byId) return byId;
-    if (toolName) {
-      return jobsByToolId.byName.get(toolName.toLowerCase()) || [];
-    }
-    return [];
-  }, [jobsByToolId]);
+    {
+      query: {
+        refetchInterval: hasActiveJobs ? 1000 : false,
+      },
+    },
+  );
 
   const getTitle = (row: Job) => {
     const value = row?.assetService
@@ -162,7 +122,8 @@ export default function Runs() {
         <div className="min-h-[60px] flex items-center">
           {row.original.tool ? (
             <Link
-              to="/tools/$id" params={{ id: row.original.tool.id }}
+              to="/tools/$id"
+              params={{ id: row.original.tool.id }}
               className="flex items-center gap-2"
             >
               <Image
@@ -321,66 +282,6 @@ export default function Runs() {
     },
   ];
 
-  const getToolStatus = useMemo(() => {
-    return (toolIndex: number) => {
-      const tools = jobHistoryDetail?.tools || [];
-
-      // Check if any previous tool in the workflow is still running or waiting
-      for (let i = 0; i < toolIndex; i++) {
-        const prevTool = tools[i];
-        if (!prevTool) {
-          console.warn(`Previous tool is undefined at index: ${i}`);
-          continue;
-        }
-        const prevToolJobs = getJobsForTool(prevTool.id, prevTool.name);
-
-        if (prevToolJobs.length > 0) {
-          const hasPrevRunning = prevToolJobs.some(
-            (job) => job.status === JobStatus.in_progress,
-          );
-          if (hasPrevRunning) return 'pending';
-
-          const allPrevCompleted = prevToolJobs.every(
-            (job) => job.status === JobStatus.completed,
-          );
-          if (!allPrevCompleted) return 'pending';
-        }
-      }
-
-      // Check current tool jobs
-      const currentTool = tools[toolIndex];
-      if (!currentTool) {
-        console.warn(`Current tool is undefined at index: ${toolIndex}`);
-        return 'pending';
-      }
-      const currentToolJobs = getJobsForTool(currentTool.id, currentTool.name);
-
-      if (currentToolJobs.length === 0) return 'pending';
-
-      const hasFailed = currentToolJobs.some(
-        (job) => job.status === JobStatus.failed,
-      );
-      if (hasFailed) return 'failed';
-
-      const hasRunning = currentToolJobs.some(
-        (job) => job.status === JobStatus.in_progress,
-      );
-      if (hasRunning) return 'running';
-
-      const allCompleted = currentToolJobs.every(
-        (job) => job.status === JobStatus.completed,
-      );
-      if (allCompleted) return 'completed';
-
-      const allPending = currentToolJobs.every(
-        (job) => job.status === JobStatus.pending,
-      );
-      if (allPending) return 'pending';
-
-      return 'running';
-    };
-  }, [jobHistoryDetail?.tools, getJobsForTool]);
-
   const navigate = useNavigate();
   return (
     <Page
@@ -396,38 +297,41 @@ export default function Runs() {
         <div className="mb-6 p-4 border rounded-lg bg-card">
           <h3 className="text-lg font-semibold mb-4">Pipeline</h3>
           <div className="flex items-center gap-4 flex-wrap">
-            {jobHistoryDetail.tools.map((tool, index) => {
-              const status = getToolStatus(index);
-              return (
-                <div key={tool.id} className="flex items-center gap-2">
-                  <Link
-                    to="/tools/$id" params={{ id: tool.id }}
-                    className="flex items-center gap-2 hover:opacity-80"
-                  >
-                    <Image
-                      url={tool.logoUrl}
-                      width={40}
-                      height={40}
-                      className="rounded-full border"
-                    />
-                    <span className="font-medium">{tool.name}</span>
-                    {status === 'running' && (
-                      <Loader2Icon className="animate-spin" />
-                    )}
-                    {status === 'completed' && (
-                      <CircleCheck className="text-green-500" />
-                    )}
-                    {status === 'pending' && (
-                      <Clock className="text-yellow-500" />
-                    )}
-                    {status === 'failed' && <X className="text-red-500" />}
-                  </Link>
-                  {index < jobHistoryDetail.tools.length - 1 && (
-                    <ArrowRight className="text-muted-foreground" size={16} />
+            {jobHistoryDetail.tools.map((tool, index) => (
+              <div key={tool.id} className="flex items-center gap-2">
+                <Link
+                  to="/tools/$id"
+                  params={{ id: tool.id }}
+                  className="flex items-center gap-2 hover:opacity-80"
+                >
+                  <Image
+                    url={tool.logoUrl}
+                    width={40}
+                    height={40}
+                    className="rounded-full border"
+                  />
+                  <span className="font-medium">{tool.name}</span>
+                  {tool.status === JobStatus.in_progress && (
+                    <Loader2Icon className="animate-spin" />
                   )}
-                </div>
-              );
-            })}
+                  {tool.status === JobStatus.completed && (
+                    <CircleCheck className="text-green-500" />
+                  )}
+                  {tool.status === JobStatus.pending && (
+                    <Clock className="text-yellow-500" />
+                  )}
+                  {tool.status === JobStatus.failed && (
+                    <X className="text-red-500" />
+                  )}
+                  {tool.status === JobStatus.skipped && (
+                    <CircleAlert className="text-gray-400" />
+                  )}
+                </Link>
+                {index < jobHistoryDetail.tools.length - 1 && (
+                  <ArrowRight className="text-muted-foreground" size={16} />
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -435,12 +339,6 @@ export default function Runs() {
       {!!jobsError && (
         <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
           Failed to load jobs. Please try again.
-        </div>
-      )}
-
-      {!!allJobsError && (
-        <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
-          Failed to load pipeline status. Please try again.
         </div>
       )}
 

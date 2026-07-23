@@ -73,6 +73,42 @@ export class WorkspaceResponseDto {
     example: 'owner',
   })
   role: WorkspaceRole;
+
+  @ApiProperty({
+    description: 'Members of the workspace',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        role: { type: 'string', enum: Object.values(WorkspaceRole) },
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            image: { type: 'string', nullable: true },
+          },
+        },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' },
+      },
+    },
+    example: [
+      {
+        id: 'member-uuid',
+        role: 'owner',
+        user: { id: 'user-uuid', name: 'John Doe', image: null },
+      },
+    ],
+  })
+  workspaceMembers: {
+    id: string;
+    role: WorkspaceRole;
+    user?: { id: string; name: string; image?: string | null };
+    createdAt: Date;
+    updatedAt: Date;
+  }[];
 }
 
 export class WorkspaceStatisticsResponseDto {

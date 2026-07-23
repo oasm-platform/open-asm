@@ -45,6 +45,7 @@ export const JobStatus = {
   completed: 'completed',
   failed: 'failed',
   cancelled: 'cancelled',
+  skipped: 'skipped',
 } as const;
 
 export type CronSchedule = (typeof CronSchedule)[keyof typeof CronSchedule];
@@ -192,9 +193,9 @@ export type Workspace = {
   /** The description of the workspace */
   description: string;
   archivedAt?: WorkspaceArchivedAt;
-  /** Asset discovery is enabled for the workspace */
+  /** Automatically scan and detect internet-facing assets (domains, IPs) in workspace networks */
   isAssetsDiscovery: boolean;
-  /** Assets are automatically enabled after discovery */
+  /** Newly discovered assets become active immediately without manual review */
   isAutoEnableAssetAfterDiscovered: boolean;
   /**
    * Encrypted Data Encryption Key (DEK) for this workspace. Encrypted with system KEK. Null for workspaces created before envelope encryption.
@@ -240,9 +241,9 @@ export type GetWorkspaceConfigsDto = {
 };
 
 export type UpdateWorkspaceConfigsDto = {
-  /** Asset discovery is enabled for the workspace */
+  /** Automatically scan and detect internet-facing assets (domains, IPs) in workspace networks */
   isAssetsDiscovery: boolean;
-  /** Assets are automatically enabled after discovery */
+  /** Newly discovered assets become active immediately without manual review */
   isAutoEnableAssetAfterDiscovered: boolean;
 };
 
@@ -268,6 +269,29 @@ export const WorkspaceResponseDtoRole = {
   owner: 'owner',
   member: 'member',
 } as const;
+
+export type WorkspaceResponseDtoWorkspaceMembersItemRole =
+  (typeof WorkspaceResponseDtoWorkspaceMembersItemRole)[keyof typeof WorkspaceResponseDtoWorkspaceMembersItemRole];
+
+export const WorkspaceResponseDtoWorkspaceMembersItemRole = {
+  owner: 'owner',
+  member: 'member',
+} as const;
+
+export type WorkspaceResponseDtoWorkspaceMembersItemUser = {
+  id?: string;
+  name?: string;
+  /** @nullable */
+  image?: string | null;
+};
+
+export type WorkspaceResponseDtoWorkspaceMembersItem = {
+  id?: string;
+  role?: WorkspaceResponseDtoWorkspaceMembersItemRole;
+  user?: WorkspaceResponseDtoWorkspaceMembersItemUser;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
 export type WorkspaceResponseDto = {
   /** Workspace ID */
@@ -300,6 +324,8 @@ export type WorkspaceResponseDto = {
   memberCount: number;
   /** Role of the current user in the workspace */
   role: WorkspaceResponseDtoRole;
+  /** Members of the workspace */
+  workspaceMembers: WorkspaceResponseDtoWorkspaceMembersItem[];
 };
 
 export type GetManyWorkspaceResponseDtoDto = {
@@ -606,6 +632,7 @@ export const JobStatusProperty = {
   completed: 'completed',
   failed: 'failed',
   cancelled: 'cancelled',
+  skipped: 'skipped',
 } as const;
 
 export type Job = {
@@ -642,6 +669,7 @@ export const JobTimelineItemStatus = {
   completed: 'completed',
   failed: 'failed',
   cancelled: 'cancelled',
+  skipped: 'skipped',
 } as const;
 
 export type JobTimelineItemToolCategory =
@@ -696,6 +724,7 @@ export const GetNextJobResponseDtoStatus = {
   completed: 'completed',
   failed: 'failed',
   cancelled: 'cancelled',
+  skipped: 'skipped',
 } as const;
 
 export type GetNextJobResponseDto = {
@@ -732,6 +761,7 @@ export const JobHistoryResponseDtoStatus = {
   completed: 'completed',
   failed: 'failed',
   cancelled: 'cancelled',
+  skipped: 'skipped',
 } as const;
 
 export type JobHistoryResponseDtoJobRunType =
@@ -762,11 +792,75 @@ export type GetManyJobHistoryResponseDtoDto = {
   pageCount: number;
 };
 
+export type ToolWithStatusDtoCategory =
+  (typeof ToolWithStatusDtoCategory)[keyof typeof ToolWithStatusDtoCategory];
+
+export const ToolWithStatusDtoCategory = {
+  subdomains: 'subdomains',
+  http_probe: 'http_probe',
+  ports_scanner: 'ports_scanner',
+  vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
+  classifier: 'classifier',
+  assistant: 'assistant',
+} as const;
+
+export type ToolWithStatusDtoType =
+  (typeof ToolWithStatusDtoType)[keyof typeof ToolWithStatusDtoType];
+
+export const ToolWithStatusDtoType = {
+  built_in: 'built_in',
+  provider: 'provider',
+} as const;
+
+export type ToolWithStatusDtoPriority =
+  (typeof ToolWithStatusDtoPriority)[keyof typeof ToolWithStatusDtoPriority];
+
+export const ToolWithStatusDtoPriority = {
+  NUMBER_0: 0,
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+  NUMBER_3: 3,
+  NUMBER_4: 4,
+} as const;
+
+export type ToolWithStatusDtoStatus =
+  (typeof ToolWithStatusDtoStatus)[keyof typeof ToolWithStatusDtoStatus];
+
+export const ToolWithStatusDtoStatus = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+  skipped: 'skipped',
+} as const;
+
+export type ToolWithStatusDto = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  description: string;
+  command: string;
+  category: ToolWithStatusDtoCategory;
+  version: string;
+  logoUrl: string;
+  isBuiltIn: boolean;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: ToolWithStatusDtoType;
+  providerId: string;
+  priority: ToolWithStatusDtoPriority;
+  availableWorkersCount: number;
+  status: ToolWithStatusDtoStatus;
+};
+
 export type JobHistoryDetailResponseDto = {
   id: string;
   createdAt: string;
   updatedAt: string;
-  tools: Tool[];
+  tools: ToolWithStatusDto[];
   workflowName: string;
   jobHistoryName: string;
 };
@@ -922,7 +1016,10 @@ export type GetManyGetIpAssetsDTODto = {
 };
 
 export type GetHostAssetsDTO = {
+  id: string;
   host: string;
+  targetId: string;
+  isEnabled: boolean;
   assetCount: number;
 };
 
@@ -1053,7 +1150,7 @@ export type UpdateAssetDto = {
   tags: string[] | null;
 };
 
-export type SwitchAssetDto = {
+export type ToggleAssetDto = {
   assetId: string;
   isEnabled: boolean;
 };
@@ -2069,13 +2166,6 @@ export type TelegramConnectDto = {
   updatedAt: string;
   /** Bot username from Telegram API, e.g. "MyAwesomeBot" */
   botUsername?: string;
-};
-
-export type RunCommandDto = {
-  /** Command to execute */
-  command: string;
-  /** Session ID for the remote execution stream */
-  sessionId: string;
 };
 
 export type ToolProvider = {
@@ -11810,43 +11900,43 @@ export const useAssetsControllerUpdateAssetById = <
 
 /**
  * Toggle the enabled/disabled status of an asset.
- * @summary Switch asset enabled/disabled
+ * @summary Toggle asset enabled/disabled
  */
-export const assetsControllerSwitchAsset = (
-  switchAssetDto: SwitchAssetDto,
+export const assetsControllerToggleAsset = (
+  toggleAssetDto: ToggleAssetDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<GetAssetsResponseDto>(
     {
-      url: `/api/assets/switch`,
+      url: `/api/assets/toggle`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      data: switchAssetDto,
+      data: toggleAssetDto,
       signal,
     },
     options,
   );
 };
 
-export const getAssetsControllerSwitchAssetMutationOptions = <
+export const getAssetsControllerToggleAssetMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+    Awaited<ReturnType<typeof assetsControllerToggleAsset>>,
     TError,
-    { data: SwitchAssetDto },
+    { data: ToggleAssetDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+  Awaited<ReturnType<typeof assetsControllerToggleAsset>>,
   TError,
-  { data: SwitchAssetDto },
+  { data: ToggleAssetDto },
   TContext
 > => {
-  const mutationKey = ['assetsControllerSwitchAsset'];
+  const mutationKey = ['assetsControllerToggleAsset'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -11856,48 +11946,48 @@ export const getAssetsControllerSwitchAssetMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
-    { data: SwitchAssetDto }
+    Awaited<ReturnType<typeof assetsControllerToggleAsset>>,
+    { data: ToggleAssetDto }
   > = (props) => {
     const { data } = props ?? {};
 
-    return assetsControllerSwitchAsset(data, requestOptions);
+    return assetsControllerToggleAsset(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type AssetsControllerSwitchAssetMutationResult = NonNullable<
-  Awaited<ReturnType<typeof assetsControllerSwitchAsset>>
+export type AssetsControllerToggleAssetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerToggleAsset>>
 >;
-export type AssetsControllerSwitchAssetMutationBody = SwitchAssetDto;
-export type AssetsControllerSwitchAssetMutationError = unknown;
+export type AssetsControllerToggleAssetMutationBody = ToggleAssetDto;
+export type AssetsControllerToggleAssetMutationError = unknown;
 
 /**
- * @summary Switch asset enabled/disabled
+ * @summary Toggle asset enabled/disabled
  */
-export const useAssetsControllerSwitchAsset = <
+export const useAssetsControllerToggleAsset = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+      Awaited<ReturnType<typeof assetsControllerToggleAsset>>,
       TError,
-      { data: SwitchAssetDto },
+      { data: ToggleAssetDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+  Awaited<ReturnType<typeof assetsControllerToggleAsset>>,
   TError,
-  { data: SwitchAssetDto },
+  { data: ToggleAssetDto },
   TContext
 > => {
   return useMutation(
-    getAssetsControllerSwitchAssetMutationOptions(options),
+    getAssetsControllerToggleAssetMutationOptions(options),
     queryClient,
   );
 };
@@ -24130,100 +24220,6 @@ export const useIntegrationsControllerDisconnectTelegramConnect = <
 > => {
   return useMutation(
     getIntegrationsControllerDisconnectTelegramConnectMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Publishes a command to the remote-execute channel via Redis pub/sub. The command is enriched with an id (nanoid) and sessionId (uuid) before publishing.
- * @summary Run a remote command
- */
-export const remoteExecuteControllerRunCommand = (
-  runCommandDto: RunCommandDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/remote-execute/run`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: runCommandDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getRemoteExecuteControllerRunCommandMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-    TError,
-    { data: RunCommandDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-  TError,
-  { data: RunCommandDto },
-  TContext
-> => {
-  const mutationKey = ['remoteExecuteControllerRunCommand'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-    { data: RunCommandDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return remoteExecuteControllerRunCommand(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type RemoteExecuteControllerRunCommandMutationResult = NonNullable<
-  Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>
->;
-export type RemoteExecuteControllerRunCommandMutationBody = RunCommandDto;
-export type RemoteExecuteControllerRunCommandMutationError = unknown;
-
-/**
- * @summary Run a remote command
- */
-export const useRemoteExecuteControllerRunCommand = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-      TError,
-      { data: RunCommandDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
-  TError,
-  { data: RunCommandDto },
-  TContext
-> => {
-  return useMutation(
-    getRemoteExecuteControllerRunCommandMutationOptions(options),
     queryClient,
   );
 };

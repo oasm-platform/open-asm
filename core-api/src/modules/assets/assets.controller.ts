@@ -21,7 +21,7 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
-import { SwitchAssetDto } from './dto/switch-asset.dto';
+import { ToggleAssetDto } from './dto/toggle-asset.dto';
 import { GetTlsResponseDto, GetTlsQueryDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import {
@@ -220,17 +220,17 @@ export class AssetsController {
   }
 
   @Doc({
-    summary: 'Switch asset enabled/disabled',
+    summary: 'Toggle asset enabled/disabled',
     description: 'Toggle the enabled/disabled status of an asset.',
     response: {
       serialization: GetAssetsResponseDto,
     },
   })
-  @Post('/switch')
-  switchAsset(@Body() switchAssetDto: SwitchAssetDto) {
-    return this.assetsService.switchAsset(
-      switchAssetDto.assetId,
-      switchAssetDto.isEnabled,
+  @Post('/toggle')
+  toggleAsset(@Body() toggleAssetDto: ToggleAssetDto) {
+    return this.assetsService.toggleAsset(
+      toggleAssetDto.assetId,
+      toggleAssetDto.isEnabled,
     );
   }
 

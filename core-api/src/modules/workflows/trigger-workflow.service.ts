@@ -1,3 +1,4 @@
+import { ToolCategory } from '@/common/enums/enum';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
@@ -20,38 +21,60 @@ export class TriggerWorkflowService implements OnModuleInit {
   onModuleInit() {
     // Listen all events with wildcard
     this.eventEmitter.onAny((event: string, payload: Target) => {
-      this.getWorkflowByEvent(event, payload)
+      void this.getWorkflowByEvent(event, payload)
         .then(async (workflow: Workflow | null) => {
-          if (workflow) {
-            // Get the first job's tool name
-            const firstJobToolName = workflow.content.jobs[0]?.run;
+          if (!workflow) return;
 
-            if (!firstJobToolName) {
-              Logger.error('Workflow does not have any jobs defined.');
-              return;
-            }
+          const workspaceConfig =
+            await this.workspaceService.getWorkspaceConfigValue(
+              workflow.workspace.id,
+            );
+          const isAssetsDiscovery = workspaceConfig.isAssetsDiscovery;
 
-            const tools = await this.toolsService.getToolByNames({
-              names: [firstJobToolName],
-            });
-
-            if (!tools || tools.length === 0) {
-              Logger.error(`Tool "${firstJobToolName}" not found.`);
-              return;
-            }
-
-            // Only use the first tool found (should be exactly one)
-            const tool = tools[0];
-
-            await this.jobRegistryService.createNewJob({
-              tool,
-              targetIds: [payload.id],
-              workflow: workflow,
-              priority: tool.priority,
-              workspaceId: workflow.workspace.id,
-              jobName: `${workflow.name} - ${payload.value}`,
-            });
+          // Resolve all job tool names to build name→category map
+          const allJobToolNames = workflow.content.jobs
+            .map((j) => j.run)
+            .filter(Boolean);
+          if (allJobToolNames.length === 0) {
+            Logger.error('Workflow does not have any jobs defined.');
+            return;
           }
+
+          const tools = await this.toolsService.getToolByNames({
+            names: allJobToolNames,
+          });
+          const toolMap = new Map(tools.map((t) => [t.name, t]));
+
+          // When assets discovery is off, skip SUBDOMAINS jobs
+          let startIndex = 0;
+          if (!isAssetsDiscovery) {
+            startIndex = workflow.content.jobs.findIndex((j) => {
+              const tool = toolMap.get(j.run);
+              return tool && tool.category !== ToolCategory.SUBDOMAINS;
+            });
+            if (startIndex === -1) {
+              Logger.warn(
+                'Asset discovery disabled and all jobs are SUBDOMAINS. Skipping workflow.',
+              );
+              return;
+            }
+          }
+
+          const startJob = workflow.content.jobs[startIndex];
+          const tool = toolMap.get(startJob.run);
+          if (!tool) {
+            Logger.error(`Tool "${startJob.run}" not found.`);
+            return;
+          }
+
+          await this.jobRegistryService.createNewJob({
+            tool,
+            targetIds: [payload.id],
+            workflow,
+            priority: tool.priority,
+            workspaceId: workflow.workspace.id,
+            jobName: `${workflow.name} - ${payload.value}`,
+          });
         })
         .catch((error) => {
           // Handle error, e.g., log it
