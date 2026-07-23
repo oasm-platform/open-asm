@@ -104,13 +104,13 @@ export function mergeBetterAuthSpec(
     if (betterAuthDoc.components.schemas) {
       document.components.schemas = {
         ...document.components.schemas,
-        ...betterAuthDoc.components.schemas,
+        ...(betterAuthDoc.components.schemas as typeof document.components.schemas),
       };
     }
     if (betterAuthDoc.components.securitySchemes) {
       document.components.securitySchemes = {
         ...document.components.securitySchemes,
-        ...betterAuthDoc.components.securitySchemes,
+        ...(betterAuthDoc.components.securitySchemes as typeof document.components.securitySchemes),
       };
     }
   }
