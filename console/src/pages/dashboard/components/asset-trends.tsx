@@ -44,7 +44,7 @@ export function AssetTrends() {
   const { data } = useStatisticControllerGetTimelineStatistics({
     query: {
       enabled: !!selectedWorkspaceId,
-      queryKey: [selectedWorkspaceId],
+      queryKey: ['/api/statistics/timeline', selectedWorkspaceId],
       refetchInterval: 60 * 60 * 1000,
     },
   });

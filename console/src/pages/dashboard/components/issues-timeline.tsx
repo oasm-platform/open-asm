@@ -36,7 +36,7 @@ export default function IssuesTimeline() {
   const { data, isLoading } = useStatisticControllerGetIssuesTimeline({
     query: {
       enabled: !!selectedWorkspaceId,
-      queryKey: [selectedWorkspaceId],
+      queryKey: ['/api/statistics/issues-timeline', selectedWorkspaceId],
     },
   });
 

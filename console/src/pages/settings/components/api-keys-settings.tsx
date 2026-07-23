@@ -22,7 +22,7 @@ export default function ApiKeysSettings() {
     refetch,
   } = useWorkspacesControllerGetWorkspaceApiKey({
     query: {
-      queryKey: [selectedWorkspaceId],
+      queryKey: ['/api/workspaces/api-key', selectedWorkspaceId],
       enabled: !!selectedWorkspaceId,
     },
   });
