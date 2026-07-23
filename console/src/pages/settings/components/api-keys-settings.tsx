@@ -1,6 +1,7 @@
 import { CopyableValue } from '@/components/common/copyable-value';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerGetWorkspaceApiKey,
@@ -77,20 +78,28 @@ export default function ApiKeysSettings() {
                 <CopyableValue
                   value={apiKeyData?.apiKey ?? 'No API key available'}
                   disabled={!apiKeyData?.apiKey}
-                />
-                <div className="flex justify-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleRotate}
+                >
+                  <ConfirmDialog
+                    title="Rotate API Key"
+                    description="This will invalidate the current API key. Are you sure you want to continue?"
+                    confirmText="Rotate"
+                    onConfirm={handleRotate}
                     disabled={isRotating || !selectedWorkspaceId}
-                  >
-                    <RefreshCw
-                      className={`h-4 w-4 ${isRotating ? 'animate-spin' : ''}`}
-                    />
-                    {isRotating ? 'Rotating...' : 'Rotate'}
-                  </Button>
-                </div>
+                    typeToConfirm="rotate"
+                    trigger={
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={isRotating || !selectedWorkspaceId}
+                      >
+                        <RefreshCw
+                          className={`h-4 w-4 ${isRotating ? 'animate-spin' : ''}`}
+                        />
+                        {isRotating ? 'Rotating...' : 'Rotate'}
+                      </Button>
+                    }
+                  />
+                </CopyableValue>
               </div>
               <p className="text-xs text-muted-foreground">
                 Keep your API key secure. Do not share it publicly or commit it

@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Copy, Check } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 
 interface CopyableValueProps {
@@ -8,13 +8,15 @@ interface CopyableValueProps {
   value: string;
   /** Disable the copy button (visual-only; value is still shown). */
   disabled?: boolean;
+  /** Extra action buttons rendered next to the Copy button. */
+  children?: ReactNode;
 }
 
 /**
  * Displays a value in a bordered box with a copy button below.
  * Mirrors the API key display pattern used in workspace settings.
  */
-export function CopyableValue({ value, disabled = false }: CopyableValueProps) {
+export function CopyableValue({ value, disabled = false, children }: CopyableValueProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -39,6 +41,7 @@ export function CopyableValue({ value, disabled = false }: CopyableValueProps) {
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? 'Copied!' : 'Copy'}
         </Button>
+        {children}
       </div>
     </div>
   );
