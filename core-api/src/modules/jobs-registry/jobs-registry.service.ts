@@ -949,9 +949,6 @@ export class JobsRegistryService {
       },
       relations: {
         workflow: true,
-        jobs: {
-          tool: true,
-        },
       },
     });
 
@@ -974,18 +971,74 @@ export class JobsRegistryService {
       throw new NotFoundException('Job history not found in workspace');
     }
 
-    let tools: Tool[] | undefined = [];
+    // Query tool statuses computed from actual jobs in this history
+    // Uses CASE/COUNT pattern from targets.service.ts L472-475
+    const rawToolStatuses = await this.repo
+      .createQueryBuilder('job')
+      .select([
+        'job.toolId as "toolId"',
+        `CASE
+          WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
+          WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
+          WHEN COUNT(CASE WHEN job.status = '${JobStatus.FAILED}' THEN 1 END) > 0 THEN '${JobStatus.FAILED}'
+          WHEN COUNT(CASE WHEN job.status = '${JobStatus.COMPLETED}' THEN 1 END) > 0 THEN '${JobStatus.COMPLETED}'
+          ELSE '${JobStatus.PENDING}'
+        END as "status"`,
+      ])
+      .where('job.jobHistoryId = :historyId', { historyId: id })
+      .groupBy('job.toolId')
+      .getRawMany<{ toolId: string; status: JobStatus }>();
+
+    // Build a lookup map: toolId → computed status
+    const toolStatusMap = new Map<string, JobStatus>();
+    rawToolStatuses.forEach((row) =>
+      toolStatusMap.set(row.toolId, row.status),
+    );
+
+    // Map tools from workflow content with their computed status
     const instaledTools = await this.toolsService.getInstalledTools(
       {},
       workspaceId,
     );
-    // Map jobs to tools
-    tools = jobHistory.workflow?.content.jobs
-      .map((job) => {
-        const tool = instaledTools.data.find((tool) => tool.name === job.run);
-        return tool;
-      })
-      .filter((tool) => tool !== undefined);
+    const tools = (
+      jobHistory.workflow?.content.jobs
+        .map((job) => {
+          const tool = instaledTools.data.find(
+            (t) => t.name === job.run,
+          );
+          return tool;
+        })
+        .filter((tool): tool is Tool => tool !== undefined) ?? []
+    ).map((tool) => ({
+      id: tool.id,
+      name: tool.name,
+      description: tool.description,
+      command: tool.command,
+      category: tool.category,
+      version: tool.version,
+      logoUrl: tool.logoUrl,
+      isBuiltIn: tool.isBuiltIn,
+      isInstalled: tool.isInstalled,
+      isOfficialSupport: tool.isOfficialSupport,
+      type: tool.type,
+      providerId: tool.providerId,
+      priority: tool.priority,
+      availableWorkersCount: tool.availableWorkersCount,
+      createdAt: tool.createdAt,
+      updatedAt: tool.updatedAt,
+      status: toolStatusMap.get(tool.id!) ?? JobStatus.PENDING,
+    }));
+
+    // Post-process: if a tool at a later index has completed, mark earlier
+    // pending tools as skipped — the workflow clearly moved past them.
+    let hasCompletedAhead = false;
+    for (let i = tools.length - 1; i >= 0; i--) {
+      if (tools[i].status === JobStatus.COMPLETED) {
+        hasCompletedAhead = true;
+      } else if (tools[i].status === JobStatus.PENDING && hasCompletedAhead) {
+        tools[i].status = JobStatus.SKIPPED;
+      }
+    }
 
     const {
       id: historyId,

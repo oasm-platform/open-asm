@@ -294,7 +294,8 @@ export class AssetsService {
     const assetServiceColumns = this.assetServiceRepo.metadata.columns.map(
       (col) => col.propertyName,
     );
-    if (!assetServiceColumns.includes(query.sortBy)) {
+    // Allow sorting by 'isEnabled' from the related asset table
+    if (!assetServiceColumns.includes(query.sortBy) && query.sortBy !== 'isEnabled') {
       query.sortBy = 'createdAt';
     }
 
@@ -308,8 +309,13 @@ export class AssetsService {
       });
     }
 
+    const sortColumn =
+      query.sortBy === 'isEnabled'
+        ? `asset.${query.sortBy}`
+        : `asset_service.${query.sortBy}`;
+
     const [list, total] = await queryBuilder
-      .orderBy(`asset_service.${query.sortBy}`, query.sortOrder)
+      .orderBy(sortColumn, query.sortOrder)
       .skip(offset)
       .take(query.limit)
       .getManyAndCount();
@@ -584,17 +590,25 @@ export class AssetsService {
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetHostAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
-    if (!(query.sortBy in GetHostAssetsDTO)) {
-      query.sortBy = '"assetCount"';
-    }
+
+    // Map DTO property names to raw SQL column aliases
+    const sortColumnMap: Record<string, string> = {
+      host: 'asset_value',
+      assetCount: '"assetCount"',
+      isEnabled: 'asset.isEnabled',
+    };
+    query.sortBy = sortColumnMap[query.sortBy] ?? '"assetCount"';
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
+        'asset.id',
         'asset.value',
+        'asset.targetId',
+        'asset.isEnabled',
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
       .andWhere('asset.value IS NOT NULL')
-      .groupBy('asset.value');
+      .groupBy('asset.id');
 
     if (query.value) {
       queryBuilder.andWhere('asset.value::text ILIKE :value', {
@@ -618,9 +632,18 @@ export class AssetsService {
     const total = totalInDb?.count ?? 0;
 
     const data = list.map(
-      (item: { asset_value: string; assetCount: number }) => {
+      (item: {
+        asset_id: string;
+        asset_value: string;
+        asset_targetId: string;
+        asset_isEnabled: boolean;
+        assetCount: number;
+      }) => {
         const obj = new GetHostAssetsDTO();
+        obj.id = item.asset_id;
         obj.host = item.asset_value;
+        obj.targetId = item.asset_targetId;
+        obj.isEnabled = item.asset_isEnabled;
         obj.assetCount = item.assetCount;
         return obj;
       },
@@ -1084,7 +1107,7 @@ export class AssetsService {
     return tags;
   }
 
-  public async switchAsset(
+  public async toggleAsset(
     assetId: string,
     isEnabled: boolean,
   ): Promise<Asset> {

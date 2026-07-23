@@ -20,14 +20,9 @@ export function ListAssets() {
       tab: <AssetTabContent />,
     },
     {
-      value: 'technology',
-      text: 'Technologies',
-      tab: <TechnologyAssetsTab />,
-    },
-    {
-      value: 'ip',
-      text: 'IP Addresses',
-      tab: <IpAssetsTab />,
+      value: 'host',
+      text: 'Hosts',
+      tab: <HostAssetsTab />,
     },
     {
       value: 'port',
@@ -35,9 +30,14 @@ export function ListAssets() {
       tab: <PortAssetsTab />,
     },
     {
-      value: 'host',
-      text: 'Hosts',
-      tab: <HostAssetsTab />,
+      value: 'ip',
+      text: 'IP Addresses',
+      tab: <IpAssetsTab />,
+    },
+    {
+      value: 'technology',
+      text: 'Technologies',
+      tab: <TechnologyAssetsTab />,
     },
     {
       value: 'status-code',

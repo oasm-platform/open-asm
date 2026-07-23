@@ -16,15 +16,14 @@ import {
 import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { GetManyTargetResponseDto } from '@/services/apis/gen/queries';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
-import { Target } from 'lucide-react';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { ScopeFilter } from './components/scope-filter';
+import { StartDiscoveryButton } from './components/start-discovery-button';
 import { TargetTypeFilter } from './components/target-type-filter';
 
 const targetTypeColor: Record<string, string> = {
@@ -265,14 +264,7 @@ export function ListTargets() {
           value={scopeFilter}
           onValueChange={handleScopeFilterChange}
         />,
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => navigate({ to: '/targets/start-discovery' })}
-        >
-          <Target className="shrink-0" />
-          <span>Start discovery</span>
-        </Button>,
+        <StartDiscoveryButton />,
       ]}
       totalItems={total}
       onRowClick={handleRowClick}

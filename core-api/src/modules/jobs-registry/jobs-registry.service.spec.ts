@@ -1,4 +1,10 @@
-import { BullMQName, JobStatus, ToolCategory } from '@/common/enums/enum';
+import {
+  BullMQName,
+  JobPriority,
+  JobStatus,
+  ToolCategory,
+  WorkerType,
+} from '@/common/enums/enum';
 import { RedisService } from '@/services/redis/redis.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
@@ -22,8 +28,13 @@ describe('JobsRegistryService', () => {
   const mockJobRepository = {
     createQueryBuilder: jest.fn().mockReturnThis(),
     innerJoin: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    addGroupBy: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn(),
     getOne: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
@@ -451,7 +462,26 @@ describe('JobsRegistryService', () => {
       jobHistoryName: 'test-job-history',
     };
 
-    it('should return job history detail with jobs', async () => {
+    it('should return job history detail with tools and their statuses', async () => {
+      const mockTool = {
+        id: 'tool-uuid',
+        name: 'test-tool',
+        description: 'A test tool',
+        command: 'test-command',
+        category: ToolCategory.SUBDOMAINS,
+        version: '1.0',
+        logoUrl: 'http://example.com/logo.png',
+        isBuiltIn: true,
+        isInstalled: true,
+        isOfficialSupport: true,
+        type: WorkerType.BUILT_IN,
+        providerId: 'provider-uuid',
+        priority: JobPriority.BACKGROUND,
+        availableWorkersCount: 2,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
         innerJoin: jest.fn().mockReturnThis(),
@@ -459,8 +489,11 @@ describe('JobsRegistryService', () => {
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
       });
+      mockJobRepository.getRawMany.mockResolvedValue([
+        { toolId: 'tool-uuid', status: JobStatus.COMPLETED },
+      ]);
       mockToolsService.getInstalledTools.mockResolvedValue({
-        data: [{ name: 'test-tool' }],
+        data: [mockTool],
       });
 
       const result = await service.getJobHistoryDetail(
@@ -472,9 +505,6 @@ describe('JobsRegistryService', () => {
         where: { id: mockHistoryId },
         relations: {
           workflow: true,
-          jobs: {
-            tool: true,
-          },
         },
       });
       expect(result).toEqual({
@@ -483,7 +513,12 @@ describe('JobsRegistryService', () => {
         jobHistoryName: 'test-job-history',
         createdAt: mockJobHistory.createdAt,
         updatedAt: mockJobHistory.updatedAt,
-        tools: [{ name: 'test-tool' }],
+        tools: [
+          {
+            ...mockTool,
+            status: JobStatus.COMPLETED,
+          },
+        ],
       });
     });
 
