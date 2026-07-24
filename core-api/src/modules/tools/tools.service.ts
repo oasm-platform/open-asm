@@ -19,6 +19,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { In, Repository } from 'typeorm';
+import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
@@ -52,6 +53,8 @@ export class ToolsService implements OnModuleInit {
 
     @Inject(forwardRef(() => WorkersService))
     private readonly workersService: WrapperType<WorkersService>,
+
+    private readonly redisLockService: RedisLockService,
   ) {}
 
   /**
@@ -136,9 +139,50 @@ export class ToolsService implements OnModuleInit {
         })
         .values(toolsToInsert)
         .execute();
+
+      // Remove built-in tools no longer declared — wrapped in distributed
+      // lock so only one replica runs cleanup across a multi-instance cluster.
+      await this.redisLockService.withLock(
+        'built-in-tools-sync',
+        10_000,
+        () => this.removeOrphanBuiltInTools(),
+      );
     } catch (error) {
       Logger.error('Error initializing built-in tools:', error);
     }
+  }
+
+  /**
+   * Remove built-in tools from the database that are no longer declared
+   * in built-in-tools.ts. Deletes associated workspace_tools rows first
+   * to avoid FK violations.
+   */
+  private async removeOrphanBuiltInTools(): Promise<void> {
+    const builtInNames = builtInTools.map((tool) => tool.name);
+    const dbBuiltInTools = await this.toolsRepository.find({
+      where: { type: WorkerType.BUILT_IN },
+    });
+    const orphanTools = dbBuiltInTools.filter(
+      (tool) => !builtInNames.includes(tool.name),
+    );
+
+    if (orphanTools.length === 0) return;
+
+    const orphanIds = orphanTools.map((tool) => tool.id);
+
+    // Delete workspace_tools entries referencing orphaned tools first
+    await this.workspaceToolRepository
+      .createQueryBuilder()
+      .delete()
+      .where('"toolId" IN (:...orphanIds)', { orphanIds })
+      .execute();
+
+    // Then delete the orphaned tools
+    await this.toolsRepository.delete({ id: In(orphanIds) });
+
+    Logger.log(
+      `Removed ${orphanTools.length} built-in tool(s) no longer declared: ${orphanTools.map((t) => t.name).join(', ')}`,
+    );
   }
 
   /**

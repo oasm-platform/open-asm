@@ -20,8 +20,8 @@ export function WorkspaceConfigs() {
     refetch,
   } = useWorkspacesControllerGetWorkspaceConfigs({
     query: {
-      enabled: selectedWorkspace !== undefined,
-      queryKey: [selectedWorkspace],
+      enabled: !!selectedWorkspace,
+      queryKey: ['/api/workspaces/configs', selectedWorkspace],
     },
   });
   const { mutate: updateWorkspaceConfigs, isPending: isUpdating } =

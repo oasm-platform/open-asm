@@ -14,7 +14,7 @@ export default function McpConnect() {
   const { data: apiKeyData, isLoading } =
     useWorkspacesControllerGetWorkspaceApiKey({
       query: {
-        queryKey: [selectedWorkspaceId],
+        queryKey: ['/api/workspaces/api-key', selectedWorkspaceId],
         enabled: !!selectedWorkspaceId,
       },
     });

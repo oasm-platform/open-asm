@@ -120,14 +120,25 @@ const ToolInstallButton = ({ tool, workspaceId, onInstallChange }: ToolInstallBu
     );
   }
 
+  // Disable install when no workers are online
+  const noWorkers = !tool.availableWorkersCount || tool.availableWorkersCount === 0;
+
   // If the tool is not installed (based on local state), show the install button
   return (
     <ConfirmDialog
       title="Install Tool"
-      description={`Are you sure you want to install "${tool.name}"?`}
+      description={
+        noWorkers
+          ? `"${tool.name}" requires at least one worker online.`
+          : `Are you sure you want to install "${tool.name}"?`
+      }
+      disabled={noWorkers}
       onConfirm={handleInstall}
       trigger={
-        <Button variant="default" disabled={installToolMutation.isPending}>
+        <Button
+          variant="default"
+          disabled={installToolMutation.isPending || noWorkers}
+        >
           {installToolMutation.isPending ? (
             "Installing..."
           ) : (

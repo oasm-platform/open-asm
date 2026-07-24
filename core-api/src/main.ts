@@ -24,6 +24,7 @@ import {
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
+import { mergeBetterAuthSpec } from './utils/mergeBetterAuth';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
@@ -90,8 +91,13 @@ async function bootstrap() {
     )
     .setVersion('1.0')
     .setExternalDoc('Authentication Docs', 'auth/docs')
+    .addTag('Admin')
+    .addTag('Authentication')
     .build();
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
+
+  const documentFactory = () =>
+    mergeBetterAuthSpec(SwaggerModule.createDocument(app, config));
+
   app.use(
     `/${API_GLOBAL_PREFIX}/docs`,
     apiReference({
