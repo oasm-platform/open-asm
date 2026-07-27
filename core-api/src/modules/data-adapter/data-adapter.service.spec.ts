@@ -882,7 +882,7 @@ describe('DataAdapterService', () => {
         expect.arrayContaining([
           expect.objectContaining({
             tag: 'environment:production',
-            assetId: 'asset-id',
+            assetServiceId: null,
             toolId: 'tool-id',
           }),
         ]),
