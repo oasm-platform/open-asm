@@ -407,8 +407,7 @@ export class JobsRegistryService {
 
       // [OPT-3] Only join workspace when actually needed
       if (isBuiltInTools && worker.scope !== WorkerScope.CLOUD) {
-        queryBuilder
-          .leftJoin('target.workspace', 'workspaces');
+        queryBuilder.leftJoin('target.workspace', 'workspaces');
       }
 
       if (isBuiltInTools) {
@@ -939,14 +938,14 @@ export class JobsRegistryService {
         '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
         // Subquery with CASE to calculate status based on job statuses
         `(
-          SELECT 
-            CASE 
+          SELECT
+            CASE
               WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
               WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
               WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
               ELSE '${JobStatus.PENDING}'
             END
-          FROM jobs 
+          FROM jobs
           WHERE "jobHistoryId" = "jobHistory".id
         ) as "status"`,
       ])

@@ -332,9 +332,12 @@ export class JobsRegistryController {
 
   @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('JobsRegistryService', 'Next')
-  async next(worker: {
+  async next(worker: { id: string }): Promise<{
     id: string;
-  }): Promise<{ id: string; asset: Asset; command?: string; category?: string }> {
+    asset: Asset;
+    command?: string;
+    category?: string;
+  }> {
     const job = await this.jobsRegistryService.getNextJob(worker.id);
 
     if (!job) {

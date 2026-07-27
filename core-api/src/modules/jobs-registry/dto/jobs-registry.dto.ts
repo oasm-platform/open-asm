@@ -90,6 +90,7 @@ export class DataPayloadResult {
   )
   payload: JobDataResultType;
 }
+
 export class UpdateResultDto {
   @ApiProperty()
   @IsUUID()
