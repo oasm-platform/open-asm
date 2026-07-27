@@ -299,14 +299,24 @@ func (m Model) View() tea.View {
 
 	l := computeLayout(m.width, m.height)
 
-	// Border helper
 	bordered := func(content string, w, h int) string {
+		innerH := h - 2
+		if innerH < 1 {
+			innerH = 1
+		}
+		lines := strings.Split(content, "\n")
+		if len(lines) > innerH {
+			lines = lines[:innerH]
+		}
+		truncated := strings.Join(lines, "\n")
+
 		return lipgloss.NewStyle().
 			Width(w).
 			Height(h).
+			MaxHeight(h).
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(ColorDarkGray).
-			Render(content)
+			Render(truncated)
 	}
 
 	// Header
