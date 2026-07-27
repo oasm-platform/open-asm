@@ -135,7 +135,7 @@ export class WorkflowsService implements OnModuleInit {
               name: workflowName,
               content: newContent,
               filePath: fileName,
-              workspace: { id: workspaceId } as Workspace,
+              workspace: { id: workspaceId },
               isCanDelete: false,
               isCanEdit: false,
             });
