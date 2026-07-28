@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as crypto from 'crypto';
-import { ToolCategory } from '../../../common/enums/enum';
-import { AssetService } from '../../assets/entities/asset-services.entity';
-import { StorageService } from '../../storage/storage.service';
-import type { ScreenshotPayload } from '../../../common/interfaces/app.interface';
+import { ToolCategory } from '@/common/enums/enum';
+import { AssetService } from '@/modules/assets/entities/asset-services.entity';
+import { StorageService } from '@/modules/storage/storage.service';
+import type { ScreenshotPayload } from '@/common/interfaces/app.interface';
 import type { HandlerPayload } from './interfaces/data-handler.interface';
 import { BaseHandler } from './base.handler';
 
@@ -49,6 +49,10 @@ export class ScreenshotHandler extends BaseHandler<ScreenshotPayload> {
         .set({ screenshotPath: path })
         .where({ id: job.assetServiceId })
         .execute();
+    } else {
+      this.logger.warn(
+        `No screenshot path returned for job ${job.id} (asset ${job.asset.value})`,
+      );
     }
   }
 }

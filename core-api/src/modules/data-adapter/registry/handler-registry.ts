@@ -1,5 +1,5 @@
 import { Injectable, Inject, Optional, OnModuleInit, Logger } from '@nestjs/common';
-import { ToolCategory } from '../../../common/enums/enum';
+import { ToolCategory } from '@/common/enums/enum';
 import type { IDataHandler } from '../handlers/interfaces/data-handler.interface';
 
 /**

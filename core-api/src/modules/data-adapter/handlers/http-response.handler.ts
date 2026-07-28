@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { ToolCategory } from '../../../common/enums/enum';
-import { AssetService } from '../../assets/entities/asset-services.entity';
-import { HttpResponse } from '../../assets/entities/http-response.entity';
+import { ToolCategory } from '@/common/enums/enum';
+import { AssetService } from '@/modules/assets/entities/asset-services.entity';
+import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import type { HandlerPayload } from './interfaces/data-handler.interface';
 import { BaseHandler } from './base.handler';
 
@@ -42,7 +42,7 @@ export class HttpResponseHandler extends BaseHandler<HttpResponse> {
             const { id: _id, ...values } = data;
             return {
               ...values,
-              assetServiceId: job.assetService?.id,
+              assetServiceId: job.assetServiceId,
               jobHistoryId: job.jobHistory.id,
             };
           })(),

@@ -10,7 +10,7 @@ export function normalizeTimestamp(val: unknown): Date | undefined {
     return undefined;
   }
   if (val instanceof Date) {
-    return val;
+    return isNaN(val.getTime()) ? undefined : val;
   }
   if (typeof val === 'string' || typeof val === 'number') {
     const d = new Date(val);

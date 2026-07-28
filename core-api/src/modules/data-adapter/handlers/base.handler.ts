@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { DataSource, EntityManager, InsertResult } from 'typeorm';
-import type { ToolCategory } from '../../../common/enums/enum';
-import type { Job } from '../../jobs-registry/entities/job.entity';
+import type { ToolCategory } from '@/common/enums/enum';
+import type { Job } from '@/modules/jobs-registry/entities/job.entity';
 import {
   type IDataHandler,
   type HandlerPayload,
@@ -29,7 +29,7 @@ export abstract class BaseHandler<T> implements IDataHandler<T> {
     return { valid: true };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+   
   abstract handle(payload: HandlerPayload<T>): Promise<void | InsertResult>;
 
   /**

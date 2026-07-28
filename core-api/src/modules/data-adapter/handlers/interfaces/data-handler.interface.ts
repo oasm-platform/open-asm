@@ -1,5 +1,5 @@
-import type { ToolCategory } from '../../../../common/enums/enum';
-import type { Job } from '../../../jobs-registry/entities/job.entity';
+import type { ToolCategory } from '@/common/enums/enum';
+import type { Job } from '@/modules/jobs-registry/entities/job.entity';
 import type { InsertResult } from 'typeorm';
 
 export type ValidationResult =
@@ -35,6 +35,6 @@ export interface IDataHandler<T = unknown> {
    * All side effects (DB writes, file uploads, event emission) happen here.
    * Transaction boundaries are the handler's responsibility.
    */
-  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+   
   handle(payload: HandlerPayload<T>): Promise<void | InsertResult>;
 }

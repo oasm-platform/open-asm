@@ -1,5 +1,5 @@
-import type { Asset } from '../../../assets/entities/assets.entity';
-import type { Job } from '../../../jobs-registry/entities/job.entity';
+import type { Asset } from '@/modules/assets/entities/assets.entity';
+import type { Job } from '@/modules/jobs-registry/entities/job.entity';
 
 /**
  * Emitted when new assets (subdomains) are discovered.

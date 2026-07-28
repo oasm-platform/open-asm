@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
-import { ToolCategory } from '../../../common/enums/enum';
-import { Asset } from '../../assets/entities/assets.entity';
-import { WorkspacesService } from '../../workspaces/workspaces.service';
+import { ToolCategory } from '@/common/enums/enum';
+import { Asset } from '@/modules/assets/entities/assets.entity';
+import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import type { HandlerPayload } from './interfaces/data-handler.interface';
-import type { InsertResult } from 'typeorm';
 import { BaseHandler } from './base.handler';
+import { AssetDiscoveredEvent } from '../domain-events/events/asset-discovered.event';
 
 /**
  * Handles subdomain discovery results (ToolCategory.SUBDOMAINS).
@@ -21,6 +22,7 @@ export class SubdomainHandler extends BaseHandler<Asset[]> {
 
   constructor(
     dataSource: DataSource,
+    private readonly eventEmitter: EventEmitter2,
     private readonly workspaceService: WorkspacesService,
   ) {
     super(dataSource);
@@ -29,8 +31,8 @@ export class SubdomainHandler extends BaseHandler<Asset[]> {
   async handle({
     data,
     job,
-  }: HandlerPayload<Asset[]>): Promise<InsertResult | void> {
-    return this.runInTransaction(async (manager) => {
+  }: HandlerPayload<Asset[]>): Promise<void> {
+    await this.runInTransaction(async (manager) => {
       // Deduplicate data based on value
       const uniqueData = Array.from(
         new Map(data.map((asset) => [asset.value, asset])).values(),
@@ -52,11 +54,17 @@ export class SubdomainHandler extends BaseHandler<Asset[]> {
         await this.workspaceService.getWorkspaceIdByTargetId(
           job.asset.target.id,
         );
+      if (!workspaceId) {
+        this.logger.warn(
+          `No workspace found for target ${job.asset.target.id}, skipping asset insertion`,
+        );
+        return;
+      }
       const workspaceConfigs =
-        await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
+        await this.workspaceService.getWorkspaceConfigValue(workspaceId);
 
       // Insert new assets
-      const insertResult = await manager
+      await manager
         .createQueryBuilder()
         .insert()
         .into(Asset)
@@ -74,8 +82,17 @@ export class SubdomainHandler extends BaseHandler<Asset[]> {
         )
         .orIgnore()
         .execute();
-
-      return insertResult;
     });
+
+    // Emit event for newly discovered assets
+    const newAssets = data.filter(
+      (asset) => !job.asset || asset.value !== job.asset.value,
+    );
+    if (newAssets.length > 0) {
+      this.eventEmitter.emit(
+        'asset.discovered',
+        new AssetDiscoveredEvent(newAssets, job),
+      );
+    }
   }
 }

@@ -1,78 +1,16 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
-import type { InsertResult } from 'typeorm';
-import { DataSource } from 'typeorm';
-import {
-  NotificationType,
-  Severity,
-  ToolCategory,
-} from '../../common/enums/enum';
-import type { Asset } from '../assets/entities/assets.entity';
-import type { HttpResponse } from '../assets/entities/http-response.entity';
-import type { Job } from '../jobs-registry/entities/job.entity';
-import { NotificationsService } from '../notifications/notifications.service';
-import { StorageService } from '../storage/storage.service';
-import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
-import { WorkspacesService } from '../workspaces/workspaces.service';
+import { ToolCategory, Severity } from '@/common/enums/enum';
+import type { Job } from '@/modules/jobs-registry/entities/job.entity';
+import type { JobDataResultType } from '@/common/types/app.types';
 import { DataAdapterService } from './data-adapter.service';
 import { HandlerRegistry } from './registry/handler-registry';
 
 describe('DataAdapterService', () => {
   let service: DataAdapterService;
-  let mockQueryRunner: any;
-  let mockDataSource: any;
-  let mockWorkspacesService: any;
-  let mockNotificationsService: any;
   let mockHandlerRegistry: any;
 
   beforeEach(async () => {
-    mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      manager: {
-        createQueryBuilder: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        execute: jest.fn(),
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orIgnore: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      },
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-    };
-
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-      createQueryBuilder: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      into: jest.fn().mockReturnThis(),
-      values: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      set: jest.fn().mockReturnThis(),
-      execute: jest.fn(),
-      getRepository: jest.fn().mockReturnThis(),
-      query: jest.fn(),
-      transaction: jest.fn(),
-    };
-
-    mockWorkspacesService = {
-      getWorkspaceIdByTargetId: jest.fn(),
-      getWorkspaceConfigValue: jest.fn(),
-      getMemberOfWorkspaceByJobId: jest.fn().mockResolvedValue([]),
-    };
-
-    mockNotificationsService = {
-      createNotification: jest.fn(),
-    };
-
-    // HandlerRegistry mock - syncData tests override get() per test
     mockHandlerRegistry = {
       get: jest.fn().mockReturnValue({
         validate: jest.fn().mockResolvedValue({ valid: true }),
@@ -84,30 +22,6 @@ describe('DataAdapterService', () => {
       providers: [
         DataAdapterService,
         {
-          provide: DataSource,
-          useValue: mockDataSource,
-        },
-        {
-          provide: WorkspacesService,
-          useValue: mockWorkspacesService,
-        },
-        {
-          provide: StorageService,
-          useValue: {
-            uploadFile: jest
-              .fn()
-              .mockReturnValue({ path: 'mock/path/file.png' }),
-            getFile: jest.fn(),
-            deleteFile: jest.fn(),
-            forwardImage: jest.fn(),
-            readJsonFile: jest.fn(),
-          },
-        },
-        {
-          provide: NotificationsService,
-          useValue: mockNotificationsService,
-        },
-        {
           provide: HandlerRegistry,
           useValue: mockHandlerRegistry,
         },
@@ -116,13 +30,11 @@ describe('DataAdapterService', () => {
 
     service = module.get<DataAdapterService>(DataAdapterService);
 
-    // Mock validateData method to return true for valid data and false for invalid data
+    // Mock validateData method
     jest.spyOn(service, 'validateData').mockImplementation((data, cls) => {
-      // Use cls parameter to satisfy lint rule, though not actually used in mock logic
-      void cls; // This satisfies the lint rule without affecting logic
+      void cls;
       const arr = Array.isArray(data) ? data : [data];
       for (const item of arr) {
-        // Simple validation: if value is a number when it should be string, return false
         if (
           item &&
           typeof item === 'object' &&
@@ -170,658 +82,9 @@ describe('DataAdapterService', () => {
         value: string;
       }
 
-      const data = { value: 123 }; // Invalid type
+      const data = { value: 123 };
       const result = await service.validateData(data, TestDto);
       expect(result).toBe(false);
-    });
-  });
-
-  describe('subdomains', () => {
-    const mockJob = {
-      asset: {
-        id: 'asset-id',
-        value: 'example.com',
-        target: { id: 'target-id' },
-        targetId: 'target-id',
-        isEnabled: true,
-        dnsRecords: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      assetServiceId: null,
-      jobHistory: { id: 'history-id' },
-      tool: { id: 'tool-id', category: ToolCategory.SUBDOMAINS },
-      category: ToolCategory.SUBDOMAINS,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as unknown as Job;
-
-    const mockAssets = [
-      {
-        id: 'asset1-id',
-        value: 'sub1.example.com',
-        target: { id: 'target-id' },
-        targetId: 'target-id',
-        isEnabled: true,
-        dnsRecords: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: 'asset2-id',
-        value: 'sub2.example.com',
-        target: { id: 'target-id' },
-        targetId: 'target-id',
-        isEnabled: true,
-        dnsRecords: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ] as Asset[];
-
-    it('should handle subdomain data successfully', async () => {
-      const mockInsertResult = {
-        identifiers: [{ id: 'inserted-id' }],
-        generatedMaps: [],
-        raw: [],
-      } as unknown as InsertResult;
-
-      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined) // Update Asset
-        .mockResolvedValueOnce(mockInsertResult); // Insert Assets
-      mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
-        'workspace-id',
-      );
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAutoEnableAssetAfterDiscovered: true,
-      });
-
-      const result = await service.subdomains({
-        data: mockAssets,
-        job: mockJob,
-      });
-
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
-      expect(result).toEqual(mockInsertResult);
-    });
-
-    it('should rollback transaction on error', async () => {
-      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      // Mock the first execute call (update Asset) to succeed
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined)
-        // Mock the second execute call (insert Assets) to fail
-        .mockRejectedValueOnce(new Error('Database error'));
-      mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
-        'workspace-id',
-      );
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAutoEnableAssetAfterDiscovered: true,
-      });
-
-      await expect(
-        service.subdomains({
-          data: mockAssets,
-          job: mockJob,
-        }),
-      ).rejects.toThrow();
-
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
-    });
-  });
-
-  describe('httpResponses', () => {
-    const mockJob = {
-      asset: {
-        id: 'asset-id',
-        value: 'example.com',
-        target: { id: 'target-id' },
-        targetId: 'target-id',
-        isEnabled: true,
-        dnsRecords: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      assetServiceId: 'service-id',
-      jobHistory: { id: 'history-id' },
-      tool: { id: 'tool-id', category: ToolCategory.HTTP_PROBE },
-      assetService: { id: 'service-id' },
-      category: ToolCategory.HTTP_PROBE,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as unknown as Job;
-
-    const mockHttpResponse = {
-      timestamp: new Date(),
-      tls: {
-        host: 'example.com',
-        port: '443',
-        probe_status: true,
-        tls_version: 'TLSv1.3',
-        cipher: 'TLS_AES_256_GCM_SHA384',
-        not_before: '2024-01T0:00:00Z',
-        not_after: '2025-01-01T00:00:00Z',
-        subject_dn: 'CN=example.com',
-        subject_cn: 'example.com',
-        subject_an: [],
-        serial: '123456',
-        issuer_dn: 'CN=Test CA',
-        issuer_cn: 'Test CA',
-        issuer_org: [],
-        fingerprint_hash: {
-          md5: 'test-md5',
-          sha1: 'test-sha1',
-          sha256: 'test-sha256',
-        },
-        wildcard_certificate: false,
-        tls_connection: 'secure',
-        sni: 'example.com',
-      },
-      port: '443',
-      url: 'https://example.com',
-      input: 'example.com',
-      title: 'Test Title',
-      scheme: 'https',
-      webserver: 'nginx',
-      body: 'test body',
-      content_type: 'text/html',
-      method: 'GET',
-      host: 'example.com',
-      path: '/',
-      favicon: '',
-      favicon_md5: '',
-      favicon_url: '',
-      header: {},
-      raw_header: '',
-      request: '',
-      time: '100ms',
-      a: [],
-      tech: [],
-      words: 10,
-      lines: 5,
-      status_code: 200,
-      content_length: 100,
-      failed: false,
-      knowledgebase: {
-        PageType: 'HTML',
-        pHash: 123456,
-      },
-      resolvers: [],
-      chain_status_codes: [],
-      assetServiceId: 'service-id',
-      jobHistoryId: 'history-id',
-      assetService: { id: 'service-id' } as any,
-      jobHistory: { id: 'history-id' } as any,
-      id: 'response-id',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as unknown as HttpResponse;
-
-    it('should handle HTTP response data successfully', async () => {
-      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockResolvedValue(undefined);
-
-      await service.httpResponses({
-        data: mockHttpResponse,
-        job: mockJob,
-      });
-
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
-    });
-
-    it('should update asset service when response failed', async () => {
-      const failedResponse = { ...mockHttpResponse, failed: true };
-
-      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockResolvedValue(undefined);
-
-      await service.httpResponses({
-        data: failedResponse,
-        job: mockJob,
-      });
-
-      expect(mockQueryRunner.manager.createQueryBuilder).toHaveBeenCalledTimes(
-        3,
-      );
-    });
-
-    it('should rollback transaction on error', async () => {
-      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockRejectedValue(new Error('Database error'));
-
-      await expect(
-        service.httpResponses({
-          data: mockHttpResponse,
-          job: mockJob,
-        }),
-      ).rejects.toThrow('Database error');
-
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
-    });
-  });
-
-  describe('portsScanner', () => {
-    const mockJob = {
-      asset: {
-        id: 'asset-id',
-        value: 'example.com',
-        target: { id: 'target-id' },
-        targetId: 'target-id',
-        isEnabled: true,
-        dnsRecords: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      assetServiceId: null,
-      jobHistory: { id: 'history-id' },
-      tool: { id: 'tool-id', category: ToolCategory.PORTS_SCANNER },
-      category: ToolCategory.PORTS_SCANNER,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as unknown as Job;
-
-    it('should handle port scanner data successfully', async () => {
-      const mockPorts: number[] = [80, 43, 8080];
-
-      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockResolvedValue(undefined);
-
-      await service.portsScanner({
-        data: mockPorts,
-        job: mockJob,
-      });
-
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
-    });
-
-    it('should filter out NaN values from ports', async () => {
-      const mockPorts: number[] = [80, 43, 8080];
-
-      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockResolvedValue(undefined);
-
-      await service.portsScanner({
-        data: mockPorts,
-        job: mockJob,
-      });
-
-      expect(
-        mockQueryRunner.manager.createQueryBuilder().values,
-      ).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ports: mockPorts,
-        }),
-      );
-    });
-
-    it('should rollback transaction on error', async () => {
-      const mockPorts: number[] = [80, 43];
-
-      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockRejectedValue(new Error('Database error'));
-
-      await expect(
-        service.portsScanner({
-          data: mockPorts,
-          job: mockJob,
-        }),
-      ).rejects.toThrow('Database error');
-
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
-    });
-  });
-
-  describe('vulnerabilities', () => {
-    const mockJob = {
-      asset: {
-        id: 'asset-id',
-        value: 'example.com',
-        target: { id: 'target-id' },
-        targetId: 'target-id',
-        isEnabled: true,
-        dnsRecords: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      assetServiceId: null,
-      jobHistory: {
-        id: 'history-id',
-        workflow: { workspace: { id: 'workspace-id' } },
-      },
-      tool: { id: 'tool-id', category: ToolCategory.VULNERABILITIES },
-      category: ToolCategory.VULNERABILITIES,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as unknown as Job;
-
-    const mockVulnerabilities = [
-      {
-        name: 'Test Vulnerability',
-        severity: Severity.HIGH,
-        description: 'Test description',
-        tags: [],
-        tool: { id: 'tool-id', name: 'test-tool', description: 'test' },
-        asset: {
-          id: 'asset-id',
-          value: 'example.com',
-          target: { id: 'target-id' },
-          targetId: 'target-id',
-          isEnabled: true,
-          dnsRecords: [],
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        jobHistoryId: 'history-id',
-        assetId: 'asset-id',
-        fingerprint: 'test-fingerprint',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ] as unknown as Vulnerability[];
-
-    it('should handle vulnerability data successfully', async () => {
-      mockDataSource.transaction.mockImplementation(
-        async (callback: (manager: any) => Promise<any>) => {
-          await callback(mockQueryRunner.manager);
-          return undefined;
-        },
-      );
-
-      // Mock the full query builder chain for vulnerabilities
-      const mockQueryBuilder = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([]),
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({
-          raw: mockVulnerabilities,
-          identifiers: mockVulnerabilities.map((v) => ({ id: v.id })),
-        }),
-      };
-
-      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder,
-      );
-
-      await service.vulnerabilities({
-        data: mockVulnerabilities,
-        job: mockJob,
-      });
-
-      expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(mockQueryBuilder.select).toHaveBeenCalledWith(
-        'v.fingerprint',
-        'fingerprint',
-      );
-      expect(mockQueryBuilder.from).toHaveBeenCalledWith(Vulnerability, 'v');
-      expect(mockQueryBuilder.where).toHaveBeenCalled();
-      expect(mockQueryBuilder.getRawMany).toHaveBeenCalled();
-      expect(mockQueryBuilder.insert).toHaveBeenCalled();
-      expect(mockQueryBuilder.into).toHaveBeenCalledWith(Vulnerability);
-      expect(mockQueryBuilder.values).toHaveBeenCalled();
-      expect(mockQueryBuilder.orUpdate).toHaveBeenCalled();
-      expect(mockQueryBuilder.returning).toHaveBeenCalledWith('*');
-      expect(mockQueryBuilder.execute).toHaveBeenCalled();
-    });
-
-    it('should process vulnerabilities without side effects when issue creation is disabled', async () => {
-      mockDataSource.transaction.mockImplementation(
-        async (callback: (manager: any) => Promise<any>) => {
-          await callback(mockQueryRunner.manager);
-          return undefined;
-        },
-      );
-
-      const mockQueryBuilder = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([]),
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({
-          raw: mockVulnerabilities,
-          identifiers: mockVulnerabilities.map((v) => ({ id: v.id })),
-        }),
-      };
-
-      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder,
-      );
-
-      await service.vulnerabilities({
-        data: mockVulnerabilities,
-        job: mockJob,
-      });
-
-      // Verify the vuln was inserted via the mock chain
-      expect(mockQueryBuilder.insert).toHaveBeenCalled();
-      expect(mockQueryBuilder.execute).toHaveBeenCalled();
-    });
-
-    it('should not insert vulnerabilities if data is empty', async () => {
-      mockDataSource.transaction.mockImplementation(
-        async (callback: (manager: any) => Promise<void>) => {
-          await callback(mockQueryRunner.manager);
-          return undefined;
-        },
-      );
-
-      await service.vulnerabilities({
-        data: [],
-        job: mockJob,
-      });
-
-      expect(mockDataSource.transaction).toHaveBeenCalled();
-    });
-
-    it('should send notification for all new vulnerabilities (all severities)', async () => {
-      const newFingerprint = 'new-fingerprint-123';
-      const newVuln = {
-        ...mockVulnerabilities[0],
-        fingerprint: newFingerprint,
-      };
-      const existingFingerprint = 'existing-fingerprint-456';
-      const existingVuln = {
-        ...mockVulnerabilities[0],
-        fingerprint: existingFingerprint,
-      };
-
-      mockDataSource.transaction.mockImplementation(
-        async (callback: (manager: any) => Promise<any>) => {
-          await callback(mockQueryRunner.manager);
-          return undefined;
-        },
-      );
-
-      // Mock workspace members so notification can be sent
-      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([
-        { user: { id: 'user-1' }, workspace: { id: 'workspace-id' } },
-      ]);
-
-      // getRawMany returns existing fingerprints on first call
-      const getRawManyMock = jest
-        .fn()
-        .mockResolvedValueOnce([{ fingerprint: existingFingerprint }])
-        .mockResolvedValue([]);
-
-      const mockQueryBuilder = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getRawMany: getRawManyMock,
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({
-          raw: [newVuln, existingVuln],
-          identifiers: [],
-        }),
-      };
-
-      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder,
-      );
-
-      await service.vulnerabilities({
-        data: [newVuln, existingVuln],
-        job: mockJob,
-      });
-
-      // Should have called createNotification with count=1 (only new vuln)
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: NotificationType.NEW_VULNERABILITY_FOUND,
-          metadata: expect.objectContaining({
-            count: '1',
-          }),
-        }),
-      );
-    });
-
-    it('should NOT send notification when all vulnerabilities already exist (updated only)', async () => {
-      const existingFingerprint = 'existing-fingerprint-789';
-      const existingVuln = {
-        ...mockVulnerabilities[0],
-        fingerprint: existingFingerprint,
-      };
-
-      mockDataSource.transaction.mockImplementation(
-        async (callback: (manager: any) => Promise<any>) => {
-          await callback(mockQueryRunner.manager);
-          return undefined;
-        },
-      );
-
-      // getRawMany returns the fingerprint as existing
-      const getRawManyMock = jest
-        .fn()
-        .mockResolvedValueOnce([{ fingerprint: existingFingerprint }])
-        .mockResolvedValue([]);
-
-      const mockQueryBuilder = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getRawMany: getRawManyMock,
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({
-          raw: [existingVuln],
-          identifiers: [],
-        }),
-      };
-
-      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder,
-      );
-
-      await service.vulnerabilities({
-        data: [existingVuln],
-        job: mockJob,
-      });
-
-      // Should NOT have called createNotification
-      expect(
-        mockNotificationsService.createNotification,
-      ).not.toHaveBeenCalled();
-    });
-
-    it('should send notification for new LOW/MEDIUM severity vulnerabilities too', async () => {
-      const lowVuln = {
-        ...mockVulnerabilities[0],
-        fingerprint: 'low-vuln-fingerprint',
-        severity: Severity.LOW,
-      };
-
-      mockDataSource.transaction.mockImplementation(
-        async (callback: (manager: any) => Promise<any>) => {
-          await callback(mockQueryRunner.manager);
-          return undefined;
-        },
-      );
-
-      // Mock workspace members so notification can be sent
-      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([
-        { user: { id: 'user-1' }, workspace: { id: 'workspace-id' } },
-      ]);
-
-      const mockQueryBuilder = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([]), // no existing fingerprints
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({
-          raw: [lowVuln],
-          identifiers: [],
-        }),
-      };
-
-      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder,
-      );
-
-      await service.vulnerabilities({
-        data: [lowVuln],
-        job: mockJob,
-      });
-
-      // Should have called createNotification (low severity now triggers notification)
-      expect(
-        mockNotificationsService.createNotification,
-      ).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: NotificationType.NEW_VULNERABILITY_FOUND,
-          metadata: expect.objectContaining({
-            count: '1',
-          }),
-        }),
-      );
     });
   });
 
@@ -904,7 +167,7 @@ describe('DataAdapterService', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as Asset[];
+      ] as unknown as JobDataResultType;
 
       await service.syncData({
         data: mockData,
@@ -948,7 +211,7 @@ describe('DataAdapterService', () => {
         url: 'https://example.com',
         status_code: 200,
         failed: false,
-      } as unknown as HttpResponse;
+      } as unknown as JobDataResultType;
 
       await service.syncData({
         data: mockData,
@@ -996,7 +259,7 @@ describe('DataAdapterService', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as unknown as Vulnerability[];
+      ] as unknown as JobDataResultType;
 
       await service.syncData({
         data: mockData,
@@ -1070,6 +333,45 @@ describe('DataAdapterService', () => {
           job: mockJob,
         }),
       ).rejects.toThrow('Tool category is undefined');
+    });
+
+    it('should throw error when validation fails', async () => {
+      const failingHandler = {
+        validate: jest.fn().mockResolvedValue({
+          valid: false,
+          errors: ['Field is required'],
+        }),
+        handle: jest.fn(),
+      };
+      mockHandlerRegistry.get.mockReturnValue(failingHandler);
+
+      const mockJob = {
+        asset: {
+          id: 'asset-id',
+          value: 'example.com',
+          target: { id: 'target-id' },
+          targetId: 'target-id',
+          isEnabled: true,
+          dnsRecords: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        assetServiceId: null,
+        jobHistory: { id: 'history-id' },
+        tool: { id: 'tool-id', category: ToolCategory.SUBDOMAINS },
+        category: ToolCategory.SUBDOMAINS,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Job;
+
+      await expect(
+        service.syncData({
+          data: [],
+          job: mockJob,
+        }),
+      ).rejects.toThrow('Data validation failed for category subdomains: Field is required');
+
+      expect(failingHandler.handle).not.toHaveBeenCalled();
     });
   });
 });

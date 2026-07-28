@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { ToolCategory } from '../../../common/enums/enum';
-import { AssetService } from '../../assets/entities/asset-services.entity';
-import { Port } from '../../assets/entities/ports.entity';
+import { ToolCategory } from '@/common/enums/enum';
+import { AssetService } from '@/modules/assets/entities/asset-services.entity';
+import { Port } from '@/modules/assets/entities/ports.entity';
 import type { HandlerPayload } from './interfaces/data-handler.interface';
 import { BaseHandler } from './base.handler';
 
