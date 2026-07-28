@@ -8,36 +8,18 @@ import { DataSource, InsertResult } from 'typeorm';
 import {
   NotificationScope,
   NotificationType,
-  ToolCategory,
 } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
-import { IssuesService } from '../issues/issues.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
+import { normalizeTimestamp } from '../../common/utils/timestamp.util';
 import { DataAdapterInput } from './data-adapter.interface';
-
-/**
- * Convert a protobuf Timestamp ({seconds, nanos}) to a Date.
- * Also handles Date instances, ISO strings, and epoch numbers.
- */
-function normalizeTimestamp(val: unknown): Date | undefined {
-  if (val === null || val === undefined) return undefined;
-  if (val instanceof Date) return val;
-  if (typeof val === 'string' || typeof val === 'number') {
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? undefined : d;
-  }
-  if (typeof val === 'object' && 'seconds' in val) {
-    const sec = Number((val as { seconds: string | number }).seconds);
-    return isNaN(sec) ? undefined : new Date(sec * 1000);
-  }
-  return undefined;
-}
+import { HandlerRegistry } from './registry/handler-registry';
 
 @Injectable()
 export class DataAdapterService {
@@ -45,10 +27,10 @@ export class DataAdapterService {
 
   constructor(
     private readonly dataSource: DataSource,
-    private workspaceService: WorkspacesService,
-    private issuesService: IssuesService,
-    private storageService: StorageService,
+    private readonly workspaceService: WorkspacesService,
+    private readonly storageService: StorageService,
     private readonly notificationsService: NotificationsService,
+    private readonly handlerRegistry: HandlerRegistry,
   ) {}
 
   public async validateData<T extends object>(
@@ -394,83 +376,40 @@ export class DataAdapterService {
   }
 
   /**
-   * Sync data based on tool category
+   * Sync data based on tool category.
+   * Routes to the correct handler via HandlerRegistry.
    * @param payload Data to sync
-   * @returns
    */
   public async syncData({
     job,
     data,
   }: DataAdapterInput<JobDataResultType>): Promise<void> {
     try {
-      // Define type for sync function configuration
-      type SyncFunctionConfig<T = unknown> = {
-        handler: (data: DataAdapterInput<T>) => Promise<void | InsertResult>;
-        validationClass?: new () => object;
-      };
-
-      // Map of tool categories to their corresponding sync functions and validation classes
-      const syncFunctions: Partial<
-        Record<ToolCategory, SyncFunctionConfig<unknown>>
-      > = {
-        [ToolCategory.PORTS_SCANNER]: {
-          handler: (data: DataAdapterInput<number[]>) =>
-            this.portsScanner(data),
-        },
-        [ToolCategory.SUBDOMAINS]: {
-          handler: (data: DataAdapterInput<Asset[]>) => this.subdomains(data),
-          // validationClass: Asset,
-        },
-        [ToolCategory.HTTP_PROBE]: {
-          handler: (data: DataAdapterInput<HttpResponse>) =>
-            this.httpResponses(data),
-          // validationClass: HttpResponse, // no validate for now
-        },
-        [ToolCategory.VULNERABILITIES]: {
-          handler: (data: DataAdapterInput<Vulnerability[]>) =>
-            this.vulnerabilities(data),
-          // validationClass: Vulnerability,
-        },
-        [ToolCategory.SCREENSHOT]: {
-          handler: (data: DataAdapterInput<ScreenshotPayload>) =>
-            this.screenshot(data),
-          validationClass: ScreenshotPayload,
-        },
-      };
-
-      // Get the appropriate sync function based on category
-      if (!job.tool.category) {
+      if (!job.tool?.category) {
         throw new Error('Tool category is undefined');
       }
 
-      const syncFunction = syncFunctions[job.tool.category];
+      const handler = this.handlerRegistry.get(
+        job.tool.category,
+      );
 
-      // Check if we have a function for this category
-      if (!syncFunction) {
-        throw new Error(`Unsupported tool category: ${job.tool.category}`);
-      }
+      this.logger.debug(
+        `syncData: job=${job.id}, category=${job.tool.category}, handler=${handler.constructor.name}`,
+      );
 
-      // Validate data before syncing
-      if (syncFunction.validationClass && data !== undefined) {
-        const isValid = await this.validateData(
-          data,
-          syncFunction.validationClass,
+      // Validate before processing
+      const validation = await handler.validate(data, job);
+      if (!validation.valid) {
+        throw new Error(
+          `Data validation failed for category ${job.tool.category}: ${validation.errors.join(', ')}`,
         );
-        if (!isValid) {
-          throw new Error(
-            `Data validation failed for category: ${job.tool.category}`,
-          );
-        }
       }
 
-      // Call the appropriate sync function with proper type assertion
-      const typedData = { job, data } as unknown as DataAdapterInput<unknown>;
-      await syncFunction.handler(typedData);
-
-      return;
+      // Process via handler
+      await handler.handle({ data, job });
     } catch (error) {
       this.logger.error(
-        `syncData failed for job ${job.id} (category: ${job.tool.category}):`,
+        `syncData failed for job ${job.id} (category: ${job.tool?.category}):`,
         error instanceof Error ? error.message : error,
       );
       throw error;

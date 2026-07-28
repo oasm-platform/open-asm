@@ -9,13 +9,13 @@ import {
 } from '../../common/enums/enum';
 import type { Asset } from '../assets/entities/assets.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
-import { IssuesService } from '../issues/issues.service';
 import type { Job } from '../jobs-registry/entities/job.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterService } from './data-adapter.service';
+import { HandlerRegistry } from './registry/handler-registry';
 
 describe('DataAdapterService', () => {
   let service: DataAdapterService;
@@ -23,6 +23,7 @@ describe('DataAdapterService', () => {
   let mockDataSource: any;
   let mockWorkspacesService: any;
   let mockNotificationsService: any;
+  let mockHandlerRegistry: any;
 
   beforeEach(async () => {
     mockQueryRunner = {
@@ -67,6 +68,18 @@ describe('DataAdapterService', () => {
       getMemberOfWorkspaceByJobId: jest.fn().mockResolvedValue([]),
     };
 
+    mockNotificationsService = {
+      createNotification: jest.fn(),
+    };
+
+    // HandlerRegistry mock - syncData tests override get() per test
+    mockHandlerRegistry = {
+      get: jest.fn().mockReturnValue({
+        validate: jest.fn().mockResolvedValue({ valid: true }),
+        handle: jest.fn().mockResolvedValue(undefined),
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DataAdapterService,
@@ -77,13 +90,6 @@ describe('DataAdapterService', () => {
         {
           provide: WorkspacesService,
           useValue: mockWorkspacesService,
-        },
-        {
-          provide: IssuesService,
-          useValue: {
-            createIssue: jest.fn(),
-            findExistingOpenIssueBySource: jest.fn().mockResolvedValue(null),
-          },
         },
         {
           provide: StorageService,
@@ -99,15 +105,16 @@ describe('DataAdapterService', () => {
         },
         {
           provide: NotificationsService,
-          useValue: {
-            createNotification: jest.fn(),
-          },
+          useValue: mockNotificationsService,
+        },
+        {
+          provide: HandlerRegistry,
+          useValue: mockHandlerRegistry,
         },
       ],
     }).compile();
 
     service = module.get<DataAdapterService>(DataAdapterService);
-    mockNotificationsService = module.get(NotificationsService);
 
     // Mock validateData method to return true for valid data and false for invalid data
     jest.spyOn(service, 'validateData').mockImplementation((data, cls) => {
@@ -589,14 +596,7 @@ describe('DataAdapterService', () => {
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
-    it('should not create issues for vulnerabilities (creation logic is disabled)', async () => {
-      // Issue creation from vulnerabilities is commented out in the service.
-      // This test verifies no issue-related methods are called.
-      const mockIssuesService = {
-        createIssue: jest.fn(),
-        findExistingOpenIssueBySource: jest.fn(),
-      };
-
+    it('should process vulnerabilities without side effects when issue creation is disabled', async () => {
       mockDataSource.transaction.mockImplementation(
         async (callback: (manager: any) => Promise<any>) => {
           await callback(mockQueryRunner.manager);
@@ -629,11 +629,9 @@ describe('DataAdapterService', () => {
         job: mockJob,
       });
 
-      // Issue creation is currently disabled — neither should be called
-      expect(
-        mockIssuesService.findExistingOpenIssueBySource,
-      ).not.toHaveBeenCalled();
-      expect(mockIssuesService.createIssue).not.toHaveBeenCalled();
+      // Verify the vuln was inserted via the mock chain
+      expect(mockQueryBuilder.insert).toHaveBeenCalled();
+      expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
     it('should not insert vulnerabilities if data is empty', async () => {
@@ -828,6 +826,16 @@ describe('DataAdapterService', () => {
   });
 
   describe('syncData', () => {
+    let mockHandler: { validate: jest.Mock; handle: jest.Mock };
+
+    beforeEach(() => {
+      mockHandler = {
+        validate: jest.fn().mockResolvedValue({ valid: true }),
+        handle: jest.fn().mockResolvedValue(undefined),
+      };
+      mockHandlerRegistry.get.mockReturnValue(mockHandler);
+    });
+
     it('should sync ports scanner data', async () => {
       const mockJob = {
         asset: {
@@ -850,14 +858,16 @@ describe('DataAdapterService', () => {
 
       const mockData: number[] = [80, 443];
 
-      jest.spyOn(service, 'portsScanner').mockResolvedValue();
-
       await service.syncData({
         data: mockData,
         job: mockJob,
       });
 
-      expect(service.portsScanner).toHaveBeenCalledWith({
+      expect(mockHandlerRegistry.get).toHaveBeenCalledWith(
+        ToolCategory.PORTS_SCANNER,
+      );
+      expect(mockHandler.validate).toHaveBeenCalledWith(mockData, mockJob);
+      expect(mockHandler.handle).toHaveBeenCalledWith({
         data: mockData,
         job: mockJob,
       });
@@ -896,14 +906,15 @@ describe('DataAdapterService', () => {
         },
       ] as Asset[];
 
-      jest.spyOn(service, 'subdomains').mockResolvedValue({} as any);
-
       await service.syncData({
         data: mockData,
         job: mockJob,
       });
 
-      expect(service.subdomains).toHaveBeenCalledWith({
+      expect(mockHandlerRegistry.get).toHaveBeenCalledWith(
+        ToolCategory.SUBDOMAINS,
+      );
+      expect(mockHandler.handle).toHaveBeenCalledWith({
         data: mockData,
         job: mockJob,
       });
@@ -932,78 +943,22 @@ describe('DataAdapterService', () => {
 
       const mockData = {
         timestamp: new Date(),
-        tls: {
-          host: 'example.com',
-          port: '443',
-          probe_status: true,
-          tls_version: 'TLSv1.3',
-          cipher: 'TLS_AES_256_GCM_SHA384',
-          not_before: '2024-01-01T00:00:00Z',
-          not_after: '2025-01-01T00:00:00Z',
-          subject_dn: 'CN=example.com',
-          subject_cn: 'example.com',
-          subject_an: [],
-          serial: '123456',
-          issuer_dn: 'CN=Test CA',
-          issuer_cn: 'Test CA',
-          issuer_org: [],
-          fingerprint_hash: {
-            md5: 'test-md5',
-            sha1: 'test-sha1',
-            sha256: 'test-sha256',
-          },
-          wildcard_certificate: false,
-          tls_connection: 'secure',
-          sni: 'example.com',
-        },
+        tls: {},
         port: '443',
         url: 'https://example.com',
-        input: 'example.com',
-        title: 'Test',
-        scheme: 'https',
-        webserver: 'nginx',
-        body: 'test body',
-        content_type: 'text/html',
-        method: 'GET',
-        host: 'example.com',
-        path: '/',
-        favicon: '',
-        favicon_md5: '',
-        favicon_url: '',
-        header: {},
-        raw_header: '',
-        request: '',
-        time: '100ms',
-        a: [],
-        tech: [],
-        words: 10,
-        lines: 5,
         status_code: 200,
-        content_length: 100,
         failed: false,
-        knowledgebase: {
-          PageType: 'HTML',
-          pHash: 123456,
-        },
-        resolvers: [],
-        chain_status_codes: [],
-        assetServiceId: 'service-id',
-        jobHistoryId: 'history-id',
-        assetService: { id: 'service-id' } as any,
-        jobHistory: { id: 'history-id' } as any,
-        id: 'response-id',
-        createdAt: new Date(),
-        updatedAt: new Date(),
       } as unknown as HttpResponse;
-
-      jest.spyOn(service, 'httpResponses').mockResolvedValue();
 
       await service.syncData({
         data: mockData,
         job: mockJob,
       });
 
-      expect(service.httpResponses).toHaveBeenCalledWith({
+      expect(mockHandlerRegistry.get).toHaveBeenCalledWith(
+        ToolCategory.HTTP_PROBE,
+      );
+      expect(mockHandler.handle).toHaveBeenCalledWith({
         data: mockData,
         job: mockJob,
       });
@@ -1035,17 +990,6 @@ describe('DataAdapterService', () => {
           severity: Severity.HIGH,
           description: 'Test description',
           tags: [],
-          tool: { id: 'tool-id', name: 'test-tool', description: 'test' },
-          asset: {
-            id: 'asset-id',
-            value: 'example.com',
-            target: { id: 'target-id' },
-            targetId: 'target-id',
-            isEnabled: true,
-            dnsRecords: [],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
           jobHistoryId: 'history-id',
           assetId: 'asset-id',
           fingerprint: 'test-fingerprint',
@@ -1054,20 +998,25 @@ describe('DataAdapterService', () => {
         },
       ] as unknown as Vulnerability[];
 
-      jest.spyOn(service, 'vulnerabilities').mockResolvedValue();
-
       await service.syncData({
         data: mockData,
         job: mockJob,
       });
 
-      expect(service.vulnerabilities).toHaveBeenCalledWith({
+      expect(mockHandlerRegistry.get).toHaveBeenCalledWith(
+        ToolCategory.VULNERABILITIES,
+      );
+      expect(mockHandler.handle).toHaveBeenCalledWith({
         data: mockData,
         job: mockJob,
       });
     });
 
     it('should throw error for unsupported tool category', async () => {
+      mockHandlerRegistry.get.mockImplementation(() => {
+        throw new Error('No handler registered for category: UNSUPPORTED_CATEGORY');
+      });
+
       const mockJob = {
         asset: {
           id: 'asset-id',
@@ -1092,7 +1041,7 @@ describe('DataAdapterService', () => {
           data: [],
           job: mockJob,
         }),
-      ).rejects.toThrow('Unsupported tool category: UNSUPPORTED_CATEGORY');
+      ).rejects.toThrow('No handler registered for category: UNSUPPORTED_CATEGORY');
     });
 
     it('should throw error for undefined tool category', async () => {
