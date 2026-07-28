@@ -11,7 +11,6 @@ import {
   ToolCategory,
 } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
-import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
@@ -21,6 +20,25 @@ import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterInput } from './data-adapter.interface';
+
+/**
+ * Convert a protobuf Timestamp ({seconds, nanos}) to a Date.
+ * Also handles Date instances, ISO strings, and epoch numbers.
+ */
+function normalizeTimestamp(val: unknown): Date | undefined {
+  if (val === null || val === undefined) return undefined;
+  if (val instanceof Date) return val;
+  if (typeof val === 'string' || typeof val === 'number') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? undefined : d;
+  }
+  if (typeof val === 'object' && 'seconds' in val) {
+    const sec = Number((val as { seconds: string | number }).seconds);
+    return isNaN(sec) ? undefined : new Date(sec * 1000);
+  }
+  return undefined;
+}
+
 @Injectable()
 export class DataAdapterService {
   private readonly logger = new Logger(DataAdapterService.name);
@@ -89,11 +107,15 @@ export class DataAdapterService {
         .insert()
         .into(Asset)
         .values(
-          uniqueData.map((asset) => ({
-            ...asset,
-            target: { id: job.asset.target.id },
-            isEnabled: workspaceConfigs.isAutoEnableAssetAfterDiscovered,
-          })),
+          uniqueData.map((asset) => {
+            const assetValues = { ...asset } as unknown as Record<string, string | number | boolean | object | null>;
+            delete assetValues.id;
+            return {
+              ...assetValues,
+              target: { id: job.asset.target.id },
+              isEnabled: workspaceConfigs.isAutoEnableAssetAfterDiscovered,
+            };
+          }),
         )
         .orIgnore()
         .execute();
@@ -102,7 +124,7 @@ export class DataAdapterService {
       return insertResult;
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      throw new Error(error);
+      throw error;
     } finally {
       await queryRunner.release();
     }
@@ -135,11 +157,15 @@ export class DataAdapterService {
         .createQueryBuilder()
         .insert()
         .into(HttpResponse)
-        .values({
-          ...data,
-          assetServiceId: job.assetService?.id,
-          jobHistoryId: job.jobHistory.id,
-        })
+        .values((() => {
+          const values = { ...data } as unknown as Record<string, string | number | boolean | object | null>;
+          delete values.id;
+          return {
+            ...values,
+            assetServiceId: job.assetService?.id,
+            jobHistoryId: job.jobHistory.id,
+          };
+        })())
         .execute();
 
       await queryRunner.commitTransaction();
@@ -235,14 +261,18 @@ export class DataAdapterService {
           .createHash('md5')
           .update(stringHash)
           .digest('hex');
+        const vulnValues = { ...vuln } as unknown as Record<string, string | number | boolean | object | null>;
+        delete vulnValues.id;
         return {
-          ...vuln,
+          ...vulnValues,
           fingerprint,
           assetId: job.asset.id,
           toolId: job.tool.id,
           asset: { id: job.asset.id },
           jobHistory: { id: job.jobHistory.id },
           tool: { id: job.tool.id },
+          publicationDate: normalizeTimestamp(vulnValues.publicationDate),
+          modificationDate: normalizeTimestamp(vulnValues.modificationDate),
           firstDetectedDate: now,
           lastSeenDate: now,
         };
@@ -337,38 +367,6 @@ export class DataAdapterService {
     });
   }
 
-  /**
-   * Asset tags data normalization
-   * @param param0
-   * @returns
-   * @example
-   * {
-   *   "tags": [
-   *     {
-   *       "key": "tag-key",
-   *       "value": "tag-value"
-   *     }
-   *   ]
-   * }
-   */
-  public async classifier({
-    data,
-    job,
-  }: DataAdapterInput<AssetTag[]>): Promise<void> {
-    await this.dataSource
-      .createQueryBuilder()
-      .insert()
-      .into(AssetTag)
-      .values(
-        data.map((tag) => ({
-          ...tag,
-          assetId: job.asset.id,
-          toolId: job.tool.id,
-        })),
-      )
-      .execute();
-  }
-
   public async screenshot({
     data,
     job,
@@ -433,17 +431,11 @@ export class DataAdapterService {
             this.vulnerabilities(data),
           // validationClass: Vulnerability,
         },
-        [ToolCategory.CLASSIFIER]: {
-          handler: (data: DataAdapterInput<AssetTag[]>) =>
-            this.classifier(data),
-          validationClass: AssetTag,
-        },
         [ToolCategory.SCREENSHOT]: {
           handler: (data: DataAdapterInput<ScreenshotPayload>) =>
             this.screenshot(data),
           validationClass: ScreenshotPayload,
         },
-        // Note: ASSISTANT category is handled separately or not supported in this mapping
       };
 
       // Get the appropriate sync function based on category
@@ -477,7 +469,11 @@ export class DataAdapterService {
 
       return;
     } catch (error) {
-      throw new Error(error);
+      this.logger.error(
+        `syncData failed for job ${job.id} (category: ${job.tool.category}):`,
+        error instanceof Error ? error.message : error,
+      );
+      throw error;
     }
   }
 }

@@ -49,6 +49,7 @@ import {
   JobTimelineQueryResult,
   JobTimelineResponseDto,
   UpdateResultDto,
+  BaseResultDto,
 } from './dto/jobs-registry.dto';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
@@ -406,8 +407,7 @@ export class JobsRegistryService {
 
       // [OPT-3] Only join workspace when actually needed
       if (isBuiltInTools && worker.scope !== WorkerScope.CLOUD) {
-        queryBuilder
-          .leftJoin('target.workspace', 'workspaces');
+        queryBuilder.leftJoin('target.workspace', 'workspaces');
       }
 
       if (isBuiltInTools) {
@@ -587,6 +587,47 @@ export class JobsRegistryService {
         workerId,
         jobId: dto.jobId,
         resultRef,
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+
+    return { jobId: bullJob.id ?? '', queueId: bullJob.queueName };
+  }
+
+  /**
+   * Updates the result of a job by category.
+   * @param workerId the ID of the worker that ran the job
+   * @param dto the category-specific result data
+   * @param category the tool category
+   * @returns an object with the worker ID and result of the job
+   */
+  public async updateResultByCategory(
+    workerId: string,
+    dto: BaseResultDto,
+    category: ToolCategory,
+  ): Promise<{ jobId: string; queueId: string }> {
+    const fileName = `${dto.jobId}-${Date.now()}.json`;
+    const { path: resultRef } = await this.storageService.uploadFile(
+      fileName,
+      Buffer.from(JSON.stringify(dto)),
+      'job-results',
+    );
+
+    const bullJob = await this.jobResultQueue.add(
+      BullMQName.JOB_RESULT,
+      {
+        workerId,
+        jobId: dto.jobId,
+        resultRef,
+        category,
       },
       {
         attempts: 3,
@@ -897,14 +938,14 @@ export class JobsRegistryService {
         '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
         // Subquery with CASE to calculate status based on job statuses
         `(
-          SELECT 
-            CASE 
+          SELECT
+            CASE
               WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
               WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
               WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
               ELSE '${JobStatus.PENDING}'
             END
-          FROM jobs 
+          FROM jobs
           WHERE "jobHistoryId" = "jobHistory".id
         ) as "status"`,
       ])

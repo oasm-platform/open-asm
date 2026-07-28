@@ -40,6 +40,10 @@ export interface Job {
      * @generated from protobuf field: optional string command = 3
      */
     command?: string;
+    /**
+     * @generated from protobuf field: string category = 4
+     */
+    category: string;
 }
 /**
  * @generated from protobuf message jobs_registry.JobResponse
@@ -49,6 +53,129 @@ export interface JobResponse {
      * @generated from protobuf field: bool success = 1
      */
     success: boolean;
+}
+// --- Category-Specific Result Requests ---
+
+/**
+ * @generated from protobuf message jobs_registry.SubdomainResultRequest
+ */
+export interface SubdomainResultRequest {
+    /**
+     * @generated from protobuf field: string worker_id = 1
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: string job_id = 2
+     */
+    jobId: string;
+    /**
+     * @generated from protobuf field: bool error = 3
+     */
+    error: boolean;
+    /**
+     * @generated from protobuf field: optional string raw = 4
+     */
+    raw?: string;
+    /**
+     * @generated from protobuf field: jobs_registry.AssetList assets = 5
+     */
+    assets?: AssetList;
+}
+/**
+ * @generated from protobuf message jobs_registry.HttpProbeResultRequest
+ */
+export interface HttpProbeResultRequest {
+    /**
+     * @generated from protobuf field: string worker_id = 1
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: string job_id = 2
+     */
+    jobId: string;
+    /**
+     * @generated from protobuf field: bool error = 3
+     */
+    error: boolean;
+    /**
+     * @generated from protobuf field: optional string raw = 4
+     */
+    raw?: string;
+    /**
+     * @generated from protobuf field: jobs_registry.HttpResponse http_response = 5
+     */
+    httpResponse?: HttpResponse;
+}
+/**
+ * @generated from protobuf message jobs_registry.PortsResultRequest
+ */
+export interface PortsResultRequest {
+    /**
+     * @generated from protobuf field: string worker_id = 1
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: string job_id = 2
+     */
+    jobId: string;
+    /**
+     * @generated from protobuf field: bool error = 3
+     */
+    error: boolean;
+    /**
+     * @generated from protobuf field: optional string raw = 4
+     */
+    raw?: string;
+    /**
+     * @generated from protobuf field: jobs_registry.NumberList numbers = 5
+     */
+    numbers?: NumberList;
+}
+/**
+ * @generated from protobuf message jobs_registry.VulnerabilitiesResultRequest
+ */
+export interface VulnerabilitiesResultRequest {
+    /**
+     * @generated from protobuf field: string worker_id = 1
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: string job_id = 2
+     */
+    jobId: string;
+    /**
+     * @generated from protobuf field: bool error = 3
+     */
+    error: boolean;
+    /**
+     * @generated from protobuf field: optional string raw = 4
+     */
+    raw?: string;
+    /**
+     * @generated from protobuf field: jobs_registry.VulnerabilityList vulnerabilities = 5
+     */
+    vulnerabilities?: VulnerabilityList;
+}
+/**
+ * @generated from protobuf message jobs_registry.ScreenshotResultRequest
+ */
+export interface ScreenshotResultRequest {
+    /**
+     * @generated from protobuf field: string worker_id = 1
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: string job_id = 2
+     */
+    jobId: string;
+    /**
+     * @generated from protobuf field: bool error = 3
+     */
+    error: boolean;
+    /**
+     * @generated from protobuf field: optional string raw = 4
+     */
+    raw?: string;
 }
 /**
  * @generated from protobuf message jobs_registry.JobResultRequest
@@ -116,12 +243,6 @@ export interface DataPayloadResult {
          */
         vulnerabilities: VulnerabilityList;
     } | {
-        oneofKind: "assetTags";
-        /**
-         * @generated from protobuf field: jobs_registry.AssetTagList asset_tags = 7
-         */
-        assetTags: AssetTagList;
-    } | {
         oneofKind: undefined;
     };
 }
@@ -151,15 +272,6 @@ export interface VulnerabilityList {
      * @generated from protobuf field: repeated jobs_registry.Vulnerability values = 1
      */
     values: Vulnerability[];
-}
-/**
- * @generated from protobuf message jobs_registry.AssetTagList
- */
-export interface AssetTagList {
-    /**
-     * @generated from protobuf field: repeated jobs_registry.AssetTag values = 1
-     */
-    values: AssetTag[];
 }
 /**
  * @generated from protobuf message jobs_registry.Asset
@@ -480,27 +592,6 @@ export interface Vulnerability {
      */
     fingerprint: string;
 }
-/**
- * @generated from protobuf message jobs_registry.AssetTag
- */
-export interface AssetTag {
-    /**
-     * @generated from protobuf field: string id = 1
-     */
-    id: string;
-    /**
-     * @generated from protobuf field: string tag = 2
-     */
-    tag: string;
-    /**
-     * @generated from protobuf field: string asset_service_id = 3
-     */
-    assetServiceId: string;
-    /**
-     * @generated from protobuf field: string tool_id = 4
-     */
-    toolId: string;
-}
 // --- Enums ---
 
 /**
@@ -581,12 +672,14 @@ class Job$Type extends MessageType<Job> {
         super("jobs_registry.Job", [
             { no: 1, name: "id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "asset", kind: "message", T: () => Asset },
-            { no: 3, name: "command", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
+            { no: 3, name: "command", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 4, name: "category", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
         ]);
     }
     create(value?: PartialMessage<Job>): Job {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.id = "";
+        message.category = "";
         if (value !== undefined)
             reflectionMergePartial<Job>(this, message, value);
         return message;
@@ -604,6 +697,9 @@ class Job$Type extends MessageType<Job> {
                     break;
                 case /* optional string command */ 3:
                     message.command = reader.string();
+                    break;
+                case /* string category */ 4:
+                    message.category = reader.string();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -626,6 +722,9 @@ class Job$Type extends MessageType<Job> {
         /* optional string command = 3; */
         if (message.command !== undefined)
             writer.tag(3, WireType.LengthDelimited).string(message.command);
+        /* string category = 4; */
+        if (message.category !== "")
+            writer.tag(4, WireType.LengthDelimited).string(message.category);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -683,6 +782,384 @@ class JobResponse$Type extends MessageType<JobResponse> {
  * @generated MessageType for protobuf message jobs_registry.JobResponse
  */
 export const JobResponse = new JobResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class SubdomainResultRequest$Type extends MessageType<SubdomainResultRequest> {
+    constructor() {
+        super("jobs_registry.SubdomainResultRequest", [
+            { no: 1, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "job_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "error", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 4, name: "raw", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "assets", kind: "message", T: () => AssetList }
+        ]);
+    }
+    create(value?: PartialMessage<SubdomainResultRequest>): SubdomainResultRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.workerId = "";
+        message.jobId = "";
+        message.error = false;
+        if (value !== undefined)
+            reflectionMergePartial<SubdomainResultRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: SubdomainResultRequest): SubdomainResultRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string worker_id */ 1:
+                    message.workerId = reader.string();
+                    break;
+                case /* string job_id */ 2:
+                    message.jobId = reader.string();
+                    break;
+                case /* bool error */ 3:
+                    message.error = reader.bool();
+                    break;
+                case /* optional string raw */ 4:
+                    message.raw = reader.string();
+                    break;
+                case /* jobs_registry.AssetList assets */ 5:
+                    message.assets = AssetList.internalBinaryRead(reader, reader.uint32(), options, message.assets);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: SubdomainResultRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string worker_id = 1; */
+        if (message.workerId !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.workerId);
+        /* string job_id = 2; */
+        if (message.jobId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.jobId);
+        /* bool error = 3; */
+        if (message.error !== false)
+            writer.tag(3, WireType.Varint).bool(message.error);
+        /* optional string raw = 4; */
+        if (message.raw !== undefined)
+            writer.tag(4, WireType.LengthDelimited).string(message.raw);
+        /* jobs_registry.AssetList assets = 5; */
+        if (message.assets)
+            AssetList.internalBinaryWrite(message.assets, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message jobs_registry.SubdomainResultRequest
+ */
+export const SubdomainResultRequest = new SubdomainResultRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class HttpProbeResultRequest$Type extends MessageType<HttpProbeResultRequest> {
+    constructor() {
+        super("jobs_registry.HttpProbeResultRequest", [
+            { no: 1, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "job_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "error", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 4, name: "raw", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "http_response", kind: "message", T: () => HttpResponse }
+        ]);
+    }
+    create(value?: PartialMessage<HttpProbeResultRequest>): HttpProbeResultRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.workerId = "";
+        message.jobId = "";
+        message.error = false;
+        if (value !== undefined)
+            reflectionMergePartial<HttpProbeResultRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: HttpProbeResultRequest): HttpProbeResultRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string worker_id */ 1:
+                    message.workerId = reader.string();
+                    break;
+                case /* string job_id */ 2:
+                    message.jobId = reader.string();
+                    break;
+                case /* bool error */ 3:
+                    message.error = reader.bool();
+                    break;
+                case /* optional string raw */ 4:
+                    message.raw = reader.string();
+                    break;
+                case /* jobs_registry.HttpResponse http_response */ 5:
+                    message.httpResponse = HttpResponse.internalBinaryRead(reader, reader.uint32(), options, message.httpResponse);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: HttpProbeResultRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string worker_id = 1; */
+        if (message.workerId !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.workerId);
+        /* string job_id = 2; */
+        if (message.jobId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.jobId);
+        /* bool error = 3; */
+        if (message.error !== false)
+            writer.tag(3, WireType.Varint).bool(message.error);
+        /* optional string raw = 4; */
+        if (message.raw !== undefined)
+            writer.tag(4, WireType.LengthDelimited).string(message.raw);
+        /* jobs_registry.HttpResponse http_response = 5; */
+        if (message.httpResponse)
+            HttpResponse.internalBinaryWrite(message.httpResponse, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message jobs_registry.HttpProbeResultRequest
+ */
+export const HttpProbeResultRequest = new HttpProbeResultRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class PortsResultRequest$Type extends MessageType<PortsResultRequest> {
+    constructor() {
+        super("jobs_registry.PortsResultRequest", [
+            { no: 1, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "job_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "error", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 4, name: "raw", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "numbers", kind: "message", T: () => NumberList }
+        ]);
+    }
+    create(value?: PartialMessage<PortsResultRequest>): PortsResultRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.workerId = "";
+        message.jobId = "";
+        message.error = false;
+        if (value !== undefined)
+            reflectionMergePartial<PortsResultRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: PortsResultRequest): PortsResultRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string worker_id */ 1:
+                    message.workerId = reader.string();
+                    break;
+                case /* string job_id */ 2:
+                    message.jobId = reader.string();
+                    break;
+                case /* bool error */ 3:
+                    message.error = reader.bool();
+                    break;
+                case /* optional string raw */ 4:
+                    message.raw = reader.string();
+                    break;
+                case /* jobs_registry.NumberList numbers */ 5:
+                    message.numbers = NumberList.internalBinaryRead(reader, reader.uint32(), options, message.numbers);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: PortsResultRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string worker_id = 1; */
+        if (message.workerId !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.workerId);
+        /* string job_id = 2; */
+        if (message.jobId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.jobId);
+        /* bool error = 3; */
+        if (message.error !== false)
+            writer.tag(3, WireType.Varint).bool(message.error);
+        /* optional string raw = 4; */
+        if (message.raw !== undefined)
+            writer.tag(4, WireType.LengthDelimited).string(message.raw);
+        /* jobs_registry.NumberList numbers = 5; */
+        if (message.numbers)
+            NumberList.internalBinaryWrite(message.numbers, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message jobs_registry.PortsResultRequest
+ */
+export const PortsResultRequest = new PortsResultRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class VulnerabilitiesResultRequest$Type extends MessageType<VulnerabilitiesResultRequest> {
+    constructor() {
+        super("jobs_registry.VulnerabilitiesResultRequest", [
+            { no: 1, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "job_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "error", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 4, name: "raw", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "vulnerabilities", kind: "message", T: () => VulnerabilityList }
+        ]);
+    }
+    create(value?: PartialMessage<VulnerabilitiesResultRequest>): VulnerabilitiesResultRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.workerId = "";
+        message.jobId = "";
+        message.error = false;
+        if (value !== undefined)
+            reflectionMergePartial<VulnerabilitiesResultRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: VulnerabilitiesResultRequest): VulnerabilitiesResultRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string worker_id */ 1:
+                    message.workerId = reader.string();
+                    break;
+                case /* string job_id */ 2:
+                    message.jobId = reader.string();
+                    break;
+                case /* bool error */ 3:
+                    message.error = reader.bool();
+                    break;
+                case /* optional string raw */ 4:
+                    message.raw = reader.string();
+                    break;
+                case /* jobs_registry.VulnerabilityList vulnerabilities */ 5:
+                    message.vulnerabilities = VulnerabilityList.internalBinaryRead(reader, reader.uint32(), options, message.vulnerabilities);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: VulnerabilitiesResultRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string worker_id = 1; */
+        if (message.workerId !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.workerId);
+        /* string job_id = 2; */
+        if (message.jobId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.jobId);
+        /* bool error = 3; */
+        if (message.error !== false)
+            writer.tag(3, WireType.Varint).bool(message.error);
+        /* optional string raw = 4; */
+        if (message.raw !== undefined)
+            writer.tag(4, WireType.LengthDelimited).string(message.raw);
+        /* jobs_registry.VulnerabilityList vulnerabilities = 5; */
+        if (message.vulnerabilities)
+            VulnerabilityList.internalBinaryWrite(message.vulnerabilities, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message jobs_registry.VulnerabilitiesResultRequest
+ */
+export const VulnerabilitiesResultRequest = new VulnerabilitiesResultRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ScreenshotResultRequest$Type extends MessageType<ScreenshotResultRequest> {
+    constructor() {
+        super("jobs_registry.ScreenshotResultRequest", [
+            { no: 1, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "job_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "error", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 4, name: "raw", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<ScreenshotResultRequest>): ScreenshotResultRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.workerId = "";
+        message.jobId = "";
+        message.error = false;
+        if (value !== undefined)
+            reflectionMergePartial<ScreenshotResultRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ScreenshotResultRequest): ScreenshotResultRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string worker_id */ 1:
+                    message.workerId = reader.string();
+                    break;
+                case /* string job_id */ 2:
+                    message.jobId = reader.string();
+                    break;
+                case /* bool error */ 3:
+                    message.error = reader.bool();
+                    break;
+                case /* optional string raw */ 4:
+                    message.raw = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ScreenshotResultRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string worker_id = 1; */
+        if (message.workerId !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.workerId);
+        /* string job_id = 2; */
+        if (message.jobId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.jobId);
+        /* bool error = 3; */
+        if (message.error !== false)
+            writer.tag(3, WireType.Varint).bool(message.error);
+        /* optional string raw = 4; */
+        if (message.raw !== undefined)
+            writer.tag(4, WireType.LengthDelimited).string(message.raw);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message jobs_registry.ScreenshotResultRequest
+ */
+export const ScreenshotResultRequest = new ScreenshotResultRequest$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class JobResultRequest$Type extends MessageType<JobResultRequest> {
     constructor() {
@@ -800,8 +1277,7 @@ class DataPayloadResult$Type extends MessageType<DataPayloadResult> {
             { no: 3, name: "assets", kind: "message", oneof: "payload", T: () => AssetList },
             { no: 4, name: "http_response", kind: "message", oneof: "payload", T: () => HttpResponse },
             { no: 5, name: "numbers", kind: "message", oneof: "payload", T: () => NumberList },
-            { no: 6, name: "vulnerabilities", kind: "message", oneof: "payload", T: () => VulnerabilityList },
-            { no: 7, name: "asset_tags", kind: "message", oneof: "payload", T: () => AssetTagList }
+            { no: 6, name: "vulnerabilities", kind: "message", oneof: "payload", T: () => VulnerabilityList }
         ]);
     }
     create(value?: PartialMessage<DataPayloadResult>): DataPayloadResult {
@@ -847,12 +1323,6 @@ class DataPayloadResult$Type extends MessageType<DataPayloadResult> {
                         vulnerabilities: VulnerabilityList.internalBinaryRead(reader, reader.uint32(), options, (message.payload as any).vulnerabilities)
                     };
                     break;
-                case /* jobs_registry.AssetTagList asset_tags */ 7:
-                    message.payload = {
-                        oneofKind: "assetTags",
-                        assetTags: AssetTagList.internalBinaryRead(reader, reader.uint32(), options, (message.payload as any).assetTags)
-                    };
-                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -883,9 +1353,6 @@ class DataPayloadResult$Type extends MessageType<DataPayloadResult> {
         /* jobs_registry.VulnerabilityList vulnerabilities = 6; */
         if (message.payload.oneofKind === "vulnerabilities")
             VulnerabilityList.internalBinaryWrite(message.payload.vulnerabilities, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
-        /* jobs_registry.AssetTagList asset_tags = 7; */
-        if (message.payload.oneofKind === "assetTags")
-            AssetTagList.internalBinaryWrite(message.payload.assetTags, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -1045,53 +1512,6 @@ class VulnerabilityList$Type extends MessageType<VulnerabilityList> {
  * @generated MessageType for protobuf message jobs_registry.VulnerabilityList
  */
 export const VulnerabilityList = new VulnerabilityList$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class AssetTagList$Type extends MessageType<AssetTagList> {
-    constructor() {
-        super("jobs_registry.AssetTagList", [
-            { no: 1, name: "values", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => AssetTag }
-        ]);
-    }
-    create(value?: PartialMessage<AssetTagList>): AssetTagList {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        message.values = [];
-        if (value !== undefined)
-            reflectionMergePartial<AssetTagList>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: AssetTagList): AssetTagList {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* repeated jobs_registry.AssetTag values */ 1:
-                    message.values.push(AssetTag.internalBinaryRead(reader, reader.uint32(), options));
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: AssetTagList, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* repeated jobs_registry.AssetTag values = 1; */
-        for (let i = 0; i < message.values.length; i++)
-            AssetTag.internalBinaryWrite(message.values[i], writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message jobs_registry.AssetTagList
- */
-export const AssetTagList = new AssetTagList$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class Asset$Type extends MessageType<Asset> {
     constructor() {
@@ -1807,81 +2227,15 @@ class Vulnerability$Type extends MessageType<Vulnerability> {
  * @generated MessageType for protobuf message jobs_registry.Vulnerability
  */
 export const Vulnerability = new Vulnerability$Type();
-// @generated message type with reflection information, may provide speed optimized methods
-class AssetTag$Type extends MessageType<AssetTag> {
-    constructor() {
-        super("jobs_registry.AssetTag", [
-            { no: 1, name: "id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "tag", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "asset_service_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 4, name: "tool_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
-        ]);
-    }
-    create(value?: PartialMessage<AssetTag>): AssetTag {
-        const message = globalThis.Object.create((this.messagePrototype!));
-        message.id = "";
-        message.tag = "";
-        message.assetServiceId = "";
-        message.toolId = "";
-        if (value !== undefined)
-            reflectionMergePartial<AssetTag>(this, message, value);
-        return message;
-    }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: AssetTag): AssetTag {
-        let message = target ?? this.create(), end = reader.pos + length;
-        while (reader.pos < end) {
-            let [fieldNo, wireType] = reader.tag();
-            switch (fieldNo) {
-                case /* string id */ 1:
-                    message.id = reader.string();
-                    break;
-                case /* string tag */ 2:
-                    message.tag = reader.string();
-                    break;
-                case /* string asset_service_id */ 3:
-                    message.assetServiceId = reader.string();
-                    break;
-                case /* string tool_id */ 4:
-                    message.toolId = reader.string();
-                    break;
-                default:
-                    let u = options.readUnknownField;
-                    if (u === "throw")
-                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-                    let d = reader.skip(wireType);
-                    if (u !== false)
-                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-            }
-        }
-        return message;
-    }
-    internalBinaryWrite(message: AssetTag, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string id = 1; */
-        if (message.id !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.id);
-        /* string tag = 2; */
-        if (message.tag !== "")
-            writer.tag(2, WireType.LengthDelimited).string(message.tag);
-        /* string asset_service_id = 3; */
-        if (message.assetServiceId !== "")
-            writer.tag(3, WireType.LengthDelimited).string(message.assetServiceId);
-        /* string tool_id = 4; */
-        if (message.toolId !== "")
-            writer.tag(4, WireType.LengthDelimited).string(message.toolId);
-        let u = options.writeUnknownFields;
-        if (u !== false)
-            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-        return writer;
-    }
-}
-/**
- * @generated MessageType for protobuf message jobs_registry.AssetTag
- */
-export const AssetTag = new AssetTag$Type();
 /**
  * @generated ServiceType for protobuf service jobs_registry.JobsRegistryService
  */
 export const JobsRegistryService = new ServiceType("jobs_registry.JobsRegistryService", [
     { name: "Next", options: {}, I: Worker, O: Job },
-    { name: "Result", options: {}, I: JobResultRequest, O: JobResponse }
+    { name: "Result", options: {}, I: JobResultRequest, O: JobResponse },
+    { name: "ResultSubdomains", options: {}, I: SubdomainResultRequest, O: JobResponse },
+    { name: "ResultHttpProbe", options: {}, I: HttpProbeResultRequest, O: JobResponse },
+    { name: "ResultPorts", options: {}, I: PortsResultRequest, O: JobResponse },
+    { name: "ResultVulnerabilities", options: {}, I: VulnerabilitiesResultRequest, O: JobResponse },
+    { name: "ResultScreenshot", options: {}, I: ScreenshotResultRequest, O: JobResponse }
 ]);

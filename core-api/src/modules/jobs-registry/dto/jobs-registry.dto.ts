@@ -1,7 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { JobRunType, JobStatus, ToolCategory } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
-import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
@@ -9,7 +8,16 @@ import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsObject, IsOptional, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import { JobHistory } from '../entities/job-history.entity';
 import { Job } from '../entities/job.entity';
 
@@ -20,7 +28,6 @@ type RawGrpcResponse = {
   httpResponse?: HttpResponse;
   numbers?: number[];
   vulnerabilities?: Vulnerability[];
-  assetTags?: AssetTag[];
 };
 
 export class GetNextJobResponseDto extends PickType(Job, [
@@ -74,13 +81,13 @@ export class DataPayloadResult {
         unwrap(obj.assets) ??
         unwrap(obj.httpResponse) ??
         unwrap(obj.numbers) ??
-        unwrap(obj.vulnerabilities) ??
-        unwrap(obj.assetTags)
+        unwrap(obj.vulnerabilities)
       );
     },
   )
   payload: JobDataResultType;
 }
+
 export class UpdateResultDto {
   @ApiProperty()
   @IsUUID()
@@ -191,3 +198,69 @@ export class CreateJobs extends PickType(Job, [
   jobName?: string;
   jobRunType?: JobRunType;
 }
+
+// --- Category-Specific Result DTOs ---
+
+export class BaseResultDto {
+  @ApiProperty({ description: 'Job ID to update' })
+  @IsUUID()
+  @Expose()
+  jobId: string;
+
+  @ApiProperty({ description: 'Indicates if result is an error' })
+  @IsOptional()
+  @IsBoolean()
+  @Expose()
+  @Transform(({ value }: { value: boolean }) => value ?? false)
+  error: boolean;
+
+  @ApiProperty({ description: 'Raw output string' })
+  @IsOptional()
+  @Expose()
+  @Transform(({ value }: { value: string }) => value ?? null)
+  raw?: string | null;
+}
+
+export class SubdomainResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Discovered subdomains', type: [Asset] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => Asset)
+  @Expose()
+  payload: Asset[];
+}
+
+export class HttpProbeResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'HTTP probe response' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => HttpResponse)
+  @Expose()
+  payload: HttpResponse;
+}
+
+export class PortsResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Open port numbers', type: [Number] })
+  @IsArray()
+  @IsNumber({}, { each: true })
+  @Expose()
+  payload: number[];
+}
+
+export class VulnerabilitiesResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Found vulnerabilities', type: [Vulnerability] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => Vulnerability)
+  @Expose()
+  payload: Vulnerability[];
+}
+
+export class ScreenshotResultDto extends BaseResultDto {
+  @ApiProperty({ description: 'Screenshot result data' })
+  @IsOptional()
+  @Expose()
+  payload?: Record<string, unknown>;
+}
+
+

@@ -13,6 +13,14 @@ import { DataPayloadResult } from '../dto/jobs-registry.dto';
 import { Job } from '../entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry.service';
 
+/** Shape of result JSON stored on S3 by the new category-specific endpoint. */
+interface CategoryResultData {
+  jobId?: string;
+  error?: boolean;
+  raw?: string | null;
+  payload?: unknown;
+}
+
 @Processor(BullMQName.JOB_RESULT, {
   concurrency: 10,
 })
@@ -31,9 +39,14 @@ export class JobResultProcessor extends WorkerHost {
   }
 
   async process(
-    bullJob: BullJob<{ workerId: string; jobId: string; resultRef: string }>,
+    bullJob: BullJob<{
+      workerId: string;
+      jobId: string;
+      resultRef: string;
+      category?: string;
+    }>,
   ): Promise<void> {
-    const { workerId, jobId, resultRef } = bullJob.data;
+    const { workerId, jobId, resultRef, category } = bullJob.data;
 
     const job = await this.jobsRegistryService.findJobForUpdate(
       workerId,
@@ -49,11 +62,23 @@ export class JobResultProcessor extends WorkerHost {
     const fileName = rest.join('/');
 
     try {
-      const data = await this.storageService.readJsonFile<DataPayloadResult>(
-        fileName,
-        bucket,
-      );
+      // Read result JSON. The new split-result endpoint stores the full DTO
+      // (e.g. SubdomainResultDto → {jobId, error, raw, payload}) while the
+      // deprecated endpoint stores only DataPayloadResult ({error, raw, payload}).
+      // Both have error/raw/payload at root — parse them in a format-agnostic way.
+      const rawResult =
+        await this.storageService.readJsonFile<CategoryResultData>(
+          fileName,
+          bucket,
+        );
 
+      // Check error flag BEFORE syncing data — avoid wasting work on failed jobs
+      if (rawResult?.error) {
+        throw new Error('Job reported error');
+      }
+
+      const raw = rawResult.raw ?? undefined;
+      const payload = rawResult.payload;
       const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
 
       let dataForSync: JobDataResultType;
@@ -64,25 +89,41 @@ export class JobResultProcessor extends WorkerHost {
         );
 
         if (!builtInStep) {
-          throw new Error(`Worker step not found for worker: ${job.tool.name}`);
+          throw new Error(`Built-in step not found for tool: ${job.tool.name}`);
         }
 
-        if (!data.raw && !builtInStep) {
-          throw new BadGatewayException('Raw data is required');
+        if (!raw) {
+          throw new BadGatewayException(
+            `Raw CLI output is required for built-in tool: ${job.tool.name}`,
+          );
         }
-        dataForSync = builtInStep?.parser?.(data.raw ?? undefined);
+
+        if (!builtInStep.parser) {
+          throw new Error(
+            `Parser function not found for built-in tool: ${job.tool.name}`,
+          );
+        }
+
+        dataForSync = builtInStep.parser(raw);
       } else {
-        dataForSync = data.payload;
+        // External/custom tool — use the structured payload directly.
+        // For the new category-specific endpoint the category is available
+        // in the BullMQ data; fall back to job.tool.category for old endpoint.
+        dataForSync = (payload ?? undefined) as JobDataResultType;
+
+        if (!dataForSync) {
+          this.logger.warn(
+            `No structured payload for external tool ${job.tool.name} ` +
+              `(category: ${category ?? job.tool.category}). Skipping data sync.`,
+          );
+        }
       }
 
-      if (job.isSaveData) {
+      if (job.isSaveData && dataForSync !== undefined) {
         await this.dataAdapterService.syncData({
           data: dataForSync,
           job,
         });
-      }
-      if (data?.error) {
-        throw new Error('Job reported error');
       }
 
       const completedJob = await this.jobRepo.save({
