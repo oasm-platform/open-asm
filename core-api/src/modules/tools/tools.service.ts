@@ -107,22 +107,41 @@ export class ToolsService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      // Convert builtInTools to Tool entities
-      const builtInToolsToInsert = builtInTools.map((tool) => ({
-        ...tool,
-        id: randomUUID(),
-        isBuiltIn: true,
-        isOfficialSupport: true,
-        type: WorkerType.BUILT_IN,
-      }));
+      // Column-only type for insert (strips relation properties from Tool)
+      type ToolInsert = Omit<
+        Tool,
+        | 'workspaceTools'
+        | 'jobs'
+        | 'vulnerabilities'
+        | 'assetTags'
+        | 'provider'
+        | 'apiKey'
+        | 'workers'
+        | 'parser'
+        | 'isInstalled'
+        | 'availableWorkersCount'
+      >;
 
-      const officialSupportToolsToInsert = officialSupportTools.map((tool) => ({
-        ...tool,
-        id: randomUUID(),
-        isBuiltIn: false,
-        isOfficialSupport: true,
-        type: WorkerType.PROVIDER,
-      }));
+      // Convert builtInTools to Tool entities
+      const builtInToolsToInsert = builtInTools.map(
+        (tool): ToolInsert => ({
+          ...tool,
+          id: randomUUID(),
+          isBuiltIn: true,
+          isOfficialSupport: true,
+          type: WorkerType.BUILT_IN,
+        }),
+      );
+
+      const officialSupportToolsToInsert = officialSupportTools.map(
+        (tool): ToolInsert => ({
+          ...tool,
+          id: randomUUID(),
+          isBuiltIn: false,
+          isOfficialSupport: true,
+          type: WorkerType.PROVIDER,
+        }),
+      );
 
       const toolsToInsert = [
         ...builtInToolsToInsert,
