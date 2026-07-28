@@ -4,8 +4,6 @@
 import type { RpcTransport } from "@protobuf-ts/runtime-rpc";
 import type { ServiceInfo } from "@protobuf-ts/runtime-rpc";
 import { JobsRegistryService } from "./jobs_registry";
-import type { AssistantResultRequest } from "./jobs_registry";
-import type { ClassifierResultRequest } from "./jobs_registry";
 import type { ScreenshotResultRequest } from "./jobs_registry";
 import type { VulnerabilitiesResultRequest } from "./jobs_registry";
 import type { PortsResultRequest } from "./jobs_registry";
@@ -56,14 +54,6 @@ export interface IJobsRegistryServiceClient {
      * @generated from protobuf rpc: ResultScreenshot
      */
     resultScreenshot(input: ScreenshotResultRequest, options?: RpcOptions): UnaryCall<ScreenshotResultRequest, JobResponse>;
-    /**
-     * @generated from protobuf rpc: ResultClassifier
-     */
-    resultClassifier(input: ClassifierResultRequest, options?: RpcOptions): UnaryCall<ClassifierResultRequest, JobResponse>;
-    /**
-     * @generated from protobuf rpc: ResultAssistant
-     */
-    resultAssistant(input: AssistantResultRequest, options?: RpcOptions): UnaryCall<AssistantResultRequest, JobResponse>;
 }
 /**
  * Service Definition
@@ -128,19 +118,5 @@ export class JobsRegistryServiceClient implements IJobsRegistryServiceClient, Se
     resultScreenshot(input: ScreenshotResultRequest, options?: RpcOptions): UnaryCall<ScreenshotResultRequest, JobResponse> {
         const method = this.methods[6], opt = this._transport.mergeOptions(options);
         return stackIntercept<ScreenshotResultRequest, JobResponse>("unary", this._transport, method, opt, input);
-    }
-    /**
-     * @generated from protobuf rpc: ResultClassifier
-     */
-    resultClassifier(input: ClassifierResultRequest, options?: RpcOptions): UnaryCall<ClassifierResultRequest, JobResponse> {
-        const method = this.methods[7], opt = this._transport.mergeOptions(options);
-        return stackIntercept<ClassifierResultRequest, JobResponse>("unary", this._transport, method, opt, input);
-    }
-    /**
-     * @generated from protobuf rpc: ResultAssistant
-     */
-    resultAssistant(input: AssistantResultRequest, options?: RpcOptions): UnaryCall<AssistantResultRequest, JobResponse> {
-        const method = this.methods[8], opt = this._transport.mergeOptions(options);
-        return stackIntercept<AssistantResultRequest, JobResponse>("unary", this._transport, method, opt, input);
     }
 }

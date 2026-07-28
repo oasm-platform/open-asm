@@ -7,7 +7,6 @@ import {
   Severity,
   ToolCategory,
 } from '../../common/enums/enum';
-import { AssetTag } from '../assets/entities/asset-tags.entity';
 import type { Asset } from '../assets/entities/assets.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
 import { IssuesService } from '../issues/issues.service';
@@ -828,68 +827,6 @@ describe('DataAdapterService', () => {
     });
   });
 
-  describe('classifier', () => {
-    const mockJob = {
-      asset: {
-        id: 'asset-id',
-        value: 'example.com',
-        target: { id: 'target-id' },
-        targetId: 'target-id',
-        isEnabled: true,
-        dnsRecords: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      assetServiceId: null,
-      jobHistory: { id: 'history-id' },
-      tool: { id: 'tool-id', category: ToolCategory.CLASSIFIER },
-      category: ToolCategory.CLASSIFIER,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as unknown as Job;
-
-    const mockTags = [
-      {
-        tag: 'environment:production',
-        assetService: null,
-        assetServiceId: null,
-        tool: { id: 'tool-id', name: 'test-tool', description: 'test' },
-        asset: {
-          id: 'asset-id',
-          value: 'example.com',
-          target: { id: 'target-id' },
-          targetId: 'target-id',
-          isEnabled: true,
-          dnsRecords: [],
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ] as unknown as AssetTag[];
-
-    it('should handle asset tag data successfully', async () => {
-      mockDataSource.createQueryBuilder().execute.mockResolvedValue(undefined);
-
-      await service.classifier({
-        data: mockTags,
-        job: mockJob,
-      });
-
-      expect(mockDataSource.createQueryBuilder).toHaveBeenCalled();
-      expect(mockDataSource.createQueryBuilder().values).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({
-            tag: 'environment:production',
-            assetServiceId: null,
-            toolId: 'tool-id',
-          }),
-        ]),
-      );
-    });
-  });
-
   describe('syncData', () => {
     it('should sync ports scanner data', async () => {
       const mockJob = {
@@ -1130,60 +1067,6 @@ describe('DataAdapterService', () => {
       });
     });
 
-    it('should sync classifier data', async () => {
-      const mockJob = {
-        asset: {
-          id: 'asset-id',
-          value: 'example.com',
-          target: { id: 'target-id' },
-          targetId: 'target-id',
-          isEnabled: true,
-          dnsRecords: [],
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        assetServiceId: null,
-        jobHistory: { id: 'history-id' },
-        tool: { id: 'tool-id', category: ToolCategory.CLASSIFIER },
-        category: ToolCategory.CLASSIFIER,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as unknown as Job;
-
-      const mockData = [
-        {
-          tag: 'environment:production',
-          assetService: null,
-          assetServiceId: null,
-          tool: { id: 'tool-id', name: 'test-tool', description: 'test' },
-          asset: {
-            id: 'asset-id',
-            value: 'example.com',
-            target: { id: 'target-id' },
-            targetId: 'target-id',
-            isEnabled: true,
-            dnsRecords: [],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ] as unknown as AssetTag[];
-
-      jest.spyOn(service, 'classifier').mockResolvedValue();
-
-      await service.syncData({
-        data: mockData,
-        job: mockJob,
-      });
-
-      expect(service.classifier).toHaveBeenCalledWith({
-        data: mockData,
-        job: mockJob,
-      });
-    });
-
     it('should throw error for unsupported tool category', async () => {
       const mockJob = {
         asset: {
@@ -1238,60 +1121,6 @@ describe('DataAdapterService', () => {
           job: mockJob,
         }),
       ).rejects.toThrow('Tool category is undefined');
-    });
-
-    it('should validate data before syncing when validation class is provided', async () => {
-      const mockJob = {
-        asset: {
-          id: 'asset-id',
-          value: 'example.com',
-          target: { id: 'target-id' },
-          targetId: 'target-id',
-          isEnabled: true,
-          dnsRecords: [],
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        assetServiceId: null,
-        jobHistory: { id: 'history-id' },
-        tool: { id: 'tool-id', category: ToolCategory.CLASSIFIER },
-        category: ToolCategory.CLASSIFIER,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as unknown as Job;
-
-      const mockData = [
-        {
-          tag: 'environment:production',
-          assetService: null,
-          assetServiceId: null,
-          tool: { id: 'tool-id', name: 'test-tool', description: 'test' },
-          asset: {
-            id: 'asset-id',
-            value: 'example.com',
-            target: { id: 'target-id' },
-            targetId: 'target-id',
-            isEnabled: true,
-            dnsRecords: [],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ] as unknown as AssetTag[];
-
-      jest.spyOn(service, 'validateData').mockResolvedValue(false);
-      jest.spyOn(service, 'classifier').mockResolvedValue();
-
-      await expect(
-        service.syncData({
-          data: mockData,
-          job: mockJob,
-        }),
-      ).rejects.toThrow('Data validation failed for category: classifier');
-
-      expect(service.validateData).toHaveBeenCalledWith(mockData, AssetTag);
     });
   });
 });

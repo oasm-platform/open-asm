@@ -11,7 +11,6 @@ import {
   ToolCategory,
 } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
-import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
@@ -368,42 +367,6 @@ export class DataAdapterService {
     });
   }
 
-  /**
-   * Asset tags data normalization
-   * @param param0
-   * @returns
-   * @example
-   * {
-   *   "tags": [
-   *     {
-   *       "key": "tag-key",
-   *       "value": "tag-value"
-   *     }
-   *   ]
-   * }
-   */
-  public async classifier({
-    data,
-    job,
-  }: DataAdapterInput<AssetTag[]>): Promise<void> {
-    await this.dataSource
-      .createQueryBuilder()
-      .insert()
-      .into(AssetTag)
-      .values(
-        data.map((tag) => {
-          const tagValues = { ...tag } as unknown as Record<string, string | number | boolean | object | null>;
-          delete tagValues.id;
-          return {
-            ...tagValues,
-            assetServiceId: job.assetServiceId,
-            toolId: job.tool.id,
-          };
-        }),
-      )
-      .execute();
-  }
-
   public async screenshot({
     data,
     job,
@@ -468,17 +431,11 @@ export class DataAdapterService {
             this.vulnerabilities(data),
           // validationClass: Vulnerability,
         },
-        [ToolCategory.CLASSIFIER]: {
-          handler: (data: DataAdapterInput<AssetTag[]>) =>
-            this.classifier(data),
-          validationClass: AssetTag,
-        },
         [ToolCategory.SCREENSHOT]: {
           handler: (data: DataAdapterInput<ScreenshotPayload>) =>
             this.screenshot(data),
           validationClass: ScreenshotPayload,
         },
-        // Note: ASSISTANT category is handled separately or not supported in this mapping
       };
 
       // Get the appropriate sync function based on category

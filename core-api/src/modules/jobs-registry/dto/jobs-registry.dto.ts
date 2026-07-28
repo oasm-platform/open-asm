@@ -1,7 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { JobRunType, JobStatus, ToolCategory } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
-import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
@@ -29,7 +28,6 @@ type RawGrpcResponse = {
   httpResponse?: HttpResponse;
   numbers?: number[];
   vulnerabilities?: Vulnerability[];
-  assetTags?: AssetTag[];
 };
 
 export class GetNextJobResponseDto extends PickType(Job, [
@@ -83,8 +81,7 @@ export class DataPayloadResult {
         unwrap(obj.assets) ??
         unwrap(obj.httpResponse) ??
         unwrap(obj.numbers) ??
-        unwrap(obj.vulnerabilities) ??
-        unwrap(obj.assetTags)
+        unwrap(obj.vulnerabilities)
       );
     },
   )
@@ -266,18 +263,4 @@ export class ScreenshotResultDto extends BaseResultDto {
   payload?: Record<string, unknown>;
 }
 
-export class ClassifierResultDto extends BaseResultDto {
-  @ApiProperty({ description: 'Asset tags', type: [AssetTag] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AssetTag)
-  @Expose()
-  payload: AssetTag[];
-}
 
-export class AssistantResultDto extends BaseResultDto {
-  @ApiProperty({ description: 'Assistant result data' })
-  @IsOptional()
-  @Expose()
-  payload?: Record<string, unknown>;
-}

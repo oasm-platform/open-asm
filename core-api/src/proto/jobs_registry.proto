@@ -20,8 +20,6 @@ service JobsRegistryService {
   rpc ResultPorts (PortsResultRequest) returns (JobResponse);
   rpc ResultVulnerabilities (VulnerabilitiesResultRequest) returns (JobResponse);
   rpc ResultScreenshot (ScreenshotResultRequest) returns (JobResponse);
-  rpc ResultClassifier (ClassifierResultRequest) returns (JobResponse);
-  rpc ResultAssistant (AssistantResultRequest) returns (JobResponse);
 }
 
 
@@ -84,21 +82,6 @@ message ScreenshotResultRequest {
   optional string raw = 4;
 }
 
-message ClassifierResultRequest {
-  string worker_id = 1;
-  string job_id = 2;
-  bool error = 3;
-  optional string raw = 4;
-  AssetTagList asset_tags = 5;
-}
-
-message AssistantResultRequest {
-  string worker_id = 1;
-  string job_id = 2;
-  bool error = 3;
-  optional string raw = 4;
-}
-
 message JobResultRequest{
   string worker_id = 1;
   UpdateResultDto data = 2;
@@ -117,7 +100,6 @@ message DataPayloadResult {
     HttpResponse http_response = 4;
     NumberList numbers = 5;
     VulnerabilityList vulnerabilities = 6;
-    AssetTagList asset_tags = 7;
   }
 }
 
@@ -131,10 +113,6 @@ message NumberList {
 
 message VulnerabilityList {
   repeated Vulnerability values = 1;
-}
-
-message AssetTagList {
-  repeated AssetTag values = 1;
 }
 
 
@@ -238,13 +216,6 @@ message Vulnerability {
   string job_history_id = 32;
   bool is_archived = 33;
   string fingerprint = 34;
-}
-
-message AssetTag {
-  string id = 1; 
-  string tag = 2;
-  string asset_service_id = 3;
-  string tool_id = 4;
 }
 
 // --- Enums ---

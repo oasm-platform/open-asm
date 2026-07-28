@@ -203,10 +203,6 @@ func submitCategoryResult(ctx context.Context, client *oasm.Client, jobID, categ
 		return client.JobsVulnerabilitiesResult(ctx, jobID, isError, raw, nil)
 	case "screenshot":
 		return client.JobsScreenshotResult(ctx, jobID, isError, raw)
-	case "classifier":
-		return client.JobsClassifierResult(ctx, jobID, isError, raw, nil)
-	case "assistant":
-		return client.JobsAssistantResult(ctx, jobID, isError, raw)
 	default:
 		// Unknown category — use the deprecated generic endpoint
 		payload := &pb.DataPayloadResult{

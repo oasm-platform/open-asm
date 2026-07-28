@@ -23,7 +23,6 @@ import {
 } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { plainToInstance } from 'class-transformer';
-import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
@@ -31,8 +30,6 @@ import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
-  AssistantResultDto,
-  ClassifierResultDto,
   GetNextJobResponseDto,
   HttpProbeResultDto,
   JobTimelineResponseDto,
@@ -195,42 +192,6 @@ export class JobsRegistryController {
       workerId,
       dto,
       ToolCategory.SCREENSHOT,
-    );
-  }
-
-  @Doc({
-    summary: 'Updates classifier results',
-    description: 'Submit asset classification results for a job',
-  })
-  @WorkerTokenAuth()
-  @Public()
-  @Post('/:workerId/result/classifier')
-  updateClassifierResult(
-    @Param() { workerId }: WorkerIdParams,
-    @Body() dto: ClassifierResultDto,
-  ) {
-    return this.jobsRegistryService.updateResultByCategory(
-      workerId,
-      dto,
-      ToolCategory.CLASSIFIER,
-    );
-  }
-
-  @Doc({
-    summary: 'Updates assistant results',
-    description: 'Submit AI assistant results for a job',
-  })
-  @WorkerTokenAuth()
-  @Public()
-  @Post('/:workerId/result/assistant')
-  updateAssistantResult(
-    @Param() { workerId }: WorkerIdParams,
-    @Body() dto: AssistantResultDto,
-  ) {
-    return this.jobsRegistryService.updateResultByCategory(
-      workerId,
-      dto,
-      ToolCategory.ASSISTANT,
     );
   }
 
@@ -525,58 +486,4 @@ export class JobsRegistryController {
     return { success: !!result.jobId };
   }
 
-  @UseGuards(GrpcWorkerTokenGuard)
-  @GrpcMethod('JobsRegistryService', 'ResultClassifier')
-  async resultClassifier({
-    workerId,
-    jobId,
-    error,
-    raw,
-    assetTags,
-  }: {
-    workerId: string;
-    jobId: string;
-    error: boolean;
-    raw?: string;
-    assetTags?: { values: AssetTag[] };
-  }): Promise<{ success: boolean }> {
-    const dto = plainToInstance(ClassifierResultDto, {
-      jobId,
-      error,
-      raw,
-      payload: assetTags?.values,
-    });
-    const result = await this.jobsRegistryService.updateResultByCategory(
-      workerId,
-      dto,
-      ToolCategory.CLASSIFIER,
-    );
-    return { success: !!result.jobId };
-  }
-
-  @UseGuards(GrpcWorkerTokenGuard)
-  @GrpcMethod('JobsRegistryService', 'ResultAssistant')
-  async resultAssistant({
-    workerId,
-    jobId,
-    error,
-    raw,
-  }: {
-    workerId: string;
-    jobId: string;
-    error: boolean;
-    raw?: string;
-  }): Promise<{ success: boolean }> {
-    const dto = plainToInstance(AssistantResultDto, {
-      jobId,
-      error,
-      raw,
-    });
-    const result = await this.jobsRegistryService.updateResultByCategory(
-      workerId,
-      dto,
-      ToolCategory.ASSISTANT,
-    );
-    return { success: !!result.jobId };
-  }
 }
