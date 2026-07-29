@@ -88,18 +88,11 @@ export class ToolsService implements OnModuleInit {
       // For BUILT_IN type, count all BUILT_IN workers that are enabled for this workspace
       queryBuilder.andWhere('w.type = :type', { type: WorkerType.BUILT_IN });
     } else {
-      // For PROVIDER type, count workers with matching toolId
-      // and ensure they have workspace_tool record with isEnabled = true
+      // For PROVIDER type, count workers with matching toolId.
+      // PROVIDER workers are always CLOUD-scoped (see determineWorkerTypeAndScope),
+      // so they're available globally regardless of per-workspace installation status.
+      // The isInstalled flag on each tool handles the workspace-installation UI concern.
       queryBuilder.andWhere('w."toolId" = :toolId', { toolId });
-      queryBuilder.andWhere(
-        `(w.type != '${WorkerType.PROVIDER}' OR EXISTS (
-          SELECT 1 FROM workspace_tools wt
-          WHERE wt."workspaceId" = :workspaceId
-          AND wt."toolId" = w."toolId"
-          AND wt."isEnabled" = true
-        ))`,
-        { workspaceId },
-      );
     }
 
     return queryBuilder.getCount();
