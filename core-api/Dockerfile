@@ -1,8 +1,8 @@
 FROM node:26-alpine AS base
 RUN apk add --no-cache curl
 
-# Build stage
-FROM base AS builder
+# Build stage — native platform (QEMU-free) for npm install + build
+FROM --platform=$BUILDPLATFORM node:26-alpine AS builder
 
 ARG APP_VERSION
 ENV APP_VERSION=$APP_VERSION
@@ -10,11 +10,12 @@ ENV APP_VERSION=$APP_VERSION
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm config set fund false audit false && npm install
 COPY . .
-RUN npm run build
-RUN mkdir -p /tmp/proto && cp -r src/proto/* /tmp/proto/
-RUN rm -rf src test node_modules/.cache
+RUN npm run build && \
+  npm prune --production && \
+  mkdir -p /tmp/proto && cp -r src/proto/* /tmp/proto/ && \
+  rm -rf src test node_modules/.cache
 
 # Production stage
 FROM base
