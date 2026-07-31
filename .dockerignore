@@ -1,4 +1,12 @@
 node_modules
+.git
+.pnpm-store
 bun.lockb
 npm-debug.log
 *.log
+# Exclude per-service node_modules (root pnpm manages them centrally)
+core-api/node_modules
+console/node_modules
+# Exclude source maps and caches
+**/node_modules/.cache
+**/.env

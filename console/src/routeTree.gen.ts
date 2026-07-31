@@ -9,58 +9,57 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as InitAdminRouteImport } from './routes/init-admin'
-import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as SplatRouteImport } from './routes/$'
-import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as InitAdminRouteImport } from './routes/init-admin'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
-import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
-import { Route as AuthedWorkersRouteImport } from './routes/_authed/workers'
-import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
 import { Route as AuthedReportsRouteImport } from './routes/_authed/reports'
-import { Route as AuthedWorkspacesIndexRouteImport } from './routes/_authed/workspaces/index'
-import { Route as AuthedVulnerabilitiesIndexRouteImport } from './routes/_authed/vulnerabilities/index'
-import { Route as AuthedToolsIndexRouteImport } from './routes/_authed/tools/index'
-import { Route as AuthedTargetsIndexRouteImport } from './routes/_authed/targets/index'
-import { Route as AuthedProvidersIndexRouteImport } from './routes/_authed/providers/index'
-import { Route as AuthedJobsIndexRouteImport } from './routes/_authed/jobs/index'
-import { Route as AuthedInternalNetworksIndexRouteImport } from './routes/_authed/internal-networks/index'
-import { Route as AuthedIntegrationsIndexRouteImport } from './routes/_authed/integrations/index'
-import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
-import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
-import { Route as AuthedAgentsIndexRouteImport } from './routes/_authed/agents/index'
-import { Route as AuthedWorkspacesCreateRouteImport } from './routes/_authed/workspaces/create'
-import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vulnerabilities/$id'
-import { Route as AuthedToolsIdRouteImport } from './routes/_authed/tools/$id'
-import { Route as AuthedTargetsStartDiscoveryRouteImport } from './routes/_authed/targets/start-discovery'
-import { Route as AuthedProvidersCreateRouteImport } from './routes/_authed/providers/create'
-import { Route as AuthedInternalNetworksCreateRouteImport } from './routes/_authed/internal-networks/create'
-import { Route as AuthedInternalNetworksIdRouteImport } from './routes/_authed/internal-networks/$id'
-import { Route as AuthedGroupsIdRouteImport } from './routes/_authed/groups/$id'
-import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
-import { Route as AuthedAgentsCreateRouteImport } from './routes/_authed/agents/create'
+import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
+import { Route as AuthedWorkersRouteImport } from './routes/_authed/workers'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
-import { Route as AuthedTargetsIdIndexRouteImport } from './routes/_authed/targets/$id/index'
-import { Route as AuthedProvidersIdIndexRouteImport } from './routes/_authed/providers/$id/index'
-import { Route as AuthedAgentsConversationsIndexRouteImport } from './routes/_authed/agents/conversations/index'
+import { Route as AuthedAgentsIndexRouteImport } from './routes/_authed/agents/index'
+import { Route as AuthedAgentsCreateRouteImport } from './routes/_authed/agents/create'
+import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
+import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
+import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
+import { Route as AuthedGroupsIdRouteImport } from './routes/_authed/groups/$id'
+import { Route as AuthedIntegrationsIndexRouteImport } from './routes/_authed/integrations/index'
+import { Route as AuthedInternalNetworksIndexRouteImport } from './routes/_authed/internal-networks/index'
+import { Route as AuthedInternalNetworksIdRouteImport } from './routes/_authed/internal-networks/$id'
+import { Route as AuthedInternalNetworksCreateRouteImport } from './routes/_authed/internal-networks/create'
+import { Route as AuthedJobsIndexRouteImport } from './routes/_authed/jobs/index'
+import { Route as AuthedProvidersIndexRouteImport } from './routes/_authed/providers/index'
+import { Route as AuthedProvidersCreateRouteImport } from './routes/_authed/providers/create'
+import { Route as AuthedTargetsIndexRouteImport } from './routes/_authed/targets/index'
+import { Route as AuthedTargetsStartDiscoveryRouteImport } from './routes/_authed/targets/start-discovery'
+import { Route as AuthedToolsIndexRouteImport } from './routes/_authed/tools/index'
+import { Route as AuthedToolsIdRouteImport } from './routes/_authed/tools/$id'
+import { Route as AuthedVulnerabilitiesIndexRouteImport } from './routes/_authed/vulnerabilities/index'
+import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vulnerabilities/$id'
+import { Route as AuthedWorkspacesIndexRouteImport } from './routes/_authed/workspaces/index'
+import { Route as AuthedWorkspacesCreateRouteImport } from './routes/_authed/workspaces/create'
 import { Route as AuthedAgentsIdIndexRouteImport } from './routes/_authed/agents/$id/index'
-import { Route as AuthedTargetsIdTabRouteImport } from './routes/_authed/targets/$id/$tab'
-import { Route as AuthedProvidersIdEditRouteImport } from './routes/_authed/providers/$id/edit'
-import { Route as AuthedJobsRunsIdRouteImport } from './routes/_authed/jobs/runs/$id'
-import { Route as AuthedAgentsProvidersConnectRouteImport } from './routes/_authed/agents/providers/connect'
-import { Route as AuthedAgentsConversationsConversationIdRouteImport } from './routes/_authed/agents/conversations/$conversationId'
 import { Route as AuthedAgentsIdEditRouteImport } from './routes/_authed/agents/$id/edit'
+import { Route as AuthedAgentsConversationsIndexRouteImport } from './routes/_authed/agents/conversations/index'
+import { Route as AuthedAgentsConversationsConversationIdRouteImport } from './routes/_authed/agents/conversations/$conversationId'
+import { Route as AuthedAgentsProvidersConnectRouteImport } from './routes/_authed/agents/providers/connect'
+import { Route as AuthedJobsRunsIdRouteImport } from './routes/_authed/jobs/runs/$id'
+import { Route as AuthedProvidersIdIndexRouteImport } from './routes/_authed/providers/$id/index'
+import { Route as AuthedProvidersIdEditRouteImport } from './routes/_authed/providers/$id/edit'
+import { Route as AuthedTargetsIdIndexRouteImport } from './routes/_authed/targets/$id/index'
+import { Route as AuthedTargetsIdTabRouteImport } from './routes/_authed/targets/$id/$tab'
 
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const SplatRoute = SplatRouteImport.update({
+  id: '/$',
+  path: '/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const AuthedRoute = AuthedRouteImport.update({
+  id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InitAdminRoute = InitAdminRouteImport.update({
@@ -68,38 +67,19 @@ const InitAdminRoute = InitAdminRouteImport.update({
   path: '/init-admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthedRoute = AuthedRouteImport.update({
-  id: '/_authed',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SplatRoute = SplatRouteImport.update({
-  id: '/$',
-  path: '/$',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsIndexRoute = SettingsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => SettingsRoute,
 } as any)
 const AuthedIndexRoute = AuthedIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const SettingsTabRoute = SettingsTabRouteImport.update({
-  id: '/$tab',
-  path: '/$tab',
-  getParentRoute: () => SettingsRoute,
-} as any)
-const AuthedWorkersRoute = AuthedWorkersRouteImport.update({
-  id: '/workers',
-  path: '/workers',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedSearchRoute = AuthedSearchRouteImport.update({
-  id: '/search',
-  path: '/search',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedReportsRoute = AuthedReportsRouteImport.update({
@@ -107,35 +87,64 @@ const AuthedReportsRoute = AuthedReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedWorkspacesIndexRoute = AuthedWorkspacesIndexRouteImport.update({
-  id: '/workspaces/',
-  path: '/workspaces/',
+const AuthedSearchRoute = AuthedSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedVulnerabilitiesIndexRoute =
-  AuthedVulnerabilitiesIndexRouteImport.update({
-    id: '/vulnerabilities/',
-    path: '/vulnerabilities/',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedToolsIndexRoute = AuthedToolsIndexRouteImport.update({
-  id: '/tools/',
-  path: '/tools/',
+const AuthedWorkersRoute = AuthedWorkersRouteImport.update({
+  id: '/workers',
+  path: '/workers',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedTargetsIndexRoute = AuthedTargetsIndexRouteImport.update({
-  id: '/targets/',
-  path: '/targets/',
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsTabRoute = SettingsTabRouteImport.update({
+  id: '/$tab',
+  path: '/$tab',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const AuthedAdminUsersRoute = AuthedAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedProvidersIndexRoute = AuthedProvidersIndexRouteImport.update({
-  id: '/providers/',
-  path: '/providers/',
+const AuthedAgentsIndexRoute = AuthedAgentsIndexRouteImport.update({
+  id: '/agents/',
+  path: '/agents/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedJobsIndexRoute = AuthedJobsIndexRouteImport.update({
-  id: '/jobs/',
-  path: '/jobs/',
+const AuthedAgentsCreateRoute = AuthedAgentsCreateRouteImport.update({
+  id: '/agents/create',
+  path: '/agents/create',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAssetsIndexRoute = AuthedAssetsIndexRouteImport.update({
+  id: '/assets/',
+  path: '/assets/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAssetsIdRoute = AuthedAssetsIdRouteImport.update({
+  id: '/assets/$id',
+  path: '/assets/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedGroupsIndexRoute = AuthedGroupsIndexRouteImport.update({
+  id: '/groups/',
+  path: '/groups/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedGroupsIdRoute = AuthedGroupsIdRouteImport.update({
+  id: '/groups/$id',
+  path: '/groups/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedIntegrationsIndexRoute = AuthedIntegrationsIndexRouteImport.update({
+  id: '/integrations/',
+  path: '/integrations/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedInternalNetworksIndexRoute =
@@ -144,39 +153,36 @@ const AuthedInternalNetworksIndexRoute =
     path: '/internal-networks/',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedIntegrationsIndexRoute = AuthedIntegrationsIndexRouteImport.update({
-  id: '/integrations/',
-  path: '/integrations/',
+const AuthedInternalNetworksIdRoute =
+  AuthedInternalNetworksIdRouteImport.update({
+    id: '/internal-networks/$id',
+    path: '/internal-networks/$id',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedInternalNetworksCreateRoute =
+  AuthedInternalNetworksCreateRouteImport.update({
+    id: '/internal-networks/create',
+    path: '/internal-networks/create',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedJobsIndexRoute = AuthedJobsIndexRouteImport.update({
+  id: '/jobs/',
+  path: '/jobs/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedGroupsIndexRoute = AuthedGroupsIndexRouteImport.update({
-  id: '/groups/',
-  path: '/groups/',
+const AuthedProvidersIndexRoute = AuthedProvidersIndexRouteImport.update({
+  id: '/providers/',
+  path: '/providers/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAssetsIndexRoute = AuthedAssetsIndexRouteImport.update({
-  id: '/assets/',
-  path: '/assets/',
+const AuthedProvidersCreateRoute = AuthedProvidersCreateRouteImport.update({
+  id: '/providers/create',
+  path: '/providers/create',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAgentsIndexRoute = AuthedAgentsIndexRouteImport.update({
-  id: '/agents/',
-  path: '/agents/',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedWorkspacesCreateRoute = AuthedWorkspacesCreateRouteImport.update({
-  id: '/workspaces/create',
-  path: '/workspaces/create',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedVulnerabilitiesIdRoute = AuthedVulnerabilitiesIdRouteImport.update({
-  id: '/vulnerabilities/$id',
-  path: '/vulnerabilities/$id',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedToolsIdRoute = AuthedToolsIdRouteImport.update({
-  id: '/tools/$id',
-  path: '/tools/$id',
+const AuthedTargetsIndexRoute = AuthedTargetsIndexRouteImport.update({
+  id: '/targets/',
+  path: '/targets/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedTargetsStartDiscoveryRoute =
@@ -185,51 +191,45 @@ const AuthedTargetsStartDiscoveryRoute =
     path: '/targets/start-discovery',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedProvidersCreateRoute = AuthedProvidersCreateRouteImport.update({
-  id: '/providers/create',
-  path: '/providers/create',
+const AuthedToolsIndexRoute = AuthedToolsIndexRouteImport.update({
+  id: '/tools/',
+  path: '/tools/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedInternalNetworksCreateRoute =
-  AuthedInternalNetworksCreateRouteImport.update({
-    id: '/internal-networks/create',
-    path: '/internal-networks/create',
+const AuthedToolsIdRoute = AuthedToolsIdRouteImport.update({
+  id: '/tools/$id',
+  path: '/tools/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedVulnerabilitiesIndexRoute =
+  AuthedVulnerabilitiesIndexRouteImport.update({
+    id: '/vulnerabilities/',
+    path: '/vulnerabilities/',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedInternalNetworksIdRoute =
-  AuthedInternalNetworksIdRouteImport.update({
-    id: '/internal-networks/$id',
-    path: '/internal-networks/$id',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedGroupsIdRoute = AuthedGroupsIdRouteImport.update({
-  id: '/groups/$id',
-  path: '/groups/$id',
+const AuthedVulnerabilitiesIdRoute = AuthedVulnerabilitiesIdRouteImport.update({
+  id: '/vulnerabilities/$id',
+  path: '/vulnerabilities/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAssetsIdRoute = AuthedAssetsIdRouteImport.update({
-  id: '/assets/$id',
-  path: '/assets/$id',
+const AuthedWorkspacesIndexRoute = AuthedWorkspacesIndexRouteImport.update({
+  id: '/workspaces/',
+  path: '/workspaces/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAgentsCreateRoute = AuthedAgentsCreateRouteImport.update({
-  id: '/agents/create',
-  path: '/agents/create',
+const AuthedWorkspacesCreateRoute = AuthedWorkspacesCreateRouteImport.update({
+  id: '/workspaces/create',
+  path: '/workspaces/create',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAdminUsersRoute = AuthedAdminUsersRouteImport.update({
-  id: '/admin/users',
-  path: '/admin/users',
+const AuthedAgentsIdIndexRoute = AuthedAgentsIdIndexRouteImport.update({
+  id: '/agents/$id/',
+  path: '/agents/$id/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedTargetsIdIndexRoute = AuthedTargetsIdIndexRouteImport.update({
-  id: '/targets/$id/',
-  path: '/targets/$id/',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedProvidersIdIndexRoute = AuthedProvidersIdIndexRouteImport.update({
-  id: '/providers/$id/',
-  path: '/providers/$id/',
+const AuthedAgentsIdEditRoute = AuthedAgentsIdEditRouteImport.update({
+  id: '/agents/$id/edit',
+  path: '/agents/$id/edit',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAgentsConversationsIndexRoute =
@@ -238,14 +238,26 @@ const AuthedAgentsConversationsIndexRoute =
     path: '/agents/conversations/',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedAgentsIdIndexRoute = AuthedAgentsIdIndexRouteImport.update({
-  id: '/agents/$id/',
-  path: '/agents/$id/',
+const AuthedAgentsConversationsConversationIdRoute =
+  AuthedAgentsConversationsConversationIdRouteImport.update({
+    id: '/agents/conversations/$conversationId',
+    path: '/agents/conversations/$conversationId',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAgentsProvidersConnectRoute =
+  AuthedAgentsProvidersConnectRouteImport.update({
+    id: '/agents/providers/connect',
+    path: '/agents/providers/connect',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedJobsRunsIdRoute = AuthedJobsRunsIdRouteImport.update({
+  id: '/jobs/runs/$id',
+  path: '/jobs/runs/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedTargetsIdTabRoute = AuthedTargetsIdTabRouteImport.update({
-  id: '/targets/$id/$tab',
-  path: '/targets/$id/$tab',
+const AuthedProvidersIdIndexRoute = AuthedProvidersIdIndexRouteImport.update({
+  id: '/providers/$id/',
+  path: '/providers/$id/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedProvidersIdEditRoute = AuthedProvidersIdEditRouteImport.update({
@@ -253,26 +265,14 @@ const AuthedProvidersIdEditRoute = AuthedProvidersIdEditRouteImport.update({
   path: '/providers/$id/edit',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedJobsRunsIdRoute = AuthedJobsRunsIdRouteImport.update({
-  id: '/jobs/runs/$id',
-  path: '/jobs/runs/$id',
+const AuthedTargetsIdIndexRoute = AuthedTargetsIdIndexRouteImport.update({
+  id: '/targets/$id/',
+  path: '/targets/$id/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAgentsProvidersConnectRoute =
-  AuthedAgentsProvidersConnectRouteImport.update({
-    id: '/agents/providers/connect',
-    path: '/agents/providers/connect',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedAgentsConversationsConversationIdRoute =
-  AuthedAgentsConversationsConversationIdRouteImport.update({
-    id: '/agents/conversations/$conversationId',
-    path: '/agents/conversations/$conversationId',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedAgentsIdEditRoute = AuthedAgentsIdEditRouteImport.update({
-  id: '/agents/$id/edit',
-  path: '/agents/$id/edit',
+const AuthedTargetsIdTabRoute = AuthedTargetsIdTabRouteImport.update({
+  id: '/targets/$id/$tab',
+  path: '/targets/$id/$tab',
   getParentRoute: () => AuthedRoute,
 } as any)
 
@@ -554,25 +554,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/init-admin': {
-      id: '/init-admin'
-      path: '/init-admin'
-      fullPath: '/init-admin'
-      preLoaderRoute: typeof InitAdminRouteImport
+    '/$': {
+      id: '/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed': {
@@ -582,46 +568,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/$': {
-      id: '/$'
-      path: '/$'
-      fullPath: '/$'
-      preLoaderRoute: typeof SplatRouteImport
+    '/init-admin': {
+      id: '/init-admin'
+      path: '/init-admin'
+      fullPath: '/init-admin'
+      preLoaderRoute: typeof InitAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/': {
-      id: '/settings/'
-      path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof SettingsIndexRouteImport
-      parentRoute: typeof SettingsRoute
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authed/': {
       id: '/_authed/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthedIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/settings/$tab': {
-      id: '/settings/$tab'
-      path: '/$tab'
-      fullPath: '/settings/$tab'
-      preLoaderRoute: typeof SettingsTabRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/_authed/workers': {
-      id: '/_authed/workers'
-      path: '/workers'
-      fullPath: '/workers'
-      preLoaderRoute: typeof AuthedWorkersRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/search': {
-      id: '/_authed/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof AuthedSearchRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/reports': {
@@ -631,74 +603,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedReportsRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/workspaces/': {
-      id: '/_authed/workspaces/'
-      path: '/workspaces'
-      fullPath: '/workspaces/'
-      preLoaderRoute: typeof AuthedWorkspacesIndexRouteImport
+    '/_authed/search': {
+      id: '/_authed/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof AuthedSearchRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/vulnerabilities/': {
-      id: '/_authed/vulnerabilities/'
-      path: '/vulnerabilities'
-      fullPath: '/vulnerabilities/'
-      preLoaderRoute: typeof AuthedVulnerabilitiesIndexRouteImport
+    '/_authed/workers': {
+      id: '/_authed/workers'
+      path: '/workers'
+      fullPath: '/workers'
+      preLoaderRoute: typeof AuthedWorkersRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/tools/': {
-      id: '/_authed/tools/'
-      path: '/tools'
-      fullPath: '/tools/'
-      preLoaderRoute: typeof AuthedToolsIndexRouteImport
-      parentRoute: typeof AuthedRoute
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
     }
-    '/_authed/targets/': {
-      id: '/_authed/targets/'
-      path: '/targets'
-      fullPath: '/targets/'
-      preLoaderRoute: typeof AuthedTargetsIndexRouteImport
-      parentRoute: typeof AuthedRoute
+    '/settings/$tab': {
+      id: '/settings/$tab'
+      path: '/$tab'
+      fullPath: '/settings/$tab'
+      preLoaderRoute: typeof SettingsTabRouteImport
+      parentRoute: typeof SettingsRoute
     }
-    '/_authed/providers/': {
-      id: '/_authed/providers/'
-      path: '/providers'
-      fullPath: '/providers/'
-      preLoaderRoute: typeof AuthedProvidersIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/jobs/': {
-      id: '/_authed/jobs/'
-      path: '/jobs'
-      fullPath: '/jobs/'
-      preLoaderRoute: typeof AuthedJobsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/internal-networks/': {
-      id: '/_authed/internal-networks/'
-      path: '/internal-networks'
-      fullPath: '/internal-networks/'
-      preLoaderRoute: typeof AuthedInternalNetworksIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/integrations/': {
-      id: '/_authed/integrations/'
-      path: '/integrations'
-      fullPath: '/integrations/'
-      preLoaderRoute: typeof AuthedIntegrationsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/groups/': {
-      id: '/_authed/groups/'
-      path: '/groups'
-      fullPath: '/groups/'
-      preLoaderRoute: typeof AuthedGroupsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/assets/': {
-      id: '/_authed/assets/'
-      path: '/assets'
-      fullPath: '/assets/'
-      preLoaderRoute: typeof AuthedAssetsIndexRouteImport
+    '/_authed/admin/users': {
+      id: '/_authed/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthedAdminUsersRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/agents/': {
@@ -708,60 +645,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAgentsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/workspaces/create': {
-      id: '/_authed/workspaces/create'
-      path: '/workspaces/create'
-      fullPath: '/workspaces/create'
-      preLoaderRoute: typeof AuthedWorkspacesCreateRouteImport
+    '/_authed/agents/create': {
+      id: '/_authed/agents/create'
+      path: '/agents/create'
+      fullPath: '/agents/create'
+      preLoaderRoute: typeof AuthedAgentsCreateRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/vulnerabilities/$id': {
-      id: '/_authed/vulnerabilities/$id'
-      path: '/vulnerabilities/$id'
-      fullPath: '/vulnerabilities/$id'
-      preLoaderRoute: typeof AuthedVulnerabilitiesIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/tools/$id': {
-      id: '/_authed/tools/$id'
-      path: '/tools/$id'
-      fullPath: '/tools/$id'
-      preLoaderRoute: typeof AuthedToolsIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/targets/start-discovery': {
-      id: '/_authed/targets/start-discovery'
-      path: '/targets/start-discovery'
-      fullPath: '/targets/start-discovery'
-      preLoaderRoute: typeof AuthedTargetsStartDiscoveryRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/providers/create': {
-      id: '/_authed/providers/create'
-      path: '/providers/create'
-      fullPath: '/providers/create'
-      preLoaderRoute: typeof AuthedProvidersCreateRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/internal-networks/create': {
-      id: '/_authed/internal-networks/create'
-      path: '/internal-networks/create'
-      fullPath: '/internal-networks/create'
-      preLoaderRoute: typeof AuthedInternalNetworksCreateRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/internal-networks/$id': {
-      id: '/_authed/internal-networks/$id'
-      path: '/internal-networks/$id'
-      fullPath: '/internal-networks/$id'
-      preLoaderRoute: typeof AuthedInternalNetworksIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/groups/$id': {
-      id: '/_authed/groups/$id'
-      path: '/groups/$id'
-      fullPath: '/groups/$id'
-      preLoaderRoute: typeof AuthedGroupsIdRouteImport
+    '/_authed/assets/': {
+      id: '/_authed/assets/'
+      path: '/assets'
+      fullPath: '/assets/'
+      preLoaderRoute: typeof AuthedAssetsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/assets/$id': {
@@ -771,39 +666,123 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAssetsIdRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/agents/create': {
-      id: '/_authed/agents/create'
-      path: '/agents/create'
-      fullPath: '/agents/create'
-      preLoaderRoute: typeof AuthedAgentsCreateRouteImport
+    '/_authed/groups/': {
+      id: '/_authed/groups/'
+      path: '/groups'
+      fullPath: '/groups/'
+      preLoaderRoute: typeof AuthedGroupsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/admin/users': {
-      id: '/_authed/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AuthedAdminUsersRouteImport
+    '/_authed/groups/$id': {
+      id: '/_authed/groups/$id'
+      path: '/groups/$id'
+      fullPath: '/groups/$id'
+      preLoaderRoute: typeof AuthedGroupsIdRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/targets/$id/': {
-      id: '/_authed/targets/$id/'
-      path: '/targets/$id'
-      fullPath: '/targets/$id/'
-      preLoaderRoute: typeof AuthedTargetsIdIndexRouteImport
+    '/_authed/integrations/': {
+      id: '/_authed/integrations/'
+      path: '/integrations'
+      fullPath: '/integrations/'
+      preLoaderRoute: typeof AuthedIntegrationsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/providers/$id/': {
-      id: '/_authed/providers/$id/'
-      path: '/providers/$id'
-      fullPath: '/providers/$id/'
-      preLoaderRoute: typeof AuthedProvidersIdIndexRouteImport
+    '/_authed/internal-networks/': {
+      id: '/_authed/internal-networks/'
+      path: '/internal-networks'
+      fullPath: '/internal-networks/'
+      preLoaderRoute: typeof AuthedInternalNetworksIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/agents/conversations/': {
-      id: '/_authed/agents/conversations/'
-      path: '/agents/conversations'
-      fullPath: '/agents/conversations/'
-      preLoaderRoute: typeof AuthedAgentsConversationsIndexRouteImport
+    '/_authed/internal-networks/$id': {
+      id: '/_authed/internal-networks/$id'
+      path: '/internal-networks/$id'
+      fullPath: '/internal-networks/$id'
+      preLoaderRoute: typeof AuthedInternalNetworksIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/internal-networks/create': {
+      id: '/_authed/internal-networks/create'
+      path: '/internal-networks/create'
+      fullPath: '/internal-networks/create'
+      preLoaderRoute: typeof AuthedInternalNetworksCreateRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/jobs/': {
+      id: '/_authed/jobs/'
+      path: '/jobs'
+      fullPath: '/jobs/'
+      preLoaderRoute: typeof AuthedJobsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/providers/': {
+      id: '/_authed/providers/'
+      path: '/providers'
+      fullPath: '/providers/'
+      preLoaderRoute: typeof AuthedProvidersIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/providers/create': {
+      id: '/_authed/providers/create'
+      path: '/providers/create'
+      fullPath: '/providers/create'
+      preLoaderRoute: typeof AuthedProvidersCreateRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/targets/': {
+      id: '/_authed/targets/'
+      path: '/targets'
+      fullPath: '/targets/'
+      preLoaderRoute: typeof AuthedTargetsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/targets/start-discovery': {
+      id: '/_authed/targets/start-discovery'
+      path: '/targets/start-discovery'
+      fullPath: '/targets/start-discovery'
+      preLoaderRoute: typeof AuthedTargetsStartDiscoveryRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/tools/': {
+      id: '/_authed/tools/'
+      path: '/tools'
+      fullPath: '/tools/'
+      preLoaderRoute: typeof AuthedToolsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/tools/$id': {
+      id: '/_authed/tools/$id'
+      path: '/tools/$id'
+      fullPath: '/tools/$id'
+      preLoaderRoute: typeof AuthedToolsIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/vulnerabilities/': {
+      id: '/_authed/vulnerabilities/'
+      path: '/vulnerabilities'
+      fullPath: '/vulnerabilities/'
+      preLoaderRoute: typeof AuthedVulnerabilitiesIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/vulnerabilities/$id': {
+      id: '/_authed/vulnerabilities/$id'
+      path: '/vulnerabilities/$id'
+      fullPath: '/vulnerabilities/$id'
+      preLoaderRoute: typeof AuthedVulnerabilitiesIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/workspaces/': {
+      id: '/_authed/workspaces/'
+      path: '/workspaces'
+      fullPath: '/workspaces/'
+      preLoaderRoute: typeof AuthedWorkspacesIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/workspaces/create': {
+      id: '/_authed/workspaces/create'
+      path: '/workspaces/create'
+      fullPath: '/workspaces/create'
+      preLoaderRoute: typeof AuthedWorkspacesCreateRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/agents/$id/': {
@@ -813,32 +792,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAgentsIdIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/targets/$id/$tab': {
-      id: '/_authed/targets/$id/$tab'
-      path: '/targets/$id/$tab'
-      fullPath: '/targets/$id/$tab'
-      preLoaderRoute: typeof AuthedTargetsIdTabRouteImport
+    '/_authed/agents/$id/edit': {
+      id: '/_authed/agents/$id/edit'
+      path: '/agents/$id/edit'
+      fullPath: '/agents/$id/edit'
+      preLoaderRoute: typeof AuthedAgentsIdEditRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/providers/$id/edit': {
-      id: '/_authed/providers/$id/edit'
-      path: '/providers/$id/edit'
-      fullPath: '/providers/$id/edit'
-      preLoaderRoute: typeof AuthedProvidersIdEditRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/jobs/runs/$id': {
-      id: '/_authed/jobs/runs/$id'
-      path: '/jobs/runs/$id'
-      fullPath: '/jobs/runs/$id'
-      preLoaderRoute: typeof AuthedJobsRunsIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/agents/providers/connect': {
-      id: '/_authed/agents/providers/connect'
-      path: '/agents/providers/connect'
-      fullPath: '/agents/providers/connect'
-      preLoaderRoute: typeof AuthedAgentsProvidersConnectRouteImport
+    '/_authed/agents/conversations/': {
+      id: '/_authed/agents/conversations/'
+      path: '/agents/conversations'
+      fullPath: '/agents/conversations/'
+      preLoaderRoute: typeof AuthedAgentsConversationsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/agents/conversations/$conversationId': {
@@ -848,11 +813,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAgentsConversationsConversationIdRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/agents/$id/edit': {
-      id: '/_authed/agents/$id/edit'
-      path: '/agents/$id/edit'
-      fullPath: '/agents/$id/edit'
-      preLoaderRoute: typeof AuthedAgentsIdEditRouteImport
+    '/_authed/agents/providers/connect': {
+      id: '/_authed/agents/providers/connect'
+      path: '/agents/providers/connect'
+      fullPath: '/agents/providers/connect'
+      preLoaderRoute: typeof AuthedAgentsProvidersConnectRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/jobs/runs/$id': {
+      id: '/_authed/jobs/runs/$id'
+      path: '/jobs/runs/$id'
+      fullPath: '/jobs/runs/$id'
+      preLoaderRoute: typeof AuthedJobsRunsIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/providers/$id/': {
+      id: '/_authed/providers/$id/'
+      path: '/providers/$id'
+      fullPath: '/providers/$id/'
+      preLoaderRoute: typeof AuthedProvidersIdIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/providers/$id/edit': {
+      id: '/_authed/providers/$id/edit'
+      path: '/providers/$id/edit'
+      fullPath: '/providers/$id/edit'
+      preLoaderRoute: typeof AuthedProvidersIdEditRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/targets/$id/': {
+      id: '/_authed/targets/$id/'
+      path: '/targets/$id'
+      fullPath: '/targets/$id/'
+      preLoaderRoute: typeof AuthedTargetsIdIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/targets/$id/$tab': {
+      id: '/_authed/targets/$id/$tab'
+      path: '/targets/$id/$tab'
+      fullPath: '/targets/$id/$tab'
+      preLoaderRoute: typeof AuthedTargetsIdTabRouteImport
       parentRoute: typeof AuthedRoute
     }
   }

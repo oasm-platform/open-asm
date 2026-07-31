@@ -1,0 +1,4 @@
+packages:
+  - "core-api"
+  - "console"
+# onlyBuiltDependencies is in root package.json — no need to duplicate here

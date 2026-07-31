@@ -8,3 +8,6 @@ Dockerfile
 tests
 *.md
 *.log
+# pnpm
+.pnpm-store
+pnpm-lock.yaml
