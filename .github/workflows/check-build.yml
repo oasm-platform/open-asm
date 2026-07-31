@@ -31,11 +31,21 @@ jobs:
             console:
               - 'console/**'
               - 'console/.dockerignore'
-              - 'console/Dockerfile'
+              - 'Dockerfile.console'
+              - '.dockerignore'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - '.npmrc'
+              - 'package.json'
             core-api:
               - 'core-api/**'
               - 'core-api/.dockerignore'
-              - 'core-api/Dockerfile'
+              - 'Dockerfile.core-api'
+              - '.dockerignore'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - '.npmrc'
+              - 'package.json'
             worker:
               - 'worker/**'
               - 'worker/.dockerignore'
@@ -56,7 +66,8 @@ jobs:
       - name: Build Docker image (Console)
         uses: docker/build-push-action@v5
         with:
-          context: ./console
+          context: .
+          file: Dockerfile.console
           push: false
           load: true
           tags: oasm/oasm-console:test
@@ -78,7 +89,8 @@ jobs:
       - name: Build Docker image (Core API)
         uses: docker/build-push-action@v5
         with:
-          context: ./core-api
+          context: .
+          file: Dockerfile.core-api
           push: false
           load: true
           tags: oasm/oasm-api:test
