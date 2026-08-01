@@ -29,7 +29,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { z } from 'zod';
 
 const formSchema = z.object({
-  name: z.string().min(1, 'Asset group name is required'),
+  name: z.string().min(1, 'Host group name is required'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -88,9 +88,9 @@ export function CreateAssetGroupDialog({
       <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create asset group</DialogTitle>
+            <DialogTitle>Create host group</DialogTitle>
             <DialogDescription>
-              Create a new asset group to organize your assets.
+              Create a new host group to organize your hosts.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
