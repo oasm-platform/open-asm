@@ -2,7 +2,7 @@ import { Clock } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { buttonVariants } from '@/components/ui/button-variants';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -61,6 +61,12 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
 const MONTH_DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
 
+/** Format a 0-23 hour as 12-hour clock with AM/PM (e.g. 0 -> '12 AM', 13 -> '1 PM'). */
+const formatHour = (hour: number) => {
+  const hour12 = hour % 12 || 12;
+  return `${hour12} ${hour < 12 ? 'AM' : 'PM'}`;
+};
+
 const TZ_OPTIONS = [
   'UTC',
   'Asia/Ho_Chi_Minh',
@@ -102,6 +108,16 @@ export function CronScheduleBuilder({
   // controlled form state is rebuilt from the new input.
   const remountKey = `${value ?? ''}|${timezoneProp}`;
   const lastEmitted = useRef<string | null>(null);
+
+  // Default to the device timezone and make sure it (and any explicit
+  // `timezone` prop) is always selectable, even when not in TZ_OPTIONS.
+  const deviceTimezone = getLocalTimezone();
+  const tzOptions = useMemo(() => {
+    const extras = Array.from(
+      new Set([timezoneProp, deviceTimezone].filter((t) => !TZ_OPTIONS.includes(t))),
+    );
+    return [...extras, ...TZ_OPTIONS];
+  }, [timezoneProp, deviceTimezone]);
 
   const [frequency, setFrequency] = useState<CronFrequency>(initial.frequency);
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(initial.daysOfWeek);
@@ -150,13 +166,6 @@ export function CronScheduleBuilder({
 
   return (
     <Card key={remountKey} className="w-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Scan schedule</CardTitle>
-        <CardDescription>
-          Runs at the selected time in your timezone — stored as a UTC cron
-          expression.
-        </CardDescription>
-      </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           {FREQUENCIES.map((f) => (
@@ -248,7 +257,7 @@ export function CronScheduleBuilder({
             <SelectContent>
               {HOURS.map((h) => (
                 <SelectItem key={h} value={String(h)}>
-                  {String(h).padStart(2, '0')}
+                  {formatHour(h)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -289,7 +298,7 @@ export function CronScheduleBuilder({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TZ_OPTIONS.map((tz) => (
+              {tzOptions.map((tz) => (
                 <SelectItem key={tz} value={tz}>
                   {getTimezoneLabel(tz)}
                 </SelectItem>
@@ -317,4 +326,3 @@ export function CronScheduleBuilder({
     </Card>
   );
 }
- 

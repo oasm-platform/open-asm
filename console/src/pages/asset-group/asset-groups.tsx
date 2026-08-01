@@ -8,7 +8,9 @@ import {
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import { useNavigate } from '@tanstack/react-router';
-import { CreateAssetGroupDialog } from '../assets/components/create-asset-group-dialog';
+import { Plus } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 
 export function AssetGroups() {
   const {
@@ -79,7 +81,16 @@ export function AssetGroups() {
         onPageSizeChange={setPageSize}
         totalItems={total}
         sortBy={sortBy}
-        toolbarComponents={[<CreateAssetGroupDialog />]}
+        toolbarComponents={[
+          <Button
+            key="create"
+            variant="outline"
+            onClick={() => navigate({ to: '/groups/create' })}
+          >
+            <Plus />
+            Create
+          </Button>,
+        ]}
         sortOrder={sortOrder}
         isShowBorder={true}
         onRowClick={(row) => navigate({ to: '/groups/' + row.id })}
