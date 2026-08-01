@@ -12,7 +12,6 @@ import BadgeList from './badge-list';
 import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
-import SwitchEnableAsset from './switch-enable-asset';
 
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
@@ -134,19 +133,6 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
         <div className="flex flex-col gap-1 max-w-30 min-h-15 justify-center">
           <span>{dayjs(createdAt).fromNow()}</span>
         </div>
-      );
-    },
-  },
-  {
-    accessorKey: 'isEnabled',
-    header: 'Enabled',
-    size: 120,
-    cell: ({ row }) => {
-      return (
-        <SwitchEnableAsset
-          id={row.original.id}
-          currentStatus={row.original.isEnabled}
-        />
       );
     },
   },

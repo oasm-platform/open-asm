@@ -34,7 +34,7 @@ export function AssetGroups() {
     },
     {
       accessorKey: 'totalAssets',
-      header: 'Total Assets',
+      header: 'Total Hosts',
       cell: ({ row }) => (
         <div className="font-medium">{row.original.totalAssets || 0}</div>
       ),
@@ -83,7 +83,7 @@ export function AssetGroups() {
         sortOrder={sortOrder}
         isShowBorder={true}
         onRowClick={(row) => navigate({ to: '/groups/' + row.id })}
-        emptyMessage="No asset groups found"
+        emptyMessage="No host groups found"
         filterColumnKey="name"
         filterValue={filter}
         onFilterChange={setFilter}

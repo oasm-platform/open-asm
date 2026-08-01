@@ -68,7 +68,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
   const assetColumns: ColumnDef<Asset>[] = [
     {
       accessorKey: 'value',
-      header: 'Asset value',
+      header: 'Host value',
     },
     {
       accessorKey: 'createdAt',
@@ -81,7 +81,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
       cell: ({ row }) => (
         <ConfirmDialog
           title="Confirm Delete"
-          description="Are you sure you want to remove this asset from the group? This action cannot be undone."
+          description="Are you sure you want to remove this host from the group? This action cannot be undone."
           onConfirm={() => handleRemoveAssets([row.original.id])}
           confirmText="Remove"
           cancelText="Cancel"
@@ -104,9 +104,9 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
     <div className="w-full space-y-4">
       <div className="flex flex-row items-center justify-between space-y-0 pb-2 mb-4">
         <div>
-          <h2 className="text-xl font-semibold">Assets</h2>
+          <h2 className="text-xl font-semibold">Hosts</h2>
           <p className="text-sm text-muted-foreground">
-            {assetsInGroupQuery.data?.total || 0} assets in this group
+            {assetsInGroupQuery.data?.total || 0} hosts in this group
           </p>
         </div>
         <div className="flex space-x-2">

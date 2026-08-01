@@ -69,12 +69,12 @@ export function EditAssetGroupDialog({
       {
         onSuccess: () => {
           setOpen(false);
-          toast.success('Asset group updated successfully');
+          toast.success('Host group updated successfully');
           queryClient.invalidateQueries({ queryKey: ['asset-group'] });
           onSuccess?.();
         },
         onError: () => {
-          toast.error('Failed to update asset group');
+          toast.error('Failed to update host group');
         },
       },
     );
@@ -98,16 +98,16 @@ export function EditAssetGroupDialog({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Edit asset group</p>
+            <p>Edit host group</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit asset group</DialogTitle>
+            <DialogTitle>Edit host group</DialogTitle>
             <DialogDescription>
-              Update the name and color of your asset group.
+              Update the name and color of your host group.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -122,7 +122,7 @@ export function EditAssetGroupDialog({
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Asset group name" {...field} />
+                      <Input placeholder="Host group name" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

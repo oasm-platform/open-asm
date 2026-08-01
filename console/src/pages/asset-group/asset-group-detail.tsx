@@ -22,12 +22,12 @@ export default function AssetGroupDetail() {
       { id: id! },
       {
         onSuccess: () => {
-          toast('Asset group deleted successfully');
+          toast('Host group deleted successfully');
           // Navigate back to the asset groups list after successful deletion
           window.history.back();
         },
         onError: () => {
-          toast.error('Failed to delete asset group');
+          toast.error('Failed to delete host group');
         },
       },
     );
@@ -51,7 +51,7 @@ export default function AssetGroupDetail() {
         <div className="flex items-center gap-2 w-full">
           <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
           <ConfirmDialog
-            title="Delete asset group"
+            title="Delete host group"
             description={`Are you sure you want to delete "${data?.name}"? This action cannot be undone.`}
             onConfirm={handleDelete}
             typeToConfirm="delete"

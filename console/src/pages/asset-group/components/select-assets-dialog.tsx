@@ -168,7 +168,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
     },
     {
       accessorKey: 'value',
-      header: 'Asset Value',
+      header: 'Host Value',
     },
     {
       accessorKey: 'createdAt',
@@ -189,9 +189,9 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
       <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
       <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle>Select assets to add</DialogTitle>
+          <DialogTitle>Select hosts to add</DialogTitle>
           <DialogDescription>
-            Choose assets not currently in this asset group to add
+            Choose hosts not currently in this host group to add
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
@@ -251,7 +251,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
           >
             {addAssetsMutation.isPending
               ? 'Adding...'
-              : `Add ${selectedAssets.size} Assets`}
+              : `Add ${selectedAssets.size} Hosts`}
           </Button>
         </DialogFooter>
       </DialogContent>

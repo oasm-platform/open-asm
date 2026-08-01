@@ -32,7 +32,7 @@ const Page = ({
   return (
     <div className={(className || '') + ' flex h-full flex-col gap-5'}>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-3">
           {isShowButtonGoBack && (
             <Button
               variant="outline"
