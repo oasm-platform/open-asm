@@ -3,8 +3,8 @@ services:
     container_name: console
     image: oasm/oasm-console:latest
     build:
-      context: ./console
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.console
     networks:
       - oasm
     env_file:
@@ -26,8 +26,8 @@ services:
     container_name: oasm-api
     image: oasm/oasm-api:latest
     build:
-      context: ./core-api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.core-api
     networks:
       - oasm
     env_file:
@@ -207,7 +207,7 @@ services:
       postgres:
         condition: service_healthy
     command: >
-      sh -c "node node_modules/typeorm/cli.js migration:run -d dist/database/database-config.js"
+      sh -c "cd /app && pnpm exec typeorm migration:run -d dist/database/database-config.js"
 
 volumes:
   pgdata:

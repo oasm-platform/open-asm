@@ -17,15 +17,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - run: npm ci
-      - run: npm run test:run --workspace=console
-      - run: npm run test:coverage --workspace=console
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter console run test:run
+      - run: pnpm --filter console run test:coverage
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4

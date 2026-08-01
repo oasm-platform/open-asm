@@ -48,9 +48,7 @@ tasks:
   # Sets up husky for git hooks and installs dependencies for all services
   install:
     cmds:
-      - npm install -D husky
-      - task: api:install
-      - task: console:install
+      - pnpm install
       - task: worker:install
 
   # Run linter
@@ -80,16 +78,26 @@ tasks:
       - mkdir -p grpc-client/go grpc-client/ts
       - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
       - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-      - cd core-api && npx protoc -I src/proto src/proto/*.proto --go_out=../grpc-client/go --go-grpc_out=../grpc-client/go --ts_out=../grpc-client/ts
+      - cd core-api && pnpm exec protoc -I src/proto src/proto/*.proto --go_out=../grpc-client/go --go-grpc_out=../grpc-client/go --ts_out=../grpc-client/ts
 
   # Project initialization
   # Sets up environment files and initializes the development environment
-  # Copies example env files and starts required infrastructure services
+  # Enables pnpm via corepack, copies example env files, starts required infrastructure services
   init:
     cmds:
+      - |
+        pnpm --version > /dev/null 2>&1 || (
+          corepack enable --install-directory "$HOME/.local/bin" 2>/dev/null ||
+          npm install -g pnpm 2>/dev/null ||
+          echo "WARN: Install pnpm manually: npm install -g pnpm"
+        )
+      - |
+        pnpm --version > /dev/null 2>&1 ||
+          corepack prepare pnpm@latest --activate 2>/dev/null || true
+      - node -e "const fs=require('fs'); ['core-api','console'].forEach(d=>{const s=d+'/example.env',t=d+'/.env';if(!fs.existsSync(t))fs.copyFileSync(s,t)})"
+      - docker compose up -d postgres redis --force-recreate
     deps:
       - install
-      - worker:tools
 
   # Clean build artifacts
   # Removes all node_modules and build artifacts from all services
