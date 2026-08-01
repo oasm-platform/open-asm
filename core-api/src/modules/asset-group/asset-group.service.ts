@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto';
 import { In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
@@ -205,12 +206,48 @@ export class AssetGroupService {
         );
       }
 
+      // The schedule only makes sense when a workflow is created from tools
+      if (
+        createAssetGroupDto.schedule &&
+        !createAssetGroupDto.toolIds?.length
+      ) {
+        throw new BadRequestException(
+          'schedule can only be provided together with toolIds',
+        );
+      }
+
       const assetGroup = this.assetGroupRepo.create({
         name: createAssetGroupDto.name,
+        hexColor: createAssetGroupDto.hexColor,
         workspace: { id: workspaceId },
       });
 
       const savedAssetGroup = await this.assetGroupRepo.save(assetGroup);
+
+      try {
+        // Attach the provided hosts to the group
+        if (createAssetGroupDto.hostIds?.length) {
+          await this.addManyAssets(
+            savedAssetGroup.id,
+            createAssetGroupDto.hostIds,
+          );
+        }
+
+        // Create a workflow from the provided tools and assign it to the group
+        if (createAssetGroupDto.toolIds?.length) {
+          await this.createAndAssignGroupWorkflow(
+            savedAssetGroup.id,
+            createAssetGroupDto.toolIds,
+            createAssetGroupDto.schedule ?? CronSchedule.EVERY_3_DAYS,
+            workspaceId,
+          );
+        }
+      } catch (error) {
+        // Roll back the group so a failed request does not leave a half-created group
+        await this.assetGroupRepo.remove(savedAssetGroup);
+        throw error;
+      }
+
       return savedAssetGroup;
     } catch (error) {
       this.logger.error(`Error creating asset group:`, error);
@@ -219,11 +256,58 @@ export class AssetGroupService {
   }
 
   /**
+   * Creates a workflow whose jobs run the given tools, then associates it
+   * with the asset group using the provided schedule.
+   */
+  private async createAndAssignGroupWorkflow(
+    groupId: string,
+    toolIds: string[],
+    schedule: string,
+    workspaceId: string,
+  ): Promise<void> {
+    // Verify that all tools exist
+    const tools = await this.assetGroupRepo.manager.find(Tool, {
+      where: { id: In(toolIds) },
+    });
+    if (tools.length !== toolIds.length) {
+      const foundToolIds = tools.map((tool) => tool.id);
+      const missingToolIds = toolIds.filter(
+        (id) => !foundToolIds.includes(id),
+      );
+      this.logger.warn(
+        `Tools with IDs "${missingToolIds.join(', ')}" not found`,
+      );
+      throw new NotFoundException(
+        `One or more tools with IDs "${missingToolIds.join(', ')}" not found`,
+      );
+    }
+
+    const workflowName = `Group Workflow - ${groupId}`;
+    const workflow = this.workflowRepo.create({
+      name: workflowName,
+      content: {
+        // ponytail: entity types schedule as CronSchedule but the column is
+        // varchar and the BullMQ repeat pattern accepts any cron string
+        on: { schedule: schedule as CronSchedule, target: [] },
+        jobs: tools.map((tool) => ({ name: tool.name, run: tool.name })),
+        name: workflowName,
+      },
+      filePath: '',
+      workspace: { id: workspaceId },
+    });
+
+    const savedWorkflow = await this.workflowRepo.save(workflow);
+
+    await this.addManyWorkflows(groupId, [savedWorkflow.id], schedule);
+  }
+
+  /**
    * Associates multiple workflows with the specified asset group
    */
   async addManyWorkflows(
     groupId: string,
     workflowIds: string[],
+    schedule: string = CronSchedule.EVERY_3_DAYS,
   ): Promise<DefaultMessageResponseDto> {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
@@ -270,8 +354,6 @@ export class AssetGroupService {
           `Workflows with IDs "${existingWorkflowIds.join(', ')}" are already associated with asset group "${groupId}"`,
         );
       }
-      const defaultCron = CronSchedule.EVERY_3_DAYS;
-
       const assetGroupWorkflowRecords: AssetGroupWorkflow[] = [];
 
       for (const workflowId of workflowIds) {
@@ -281,7 +363,7 @@ export class AssetGroupService {
           { id: assetGroupWorkflowId } as AssetGroupWorkflow,
           {
             repeat: {
-              pattern: defaultCron,
+              pattern: schedule,
             },
           },
         );
@@ -290,7 +372,7 @@ export class AssetGroupService {
           id: assetGroupWorkflowId,
           assetGroup: { id: groupId },
           workflow: { id: workflowId },
-          schedule: defaultCron,
+          schedule: schedule as CronSchedule,
           jobId: job.repeatJobKey,
         });
 

@@ -30,6 +30,7 @@ import { z } from 'zod';
 
 const formSchema = z.object({
   name: z.string().min(1, 'Host group name is required'),
+  hexColor: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -49,6 +50,7 @@ export function CreateAssetGroupDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
+      hexColor: '',
     },
   });
 
@@ -66,6 +68,7 @@ export function CreateAssetGroupDialog({
       {
         data: {
           name: values.name,
+          hexColor: values.hexColor || undefined,
         },
       },
       {
@@ -103,6 +106,41 @@ export function CreateAssetGroupDialog({
                     <FormLabel>Name</FormLabel>
                     <FormControl>
                       <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="hexColor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Color</FormLabel>
+                    <FormControl>
+                      <div className="flex space-x-2">
+                        {[
+                          '#78716C', // current/default
+                          '#3b82f6', // blue
+                          '#22c55e', // green
+                          '#f59e0b', // yellow
+                          '#7e22ce', // purple
+                          '#ec4899', // pink
+                        ].map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className={`w-8 h-8 rounded-full border-2 cursor-pointer ${
+                              field.value === color
+                                ? 'border-gray-400 ring-2 ring-offset-2 ring-blue-500'
+                                : 'border-gray-300'
+                            }`}
+                            style={{ backgroundColor: color }}
+                            onClick={() => field.onChange(color)}
+                            aria-label={`Select ${color} color`}
+                          />
+                        ))}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
