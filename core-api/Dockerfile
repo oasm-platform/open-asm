@@ -25,7 +25,6 @@ RUN pnpm install --frozen-lockfile
 
 # Copy full source
 COPY core-api/ ./core-api
-COPY console/ ./console
 
 RUN pnpm --filter core-api run build && \
   pnpm deploy --legacy --filter core-api --prod /prod/core-api && \
