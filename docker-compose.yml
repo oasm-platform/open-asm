@@ -4,7 +4,7 @@ services:
     image: oasm/oasm-console:latest
     build:
       context: .
-      dockerfile: Dockerfile.console
+      dockerfile: console/Dockerfile
     networks:
       - oasm
     env_file:
@@ -27,7 +27,7 @@ services:
     image: oasm/oasm-api:latest
     build:
       context: .
-      dockerfile: Dockerfile.core-api
+      dockerfile: core-api/Dockerfile
     networks:
       - oasm
     env_file:

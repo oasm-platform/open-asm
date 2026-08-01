@@ -31,7 +31,7 @@ jobs:
             console:
               - 'console/**'
               - 'console/.dockerignore'
-              - 'Dockerfile.console'
+              - 'console/Dockerfile'
               - '.dockerignore'
               - 'pnpm-workspace.yaml'
               - 'pnpm-lock.yaml'
@@ -40,7 +40,7 @@ jobs:
             core-api:
               - 'core-api/**'
               - 'core-api/.dockerignore'
-              - 'Dockerfile.core-api'
+              - 'core-api/Dockerfile'
               - '.dockerignore'
               - 'pnpm-workspace.yaml'
               - 'pnpm-lock.yaml'
@@ -67,7 +67,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.console
+          file: console/Dockerfile
           push: false
           load: true
           tags: oasm/oasm-console:test
@@ -90,7 +90,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.core-api
+          file: core-api/Dockerfile
           push: false
           load: true
           tags: oasm/oasm-api:test
