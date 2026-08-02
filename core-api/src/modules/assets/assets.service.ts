@@ -316,6 +316,10 @@ export class AssetsService {
 
     const [list, total] = await queryBuilder
       .orderBy(sortColumn, query.sortOrder)
+      // Unique tiebreaker: createdAt alone is not unique (batch-scanned
+      // assets share timestamps), so Postgres may order ties differently
+      // per query, causing rows to repeat/skip across offset pages.
+      .addOrderBy('asset_service.id', query.sortOrder)
       .skip(offset)
       .take(query.limit)
       .getManyAndCount();
