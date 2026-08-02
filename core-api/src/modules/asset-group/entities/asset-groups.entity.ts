@@ -13,6 +13,7 @@ import {
 } from 'typeorm';
 import { AssetGroupAsset } from './asset-groups-assets.entity';
 import { AssetGroupWorkflow } from './asset-groups-workflows.entity';
+import { AssetGroupLastRunDto } from '../dto/asset-group-last-run.dto';
 
 @Unique(['name', 'workspace'])
 @Entity('asset_groups')
@@ -41,6 +42,7 @@ export class AssetGroup extends BaseEntity {
   )
   assetGroupAssets: Relation<AssetGroupAsset[]>;
 
+  @ApiProperty({ type: () => [AssetGroupWorkflow], required: false })
   @OneToMany(
     () => AssetGroupWorkflow,
     (assetGroupWorkflows) => assetGroupWorkflows.assetGroup,
@@ -49,4 +51,7 @@ export class AssetGroup extends BaseEntity {
 
   @ApiProperty()
   totalAssets: number;
+
+  @ApiProperty({ type: () => AssetGroupLastRunDto, required: false })
+  lastRun?: AssetGroupLastRunDto | null;
 }

@@ -19,7 +19,6 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Asset } from '../assets/entities/assets.entity';
-import { Workflow } from '../workflows/entities/workflow.entity';
 import { AssetGroupService } from './asset-group.service';
 import { AddManyAssetsToAssetGroupDto } from './dto/add-many-assets-to-asset-group.dto';
 import { AddManyWorkflowsToAssetGroupDto } from './dto/add-many-workflows-to-asset-group.dto';
@@ -222,30 +221,6 @@ export class AssetGroupController {
   }
 
   @Doc({
-    summary: 'Get workflows by asset group ID',
-    description:
-      'Retrieves workflows associated with a specific asset group with pagination.',
-    response: {
-      serialization: GetManyResponseDto(AssetGroupWorkflow),
-    },
-    request: {
-      getWorkspaceId: true,
-    },
-  })
-  @Get(':assetGroupId/workflows')
-  getWorkflowsByAssetGroupsId(
-    @Param('assetGroupId') assetGroupId: string,
-    @Query() query: GetManyBaseQueryParams,
-    @WorkspaceId() workspaceId: string,
-  ) {
-    return this.assetGroupService.getWorkflowsByAssetGroupsId(
-      assetGroupId,
-      query,
-      workspaceId,
-    );
-  }
-
-  @Doc({
     summary: 'Get assets not in asset group',
     description:
       'Retrieves assets not associated with a specific asset group with pagination.',
@@ -263,30 +238,6 @@ export class AssetGroupController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetGroupService.getAssetsNotInAssetGroup(
-      assetGroupId,
-      query,
-      workspaceId,
-    );
-  }
-
-  @Doc({
-    summary: 'Get workflows not in asset group (preinstalled in workspace)',
-    description:
-      'Retrieves workflows not associated with a specific asset group but preinstalled in the workspace with pagination.',
-    response: {
-      serialization: GetManyResponseDto(Workflow),
-    },
-    request: {
-      getWorkspaceId: true,
-    },
-  })
-  @Get(':assetGroupId/workflows/not-in-group')
-  getWorkflowsNotInAssetGroup(
-    @Param('assetGroupId') assetGroupId: string,
-    @Query() query: GetManyBaseQueryParams,
-    @WorkspaceId() workspaceId: string,
-  ) {
-    return this.assetGroupService.getWorkflowsNotInAssetGroup(
       assetGroupId,
       query,
       workspaceId,

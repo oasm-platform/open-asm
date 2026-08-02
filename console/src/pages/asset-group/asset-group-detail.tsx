@@ -65,7 +65,11 @@ export default function AssetGroupDetail() {
         </div>
       }
     >
-      <AssetGroupWorkflow assetGroupId={id!} />
+      <AssetGroupWorkflow
+        assetGroupId={id!}
+        workflows={data.assetGroupWorkflows ?? []}
+        onRefetch={refetch}
+      />
       <AssetSection assetGroupId={id!} />
     </Page>
   );

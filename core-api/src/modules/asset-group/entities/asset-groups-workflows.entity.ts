@@ -17,7 +17,7 @@ export class AssetGroupWorkflow extends BaseEntity {
   @JoinColumn({ name: 'assetGroupId' })
   assetGroup: Relation<AssetGroup>;
 
-  @ApiProperty()
+  @ApiProperty({ type: () => Workflow })
   @ManyToOne(() => Workflow, (workflow) => workflow.id, {
     onDelete: 'CASCADE',
   })

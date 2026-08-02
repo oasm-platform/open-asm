@@ -6,8 +6,8 @@ import {
   ToolCategory,
   ToolsControllerGetManyToolsType,
   UpdateTargetDtoScanSchedule,
+  type AssetGroupWorkflow as AssetGroupWorkflowRelation,
   useAssetGroupControllerAddManyWorkflows,
-  useAssetGroupControllerGetWorkflowsByAssetGroupsId,
   useAssetGroupControllerRemoveManyWorkflows,
   useAssetGroupControllerUpdateAssetGroupWorkflow,
   useToolsControllerGetInstalledTools,
@@ -20,35 +20,15 @@ import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
-// Local type definitions for workflow data accessed in this component
-// The AssetGroupWorkflowWorkflow type from the API is opaque ({ [key: string]: unknown })
-// but we know the actual shape based on the Workflow and WorkflowContent types
-interface WorkflowJob {
-  name: string;
-  run: string;
-}
-
-interface WorkflowWithContent {
-  id: string;
-  content?: {
-    on?: { schedule?: string; target?: string[] };
-    jobs?: WorkflowJob[];
-    name?: string;
-  };
-}
-
-/** Cast an opaque AssetGroupWorkflowWorkflow to a usable WorkflowWithContent */
-function toWorkflow(w: unknown): WorkflowWithContent {
-  return w as WorkflowWithContent;
-}
-
 export default function AssetGroupWorkflow({
   assetGroupId,
+  workflows,
+  onRefetch,
 }: {
   assetGroupId: string;
+  workflows: AssetGroupWorkflowRelation[];
+  onRefetch: () => void;
 }) {
-  const { data: groupWorkflows, refetch: refetchWorkflows } =
-    useAssetGroupControllerGetWorkflowsByAssetGroupsId(assetGroupId);
   const { data: workspaceToolsInstalled } =
     useToolsControllerGetInstalledTools();
   const [hoveredToolId, setHoveredToolId] = useState<string | null>(null);
@@ -76,12 +56,12 @@ export default function AssetGroupWorkflow({
   const isToolInGroup = (toolName: string) => {
     // Get all jobs from all workflows in the group
     const allJobs =
-      groupWorkflows?.data?.flatMap(
-        (groupWorkflow) => toWorkflow(groupWorkflow.workflow).content?.jobs || [],
+      workflows.flatMap(
+        (groupWorkflow) => groupWorkflow.workflow.content?.jobs || [],
       ) || [];
 
     // Extract all run values from jobs
-    const toolsName = allJobs.map((job: { run: string }) => job.run) || [];
+    const toolsName = allJobs.map((job) => job.run) || [];
 
     // Check if the tool name exists in any workflow
     return toolsName.includes(toolName);
@@ -89,16 +69,16 @@ export default function AssetGroupWorkflow({
 
   // Get the workflow that contains a specific tool
   const getWorkflowContainingTool = (toolName: string) => {
-    return groupWorkflows?.data?.find((groupWorkflow) => {
-      const jobs = toWorkflow(groupWorkflow.workflow).content?.jobs || [];
-      const toolsName = jobs.map((job: { run: string }) => job.run) || [];
+    return workflows.find((groupWorkflow) => {
+      const jobs = groupWorkflow.workflow.content?.jobs || [];
+      const toolsName = jobs.map((job) => job.run) || [];
       return toolsName.includes(toolName);
     });
   };
 
   // Get the current workflow in the group (assuming there's only one workflow per group)
   const getCurrentWorkflow = () => {
-    return groupWorkflows?.data?.[0];
+    return workflows[0];
   };
 
   // Handle tool click - add if not exists, remove if exists
@@ -108,9 +88,8 @@ export default function AssetGroupWorkflow({
     if (isInGroup) {
       // If tool is in group, find the workflow containing it and remove the tool
       const groupWorkflow = getWorkflowContainingTool(tool.name)?.workflow;
-      const wf = groupWorkflow ? toWorkflow(groupWorkflow) : null;
 
-      if (!wf) {
+      if (!groupWorkflow) {
         toast.error('Workflow not found');
         return;
       }
@@ -120,19 +99,20 @@ export default function AssetGroupWorkflow({
 
         // Filter out the tool from the workflow's jobs
         const updatedJobs =
-          wf.content?.jobs?.filter((job) => job.run !== tool.name) || [];
+          groupWorkflow.content?.jobs?.filter((job) => job.run !== tool.name) ||
+          [];
 
         if (updatedJobs.length === 0) {
           // If no jobs left, remove workflow from asset group and delete it
           await removeWorkflowsMutation.mutateAsync({
             groupId: assetGroupId,
             data: {
-              workflowIds: [wf.id],
+              workflowIds: [groupWorkflow.id],
             },
           });
 
           await deleteWorkflowMutation.mutateAsync({
-            id: wf.id,
+            id: groupWorkflow.id,
           });
 
           toast.success(
@@ -141,14 +121,14 @@ export default function AssetGroupWorkflow({
         } else {
           // Update the workflow with the remaining jobs
           const updatedWorkflowContent = {
-            ...wf.content,
+            ...groupWorkflow.content,
             jobs: updatedJobs,
           };
 
           await updateWorkflowMutation.mutateAsync({
-            id: wf.id,
+            id: groupWorkflow.id,
             data: {
-              content: updatedWorkflowContent as import('@/services/apis/gen/queries').WorkflowContent,
+              content: updatedWorkflowContent,
             },
           });
 
@@ -158,7 +138,7 @@ export default function AssetGroupWorkflow({
         }
 
         // Refetch workflows to update the UI
-        await refetchWorkflows();
+        await onRefetch();
       } catch (error) {
         console.error('Error removing tool from workflow:', error);
         toast.error('Failed to remove tool. Please try again.');
@@ -167,8 +147,7 @@ export default function AssetGroupWorkflow({
       }
     } else {
       // If tool is not in group, check if group already has a workflow
-      const groupWf = getCurrentWorkflow()?.workflow;
-      const existingWorkflow = groupWf ? toWorkflow(groupWf) : null;
+      const existingWorkflow = getCurrentWorkflow()?.workflow ?? null;
 
       try {
         setIsProcessing(true);
@@ -191,7 +170,7 @@ export default function AssetGroupWorkflow({
           await updateWorkflowMutation.mutateAsync({
             id: existingWorkflow.id,
             data: {
-              content: updatedWorkflowContent as import('@/services/apis/gen/queries').WorkflowContent,
+              content: updatedWorkflowContent,
             },
           });
 
@@ -238,7 +217,7 @@ export default function AssetGroupWorkflow({
         }
 
         // Refetch workflows to update the UI
-        await refetchWorkflows();
+        await onRefetch();
       } catch (error) {
         console.error('Error adding tool:', error);
         toast.error('Failed to add tool. Please try again.');
@@ -346,12 +325,10 @@ export default function AssetGroupWorkflow({
         </div>
         <div className="flex gap-2 justify-between">
           <ScanScheduleSelect
-            disabled={isPendingUpdateSchedule || !groupWorkflows?.data[0]?.id}
-            value={
-              groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule
-            }
+            disabled={isPendingUpdateSchedule || !workflows[0]?.id}
+            value={workflows[0]?.schedule as UpdateTargetDtoScanSchedule}
             onChange={(value: UpdateTargetDtoScanSchedule) => {
-              const workflowId = groupWorkflows?.data[0]?.id;
+              const workflowId = workflows[0]?.id;
               if (!workflowId) return;
               updateAssetGroupWorkflowMutation(
                 {
@@ -362,7 +339,7 @@ export default function AssetGroupWorkflow({
                 },
                 {
                   onSuccess: async () => {
-                    await refetchWorkflows();
+                    await onRefetch();
                     toast.success('Update schedule successfuly');
                   },
                 },

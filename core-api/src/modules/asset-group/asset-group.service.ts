@@ -1,6 +1,6 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { BullMQName, CronSchedule, JobRunType } from '@/common/enums/enum';
+import { BullMQName, CronSchedule, JobRunType, JobStatus } from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -15,10 +15,12 @@ import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
+import { JobHistory } from '../jobs-registry/entities/job-history.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
+import { AssetGroupLastRunDto } from './dto/asset-group-last-run.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { UpdateAssetGroupDto } from './dto/update-asset-group.dto';
@@ -40,6 +42,8 @@ export class AssetGroupService {
     public readonly assetRepo: Repository<Asset>,
     @InjectRepository(Workflow)
     public readonly workflowRepo: Repository<Workflow>,
+    @InjectRepository(JobHistory)
+    public readonly jobHistoryRepo: Repository<JobHistory>,
     @InjectQueue(BullMQName.ASSET_GROUPS_WORKFLOW_SCHEDULE)
     private scanScheduleQueue: Queue<AssetGroupWorkflow>,
     private toolsService: ToolsService,
@@ -150,7 +154,9 @@ export class AssetGroupService {
   }
 
   /**
-   * Fetches a specific asset group by its unique identifier
+   * Fetches a specific asset group by its unique identifier,
+   * including the workflows assigned to it and the latest run
+   * so the detail view does not need additional requests.
    */
   async getAssetGroupById(
     id: string,
@@ -159,6 +165,7 @@ export class AssetGroupService {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id, workspace: { id: workspaceId } },
+        relations: { assetGroupWorkflows: { workflow: true } },
       });
 
       if (!assetGroup) {
@@ -166,6 +173,14 @@ export class AssetGroupService {
           `Asset group with ID "${id}" not found in workspace "${workspaceId}"`,
         );
       }
+
+      const workflowIds =
+        assetGroup.assetGroupWorkflows?.map((agw) => agw.workflow.id) ?? [];
+
+      assetGroup.lastRun =
+        workflowIds.length === 0
+          ? null
+          : await this.getLastRunForWorkflows(workflowIds);
 
       return assetGroup;
     } catch (error) {
@@ -175,6 +190,70 @@ export class AssetGroupService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Resolves the most recent job history across the given workflows,
+   * deriving its status from the individual job statuses.
+   */
+  private async getLastRunForWorkflows(
+    workflowIds: string[],
+  ): Promise<AssetGroupLastRunDto | null> {
+    interface RawJobHistoryRow {
+      id: string;
+      createdAt: Date;
+      updatedAt: Date;
+      totalJobs: string;
+      status: JobStatus;
+      workflowName: string;
+      jobHistoryName: string;
+      jobRunType: JobRunType;
+    }
+
+    const raw = await this.jobHistoryRepo
+      .createQueryBuilder('jobHistory')
+      .leftJoin('jobHistory.workflow', 'workflow')
+      .where('jobHistory.workflowId IN (:...workflowIds)', { workflowIds })
+      .select([
+        '"jobHistory".id as "id"',
+        '"jobHistory"."createdAt" as "createdAt"',
+        '"jobHistory"."updatedAt" as "updatedAt"',
+        '"jobHistory"."jobHistoryName" as "jobHistoryName"',
+        '"jobHistory"."jobRunType" as "jobRunType"',
+        '"workflow"."name" as "workflowName"',
+        // Subquery to count total jobs for this job history
+        '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
+        // Subquery with CASE to calculate status based on job statuses
+        `(
+          SELECT
+            CASE
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
+              ELSE '${JobStatus.PENDING}'
+            END
+          FROM jobs
+          WHERE "jobHistoryId" = "jobHistory".id
+        ) as "status"`,
+      ])
+      .orderBy('jobHistory.createdAt', 'DESC')
+      .limit(1)
+      .getRawOne<RawJobHistoryRow>();
+
+    if (!raw) {
+      return null;
+    }
+
+    return {
+      id: raw.id,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      totalJobs: parseInt(raw.totalJobs, 10),
+      status: raw.status,
+      workflowName: raw.workflowName,
+      jobHistoryName: raw.jobHistoryName,
+      jobRunType: raw.jobRunType,
+    };
   }
 
   /**
@@ -673,57 +752,6 @@ export class AssetGroupService {
   }
 
   /**
-   * Retrieves workflows associated with a specific asset group with pagination
-   */
-  async getWorkflowsByAssetGroupsId(
-    assetGroupId: string,
-    query: GetManyBaseQueryParams,
-    workspaceId: string,
-  ) {
-    try {
-      const { page, limit, sortBy, sortOrder } = query;
-      const offset = (page - 1) * limit;
-
-      // Find the asset group to ensure it exists and belongs to the workspace
-      const assetGroup = await this.assetGroupRepo.findOne({
-        where: { id: assetGroupId, workspace: { id: workspaceId } },
-      });
-
-      if (!assetGroup) {
-        throw new NotFoundException(
-          `Asset group with ID "${assetGroupId}" not found in workspace "${workspaceId}"`,
-        );
-      }
-
-      const queryBuilder = this.assetGroupWorkflowRepo
-        .createQueryBuilder('assetGroupWorkflow')
-        .innerJoinAndSelect('assetGroupWorkflow.workflow', 'workflow')
-        .innerJoin('assetGroupWorkflow.assetGroup', 'ag')
-        .where(
-          'assetGroupWorkflow.assetGroupId = :assetGroupId AND ag.workspaceId = :workspaceId',
-          {
-            assetGroupId,
-            workspaceId,
-          },
-        );
-
-      const [data, total] = await queryBuilder
-        .orderBy(`workflow.${sortBy}`, sortOrder)
-        .skip(offset)
-        .take(limit)
-        .getManyAndCount();
-
-      return getManyResponse({ query, data, total });
-    } catch (error) {
-      this.logger.error(
-        `Error retrieving workflows for asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
-        error,
-      );
-      throw error;
-    }
-  }
-
-  /**
    * Retrieves assets not associated with a specific asset group with pagination
    */
   async getAssetsNotInAssetGroup(
@@ -779,67 +807,6 @@ export class AssetGroupService {
     } catch (error) {
       this.logger.error(
         `Error retrieving assets not in asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
-        error,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Retrieves workflows not associated with a specific asset group but preinstalled in the workspace with pagination
-   */
-  async getWorkflowsNotInAssetGroup(
-    assetGroupId: string,
-    query: GetManyBaseQueryParams,
-    workspaceId: string,
-  ) {
-    try {
-      const { page, limit, sortBy, sortOrder } = query;
-      const offset = (page - 1) * limit;
-
-      // Find the asset group to ensure it exists and belongs to the workspace
-      const assetGroup = await this.assetGroupRepo.findOne({
-        where: { id: assetGroupId, workspace: { id: workspaceId } },
-      });
-
-      if (!assetGroup) {
-        throw new NotFoundException(
-          `Asset group with ID "${assetGroupId}" not found in workspace "${workspaceId}"`,
-        );
-      }
-
-      // Build query using query builder to get workflows that are NOT in the asset group but ARE in the workspace
-      const queryBuilder = this.workflowRepo
-        .createQueryBuilder('workflow')
-        .leftJoin(
-          'asset_group_workflows',
-          'agt',
-          'agt.workflowId = workflow.id AND agt.assetGroupId = :assetGroupId',
-          { assetGroupId },
-        )
-        .where(
-          'agt.workflowId IS NULL AND workflow.workspaceId = :workspaceId',
-          { workspaceId },
-        );
-
-      const [data, total] = await queryBuilder
-        .orderBy(`workflow.${sortBy}`, sortOrder)
-        .skip(offset)
-        .take(limit)
-        .leftJoinAndSelect(
-          'workflow.assetGroupWorkflows',
-          'assetGroupWorkflows',
-        )
-        .getManyAndCount();
-
-      return getManyResponse({
-        query,
-        data,
-        total,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Error retrieving workflows not in asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
         error,
       );
       throw error;
