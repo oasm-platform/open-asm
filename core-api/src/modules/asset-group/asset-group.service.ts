@@ -292,7 +292,7 @@ export class AssetGroupService {
         jobs: tools.map((tool) => ({ name: tool.name, run: tool.name })),
         name: workflowName,
       },
-      filePath: '',
+      filePath: `group-${groupId}.yaml`,
       workspace: { id: workspaceId },
     });
 

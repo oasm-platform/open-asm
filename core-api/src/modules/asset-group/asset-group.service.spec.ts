@@ -222,7 +222,7 @@ describe('AssetGroupService', () => {
             ],
             name: `Group Workflow - ${groupId}`,
           },
-          filePath: '',
+          filePath: `group-${groupId}.yaml`,
           workspace: { id: workspaceId },
         }),
       );

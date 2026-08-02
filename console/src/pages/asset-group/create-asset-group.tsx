@@ -32,7 +32,6 @@ import {
   useToolsControllerGetInstalledTools,
   type AssetGroup,
   type CreateAssetGroupDto,
-  type GetHostAssetsDTO,
 } from '@/services/apis/gen/queries';
 import { type ColumnDef } from '@tanstack/react-table';
 import { useNavigate } from '@tanstack/react-router';
@@ -84,7 +83,12 @@ export function CreateAssetGroup() {
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setParams, setFilter },
-  } = useServerDataTable({ isUpdateSearchQueryParam: false, defaultPageSize: 10 });
+  } = useServerDataTable({
+    isUpdateSearchQueryParam: false,
+    defaultPageSize: 10,
+    defaultSortBy: 'host',
+    defaultSortOrder: 'ASC',
+  });
 
   const hostsQuery = useAssetsControllerGetHostAssets(
     { page, limit: pageSize, sortBy, sortOrder, search: filter },
@@ -179,7 +183,7 @@ export function CreateAssetGroup() {
 
   return (
     <Page>
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto px-4 sm:px-0">
         <Card className="mx-auto w-full max-w-4xl">
           <CardHeader>
             <CardTitle>Create Host Group</CardTitle>
