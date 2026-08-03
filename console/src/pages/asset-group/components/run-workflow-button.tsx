@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAssetGroupControllerRunGroupWorkflowScheduler } from '@/services/apis/gen/queries';
 import type { AxiosError } from 'axios';
-import { ArrowRight } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface RunAssetGroupWorkflowButtonProps {
@@ -39,9 +39,13 @@ const RunWorkflowButton = ({
       description={`Are you sure you want to run workflow?`}
       onConfirm={handleRun}
       trigger={
-        <Button disabled={disabled} variant="outline">
+        <Button
+          disabled={disabled}
+          variant="outline"
+          className="border-green-500/60 text-green-500 hover:bg-green-500/10 hover:text-green-600"
+        >
+          <Play className="h-4 w-4" />
           Run
-          <ArrowRight className="h-4 w-4" />
         </Button>
       }
     />

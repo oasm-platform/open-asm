@@ -78,7 +78,7 @@ describe('CronScheduleBuilder', () => {
   });
 
   it('parses an existing cron value into the form', () => {
-    renderBuilder({ value: '30 1 * * 1' });
+    renderBuilder({ defaultValue: '30 1 * * 1' });
     // 01:30 UTC +07 -> 08:30 local; weekly with Monday selected
     expect(screen.getByRole('button', { name: 'Mon' })).toHaveAttribute('aria-pressed', 'true');
   });

@@ -2542,20 +2542,9 @@ export type GetManyAssetDto = {
   pageCount: number;
 };
 
-export type UpdateAssetGroupWorkflowDtoSchedule =
-  (typeof UpdateAssetGroupWorkflowDtoSchedule)[keyof typeof UpdateAssetGroupWorkflowDtoSchedule];
-
-export const UpdateAssetGroupWorkflowDtoSchedule = {
-  disabled: 'disabled',
-  '0_0_*_*_*': '0 0 * * *',
-  '0_0_*/3_*_*': '0 0 */3 * *',
-  '0_0_*_*_0': '0 0 * * 0',
-  '0_0_*/14_*_*': '0 0 */14 * *',
-  '0_0_1_*_*': '0 0 1 * *',
-} as const;
-
 export type UpdateAssetGroupWorkflowDto = {
-  schedule: UpdateAssetGroupWorkflowDtoSchedule;
+  /** 5-field cron expression (UTC) or "disabled" to turn scheduling off */
+  schedule: string;
 };
 
 export type GetManyInternalNetworksResponseDtoDataItem = {

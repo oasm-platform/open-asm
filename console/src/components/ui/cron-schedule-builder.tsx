@@ -1,4 +1,5 @@
-import { Clock } from 'lucide-react';
+import { CalendarClockIcon, Clock } from 'lucide-react';
+import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { buttonVariants } from '@/components/ui/button-variants';
@@ -15,7 +16,6 @@ import {
   DEFAULT_CRON_STATE,
   buildCronExpression,
   formatCronLabel,
-  formatNextRun,
   getLocalTimezone,
   getNextRun,
   getTimezoneLabel,
@@ -31,8 +31,8 @@ export interface CronScheduleChange {
 }
 
 export interface CronScheduleBuilderProps {
-  /** Existing cron expression (UTC) to edit. */
-  value?: string;
+  /** Existing cron expression (UTC) to prefill the form. */
+  defaultValue?: string;
   /** IANA timezone used to convert the local schedule into UTC. */
   timezone?: string;
   onChange: (change: CronScheduleChange) => void;
@@ -91,22 +91,22 @@ const TZ_OPTIONS = [
 ];
 
 export function CronScheduleBuilder({
-  value,
+  defaultValue,
   timezone: timezoneProp = getLocalTimezone(),
   onChange,
   onTimezoneChange,
   disabled,
 }: CronScheduleBuilderProps) {
   const initial = useMemo(() => {
-    // `value` is only consumed on mount; the Card `key` below remounts this
-    // component whenever the parent changes value/timezone.
-    const parsed = parseCronExpression(value);
+    // `defaultValue` is only consumed on mount; the Card `key` below remounts
+    // this component whenever the parent changes defaultValue/timezone.
+    const parsed = parseCronExpression(defaultValue);
     return parsed ?? { ...DEFAULT_CRON_STATE };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Re-mount when the parent changes the source value/timezone so the
+  // Re-mount when the parent changes the source defaultValue/timezone so the
   // controlled form state is rebuilt from the new input.
-  const remountKey = `${value ?? ''}|${timezoneProp}`;
+  const remountKey = `${defaultValue ?? ''}|${timezoneProp}`;
   const lastEmitted = useRef<string | null>(null);
 
   // Default to the device timezone and make sure it (and any explicit
@@ -245,7 +245,7 @@ export function CronScheduleBuilder({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[7.5rem_7.5rem_1fr]">
+        <div className="grid w-fit grid-cols-2 gap-3">
           <Select
             disabled={disabled}
             value={String(hour)}
@@ -293,7 +293,7 @@ export function CronScheduleBuilder({
             <SelectTrigger
               id="cron-timezone"
               aria-label="Timezone"
-              className="w-full"
+              className="col-span-2 w-full"
             >
               <SelectValue />
             </SelectTrigger>
@@ -307,20 +307,32 @@ export function CronScheduleBuilder({
           </Select>
         </div>
 
-        <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
-          <Clock className="size-4" />
-          <span className="text-foreground">{cronLabel ?? cron}</span>
-        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
+              <Clock className="size-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Schedule</p>
+              <p className="text-sm font-medium text-foreground">
+                {cronLabel ?? cron}
+              </p>
+            </div>
+          </div>
 
-        <div className="text-muted-foreground text-sm">
-          {nextRun ? (
-            <span>
-              Next run:{' '}
-              <span className="text-foreground">{formatNextRun(nextRun, tz)}</span>
-            </span>
-          ) : (
-            <span>Schedule not available</span>
-          )}
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
+              <CalendarClockIcon className="size-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Next run</p>
+              <p className="text-sm font-medium text-foreground tabular-nums">
+                {nextRun
+                  ? dayjs(nextRun).format('DD/MM/YYYY HH:mm')
+                  : 'Schedule not available'}
+              </p>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

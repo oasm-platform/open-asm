@@ -829,7 +829,7 @@ export class AssetGroupService {
   async updateAssetGroupWorkflow(
     assetGroupWorkflowId: string,
     updateData: Partial<{
-      schedule?: CronSchedule;
+      schedule?: string;
       jobId?: string;
     }>,
   ): Promise<AssetGroupWorkflow> {
@@ -848,7 +848,7 @@ export class AssetGroupService {
 
       // Update the relationship with provided data
       if (updateData.schedule !== undefined) {
-        assetGroupWorkspace.schedule = updateData.schedule;
+        assetGroupWorkspace.schedule = updateData.schedule as CronSchedule;
 
         await this.scanScheduleQueue.removeJobScheduler(
           assetGroupWorkspace.jobId,

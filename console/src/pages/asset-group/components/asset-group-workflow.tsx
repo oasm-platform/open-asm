@@ -1,15 +1,30 @@
-import { ScanScheduleSelect } from '@/components/scan-schedule-select';
-import { Image } from '@/components/ui/image';
+import { Button } from '@/components/ui/button';
 import {
-  getLocalTimezone,
-  getNextRun,
-} from '@/lib/cron-schedule';
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  CronScheduleBuilder,
+  type CronScheduleChange,
+} from '@/components/ui/cron-schedule-builder';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Image } from '@/components/ui/image';
+import { getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
 import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
   OnSchedule,
   ToolCategory,
   ToolsControllerGetManyToolsType,
-  UpdateTargetDtoScanSchedule,
   type AssetGroupWorkflow as AssetGroupWorkflowRelation,
   useAssetGroupControllerAddManyWorkflows,
   useAssetGroupControllerRemoveManyWorkflows,
@@ -19,7 +34,13 @@ import {
   useWorkflowsControllerDeleteWorkflow,
   useWorkflowsControllerUpdateWorkflow,
 } from '@/services/apis/gen/queries';
-import { CalendarClockIcon, HistoryIcon, MoveUpRight, Plus } from 'lucide-react';
+import {
+  CalendarClockIcon,
+  HistoryIcon,
+  MoveUpRight,
+  Plus,
+  Settings,
+} from 'lucide-react';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
@@ -38,6 +59,9 @@ export default function AssetGroupWorkflow({
     useToolsControllerGetInstalledTools();
   const [hoveredToolId, setHoveredToolId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSetScheduleOpen, setIsSetScheduleOpen] = useState(false);
+  const [draftSchedule, setDraftSchedule] =
+    useState<CronScheduleChange | null>(null);
   const {
     mutate: updateAssetGroupWorkflow,
     isPending: isPendingUpdateSchedule,
@@ -93,7 +117,7 @@ export default function AssetGroupWorkflow({
     ? dayjs(lastRun.createdAt).format('DD/MM/YYYY HH:mm')
     : 'Never';
   const nextRun =
-    currentSchedule && currentSchedule !== UpdateTargetDtoScanSchedule.disabled
+    currentSchedule && currentSchedule !== 'disabled'
       ? getNextRun(currentSchedule, timezone)
       : null;
   const nextRunText = nextRun
@@ -246,109 +270,180 @@ export default function AssetGroupWorkflow({
     }
   };
 
+  // Save a custom cron schedule from the dialog, same API as the dropdown
+  const handleSaveCustomSchedule = () => {
+    const workflowId = workflows[0]?.id;
+    if (!workflowId || !draftSchedule?.cron) return;
+
+    updateAssetGroupWorkflow(
+      { id: workflowId, data: { schedule: draftSchedule.cron } },
+      {
+        onSuccess: async () => {
+          await onRefetch();
+          toast.success('Update schedule successfuly');
+          setIsSetScheduleOpen(false);
+        },
+      },
+    );
+  };
+
   return (
     <div className="space-y-4 mb-4">
-      <div className="space-y-2">
-        <h2 className="text-xl font-semibold">Schedule</h2>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <div className="text-sm text-muted-foreground space-y-1">
-            <div className="flex items-center gap-1.5">
-              <HistoryIcon className="size-4" />
-              <span>
-                Last run:{' '}
-                <span className="text-foreground">{lastRunText}</span>
-              </span>
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>Schedule</CardTitle>
+            <CardDescription>
+              Configure the scan frequency and run the workflow on demand.
+            </CardDescription>
+          </div>
+          <RunWorkflowButton id={getCurrentWorkflow()?.id} />
+        </CardHeader>
+        <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
+                <HistoryIcon className="size-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Last run</p>
+                <p className="text-sm font-medium text-foreground tabular-nums">
+                  {lastRunText}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <CalendarClockIcon className="size-4" />
-              <span>
-                Next run:{' '}
-                <span className="text-foreground">{nextRunText}</span>
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
+                <CalendarClockIcon className="size-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Next run</p>
+                <p className="text-sm font-medium text-foreground tabular-nums">
+                  {nextRunText}
+                </p>
+              </div>
             </div>
           </div>
           <div className="flex gap-2">
-            <ScanScheduleSelect
+            <Button
+              type="button"
+              variant="outline"
               disabled={isPendingUpdateSchedule || !workflows[0]?.id}
-              value={workflows[0]?.schedule as UpdateTargetDtoScanSchedule}
-              onChange={(value: UpdateTargetDtoScanSchedule) => {
-                const workflowId = workflows[0]?.id;
-                if (!workflowId) return;
-                updateAssetGroupWorkflow(
-                  { id: workflowId, data: { schedule: value } },
-                  {
-                    onSuccess: async () => {
-                      await onRefetch();
-                      toast.success('Update schedule successfuly');
-                    },
-                  },
-                );
-              }}
-            />
-            <RunWorkflowButton id={getCurrentWorkflow()?.id} />
-          </div>
-        </div>
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-xl font-semibold">Tools</h2>
-        <div className="flex flex-col md:flex-row justify-start md:justify-between md:items-center gap-2">
-          <div className="flex gap-4">
-          {toolProviders.length === 0 && (
-            <Link
-              className="text-blue-500 italic flex items-center gap-1 hover:underline"
-              to="/tools"
+              onClick={() => setIsSetScheduleOpen(true)}
             >
-              Open Marketplace <MoveUpRight className="w-4 h-4" />
-            </Link>
-          )}
-          {toolProviders.map((tool) => {
-            const isAdded = isToolInGroup(tool.name);
-            const isHovered = hoveredToolId === tool.id;
-            return (
-              <div
-                key={tool.id}
-                className={`relative space-y-2 ${
-                  isAdded
-                    ? isProcessing
-                      ? 'cursor-wait'
-                      : 'cursor-pointer'
-                    : 'cursor-pointer'
-                }`}
-                onClick={() => !isProcessing && handleToolClick(tool)}
-                onMouseEnter={() => setHoveredToolId(tool.id)}
-                onMouseLeave={() => setHoveredToolId(null)}
-              >
-                <div
-                  className={`transition-all duration-300 ${
-                    isAdded ? '' : 'grayscale opacity-60'
-                  }`}
+              <Settings className="size-4" />
+              Config
+            </Button>
+          </div>
+          <Dialog open={isSetScheduleOpen} onOpenChange={setIsSetScheduleOpen}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Set custom schedule</DialogTitle>
+                <DialogDescription>
+                  Configure a custom cron expression for this workflow.
+                </DialogDescription>
+              </DialogHeader>
+              <CronScheduleBuilder
+                defaultValue={
+                  currentSchedule && currentSchedule !== 'disabled'
+                    ? currentSchedule
+                    : undefined
+                }
+                onChange={setDraftSchedule}
+              />
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  disabled={isPendingUpdateSchedule}
+                  onClick={() => setIsSetScheduleOpen(false)}
                 >
-                  <Image
-                    url={tool.logoUrl}
-                    width={64}
-                    height={64}
-                    className="rounded-full"
-                  />
-                </div>
-                {/* Show + icon on hover for unassigned tools */}
-                {!isAdded && isHovered && (
-                  <div className="absolute top-0 left-0 w-16 h-16 rounded-full bg-black/60 flex items-center justify-center">
-                    <Plus size={32} color="white" />
+                  Cancel
+                </Button>
+                <Button
+                  disabled={
+                    isPendingUpdateSchedule ||
+                    !workflows[0]?.id ||
+                    !draftSchedule?.cron
+                  }
+                  onClick={handleSaveCustomSchedule}
+                >
+                  Save
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Tools</CardTitle>
+          <CardDescription>
+            Scanning tools assigned to this group. Click a tool to add or
+            remove it.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {toolProviders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                No scanning tools installed yet
+              </p>
+              <Link
+                className="text-blue-500 italic flex items-center gap-1 hover:underline"
+                to="/tools"
+              >
+                Open Marketplace <MoveUpRight className="w-4 h-4" />
+              </Link>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-6">
+              {toolProviders.map((tool) => {
+                const isAdded = isToolInGroup(tool.name);
+                const isHovered = hoveredToolId === tool.id;
+                return (
+                  <div
+                    key={tool.id}
+                    className={`relative flex flex-col items-center gap-2 ${
+                      isProcessing ? 'cursor-wait' : 'cursor-pointer'
+                    }`}
+                    onClick={() => !isProcessing && handleToolClick(tool)}
+                    onMouseEnter={() => setHoveredToolId(tool.id)}
+                    onMouseLeave={() => setHoveredToolId(null)}
+                  >
+                    <div
+                      className={`transition-all duration-300 ${
+                        isAdded ? '' : 'grayscale opacity-60 hover:grayscale-0 hover:opacity-100'
+                      }`}
+                    >
+                      <Image
+                        url={tool.logoUrl}
+                        width={64}
+                        height={64}
+                        className="rounded-full"
+                      />
+                    </div>
+                    {/* Show + icon on hover for unassigned tools */}
+                    {!isAdded && isHovered && (
+                      <div className="absolute top-0 left-0 w-16 h-16 rounded-full bg-black/60 flex items-center justify-center">
+                        <Plus size={32} color="white" />
+                      </div>
+                    )}
+                    {/* Show indication for assigned tools */}
+                    {isAdded && (
+                      <div className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-xs font-bold text-white">
+                        ✓
+                      </div>
+                    )}
+                    <div className="text-xs font-medium text-center capitalize">
+                      {tool.name}
+                    </div>
                   </div>
-                )}
-                {/* Show indication for assigned tools */}
-                {isAdded && (
-                  <div className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-xs font-bold text-white">
-                    ✓
-                  </div>
-                )}
-                <div className="text-center capitalize">{tool.name}</div>
-              </div>
-            );
-          })}
-        </div>
-        </div>
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
