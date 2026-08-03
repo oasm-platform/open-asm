@@ -271,6 +271,23 @@ export default function AssetGroupWorkflow({
     }
   };
 
+  // Disable the workflow schedule by submitting the "disabled" value
+  const handleDisableSchedule = () => {
+    const workflowId = workflows[0]?.id;
+    if (!workflowId) return;
+
+    updateAssetGroupWorkflow(
+      { id: workflowId, data: { schedule: 'disabled' } },
+      {
+        onSuccess: async () => {
+          await onRefetch();
+          toast.success('Workflow schedule disabled');
+          setIsSetScheduleOpen(false);
+        },
+      },
+    );
+  };
+
   // Save a custom cron schedule from the dialog, same API as the dropdown
   const handleSaveCustomSchedule = () => {
     const workflowId = workflows[0]?.id;
@@ -359,6 +376,18 @@ export default function AssetGroupWorkflow({
               <DialogFooter>
                 <Button
                   variant="outline"
+                  className="sm:mr-auto"
+                  disabled={
+                    isPendingUpdateSchedule ||
+                    !workflows[0]?.id ||
+                    currentSchedule === 'disabled'
+                  }
+                  onClick={handleDisableSchedule}
+                >
+                  Disable
+                </Button>
+                <Button
+                  variant="outline"
                   disabled={isPendingUpdateSchedule}
                   onClick={() => setIsSetScheduleOpen(false)}
                 >
@@ -372,7 +401,7 @@ export default function AssetGroupWorkflow({
                   }
                   onClick={handleSaveCustomSchedule}
                 >
-                  Save
+                  Set
                 </Button>
               </DialogFooter>
             </DialogContent>

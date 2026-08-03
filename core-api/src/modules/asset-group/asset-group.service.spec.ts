@@ -45,6 +45,7 @@ describe('AssetGroupService', () => {
       [data: Record<string, unknown>]
     >(),
     save: jest.fn(),
+    remove: jest.fn(),
   };
 
   const mockAssetGroupWorkflowRepo = {
@@ -70,6 +71,7 @@ describe('AssetGroupService', () => {
       [data: Record<string, unknown>]
     >(),
     save: jest.fn(),
+    delete: jest.fn(),
   };
 
   const mockScanScheduleQueue = {
@@ -519,6 +521,68 @@ describe('AssetGroupService', () => {
       await expect(
         service.getAssetGroupById(groupId, workspaceId),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('delete', () => {
+    const groupId = 'group-1';
+
+    it('should cancel the schedulers and delete the group workflows so their job histories and jobs cascade', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'Web Servers',
+        assetGroupAssets: [{ id: 'aga-1' }],
+        assetGroupWorkflows: [
+          { id: 'agw-1', jobId: 'repeat-key-1', workflow: { id: 'wf-1' } },
+          { id: 'agw-2', jobId: 'repeat-key-2', workflow: { id: 'wf-2' } },
+        ],
+      });
+      mockAssetGroupRepo.remove.mockResolvedValue(undefined);
+      mockAssetGroupAssetRepo.remove.mockResolvedValue(undefined);
+      mockWorkflowRepo.delete.mockResolvedValue(undefined);
+
+      const result = await service.delete(groupId);
+
+      expect(mockScanScheduleQueue.removeJobScheduler).toHaveBeenCalledTimes(2);
+      expect(mockScanScheduleQueue.removeJobScheduler).toHaveBeenCalledWith(
+        'repeat-key-1',
+      );
+      expect(mockScanScheduleQueue.removeJobScheduler).toHaveBeenCalledWith(
+        'repeat-key-2',
+      );
+      expect(mockWorkflowRepo.delete).toHaveBeenCalledWith(['wf-1', 'wf-2']);
+      expect(mockAssetGroupAssetRepo.remove).toHaveBeenCalledWith([
+        { id: 'aga-1' },
+      ]);
+      expect(mockAssetGroupRepo.remove).toHaveBeenCalledWith(
+        expect.objectContaining({ id: groupId }),
+      );
+      expect(result.message).toContain(groupId);
+    });
+
+    it('should not touch schedulers or workflows when the group has no workflows', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue({
+        id: groupId,
+        assetGroupAssets: [],
+        assetGroupWorkflows: [],
+      });
+      mockAssetGroupRepo.remove.mockResolvedValue(undefined);
+
+      const result = await service.delete(groupId);
+
+      expect(mockScanScheduleQueue.removeJobScheduler).not.toHaveBeenCalled();
+      expect(mockWorkflowRepo.delete).not.toHaveBeenCalled();
+      expect(mockAssetGroupRepo.remove).toHaveBeenCalledTimes(1);
+      expect(result.message).toContain(groupId);
+    });
+
+    it('should throw NotFoundException when the group does not exist', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue(undefined);
+
+      await expect(service.delete(groupId)).rejects.toThrow(NotFoundException);
+      expect(mockScanScheduleQueue.removeJobScheduler).not.toHaveBeenCalled();
+      expect(mockWorkflowRepo.delete).not.toHaveBeenCalled();
+      expect(mockAssetGroupRepo.remove).not.toHaveBeenCalled();
     });
   });
 });

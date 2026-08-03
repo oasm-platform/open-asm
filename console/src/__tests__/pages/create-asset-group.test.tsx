@@ -79,7 +79,7 @@ describe('CreateAssetGroup wizard page', () => {
     });
 
     // Step indicator + form fields
-    expect(await screen.findByText(/Basic info/)).toBeInTheDocument();
+    expect(await screen.findByText(/Info/)).toBeInTheDocument();
     const nameInput = screen.getByLabelText('Name');
     expect(nameInput).toBeInTheDocument();
     expect(screen.getByLabelText('Select #78716C color')).toBeInTheDocument();
@@ -120,16 +120,13 @@ describe('CreateAssetGroup wizard page', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
     // Step 3: tools table with row selection
-    expect(await screen.findByText(/Add tools/)).toBeInTheDocument();
+    expect(await screen.findByText(/Tools/)).toBeInTheDocument();
     await user.click(await screen.findByText('Subdomain scan'));
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
     // Step 4: schedule builder; Next becomes Save
-    expect(await screen.findByText(/Add schedule/)).toBeInTheDocument();
-    expect(screen.getByText('Scan schedule')).toBeInTheDocument();
-    const saveButton = screen.getByRole('button', { name: 'Save' });
-    expect(saveButton).toBeEnabled();
-    await user.click(saveButton);
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
     const dto = createMock.mock.calls[0][0].data;

@@ -673,28 +673,38 @@ export class AssetGroupService {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id },
-        relations: ['assetGroupAssets', 'assetGroupWorkflows'],
+        relations: { assetGroupWorkflows: { workflow: true } },
       });
 
       if (!assetGroup) {
         throw new NotFoundException(`Asset group with ID "${id}" not found`);
       }
 
-      // Delete all related associations first
+      // Cancel the BullMQ repeat schedulers so no new runs are queued
+      // for the group's workflows while the group is being deleted.
+      const groupWorkflows = assetGroup.assetGroupWorkflows ?? [];
+      await Promise.all(
+        groupWorkflows.map((agw) =>
+          this.scanScheduleQueue.removeJobScheduler(agw.jobId),
+        ),
+      );
+
+      // Delete the group's workflows. The DB-level FK cascades remove the
+      // asset_group_workflows join rows and every job history + job that
+      // was created for this group (job_histories -> jobs -> job_error_log).
+      const workflowIds = groupWorkflows
+        .map((agw) => agw.workflow?.id)
+        .filter((workflowId): workflowId is string => Boolean(workflowId));
+      if (workflowIds.length > 0) {
+        await this.workflowRepo.delete(workflowIds);
+      }
+
+      // Delete all related asset associations
       if (
         assetGroup.assetGroupAssets &&
         assetGroup.assetGroupAssets.length > 0
       ) {
         await this.assetGroupAssetRepo.remove(assetGroup.assetGroupAssets);
-      }
-
-      if (
-        assetGroup.assetGroupWorkflows &&
-        assetGroup.assetGroupWorkflows.length > 0
-      ) {
-        await this.assetGroupWorkflowRepo.remove(
-          assetGroup.assetGroupWorkflows,
-        );
       }
 
       // Delete the asset group itself

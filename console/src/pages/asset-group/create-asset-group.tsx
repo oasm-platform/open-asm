@@ -183,9 +183,9 @@ export function CreateAssetGroup() {
 
   return (
     <Page>
-      <div className="h-full overflow-y-auto px-4 sm:px-0">
-        <Card className="mx-auto w-full max-w-4xl">
-          <CardHeader>
+      <div className="h-full overflow-y-auto">
+        <Card className="mx-auto w-full max-w-4xl max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent">
+          <CardHeader className="max-sm:px-0">
             <CardTitle>Automation group</CardTitle>
             <CardDescription>
               Runs automated security scans. Add your
@@ -193,7 +193,7 @@ export function CreateAssetGroup() {
               scans run on their own, with no manual kick-off.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-8">
+          <CardContent className="flex max-sm:px-0 flex-col gap-8">
             {/* Step indicator */}
             <Stepper
               value={step + 1}
