@@ -23,8 +23,8 @@ const RunWorkflowButton = ({
           id,
         },
         {
-          onSuccess: (response) => {
-            toast(response.message);
+          onSuccess: () => {
+            toast('Run manual success');
             onSuccess?.();
           },
           onError: (e) => {

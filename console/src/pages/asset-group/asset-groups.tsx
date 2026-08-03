@@ -94,7 +94,7 @@ export function AssetGroups() {
         sortOrder={sortOrder}
         isShowBorder={true}
         onRowClick={(row) => navigate({ to: '/groups/' + row.id })}
-        emptyMessage="No host groups found"
+        emptyMessage="No groups found"
         filterColumnKey="name"
         filterValue={filter}
         onFilterChange={setFilter}

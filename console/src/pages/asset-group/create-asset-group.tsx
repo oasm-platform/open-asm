@@ -49,7 +49,7 @@ import { useState } from 'react';
 
 const STEPS = [
   { title: 'Info', icon: <FileTextIcon className="size-4" /> },
-  { title: 'Add hosts', icon: <ServerIcon className="size-4" /> },
+  { title: 'Hosts', icon: <ServerIcon className="size-4" /> },
   { title: 'Tools', icon: <WrenchIcon className="size-4" /> },
   { title: 'Schedule', icon: <CalendarClockIcon className="size-4" /> },
 ];
@@ -85,7 +85,7 @@ export function CreateAssetGroup() {
     tableHandlers: { setPage, setPageSize, setParams, setFilter },
   } = useServerDataTable({
     isUpdateSearchQueryParam: false,
-    defaultPageSize: 10,
+    defaultPageSize: 5,
     defaultSortBy: 'host',
     defaultSortOrder: 'ASC',
   });
@@ -95,7 +95,9 @@ export function CreateAssetGroup() {
     { query: { queryKey: ['create-group-hosts', page, pageSize, sortBy, sortOrder, filter] } },
   );
 
-  const toolsQuery = useToolsControllerGetInstalledTools();
+  const toolsQuery = useToolsControllerGetInstalledTools({
+    category: 'vulnerabilities',
+  });
 
   const { mutate: createAssetGroup, isPending } = useAssetGroupControllerCreate();
 
@@ -103,9 +105,11 @@ export function CreateAssetGroup() {
   const canNext =
     step === 0
       ? name.trim().length > 0
-      : step === 3
-        ? Boolean(schedule)
-        : true;
+      : step === 2
+        ? toolIds.size > 0
+        : step === 3
+          ? Boolean(schedule)
+          : true;
 
   const handleNext = () => {
     if (!isLastStep) {
@@ -178,7 +182,7 @@ export function CreateAssetGroup() {
       enableHiding: false,
     },
     { accessorKey: 'host', header: 'Host' },
-    { accessorKey: 'assetCount', header: 'Assets' },
+    { accessorKey: 'assetCount', header: 'Services' },
   ];
 
   return (

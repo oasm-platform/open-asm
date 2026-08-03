@@ -23,6 +23,7 @@ import { Image } from '@/components/ui/image';
 import { getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
 import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
+  AssetGroupLastRunDtoStatus,
   OnSchedule,
   ToolCategory,
   ToolsControllerGetManyToolsType,
@@ -307,7 +308,7 @@ export default function AssetGroupWorkflow({
 
   return (
     <div className="space-y-4 mb-4">
-      <Card>
+      <Card className="pt-2 md:pt-6">
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
             <CardTitle>Schedule</CardTitle>
@@ -315,7 +316,18 @@ export default function AssetGroupWorkflow({
               Configure the scan frequency and run the workflow on demand.
             </CardDescription>
           </div>
-          {lastRun && <JobStatusBadge status={lastRun.status} />}
+          <div className="flex items-center gap-2">
+            {lastRun && <JobStatusBadge status={lastRun.status} />}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPendingUpdateSchedule || !workflows[0]?.id}
+              onClick={() => setIsSetScheduleOpen(true)}
+            >
+              <Settings className="size-4" />
+              <span className="hidden sm:inline">Config</span>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex flex-col gap-3">
@@ -345,17 +357,6 @@ export default function AssetGroupWorkflow({
                 </div>
               </div>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPendingUpdateSchedule || !workflows[0]?.id}
-              onClick={() => setIsSetScheduleOpen(true)}
-            >
-              <Settings className="size-4" />
-              Config
-            </Button>
           </div>
           <Dialog open={isSetScheduleOpen} onOpenChange={setIsSetScheduleOpen}>
             <DialogContent className="sm:max-w-lg">
@@ -408,7 +409,7 @@ export default function AssetGroupWorkflow({
           </Dialog>
         </CardContent>
       </Card>
-      <Card>
+      <Card className="pt-2 md:pt-6">
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
             <CardTitle>Tools</CardTitle>
@@ -419,6 +420,12 @@ export default function AssetGroupWorkflow({
           </div>
           <RunWorkflowButton
             id={getCurrentWorkflow()?.id}
+            disabled={
+              lastRun?.status ===
+                AssetGroupLastRunDtoStatus.pending ||
+              lastRun?.status ===
+                AssetGroupLastRunDtoStatus.in_progress
+            }
             onSuccess={onRefetch}
           />
         </CardHeader>
