@@ -585,4 +585,23 @@ describe('AssetGroupService', () => {
       expect(mockAssetGroupRepo.remove).not.toHaveBeenCalled();
     });
   });
+
+  describe('removeGroupWorkflowScheduler', () => {
+    it('should remove the BullMQ scheduler for the given repeat key', async () => {
+      mockScanScheduleQueue.removeJobScheduler.mockResolvedValue(undefined);
+
+      await service.removeGroupWorkflowScheduler('repeat:agw-1:1');
+
+      expect(mockScanScheduleQueue.removeJobScheduler).toHaveBeenCalledWith(
+        'repeat:agw-1:1',
+      );
+    });
+
+    it('should do nothing when no repeat key is provided', async () => {
+      await service.removeGroupWorkflowScheduler(undefined);
+      await service.removeGroupWorkflowScheduler(null);
+
+      expect(mockScanScheduleQueue.removeJobScheduler).not.toHaveBeenCalled();
+    });
+  });
 });

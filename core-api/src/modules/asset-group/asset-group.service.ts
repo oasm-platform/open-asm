@@ -970,6 +970,20 @@ export class AssetGroupService {
   }
 
   /**
+   * Removes the BullMQ repeat scheduler for an asset group workflow whose
+   * group/workflow no longer resolves in the DB (orphaned schedule).
+   * Used by the schedule consumer so stale jobs stop being queued.
+   */
+  async removeGroupWorkflowScheduler(
+    repeatJobKey: string | null | undefined,
+  ): Promise<void> {
+    if (!repeatJobKey) {
+      return;
+    }
+    await this.scanScheduleQueue.removeJobScheduler(repeatJobKey);
+  }
+
+  /**
    * Updates an existing asset group
    */
   async updateAssetGroupById(
