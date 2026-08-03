@@ -1,5 +1,9 @@
 import { ScanScheduleSelect } from '@/components/scan-schedule-select';
 import { Image } from '@/components/ui/image';
+import {
+  getLocalTimezone,
+  getNextRun,
+} from '@/lib/cron-schedule';
 import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
   OnSchedule,
@@ -15,7 +19,8 @@ import {
   useWorkflowsControllerDeleteWorkflow,
   useWorkflowsControllerUpdateWorkflow,
 } from '@/services/apis/gen/queries';
-import { MoveUpRight, Plus } from 'lucide-react';
+import { CalendarClockIcon, HistoryIcon, MoveUpRight, Plus } from 'lucide-react';
+import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
@@ -34,7 +39,7 @@ export default function AssetGroupWorkflow({
   const [hoveredToolId, setHoveredToolId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const {
-    mutate: updateAssetGroupWorkflowMutation,
+    mutate: updateAssetGroupWorkflow,
     isPending: isPendingUpdateSchedule,
   } = useAssetGroupControllerUpdateAssetGroupWorkflow();
   // Create/update/delete workflow mutation
@@ -80,6 +85,20 @@ export default function AssetGroupWorkflow({
   const getCurrentWorkflow = () => {
     return workflows[0];
   };
+
+  const timezone = getLocalTimezone();
+  const currentSchedule = getCurrentWorkflow()?.schedule;
+  const lastRun = getCurrentWorkflow()?.lastRun;
+  const lastRunText = lastRun
+    ? dayjs(lastRun.createdAt).format('DD/MM/YYYY HH:mm')
+    : 'Never';
+  const nextRun =
+    currentSchedule && currentSchedule !== UpdateTargetDtoScanSchedule.disabled
+      ? getNextRun(currentSchedule, timezone)
+      : null;
+  const nextRunText = nextRun
+    ? dayjs(nextRun).format('DD/MM/YYYY HH:mm')
+    : 'Disabled';
 
   // Handle tool click - add if not exists, remove if exists
   const handleToolClick = async (tool: { name: string; id: string }) => {
@@ -229,18 +248,58 @@ export default function AssetGroupWorkflow({
 
   return (
     <div className="space-y-4 mb-4">
-      <h2 className="text-xl font-semibold">Tools</h2>
-      <div className="flex-col md:flex-row flex justify-start md:justify-between md:items-center gap-2">
-        <div className="flex gap-4">
-          {toolProviders.length === 0 && (
-            <div>
-              <Link
-                className="text-blue-500 italic flex items-center gap-1 hover:underline"
-                to={'/tools'}
-              >
-                Open Marketplace <MoveUpRight className="w-4 h-4" />
-              </Link>
+      <div className="space-y-2">
+        <h2 className="text-xl font-semibold">Schedule</h2>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div className="flex items-center gap-1.5">
+              <HistoryIcon className="size-4" />
+              <span>
+                Last run:{' '}
+                <span className="text-foreground">{lastRunText}</span>
+              </span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <CalendarClockIcon className="size-4" />
+              <span>
+                Next run:{' '}
+                <span className="text-foreground">{nextRunText}</span>
+              </span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <ScanScheduleSelect
+              disabled={isPendingUpdateSchedule || !workflows[0]?.id}
+              value={workflows[0]?.schedule as UpdateTargetDtoScanSchedule}
+              onChange={(value: UpdateTargetDtoScanSchedule) => {
+                const workflowId = workflows[0]?.id;
+                if (!workflowId) return;
+                updateAssetGroupWorkflow(
+                  { id: workflowId, data: { schedule: value } },
+                  {
+                    onSuccess: async () => {
+                      await onRefetch();
+                      toast.success('Update schedule successfuly');
+                    },
+                  },
+                );
+              }}
+            />
+            <RunWorkflowButton id={getCurrentWorkflow()?.id} />
+          </div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-xl font-semibold">Tools</h2>
+        <div className="flex flex-col md:flex-row justify-start md:justify-between md:items-center gap-2">
+          <div className="flex gap-4">
+          {toolProviders.length === 0 && (
+            <Link
+              className="text-blue-500 italic flex items-center gap-1 hover:underline"
+              to="/tools"
+            >
+              Open Marketplace <MoveUpRight className="w-4 h-4" />
+            </Link>
           )}
           {toolProviders.map((tool) => {
             const isAdded = isToolInGroup(tool.name);
@@ -248,25 +307,21 @@ export default function AssetGroupWorkflow({
             return (
               <div
                 key={tool.id}
-                style={{
-                  position: 'relative',
-                  cursor: isAdded
+                className={`relative space-y-2 ${
+                  isAdded
                     ? isProcessing
-                      ? 'wait'
-                      : 'pointer'
-                    : 'pointer',
-                }}
-                className="space-y-2"
+                      ? 'cursor-wait'
+                      : 'cursor-pointer'
+                    : 'cursor-pointer'
+                }`}
                 onClick={() => !isProcessing && handleToolClick(tool)}
                 onMouseEnter={() => setHoveredToolId(tool.id)}
                 onMouseLeave={() => setHoveredToolId(null)}
               >
                 <div
-                  style={{
-                    filter: isAdded ? 'none' : 'grayscale(100%)',
-                    opacity: isAdded ? 1 : 0.6,
-                    transition: 'all 0.3s ease',
-                  }}
+                  className={`transition-all duration-300 ${
+                    isAdded ? '' : 'grayscale opacity-60'
+                  }`}
                 >
                   <Image
                     url={tool.logoUrl}
@@ -277,44 +332,13 @@ export default function AssetGroupWorkflow({
                 </div>
                 {/* Show + icon on hover for unassigned tools */}
                 {!isAdded && isHovered && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '50%',
-                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
+                  <div className="absolute top-0 left-0 w-16 h-16 rounded-full bg-black/60 flex items-center justify-center">
                     <Plus size={32} color="white" />
                   </div>
                 )}
                 {/* Show indication for assigned tools */}
                 {isAdded && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '2px',
-                      right: '2px',
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: '#10b981',
-                      border: '2px solid white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      color: 'white',
-                    }}
-                  >
+                  <div className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-xs font-bold text-white">
                     ✓
                   </div>
                 )}
@@ -323,30 +347,6 @@ export default function AssetGroupWorkflow({
             );
           })}
         </div>
-        <div className="flex gap-2 justify-between">
-          <ScanScheduleSelect
-            disabled={isPendingUpdateSchedule || !workflows[0]?.id}
-            value={workflows[0]?.schedule as UpdateTargetDtoScanSchedule}
-            onChange={(value: UpdateTargetDtoScanSchedule) => {
-              const workflowId = workflows[0]?.id;
-              if (!workflowId) return;
-              updateAssetGroupWorkflowMutation(
-                {
-                  id: workflowId,
-                  data: {
-                    schedule: value,
-                  },
-                },
-                {
-                  onSuccess: async () => {
-                    await onRefetch();
-                    toast.success('Update schedule successfuly');
-                  },
-                },
-              );
-            }}
-          />
-          <RunWorkflowButton id={getCurrentWorkflow()?.id} />
         </div>
       </div>
     </div>

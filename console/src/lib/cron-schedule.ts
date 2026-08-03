@@ -134,11 +134,18 @@ export function parseCronExpression(
     daysOfWeek = days.map((d) => (d === 7 ? 0 : d));
   } else if (dom !== '*' && dow === '*') {
     frequency = 'monthly';
-    const days = dom.split(',').map((d) => Number(d.trim()));
-    if (
-      days.some((d) => !Number.isInteger(d) || d < 1 || d > 31)
-    ) {
-      return null;
+    let days: number[];
+    if (dom.startsWith('*/')) {
+      // Step expression like */3: expand to every Nth day of month.
+      const step = Number(dom.slice(2));
+      if (!Number.isInteger(step) || step < 1 || step > 31) return null;
+      days = [];
+      for (let d = 1; d <= 31; d += step) days.push(d);
+    } else {
+      days = dom.split(',').map((d) => Number(d.trim()));
+      if (days.some((d) => !Number.isInteger(d) || d < 1 || d > 31)) {
+        return null;
+      }
     }
     daysOfMonth = days;
   } else {

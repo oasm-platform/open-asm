@@ -5,6 +5,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum } from 'class-validator';
 import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { AssetGroup } from './asset-groups.entity';
+import { AssetGroupLastRunDto } from '../dto/asset-group-last-run.dto';
 
 @Entity('asset_group_workflows')
 @Index('IDX_agw_assetGroupId', ['assetGroup'])
@@ -31,4 +32,7 @@ export class AssetGroupWorkflow extends BaseEntity {
 
   @Column({ nullable: true })
   jobId: string;
+
+  @ApiProperty({ type: () => AssetGroupLastRunDto, required: false })
+  lastRun?: AssetGroupLastRunDto | null;
 }

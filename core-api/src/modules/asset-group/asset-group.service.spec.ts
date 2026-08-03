@@ -77,15 +77,16 @@ describe('AssetGroupService', () => {
     removeJobScheduler: jest.fn(),
   };
 
-  // Query builder chain mock for the latest job history lookup
-  const createMockJobHistoryBuilder = (rawRow: unknown) => {
+  // Query builder chain mock for the per-workflow latest job history lookup
+  const createMockJobHistoryBuilder = (rawRows: unknown) => {
     const builder = {
       leftJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
+      distinctOn: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      getRawOne: jest.fn().mockResolvedValue(rawRow),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue(rawRows),
     };
     return builder;
   };
@@ -369,6 +370,7 @@ describe('AssetGroupService', () => {
 
     const rawLastRun = {
       id: 'jh-1',
+      workflowId: 'wf-1',
       createdAt: new Date('2026-08-01T10:00:00Z'),
       updatedAt: new Date('2026-08-01T10:30:00Z'),
       totalJobs: '3',
@@ -378,9 +380,21 @@ describe('AssetGroupService', () => {
       jobRunType: 'MANUAL',
     };
 
+    const rawLastRun2 = {
+      id: 'jh-2',
+      workflowId: 'wf-2',
+      createdAt: new Date('2026-08-01T09:00:00Z'),
+      updatedAt: new Date('2026-08-01T09:15:00Z'),
+      totalJobs: '1',
+      status: 'FAILED',
+      workflowName: 'Group Workflow - group-2',
+      jobHistoryName: 'Group Workflow - group-2',
+      jobRunType: 'MANUAL',
+    };
+
     beforeEach(() => {
       mockJobHistoryRepo.createQueryBuilder.mockImplementation(() =>
-        createMockJobHistoryBuilder(rawLastRun),
+        createMockJobHistoryBuilder([rawLastRun]),
       );
     });
 
@@ -404,10 +418,13 @@ describe('AssetGroupService', () => {
         where: { id: groupId, workspace: { id: workspaceId } },
         relations: { assetGroupWorkflows: { workflow: true } },
       });
-      expect(result).toEqual(groupWithWorkflows);
+      expect(result.assetGroupWorkflows[0].workflow).toEqual({
+        id: 'wf-1',
+        name: 'Group Workflow - group-1',
+      });
     });
 
-    it('should attach the latest job history as lastRun', async () => {
+    it('should attach the latest job history as lastRun on each workflow', async () => {
       const groupWithWorkflows = {
         id: groupId,
         name: 'Web Servers',
@@ -426,7 +443,7 @@ describe('AssetGroupService', () => {
       expect(mockJobHistoryRepo.createQueryBuilder).toHaveBeenCalledWith(
         'jobHistory',
       );
-      expect(result.lastRun).toEqual({
+      expect(result.assetGroupWorkflows[0].lastRun).toEqual({
         id: 'jh-1',
         createdAt: rawLastRun.createdAt,
         updatedAt: rawLastRun.updatedAt,
@@ -438,7 +455,32 @@ describe('AssetGroupService', () => {
       });
     });
 
-    it('should set lastRun to null when the group has no workflows', async () => {
+    it('should attach a distinct lastRun per workflow', async () => {
+      mockJobHistoryRepo.createQueryBuilder.mockImplementation(() =>
+        createMockJobHistoryBuilder([rawLastRun, rawLastRun2]),
+      );
+      mockAssetGroupRepo.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'Web Servers',
+        assetGroupWorkflows: [
+          {
+            id: 'agw-1',
+            workflow: { id: 'wf-1' },
+          },
+          {
+            id: 'agw-2',
+            workflow: { id: 'wf-2' },
+          },
+        ],
+      });
+
+      const result = await service.getAssetGroupById(groupId, workspaceId);
+
+      expect(result.assetGroupWorkflows[0].lastRun?.status).toBe('COMPLETED');
+      expect(result.assetGroupWorkflows[1].lastRun?.status).toBe('FAILED');
+    });
+
+    it('should not query job history when the group has no workflows', async () => {
       mockAssetGroupRepo.findOne.mockResolvedValue({
         id: groupId,
         name: 'Web Servers',
@@ -447,13 +489,13 @@ describe('AssetGroupService', () => {
 
       const result = await service.getAssetGroupById(groupId, workspaceId);
 
-      expect(result.lastRun).toBeNull();
+      expect(result.assetGroupWorkflows).toEqual([]);
       expect(mockJobHistoryRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
 
     it('should set lastRun to null when no job history exists', async () => {
       mockJobHistoryRepo.createQueryBuilder.mockImplementation(() =>
-        createMockJobHistoryBuilder(undefined),
+        createMockJobHistoryBuilder([]),
       );
       mockAssetGroupRepo.findOne.mockResolvedValue({
         id: groupId,
@@ -468,7 +510,7 @@ describe('AssetGroupService', () => {
 
       const result = await service.getAssetGroupById(groupId, workspaceId);
 
-      expect(result.lastRun).toBeNull();
+      expect(result.assetGroupWorkflows[0].lastRun).toBeNull();
     });
 
     it('should throw NotFoundException when the group does not belong to the workspace', async () => {

@@ -176,11 +176,12 @@ export class AssetGroupService {
 
       const workflowIds =
         assetGroup.assetGroupWorkflows?.map((agw) => agw.workflow.id) ?? [];
+      const lastRunByWorkflow =
+        await this.getLastRunForWorkflows(workflowIds);
 
-      assetGroup.lastRun =
-        workflowIds.length === 0
-          ? null
-          : await this.getLastRunForWorkflows(workflowIds);
+      for (const agw of assetGroup.assetGroupWorkflows ?? []) {
+        agw.lastRun = lastRunByWorkflow.get(agw.workflow.id) ?? null;
+      }
 
       return assetGroup;
     } catch (error) {
@@ -193,13 +194,18 @@ export class AssetGroupService {
   }
 
   /**
-   * Resolves the most recent job history across the given workflows,
-   * deriving its status from the individual job statuses.
+   * Resolves the most recent job history per workflow,
+   * deriving each status from the individual job statuses.
    */
   private async getLastRunForWorkflows(
     workflowIds: string[],
-  ): Promise<AssetGroupLastRunDto | null> {
+  ): Promise<Map<string, AssetGroupLastRunDto>> {
+    if (workflowIds.length === 0) {
+      return new Map();
+    }
+
     interface RawJobHistoryRow {
+      workflowId: string;
       id: string;
       createdAt: Date;
       updatedAt: Date;
@@ -215,6 +221,7 @@ export class AssetGroupService {
       .leftJoin('jobHistory.workflow', 'workflow')
       .where('jobHistory.workflowId IN (:...workflowIds)', { workflowIds })
       .select([
+        '"jobHistory"."workflowId" as "workflowId"',
         '"jobHistory".id as "id"',
         '"jobHistory"."createdAt" as "createdAt"',
         '"jobHistory"."updatedAt" as "updatedAt"',
@@ -236,24 +243,27 @@ export class AssetGroupService {
           WHERE "jobHistoryId" = "jobHistory".id
         ) as "status"`,
       ])
-      .orderBy('jobHistory.createdAt', 'DESC')
-      .limit(1)
-      .getRawOne<RawJobHistoryRow>();
+      .distinctOn(['"jobHistory"."workflowId"'])
+      .orderBy('"jobHistory"."workflowId"')
+      .addOrderBy('jobHistory.createdAt', 'DESC')
+      .getRawMany<RawJobHistoryRow>();
 
-    if (!raw) {
-      return null;
+    const lastRunByWorkflow = new Map<string, AssetGroupLastRunDto>();
+
+    for (const row of raw) {
+      lastRunByWorkflow.set(row.workflowId, {
+        id: row.id,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        totalJobs: parseInt(row.totalJobs, 10),
+        status: row.status,
+        workflowName: row.workflowName,
+        jobHistoryName: row.jobHistoryName,
+        jobRunType: row.jobRunType,
+      });
     }
 
-    return {
-      id: raw.id,
-      createdAt: raw.createdAt,
-      updatedAt: raw.updatedAt,
-      totalJobs: parseInt(raw.totalJobs, 10),
-      status: raw.status,
-      workflowName: raw.workflowName,
-      jobHistoryName: raw.jobHistoryName,
-      jobRunType: raw.jobRunType,
-    };
+    return lastRunByWorkflow;
   }
 
   /**

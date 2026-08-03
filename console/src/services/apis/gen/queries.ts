@@ -2419,29 +2419,6 @@ export type GetManyTemplateDto = {
   pageCount: number;
 };
 
-export type AssetGroupWorkflowAssetGroup = { [key: string]: unknown };
-
-export type AssetGroupWorkflowSchedule =
-  (typeof AssetGroupWorkflowSchedule)[keyof typeof AssetGroupWorkflowSchedule];
-
-export const AssetGroupWorkflowSchedule = {
-  disabled: 'disabled',
-  '0_0_*_*_*': '0 0 * * *',
-  '0_0_*/3_*_*': '0 0 */3 * *',
-  '0_0_*_*_0': '0 0 * * 0',
-  '0_0_*/14_*_*': '0 0 */14 * *',
-  '0_0_1_*_*': '0 0 1 * *',
-} as const;
-
-export type AssetGroupWorkflow = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  assetGroup: AssetGroupWorkflowAssetGroup;
-  workflow: Workflow;
-  schedule: AssetGroupWorkflowSchedule;
-};
-
 export type AssetGroupLastRunDtoStatus =
   (typeof AssetGroupLastRunDtoStatus)[keyof typeof AssetGroupLastRunDtoStatus];
 
@@ -2473,6 +2450,30 @@ export type AssetGroupLastRunDto = {
   jobRunType: AssetGroupLastRunDtoJobRunType;
 };
 
+export type AssetGroupWorkflowAssetGroup = { [key: string]: unknown };
+
+export type AssetGroupWorkflowSchedule =
+  (typeof AssetGroupWorkflowSchedule)[keyof typeof AssetGroupWorkflowSchedule];
+
+export const AssetGroupWorkflowSchedule = {
+  disabled: 'disabled',
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type AssetGroupWorkflow = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  assetGroup: AssetGroupWorkflowAssetGroup;
+  workflow: Workflow;
+  schedule: AssetGroupWorkflowSchedule;
+  lastRun?: AssetGroupLastRunDto;
+};
+
 export type AssetGroup = {
   id: string;
   createdAt: string;
@@ -2481,7 +2482,6 @@ export type AssetGroup = {
   hexColor?: string;
   assetGroupWorkflows?: AssetGroupWorkflow[];
   totalAssets: number;
-  lastRun?: AssetGroupLastRunDto;
 };
 
 export type GetManyAssetGroupDto = {
