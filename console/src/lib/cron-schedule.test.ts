@@ -173,6 +173,32 @@ describe('parseCronExpression', () => {
     expect(parseCronExpression('0 25 * * *')).toBeNull();
     expect(parseCronExpression('0 2 15 * 1')).toBeNull(); // fixed dom + dow combo
   });
+
+  it('converts UTC cron time into local wall-clock time for a timezone', () => {
+    // 03:00 UTC is 10:00 local in Asia/Ho_Chi_Minh (+07)
+    expect(parseCronExpression('0 3 * * *', 'Asia/Ho_Chi_Minh', at('2026-01-15T00:00:00Z'))).toEqual(
+      {
+        frequency: 'daily',
+        daysOfWeek: [],
+        daysOfMonth: [],
+        hour: 10,
+        minute: 0,
+      },
+    );
+  });
+
+  it('wraps UTC time back into the same day for negative offsets', () => {
+    // 03:00 UTC is 22:00 local in America/New_York (UTC-5, previous calendar day)
+    expect(parseCronExpression('0 3 * * *', 'America/New_York', at('2026-01-15T00:00:00Z'))).toEqual(
+      {
+        frequency: 'daily',
+        daysOfWeek: [],
+        daysOfMonth: [],
+        hour: 22,
+        minute: 0,
+      },
+    );
+  });
 });
 
 describe('getTimezoneOffsetMinutes', () => {

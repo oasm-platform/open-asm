@@ -29,7 +29,7 @@ describe('CronScheduleBuilder', () => {
 
   it('renders the next-run preview with local time', () => {
     renderBuilder();
-    expect(screen.getByText(/Next run:/)).toBeInTheDocument();
+    expect(screen.getByText(/Next run/)).toBeInTheDocument();
   });
 
   it('shows a human cron label in local time, consistent with next run', () => {
@@ -83,11 +83,18 @@ describe('CronScheduleBuilder', () => {
     expect(screen.getByRole('button', { name: 'Mon' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('prefills the hour/minute selects in local time, not UTC', () => {
+    renderBuilder({ defaultValue: '0 3 * * *' });
+    // 03:00 UTC is 10:00 local in Asia/Ho_Chi_Minh (+07)
+    expect(screen.getByRole('combobox', { name: 'Hour' })).toHaveTextContent('10 AM');
+    expect(screen.getByRole('combobox', { name: 'Minute' })).toHaveTextContent('00');
+  });
+
   it('emits UTC cron from the selected time', async () => {
     const user = userEvent.setup();
     const { onChange } = renderBuilder();
     await user.click(screen.getByRole('combobox', { name: 'Hour' }));
-    await user.click(await screen.findByText('09'));
+    await user.click(await screen.findByText('9 AM'));
     // 09:00 local +07 -> 02:00 UTC
     expect(onChange).toHaveBeenLastCalledWith({
       cron: '0 2 * * *',
@@ -101,6 +108,49 @@ describe('CronScheduleBuilder', () => {
     await user.click(screen.getByRole('combobox', { name: 'Timezone' }));
     await user.click(await screen.findByText(/Asia\/Tokyo/));
     expect(onTimezoneChange).toHaveBeenCalledWith('Asia/Tokyo');
+  });
+
+  it('self-adjusts the timezone select when the timezone prop changes', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <CronScheduleBuilder timezone="Asia/Ho_Chi_Minh" onChange={onChange} />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Timezone' })).toHaveTextContent(
+      /Asia\/Ho_Chi_Minh/,
+    );
+    // e.g. the browser/device timezone changed: the select must follow the new
+    // timezone prop instead of keeping the value captured at mount.
+    rerender(<CronScheduleBuilder timezone="Asia/Tokyo" onChange={onChange} />);
+    expect(screen.getByRole('combobox', { name: 'Timezone' })).toHaveTextContent(
+      /Asia\/Tokyo/,
+    );
+  });
+
+  it('keeps a manually picked timezone when the timezone prop changes', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onTimezoneChange = vi.fn();
+    const { rerender } = render(
+      <CronScheduleBuilder
+        timezone="Asia/Ho_Chi_Minh"
+        onChange={onChange}
+        onTimezoneChange={onTimezoneChange}
+      />,
+    );
+    await user.click(screen.getByRole('combobox', { name: 'Timezone' }));
+    await user.click(await screen.findByText(/Asia\/Tokyo/));
+    expect(onTimezoneChange).toHaveBeenCalledWith('Asia/Tokyo');
+    rerender(
+      <CronScheduleBuilder
+        timezone="America/New_York"
+        onChange={onChange}
+        onTimezoneChange={onTimezoneChange}
+      />,
+    );
+    // the explicit user choice wins over automatic timezone detection
+    expect(screen.getByRole('combobox', { name: 'Timezone' })).toHaveTextContent(
+      /Asia\/Tokyo/,
+    );
   });
 
   it('applies disabled state to controls', () => {

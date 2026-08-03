@@ -104,10 +104,14 @@ const CRON_RE = /^(\d{1,2}) (\d{1,2}) (\S+) (\S+) (\S+)$/;
 
 /**
  * Parses a 5-field cron expression into form state.
+ * When `timezone` is provided, the UTC cron time is converted into the
+ * local wall-clock time of that timezone (the inverse of buildCronExpression).
  * Returns null when the expression is not supported.
  */
 export function parseCronExpression(
   value: string | undefined,
+  timezone?: string,
+  referenceDate: Date = new Date(),
 ): CronScheduleState | null {
   if (!value) return null;
   const match = value.trim().match(CRON_RE);
@@ -152,7 +156,24 @@ export function parseCronExpression(
     return null;
   }
 
-  return { frequency, daysOfWeek, daysOfMonth, hour, minute };
+  const state: CronScheduleState = {
+    frequency,
+    daysOfWeek,
+    daysOfMonth,
+    hour,
+    minute,
+  };
+
+  if (timezone) {
+    // Inverse of buildCronExpression: local = utc + offset (mod 1440).
+    const offset = getTimezoneOffsetMinutes(timezone, referenceDate);
+    const localTotal =
+      (((state.hour * 60 + state.minute + offset) % 1440) + 1440) % 1440;
+    state.hour = Math.floor(localTotal / 60) % 24;
+    state.minute = localTotal % 60;
+  }
+
+  return state;
 }
 
 /**

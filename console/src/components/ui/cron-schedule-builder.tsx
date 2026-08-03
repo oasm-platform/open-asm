@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { buttonVariants } from '@/components/ui/button-variants';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -100,7 +100,9 @@ export function CronScheduleBuilder({
   const initial = useMemo(() => {
     // `defaultValue` is only consumed on mount; the Card `key` below remounts
     // this component whenever the parent changes defaultValue/timezone.
-    const parsed = parseCronExpression(defaultValue);
+    // The cron is stored in UTC, so convert it into the authored timezone's
+    // local wall-clock time to prefill the selects (matches Next run/label).
+    const parsed = parseCronExpression(defaultValue, timezoneProp);
     return parsed ?? { ...DEFAULT_CRON_STATE };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -127,6 +129,17 @@ export function CronScheduleBuilder({
   // Internal timezone state so the select works even when the parent only
   // provides `onChange` (no controlled timezone prop / onTimezoneChange).
   const [tz, setTz] = useState(timezoneProp);
+  // Set when the user picks a timezone in the select so automatic detection
+  // never overrides an explicit choice.
+  const tzPickedManually = useRef(false);
+
+  // The Card `key` below only remounts the Card subtree, not this component,
+  // so the internal timezone state would keep a stale value when the device
+  // timezone (or a controlled `timezone` prop) changes. Self-adjust here.
+  useEffect(() => {
+    if (tzPickedManually.current) return;
+    setTz((prev) => (prev === timezoneProp ? prev : timezoneProp));
+  }, [timezoneProp]);
 
   const cron = useMemo(
     () =>
@@ -286,6 +299,7 @@ export function CronScheduleBuilder({
             disabled={disabled}
             value={tz}
             onValueChange={(v) => {
+              tzPickedManually.current = true;
               setTz(v);
               onTimezoneChange?.(v);
             }}
