@@ -11,7 +11,6 @@ import { AssetGroupController } from './asset-group.controller';
 import { AssetGroupService } from './asset-group.service';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
-import { AssetGroupWorkflowSubscriber } from './entities/asset-groups-workflows.subscriber';
 import { AssetGroup } from './entities/asset-groups.entity';
 
 @Global()
@@ -32,7 +31,7 @@ import { AssetGroup } from './entities/asset-groups.entity';
     ]),
   ],
   controllers: [AssetGroupController],
-  providers: [AssetGroupService, AssetGroupWorkflowSubscriber],
+  providers: [AssetGroupService],
   exports: [AssetGroupService],
 })
 export class AssetGroupModule {}
