@@ -8,10 +8,12 @@ import { toast } from 'sonner';
 interface RunAssetGroupWorkflowButtonProps {
   id?: string;
   disabled?: boolean;
+  onSuccess?: () => void;
 }
 const RunWorkflowButton = ({
   id,
   disabled,
+  onSuccess,
 }: RunAssetGroupWorkflowButtonProps) => {
   const { mutate } = useAssetGroupControllerRunGroupWorkflowScheduler();
   const handleRun = () => {
@@ -23,6 +25,7 @@ const RunWorkflowButton = ({
         {
           onSuccess: (response) => {
             toast(response.message);
+            onSuccess?.();
           },
           onError: (e) => {
             const err = e as AxiosError<{ message: string }>;
@@ -35,8 +38,8 @@ const RunWorkflowButton = ({
 
   return (
     <ConfirmDialog
-      title="Run Tool"
-      description={`Are you sure you want to run workflow?`}
+      title="Run Manual"
+      description="Are you sure you want to run this manually?"
       onConfirm={handleRun}
       trigger={
         <Button

@@ -98,14 +98,14 @@ export function EditAssetGroupDialog({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Edit host group</p>
+            <p>Edit automation group</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit host group</DialogTitle>
+            <DialogTitle>Edit automation group</DialogTitle>
             <DialogDescription>
               Update the name and color of your host group.
             </DialogDescription>

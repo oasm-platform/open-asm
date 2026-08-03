@@ -73,7 +73,7 @@ const JobStatusBadge = ({ status, onlyIcon = false }: JobStatusProps) => {
   return (
     <Badge
       variant={config.variant}
-      className={config.className + ' h-8 cursor-pointer flex items-center'}
+      className={config.className + ' h-8 cursor-pointer flex items-center border-transparent'}
       onClick={() => {
         const showAnimation = status === JobStatus.pending || status === JobStatus.in_progress;
         navigate({

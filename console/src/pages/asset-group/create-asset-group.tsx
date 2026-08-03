@@ -91,7 +91,7 @@ export function CreateAssetGroup() {
   });
 
   const hostsQuery = useAssetsControllerGetHostAssets(
-    { page, limit: pageSize, sortBy, sortOrder, search: filter },
+    { page, limit: pageSize, sortBy, sortOrder, value: filter },
     { query: { queryKey: ['create-group-hosts', page, pageSize, sortBy, sortOrder, filter] } },
   );
 
@@ -186,7 +186,7 @@ export function CreateAssetGroup() {
       <div className="h-full overflow-y-auto px-4 sm:px-0">
         <Card className="mx-auto w-full max-w-4xl">
           <CardHeader>
-            <CardTitle>Create Host Group</CardTitle>
+            <CardTitle>Automation group</CardTitle>
             <CardDescription>
               Runs automated security scans. Add your
               hosts, pick the tools to execute, and set a schedule — recurring

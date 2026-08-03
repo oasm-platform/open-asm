@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import JobStatusBadge from '@/components/ui/job-status';
 import {
   CronScheduleBuilder,
   type CronScheduleChange,
@@ -290,37 +291,41 @@ export default function AssetGroupWorkflow({
   return (
     <div className="space-y-4 mb-4">
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
             <CardTitle>Schedule</CardTitle>
-            <CardDescription>
+            <CardDescription className="hidden md:block">
               Configure the scan frequency and run the workflow on demand.
             </CardDescription>
           </div>
-          <RunWorkflowButton id={getCurrentWorkflow()?.id} />
+          {lastRun && <JobStatusBadge status={lastRun.status} />}
         </CardHeader>
         <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
-                <HistoryIcon className="size-4 text-muted-foreground" />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
+                  <HistoryIcon className="size-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Last run</p>
+                  <p className="text-sm font-medium text-foreground tabular-nums">
+                    {lastRun
+                      ? `${lastRun.jobRunType.charAt(0).toUpperCase()}${lastRun.jobRunType.slice(1)} at ${lastRunText}`
+                      : lastRunText}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Last run</p>
-                <p className="text-sm font-medium text-foreground tabular-nums">
-                  {lastRunText}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
-                <CalendarClockIcon className="size-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Next run</p>
-                <p className="text-sm font-medium text-foreground tabular-nums">
-                  {nextRunText}
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
+                  <CalendarClockIcon className="size-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Next run</p>
+                  <p className="text-sm font-medium text-foreground tabular-nums">
+                    {nextRunText}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -375,12 +380,18 @@ export default function AssetGroupWorkflow({
         </CardContent>
       </Card>
       <Card>
-        <CardHeader>
-          <CardTitle>Tools</CardTitle>
-          <CardDescription>
-            Scanning tools assigned to this group. Click a tool to add or
-            remove it.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Tools</CardTitle>
+            <CardDescription className="hidden md:block">
+              Scanning tools assigned to this group. Click a tool to add or
+              remove it.
+            </CardDescription>
+          </div>
+          <RunWorkflowButton
+            id={getCurrentWorkflow()?.id}
+            onSuccess={onRefetch}
+          />
         </CardHeader>
         <CardContent>
           {toolProviders.length === 0 ? (
