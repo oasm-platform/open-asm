@@ -98,17 +98,14 @@ export function CronScheduleBuilder({
   disabled,
 }: CronScheduleBuilderProps) {
   const initial = useMemo(() => {
-    // `defaultValue` is only consumed on mount; the Card `key` below remounts
-    // this component whenever the parent changes defaultValue/timezone.
-    // The cron is stored in UTC, so convert it into the authored timezone's
-    // local wall-clock time to prefill the selects (matches Next run/label).
+    // `defaultValue` is consumed on mount and re-synced by the effect below
+    // whenever the parent changes it. The cron is stored in UTC, so convert
+    // it into the authored timezone's local wall-clock time to prefill the
+    // selects (matches Next run/label).
     const parsed = parseCronExpression(defaultValue, timezoneProp);
     return parsed ?? { ...DEFAULT_CRON_STATE };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Re-mount when the parent changes the source defaultValue/timezone so the
-  // controlled form state is rebuilt from the new input.
-  const remountKey = `${defaultValue ?? ''}|${timezoneProp}`;
   const lastEmitted = useRef<string | null>(null);
 
   // Default to the device timezone and make sure it (and any explicit
@@ -133,9 +130,26 @@ export function CronScheduleBuilder({
   // never overrides an explicit choice.
   const tzPickedManually = useRef(false);
 
-  // The Card `key` below only remounts the Card subtree, not this component,
-  // so the internal timezone state would keep a stale value when the device
-  // timezone (or a controlled `timezone` prop) changes. Self-adjust here.
+  // The Card below used to carry a `key` that was supposed to remount this
+  // component on defaultValue/timezone changes, but it never did (the key was
+  // applied to a child subtree). Sync the form state here instead so a
+  // changed `defaultValue` rebuilds the selection from the new cron while the
+  // timezone select keeps its own (separately managed) state.
+  const prevDefaultValue = useRef(defaultValue);
+  useEffect(() => {
+    if (prevDefaultValue.current === defaultValue) return;
+    prevDefaultValue.current = defaultValue;
+    const next =
+      parseCronExpression(defaultValue, tz) ?? { ...DEFAULT_CRON_STATE };
+    setFrequency(next.frequency);
+    setDaysOfWeek(next.daysOfWeek);
+    setDaysOfMonth(next.daysOfMonth);
+    setHour(next.hour);
+    setMinute(next.minute);
+  }, [defaultValue, tz]);
+
+  // Keep the timezone select in sync when a controlled `timezone` prop (or
+  // the device timezone) changes, unless the user picked one explicitly.
   useEffect(() => {
     if (tzPickedManually.current) return;
     setTz((prev) => (prev === timezoneProp ? prev : timezoneProp));
@@ -178,8 +192,8 @@ export function CronScheduleBuilder({
   };
 
   return (
-    <Card key={remountKey} className="w-full">
-      <CardContent className="flex flex-col gap-4">
+    <Card className="w-full py-4">
+      <CardContent className="flex flex-col gap-4 px-3 md:px-4">
         <div className="flex flex-wrap items-center gap-2">
           {FREQUENCIES.map((f) => (
             <button
@@ -187,7 +201,15 @@ export function CronScheduleBuilder({
               type="button"
               disabled={disabled}
               aria-pressed={frequency === f.value}
-              onClick={() => setFrequency(f.value)}
+              onClick={() => {
+                setFrequency(f.value);
+                // A Weekly schedule with no weekday selected would fall back
+                // to a daily wildcard; preselect today so the emitted cron
+                // always matches the chosen frequency.
+                if (f.value === 'weekly' && daysOfWeek.length === 0) {
+                  setDaysOfWeek([((new Date().getDay() + 6) % 7) + 1]);
+                }
+              }}
               className={cn(
                 buttonVariants({
                   variant: frequency === f.value ? 'default' : 'outline',

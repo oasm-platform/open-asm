@@ -103,6 +103,49 @@ describe('buildCronExpression', () => {
       '30 3 * * *',
     );
   });
+
+  it('shifts weekdays back one day when local time crosses midnight into UTC', () => {
+    // Local Mon+Thu 00:00 in +07 is UTC Sun+Wed 17:00 the previous day.
+    const state: CronScheduleState = {
+      frequency: 'weekly',
+      daysOfWeek: [1, 4],
+      daysOfMonth: [],
+      hour: 0,
+      minute: 0,
+    };
+    expect(buildCronExpression(state, 'Asia/Ho_Chi_Minh', at('2026-01-15T00:00:00Z'))).toBe(
+      '0 17 * * 3,7',
+    );
+  });
+
+  it('shifts and drops days-of-month when local time crosses midnight into UTC', () => {
+    // Local day 1,10,26 00:00 in +07 -> UTC 17:00 on days 0,9,25; day 0
+    // (previous month) cannot be expressed, so it is dropped.
+    const state: CronScheduleState = {
+      frequency: 'monthly',
+      daysOfWeek: [],
+      daysOfMonth: [1, 10, 26],
+      hour: 0,
+      minute: 0,
+    };
+    expect(buildCronExpression(state, 'Asia/Ho_Chi_Minh', at('2026-01-15T00:00:00Z'))).toBe(
+      '0 17 9,25 * *',
+    );
+  });
+
+  it('shifts weekdays forward for negative offsets', () => {
+    // Local Tue 23:30 in UTC-5 is Wed 04:30 UTC the next day.
+    const state: CronScheduleState = {
+      frequency: 'weekly',
+      daysOfWeek: [2],
+      daysOfMonth: [],
+      hour: 23,
+      minute: 30,
+    };
+    expect(buildCronExpression(state, 'America/New_York', at('2026-01-15T00:00:00Z'))).toBe(
+      '30 4 * * 3',
+    );
+  });
 });
 
 describe('parseCronExpression', () => {
@@ -116,13 +159,23 @@ describe('parseCronExpression', () => {
     });
   });
 
-  it('parses weekly with dow list and maps 7 -> 0 (Sunday)', () => {
+  it('parses weekly with dow list and keeps Sunday as 7', () => {
     expect(parseCronExpression('30 1 * * 1,4,7')).toEqual({
       frequency: 'weekly',
-      daysOfWeek: [1, 4, 0],
+      daysOfWeek: [1, 4, 7],
       daysOfMonth: [],
       hour: 1,
       minute: 30,
+    });
+  });
+
+  it('normalizes cron dow 0 (Sunday) to 7', () => {
+    expect(parseCronExpression('0 0 * * 0')).toEqual({
+      frequency: 'weekly',
+      daysOfWeek: [7],
+      daysOfMonth: [],
+      hour: 0,
+      minute: 0,
     });
   });
 
@@ -199,6 +252,43 @@ describe('parseCronExpression', () => {
       },
     );
   });
+
+  it('shifts weekdays when the UTC->local conversion crosses midnight', () => {
+    // 17:00 UTC Sunday is 00:00 local Monday in +07: the local day shifts +1.
+    expect(
+      parseCronExpression('0 17 * * 7', 'Asia/Ho_Chi_Minh', at('2026-01-15T00:00:00Z')),
+    ).toEqual({
+      frequency: 'weekly',
+      daysOfWeek: [1],
+      daysOfMonth: [],
+      hour: 0,
+      minute: 0,
+    });
+  });
+
+  it('shifts days-of-month with the local day and drops out-of-range values', () => {
+    // 17:00 UTC on days 1,9,25 is 00:00 local (+07) on days 2,10,26.
+    expect(parseCronExpression('0 17 1,9,25 * *', 'Asia/Ho_Chi_Minh', at('2026-01-15T00:00:00Z'))).toEqual(
+      {
+        frequency: 'monthly',
+        daysOfWeek: [],
+        daysOfMonth: [2, 10, 26],
+        hour: 0,
+        minute: 0,
+      },
+    );
+    // 03:00 UTC on the 1st is 22:00 local the PREVIOUS day in UTC-5; the
+    // shifted dom (0) cannot be represented, so it is dropped.
+    expect(parseCronExpression('0 3 1,15 * *', 'America/New_York', at('2026-01-15T00:00:00Z'))).toEqual(
+      {
+        frequency: 'monthly',
+        daysOfWeek: [],
+        daysOfMonth: [14],
+        hour: 22,
+        minute: 0,
+      },
+    );
+  });
 });
 
 describe('getTimezoneOffsetMinutes', () => {
@@ -264,6 +354,33 @@ describe('getNextRun', () => {
     const next = getNextRun('0 0 */3 * *', 'UTC', from);
     // */3 matches days 1,4,7,...,28,31 -> next after Jan 15 is Jan 16
     expect(next!.getTime()).toBe(at('2026-01-16T00:00:00Z').getTime());
+  });
+
+  it('weekly Sunday cron (dow 7) finds the next Sunday', () => {
+    // 2026-01-15 is a Thursday; the next Sunday is Jan 18.
+    const from = at('2026-01-15T00:00:00Z');
+    const next = getNextRun('0 0 * * 7', 'UTC', from);
+    expect(next).not.toBeNull();
+    expect(next!.getTime()).toBe(at('2026-01-18T00:00:00Z').getTime());
+  });
+
+  it('does not skip a run whose local calendar day lags the UTC date', () => {
+    // 04:00 UTC on the 15th is 23:00 local (UTC-5) on the 14th. The run on
+    // 2026-01-15T04:00Z is still after `from` but lands on the local day
+    // BEFORE `from`'s UTC date, so the scan must start one day earlier.
+    const from = at('2026-01-15T02:00:00Z');
+    const next = getNextRun('0 4 15 * *', 'America/New_York', from);
+    expect(next).not.toBeNull();
+    expect(next!.getTime()).toBe(at('2026-01-15T04:00:00Z').getTime());
+  });
+
+  it('weekly cron with a Sunday dow matches in a positive-offset zone', () => {
+    // 17:00 UTC Sunday is 00:00 local Monday in +07; from a Thursday the
+    // next run is Sunday 17:00 UTC.
+    const from = at('2026-01-15T00:00:00Z');
+    const next = getNextRun('0 17 * * 7', 'Asia/Ho_Chi_Minh', from);
+    expect(next).not.toBeNull();
+    expect(next!.getTime()).toBe(at('2026-01-18T17:00:00Z').getTime());
   });
 });
 

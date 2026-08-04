@@ -2,7 +2,6 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { CronSchedule } from '@/common/enums/enum';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum } from 'class-validator';
 import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { AssetGroup } from './asset-groups.entity';
 import { AssetGroupLastRunDto } from '../dto/asset-group-last-run.dto';
@@ -30,13 +29,20 @@ export class AssetGroupWorkflow extends BaseEntity {
   @JoinColumn({ name: 'workflowId' })
   workflow: Relation<Workflow>;
 
-  @ApiProperty({ enum: CronSchedule })
+  // Stored as a plain string: the column is varchar and BullMQ accepts any
+  // 5-field cron expression, so the schedule is no longer limited to the
+  // fixed {@link CronSchedule} presets. "disabled" is the only disable value.
+  @ApiProperty({
+    example: '0 0 */3 * *',
+    description:
+      '5-field cron expression (UTC) or "disabled" to turn scheduling off',
+  })
   @Column({ type: 'varchar', default: CronSchedule.DISABLED })
-  @IsEnum(CronSchedule)
-  schedule: CronSchedule;
+  schedule: string;
 
-  @Column({ nullable: true })
-  jobId: string;
+  @ApiProperty({ required: false, nullable: true })
+  @Column({ type: 'varchar', nullable: true })
+  jobId: string | null;
 
   @ApiProperty({ type: () => AssetGroupLastRunDto, required: false })
   lastRun?: AssetGroupLastRunDto | null;

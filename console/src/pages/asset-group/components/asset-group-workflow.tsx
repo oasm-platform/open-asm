@@ -26,7 +26,6 @@ import { getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
 import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
   AssetGroupLastRunDtoStatus,
-  OnSchedule,
   ToolCategory,
   ToolsControllerGetManyToolsType,
   type AssetGroupWorkflow as AssetGroupWorkflowRelation,
@@ -241,7 +240,7 @@ export default function AssetGroupWorkflow({
               name: `Group Workflow - ${assetGroupId}`,
               content: {
                 on: {
-                  schedule: OnSchedule['0_0_*_*_*'], // Use correct enum value
+                  schedule: '0 0 * * *',
                   target: [], // Empty target array
                 },
                 jobs: [
@@ -297,6 +296,9 @@ export default function AssetGroupWorkflow({
           toast.success('Workflow schedule disabled');
           setIsSetScheduleOpen(false);
         },
+        onError: () => {
+          toast.error('Failed to disable the workflow schedule');
+        },
       },
     );
   };
@@ -311,8 +313,11 @@ export default function AssetGroupWorkflow({
       {
         onSuccess: async () => {
           await onRefetch();
-          toast.success('Update schedule successfuly');
+          toast.success('Schedule updated successfully');
           setIsSetScheduleOpen(false);
+        },
+        onError: () => {
+          toast.error('Failed to update the schedule');
         },
       },
     );
@@ -384,15 +389,15 @@ export default function AssetGroupWorkflow({
           <Sheet open={isSetScheduleOpen} onOpenChange={setIsSetScheduleOpen}>
             <SheetContent
               side="right"
-              className="w-full sm:max-w-lg"
+              className="w-full sm:max-w-lg gap-3"
             >
-              <SheetHeader>
+              <SheetHeader className="px-4 pt-3 pb-2">
                 <SheetTitle>Set custom schedule</SheetTitle>
                 <SheetDescription>
                   Configure a custom cron expression for this workflow.
                 </SheetDescription>
               </SheetHeader>
-              <div className="flex-1 space-y-4 overflow-y-auto px-4">
+              <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-0">
                 <CronScheduleBuilder
                   defaultValue={
                     currentSchedule && currentSchedule !== 'disabled'
@@ -402,7 +407,7 @@ export default function AssetGroupWorkflow({
                   onChange={setDraftSchedule}
                 />
               </div>
-              <SheetFooter className="mt-auto flex-row items-center">
+              <SheetFooter className="mt-auto flex-row items-center pt-2">
                 <ConfirmDialog
                   title="Disable schedule"
                   description="This will stop the schedule from running. You can re-enable it later."

@@ -75,6 +75,18 @@ const JobStatusBadge = ({ status, onlyIcon = false, onClick }: JobStatusProps) =
       variant={config.variant}
       className={config.className + ' h-8 flex items-center border-transparent select-none' + (onClick ? ' cursor-pointer' : ' cursor-default')}
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
     >
       <span className="flex items-center">
         {config.icon}

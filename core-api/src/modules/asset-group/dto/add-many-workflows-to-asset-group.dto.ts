@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsUUID } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsUUID } from 'class-validator';
 
 export class AddManyWorkflowsToAssetGroupDto {
   @ApiProperty({
@@ -12,5 +12,7 @@ export class AddManyWorkflowsToAssetGroupDto {
   })
   @IsArray()
   @IsUUID(undefined, { each: true })
+  @ArrayUnique()
+  @ArrayMaxSize(1000)
   workflowIds: string[];
 }

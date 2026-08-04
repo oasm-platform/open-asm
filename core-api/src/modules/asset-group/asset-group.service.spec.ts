@@ -652,7 +652,7 @@ describe('AssetGroupService', () => {
       } as GetAllAssetGroupsQueryDto;
       await service.getManyAssetGroups(sortByLastRunAtQuery, workspaceId);
 
-      expect(builder.orderBy).toHaveBeenCalledWith('lastRunAt', 'DESC');
+      expect(builder.orderBy).toHaveBeenCalledWith('"lastRunAt"', 'DESC');
     });
 
     it('should keep sorting by entity columns for other sortBy values', async () => {

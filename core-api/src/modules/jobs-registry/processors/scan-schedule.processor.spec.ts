@@ -1,8 +1,8 @@
 import { JobRunType } from '@/common/enums/enum';
+import type { AssetGroupService } from '@/modules/asset-group/asset-group.service';
+import type { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import type { AssetGroupService } from '../../asset-group/asset-group.service';
-import type { AssetGroupWorkflow } from '../../asset-group/entities/asset-groups-workflows.entity';
 import { AssetGroupsScheduleConsumer } from './scan-schedule.processor';
 
 describe('AssetGroupsScheduleConsumer', () => {

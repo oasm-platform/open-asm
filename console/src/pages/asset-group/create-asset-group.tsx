@@ -287,9 +287,7 @@ export function CreateAssetGroup() {
               filterColumnKey="host"
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              onRowClick={(row) =>
-                setHostIds((prev) => toggleId(prev, (row as HostAssetRow).id))
-              }
+              onRowClick={(row) => setHostIds((prev) => toggleId(prev, row.id))}
               tableState={{
                 rowSelection: Array.from(hostIds).reduce(
                   (acc, id) => {

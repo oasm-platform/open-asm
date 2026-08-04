@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 export function AssetGroups() {
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
-    tableHandlers: { setPage, setPageSize, setFilter },
+    tableHandlers: { setPage, setPageSize, setFilter, setParams },
   } = useServerDataTable();
 
   const navigate = useNavigate();
@@ -66,7 +66,7 @@ export function AssetGroups() {
     {
       limit: pageSize,
       page: page,
-      sortBy: 'name',
+      sortBy: sortBy,
       sortOrder: sortOrder,
       search: filter,
     },
@@ -104,6 +104,9 @@ export function AssetGroups() {
         ]}
         sortOrder={sortOrder}
         isShowBorder={true}
+        onSortChange={(column, order) =>
+          setParams({ sortBy: column, sortOrder: order })
+        }
         onRowClick={(row) => navigate({ to: '/groups/' + row.id })}
         emptyMessage="No groups found"
         filterColumnKey="name"

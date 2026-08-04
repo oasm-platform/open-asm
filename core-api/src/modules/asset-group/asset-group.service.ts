@@ -133,10 +133,14 @@ export class AssetGroupService {
 
       const total = await countQueryBuilder.getCount();
 
-      // Apply ordering, pagination to main query. lastRunAt is a select
-      // alias (not an entity column), so order by the alias directly.
+      // Apply ordering, pagination to main query. lastRunAt/totalAssets are
+      // select aliases (not entity columns), so order by the alias directly.
       const orderColumn =
-        sortBy === 'lastRunAt' ? 'lastRunAt' : `assetGroup.${sortBy}`;
+        sortBy === 'lastRunAt'
+          ? '"lastRunAt"'
+          : sortBy === 'totalAssets'
+            ? '"totalAssets"'
+            : `assetGroup.${sortBy}`;
       queryBuilder
         .orderBy(orderColumn, sortOrder)
         .offset(offset)
@@ -196,13 +200,20 @@ export class AssetGroupService {
         );
       }
 
+      // A workflow can be missing if its join row outlived the workflow
+      // (orphaned association), so guard every dereference.
       const workflowIds =
-        assetGroup.assetGroupWorkflows?.map((agw) => agw.workflow.id) ?? [];
+        assetGroup.assetGroupWorkflows
+          ?.map((agw) => agw.workflow?.id)
+          .filter((workflowId): workflowId is string => Boolean(workflowId)) ??
+        [];
       const lastRunByWorkflow =
         await this.getLastRunForWorkflows(workflowIds);
 
       for (const agw of assetGroup.assetGroupWorkflows ?? []) {
-        agw.lastRun = lastRunByWorkflow.get(agw.workflow.id) ?? null;
+        agw.lastRun = agw.workflow
+          ? (lastRunByWorkflow.get(agw.workflow.id) ?? null)
+          : null;
       }
 
       return assetGroup;
@@ -354,8 +365,11 @@ export class AssetGroupService {
           );
         }
       } catch (error) {
-        // Roll back the group so a failed request does not leave a half-created group
-        await this.assetGroupRepo.remove(savedAssetGroup);
+        // Roll back the group so a failed request does not leave a
+        // half-created group: remove any workflows (and their BullMQ
+        // schedulers) created before the failure, then the group itself.
+        // The DB-level FKs cascade the join rows and asset rows.
+        await this.rollbackCreatedGroup(savedAssetGroup.id);
         throw error;
       }
 
@@ -363,6 +377,47 @@ export class AssetGroupService {
     } catch (error) {
       this.logger.error(`Error creating asset group:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Removes everything a failed {@link create} call may have persisted:
+   * group workflows (with their repeat schedulers), the workflows that
+   * were created for the group, and finally the group itself. Join rows
+   * and asset associations are removed by the DB-level cascades.
+   */
+  private async rollbackCreatedGroup(groupId: string): Promise<void> {
+    try {
+      const groupWorkflows = await this.assetGroupWorkflowRepo.find({
+        where: { assetGroup: { id: groupId } },
+        relations: ['workflow'],
+      });
+
+      await Promise.all(
+        groupWorkflows
+          .map((agw) => agw.jobId)
+          .filter((jobId): jobId is string => Boolean(jobId))
+          .map((jobId) => this.scanScheduleQueue.removeJobScheduler(jobId)),
+      );
+
+      const workflowIds = groupWorkflows
+        .map((agw) => agw.workflow?.id)
+        .filter((workflowId): workflowId is string => Boolean(workflowId));
+      if (workflowIds.length > 0) {
+        await this.workflowRepo.delete(workflowIds);
+      }
+
+      const savedAssetGroup = await this.assetGroupRepo.findOne({
+        where: { id: groupId },
+      });
+      if (savedAssetGroup) {
+        await this.assetGroupRepo.remove(savedAssetGroup);
+      }
+    } catch (rollbackError) {
+      this.logger.error(
+        `Error rolling back asset group "${groupId}" after failed creation:`,
+        rollbackError,
+      );
     }
   }
 
@@ -397,9 +452,7 @@ export class AssetGroupService {
     const workflow = this.workflowRepo.create({
       name: workflowName,
       content: {
-        // ponytail: entity types schedule as CronSchedule but the column is
-        // varchar and the BullMQ repeat pattern accepts any cron string
-        on: { schedule: schedule as CronSchedule, target: [] },
+        on: { schedule, target: [] },
         jobs: tools.map((tool) => ({ name: tool.name, run: tool.name })),
         name: workflowName,
       },
@@ -469,22 +522,28 @@ export class AssetGroupService {
 
       for (const workflowId of workflowIds) {
         const assetGroupWorkflowId = randomUUID();
-        const job = await this.scanScheduleQueue.add(
-          assetGroupWorkflowId,
-          { id: assetGroupWorkflowId } as AssetGroupWorkflow,
-          {
-            repeat: {
-              pattern: schedule,
+        // 'disabled' is not a valid BullMQ repeat pattern (cron-parser would
+        // reject it), so only register a scheduler for real schedules.
+        let jobId: string | null = null;
+        if (schedule !== 'disabled') {
+          const job = await this.scanScheduleQueue.add(
+            assetGroupWorkflowId,
+            { id: assetGroupWorkflowId } as AssetGroupWorkflow,
+            {
+              repeat: {
+                pattern: schedule,
+              },
             },
-          },
-        );
+          );
+          jobId = job.repeatJobKey ?? null;
+        }
 
         const record = this.assetGroupWorkflowRepo.create({
           id: assetGroupWorkflowId,
           assetGroup: { id: groupId },
           workflow: { id: workflowId },
-          schedule: schedule as CronSchedule,
-          jobId: job.repeatJobKey,
+          schedule,
+          jobId,
         });
 
         assetGroupWorkflowRecords.push(record);
@@ -620,9 +679,10 @@ export class AssetGroupService {
       }
 
       await Promise.all(
-        associations.map((a) =>
-          this.scanScheduleQueue.removeJobScheduler(a.jobId),
-        ),
+        associations
+          .map((a) => a.jobId)
+          .filter((jobId): jobId is string => Boolean(jobId))
+          .map((jobId) => this.scanScheduleQueue.removeJobScheduler(jobId)),
       );
       // Remove the associations
       await this.assetGroupWorkflowRepo.remove(associations);
@@ -706,9 +766,10 @@ export class AssetGroupService {
       // for the group's workflows while the group is being deleted.
       const groupWorkflows = assetGroup.assetGroupWorkflows ?? [];
       await Promise.all(
-        groupWorkflows.map((agw) =>
-          this.scanScheduleQueue.removeJobScheduler(agw.jobId),
-        ),
+        groupWorkflows
+          .map((agw) => agw.jobId)
+          .filter((jobId): jobId is string => Boolean(jobId))
+          .map((jobId) => this.scanScheduleQueue.removeJobScheduler(jobId)),
       );
 
       // Delete the group's workflows. The DB-level FK cascades remove the
@@ -886,13 +947,15 @@ export class AssetGroupService {
 
       // Update the relationship with provided data
       if (updateData.schedule !== undefined) {
-        assetGroupWorkspace.schedule = updateData.schedule as CronSchedule;
+        assetGroupWorkspace.schedule = updateData.schedule;
 
-        await this.scanScheduleQueue.removeJobScheduler(
-          assetGroupWorkspace.jobId,
-        );
+        if (assetGroupWorkspace.jobId) {
+          await this.scanScheduleQueue.removeJobScheduler(
+            assetGroupWorkspace.jobId,
+          );
+        }
 
-        if ((updateData.schedule as CronSchedule) !== CronSchedule.DISABLED) {
+        if (updateData.schedule !== 'disabled') {
           const newJob = await this.scanScheduleQueue.add(
             assetGroupWorkspace.id,
             { id: assetGroupWorkspace.id } as AssetGroupWorkflow,
@@ -905,6 +968,10 @@ export class AssetGroupService {
           if (newJob.repeatJobKey) {
             assetGroupWorkspace.jobId = newJob.repeatJobKey;
           }
+        } else {
+          // The old scheduler was removed above; drop the stale jobId so
+          // it no longer references a removed repeat job.
+          assetGroupWorkspace.jobId = null;
         }
       }
 

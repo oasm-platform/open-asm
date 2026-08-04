@@ -435,20 +435,9 @@ export type GetManyGetManyWorkflowsResponseDtoDto = {
   pageCount: number;
 };
 
-export type OnSchedule = (typeof OnSchedule)[keyof typeof OnSchedule];
-
-export const OnSchedule = {
-  disabled: 'disabled',
-  '0_0_*_*_*': '0 0 * * *',
-  '0_0_*/3_*_*': '0 0 */3 * *',
-  '0_0_*_*_0': '0 0 * * 0',
-  '0_0_*/14_*_*': '0 0 */14 * *',
-  '0_0_1_*_*': '0 0 1 * *',
-} as const;
-
 export type On = {
   target: string[];
-  schedule: OnSchedule;
+  schedule: string;
 };
 
 export type WorkflowJob = {
@@ -2452,17 +2441,10 @@ export type AssetGroupLastRunDto = {
 
 export type AssetGroupWorkflowAssetGroup = { [key: string]: unknown };
 
-export type AssetGroupWorkflowSchedule =
-  (typeof AssetGroupWorkflowSchedule)[keyof typeof AssetGroupWorkflowSchedule];
-
-export const AssetGroupWorkflowSchedule = {
-  disabled: 'disabled',
-  '0_0_*_*_*': '0 0 * * *',
-  '0_0_*/3_*_*': '0 0 */3 * *',
-  '0_0_*_*_0': '0 0 * * 0',
-  '0_0_*/14_*_*': '0 0 */14 * *',
-  '0_0_1_*_*': '0 0 1 * *',
-} as const;
+/**
+ * @nullable
+ */
+export type AssetGroupWorkflowJobId = { [key: string]: unknown } | null;
 
 export type AssetGroupWorkflow = {
   id: string;
@@ -2470,7 +2452,10 @@ export type AssetGroupWorkflow = {
   updatedAt: string;
   assetGroup: AssetGroupWorkflowAssetGroup;
   workflow: Workflow;
-  schedule: AssetGroupWorkflowSchedule;
+  /** 5-field cron expression (UTC) or "disabled" to turn scheduling off */
+  schedule: string;
+  /** @nullable */
+  jobId?: AssetGroupWorkflowJobId;
   lastRun?: AssetGroupLastRunDto;
 };
 

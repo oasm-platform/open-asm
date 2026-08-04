@@ -1,11 +1,10 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { CronSchedule } from '@/common/enums/enum';
 import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional } from 'class-validator';
+import { IsOptional } from 'class-validator';
 import {
   Column,
   Entity,
@@ -19,10 +18,11 @@ import {
 export class On {
   @ApiProperty()
   target?: string[];
-  @ApiProperty({ enum: CronSchedule })
-  @IsEnum(CronSchedule)
+  // Plain string: arbitrary 5-field cron expressions are written into this
+  // JSONB content field (e.g. from asset-group workflow creation).
+  @ApiProperty({ example: '0 0 * * *' })
   @IsOptional()
-  schedule?: CronSchedule;
+  schedule?: string;
 }
 
 export class WorkflowJob {

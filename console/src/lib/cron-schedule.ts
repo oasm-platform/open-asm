@@ -70,9 +70,21 @@ export function getTimezoneLabel(timezone: string, date: Date = new Date()): str
 }
 
 /**
+ * Shifts a cron weekday (1=Monday .. 7=Sunday) by a day delta, wrapping
+ * around the 7-day week. Used when a local-to-UTC conversion crosses
+ * midnight so the emitted/displayed weekday follows the shifted calendar day.
+ */
+const shiftWeekday = (d: number, delta: number): number =>
+  ((((d - 1 + delta) % 7) + 7) % 7) + 1;
+
+/**
  * Converts local wall-clock time (hour/minute in `timezone`) into a UTC
  * cron expression. The offset is resolved using `referenceDate` so DST
  * transitions are reflected.
+ *
+ * When the conversion crosses midnight the day delta is applied to
+ * `daysOfWeek` (wrapped) and `daysOfMonth` (out-of-range days dropped, since
+ * they cannot be represented as a fixed day-of-month in a 5-field cron).
  */
 export function buildCronExpression(
   state: CronScheduleState,
@@ -81,7 +93,9 @@ export function buildCronExpression(
 ): string {
   const offset = getTimezoneOffsetMinutes(timezone, referenceDate);
   const localTotal = state.hour * 60 + state.minute;
-  const utcTotal = ((localTotal - offset) % 1440 + 1440) % 1440;
+  const utcTotalRaw = localTotal - offset;
+  const utcTotal = ((utcTotalRaw % 1440) + 1440) % 1440;
+  const dayDelta = Math.floor(utcTotalRaw / 1440);
   const hour = Math.floor(utcTotal / 60) % 24;
   const minute = utcTotal % 60;
 
@@ -89,11 +103,18 @@ export function buildCronExpression(
   const hh = String(hour);
   const dow =
     state.frequency === 'weekly' && state.daysOfWeek.length > 0
-      ? [...state.daysOfWeek].sort((a, b) => a - b).join(',')
+      ? [...state.daysOfWeek]
+          .map((d) => shiftWeekday(d, dayDelta))
+          .sort((a, b) => a - b)
+          .join(',')
       : '*';
   const dom =
     state.frequency === 'monthly' && state.daysOfMonth.length > 0
-      ? [...state.daysOfMonth].sort((a, b) => a - b).join(',')
+      ? [...state.daysOfMonth]
+          .map((d) => d + dayDelta)
+          .filter((d) => d >= 1 && d <= 31)
+          .sort((a, b) => a - b)
+          .join(',')
       : state.frequency === 'monthly'
         ? '1'
         : '*';
@@ -135,7 +156,9 @@ export function parseCronExpression(
     ) {
       return null;
     }
-    daysOfWeek = days.map((d) => (d === 7 ? 0 : d));
+    // Normalize cron's dual Sunday encoding (0 and 7) to 7, matching
+    // getNextRun, formatCronLabel and the builder's WEEKDAYS values.
+    daysOfWeek = days.map((d) => (d === 0 ? 7 : d));
   } else if (dom !== '*' && dow === '*') {
     frequency = 'monthly';
     let days: number[];
@@ -165,12 +188,25 @@ export function parseCronExpression(
   };
 
   if (timezone) {
-    // Inverse of buildCronExpression: local = utc + offset (mod 1440).
+    // Inverse of buildCronExpression: local = utc + offset (mod 1440). When
+    // the conversion crosses midnight the day delta shifts the weekdays and
+    // (where representable) the days-of-month into the local calendar day.
     const offset = getTimezoneOffsetMinutes(timezone, referenceDate);
+    const localTotalRaw = state.hour * 60 + state.minute + offset;
     const localTotal =
-      (((state.hour * 60 + state.minute + offset) % 1440) + 1440) % 1440;
+      (((localTotalRaw % 1440) + 1440) % 1440);
+    const dayDelta = Math.floor(localTotalRaw / 1440);
     state.hour = Math.floor(localTotal / 60) % 24;
     state.minute = localTotal % 60;
+    if (state.frequency === 'weekly') {
+      state.daysOfWeek = state.daysOfWeek.map((d) =>
+        shiftWeekday(d, dayDelta),
+      );
+    } else if (state.frequency === 'monthly') {
+      state.daysOfMonth = state.daysOfMonth
+        .map((d) => d + dayDelta)
+        .filter((d) => d >= 1 && d <= 31);
+    }
   }
 
   return state;
@@ -206,18 +242,25 @@ export function getNextRun(
     ),
   );
 
-  for (let day = 0; day < 366; day++) {
+  // Start one day earlier: for negative offsets the local calendar day can
+  // lag the UTC day of `from`. Past candidates are filtered below.
+  for (let day = -1; day < 366; day++) {
     const localDay = new Date(startLocal.getTime() + day * 86400000);
     const offset = getTimezoneOffsetMinutes(timezone, localDay);
-    if (state.frequency === 'weekly') {
-      const dow = ((localDay.getUTCDay() + 6) % 7) + 1; // 1=Monday ... 7=Sunday
-      if (!state.daysOfWeek.includes(dow)) continue;
-    } else if (state.frequency === 'monthly') {
-      if (!state.daysOfMonth.includes(localDay.getUTCDate())) continue;
-    }
     const utcMs =
       localDay.getTime() + (localHour * 60 + localMinute - offset) * 60000;
-    if (utcMs > from.getTime()) return new Date(utcMs);
+    if (utcMs <= from.getTime()) continue;
+    // The cron's day fields are in UTC, so match against the UTC calendar
+    // date of the candidate instant (its local date can differ when the
+    // offset conversion crosses midnight).
+    const utcDate = new Date(utcMs);
+    if (state.frequency === 'weekly') {
+      const dow = ((utcDate.getUTCDay() + 6) % 7) + 1; // 1=Monday ... 7=Sunday
+      if (!state.daysOfWeek.includes(dow)) continue;
+    } else if (state.frequency === 'monthly') {
+      if (!state.daysOfMonth.includes(utcDate.getUTCDate())) continue;
+    }
+    return new Date(utcMs);
   }
   return null;
 }
@@ -236,7 +279,7 @@ export function formatNextRun(date: Date, timezone: string): string {
   }).format(date);
 }
 
-const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function formatTime12(hour: number, minute: number): string {
   const period = hour < 12 ? 'AM' : 'PM';
@@ -254,27 +297,27 @@ export function formatCronLabel(
   timezone: string,
   referenceDate: Date = new Date(),
 ): string | null {
-  const state = parseCronExpression(cron);
+  // Parsing with the timezone converts both the clock time and the day
+  // fields into the local calendar day, so the label agrees with getNextRun.
+  const state = parseCronExpression(cron, timezone, referenceDate);
   if (!state) return null;
 
-  // Cron is in UTC: convert to local wall-clock time in `timezone`, matching
-  // the same conversion getNextRun uses so both displays agree.
-  const offset = getTimezoneOffsetMinutes(timezone, referenceDate);
-  const localTotal =
-    (((state.hour * 60 + state.minute + offset) % 1440) + 1440) % 1440;
-  const localHour = Math.floor(localTotal / 60) % 24;
-  const localMinute = localTotal % 60;
-  const time = formatTime12(localHour, localMinute);
+  const time = formatTime12(state.hour, state.minute);
 
   if (state.frequency === 'weekly') {
     const days = [...state.daysOfWeek]
       .sort((a, b) => a - b)
-      // Internally Sunday is stored as 0; WEEKDAY_LABELS is 1-indexed (Mon=0).
-      .map((d) => WEEKDAY_LABELS[d === 0 ? 6 : d - 1])
+      // WEEKDAY_LABELS is 0-indexed while days are 1=Mon .. 7=Sun.
+      .map((d) => WEEKDAY_LABELS[d - 1])
       .join(', ');
     return `Every week on ${days} at ${time}`;
   }
   if (state.frequency === 'monthly') {
+    if (state.daysOfMonth.length === 0) {
+      // The day shift pushed every selected day outside 1..31 (e.g. a local
+      // day 1 that lands on the previous month); only the time is stable.
+      return `Every month at ${time}`;
+    }
     const days = [...state.daysOfMonth]
       .sort((a, b) => a - b)
       .join(', ');

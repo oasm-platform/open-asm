@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
+import { WEEKDAY_LABELS } from '@/lib/cron-schedule';
 
 const renderBuilder = (props?: Partial<React.ComponentProps<typeof CronScheduleBuilder>>) => {
   const onChange = vi.fn();
@@ -20,7 +21,10 @@ const renderBuilder = (props?: Partial<React.ComponentProps<typeof CronScheduleB
 };
 
 describe('CronScheduleBuilder', () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
 
   it('emits the default cron (daily 00:00 UTC for +07) on mount', () => {
     const { onChange } = renderBuilder();
@@ -57,11 +61,24 @@ describe('CronScheduleBuilder', () => {
     await user.click(screen.getByRole('button', { name: 'Day 1' }));
     await user.click(screen.getByRole('button', { name: 'Day 10' }));
     await user.click(screen.getByRole('button', { name: 'Day 26' }));
-    // default 00:00 +07 -> 17:00 UTC (previous day); dom 1,10,26
+    // default 00:00 +07 -> 17:00 UTC (previous day); dom shifts back one day
+    // and day 1 lands on the previous month, so it is dropped.
     expect(onChange).toHaveBeenLastCalledWith({
-      cron: '0 17 1,10,26 * *',
+      cron: '0 17 9,25 * *',
       timezone: 'Asia/Ho_Chi_Minh',
     });
+  });
+
+  it('preselects the current weekday when Weekly is chosen', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    // Expected value derives from the same real clock the builder uses, so no
+    // fake timers are needed (vitest 4 fake timers deadlock the worker pool).
+    const today = ((new Date().getDay() + 6) % 7) + 1; // 1=Mon .. 7=Sun
+    await user.click(screen.getByRole('button', { name: 'Weekly' }));
+    expect(
+      screen.getByRole('button', { name: WEEKDAY_LABELS[today - 1] }),
+    ).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('emits weekly cron with selected days', async () => {
@@ -70,9 +87,13 @@ describe('CronScheduleBuilder', () => {
     await user.click(screen.getByRole('button', { name: 'Weekly' }));
     await user.click(screen.getByRole('button', { name: 'Mon' }));
     await user.click(screen.getByRole('button', { name: 'Thu' }));
-    // default 00:00 local +07 -> 17:00 UTC (previous day); weekly Mon+Thu
+    // Weekly preselects today; selected days are Mon+Thu+today. Local 00:00
+    // +07 -> 17:00 UTC the previous day shifts each weekday back one day.
+    const today = ((new Date().getDay() + 6) % 7) + 1;
+    const shiftBack = (d: number) => ((((d - 2) % 7) + 7) % 7) + 1;
+    const expected = [...new Set([1, 4, today].map(shiftBack))].sort().join(',');
     expect(onChange).toHaveBeenLastCalledWith({
-      cron: '0 17 * * 1,4',
+      cron: `0 17 * * ${expected}`,
       timezone: 'Asia/Ho_Chi_Minh',
     });
   });
@@ -81,6 +102,38 @@ describe('CronScheduleBuilder', () => {
     renderBuilder({ defaultValue: '30 1 * * 1' });
     // 01:30 UTC +07 -> 08:30 local; weekly with Monday selected
     expect(screen.getByRole('button', { name: 'Mon' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('re-syncs the form state when defaultValue changes', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <CronScheduleBuilder
+        timezone="Asia/Ho_Chi_Minh"
+        onChange={onChange}
+        defaultValue="30 1 * * 1"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Mon' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // Switching the source cron rebuilds the selection: 00:00 UTC Wed is
+    // 07:00 local Wed in +07.
+    rerender(
+      <CronScheduleBuilder
+        timezone="Asia/Ho_Chi_Minh"
+        onChange={onChange}
+        defaultValue="0 0 * * 3"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Mon' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(screen.getByRole('button', { name: 'Wed' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('prefills the hour/minute selects in local time, not UTC', () => {

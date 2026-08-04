@@ -1,5 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+} from 'class-validator';
+import { IsCronSchedule } from './cron-schedule.validator';
 
 export class CreateAssetGroupDto {
   @ApiProperty({
@@ -16,6 +25,9 @@ export class CreateAssetGroupDto {
   })
   @IsOptional()
   @IsString()
+  @Matches(/^#[0-9a-fA-F]{6}$/, {
+    message: 'hexColor must be a 6-digit hex color, e.g. `#78716C`',
+  })
   hexColor?: string;
 
   @ApiProperty({
@@ -30,6 +42,8 @@ export class CreateAssetGroupDto {
   @IsOptional()
   @IsArray()
   @IsUUID(undefined, { each: true })
+  @ArrayUnique()
+  @ArrayMaxSize(1000)
   hostIds?: string[];
 
   @ApiProperty({
@@ -40,6 +54,7 @@ export class CreateAssetGroupDto {
   })
   @IsOptional()
   @IsString()
+  @IsCronSchedule()
   schedule?: string;
 
   @ApiProperty({
@@ -52,5 +67,7 @@ export class CreateAssetGroupDto {
   @IsOptional()
   @IsArray()
   @IsUUID(undefined, { each: true })
+  @ArrayUnique()
+  @ArrayMaxSize(1000)
   toolIds?: string[];
 }
