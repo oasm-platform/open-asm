@@ -86,3 +86,5 @@ console/coverage/
 console/e2e/playwright-report/
 console/e2e/test-results/
 console/e2e/.auth/
+.playwright-mcp/
+asset-groups-lastrun.png

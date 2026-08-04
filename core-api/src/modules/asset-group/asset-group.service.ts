@@ -94,6 +94,22 @@ export class AssetGroupService {
         'totalAssets',
       );
 
+      // Add latest job history run time subquery so the list can both
+      // return lastRunAt and sort by it (via the select alias).
+      queryBuilder.addSelect(
+        (subQuery) =>
+          subQuery
+            .select('MAX(jh."createdAt")', 'lastRunAt')
+            .from('job_histories', 'jh')
+            .innerJoin(
+              'asset_group_workflows',
+              'agw_sub',
+              'agw_sub."workflowId" = jh."workflowId"',
+            )
+            .where('agw_sub."assetGroupId" = assetGroup.id'),
+        'lastRunAt',
+      );
+
       // Get total count with the same base conditions (without pagination)
       const countQueryBuilder = this.assetGroupRepo
         .createQueryBuilder('assetGroup')
@@ -117,24 +133,30 @@ export class AssetGroupService {
 
       const total = await countQueryBuilder.getCount();
 
-      // Apply ordering, pagination to main query
+      // Apply ordering, pagination to main query. lastRunAt is a select
+      // alias (not an entity column), so order by the alias directly.
+      const orderColumn =
+        sortBy === 'lastRunAt' ? 'lastRunAt' : `assetGroup.${sortBy}`;
       queryBuilder
-        .orderBy(`assetGroup.${sortBy}`, sortOrder)
+        .orderBy(orderColumn, sortOrder)
         .offset(offset)
         .limit(limit);
 
       const results: {
         entities: AssetGroup[];
-        raw: Array<{ totalAssets: string }>;
+        raw: Array<{ totalAssets: string; lastRunAt: Date | null }>;
       } = await queryBuilder.getRawAndEntities();
 
-      // Map results to include totalAssets in the entity
+      // Map results to include totalAssets and lastRunAt in the entity
       const assetGroupsWithTotalAssets = results.entities.map(
         (assetGroup, index) => {
           const rawResult = results.raw[index];
           return {
             ...assetGroup,
             totalAssets: parseInt(rawResult.totalAssets) || 0,
+            lastRunAt: rawResult.lastRunAt
+              ? new Date(rawResult.lastRunAt)
+              : null,
           };
         },
       );
@@ -864,7 +886,7 @@ export class AssetGroupService {
           assetGroupWorkspace.jobId,
         );
 
-        if (updateData.schedule !== CronSchedule.DISABLED) {
+        if ((updateData.schedule as CronSchedule) !== CronSchedule.DISABLED) {
           const newJob = await this.scanScheduleQueue.add(
             assetGroupWorkspace.id,
             { id: assetGroupWorkspace.id } as AssetGroupWorkflow,

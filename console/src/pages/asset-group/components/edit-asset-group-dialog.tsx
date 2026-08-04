@@ -69,12 +69,12 @@ export function EditAssetGroupDialog({
       {
         onSuccess: () => {
           setOpen(false);
-          toast.success('Host group updated successfully');
+          toast.success('Automation group updated successfully');
           queryClient.invalidateQueries({ queryKey: ['asset-group'] });
           onSuccess?.();
         },
         onError: () => {
-          toast.error('Failed to update host group');
+          toast.error('Failed to update automation group');
         },
       },
     );
@@ -107,7 +107,7 @@ export function EditAssetGroupDialog({
           <DialogHeader>
             <DialogTitle>Edit automation group</DialogTitle>
             <DialogDescription>
-              Update the name and color of your host group.
+              Update the name and color of your automation group.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -122,7 +122,7 @@ export function EditAssetGroupDialog({
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Host group name" {...field} />
+                      <Input placeholder="Automation group name" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -1,4 +1,6 @@
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ToolSelector } from '@/components/common/tool-selector';
 import {
   Card,
   CardContent,
@@ -7,19 +9,19 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import JobStatusBadge from '@/components/ui/job-status';
+import { useNavigate } from '@tanstack/react-router';
 import {
   CronScheduleBuilder,
   type CronScheduleChange,
 } from '@/components/ui/cron-schedule-builder';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Image } from '@/components/ui/image';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
 import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
@@ -40,7 +42,6 @@ import {
   CalendarClockIcon,
   HistoryIcon,
   MoveUpRight,
-  Plus,
   Settings,
 } from 'lucide-react';
 import dayjs from 'dayjs';
@@ -59,7 +60,7 @@ export default function AssetGroupWorkflow({
 }) {
   const { data: workspaceToolsInstalled } =
     useToolsControllerGetInstalledTools();
-  const [hoveredToolId, setHoveredToolId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSetScheduleOpen, setIsSetScheduleOpen] = useState(false);
   const [draftSchedule, setDraftSchedule] =
@@ -97,6 +98,17 @@ export default function AssetGroupWorkflow({
     // Check if the tool name exists in any workflow
     return toolsName.includes(toolName);
   };
+
+  const toolById = Object.fromEntries(
+    toolProviders.map((tool) => [tool.id, tool]),
+  );
+
+  // Tools that are already part of the workflow
+  const selectedToolIds = new Set(
+    toolProviders
+      .filter((tool) => isToolInGroup(tool.name))
+      .map((tool) => tool.id),
+  );
 
   // Get the workflow that contains a specific tool
   const getWorkflowContainingTool = (toolName: string) => {
@@ -308,8 +320,8 @@ export default function AssetGroupWorkflow({
 
   return (
     <div className="space-y-4 mb-4">
-      <Card className="pt-2 md:pt-6">
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+      <Card className="py-2 gap-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 px-2 md:px-4 py-2">
           <div>
             <CardTitle>Schedule</CardTitle>
             <CardDescription className="hidden md:block">
@@ -317,19 +329,30 @@ export default function AssetGroupWorkflow({
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            {lastRun && <JobStatusBadge status={lastRun.status} />}
+            {lastRun && (
+              <JobStatusBadge
+                status={lastRun.status}
+                onClick={() =>
+                  navigate({
+                    to: '/jobs/runs/$id',
+                    params: { id: lastRun.id },
+                  })
+                }
+              />
+            )}
             <Button
               type="button"
               variant="outline"
+              size="icon"
+              aria-label="Configure schedule"
               disabled={isPendingUpdateSchedule || !workflows[0]?.id}
               onClick={() => setIsSetScheduleOpen(true)}
             >
               <Settings className="size-4" />
-              <span className="hidden sm:inline">Config</span>
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-4 py-2">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
               <div className="flex items-center gap-3">
@@ -358,43 +381,44 @@ export default function AssetGroupWorkflow({
               </div>
             </div>
           </div>
-          <Dialog open={isSetScheduleOpen} onOpenChange={setIsSetScheduleOpen}>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Set custom schedule</DialogTitle>
-                <DialogDescription>
+          <Sheet open={isSetScheduleOpen} onOpenChange={setIsSetScheduleOpen}>
+            <SheetContent
+              side="right"
+              className="w-full sm:max-w-lg"
+            >
+              <SheetHeader>
+                <SheetTitle>Set custom schedule</SheetTitle>
+                <SheetDescription>
                   Configure a custom cron expression for this workflow.
-                </DialogDescription>
-              </DialogHeader>
-              <CronScheduleBuilder
-                defaultValue={
-                  currentSchedule && currentSchedule !== 'disabled'
-                    ? currentSchedule
-                    : undefined
-                }
-                onChange={setDraftSchedule}
-              />
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  className="sm:mr-auto"
+                </SheetDescription>
+              </SheetHeader>
+              <div className="flex-1 space-y-4 overflow-y-auto px-4">
+                <CronScheduleBuilder
+                  defaultValue={
+                    currentSchedule && currentSchedule !== 'disabled'
+                      ? currentSchedule
+                      : undefined
+                  }
+                  onChange={setDraftSchedule}
+                />
+              </div>
+              <SheetFooter className="mt-auto flex-row items-center">
+                <ConfirmDialog
+                  title="Disable schedule"
+                  description="This will stop the schedule from running. You can re-enable it later."
+                  confirmText="Disable"
                   disabled={
                     isPendingUpdateSchedule ||
                     !workflows[0]?.id ||
                     currentSchedule === 'disabled'
                   }
-                  onClick={handleDisableSchedule}
-                >
-                  Disable
-                </Button>
+                  onConfirm={handleDisableSchedule}
+                  trigger={
+                    <Button variant="outline">Disable</Button>
+                  }
+                />
                 <Button
-                  variant="outline"
-                  disabled={isPendingUpdateSchedule}
-                  onClick={() => setIsSetScheduleOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
+                  className="ml-auto"
                   disabled={
                     isPendingUpdateSchedule ||
                     !workflows[0]?.id ||
@@ -404,13 +428,13 @@ export default function AssetGroupWorkflow({
                 >
                   Set
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
         </CardContent>
       </Card>
-      <Card className="pt-2 md:pt-6">
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+      <Card className="py-2 gap-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 px-2 md:px-4 py-2">
           <div>
             <CardTitle>Tools</CardTitle>
             <CardDescription className="hidden md:block">
@@ -429,7 +453,7 @@ export default function AssetGroupWorkflow({
             onSuccess={onRefetch}
           />
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-2 md:px-4 py-2">
           {toolProviders.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-8 text-center">
               <p className="text-sm text-muted-foreground">
@@ -443,51 +467,19 @@ export default function AssetGroupWorkflow({
               </Link>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-6">
-              {toolProviders.map((tool) => {
-                const isAdded = isToolInGroup(tool.name);
-                const isHovered = hoveredToolId === tool.id;
-                return (
-                  <div
-                    key={tool.id}
-                    className={`relative flex flex-col items-center gap-2 ${
-                      isProcessing ? 'cursor-wait' : 'cursor-pointer'
-                    }`}
-                    onClick={() => !isProcessing && handleToolClick(tool)}
-                    onMouseEnter={() => setHoveredToolId(tool.id)}
-                    onMouseLeave={() => setHoveredToolId(null)}
-                  >
-                    <div
-                      className={`transition-all duration-300 ${
-                        isAdded ? '' : 'grayscale opacity-60 hover:grayscale-0 hover:opacity-100'
-                      }`}
-                    >
-                      <Image
-                        url={tool.logoUrl}
-                        width={64}
-                        height={64}
-                        className="rounded-full"
-                      />
-                    </div>
-                    {/* Show + icon on hover for unassigned tools */}
-                    {!isAdded && isHovered && (
-                      <div className="absolute top-0 left-0 w-16 h-16 rounded-full bg-black/60 flex items-center justify-center">
-                        <Plus size={32} color="white" />
-                      </div>
-                    )}
-                    {/* Show indication for assigned tools */}
-                    {isAdded && (
-                      <div className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-xs font-bold text-white">
-                        ✓
-                      </div>
-                    )}
-                    <div className="text-xs font-medium text-center capitalize">
-                      {tool.name}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <ToolSelector
+              tools={toolProviders.map((tool) => ({
+                id: tool.id,
+                name: tool.name,
+                logoUrl: tool.logoUrl,
+              }))}
+              selectedIds={selectedToolIds}
+              disabled={isProcessing}
+              onToggle={(id) => {
+                const tool = toolById[id];
+                if (tool && !isProcessing) handleToolClick(tool);
+              }}
+            />
           )}
         </CardContent>
       </Card>

@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 import Page from '@/components/common/page';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import {
   Dialog,
@@ -294,46 +295,51 @@ export default function Runs() {
     >
       {/* Tools Section */}
       {!!jobHistoryDetail?.tools?.length && (
-        <div className="mb-6 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold mb-4">Pipeline</h3>
-          <div className="flex items-center gap-4 flex-wrap">
-            {jobHistoryDetail.tools.map((tool, index) => (
-              <div key={tool.id} className="flex items-center gap-2">
-                <Link
-                  to="/tools/$id"
-                  params={{ id: tool.id }}
-                  className="flex items-center gap-2 hover:opacity-80"
-                >
-                  <Image
-                    url={tool.logoUrl}
-                    width={40}
-                    height={40}
-                    className="rounded-full border"
-                  />
-                  <span className="font-medium">{tool.name}</span>
-                  {tool.status === JobStatus.in_progress && (
-                    <Loader2Icon className="animate-spin" />
+        <Card className="mb-6 py-2">
+          <CardContent className="px-2 md:px-4 py-2">
+            <CardTitle className="mb-3">Tools</CardTitle>
+            <div className="flex items-center gap-4 flex-wrap">
+              {jobHistoryDetail.tools.map((tool, index) => (
+                <div key={tool.id} className="flex items-center gap-2">
+                  <Link
+                    to="/tools/$id"
+                    params={{ id: tool.id }}
+                    className="flex items-center gap-2 hover:opacity-80"
+                  >
+                    <Image
+                      url={tool.logoUrl}
+                      width={40}
+                      height={40}
+                      className="rounded-full border"
+                    />
+                    <span className="font-medium text-sm">{tool.name}</span>
+                    {tool.status === JobStatus.in_progress && (
+                      <Loader2Icon className="animate-spin size-4" />
+                    )}
+                    {tool.status === JobStatus.completed && (
+                      <CircleCheck className="text-green-500 size-4" />
+                    )}
+                    {tool.status === JobStatus.pending && (
+                      <Clock className="text-yellow-500 size-4" />
+                    )}
+                    {tool.status === JobStatus.failed && (
+                      <X className="text-red-500 size-4" />
+                    )}
+                    {tool.status === JobStatus.skipped && (
+                      <CircleAlert className="text-gray-400 size-4" />
+                    )}
+                  </Link>
+                  {index < jobHistoryDetail.tools.length - 1 && (
+                    <ArrowRight
+                      className="text-muted-foreground"
+                      size={16}
+                    />
                   )}
-                  {tool.status === JobStatus.completed && (
-                    <CircleCheck className="text-green-500" />
-                  )}
-                  {tool.status === JobStatus.pending && (
-                    <Clock className="text-yellow-500" />
-                  )}
-                  {tool.status === JobStatus.failed && (
-                    <X className="text-red-500" />
-                  )}
-                  {tool.status === JobStatus.skipped && (
-                    <CircleAlert className="text-gray-400" />
-                  )}
-                </Link>
-                {index < jobHistoryDetail.tools.length - 1 && (
-                  <ArrowRight className="text-muted-foreground" size={16} />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {!!jobsError && (

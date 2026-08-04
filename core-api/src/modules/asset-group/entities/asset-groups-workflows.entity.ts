@@ -18,6 +18,11 @@ export class AssetGroupWorkflow extends BaseEntity {
   @JoinColumn({ name: 'assetGroupId' })
   assetGroup: Relation<AssetGroup>;
 
+  // Explicit FK column so the join id is available without loading the
+  // relation (query builders only select it when the relation is joined).
+  @Column({ name: 'assetGroupId', type: 'uuid' })
+  assetGroupId: string;
+
   @ApiProperty({ type: () => Workflow })
   @ManyToOne(() => Workflow, (workflow) => workflow.id, {
     onDelete: 'CASCADE',

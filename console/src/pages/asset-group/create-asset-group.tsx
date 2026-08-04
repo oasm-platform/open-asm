@@ -1,6 +1,7 @@
 'use client';
 
 import Page from '@/components/common/page';
+import { ToolSelector } from '@/components/common/tool-selector';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,7 +13,6 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { DataTable } from '@/components/ui/data-table';
-import { Image } from '@/components/ui/image';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -40,7 +40,6 @@ import {
   CheckIcon,
   FileTextIcon,
   LoaderCircleIcon,
-  Plus,
   ServerIcon,
   WrenchIcon,
 } from 'lucide-react';
@@ -130,7 +129,7 @@ export function CreateAssetGroup() {
           navigate({ to: `/groups/${response.id}` });
         },
         onError: () => {
-          toast.error('Failed to create host group');
+          toast.error('Failed to create automation group');
         },
       },
     );
@@ -147,7 +146,7 @@ export function CreateAssetGroup() {
     return next;
   };
 
-  const hostColumns: ColumnDef<AssetRow>[] = [
+  const hostColumns: ColumnDef<HostAssetRow>[] = [
     {
       id: 'select',
       header: () => {
@@ -193,8 +192,8 @@ export function CreateAssetGroup() {
             <CardTitle>Automation group</CardTitle>
             <CardDescription>
               Runs automated security scans. Add your
-              hosts, pick the tools to execute, and set a schedule — recurring
-              scans run on their own, with no manual kick-off.
+              hosts, pick the tools to execute, and set a schedule — scans run
+              automatically on schedule, or on demand.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex max-sm:px-0 flex-col gap-8">
@@ -305,58 +304,16 @@ export function CreateAssetGroup() {
           )}
 
           {step === 2 && (
-            <div className="flex flex-wrap gap-6">
-              {(toolsQuery.data?.data || []).map((tool) => {
-                const isSelected = toolIds.has(tool.id);
-                return (
-                  <button
-                    key={tool.id}
-                    type="button"
-                    className="group flex cursor-pointer flex-col items-center gap-2"
-                    onClick={() =>
-                      setToolIds((prev) => toggleId(prev, tool.id))
-                    }
-                  >
-                    <div
-                      className="relative"
-                      style={{
-                        filter: isSelected ? 'none' : 'grayscale(100%)',
-                        opacity: isSelected ? 1 : 0.6,
-                        transition: 'all 0.3s ease',
-                      }}
-                    >
-                      <Image
-                        url={tool.logoUrl}
-                        width={64}
-                        height={64}
-                        className="rounded-full"
-                      />
-                      {/* Show + on hover for unselected tools */}
-                      {!isSelected && (
-                        <div
-                          className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                          aria-hidden
-                        >
-                          <Plus className="size-8 text-white" />
-                        </div>
-                      )}
-                      {/* Show check badge for selected tools */}
-                      {isSelected && (
-                        <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#10b981]">
-                          <CheckIcon className="size-3 text-white" />
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-center text-sm capitalize">
-                      {tool.name}
-                    </span>
-                  </button>
-                );
-              })}
-              {(toolsQuery.data?.data?.length ?? 0) === 0 && (
-                <p className="text-sm text-muted-foreground">No tools found</p>
-              )}
-            </div>
+            <ToolSelector
+              tools={(toolsQuery.data?.data || []).map((tool) => ({
+                id: tool.id,
+                name: tool.name,
+                logoUrl: tool.logoUrl,
+              }))}
+              selectedIds={toolIds}
+              onToggle={(id) => setToolIds((prev) => toggleId(prev, id))}
+              emptyMessage="No tools found"
+            />
           )}
 
           {step === 3 && (

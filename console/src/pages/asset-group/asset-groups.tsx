@@ -42,6 +42,17 @@ export function AssetGroups() {
       ),
     },
     {
+      accessorKey: 'lastRunAt',
+      header: 'Last Run',
+      cell: ({ row }) => (
+        <div className="font-medium">
+          {row.original.lastRunAt
+            ? dayjs(row.original.lastRunAt).format('YYYY-MM-DD HH:mm')
+            : '—'}
+        </div>
+      ),
+    },
+    {
       accessorKey: 'createdAt',
       header: 'Created Date',
       enableSorting: false,

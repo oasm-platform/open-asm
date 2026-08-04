@@ -233,7 +233,7 @@ export function DataTable<TData, TValue>({
       )}
 
       {/* Table */}
-      <div className={cn('my-4 rounded-md', isShowBorder && 'border')}>
+      <div className={cn('my-4 rounded-lg', isShowBorder && 'border')}>
         <Table>
           {isShowHeader && (
             <TableHeader>

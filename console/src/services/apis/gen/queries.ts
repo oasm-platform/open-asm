@@ -2482,6 +2482,8 @@ export type AssetGroup = {
   hexColor?: string;
   assetGroupWorkflows?: AssetGroupWorkflow[];
   totalAssets: number;
+  /** @nullable */
+  lastRunAt?: string | null;
 };
 
 export type GetManyAssetGroupDto = {

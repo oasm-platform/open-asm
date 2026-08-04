@@ -50,4 +50,7 @@ export class AssetGroup extends BaseEntity {
 
   @ApiProperty()
   totalAssets: number;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true, required: false })
+  lastRunAt?: Date | null;
 }

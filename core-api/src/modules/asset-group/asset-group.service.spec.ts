@@ -14,9 +14,34 @@ import type { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
 import { AssetGroup } from './entities/asset-groups.entity';
+import type { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 
 describe('AssetGroupService', () => {
   let service: AssetGroupService;
+
+  const rawLastRun = {
+    id: 'jh-1',
+    workflowId: 'wf-1',
+    createdAt: new Date('2026-08-01T10:00:00Z'),
+    updatedAt: new Date('2026-08-01T10:30:00Z'),
+    totalJobs: '3',
+    status: 'COMPLETED',
+    workflowName: 'Group Workflow - group-1',
+    jobHistoryName: 'Group Workflow - group-1',
+    jobRunType: 'MANUAL',
+  };
+
+  const rawLastRun2 = {
+    id: 'jh-2',
+    workflowId: 'wf-2',
+    createdAt: new Date('2026-08-01T09:00:00Z'),
+    updatedAt: new Date('2026-08-01T09:15:00Z'),
+    totalJobs: '1',
+    status: 'FAILED',
+    workflowName: 'Group Workflow - group-2',
+    jobHistoryName: 'Group Workflow - group-2',
+    jobRunType: 'MANUAL',
+  };
 
   const mockManager = {
     findOneBy: jest.fn(),
@@ -27,6 +52,7 @@ describe('AssetGroupService', () => {
     manager: mockManager,
     findOne: jest.fn(),
     findByIds: jest.fn(),
+    createQueryBuilder: jest.fn(),
     create: jest.fn<
       Record<string, unknown>,
       [data: Record<string, unknown>]
@@ -50,6 +76,7 @@ describe('AssetGroupService', () => {
 
   const mockAssetGroupWorkflowRepo = {
     find: jest.fn(),
+    createQueryBuilder: jest.fn(),
     create: jest.fn<
       Record<string, unknown>,
       [data: Record<string, unknown>]
@@ -89,6 +116,30 @@ describe('AssetGroupService', () => {
       orderBy: jest.fn().mockReturnThis(),
       addOrderBy: jest.fn().mockReturnThis(),
       getRawMany: jest.fn().mockResolvedValue(rawRows),
+    };
+    return builder;
+  };
+
+  // Query builder chain mock for the asset group list query
+  const createMockAssetGroupListBuilder = ({
+    entities = [],
+    raw = [],
+    total = 0,
+  }: {
+    entities?: Record<string, unknown>[];
+    raw?: Array<{ totalAssets: string; lastRunAt?: string | null }>;
+    total?: number;
+  } = {}) => {
+    const builder = {
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getRawAndEntities: jest.fn().mockResolvedValue({ entities, raw }),
+      getCount: jest.fn().mockResolvedValue(total),
     };
     return builder;
   };
@@ -370,30 +421,6 @@ describe('AssetGroupService', () => {
     const workspaceId = 'workspace-uuid';
     const groupId = 'group-1';
 
-    const rawLastRun = {
-      id: 'jh-1',
-      workflowId: 'wf-1',
-      createdAt: new Date('2026-08-01T10:00:00Z'),
-      updatedAt: new Date('2026-08-01T10:30:00Z'),
-      totalJobs: '3',
-      status: 'COMPLETED',
-      workflowName: 'Group Workflow - group-1',
-      jobHistoryName: 'Group Workflow - group-1',
-      jobRunType: 'MANUAL',
-    };
-
-    const rawLastRun2 = {
-      id: 'jh-2',
-      workflowId: 'wf-2',
-      createdAt: new Date('2026-08-01T09:00:00Z'),
-      updatedAt: new Date('2026-08-01T09:15:00Z'),
-      totalJobs: '1',
-      status: 'FAILED',
-      workflowName: 'Group Workflow - group-2',
-      jobHistoryName: 'Group Workflow - group-2',
-      jobRunType: 'MANUAL',
-    };
-
     beforeEach(() => {
       mockJobHistoryRepo.createQueryBuilder.mockImplementation(() =>
         createMockJobHistoryBuilder([rawLastRun]),
@@ -521,6 +548,122 @@ describe('AssetGroupService', () => {
       await expect(
         service.getAssetGroupById(groupId, workspaceId),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getManyAssetGroups', () => {
+    const workspaceId = 'workspace-uuid';
+    const groupId = 'group-1';
+    const groupId2 = 'group-2';
+
+    const listQuery = {
+      page: 1,
+      limit: 10,
+      sortBy: 'name',
+      sortOrder: 'ASC',
+    } as GetAllAssetGroupsQueryDto;
+
+    const lastRunAt = new Date('2026-08-01T10:00:00Z');
+    const lastRunAt2 = new Date('2026-08-01T09:00:00Z');
+
+    beforeEach(() => {
+      mockAssetGroupRepo.createQueryBuilder.mockImplementation(() =>
+        createMockAssetGroupListBuilder({
+          entities: [{ id: groupId, name: 'Web Servers' }],
+          raw: [{ totalAssets: '3', lastRunAt: lastRunAt.toISOString() }],
+          total: 1,
+        }),
+      );
+    });
+
+    it('should return lastRunAt from the group workflows latest job history instead of embedding workflows', async () => {
+      const result = await service.getManyAssetGroups(listQuery, workspaceId);
+
+      expect(result.total).toBe(1);
+      expect(result.data[0].totalAssets).toBe(3);
+      expect(result.data[0].lastRunAt).toEqual(lastRunAt);
+      expect(result.data[0]).not.toHaveProperty('assetGroupWorkflows');
+      expect(mockAssetGroupWorkflowRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('should attach a distinct lastRunAt per group', async () => {
+      mockAssetGroupRepo.createQueryBuilder.mockImplementation(() =>
+        createMockAssetGroupListBuilder({
+          entities: [
+            { id: groupId, name: 'Web Servers' },
+            { id: groupId2, name: 'Databases' },
+          ],
+          raw: [
+            { totalAssets: '3', lastRunAt: lastRunAt.toISOString() },
+            { totalAssets: '0', lastRunAt: lastRunAt2.toISOString() },
+          ],
+          total: 2,
+        }),
+      );
+
+      const result = await service.getManyAssetGroups(listQuery, workspaceId);
+
+      expect(result.data[0].lastRunAt).toEqual(lastRunAt);
+      expect(result.data[1].lastRunAt).toEqual(lastRunAt2);
+    });
+
+    it('should set lastRunAt to null when the group workflows have no job history', async () => {
+      mockAssetGroupRepo.createQueryBuilder.mockImplementation(() =>
+        createMockAssetGroupListBuilder({
+          entities: [{ id: groupId, name: 'Web Servers' }],
+          raw: [{ totalAssets: '3', lastRunAt: null }],
+          total: 1,
+        }),
+      );
+
+      const result = await service.getManyAssetGroups(listQuery, workspaceId);
+
+      expect(result.data[0].lastRunAt).toBeNull();
+    });
+
+    it('should not query anything else when the page has no groups', async () => {
+      mockAssetGroupRepo.createQueryBuilder.mockImplementation(() =>
+        createMockAssetGroupListBuilder({ entities: [], raw: [], total: 0 }),
+      );
+
+      const result = await service.getManyAssetGroups(listQuery, workspaceId);
+
+      expect(result.data).toEqual([]);
+      expect(
+        mockAssetGroupWorkflowRepo.createQueryBuilder,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should sort by the lastRunAt select alias when sortBy is lastRunAt', async () => {
+      const builder = createMockAssetGroupListBuilder({
+        entities: [{ id: groupId, name: 'Web Servers' }],
+        raw: [{ totalAssets: '3', lastRunAt: lastRunAt.toISOString() }],
+        total: 1,
+      });
+      mockAssetGroupRepo.createQueryBuilder.mockReturnValue(builder);
+
+      const sortByLastRunAtQuery = {
+        page: 1,
+        limit: 10,
+        sortBy: 'lastRunAt',
+        sortOrder: 'DESC',
+      } as GetAllAssetGroupsQueryDto;
+      await service.getManyAssetGroups(sortByLastRunAtQuery, workspaceId);
+
+      expect(builder.orderBy).toHaveBeenCalledWith('lastRunAt', 'DESC');
+    });
+
+    it('should keep sorting by entity columns for other sortBy values', async () => {
+      const builder = createMockAssetGroupListBuilder({
+        entities: [{ id: groupId, name: 'Web Servers' }],
+        raw: [{ totalAssets: '3', lastRunAt: lastRunAt.toISOString() }],
+        total: 1,
+      });
+      mockAssetGroupRepo.createQueryBuilder.mockReturnValue(builder);
+
+      await service.getManyAssetGroups(listQuery, workspaceId);
+
+      expect(builder.orderBy).toHaveBeenCalledWith('assetGroup.name', 'ASC');
     });
   });
 

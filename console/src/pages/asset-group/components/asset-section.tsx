@@ -104,7 +104,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
     <div className="w-full space-y-4">
       <div className="flex flex-row items-center justify-between space-y-0 pb-2 mb-4">
         <div>
-          <h2 className="text-xl font-semibold">Hosts</h2>
+          <h2 className="text-base font-semibold">Hosts</h2>
           <p className="text-sm text-muted-foreground">
             {assetsInGroupQuery.data?.total || 0} hosts in this group
           </p>

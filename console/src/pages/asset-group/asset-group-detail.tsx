@@ -25,7 +25,7 @@ export default function AssetGroupDetail() {
       { id: id! },
       {
         onSuccess: () => {
-          toast('Host group deleted successfully');
+          toast('Automation group deleted successfully');
           // Invalidate the list cache so the deleted group disappears from
           // the asset groups list when navigating back.
           queryClient.invalidateQueries({ queryKey: ['asset-group'] });
@@ -33,7 +33,7 @@ export default function AssetGroupDetail() {
           navigate({ to: '/groups' });
         },
         onError: () => {
-          toast.error('Failed to delete host group');
+          toast.error('Failed to delete automation group');
         },
       },
     );
@@ -46,7 +46,7 @@ export default function AssetGroupDetail() {
       isShowButtonGoBack
       title={
         <div className="flex items-center gap-2">
-          <span className="font-bold text-xl">{data?.name}</span>
+          <span>{data?.name}</span>
           <div
             className={`h-4 w-4 rounded-full`}
             style={{ background: data?.hexColor }}
@@ -57,7 +57,7 @@ export default function AssetGroupDetail() {
         <div className="flex items-center gap-2 w-full">
           <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
           <ConfirmDialog
-            title="Delete host group"
+            title="Delete automation group"
             description={`Are you sure you want to delete "${data?.name}"? This action cannot be undone.`}
             onConfirm={handleDelete}
             typeToConfirm="delete"
