@@ -33,6 +33,41 @@ interface BetterAuthSpec {
  * - No tags → "Authentication"
  * - Other tags → preserved
  */
+/**
+ * OpenAPI 3.1 allows `type` to be an array (e.g. `["object", "null"]`), but
+ * tools validating against OpenAPI 3.0 (orval) reject it. Normalize array-form
+ * `type` into a single `type` plus `nullable: true`.
+ */
+/**
+ * JSON Schema 3.1 keywords that are not part of the OpenAPI 3.0 Schema
+ * Object. orval validates against OpenAPI 3.0 and rejects these, so they
+ * are dropped during normalization. `propertyNames` appears in the
+ * better-auth spec (e.g. sign-in/social additionalData, admin endpoints).
+ */
+const NON_OA30_SCHEMA_KEYS = new Set(['propertyNames']);
+
+export function normalizeSchemaType(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeSchemaType);
+  }
+  if (value && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      if (NON_OA30_SCHEMA_KEYS.has(key)) continue;
+      result[key] = normalizeSchemaType(child);
+    }
+    if (Array.isArray(result.type)) {
+      const types = result.type as string[];
+      const hasNull = types.includes('null');
+      const nonNullTypes = types.filter((t) => t !== 'null');
+      result.type = nonNullTypes.length === 1 ? nonNullTypes[0] : nonNullTypes;
+      if (hasNull) result.nullable = true;
+    }
+    return result;
+  }
+  return value;
+}
+
 function loadBetterAuthSpec(): BetterAuthSpec | null {
   const betterAuthPath = path.join(
     __dirname,
@@ -49,7 +84,9 @@ function loadBetterAuthSpec(): BetterAuthSpec | null {
 export function mergeBetterAuthSpec(
   document: OpenAPIObject,
 ): OpenAPIObject {
-  const betterAuthDoc = loadBetterAuthSpec();
+  const betterAuthDoc = normalizeSchemaType(
+    loadBetterAuthSpec(),
+  ) as BetterAuthSpec | null;
   if (!betterAuthDoc) return document;
 
   // Merge tags (skip "Default" — replaced by "Authentication")

@@ -6,7 +6,6 @@ import {
   Loader2Icon,
   XCircleIcon,
 } from 'lucide-react';
-import { useNavigate } from '@tanstack/react-router';
 import { Badge } from './badge';
 
 interface StatusConfig {
@@ -65,25 +64,29 @@ const defaultConfig: StatusConfig = {
 interface JobStatusProps {
   status: JobStatus;
   onlyIcon?: boolean;
+  /** Optional click handler; navigation logic lives in the caller. */
+  onClick?: () => void;
 }
 
-const JobStatusBadge = ({ status, onlyIcon = false }: JobStatusProps) => {
+const JobStatusBadge = ({ status, onlyIcon = false, onClick }: JobStatusProps) => {
   const config = statusConfigs[status] || defaultConfig;
-  const navigate = useNavigate();
   return (
     <Badge
       variant={config.variant}
-      className={config.className + ' h-8 cursor-pointer flex items-center'}
-      onClick={() => {
-        const showAnimation = status === JobStatus.pending || status === JobStatus.in_progress;
-        navigate({
-          search: ((prev: Record<string, unknown>) => ({
-            ...prev,
-            animation: showAnimation ? 'true' : undefined,
-          })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-          replace: true,
-        });
-      }}
+      className={config.className + ' h-8 flex items-center border-transparent select-none' + (onClick ? ' cursor-pointer' : ' cursor-default')}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
     >
       <span className="flex items-center">
         {config.icon}

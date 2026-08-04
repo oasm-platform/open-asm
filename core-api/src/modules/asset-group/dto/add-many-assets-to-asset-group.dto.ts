@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsUUID } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsUUID } from 'class-validator';
 
 export class AddManyAssetsToAssetGroupDto {
   @ApiProperty({
@@ -12,5 +12,7 @@ export class AddManyAssetsToAssetGroupDto {
   })
   @IsArray()
   @IsUUID(undefined, { each: true })
+  @ArrayUnique()
+  @ArrayMaxSize(1000)
   assetIds: string[];
 }

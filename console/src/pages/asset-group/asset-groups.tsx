@@ -8,12 +8,14 @@ import {
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import { useNavigate } from '@tanstack/react-router';
-import { CreateAssetGroupDialog } from '../assets/components/create-asset-group-dialog';
+import { Plus } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 
 export function AssetGroups() {
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
-    tableHandlers: { setPage, setPageSize, setFilter },
+    tableHandlers: { setPage, setPageSize, setFilter, setParams },
   } = useServerDataTable();
 
   const navigate = useNavigate();
@@ -40,6 +42,17 @@ export function AssetGroups() {
       ),
     },
     {
+      accessorKey: 'lastRunAt',
+      header: 'Last Run',
+      cell: ({ row }) => (
+        <div className="font-medium">
+          {row.original.lastRunAt
+            ? dayjs(row.original.lastRunAt).format('YYYY-MM-DD HH:mm')
+            : '—'}
+        </div>
+      ),
+    },
+    {
       accessorKey: 'createdAt',
       header: 'Created Date',
       enableSorting: false,
@@ -53,7 +66,7 @@ export function AssetGroups() {
     {
       limit: pageSize,
       page: page,
-      sortBy: 'name',
+      sortBy: sortBy,
       sortOrder: sortOrder,
       search: filter,
     },
@@ -79,11 +92,23 @@ export function AssetGroups() {
         onPageSizeChange={setPageSize}
         totalItems={total}
         sortBy={sortBy}
-        toolbarComponents={[<CreateAssetGroupDialog />]}
+        toolbarComponents={[
+          <Button
+            key="create"
+            variant="outline"
+            onClick={() => navigate({ to: '/groups/create' })}
+          >
+            <Plus />
+            Create
+          </Button>,
+        ]}
         sortOrder={sortOrder}
         isShowBorder={true}
+        onSortChange={(column, order) =>
+          setParams({ sortBy: column, sortOrder: order })
+        }
         onRowClick={(row) => navigate({ to: '/groups/' + row.id })}
-        emptyMessage="No host groups found"
+        emptyMessage="No groups found"
         filterColumnKey="name"
         filterValue={filter}
         onFilterChange={setFilter}

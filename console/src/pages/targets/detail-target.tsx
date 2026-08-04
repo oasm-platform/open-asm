@@ -80,7 +80,20 @@ export function DetailTarget() {
       header={
         <div className="flex items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
-            <JobStatusBadge status={target.status} />
+            <JobStatusBadge
+              status={target.status}
+              onClick={() => {
+                const showAnimation =
+                  target.status === JobStatus.pending ||
+                  target.status === JobStatus.in_progress;
+                navigate({
+                  search: {
+                    animation: showAnimation ? 'true' : undefined,
+                  },
+                  replace: true,
+                });
+              }}
+            />
           </div>
           <div className="flex items-center gap-3">
             <p className="text-muted-foreground hidden md:block">

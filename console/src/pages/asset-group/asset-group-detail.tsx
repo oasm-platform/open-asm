@@ -5,8 +5,9 @@ import {
   useAssetGroupControllerDelete,
   useAssetGroupControllerGetById,
 } from '@/services/apis/gen/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { Trash } from 'lucide-react';
-import { useParams } from '@tanstack/react-router';
+import { useParams, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import AssetGroupWorkflow from './components/asset-group-workflow';
 import { AssetSection } from './components/asset-section';
@@ -14,20 +15,25 @@ import { EditAssetGroupDialog } from './components/edit-asset-group-dialog';
 
 export default function AssetGroupDetail() {
   const { id } = useParams({ strict: false });
+  const navigate = useNavigate();
   const { data, refetch } = useAssetGroupControllerGetById(id!);
   const { mutate, isPending } = useAssetGroupControllerDelete();
+  const queryClient = useQueryClient();
 
   const handleDelete = () => {
     mutate(
       { id: id! },
       {
         onSuccess: () => {
-          toast('Host group deleted successfully');
-          // Navigate back to the asset groups list after successful deletion
-          window.history.back();
+          toast('Automation group deleted successfully');
+          // Invalidate the list cache so the deleted group disappears from
+          // the asset groups list when navigating back.
+          queryClient.invalidateQueries({ queryKey: ['asset-group'] });
+          // Navigate to the asset groups list after successful deletion
+          navigate({ to: '/groups' });
         },
         onError: () => {
-          toast.error('Failed to delete host group');
+          toast.error('Failed to delete automation group');
         },
       },
     );
@@ -40,7 +46,7 @@ export default function AssetGroupDetail() {
       isShowButtonGoBack
       title={
         <div className="flex items-center gap-2">
-          <span className="font-bold text-xl">{data?.name}</span>
+          <span>{data?.name}</span>
           <div
             className={`h-4 w-4 rounded-full`}
             style={{ background: data?.hexColor }}
@@ -51,7 +57,7 @@ export default function AssetGroupDetail() {
         <div className="flex items-center gap-2 w-full">
           <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
           <ConfirmDialog
-            title="Delete host group"
+            title="Delete automation group"
             description={`Are you sure you want to delete "${data?.name}"? This action cannot be undone.`}
             onConfirm={handleDelete}
             typeToConfirm="delete"
@@ -65,7 +71,11 @@ export default function AssetGroupDetail() {
         </div>
       }
     >
-      <AssetGroupWorkflow assetGroupId={id!} />
+      <AssetGroupWorkflow
+        assetGroupId={id!}
+        workflows={data.assetGroupWorkflows ?? []}
+        onRefetch={refetch}
+      />
       <AssetSection assetGroupId={id!} />
     </Page>
   );

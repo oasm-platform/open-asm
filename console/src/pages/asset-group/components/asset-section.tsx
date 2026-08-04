@@ -32,13 +32,13 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
 
   // Queries for assets in the asset group
   const {
-    tableParams: { page, pageSize, sortBy, sortOrder },
-    tableHandlers: { setPage, setPageSize, setParams },
+    tableParams: { page, pageSize, sortBy, sortOrder, filter },
+    tableHandlers: { setPage, setPageSize, setParams, setFilter },
   } = useServerDataTable();
 
   const assetsInGroupQuery = useAssetGroupControllerGetAssetsByAssetGroupsId(
     assetGroupId,
-    { page, limit: pageSize, sortBy, sortOrder },
+    { page, limit: pageSize, sortBy, sortOrder, search: filter },
   );
 
   // Mutations
@@ -104,7 +104,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
     <div className="w-full space-y-4">
       <div className="flex flex-row items-center justify-between space-y-0 pb-2 mb-4">
         <div>
-          <h2 className="text-xl font-semibold">Hosts</h2>
+          <h2 className="text-base font-semibold">Hosts</h2>
           <p className="text-sm text-muted-foreground">
             {assetsInGroupQuery.data?.total || 0} hosts in this group
           </p>
@@ -129,7 +129,11 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
         onSortChange={(col, order) => {
           setParams({ sortBy: col, sortOrder: order });
         }}
+        filterColumnKey="value"
+        filterValue={filter}
+        onFilterChange={setFilter}
         totalItems={assetsInGroupQuery.data?.total ?? 0}
+        emptyMessage="No hosts in this group yet"
       />
     </div>
   );

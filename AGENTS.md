@@ -12,6 +12,8 @@ Before substantial work:
 
 **Critical**: This file contains only non-obvious, repo-specific facts agents would likely miss. Generic language/framework advice is intentionally omitted.
 
+**> **Run commands via `task` from the repo root — never via `npm/pnpm run ...` or raw `go test`.** The taskfiles encode performance-critical and correctness-critical configuration that raw package.json scripts bypass (sequential lint, Jest worker limits, SWC transform, env vars, dependency ordering). Running scripts directly is a violation and will be reverted.**
+
 ## Repository Layout
 
 Monorepo with 3 services:
@@ -23,20 +25,27 @@ Root `package.json` is an npm workspace for `core-api` + `console` only. Worker 
 
 Shared infra: PostgreSQL (pgvector/pg17), Redis, geo-ip proxy. See `docker-compose.yml`.
 
-## Key Commands (Use taskfile)
+## Key Commands (Run via `task` — NEVER raw npm/pnpm scripts)
+
+**Rule**: every build/dev/lint/test/codegen/migration command goes through `task` from the repo root. The taskfiles are the ONLY correct entry point: `task lint` runs ESLint sequentially (two type-aware processes at once will exhaust RAM), `task test` applies `--maxWorkers=50%` + the SWC transform, `task dev` sets the right `NODE_ENV`. `npm run lint`, `pnpm run test`, `go test ./...` etc. bypass all of that — don't call them.
 
 ```bash
 # Full project
 task init          # Install all deps + worker tools
 task dev           # API + Console dev servers (hot reload)
 task test          # Run API tests only (console tests commented out in root taskfile)
-task lint          # Lint core-api + console
+task lint          # Lint core-api + console (SEQUENTIAL — do not parallelize)
 task build         # Build all (API + Console + Worker)
 
 # Per-service
-task api:test      # core-api tests only
-task api:lint      # core-api lint
+task api:test      # core-api tests only (Jest, --maxWorkers=50%, SWC transform)
+task api:lint      # core-api lint (type-checked ESLint + --fix)
+task console:test  # console tests (vitest; NOT included in root `task test`)
 task console:lint  # console lint
+task worker:test   # worker tests (go test ./...)
+task worker:lint   # worker vet (go vet ./...)
+task worker:check  # worker compile check (go build ./...)
+task worker:format # worker formatting (go fmt ./...)
 task worker:dev    # Run worker (CLI mode)
 task worker:dev-app  # Run worker (app mode)
 task worker:dev replicas=3 maxJobs=10  # Multi-instance workers
@@ -74,7 +83,7 @@ task docker-compose  # Full stack (API, Console, 3 workers, DB, Redis, geo-ip)
   - `@typescript-eslint/consistent-type-imports: error`
 - `.prettierrc` — Single quotes, semicolons, 2-space indent.
 - `tsconfig.json` — `@/` alias maps to `src/`. Jest `moduleNameMapper` mirrors this.
-- Lint command: `npm run lint` (includes `--fix`).
+- Lint command: `task api:lint` (runs `eslint "{src,apps,libs,test}/**/*.ts" --fix`).
 
 ### console (React/TypeScript)
 - `eslint.config.js` — React hooks + refresh plugin rules.
@@ -123,12 +132,11 @@ Each service has its own `.env` (not committed, gitignored):
 
 ## Testing
 
-- **core-api**: Jest, `*.spec.ts` alongside source. Mock all external deps. `moduleNameMapper` for `@/` alias.
-  - `npm run test` — unit tests
-  - `npm run test:e2e` — e2e tests (separate config)
-  - `npm run test:watch` — watch mode
-- **console**: Tests exist but `task test` skips them (commented in root taskfile). Run `cd console && npm run test` explicitly.
-- **worker**: `go test ./...` or `task worker:test`.
+- **core-api**: Jest, `*.spec.ts` alongside source. Mock all external deps. `moduleNameMapper` for `@/` alias. Run with `task api:test` — Jest runs with `--maxWorkers=50%` and the SWC transform (config in `core-api/package.json` under `jest.transform`; do NOT switch back to ts-jest or remove `maxWorkers`, both will thrash RAM on this machine).
+  - Unit tests: `task api:test`
+  - Watch / e2e / coverage variants exist as scripts (`test:watch`, `test:e2e`, `test:cov`) but have no taskfile entry — add one to the taskfile before running (never invoke the raw script).
+- **console**: Tests exist but `task test` skips them (commented in root taskfile). Run `task console:test` explicitly.
+- **worker**: `task worker:test` (go test ./...), `task worker:check` (compile), `task worker:lint` (go vet).
 - CI: Node.js 22. Runs lint (both services) + test (core-api only) on all PRs/pushes.
 
 ## Git Hooks
@@ -149,8 +157,9 @@ MCP server provides AI context over core-api. Config in `core-api/.env`:
 
 ## Common Gotchas
 
+0. **Never bypass taskfile** — running `npm run lint`, `pnpm run test`, or `go test ./...` directly skips the RAM/CPU limits and transform config baked into the taskfiles (sequential lint, `--maxWorkers=50%`, SWC). If a taskfile entry is missing for what you need, add it to the taskfile — do not invoke the raw script.
 1. **API contract changes** → Run `task gen-api` or console hooks will be stale.
-2. **Console tests disabled** in root `task test` — run `cd console && npm run test` explicitly.
+2. **Console tests disabled** in root `task test` — run `task console:test` explicitly.
 3. **Migrations** use TypeORM CLI via `task migration:*`. DB config in `core-api/src/database/database-config.ts`.
 4. **Worker API key** must match core-api expected key (set in both `.env` files).
 5. **Generated code** in `console/src/services/apis/gen/` — edit via regeneration, not manually.

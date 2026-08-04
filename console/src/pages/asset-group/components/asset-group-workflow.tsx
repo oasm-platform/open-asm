@@ -1,13 +1,35 @@
-import { ScanScheduleSelect } from '@/components/scan-schedule-select';
-import { Image } from '@/components/ui/image';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ToolSelector } from '@/components/common/tool-selector';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import JobStatusBadge from '@/components/ui/job-status';
+import { useNavigate } from '@tanstack/react-router';
+import {
+  CronScheduleBuilder,
+  type CronScheduleChange,
+} from '@/components/ui/cron-schedule-builder';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
 import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
-  OnSchedule,
+  AssetGroupLastRunDtoStatus,
   ToolCategory,
   ToolsControllerGetManyToolsType,
-  UpdateTargetDtoScanSchedule,
+  type AssetGroupWorkflow as AssetGroupWorkflowRelation,
   useAssetGroupControllerAddManyWorkflows,
-  useAssetGroupControllerGetWorkflowsByAssetGroupsId,
   useAssetGroupControllerRemoveManyWorkflows,
   useAssetGroupControllerUpdateAssetGroupWorkflow,
   useToolsControllerGetInstalledTools,
@@ -15,46 +37,35 @@ import {
   useWorkflowsControllerDeleteWorkflow,
   useWorkflowsControllerUpdateWorkflow,
 } from '@/services/apis/gen/queries';
-import { MoveUpRight, Plus } from 'lucide-react';
+import {
+  CalendarClockIcon,
+  HistoryIcon,
+  MoveUpRight,
+  Settings,
+} from 'lucide-react';
+import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
-// Local type definitions for workflow data accessed in this component
-// The AssetGroupWorkflowWorkflow type from the API is opaque ({ [key: string]: unknown })
-// but we know the actual shape based on the Workflow and WorkflowContent types
-interface WorkflowJob {
-  name: string;
-  run: string;
-}
-
-interface WorkflowWithContent {
-  id: string;
-  content?: {
-    on?: { schedule?: string; target?: string[] };
-    jobs?: WorkflowJob[];
-    name?: string;
-  };
-}
-
-/** Cast an opaque AssetGroupWorkflowWorkflow to a usable WorkflowWithContent */
-function toWorkflow(w: unknown): WorkflowWithContent {
-  return w as WorkflowWithContent;
-}
-
 export default function AssetGroupWorkflow({
   assetGroupId,
+  workflows,
+  onRefetch,
 }: {
   assetGroupId: string;
+  workflows: AssetGroupWorkflowRelation[];
+  onRefetch: () => void;
 }) {
-  const { data: groupWorkflows, refetch: refetchWorkflows } =
-    useAssetGroupControllerGetWorkflowsByAssetGroupsId(assetGroupId);
   const { data: workspaceToolsInstalled } =
     useToolsControllerGetInstalledTools();
-  const [hoveredToolId, setHoveredToolId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSetScheduleOpen, setIsSetScheduleOpen] = useState(false);
+  const [draftSchedule, setDraftSchedule] =
+    useState<CronScheduleChange | null>(null);
   const {
-    mutate: updateAssetGroupWorkflowMutation,
+    mutate: updateAssetGroupWorkflow,
     isPending: isPendingUpdateSchedule,
   } = useAssetGroupControllerUpdateAssetGroupWorkflow();
   // Create/update/delete workflow mutation
@@ -76,30 +87,55 @@ export default function AssetGroupWorkflow({
   const isToolInGroup = (toolName: string) => {
     // Get all jobs from all workflows in the group
     const allJobs =
-      groupWorkflows?.data?.flatMap(
-        (groupWorkflow) => toWorkflow(groupWorkflow.workflow).content?.jobs || [],
+      workflows.flatMap(
+        (groupWorkflow) => groupWorkflow.workflow.content?.jobs || [],
       ) || [];
 
     // Extract all run values from jobs
-    const toolsName = allJobs.map((job: { run: string }) => job.run) || [];
+    const toolsName = allJobs.map((job) => job.run) || [];
 
     // Check if the tool name exists in any workflow
     return toolsName.includes(toolName);
   };
 
+  const toolById = Object.fromEntries(
+    toolProviders.map((tool) => [tool.id, tool]),
+  );
+
+  // Tools that are already part of the workflow
+  const selectedToolIds = new Set(
+    toolProviders
+      .filter((tool) => isToolInGroup(tool.name))
+      .map((tool) => tool.id),
+  );
+
   // Get the workflow that contains a specific tool
   const getWorkflowContainingTool = (toolName: string) => {
-    return groupWorkflows?.data?.find((groupWorkflow) => {
-      const jobs = toWorkflow(groupWorkflow.workflow).content?.jobs || [];
-      const toolsName = jobs.map((job: { run: string }) => job.run) || [];
+    return workflows.find((groupWorkflow) => {
+      const jobs = groupWorkflow.workflow.content?.jobs || [];
+      const toolsName = jobs.map((job) => job.run) || [];
       return toolsName.includes(toolName);
     });
   };
 
   // Get the current workflow in the group (assuming there's only one workflow per group)
   const getCurrentWorkflow = () => {
-    return groupWorkflows?.data?.[0];
+    return workflows[0];
   };
+
+  const timezone = getLocalTimezone();
+  const currentSchedule = getCurrentWorkflow()?.schedule;
+  const lastRun = getCurrentWorkflow()?.lastRun;
+  const lastRunText = lastRun
+    ? dayjs(lastRun.createdAt).format('DD/MM/YYYY HH:mm')
+    : 'Never';
+  const nextRun =
+    currentSchedule && currentSchedule !== 'disabled'
+      ? getNextRun(currentSchedule, timezone)
+      : null;
+  const nextRunText = nextRun
+    ? dayjs(nextRun).format('DD/MM/YYYY HH:mm')
+    : 'Disabled';
 
   // Handle tool click - add if not exists, remove if exists
   const handleToolClick = async (tool: { name: string; id: string }) => {
@@ -108,9 +144,8 @@ export default function AssetGroupWorkflow({
     if (isInGroup) {
       // If tool is in group, find the workflow containing it and remove the tool
       const groupWorkflow = getWorkflowContainingTool(tool.name)?.workflow;
-      const wf = groupWorkflow ? toWorkflow(groupWorkflow) : null;
 
-      if (!wf) {
+      if (!groupWorkflow) {
         toast.error('Workflow not found');
         return;
       }
@@ -120,19 +155,20 @@ export default function AssetGroupWorkflow({
 
         // Filter out the tool from the workflow's jobs
         const updatedJobs =
-          wf.content?.jobs?.filter((job) => job.run !== tool.name) || [];
+          groupWorkflow.content?.jobs?.filter((job) => job.run !== tool.name) ||
+          [];
 
         if (updatedJobs.length === 0) {
           // If no jobs left, remove workflow from asset group and delete it
           await removeWorkflowsMutation.mutateAsync({
             groupId: assetGroupId,
             data: {
-              workflowIds: [wf.id],
+              workflowIds: [groupWorkflow.id],
             },
           });
 
           await deleteWorkflowMutation.mutateAsync({
-            id: wf.id,
+            id: groupWorkflow.id,
           });
 
           toast.success(
@@ -141,14 +177,14 @@ export default function AssetGroupWorkflow({
         } else {
           // Update the workflow with the remaining jobs
           const updatedWorkflowContent = {
-            ...wf.content,
+            ...groupWorkflow.content,
             jobs: updatedJobs,
           };
 
           await updateWorkflowMutation.mutateAsync({
-            id: wf.id,
+            id: groupWorkflow.id,
             data: {
-              content: updatedWorkflowContent as import('@/services/apis/gen/queries').WorkflowContent,
+              content: updatedWorkflowContent,
             },
           });
 
@@ -158,7 +194,7 @@ export default function AssetGroupWorkflow({
         }
 
         // Refetch workflows to update the UI
-        await refetchWorkflows();
+        await onRefetch();
       } catch (error) {
         console.error('Error removing tool from workflow:', error);
         toast.error('Failed to remove tool. Please try again.');
@@ -167,8 +203,7 @@ export default function AssetGroupWorkflow({
       }
     } else {
       // If tool is not in group, check if group already has a workflow
-      const groupWf = getCurrentWorkflow()?.workflow;
-      const existingWorkflow = groupWf ? toWorkflow(groupWf) : null;
+      const existingWorkflow = getCurrentWorkflow()?.workflow ?? null;
 
       try {
         setIsProcessing(true);
@@ -191,7 +226,7 @@ export default function AssetGroupWorkflow({
           await updateWorkflowMutation.mutateAsync({
             id: existingWorkflow.id,
             data: {
-              content: updatedWorkflowContent as import('@/services/apis/gen/queries').WorkflowContent,
+              content: updatedWorkflowContent,
             },
           });
 
@@ -205,7 +240,7 @@ export default function AssetGroupWorkflow({
               name: `Group Workflow - ${assetGroupId}`,
               content: {
                 on: {
-                  schedule: OnSchedule['0_0_*_*_*'], // Use correct enum value
+                  schedule: '0 0 * * *',
                   target: [], // Empty target array
                 },
                 jobs: [
@@ -238,7 +273,7 @@ export default function AssetGroupWorkflow({
         }
 
         // Refetch workflows to update the UI
-        await refetchWorkflows();
+        await onRefetch();
       } catch (error) {
         console.error('Error adding tool:', error);
         toast.error('Failed to add tool. Please try again.');
@@ -248,130 +283,211 @@ export default function AssetGroupWorkflow({
     }
   };
 
+  // Disable the workflow schedule by submitting the "disabled" value
+  const handleDisableSchedule = () => {
+    const workflowId = workflows[0]?.id;
+    if (!workflowId) return;
+
+    updateAssetGroupWorkflow(
+      { id: workflowId, data: { schedule: 'disabled' } },
+      {
+        onSuccess: async () => {
+          await onRefetch();
+          toast.success('Workflow schedule disabled');
+          setIsSetScheduleOpen(false);
+        },
+        onError: () => {
+          toast.error('Failed to disable the workflow schedule');
+        },
+      },
+    );
+  };
+
+  // Save a custom cron schedule from the dialog, same API as the dropdown
+  const handleSaveCustomSchedule = () => {
+    const workflowId = workflows[0]?.id;
+    if (!workflowId || !draftSchedule?.cron) return;
+
+    updateAssetGroupWorkflow(
+      { id: workflowId, data: { schedule: draftSchedule.cron } },
+      {
+        onSuccess: async () => {
+          await onRefetch();
+          toast.success('Schedule updated successfully');
+          setIsSetScheduleOpen(false);
+        },
+        onError: () => {
+          toast.error('Failed to update the schedule');
+        },
+      },
+    );
+  };
+
   return (
     <div className="space-y-4 mb-4">
-      <h2 className="text-xl font-semibold">Tools</h2>
-      <div className="flex-col md:flex-row flex justify-start md:justify-between md:items-center gap-2">
-        <div className="flex gap-4">
-          {toolProviders.length === 0 && (
-            <div>
+      <Card className="py-2 gap-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 px-2 md:px-4 py-2">
+          <div>
+            <CardTitle>Schedule</CardTitle>
+            <CardDescription className="hidden md:block">
+              Configure the scan frequency and run the workflow on demand.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {lastRun && (
+              <JobStatusBadge
+                status={lastRun.status}
+                onClick={() =>
+                  navigate({
+                    to: '/jobs/runs/$id',
+                    params: { id: lastRun.id },
+                  })
+                }
+              />
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Configure schedule"
+              disabled={isPendingUpdateSchedule || !workflows[0]?.id}
+              onClick={() => setIsSetScheduleOpen(true)}
+            >
+              <Settings className="size-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-4 py-2">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
+                  <HistoryIcon className="size-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Last run</p>
+                  <p className="text-sm font-medium text-foreground tabular-nums">
+                    {lastRun
+                      ? `${lastRun.jobRunType.charAt(0).toUpperCase()}${lastRun.jobRunType.slice(1)} at ${lastRunText}`
+                      : lastRunText}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
+                  <CalendarClockIcon className="size-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Next run</p>
+                  <p className="text-sm font-medium text-foreground tabular-nums">
+                    {nextRunText}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <Sheet open={isSetScheduleOpen} onOpenChange={setIsSetScheduleOpen}>
+            <SheetContent
+              side="right"
+              className="w-full sm:max-w-lg gap-3"
+            >
+              <SheetHeader className="px-4 pt-3 pb-2">
+                <SheetTitle>Set custom schedule</SheetTitle>
+                <SheetDescription>
+                  Configure a custom cron expression for this workflow.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-0">
+                <CronScheduleBuilder
+                  defaultValue={
+                    currentSchedule && currentSchedule !== 'disabled'
+                      ? currentSchedule
+                      : undefined
+                  }
+                  onChange={setDraftSchedule}
+                />
+              </div>
+              <SheetFooter className="mt-auto flex-row items-center pt-2">
+                <ConfirmDialog
+                  title="Disable schedule"
+                  description="This will stop the schedule from running. You can re-enable it later."
+                  confirmText="Disable"
+                  disabled={
+                    isPendingUpdateSchedule ||
+                    !workflows[0]?.id ||
+                    currentSchedule === 'disabled'
+                  }
+                  onConfirm={handleDisableSchedule}
+                  trigger={
+                    <Button variant="outline">Disable</Button>
+                  }
+                />
+                <Button
+                  className="ml-auto"
+                  disabled={
+                    isPendingUpdateSchedule ||
+                    !workflows[0]?.id ||
+                    !draftSchedule?.cron
+                  }
+                  onClick={handleSaveCustomSchedule}
+                >
+                  Set
+                </Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </CardContent>
+      </Card>
+      <Card className="py-2 gap-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 px-2 md:px-4 py-2">
+          <div>
+            <CardTitle>Tools</CardTitle>
+            <CardDescription className="hidden md:block">
+              Scanning tools assigned to this group. Click a tool to add or
+              remove it.
+            </CardDescription>
+          </div>
+          <RunWorkflowButton
+            id={getCurrentWorkflow()?.id}
+            disabled={
+              lastRun?.status ===
+                AssetGroupLastRunDtoStatus.pending ||
+              lastRun?.status ===
+                AssetGroupLastRunDtoStatus.in_progress
+            }
+            onSuccess={onRefetch}
+          />
+        </CardHeader>
+        <CardContent className="px-2 md:px-4 py-2">
+          {toolProviders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                No scanning tools installed yet
+              </p>
               <Link
                 className="text-blue-500 italic flex items-center gap-1 hover:underline"
-                to={'/tools'}
+                to="/tools"
               >
                 Open Marketplace <MoveUpRight className="w-4 h-4" />
               </Link>
             </div>
+          ) : (
+            <ToolSelector
+              tools={toolProviders.map((tool) => ({
+                id: tool.id,
+                name: tool.name,
+                logoUrl: tool.logoUrl,
+              }))}
+              selectedIds={selectedToolIds}
+              disabled={isProcessing}
+              onToggle={(id) => {
+                const tool = toolById[id];
+                if (tool && !isProcessing) handleToolClick(tool);
+              }}
+            />
           )}
-          {toolProviders.map((tool) => {
-            const isAdded = isToolInGroup(tool.name);
-            const isHovered = hoveredToolId === tool.id;
-            return (
-              <div
-                key={tool.id}
-                style={{
-                  position: 'relative',
-                  cursor: isAdded
-                    ? isProcessing
-                      ? 'wait'
-                      : 'pointer'
-                    : 'pointer',
-                }}
-                className="space-y-2"
-                onClick={() => !isProcessing && handleToolClick(tool)}
-                onMouseEnter={() => setHoveredToolId(tool.id)}
-                onMouseLeave={() => setHoveredToolId(null)}
-              >
-                <div
-                  style={{
-                    filter: isAdded ? 'none' : 'grayscale(100%)',
-                    opacity: isAdded ? 1 : 0.6,
-                    transition: 'all 0.3s ease',
-                  }}
-                >
-                  <Image
-                    url={tool.logoUrl}
-                    width={64}
-                    height={64}
-                    className="rounded-full"
-                  />
-                </div>
-                {/* Show + icon on hover for unassigned tools */}
-                {!isAdded && isHovered && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '50%',
-                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
-                    <Plus size={32} color="white" />
-                  </div>
-                )}
-                {/* Show indication for assigned tools */}
-                {isAdded && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '2px',
-                      right: '2px',
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: '#10b981',
-                      border: '2px solid white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      color: 'white',
-                    }}
-                  >
-                    ✓
-                  </div>
-                )}
-                <div className="text-center capitalize">{tool.name}</div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex gap-2 justify-between">
-          <ScanScheduleSelect
-            disabled={isPendingUpdateSchedule || !groupWorkflows?.data[0]?.id}
-            value={
-              groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule
-            }
-            onChange={(value: UpdateTargetDtoScanSchedule) => {
-              const workflowId = groupWorkflows?.data[0]?.id;
-              if (!workflowId) return;
-              updateAssetGroupWorkflowMutation(
-                {
-                  id: workflowId,
-                  data: {
-                    schedule: value,
-                  },
-                },
-                {
-                  onSuccess: async () => {
-                    await refetchWorkflows();
-                    toast.success('Update schedule successfuly');
-                  },
-                },
-              );
-            }}
-          />
-          <RunWorkflowButton id={getCurrentWorkflow()?.id} />
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

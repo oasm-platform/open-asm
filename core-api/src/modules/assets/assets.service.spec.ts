@@ -155,6 +155,45 @@ describe('AssetsService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('getManyAsssetServices', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (mockAssetServiceRepository as any).metadata = { columns: [] };
+      (mockAssetServiceRepository as any).getManyAndCount = jest
+        .fn()
+        .mockResolvedValue([[], 0]);
+      (mockAssetServiceRepository as any).orderBy = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).addOrderBy = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).skip = jest.fn().mockReturnThis();
+      (mockAssetServiceRepository as any).take = jest.fn().mockReturnThis();
+    });
+
+    it('adds asset_service.id as ORDER BY tiebreaker so offset pagination stays stable when createdAt values tie', async () => {
+      await service.getManyAsssetServices(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'ASC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(
+        (mockAssetServiceRepository as any).orderBy,
+      ).toHaveBeenCalledWith('asset_service.createdAt', 'ASC');
+      // Without a unique tiebreaker, rows with equal createdAt are ordered
+      // arbitrarily by Postgres, so page 2 can repeat rows from page 1.
+      expect(
+        (mockAssetServiceRepository as any).addOrderBy,
+      ).toHaveBeenCalledWith('asset_service.id', 'ASC');
+    });
+  });
+
   describe('reScan', () => {
     const targetId = 'target-uuid';
 

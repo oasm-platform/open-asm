@@ -27,6 +27,7 @@ import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/i
 import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
 import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
 import { Route as AuthedGroupsIdRouteImport } from './routes/_authed/groups/$id'
+import { Route as AuthedGroupsCreateRouteImport } from './routes/_authed/groups/create'
 import { Route as AuthedIntegrationsIndexRouteImport } from './routes/_authed/integrations/index'
 import { Route as AuthedInternalNetworksIndexRouteImport } from './routes/_authed/internal-networks/index'
 import { Route as AuthedInternalNetworksIdRouteImport } from './routes/_authed/internal-networks/$id'
@@ -140,6 +141,11 @@ const AuthedGroupsIndexRoute = AuthedGroupsIndexRouteImport.update({
 const AuthedGroupsIdRoute = AuthedGroupsIdRouteImport.update({
   id: '/groups/$id',
   path: '/groups/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedGroupsCreateRoute = AuthedGroupsCreateRouteImport.update({
+  id: '/groups/create',
+  path: '/groups/create',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedIntegrationsIndexRoute = AuthedIntegrationsIndexRouteImport.update({
@@ -291,6 +297,7 @@ export interface FileRoutesByFullPath {
   '/agents/create': typeof AuthedAgentsCreateRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
+  '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
   '/providers/create': typeof AuthedProvidersCreateRoute
@@ -334,6 +341,7 @@ export interface FileRoutesByTo {
   '/agents/create': typeof AuthedAgentsCreateRoute
   '/assets/$id': typeof AuthedAssetsIdRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
+  '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
   '/providers/create': typeof AuthedProvidersCreateRoute
@@ -380,6 +388,7 @@ export interface FileRoutesById {
   '/_authed/agents/create': typeof AuthedAgentsCreateRoute
   '/_authed/assets/$id': typeof AuthedAssetsIdRoute
   '/_authed/groups/$id': typeof AuthedGroupsIdRoute
+  '/_authed/groups/create': typeof AuthedGroupsCreateRoute
   '/_authed/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/_authed/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
   '/_authed/providers/create': typeof AuthedProvidersCreateRoute
@@ -426,6 +435,7 @@ export interface FileRouteTypes {
     | '/agents/create'
     | '/assets/$id'
     | '/groups/$id'
+    | '/groups/create'
     | '/internal-networks/$id'
     | '/internal-networks/create'
     | '/providers/create'
@@ -469,6 +479,7 @@ export interface FileRouteTypes {
     | '/agents/create'
     | '/assets/$id'
     | '/groups/$id'
+    | '/groups/create'
     | '/internal-networks/$id'
     | '/internal-networks/create'
     | '/providers/create'
@@ -514,6 +525,7 @@ export interface FileRouteTypes {
     | '/_authed/agents/create'
     | '/_authed/assets/$id'
     | '/_authed/groups/$id'
+    | '/_authed/groups/create'
     | '/_authed/internal-networks/$id'
     | '/_authed/internal-networks/create'
     | '/_authed/providers/create'
@@ -678,6 +690,13 @@ declare module '@tanstack/react-router' {
       path: '/groups/$id'
       fullPath: '/groups/$id'
       preLoaderRoute: typeof AuthedGroupsIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/groups/create': {
+      id: '/_authed/groups/create'
+      path: '/groups/create'
+      fullPath: '/groups/create'
+      preLoaderRoute: typeof AuthedGroupsCreateRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/integrations/': {
@@ -867,6 +886,7 @@ interface AuthedRouteChildren {
   AuthedAgentsCreateRoute: typeof AuthedAgentsCreateRoute
   AuthedAssetsIdRoute: typeof AuthedAssetsIdRoute
   AuthedGroupsIdRoute: typeof AuthedGroupsIdRoute
+  AuthedGroupsCreateRoute: typeof AuthedGroupsCreateRoute
   AuthedInternalNetworksIdRoute: typeof AuthedInternalNetworksIdRoute
   AuthedInternalNetworksCreateRoute: typeof AuthedInternalNetworksCreateRoute
   AuthedProvidersCreateRoute: typeof AuthedProvidersCreateRoute
@@ -906,6 +926,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAgentsCreateRoute: AuthedAgentsCreateRoute,
   AuthedAssetsIdRoute: AuthedAssetsIdRoute,
   AuthedGroupsIdRoute: AuthedGroupsIdRoute,
+  AuthedGroupsCreateRoute: AuthedGroupsCreateRoute,
   AuthedInternalNetworksIdRoute: AuthedInternalNetworksIdRoute,
   AuthedInternalNetworksCreateRoute: AuthedInternalNetworksCreateRoute,
   AuthedProvidersCreateRoute: AuthedProvidersCreateRoute,

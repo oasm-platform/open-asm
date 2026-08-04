@@ -41,6 +41,7 @@ export class AssetGroup extends BaseEntity {
   )
   assetGroupAssets: Relation<AssetGroupAsset[]>;
 
+  @ApiProperty({ type: () => [AssetGroupWorkflow], required: false })
   @OneToMany(
     () => AssetGroupWorkflow,
     (assetGroupWorkflows) => assetGroupWorkflows.assetGroup,
@@ -49,4 +50,7 @@ export class AssetGroup extends BaseEntity {
 
   @ApiProperty()
   totalAssets: number;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true, required: false })
+  lastRunAt?: Date | null;
 }

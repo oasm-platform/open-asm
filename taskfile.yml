@@ -53,10 +53,11 @@ tasks:
 
   # Run linter
   # Executes ESLint for both core-api and console
+  # Sequential (cmds) to avoid running two type-aware ESLint processes at once
   lint:
-    deps:
-      - api:lint
-      - console:lint
+    cmds:
+      - task: api:lint
+      - task: console:lint
 
   # API documentation generation
   # Generates API documentation after ensuring API server is ready

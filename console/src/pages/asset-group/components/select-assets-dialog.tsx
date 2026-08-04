@@ -191,7 +191,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Select hosts to add</DialogTitle>
           <DialogDescription>
-            Choose hosts not currently in this host group to add
+            Choose hosts not currently in this automation group to add
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
