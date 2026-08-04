@@ -11,7 +11,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { authClient } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -22,10 +21,7 @@ const formSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
-const routeApi = getRouteApi('/login');
-
 export default function Login() {
-  const { redirect: redirectUrl } = routeApi.useSearch();
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -35,7 +31,6 @@ export default function Login() {
   });
 
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
@@ -44,7 +39,10 @@ export default function Login() {
       password: values.password,
       fetchOptions: {
         onSuccess: async () => {
-          await navigate({ to: redirectUrl || '/', replace: true });
+          // Don't navigate here — session hasn't propagated to
+          // RouterProvider context yet. Let AppRouter's effect call
+          // router.invalidate() after useSession() updates, which
+          // re-runs login.tsx:beforeLoad and redirects to '/'.
         },
         onError: (ctx) => {
           form.setError('password', {
@@ -82,7 +80,7 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@example.com" {...field} />
+                      <Input placeholder="email@example.com" className="h-10" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -98,6 +96,7 @@ export default function Login() {
                       <Input
                         type="password"
                         placeholder="••••••••"
+                        className="h-10"
                         {...field}
                       />
                     </FormControl>
