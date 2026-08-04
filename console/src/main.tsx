@@ -135,13 +135,10 @@ function AppRouter() {
       return;
     }
 
-    // Only invalidate on session refresh/switch (valid → valid).
-    // Skip on first load (null → valid) — RouterProvider already resolved
-    // routes with the correct context, and invalidate() can cause a brief
-    // stale-context re-resolution that flashes /login.
-    if (prevSession) {
-      router.invalidate();
-    }
+    // Invalidate on any session state change (null→valid, valid→valid).
+    // This re-evaluates route guards so _authed.beforeLoad sees the
+    // current session and login.tsx:beforeLoad redirects away from /login.
+    router.invalidate();
   }, [session]);
 
   // Wait for session to load before rendering the router.
