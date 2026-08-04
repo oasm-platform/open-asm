@@ -25,6 +25,6 @@
   },
   "dependencies": {
     "@tanstack/intent": "^0.0.41",
-    "@tanstack/router-core": "^1.171.8"
+    "@tanstack/router-core": "^1.171.15"
   }
 }
