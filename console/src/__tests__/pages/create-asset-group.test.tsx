@@ -115,13 +115,12 @@ describe('CreateAssetGroup wizard page', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
     // Step 2: hosts table with row selection
-    expect(await screen.findByText(/Add hosts/)).toBeInTheDocument();
     await user.click(await screen.findByText('https://example.com'));
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
-    // Step 3: tools table with row selection
-    expect(await screen.findByText(/Tools/)).toBeInTheDocument();
-    await user.click(await screen.findByText('Subdomain scan'));
+    // Step 3: tools selector (logo grid) with toggle selection
+    expect(await screen.findByText('Port scan')).toBeInTheDocument();
+    await user.click(screen.getByText('Subdomain scan'));
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
     // Step 4: schedule builder; Next becomes Save

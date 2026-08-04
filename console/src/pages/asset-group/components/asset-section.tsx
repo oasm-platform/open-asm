@@ -130,6 +130,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
           setParams({ sortBy: col, sortOrder: order });
         }}
         totalItems={assetsInGroupQuery.data?.total ?? 0}
+        emptyMessage="No hosts in this group yet"
       />
     </div>
   );

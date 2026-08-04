@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
+import { within } from '@testing-library/react';
 import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
 
 const mockGroup = {
@@ -7,18 +8,6 @@ const mockGroup = {
   name: 'Web Servers',
   hexColor: '#3b82f6',
   assetGroupWorkflows: [],
-};
-
-const mockStatistic = {
-  totalAssets: 12,
-  vulns: 5,
-  criticalVuls: 1,
-  highVuls: 2,
-  mediumVuls: 1,
-  lowVuls: 0,
-  infoVuls: 1,
-  ports: 15,
-  services: 4,
 };
 
 const { removeManyMock, assetsRef } = vi.hoisted(() => {
@@ -91,10 +80,6 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
       mutate: vi.fn(),
       isPending: false,
     }),
-    useAssetGroupControllerGetStatistic: () => ({
-      data: mockStatistic,
-      isLoading: false,
-    }),
     useAssetGroupControllerGetAssetsByAssetGroupsId: () => ({
       data: {
         data: assetsRef.value,
@@ -126,46 +111,22 @@ beforeEach(() => {
 });
 
 describe('AssetGroupDetail page', () => {
-  it('renders stat cards with severity breakdown from the group statistic', async () => {
-    renderWithProviders(<AssetGroupDetail />, {
-      routePath: '/groups/$id',
-      initialEntries: ['/groups/group-1'],
-    });
-
-    expect(await screen.findByText('Vulnerabilities')).toBeInTheDocument();
-    expect(screen.getByText('Assets')).toBeInTheDocument();
-    expect(screen.getByText('Ports')).toBeInTheDocument();
-    expect(screen.getByText('Services')).toBeInTheDocument();
-
-    // Severity stacked bar + legend
-    expect(screen.getByTestId('severity-bar')).toBeInTheDocument();
-    expect(
-      screen.getByTestId('severity-segment-criticalVuls'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('severity-segment-highVuls'),
-    ).toBeInTheDocument();
-    // Zero-count severity has no segment
-    expect(
-      screen.queryByTestId('severity-segment-lowVuls'),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText('Critical 1')).toBeInTheDocument();
-    expect(screen.getByText('High 2')).toBeInTheDocument();
-  });
-
-  it('lists hosts with status and IP count', async () => {
+  it('lists hosts with value and created date', async () => {
     renderWithProviders(<AssetGroupDetail />, {
       routePath: '/groups/$id',
       initialEntries: ['/groups/group-1'],
     });
 
     expect(await screen.findByText('https://example.com')).toBeInTheDocument();
-    expect(screen.getByText('Enabled')).toBeInTheDocument();
-    expect(screen.getByText('Disabled')).toBeInTheDocument();
-    // asset-1 has 2 A records + 1 AAAA record
-    expect(screen.getByTestId('ips-asset-1')).toHaveTextContent('3');
-    // asset-2 has no dnsRecords
-    expect(screen.getByTestId('ips-asset-2')).toHaveTextContent('0');
+    expect(screen.getByText('https://api.example.com')).toBeInTheDocument();
+    expect(screen.getByText('Host value')).toBeInTheDocument();
+    expect(screen.getByText('Created at')).toBeInTheDocument();
+    expect(
+      screen.getByText(new Date('2026-01-01T00:00:00Z').toLocaleDateString()),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(new Date('2026-01-02T00:00:00Z').toLocaleDateString()),
+    ).toBeInTheDocument();
   });
 
   it('shows the empty state when the group has no hosts', async () => {
@@ -180,35 +141,26 @@ describe('AssetGroupDetail page', () => {
     ).toBeInTheDocument();
   });
 
-  it('bulk removes selected hosts', async () => {
+  it('removes a single host through the row action', async () => {
     const { user } = renderWithProviders(<AssetGroupDetail />, {
       routePath: '/groups/$id',
       initialEntries: ['/groups/group-1'],
     });
     await screen.findByText('https://example.com');
 
-    await user.click(screen.getAllByLabelText('Select row')[0]);
-    expect(await screen.findByText(/1 selected/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Remove selected' }));
+    // The action button lives in the first data row (row 0 is the header).
+    const firstRow = screen.getAllByRole('row')[1];
+    await user.click(within(firstRow).getByRole('button'));
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Remove' }),
+    );
 
     await waitFor(() => {
       expect(removeManyMock).toHaveBeenCalledWith(
         { groupId: 'group-1', data: { assetIds: ['asset-1'] } },
         expect.anything(),
       );
-    });
-  });
-
-  it('navigates to the asset detail page when a row is clicked', async () => {
-    const { user, router } = renderWithProviders(<AssetGroupDetail />, {
-      routePath: '/groups/$id',
-      initialEntries: ['/groups/group-1'],
-    });
-    await screen.findByText('https://example.com');
-
-    await user.click(screen.getByText('https://example.com'));
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/assets/asset-1');
     });
   });
 });
