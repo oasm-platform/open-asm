@@ -1,4 +1,5 @@
 import { BullMQName, CronSchedule } from '@/common/enums/enum';
+import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { getQueueToken } from '@nestjs/bullmq';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -89,6 +90,7 @@ describe('AssetGroupService', () => {
 
   const mockAssetRepo = {
     findByIds: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
 
   const mockWorkflowRepo = {
@@ -646,7 +648,7 @@ describe('AssetGroupService', () => {
         page: 1,
         limit: 10,
         sortBy: 'lastRunAt',
-        sortOrder: 'DESC',
+        sortOrder: SortOrder.DESC,
       } as GetAllAssetGroupsQueryDto;
       await service.getManyAssetGroups(sortByLastRunAtQuery, workspaceId);
 
@@ -726,6 +728,82 @@ describe('AssetGroupService', () => {
       expect(mockScanScheduleQueue.removeJobScheduler).not.toHaveBeenCalled();
       expect(mockWorkflowRepo.delete).not.toHaveBeenCalled();
       expect(mockAssetGroupRepo.remove).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAssetsByAssetGroupsId', () => {
+    const workspaceId = 'workspace-uuid';
+    const groupId = 'group-1';
+
+    const createMockAssetSearchBuilder = ({
+      data = [] as Record<string, unknown>[],
+      total = 0,
+    } = {}) => {
+      const builder = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([data, total]),
+      };
+      return builder;
+    };
+
+    it('should filter assets by value ILIKE when search is provided', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue({ id: groupId });
+      const builder = createMockAssetSearchBuilder({
+        data: [{ id: 'asset-1', value: 'api.example.com' }],
+        total: 1,
+      });
+      mockAssetRepo.createQueryBuilder = jest.fn().mockReturnValue(builder);
+
+      const result = await service.getAssetsByAssetGroupsId(
+        groupId,
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: SortOrder.DESC,
+          search: 'example',
+        },
+        workspaceId,
+      );
+
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        'asset.value ILIKE :search',
+        { search: '%example%' },
+      );
+      expect(result.data).toEqual([{ id: 'asset-1', value: 'api.example.com' }]);
+      expect(result.total).toBe(1);
+    });
+
+    it('should not add the search filter when search is absent', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue({ id: groupId });
+      const builder = createMockAssetSearchBuilder();
+      mockAssetRepo.createQueryBuilder = jest.fn().mockReturnValue(builder);
+
+      await service.getAssetsByAssetGroupsId(
+        groupId,
+        { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: SortOrder.DESC },
+        workspaceId,
+      );
+
+      expect(builder.andWhere).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when the group does not belong to the workspace', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue(undefined);
+
+      await expect(
+        service.getAssetsByAssetGroupsId(
+          groupId,
+          { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: SortOrder.DESC },
+          workspaceId,
+        ),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockAssetRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
   });
 

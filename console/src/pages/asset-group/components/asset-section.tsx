@@ -32,13 +32,13 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
 
   // Queries for assets in the asset group
   const {
-    tableParams: { page, pageSize, sortBy, sortOrder },
-    tableHandlers: { setPage, setPageSize, setParams },
+    tableParams: { page, pageSize, sortBy, sortOrder, filter },
+    tableHandlers: { setPage, setPageSize, setParams, setFilter },
   } = useServerDataTable();
 
   const assetsInGroupQuery = useAssetGroupControllerGetAssetsByAssetGroupsId(
     assetGroupId,
-    { page, limit: pageSize, sortBy, sortOrder },
+    { page, limit: pageSize, sortBy, sortOrder, search: filter },
   );
 
   // Mutations
@@ -129,6 +129,9 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
         onSortChange={(col, order) => {
           setParams({ sortBy: col, sortOrder: order });
         }}
+        filterColumnKey="value"
+        filterValue={filter}
+        onFilterChange={setFilter}
         totalItems={assetsInGroupQuery.data?.total ?? 0}
         emptyMessage="No hosts in this group yet"
       />
