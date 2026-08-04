@@ -12,10 +12,6 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
-      parserOptions: {
-        project: ['./tsconfig.app.json', './tsconfig.node.json'], // Specify the project files to use
-        tsconfigRootDir: import.meta.dirname, // Set the root directory to the current directory
-      },
     },
     plugins: {
       'react-hooks': reactHooks,

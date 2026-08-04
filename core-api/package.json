@@ -14,7 +14,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
+    "test": "jest --maxWorkers=50%",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -93,6 +93,7 @@
     "@protobuf-ts/runtime-rpc": "^2.11.1",
     "@swc/cli": "^0.7.9",
     "@swc/core": "^1.15.3",
+    "@swc/jest": "^0.2.39",
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.6",
     "@types/jest": "^29.5.14",
@@ -127,7 +128,17 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)sx?$": "ts-jest"
+      "^.+\\.(t|j)sx?$": [
+        "@swc/jest",
+        {
+          "jsc": {
+            "parser": { "syntax": "typescript", "decorators": true },
+            "target": "es5",
+            "transform": { "legacyDecorator": true, "decoratorMetadata": true }
+          },
+          "module": { "type": "commonjs", "noInterop": true }
+        }
+      ]
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
