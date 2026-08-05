@@ -41,6 +41,7 @@ import { WorkerInstance } from '../workers/entities/worker.entity';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
+import { JobListItemDto } from './dto/job-list-item.dto';
 import {
   CreateJobs,
   GetManyJobsQueryParams,
@@ -103,7 +104,7 @@ export class JobsRegistryService {
   public async getManyJobs(
     workspaceId: string,
     query: GetManyJobsRequestDto,
-  ): Promise<GetManyBaseResponseDto<Job>> {
+  ): Promise<GetManyBaseResponseDto<JobListItemDto>> {
     const { limit, page, sortOrder, jobHistoryId, jobStatus } = query;
     let { sortBy } = query;
 
@@ -148,7 +149,7 @@ export class JobsRegistryService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    return getManyResponse<Job>({ query, data, total });
+    return getManyResponse<JobListItemDto>({ query, data, total });
   }
 
   /**
@@ -980,6 +981,8 @@ export class JobsRegistryService {
           WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
           WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
           WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.CANCELLED}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.SKIPPED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.SKIPPED}'
           ELSE '${JobStatus.PENDING}'
         END as "status"`,
       ])

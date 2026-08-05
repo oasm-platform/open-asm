@@ -121,7 +121,7 @@ const JobsRegistryPage = () => {
         columns={columns}
         data={jobsData?.data || []}
         isLoading={isLoading}
-        page={jobsData?.page ?? 1}
+        page={jobsData?.page ?? page}
         pageSize={jobsData?.limit ?? pageSize}
         totalItems={jobsData?.total ?? 0}
         emptyMessage="No jobs found"

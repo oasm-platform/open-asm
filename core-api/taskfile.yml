@@ -26,8 +26,13 @@ tasks:
   # --maxWorkers=50% limits as `task api:test`). Usage:
   #   task api:test:one SPEC=src/modules/storage/storage.service.spec.ts
   test:one:
+    requires:
+      vars: [SPEC]
+    preconditions:
+      - sh: test -n "{{.SPEC}}"
+        msg: SPEC must identify one test file
     cmds:
-      - pnpm run test -- {{.SPEC}}
+      - pnpm run test -- --runTestsByPath {{.SPEC}}
   clean:
     cmds:
       - rm -rf ./husky

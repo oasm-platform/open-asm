@@ -20,7 +20,7 @@ import {
 import Image from '@/components/ui/image';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import type { Job } from '@/services/apis/gen/queries';
+import type { JobListItemDto } from '@/services/apis/gen/queries';
 import {
   JobStatus,
   getJobsRegistryControllerGetJobHistoryDetailQueryKey,
@@ -41,7 +41,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams({ strict: false });
-  const [jobError, setJobError] = useState<Job | null>();
+  const [jobError, setJobError] = useState<JobListItemDto | null>();
   const queryClient = useQueryClient();
 
   const { mutate: deleteJobMutate } = useJobsRegistryControllerDeleteJob();
@@ -101,14 +101,14 @@ export default function Runs() {
     },
   );
 
-  const getTitle = (row: Job) => {
+  const getTitle = (row: JobListItemDto) => {
     const value = row?.assetService
       ? `${row.assetService.value}`
       : row?.asset?.value;
     return value;
   };
 
-  const columns: ColumnDef<Job>[] = [
+  const columns: ColumnDef<JobListItemDto>[] = [
     {
       accessorKey: 'status',
       cell: ({ row }) => {
@@ -130,7 +130,7 @@ export default function Runs() {
           {row.original.tool ? (
             <Link
               to="/tools/$id"
-              params={{ id: row.original.tool.id }}
+              params={{ id: row.original.tool.id ?? '' }}
               className="flex items-center gap-2"
             >
               <Image
@@ -319,7 +319,11 @@ export default function Runs() {
                       className="rounded-full border"
                     />
                     <span className="font-medium text-sm">{tool.name}</span>
-                    <JobStatusBadge status={tool.status} onlyIcon />
+                    <JobStatusBadge
+                      status={tool.status}
+                      onlyIcon
+                      className="px-0"
+                    />
                   </Link>
                   {index < jobHistoryDetail.tools.length - 1 && (
                     <ArrowRight
