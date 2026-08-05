@@ -23,6 +23,7 @@ import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Job } from '@/services/apis/gen/queries';
 import {
   JobStatus,
+  getJobsRegistryControllerGetJobHistoryDetailQueryKey,
   useJobsRegistryControllerCancelJob,
   useJobsRegistryControllerDeleteJob,
   useJobsRegistryControllerGetJobHistoryDetail,
@@ -33,14 +34,10 @@ import dayjs from 'dayjs';
 import {
   ArrowRight,
   Calendar,
-  CircleAlert,
-  CircleCheck,
   Clock,
-  Loader2Icon,
   MoreHorizontal,
-  X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams({ strict: false });
@@ -58,10 +55,15 @@ export default function Runs() {
     isUpdateSearchQueryParam: false,
   });
 
+  const hasActiveJobsRef = useRef(false);
+
   const { data: jobHistoryDetail } =
     useJobsRegistryControllerGetJobHistoryDetail(jobHistoryId || '', {
       query: {
-        refetchInterval: 1000,
+        // Poll only while any tool in this run is still active.
+        // The function form is evaluated lazily by React Query, so it always
+        // reads the latest value without re-creating the query config.
+        refetchInterval: () => (hasActiveJobsRef.current ? 1000 : false),
       },
     });
 
@@ -74,6 +76,10 @@ export default function Runs() {
         tool.status === JobStatus.in_progress,
     );
   }, [jobHistoryDetail?.tools]);
+
+  useEffect(() => {
+    hasActiveJobsRef.current = hasActiveJobs;
+  }, [hasActiveJobs]);
 
   const {
     data: paginatedJobsData,
@@ -112,7 +118,7 @@ export default function Runs() {
               onlyIcon
               status={row.original.status as JobStatus}
             />
-            <pre>{getTitle(row.original)}</pre>
+            <span className="font-medium">{getTitle(row.original)}</span>
           </div>
         );
       },
@@ -226,10 +232,10 @@ export default function Runs() {
                         {
                           onSuccess: () => {
                             queryClient.invalidateQueries({
-                              queryKey: [
-                                'JobsRegistryControllerGetJobHistoryDetail',
-                                jobHistoryId,
-                              ],
+                              queryKey:
+                                getJobsRegistryControllerGetJobHistoryDetailQueryKey(
+                                  jobHistoryId || '',
+                                ),
                             });
                             queryClient.invalidateQueries({
                               queryKey: paginatedJobsQueryKey,
@@ -254,10 +260,10 @@ export default function Runs() {
                       {
                         onSuccess: () => {
                           queryClient.invalidateQueries({
-                            queryKey: [
-                              'JobsRegistryControllerGetJobHistoryDetail',
-                              jobHistoryId,
-                            ],
+                            queryKey:
+                              getJobsRegistryControllerGetJobHistoryDetailQueryKey(
+                                jobHistoryId || '',
+                              ),
                           });
                           queryClient.invalidateQueries({
                             queryKey: paginatedJobsQueryKey,
@@ -313,21 +319,7 @@ export default function Runs() {
                       className="rounded-full border"
                     />
                     <span className="font-medium text-sm">{tool.name}</span>
-                    {tool.status === JobStatus.in_progress && (
-                      <Loader2Icon className="animate-spin size-4" />
-                    )}
-                    {tool.status === JobStatus.completed && (
-                      <CircleCheck className="text-green-500 size-4" />
-                    )}
-                    {tool.status === JobStatus.pending && (
-                      <Clock className="text-yellow-500 size-4" />
-                    )}
-                    {tool.status === JobStatus.failed && (
-                      <X className="text-red-500 size-4" />
-                    )}
-                    {tool.status === JobStatus.skipped && (
-                      <CircleAlert className="text-gray-400 size-4" />
-                    )}
+                    <JobStatusBadge status={tool.status} onlyIcon />
                   </Link>
                   {index < jobHistoryDetail.tools.length - 1 && (
                     <ArrowRight
@@ -355,9 +347,10 @@ export default function Runs() {
         isLoading={isLoadingJobs}
         showColumnVisibility={true}
         showPagination={true}
-        page={paginatedJobsData?.page || 1}
-        pageSize={paginatedJobsData?.limit || 10}
-        totalItems={paginatedJobsData?.total || 0}
+        page={paginatedJobsData?.page ?? tableParams.page}
+        pageSize={paginatedJobsData?.limit ?? tableParams.pageSize}
+        totalItems={paginatedJobsData?.total ?? 0}
+        emptyMessage="No jobs found"
         onPageChange={tableHandlers.setPage}
         onPageSizeChange={tableHandlers.setPageSize}
         onRowClick={(row) => {

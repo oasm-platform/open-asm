@@ -22,6 +22,12 @@ tasks:
   test:
     cmds:
       - pnpm run test
+  # Run a single test file by name/path (keeps the same Jest config and
+  # --maxWorkers=50% limits as `task api:test`). Usage:
+  #   task api:test:one SPEC=src/modules/storage/storage.service.spec.ts
+  test:one:
+    cmds:
+      - pnpm run test -- {{.SPEC}}
   clean:
     cmds:
       - rm -rf ./husky

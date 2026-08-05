@@ -12,6 +12,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
@@ -185,6 +186,51 @@ export class StorageService implements OnModuleInit {
     } catch {
       throw new BadRequestException('Invalid or expired download token');
     }
+  }
+
+  /**
+   * Lists all object keys in a bucket with their last-modified timestamps,
+   * following pagination. Used by cleanup jobs that need to scan a whole bucket.
+   *
+   * @param bucket - The bucket to list.
+   * @returns An array of `{ key, lastModified }` entries (key omitted objects are skipped).
+   */
+  public async listFiles(
+    bucket: string,
+  ): Promise<Array<{ key: string; lastModified?: Date }>> {
+    const client = this.rustFsClient.getClient();
+    const files: Array<{ key: string; lastModified?: Date }> = [];
+    let continuationToken: string | undefined;
+
+    try {
+      do {
+        const response = await client.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            ContinuationToken: continuationToken,
+          }),
+        );
+
+        for (const obj of response.Contents ?? []) {
+          if (obj.Key) {
+            files.push({ key: obj.Key, lastModified: obj.LastModified });
+          }
+        }
+
+        continuationToken = response.NextContinuationToken;
+      } while (continuationToken);
+    } catch (error: unknown) {
+      if (error instanceof S3ServiceException && (error.name === 'NoSuchBucket' || error.$metadata.httpStatusCode === 404)) {
+        throw new NotFoundException('Bucket not found');
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new InternalServerErrorException(
+        `Failed to list files: ${errorMessage}`,
+      );
+    }
+
+    return files;
   }
 
   public async deleteFile(filePath: string, bucket: string = 'default'): Promise<void> {

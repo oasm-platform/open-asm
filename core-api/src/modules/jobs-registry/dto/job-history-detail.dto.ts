@@ -1,9 +1,4 @@
-import {
-  JobPriority,
-  JobStatus,
-  ToolCategory,
-  WorkerType,
-} from '@/common/enums/enum';
+import { JobStatus, ToolCategory } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
@@ -70,49 +65,10 @@ export class ToolWithStatusDto {
   id?: string;
 
   @ApiProperty()
-  createdAt?: Date;
-
-  @ApiProperty()
-  updatedAt?: Date;
-
-  @ApiProperty()
   name?: string;
 
   @ApiProperty()
-  description?: string;
-
-  @ApiProperty()
-  command?: string;
-
-  @ApiProperty({ enum: ToolCategory })
-  category?: ToolCategory;
-
-  @ApiProperty()
-  version?: string;
-
-  @ApiProperty()
   logoUrl?: string;
-
-  @ApiProperty()
-  isBuiltIn?: boolean;
-
-  @ApiProperty()
-  isInstalled?: boolean;
-
-  @ApiProperty()
-  isOfficialSupport?: boolean;
-
-  @ApiProperty({ enum: WorkerType })
-  type?: WorkerType;
-
-  @ApiProperty()
-  providerId?: string;
-
-  @ApiProperty({ enum: JobPriority })
-  priority?: JobPriority;
-
-  @ApiProperty()
-  availableWorkersCount?: number;
 
   @ApiProperty({ enum: JobStatus, required: true })
   status: JobStatus;
