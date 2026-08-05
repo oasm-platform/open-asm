@@ -52,11 +52,11 @@ const JobsRegistryPage = () => {
               onlyIcon
               status={row.original.status as JobStatus}
             />
-            <pre>
+            <span className="font-medium">
               {row.original?.jobHistoryName ||
                 row.original?.workflowName ||
                 'Manual run'}
-            </pre>
+            </span>
           </div>
         );
       },
@@ -77,7 +77,7 @@ const JobsRegistryPage = () => {
       header: 'Created At',
       cell: ({ row }) => {
         const job = row.original;
-        const createdAt = new Date(job.updatedAt);
+        const createdAt = new Date(job.createdAt);
         return (
           <div className="flex flex-col text-muted-foreground text-xs gap-3">
             <span className="flex items-center gap-1">
@@ -89,8 +89,8 @@ const JobsRegistryPage = () => {
       },
     },
     {
-      accessorKey: '',
-      header: 'Created At',
+      accessorKey: 'jobRunType',
+      header: 'Run Type',
       cell: ({ row }) => {
         return (
           <Badge variant="outline">
@@ -121,9 +121,10 @@ const JobsRegistryPage = () => {
         columns={columns}
         data={jobsData?.data || []}
         isLoading={isLoading}
-        page={jobsData?.page || 1}
-        pageSize={jobsData?.limit || 100}
-        totalItems={jobsData?.total || 100}
+        page={jobsData?.page ?? 1}
+        pageSize={jobsData?.limit ?? pageSize}
+        totalItems={jobsData?.total ?? 0}
+        emptyMessage="No jobs found"
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
         sortBy={sortBy}

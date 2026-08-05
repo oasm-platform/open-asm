@@ -53,10 +53,16 @@ export class JobsRegistryController {
     response: {
       serialization: GetManyResponseDto(Job),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get('')
-  getManyJobs(@Query() query: GetManyJobsRequestDto) {
-    return this.jobsRegistryService.getManyJobs(query);
+  getManyJobs(
+    @WorkspaceId() workspaceId: string,
+    @Query() query: GetManyJobsRequestDto,
+  ) {
+    return this.jobsRegistryService.getManyJobs(workspaceId, query);
   }
 
   @Doc({

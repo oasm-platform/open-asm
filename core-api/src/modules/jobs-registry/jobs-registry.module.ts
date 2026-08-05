@@ -11,6 +11,7 @@ import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryController } from './jobs-registry.controller';
 import { JobsRegistryService } from './jobs-registry.service';
+import { JobResultCleanupService } from './job-result-cleanup.service';
 import { JobResultProcessor } from './processors/job-result.processor';
 import {
   AssetGroupsScheduleConsumer,
@@ -42,6 +43,7 @@ import {
     AssetsDiscoveryScheduleConsumer,
     AssetGroupsScheduleConsumer,
     JobResultProcessor,
+    JobResultCleanupService,
     // IssueCreationProcessor,
   ],
   exports: [JobsRegistryService],

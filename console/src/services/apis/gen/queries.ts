@@ -1051,36 +1051,6 @@ export type GetManyJobHistoryResponseDtoDto = {
   pageCount: number;
 };
 
-export type ToolWithStatusDtoCategory =
-  (typeof ToolWithStatusDtoCategory)[keyof typeof ToolWithStatusDtoCategory];
-
-export const ToolWithStatusDtoCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  screenshot: 'screenshot',
-} as const;
-
-export type ToolWithStatusDtoType =
-  (typeof ToolWithStatusDtoType)[keyof typeof ToolWithStatusDtoType];
-
-export const ToolWithStatusDtoType = {
-  built_in: 'built_in',
-  provider: 'provider',
-} as const;
-
-export type ToolWithStatusDtoPriority =
-  (typeof ToolWithStatusDtoPriority)[keyof typeof ToolWithStatusDtoPriority];
-
-export const ToolWithStatusDtoPriority = {
-  NUMBER_0: 0,
-  NUMBER_1: 1,
-  NUMBER_2: 2,
-  NUMBER_3: 3,
-  NUMBER_4: 4,
-} as const;
-
 export type ToolWithStatusDtoStatus =
   (typeof ToolWithStatusDtoStatus)[keyof typeof ToolWithStatusDtoStatus];
 
@@ -1095,21 +1065,8 @@ export const ToolWithStatusDtoStatus = {
 
 export type ToolWithStatusDto = {
   id: string;
-  createdAt: string;
-  updatedAt: string;
   name: string;
-  description: string;
-  command: string;
-  category: ToolWithStatusDtoCategory;
-  version: string;
   logoUrl: string;
-  isBuiltIn: boolean;
-  isInstalled: boolean;
-  isOfficialSupport: boolean;
-  type: ToolWithStatusDtoType;
-  providerId: string;
-  priority: ToolWithStatusDtoPriority;
-  availableWorkersCount: number;
   status: ToolWithStatusDtoStatus;
 };
 
@@ -2743,9 +2700,24 @@ export type JobsRegistryControllerGetManyJobsParams = {
   sortBy?: string;
   sortOrder?: string;
   jobHistoryId?: string;
-  jobStatus?: string;
-  workspaceId?: string;
+  /**
+   * Filter by job status; "all" disables the filter
+   */
+  jobStatus?: JobsRegistryControllerGetManyJobsJobStatus;
 };
+
+export type JobsRegistryControllerGetManyJobsJobStatus =
+  (typeof JobsRegistryControllerGetManyJobsJobStatus)[keyof typeof JobsRegistryControllerGetManyJobsJobStatus];
+
+export const JobsRegistryControllerGetManyJobsJobStatus = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+  skipped: 'skipped',
+  all: 'all',
+} as const;
 
 export type JobsRegistryControllerGetManyJobHistoriesParams = {
   search?: string;

@@ -48,18 +48,29 @@ export class JobResultProcessor extends WorkerHost {
   ): Promise<void> {
     const { workerId, jobId, resultRef, category } = bullJob.data;
 
+    // resultRef is in format "bucket/filename"
+    const [bucket, ...rest] = resultRef.split('/');
+    const fileName = rest.join('/');
+
     const job = await this.jobsRegistryService.findJobForUpdate(
       workerId,
       jobId,
     );
     if (!job) {
+      // The job row is gone (e.g. workflow deleted or job created on another
+      // instance). Nothing can be processed — delete the staged result file so
+      // it does not accumulate in storage as an orphan.
       this.logger.error(`Job not found: ${jobId} for worker: ${workerId}`);
+      try {
+        await this.storageService.deleteFile(fileName, bucket);
+      } catch (error) {
+        this.logger.error(
+          `Failed to delete orphaned result file ${resultRef}:`,
+          error,
+        );
+      }
       return;
     }
-
-    // resultRef is in format "bucket/filename"
-    const [bucket, ...rest] = resultRef.split('/');
-    const fileName = rest.join('/');
 
     try {
       // Read result JSON. The new split-result endpoint stores the full DTO

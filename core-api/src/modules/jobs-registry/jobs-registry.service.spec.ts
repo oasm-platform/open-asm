@@ -29,12 +29,19 @@ describe('JobsRegistryService', () => {
     createQueryBuilder: jest.fn().mockReturnThis(),
     innerJoin: jest.fn().mockReturnThis(),
     leftJoin: jest.fn().mockReturnThis(),
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
     groupBy: jest.fn().mockReturnThis(),
     addGroupBy: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
     getRawMany: jest.fn(),
+    getManyAndCount: jest.fn(),
     getOne: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
@@ -515,11 +522,20 @@ describe('JobsRegistryService', () => {
         updatedAt: mockJobHistory.updatedAt,
         tools: [
           {
-            ...mockTool,
+            id: 'tool-uuid',
+            name: 'test-tool',
+            logoUrl: 'http://example.com/logo.png',
             status: JobStatus.COMPLETED,
           },
         ],
       });
+      // Bandwidth contract: tools must expose only id/name/logoUrl/status
+      expect(Object.keys(result.tools![0]).sort()).toEqual([
+        'id',
+        'logoUrl',
+        'name',
+        'status',
+      ]);
     });
 
     it('should throw NotFoundException when job history not found', async () => {
@@ -542,6 +558,332 @@ describe('JobsRegistryService', () => {
       await expect(
         service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should not crash when job history has no workflow', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValue({
+        ...mockJobHistory,
+        workflow: null,
+      });
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({ data: [] });
+
+      const result = await service.getJobHistoryDetail(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(result.workflowName).toBeUndefined();
+      expect(result.tools).toEqual([]);
+    });
+  });
+
+  describe('getManyJobs', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJobRepository.getManyAndCount = jest
+        .fn()
+        .mockResolvedValue([[], 0]);
+    });
+
+    it('should scope jobs to the workspace using param binding', async () => {
+      const result = await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(mockJobRepository.andWhere).toHaveBeenCalledWith(
+        'target.workspaceId = :workspaceId',
+        { workspaceId: mockWorkspaceId },
+      );
+      expect(mockJobRepository.getManyAndCount).toHaveBeenCalled();
+      expect(result).toMatchObject({
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+      });
+    });
+
+    it('should apply the jobStatus filter when a concrete status is given', async () => {
+      await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobStatus: JobStatus.FAILED,
+      } as any);
+
+      expect(mockJobRepository.andWhere).toHaveBeenCalledWith(
+        'job.status = :jobStatus',
+        { jobStatus: JobStatus.FAILED },
+      );
+    });
+
+    it('should skip the status filter when jobStatus is "all"', async () => {
+      await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobStatus: 'all',
+      } as any);
+
+      const statusFilters = mockJobRepository.andWhere.mock.calls.filter(
+        ([clause]) =>
+          typeof clause === 'string' && clause.includes('job.status'),
+      );
+      expect(statusFilters).toHaveLength(0);
+    });
+
+    it('should fall back to createdAt and append an id tiebreaker for unknown sortBy', async () => {
+      await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: '__proto__',
+        sortOrder: 'ASC',
+      } as any);
+
+      expect(mockJobRepository.orderBy).toHaveBeenCalledWith(
+        'job.createdAt',
+        'ASC',
+      );
+      expect(mockJobRepository.addOrderBy).toHaveBeenCalledWith('job.id', 'ASC');
+    });
+
+    it('should pass through whitelisted sortBy values', async () => {
+      await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'status',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(mockJobRepository.orderBy).toHaveBeenCalledWith(
+        'job.status',
+        'DESC',
+      );
+    });
+
+    it('should paginate using take/skip', async () => {
+      await service.getManyJobs(mockWorkspaceId, {
+        page: 3,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(mockJobRepository.take).toHaveBeenCalledWith(10);
+      expect(mockJobRepository.skip).toHaveBeenCalledWith(20);
+    });
+
+    it('should hydrate only slim tool columns (id, name, logoUrl) to save bandwidth', async () => {
+      await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(mockJobRepository.leftJoin).toHaveBeenCalledWith(
+        'job.tool',
+        'tool',
+      );
+      expect(mockJobRepository.addSelect).toHaveBeenCalledWith([
+        'tool.id',
+        'tool.name',
+        'tool.logoUrl',
+      ]);
+      // The full tool entity must no longer be selected eagerly
+      const fullToolSelects = mockJobRepository.leftJoinAndSelect.mock.calls
+        .filter(([relation]) => relation === 'job.tool');
+      expect(fullToolSelects).toHaveLength(0);
+    });
+
+    it('should hydrate only slim asset columns (id, value, targetId) to save bandwidth', async () => {
+      await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(mockJobRepository.leftJoin).toHaveBeenCalledWith(
+        'job.asset',
+        'asset',
+      );
+      expect(mockJobRepository.addSelect).toHaveBeenCalledWith([
+        'asset.id',
+        'asset.value',
+        'asset.targetId',
+      ]);
+      // The full asset entity must no longer be selected eagerly
+      const fullAssetSelects = mockJobRepository.leftJoinAndSelect.mock.calls
+        .filter(([relation]) => relation === 'job.asset');
+      expect(fullAssetSelects).toHaveLength(0);
+      // The target join must remain: it backs the tenant workspaceId filter
+      expect(mockJobRepository.leftJoin).toHaveBeenCalledWith(
+        'asset.target',
+        'target',
+      );
+      // Target columns must not be selected either (bandwidth)
+      expect(mockJobRepository.leftJoinAndSelect).not.toHaveBeenCalledWith(
+        'asset.target',
+        'target',
+      );
+    });
+  });
+
+  describe('getManyJobHistories', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+
+    interface HistoryQueryBuilder {
+      innerJoin: jest.Mock<HistoryQueryBuilder>;
+      leftJoin: jest.Mock<HistoryQueryBuilder>;
+      where: jest.Mock<HistoryQueryBuilder>;
+      select: (args: unknown[]) => HistoryQueryBuilder;
+      groupBy: jest.Mock<HistoryQueryBuilder>;
+      addGroupBy: jest.Mock<HistoryQueryBuilder>;
+      orderBy: jest.Mock<HistoryQueryBuilder>;
+      addOrderBy: jest.Mock<HistoryQueryBuilder>;
+      offset: jest.Mock<HistoryQueryBuilder>;
+      limit: jest.Mock<HistoryQueryBuilder>;
+      getRawMany: jest.Mock<Promise<unknown[]>>;
+      getCount: jest.Mock<Promise<number>>;
+    }
+
+    const buildHistoryQueryBuilder = () => {
+      const selectArgs: unknown[][] = [];
+      const qb: HistoryQueryBuilder = {
+        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        select: jest.fn((args: unknown[]) => {
+          selectArgs.push(args);
+          return qb;
+        }),
+        groupBy: jest.fn().mockReturnThis(),
+        addGroupBy: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+      return { qb, selectArgs };
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should compute totalJobs and status from joined jobs without correlated subqueries', async () => {
+      const { qb, selectArgs } = buildHistoryQueryBuilder();
+      qb.getRawMany.mockResolvedValue([]);
+      qb.getCount.mockResolvedValue(2);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(selectArgs[0]).toContain('COUNT(job.id) as "totalJobs"');
+      // No correlated subquery referencing the jobs table from scratch
+      expect(
+        selectArgs[0].some(
+          (s) => typeof s === 'string' && s.includes('FROM jobs'),
+        ),
+      ).toBe(false);
+      // Status derived from the joined job rows via aggregate FILTER
+      const statusExpr = selectArgs[0].find(
+        (s) => typeof s === 'string' && s.includes('FILTER'),
+      ) as string;
+      expect(statusExpr).toContain(`job.status = '${JobStatus.FAILED}'`);
+      expect(statusExpr).toContain(`job.status = '${JobStatus.IN_PROGRESS}'`);
+      // Separate count query is still executed (getCount would strip GROUP BY)
+      expect(qb.getCount).toHaveBeenCalled();
+      expect(result.total).toBe(2);
+    });
+
+    it('should fall back to createdAt and append an id tiebreaker for unknown sortBy', async () => {
+      const { qb } = buildHistoryQueryBuilder();
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: '__proto__',
+        sortOrder: 'ASC',
+      } as any);
+
+      expect(qb.orderBy).toHaveBeenCalledWith('jobHistory.createdAt', 'ASC');
+      expect(qb.addOrderBy).toHaveBeenCalledWith('jobHistory.id', 'ASC');
+    });
+
+    it('should pass through whitelisted sortBy values', async () => {
+      const { qb } = buildHistoryQueryBuilder();
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'jobHistoryName',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(qb.orderBy).toHaveBeenCalledWith(
+        'jobHistory.jobHistoryName',
+        'DESC',
+      );
+    });
+
+    it('should transform raw rows into the response DTO shape', async () => {
+      const { qb } = buildHistoryQueryBuilder();
+      qb.getRawMany.mockResolvedValue([
+        {
+          id: 'history-1',
+          createdAt: new Date('2024-01-01T00:00:00Z'),
+          updatedAt: new Date('2024-01-02T00:00:00Z'),
+          totalJobs: '5',
+          status: JobStatus.COMPLETED,
+          workflowName: 'workflow-1',
+          jobHistoryName: 'name-1',
+          jobRunType: 'manual',
+        },
+      ]);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(result.data[0]).toEqual({
+        id: 'history-1',
+        createdAt: expect.any(Date),
+        updatedAt: expect.any(Date),
+        totalJobs: 5,
+        status: JobStatus.COMPLETED,
+        workflowName: 'workflow-1',
+        jobHistoryName: 'name-1',
+        jobRunType: 'manual',
+      });
     });
   });
 

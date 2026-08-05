@@ -464,14 +464,17 @@ export class AgentTool {
         parameters: listJobsSchema,
         execute: async (params: z.infer<typeof listJobsSchema>) => {
           const { page, limit, jobHistoryId, jobStatus } = params;
-          const response = await this.jobsRegistryService.getManyJobs({
-            limit: limit ?? 100,
-            page: page ?? 1,
-            sortBy: 'createdAt',
-            sortOrder: SortOrder.DESC,
-            jobHistoryId,
-            jobStatus,
-          });
+          const response = await this.jobsRegistryService.getManyJobs(
+            workspaceId,
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              jobHistoryId,
+              jobStatus,
+            },
+          );
           return {
             ...response,
             data: response.data.map((i) => ({ id: i.id, status: i.status })),

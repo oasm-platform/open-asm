@@ -55,6 +55,35 @@ import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 
+/**
+ * Sortable columns for Job, whitelisted to prevent SQL injection via
+ * ORDER BY interpolation (client-supplied column names are never trusted).
+ */
+const JOB_SORTABLE_COLUMNS: string[] = [
+  'id',
+  'createdAt',
+  'updatedAt',
+  'completedAt',
+  'pickJobAt',
+  'priority',
+  'status',
+  'category',
+  'workerId',
+  'retryCount',
+];
+
+/**
+ * Sortable columns for JobHistory, whitelisted to prevent SQL injection via
+ * ORDER BY interpolation.
+ */
+const JOB_HISTORY_SORTABLE_COLUMNS: string[] = [
+  'id',
+  'createdAt',
+  'updatedAt',
+  'jobHistoryName',
+  'jobRunType',
+];
+
 @Injectable()
 export class JobsRegistryService {
   constructor(
@@ -72,21 +101,29 @@ export class JobsRegistryService {
     private workspaceService: WorkspacesService,
   ) {}
   public async getManyJobs(
+    workspaceId: string,
     query: GetManyJobsRequestDto,
   ): Promise<GetManyBaseResponseDto<Job>> {
-    const { limit, page, sortOrder, jobHistoryId, jobStatus, workspaceId } =
-      query;
+    const { limit, page, sortOrder, jobHistoryId, jobStatus } = query;
     let { sortBy } = query;
 
-    if (!(sortBy in Job)) {
+    if (!JOB_SORTABLE_COLUMNS.includes(sortBy)) {
       sortBy = 'createdAt';
     }
 
     const qb = this.repo
       .createQueryBuilder('job')
-      .leftJoinAndSelect('job.tool', 'tool')
-      .leftJoinAndSelect('job.asset', 'asset')
-      .leftJoinAndSelect('asset.target', 'target')
+      // Only hydrate the tool columns the UI renders (id/name/logoUrl) —
+      // selecting the full Tool entity wastes bandwidth on every list row.
+      .leftJoin('job.tool', 'tool')
+      .addSelect(['tool.id', 'tool.name', 'tool.logoUrl'])
+      // Only hydrate the asset columns the UI renders (id/value/targetId) —
+      // selecting the full Asset entity (incl. dnsRecords, target) wastes
+      // bandwidth on every list row. The target join stays: it backs the
+      // tenant workspaceId filter below.
+      .leftJoin('job.asset', 'asset')
+      .addSelect(['asset.id', 'asset.value', 'asset.targetId'])
+      .leftJoin('asset.target', 'target')
       .leftJoinAndSelect('job.assetService', 'assetService')
       .leftJoinAndSelect('job.errorLogs', 'errorLogs')
       .where('1=1');
@@ -95,17 +132,19 @@ export class JobsRegistryService {
       qb.andWhere('job.jobHistoryId = :jobHistoryId', { jobHistoryId });
     }
 
-    if (jobStatus) {
+    // 'all' is a UI convention meaning "no status filter"
+    if (jobStatus && jobStatus !== 'all') {
       qb.andWhere('job.status = :jobStatus', { jobStatus });
     }
 
-    if (workspaceId) {
-      qb.andWhere('target.workspaceId = :workspaceId', { workspaceId });
-    }
+    // Tenant scope always comes from the authenticated request context,
+    // never from a client-supplied query parameter.
+    qb.andWhere('target.workspaceId = :workspaceId', { workspaceId });
 
     qb.take(query.limit)
       .skip((page - 1) * limit)
-      .orderBy(`job.${sortBy}`, sortOrder);
+      .orderBy(`job.${sortBy}`, sortOrder)
+      .addOrderBy('job.id', 'ASC');
 
     const [data, total] = await qb.getManyAndCount();
 
@@ -902,7 +941,7 @@ export class JobsRegistryService {
     const { limit, page, sortOrder } = query;
     let { sortBy } = query;
 
-    if (!(sortBy in JobHistory)) {
+    if (!JOB_HISTORY_SORTABLE_COLUMNS.includes(sortBy)) {
       sortBy = 'createdAt';
     }
 
@@ -918,7 +957,9 @@ export class JobsRegistryService {
       jobRunType: JobRunType;
     }
 
-    // Query job histories with calculated counts and statuses using subqueries
+    // Aggregate totalJobs and status directly over the joined job rows.
+    // The jobs relation is already inner-joined, so correlated subqueries
+    // per row are unnecessary.
     const qb = this.jobHistoryRepo
       .createQueryBuilder('jobHistory')
       .innerJoin('jobHistory.jobs', 'job')
@@ -934,24 +975,18 @@ export class JobsRegistryService {
         '"jobHistory"."updatedAt" as "updatedAt"',
         '"workflow"."name" as "workflowName"',
         '"jobHistory"."jobRunType" as "jobRunType"',
-        // Subquery to count total jobs for this job history
-        '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
-        // Subquery with CASE to calculate status based on job statuses
-        `(
-          SELECT
-            CASE
-              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
-              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
-              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
-              ELSE '${JobStatus.PENDING}'
-            END
-          FROM jobs
-          WHERE "jobHistoryId" = "jobHistory".id
-        ) as "status"`,
+        'COUNT(job.id) as "totalJobs"',
+        `CASE
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
+          ELSE '${JobStatus.PENDING}'
+        END as "status"`,
       ])
       .groupBy('jobHistory.id')
       .addGroupBy('workflow.name')
       .orderBy(`jobHistory.${sortBy}`, sortOrder)
+      .addOrderBy('jobHistory.id', 'ASC')
       .offset((page - 1) * limit)
       .limit(limit);
 
@@ -1036,7 +1071,10 @@ export class JobsRegistryService {
       toolStatusMap.set(row.toolId, row.status),
     );
 
-    // Map tools from workflow content with their computed status
+    // Map tools from workflow content with their computed status.
+    // Only id/name/logoUrl/status are exposed — the UI renders nothing else
+    // from these records, so the rest of the Tool entity is omitted to save
+    // bandwidth (the full entity is only resolved server-side for matching).
     const instaledTools = await this.toolsService.getInstalledTools(
       {},
       workspaceId,
@@ -1053,20 +1091,7 @@ export class JobsRegistryService {
     ).map((tool) => ({
       id: tool.id,
       name: tool.name,
-      description: tool.description,
-      command: tool.command,
-      category: tool.category,
-      version: tool.version,
       logoUrl: tool.logoUrl,
-      isBuiltIn: tool.isBuiltIn,
-      isInstalled: tool.isInstalled,
-      isOfficialSupport: tool.isOfficialSupport,
-      type: tool.type,
-      providerId: tool.providerId,
-      priority: tool.priority,
-      availableWorkersCount: tool.availableWorkersCount,
-      createdAt: tool.createdAt,
-      updatedAt: tool.updatedAt,
       status: toolStatusMap.get(tool.id!) ?? JobStatus.PENDING,
     }));
 
@@ -1091,7 +1116,7 @@ export class JobsRegistryService {
 
     return {
       id: historyId,
-      workflowName: workflow.name,
+      workflowName: workflow?.name,
       jobHistoryName,
       createdAt,
       updatedAt,
