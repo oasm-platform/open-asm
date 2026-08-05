@@ -70,8 +70,8 @@ export class ToolWithStatusDto {
   @ApiProperty()
   logoUrl?: string;
 
-  @ApiProperty({ enum: JobStatus, required: true })
-  status: JobStatus;
+  @ApiProperty({ enum: JobStatus, required: false })
+  status?: JobStatus;
 }
 
 export class JobHistoryDetailResponseDto {
