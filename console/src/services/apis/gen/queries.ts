@@ -558,53 +558,16 @@ export type UpdateSystemConfigDto = {
   logoPath?: UpdateSystemConfigDtoLogoPath;
 };
 
-export type AssetDnsRecords = { [key: string]: unknown };
-
-export type Asset = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  value: string;
-  targetId: string;
-  isPrimary: boolean;
-  dnsRecords: AssetDnsRecords;
-  isEnabled: boolean;
+export type JobListItemToolDto = {
+  id?: string;
+  name?: string;
+  logoUrl?: string;
 };
 
-export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
-
-export const ToolCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  screenshot: 'screenshot',
-} as const;
-
-export type ToolType = (typeof ToolType)[keyof typeof ToolType];
-
-export const ToolType = {
-  built_in: 'built_in',
-  provider: 'provider',
-} as const;
-
-export type Tool = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  name: string;
-  description: string;
-  command: string;
-  category: ToolCategory;
-  version: string;
-  /** @nullable */
-  logoUrl?: string | null;
-  isBuiltIn: boolean;
-  isInstalled: boolean;
-  isOfficialSupport: boolean;
-  type: ToolType;
-  providerId: string;
-  availableWorkersCount?: number;
+export type JobListItemAssetDto = {
+  id?: string;
+  value?: string;
+  targetId?: string;
 };
 
 export type AssetService = {
@@ -627,20 +590,10 @@ export type JobErrorLog = {
   jobId: string;
 };
 
-export type JobCategory = (typeof JobCategory)[keyof typeof JobCategory];
+export type JobListItemDtoStatus =
+  (typeof JobListItemDtoStatus)[keyof typeof JobListItemDtoStatus];
 
-export const JobCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  screenshot: 'screenshot',
-} as const;
-
-export type JobStatusProperty =
-  (typeof JobStatusProperty)[keyof typeof JobStatusProperty];
-
-export const JobStatusProperty = {
+export const JobListItemDtoStatus = {
   pending: 'pending',
   in_progress: 'in_progress',
   completed: 'completed',
@@ -649,24 +602,34 @@ export const JobStatusProperty = {
   skipped: 'skipped',
 } as const;
 
-export type Job = {
+export type JobListItemDtoCategory =
+  (typeof JobListItemDtoCategory)[keyof typeof JobListItemDtoCategory];
+
+export const JobListItemDtoCategory = {
+  subdomains: 'subdomains',
+  http_probe: 'http_probe',
+  ports_scanner: 'ports_scanner',
+  vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
+} as const;
+
+export type JobListItemDto = {
   id: string;
+  status: JobListItemDtoStatus;
+  category: JobListItemDtoCategory;
   createdAt: string;
   updatedAt: string;
-  asset: Asset;
-  category: JobCategory;
-  status: JobStatusProperty;
-  pickJobAt: string;
-  tool: Tool;
-  completedAt: string;
-  command: string;
-  assetServiceId: string;
+  pickJobAt?: string;
+  completedAt?: string;
+  assetServiceId?: string;
+  tool: JobListItemToolDto;
+  asset: JobListItemAssetDto;
   assetService: AssetService;
   errorLogs: JobErrorLog[];
 };
 
-export type GetManyJobDto = {
-  data: Job[];
+export type GetManyJobListItemDtoDto = {
+  data: JobListItemDto[];
   total: number;
   page: number;
   limit: number;
@@ -712,6 +675,19 @@ export type JobTimelineItem = {
 
 export type JobTimelineResponseDto = {
   data: JobTimelineItem[];
+};
+
+export type AssetDnsRecords = { [key: string]: unknown };
+
+export type Asset = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  value: string;
+  targetId: string;
+  isPrimary: boolean;
+  dnsRecords: AssetDnsRecords;
+  isEnabled: boolean;
 };
 
 export type GetNextJobResponseDtoCategory =
@@ -876,6 +852,42 @@ export type PortsResultDto = {
   raw: PortsResultDtoRaw;
   /** Open port numbers */
   payload: number[];
+};
+
+export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
+
+export const ToolCategory = {
+  subdomains: 'subdomains',
+  http_probe: 'http_probe',
+  ports_scanner: 'ports_scanner',
+  vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
+} as const;
+
+export type ToolType = (typeof ToolType)[keyof typeof ToolType];
+
+export const ToolType = {
+  built_in: 'built_in',
+  provider: 'provider',
+} as const;
+
+export type Tool = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  description: string;
+  command: string;
+  category: ToolCategory;
+  version: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  isBuiltIn: boolean;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: ToolType;
+  providerId: string;
+  availableWorkersCount?: number;
 };
 
 export type User = {
@@ -1075,7 +1087,7 @@ export type JobHistoryDetailResponseDto = {
   createdAt: string;
   updatedAt: string;
   tools: ToolWithStatusDto[];
-  workflowName: string;
+  workflowName?: string;
   jobHistoryName: string;
 };
 
@@ -9524,7 +9536,7 @@ export const jobsRegistryControllerGetManyJobs = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyJobDto>(
+  return orvalClient<GetManyJobListItemDtoDto>(
     { url: `/api/jobs-registry`, method: 'GET', params, signal },
     options,
   );

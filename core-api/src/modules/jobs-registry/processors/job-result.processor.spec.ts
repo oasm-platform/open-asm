@@ -5,9 +5,9 @@ import { RedisService } from '@/services/redis/redis.service';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Job } from '../entities/job.entity';
-import { JobsRegistryService } from '../jobs-registry.service';
-import { JobResultProcessor } from './job-result.processor';
+import { Job } from '@/modules/jobs-registry/entities/job.entity';
+import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
+import { JobResultProcessor } from '@/modules/jobs-registry/processors/job-result.processor';
 
 describe('JobResultProcessor', () => {
   let processor: JobResultProcessor;

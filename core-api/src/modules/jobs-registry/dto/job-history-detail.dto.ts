@@ -87,7 +87,7 @@ export class JobHistoryDetailResponseDto {
   @ApiProperty({ type: () => [ToolWithStatusDto] })
   tools?: ToolWithStatusDto[];
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   workflowName?: string;
 
   @ApiProperty()

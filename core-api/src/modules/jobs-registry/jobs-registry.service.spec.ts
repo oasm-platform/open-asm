@@ -819,6 +819,50 @@ describe('JobsRegistryService', () => {
       expect(result.total).toBe(2);
     });
 
+    it('should aggregate terminal cancelled status when all jobs are cancelled', async () => {
+      const { qb, selectArgs } = buildHistoryQueryBuilder();
+      qb.getRawMany.mockResolvedValue([]);
+      qb.getCount.mockResolvedValue(0);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      const statusExpr = selectArgs[0].find(
+        (s) => typeof s === 'string' && s.includes('FILTER'),
+      ) as string;
+      // All-cancelled histories must surface as cancelled, not pending
+      expect(statusExpr).toContain(
+        `WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.CANCELLED}'`,
+      );
+    });
+
+    it('should aggregate terminal skipped status when all jobs are skipped', async () => {
+      const { qb, selectArgs } = buildHistoryQueryBuilder();
+      qb.getRawMany.mockResolvedValue([]);
+      qb.getCount.mockResolvedValue(0);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      const statusExpr = selectArgs[0].find(
+        (s) => typeof s === 'string' && s.includes('FILTER'),
+      ) as string;
+      // All-skipped histories must surface as skipped, not pending
+      expect(statusExpr).toContain(
+        `WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.SKIPPED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.SKIPPED}'`,
+      );
+    });
+
     it('should fall back to createdAt and append an id tiebreaker for unknown sortBy', async () => {
       const { qb } = buildHistoryQueryBuilder();
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);

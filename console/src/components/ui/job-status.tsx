@@ -6,6 +6,7 @@ import {
   Loader2Icon,
   XCircleIcon,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Badge } from './badge';
 
 interface StatusConfig {
@@ -66,14 +67,26 @@ interface JobStatusProps {
   onlyIcon?: boolean;
   /** Optional click handler; navigation logic lives in the caller. */
   onClick?: () => void;
+  /** Extra classes merged into the badge; e.g. override default pill padding. */
+  className?: string;
 }
 
-const JobStatusBadge = ({ status, onlyIcon = false, onClick }: JobStatusProps) => {
+const JobStatusBadge = ({
+  status,
+  onlyIcon = false,
+  onClick,
+  className,
+}: JobStatusProps) => {
   const config = statusConfigs[status] || defaultConfig;
   return (
     <Badge
       variant={config.variant}
-      className={config.className + ' h-8 flex items-center border-transparent select-none' + (onClick ? ' cursor-pointer' : ' cursor-default')}
+      className={cn(
+        config.className +
+          ' h-8 flex items-center border-transparent select-none' +
+          (onClick ? ' cursor-pointer' : ' cursor-default'),
+        className,
+      )}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}

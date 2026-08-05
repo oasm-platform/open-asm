@@ -27,6 +27,7 @@ import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
+import { JobListItemDto } from './dto/job-list-item.dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
@@ -40,7 +41,6 @@ import {
   VulnerabilitiesResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
-import { Job } from './entities/job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
 
 @Controller('jobs-registry')
@@ -51,7 +51,7 @@ export class JobsRegistryController {
     summary: 'Get Jobs',
     description: 'Retrieves a list of jobs that the user is a member of.',
     response: {
-      serialization: GetManyResponseDto(Job),
+      serialization: GetManyResponseDto(JobListItemDto),
     },
     request: {
       getWorkspaceId: true,
