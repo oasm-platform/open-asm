@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, MoreThanOrEqual } from 'typeorm';
 
 import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
+import { InventoryChangesResponseDto } from './dto/inventory-changes.dto';
+import { TopPortsResponseDto } from './dto/top-ports.dto';
+import { TopTechnologiesResponseDto } from './dto/top-technologies.dto';
 
 import {
   DefaultWorkflow,
@@ -724,6 +727,146 @@ export class StatisticService {
       expireIn3Months: Number(result.expireIn3Months),
       wontExpireAnytimeSoon: Number(result.wontExpireAnytimeSoon),
       newCertificatesDiscovered: Number(result.newCertificatesDiscovered),
+    };
+  }
+
+  /**
+   * Retrieves newly discovered assets and services within the last 7 and 30
+   * days, plus the most recently discovered assets, for a workspace.
+   */
+  async getInventoryChanges(
+    workspaceId: string,
+  ): Promise<InventoryChangesResponseDto> {
+    const since7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const since30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const assetRepo = this.dataSource.getRepository(Asset);
+    const serviceRepo = this.dataSource.getRepository(AssetService);
+
+    const assetBase = () =>
+      assetRepo
+        .createQueryBuilder('asset')
+        .innerJoin('asset.target', 'target')
+        .where('target.workspaceId = :workspaceId', { workspaceId });
+
+    const serviceBase = () =>
+      serviceRepo
+        .createQueryBuilder('assetService')
+        .innerJoin('assetService.asset', 'asset')
+        .innerJoin('asset.target', 'target')
+        .where('target.workspaceId = :workspaceId', { workspaceId });
+
+    const [assetsAdded7Days, assetsAdded30Days, recentAssets] =
+      await Promise.all([
+        assetBase().andWhere('asset.createdAt >= :since', { since: since7Days }).getCount(),
+        assetBase().andWhere('asset.createdAt >= :since', { since: since30Days }).getCount(),
+        assetBase()
+          .andWhere('asset.createdAt >= :since', { since: since30Days })
+          .select(['asset.id AS id', 'asset.value AS value', 'asset.createdAt AS "createdAt"'])
+          .orderBy('asset.createdAt', 'DESC')
+          .limit(10)
+          .getRawMany<{ id: string; value: string; createdAt: Date }>(),
+      ]);
+
+    const [servicesAdded7Days, servicesAdded30Days] = await Promise.all([
+      serviceBase()
+        .andWhere('assetService.createdAt >= :since', { since: since7Days })
+        .getCount(),
+      serviceBase()
+        .andWhere('assetService.createdAt >= :since', { since: since30Days })
+        .getCount(),
+    ]);
+
+    return {
+      assetsAdded7Days,
+      assetsAdded30Days,
+      servicesAdded7Days,
+      servicesAdded30Days,
+      recentAssets,
+    };
+  }
+
+  /**
+   * Retrieves the top 10 most exposed ports for a workspace, classified as
+   * standard (IANA well-known/registered, < 49152) or non-standard, plus
+   * distinct port totals.
+   */
+  async getTopPorts(workspaceId: string): Promise<TopPortsResponseDto> {
+    const baseQuery = (select: string) =>
+      this.dataSource
+        .createQueryBuilder()
+        .select(select)
+        .from(AssetService, 'assetService')
+        .innerJoin('assetService.asset', 'asset')
+        .innerJoin('asset.target', 'target')
+        .where('target.workspaceId = :workspaceId', { workspaceId });
+
+    const [totals, ports] = await Promise.all([
+      baseQuery(
+        `COUNT(DISTINCT assetService.port) AS total,
+         COUNT(DISTINCT CASE WHEN assetService.port >= 49152 THEN assetService.port END) AS nonstandard`,
+      ).getRawOne<{ total: string; nonstandard: string }>(),
+      baseQuery(
+        'assetService.port AS port, COUNT(assetService.id) AS count',
+      )
+        .addGroupBy('assetService.port')
+        .addOrderBy('count', 'DESC')
+        .addOrderBy('assetService.port', 'ASC')
+        .limit(10)
+        .getRawMany<{ port: string; count: string }>(),
+    ]);
+
+    return {
+      totalPorts: Number(totals?.total ?? 0),
+      nonstandardPorts: Number(totals?.nonstandard ?? 0),
+      ports: ports.map(({ port, count }) => ({
+        port: Number(port),
+        count: Number(count),
+        isStandard: Number(port) < 49152,
+      })),
+    };
+  }
+
+  /**
+   * Retrieves the top 10 technologies detected on the latest HTTP response of
+   * each service in a workspace, ranked by number of services running them.
+   */
+  async getTopTechnologies(
+    workspaceId: string,
+  ): Promise<TopTechnologiesResponseDto> {
+    const subQuery = this.dataSource
+      .createQueryBuilder()
+      .select('assetService.id', 'serviceId')
+      .addSelect('unnest(latest_http.tech)', 'tech')
+      .from(AssetService, 'assetService')
+      .innerJoin('assetService.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .innerJoin(
+        'assetService.httpResponses',
+        'latest_http',
+        'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
+      )
+      .where('target.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('latest_http.tech IS NOT NULL');
+
+    const rawResults: { name: string; count: string }[] =
+      await this.dataSource
+        .createQueryBuilder()
+        .select('sq.tech', 'name')
+        .addSelect('COUNT(DISTINCT sq."serviceId")', 'count')
+        .from(`(${subQuery.getQuery()})`, 'sq')
+        .setParameters(subQuery.getParameters())
+        .groupBy('sq.tech')
+        .orderBy('count', 'DESC')
+        .addOrderBy('sq.tech', 'ASC')
+        .limit(10)
+        .getRawMany();
+
+    return {
+      technologies: rawResults.map(({ name, count }) => ({
+        name,
+        count: Number(count),
+      })),
     };
   }
 

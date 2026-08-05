@@ -5,11 +5,15 @@ import { useStatisticControllerGetAssetLocations } from '@/services/apis/gen/que
 import { useState } from 'react';
 import CreateWorkspace from '../workspaces/create-workspace';
 import { AssetTrends } from './components/asset-trends';
+import InventoryChanges from './components/inventory-changes';
 import IpLocationsCard from './components/ip-locations-card';
 import IssuesTimeline from './components/issues-timeline';
+import RecentAssets from './components/recent-assets';
 import Statistic from './components/statistic';
 import TlsStatistics from './components/tls-statistics';
 import TopAssetsVulnerabilitiesChart from './components/top-assets-vulnerabilities-chart';
+import TopPorts from './components/top-ports';
+import TopTechnologies from './components/top-technologies';
 import VulnerabilityStatistic from './components/vulnerabilities-statistic';
 
 export default function Dashboard() {
@@ -66,10 +70,22 @@ export default function Dashboard() {
               <AssetTrends />
             </div>
             <div className="xl:col-span-2">
+              <RecentAssets />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <InventoryChanges />
+            <TopPorts />
+            <TopTechnologies />
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-6 gap-4">
+            <div className="xl:col-span-4">
+              <IssuesTimeline />
+            </div>
+            <div className="xl:col-span-2">
               <TopAssetsVulnerabilitiesChart />
             </div>
           </div>
-          <IssuesTimeline />
         </div>
       </div>
     </Page>

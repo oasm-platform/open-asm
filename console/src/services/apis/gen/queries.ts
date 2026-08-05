@@ -1622,6 +1622,58 @@ export type TopAssetVulnerabilities = {
   value: string;
 };
 
+export type RecentAssetDto = {
+  /** The ID of the asset */
+  id: string;
+  /** The asset value */
+  value: string;
+  /** When the asset was first discovered */
+  createdAt: string;
+};
+
+export type InventoryChangesResponseDto = {
+  /** Number of assets discovered in the last 7 days */
+  assetsAdded7Days: number;
+  /** Number of assets discovered in the last 30 days */
+  assetsAdded30Days: number;
+  /** Number of services discovered in the last 7 days */
+  servicesAdded7Days: number;
+  /** Number of services discovered in the last 30 days */
+  servicesAdded30Days: number;
+  /** Up to 10 most recently discovered assets in the last 30 days */
+  recentAssets: RecentAssetDto[];
+};
+
+export type PortCountDto = {
+  /** The port number */
+  port: number;
+  /** Number of services exposing this port */
+  count: number;
+  /** Whether the port is IANA-assigned (well-known or registered, < 49152) */
+  isStandard: boolean;
+};
+
+export type TopPortsResponseDto = {
+  /** Total distinct ports exposed by the workspace */
+  totalPorts: number;
+  /** Distinct non-standard (IANA dynamic/private, >= 49152) ports exposed */
+  nonstandardPorts: number;
+  /** Top 10 ports by number of exposed services */
+  ports: PortCountDto[];
+};
+
+export type TechnologyCountDto = {
+  /** Technology name */
+  name: string;
+  /** Number of services running this technology */
+  count: number;
+};
+
+export type TopTechnologiesResponseDto = {
+  /** Top 10 technologies by number of services */
+  technologies: TechnologyCountDto[];
+};
+
 export type ScanDto = {
   /** Target ID */
   targetId: string;
@@ -18838,6 +18890,474 @@ export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
     getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions(
       options,
     );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the number of assets and services discovered in the last 7 and 30 days, plus the most recently discovered assets.
+ * @summary Get inventory changes for a workspace
+ */
+export const statisticControllerGetInventoryChanges = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<InventoryChangesResponseDto>(
+    { url: `/api/statistic/inventory-changes`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetInventoryChangesQueryKey = () => {
+  return [`/api/statistic/inventory-changes`] as const;
+};
+
+export const getStatisticControllerGetInventoryChangesQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getStatisticControllerGetInventoryChangesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>
+  > = ({ signal }) =>
+    statisticControllerGetInventoryChanges(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetInventoryChangesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>
+>;
+export type StatisticControllerGetInventoryChangesQueryError = unknown;
+
+export function useStatisticControllerGetInventoryChanges<
+  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetInventoryChanges<
+  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetInventoryChanges<
+  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get inventory changes for a workspace
+ */
+
+export function useStatisticControllerGetInventoryChanges<
+  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetInventoryChangesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the top 10 ports by number of exposed services, classified as standard (IANA) or non-standard, plus distinct port totals.
+ * @summary Get top exposed ports for a workspace
+ */
+export const statisticControllerGetTopPorts = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TopPortsResponseDto>(
+    { url: `/api/statistic/top-ports`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTopPortsQueryKey = () => {
+  return [`/api/statistic/top-ports`] as const;
+};
+
+export const getStatisticControllerGetTopPortsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetTopPortsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
+  > = ({ signal }) => statisticControllerGetTopPorts(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTopPortsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
+>;
+export type StatisticControllerGetTopPortsQueryError = unknown;
+
+export function useStatisticControllerGetTopPorts<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopPorts<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopPorts<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top exposed ports for a workspace
+ */
+
+export function useStatisticControllerGetTopPorts<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStatisticControllerGetTopPortsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the top 10 technologies detected on the latest HTTP response of each service, ranked by number of services.
+ * @summary Get top technologies for a workspace
+ */
+export const statisticControllerGetTopTechnologies = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TopTechnologiesResponseDto>(
+    { url: `/api/statistic/top-technologies`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTopTechnologiesQueryKey = () => {
+  return [`/api/statistic/top-technologies`] as const;
+};
+
+export const getStatisticControllerGetTopTechnologiesQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getStatisticControllerGetTopTechnologiesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
+  > = ({ signal }) =>
+    statisticControllerGetTopTechnologies(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTopTechnologiesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
+>;
+export type StatisticControllerGetTopTechnologiesQueryError = unknown;
+
+export function useStatisticControllerGetTopTechnologies<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTechnologies<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTechnologies<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top technologies for a workspace
+ */
+
+export function useStatisticControllerGetTopTechnologies<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopTechnologiesQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
