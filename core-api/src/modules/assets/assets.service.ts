@@ -600,6 +600,7 @@ export class AssetsService {
       host: 'asset_value',
       assetCount: '"assetCount"',
       isEnabled: 'asset.isEnabled',
+      createdAt: 'asset.createdAt',
     };
     query.sortBy = sortColumnMap[query.sortBy] ?? '"assetCount"';
 
@@ -609,6 +610,7 @@ export class AssetsService {
         'asset.value',
         'asset.targetId',
         'asset.isEnabled',
+        'asset.createdAt',
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
       .andWhere('asset.value IS NOT NULL')
@@ -641,6 +643,7 @@ export class AssetsService {
         asset_value: string;
         asset_targetId: string;
         asset_isEnabled: boolean;
+        asset_createdAt: string;
         assetCount: number;
       }) => {
         const obj = new GetHostAssetsDTO();
@@ -649,6 +652,7 @@ export class AssetsService {
         obj.targetId = item.asset_targetId;
         obj.isEnabled = item.asset_isEnabled;
         obj.assetCount = item.assetCount;
+        obj.createdAt = new Date(item.asset_createdAt);
         return obj;
       },
     );
@@ -942,7 +946,16 @@ export class AssetsService {
 
     // Re-use the base query (workspace isolation + all standard filters).
     // Cast to GetAssetsQueryDto so we can forward targetIds / hosts filters.
-    const baseQuery: GetAssetsQueryDto = { ...query, tlsHosts: query.hosts };
+    // startDate/endDate are stripped here: buildBaseQuery applies them to
+    // asset_service."createdAt", but for TLS the range must filter the cert's
+    // not_after only (handled below) — forwarding them would wrongly exclude
+    // certs whose service row predates the range.
+    const baseQuery: GetAssetsQueryDto = {
+      ...query,
+      tlsHosts: query.hosts,
+      startDate: undefined,
+      endDate: undefined,
+    };
     const qb = this.buildBaseQuery(baseQuery, workspaceId).select([
       '"tlsAssets"."host"              AS host',
       '"tlsAssets"."sni"               AS sni',

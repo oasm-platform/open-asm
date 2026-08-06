@@ -15,4 +15,7 @@ export class GetHostAssetsDTO {
 
   @ApiProperty()
   assetCount: number;
+
+  @ApiProperty()
+  createdAt: Date;
 }

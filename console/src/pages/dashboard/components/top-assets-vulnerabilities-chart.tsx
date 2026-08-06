@@ -1,27 +1,14 @@
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { DataTable } from '@/components/ui/data-table';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/services/apis/gen/queries';
+import { Bug, ChevronRight } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
-import type { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
-
-interface VulnerabilityAsset {
-  asset: string;
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-  info: number;
-  total: number;
-  id: string;
-}
 
 const severityColors = {
   info: 'bg-muted-foreground/40',
@@ -33,7 +20,7 @@ const severityColors = {
 
 const severityOrder = ['info', 'low', 'medium', 'high', 'critical'] as const;
 
-const TopAssetsVulnerabilitiesTable = () => {
+const TopAssetsVulnerabilities = () => {
   const navigate = useNavigate();
   const {
     state: { selectedWorkspaceId },
@@ -48,119 +35,96 @@ const TopAssetsVulnerabilitiesTable = () => {
     },
   });
 
-  const columns: ColumnDef<VulnerabilityAsset>[] = [
-    {
-      accessorKey: 'severity',
-      header: 'Severity',
-      size: 400,
-      cell: ({ row }) => {
-        const total = row.original.total || 0;
+  const assets = (apiData ?? []).filter((item) => item.total !== 0);
 
-        if (total === 0) {
-          return <div className="h-5 flex items-center"></div>;
-        }
-
-        return (
-          <div className="h-5 flex items-center w-full">
-            <div className="flex w-40 h-4 rounded-xl overflow-hidden">
-              {severityOrder.map((severity) => {
-                const count = row.original[severity] || 0;
-                if (count === 0) return null;
-                return (
-                  <div
-                    key={severity}
-                    className={clsx(severityColors[severity])}
-                    style={{ width: `${(count / total) * 100}%` }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: 'asset',
-      header: 'Asset',
-      cell: ({ row }) => (
-        <div className="font-medium h-5 flex items-center">
-          {row.getValue('asset') || ''}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'total',
-      header: 'Total',
-      size: 100,
-      cell: ({ row }) => {
-        const total = row.getValue('total') as number;
-        return (
-          <div className="font-semibold h-5 flex items-center text-center">
-            {total > 0 ? total : ''}
-          </div>
-        );
-      },
-    },
-  ];
-
-  const filteredData =
-    apiData
-      ?.filter((item) => item.total !== 0)
-      .map((item) => ({
-        asset: item.value,
-        critical: item.critical,
-        high: item.high,
-        medium: item.medium,
-        low: item.low,
-        info: item.info,
-        total: item.total,
-        id: item.id,
-      })) || [];
+  if (isLoading) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bug className="h-5 w-5 text-primary" />
+            Top assets with most vulnerabilities
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          Loading...
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (error) {
     return (
-      <Card>
+      <Card className="h-full">
         <CardHeader>
-          <CardTitle>Top assets with most vulnerabilities</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Bug className="h-5 w-5 text-primary" />
+            Top assets with most vulnerabilities
+          </CardTitle>
         </CardHeader>
-        <CardContent className="p-4">
-          <div className="text-red-600">Error loading data</div>
+        <CardContent className="flex h-full items-center justify-center text-sm text-red-600">
+          Error loading data
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="py-3 pt-6 h-full">
+    <Card className="flex h-full flex-col overflow-hidden">
       <CardHeader>
-        <CardTitle>Top assets with most vulnerabilities</CardTitle>
-        <CardDescription>
-          10 assets with the highest number of vulnerabilities
-        </CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <Bug className="h-5 w-5 text-primary" />
+          Top assets with most vulnerabilities
+        </CardTitle>
       </CardHeader>
-      <CardContent className="p-4 py-0">
-        <DataTable
-          onRowClick={(row) =>
-            row.asset &&
-            navigate({
-              to: '/assets',
-              search: { tab: 'host', hosts: row.asset },
-            })
-          }
-          isShowBorder={false}
-          columns={columns}
-          data={filteredData}
-          isLoading={isLoading}
-          page={1}
-          pageSize={10}
-          totalItems={filteredData.length}
-          showPagination={false}
-          isShowHeader={true}
-          minRows={10}
-        />
+      <CardContent className="min-h-0 flex-1">
+        {assets.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            No assets with vulnerabilities
+          </div>
+        ) : (
+          <div className="min-h-0 h-full space-y-1 overflow-y-auto pr-1">
+            {assets.map((item) => (
+              <button
+                key={item.id}
+                className="group w-full rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/50"
+                onClick={() =>
+                  item.value &&
+                  navigate({
+                    to: '/assets',
+                    search: { tab: 'host', hosts: item.value },
+                  })
+                }
+              >
+                <div className="flex items-center justify-between text-sm">
+                  <span className="truncate pr-2 font-medium">
+                    {item.value}
+                  </span>
+                  <span className="flex items-center gap-1 font-mono text-muted-foreground">
+                    {item.total}
+                    <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </span>
+                </div>
+                <div className="mt-1 flex h-1 w-full overflow-hidden rounded-full bg-muted">
+                  {severityOrder.map((severity) => {
+                    const count = item[severity] || 0;
+                    if (count === 0) return null;
+                    return (
+                      <div
+                        key={severity}
+                        className={clsx('h-full', severityColors[severity])}
+                        style={{ width: `${(count / item.total) * 100}%` }}
+                      />
+                    );
+                  })}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 };
 
-export default TopAssetsVulnerabilitiesTable;
+export default TopAssetsVulnerabilities;
