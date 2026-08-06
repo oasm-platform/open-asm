@@ -52,7 +52,7 @@ export function DatePickerWithRange({
     onChange?.(undefined);
   };
 
-  const hasValue = value?.from !== undefined;
+  const hasValue = value?.from !== undefined || value?.to !== undefined;
 
   return (
     <Field className={className}>
@@ -73,6 +73,8 @@ export function DatePickerWithRange({
               ) : (
                 format(value.from, 'LLL dd, y')
               )
+            ) : value?.to ? (
+              format(value.to, 'LLL dd, y')
             ) : (
               <span>{label ?? 'Pick a date range'}</span>
             )}

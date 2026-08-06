@@ -942,7 +942,16 @@ export class AssetsService {
 
     // Re-use the base query (workspace isolation + all standard filters).
     // Cast to GetAssetsQueryDto so we can forward targetIds / hosts filters.
-    const baseQuery: GetAssetsQueryDto = { ...query, tlsHosts: query.hosts };
+    // startDate/endDate are stripped here: buildBaseQuery applies them to
+    // asset_service."createdAt", but for TLS the range must filter the cert's
+    // not_after only (handled below) — forwarding them would wrongly exclude
+    // certs whose service row predates the range.
+    const baseQuery: GetAssetsQueryDto = {
+      ...query,
+      tlsHosts: query.hosts,
+      startDate: undefined,
+      endDate: undefined,
+    };
     const qb = this.buildBaseQuery(baseQuery, workspaceId).select([
       '"tlsAssets"."host"              AS host',
       '"tlsAssets"."sni"               AS sni',

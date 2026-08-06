@@ -193,6 +193,64 @@ describe('AssetsService', () => {
       ).toHaveBeenCalledWith('asset_service.id', 'ASC');
     });
   });
+  describe('getManyTls', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (mockAssetServiceRepository as any).groupBy = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).addGroupBy = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).orderBy = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).limit = jest.fn().mockReturnThis();
+      (mockAssetServiceRepository as any).offset = jest.fn().mockReturnThis();
+      (mockAssetServiceRepository as any).getQuery = jest
+        .fn()
+        .mockReturnValue('SELECT 1');
+      (mockAssetServiceRepository as any).getParameters = jest
+        .fn()
+        .mockReturnValue({});
+      (mockAssetServiceRepository as any).getRawMany = jest
+        .fn()
+        .mockResolvedValue([]);
+      (mockDataSource as any).setParameters = jest.fn().mockReturnThis();
+      (mockDataSource as any).getRawOne = jest
+        .fn()
+        .mockResolvedValue({ count: '0' });
+    });
+
+    it('applies the date range to tls not_after only, never to asset_service.createdAt', async () => {
+      await service.getManyTls(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'not_after',
+          sortOrder: 'ASC',
+          startDate: '2026-08-06',
+          endDate: '2026-08-06',
+        } as any,
+        'workspace-uuid',
+      );
+
+      const andWhere = mockAssetServiceRepository.andWhere as jest.Mock;
+      // Range filters land on the cert expiry column (DTO contract).
+      expect(andWhere).toHaveBeenCalledWith(
+        '"tlsAssets"."not_after"::timestamp >= :startDate',
+        { startDate: '2026-08-06' },
+      );
+      expect(andWhere).toHaveBeenCalledWith(
+        '"tlsAssets"."not_after"::timestamp <= :endDate',
+        { endDate: '2026-08-06 23:59:59.999' },
+      );
+      // ...and must not leak onto when the asset service row was created.
+      for (const call of andWhere.mock.calls) {
+        expect(String(call[0])).not.toContain('asset_service."createdAt"');
+      }
+    });
+  });
 
   describe('reScan', () => {
     const targetId = 'target-uuid';

@@ -77,13 +77,16 @@ export default function AssetProvider({
 
   const urlDateFrom = Array.isArray(search.startDate) ? search.startDate[0] : search.startDate;
   const urlDateTo = Array.isArray(search.endDate) ? search.endDate[0] : search.endDate;
-  const initialDateRange =
-    urlDateFrom && urlDateTo
-      ? { from: new Date(urlDateFrom), to: new Date(urlDateTo) }
+  // Derived from the URL (not useState) so deep links with a single bound —
+  // e.g. the dashboard TLS card navigates with only startDate or only endDate —
+  // still produce a working filter. A DateRange with one bound is a valid range.
+  const dateRange: DateRange | undefined =
+    urlDateFrom || urlDateTo
+      ? {
+          from: urlDateFrom ? new Date(urlDateFrom) : undefined,
+          to: urlDateTo ? new Date(urlDateTo) : undefined,
+        }
       : undefined;
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(
-    initialDateRange,
-  );
 
   const { tableParams, tableHandlers } = useServerDataTable({
     defaultSortBy: 'value',
@@ -167,12 +170,8 @@ export default function AssetProvider({
       hosts: hosts,
       statusCodes: statusCodes,
       tlsHosts: tlsHosts,
-      startDate: dateRange?.from
-        ? format(dateRange.from, 'yyyy-MM-dd')
-        : undefined,
-      endDate: dateRange?.to
-        ? format(dateRange.to, 'yyyy-MM-dd')
-        : undefined,
+      startDate: urlDateFrom,
+      endDate: urlDateTo,
       page: tableParams.page,
       sortBy: tableParams.sortBy,
       sortOrder: tableParams.sortOrder,
@@ -190,7 +189,8 @@ export default function AssetProvider({
       hosts,
       statusCodes,
       tlsHosts,
-      dateRange,
+      urlDateFrom,
+      urlDateTo,
     ],
   );
 
@@ -220,10 +220,8 @@ export default function AssetProvider({
           hosts,
           statusCodes,
           tlsHosts,
-          dateRange?.from
-            ? format(dateRange.from, 'yyyy-MM-dd')
-            : undefined,
-          dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
+          urlDateFrom,
+          urlDateTo,
         ],
       },
     }),
@@ -241,7 +239,8 @@ export default function AssetProvider({
       hosts,
       statusCodes,
       tlsHosts,
-      dateRange,
+      urlDateFrom,
+      urlDateTo,
     ],
   );
 

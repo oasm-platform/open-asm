@@ -19,10 +19,13 @@ describe('StatisticService', () => {
     andWhere: jest.fn().mockReturnThis(),
     groupBy: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     getRawMany: jest.fn(),
     getRawOne: jest.fn(),
     getQuery: jest.fn(),
+    getParameters: jest.fn().mockReturnValue({}),
+    setParameter: jest.fn().mockReturnThis(),
     setParameters: jest.fn().mockReturnThis(),
   };
 
@@ -73,5 +76,46 @@ describe('StatisticService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('getTlsStatistics', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockQueryBuilder.getRawOne.mockResolvedValue({
+        alreadyExpired: '3',
+        expireInAMonth: '2',
+        expireIn3Months: '1',
+        wontExpireAnytimeSoon: '0',
+        newCertificatesDiscovered: '4',
+      });
+    });
+
+    it('deduplicates by full certificate columns so counts match the TLS tab totals', async () => {
+      await service.getTlsStatistics('workspace-uuid');
+
+      const fromCall = mockQueryBuilder.from.mock.calls[0];
+      // Normalize whitespace so multi-line template SQL still matches.
+      const sql = String(fromCall[0]).replace(/\s+/g, ' ');
+      // Same grouping as getManyTls: one row per distinct certificate, not
+      // per (host, assetServiceId) — otherwise a cert served on several ports
+      // of the same host is counted once per service and the dashboard card
+      // no longer matches the TLS tab total after clicking through.
+      expect(sql).toMatch(/DISTINCT ON\s*\(\s*hr\.tls->>'host'/);
+      expect(sql).toContain("hr.tls->>'sni'");
+      expect(sql).toContain("hr.tls->>'subject_an'");
+      expect(sql).not.toContain('assetServiceId)');
+    });
+
+    it('returns numeric buckets from the raw row', async () => {
+      const result = await service.getTlsStatistics('workspace-uuid');
+
+      expect(result).toEqual({
+        alreadyExpired: 3,
+        expireInAMonth: 2,
+        expireIn3Months: 1,
+        wontExpireAnytimeSoon: 0,
+        newCertificatesDiscovered: 4,
+      });
+    });
   });
 });

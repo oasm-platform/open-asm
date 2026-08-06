@@ -672,8 +672,16 @@ export class StatisticService {
   async getTlsStatistics(
     workspaceId: string,
   ): Promise<TlsStatisticResponseDto> {
+    // One row per distinct certificate (same grouping as assets getManyTls),
+    // so the dashboard counts match the TLS tab total after clicking through.
+    // Grouping by (host, assetServiceId) instead would count the same cert
+    // once per port/service of the host.
     const rawSubQuery = `
-      SELECT DISTINCT ON (hr.tls->>'host', hr."assetServiceId")
+      SELECT DISTINCT ON (
+        hr.tls->>'host', hr.tls->>'sni', hr.tls->>'subject_dn', hr.tls->>'subject_cn',
+        hr.tls->>'issuer_dn', hr.tls->>'not_before', hr.tls->>'not_after',
+        hr.tls->>'tls_version', hr.tls->>'cipher', hr.tls->>'tls_connection', hr.tls->>'subject_an'
+      )
         NULLIF(hr.tls->>'not_after', '')::timestamp AS not_after,
         hr."createdAt" AS created_at
       FROM "http_responses" hr
@@ -682,7 +690,11 @@ export class StatisticService {
       INNER JOIN "targets" t ON t.id = a."targetId"
       WHERE hr.tls IS NOT NULL
         AND t."workspaceId" = :workspaceId
-      ORDER BY hr.tls->>'host', hr."assetServiceId", hr."createdAt" DESC
+      ORDER BY
+        hr.tls->>'host', hr.tls->>'sni', hr.tls->>'subject_dn', hr.tls->>'subject_cn',
+        hr.tls->>'issuer_dn', hr.tls->>'not_before', hr.tls->>'not_after',
+        hr.tls->>'tls_version', hr.tls->>'cipher', hr.tls->>'tls_connection', hr.tls->>'subject_an',
+        hr."createdAt" DESC
     `;
 
     const result = await this.dataSource
