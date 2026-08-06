@@ -12,7 +12,6 @@ describe('StatisticController', () => {
     getStatistics: jest.fn(),
     getTimelineStatistics: jest.fn(),
     getIssuesTimeline: jest.fn(),
-    getInventoryChanges: jest.fn(),
     getTopPorts: jest.fn(),
     getTopTechnologies: jest.fn(),
   };
@@ -69,26 +68,6 @@ describe('StatisticController', () => {
       const result = await controller.getIssuesTimeline(workspaceId);
       expect(result).toBe(expectedResult);
       expect(service.getIssuesTimeline).toHaveBeenCalledWith(workspaceId);
-    });
-  });
-
-  describe('getInventoryChanges', () => {
-    it('should call statisticService.getInventoryChanges', async () => {
-      const workspaceId = '1';
-      const expectedResult = {
-        assetsAdded7Days: 1,
-        assetsAdded30Days: 2,
-        servicesAdded7Days: 3,
-        servicesAdded30Days: 4,
-        recentAssets: [],
-      } as any;
-      mockStatisticService.getInventoryChanges.mockResolvedValue(
-        expectedResult,
-      );
-
-      const result = await controller.getInventoryChanges(workspaceId);
-      expect(result).toBe(expectedResult);
-      expect(service.getInventoryChanges).toHaveBeenCalledWith(workspaceId);
     });
   });
 

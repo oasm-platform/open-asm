@@ -3,7 +3,6 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
-import { InventoryChangesResponseDto } from './dto/inventory-changes.dto';
 import { TopPortsResponseDto } from './dto/top-ports.dto';
 import { TopTechnologiesResponseDto } from './dto/top-technologies.dto';
 import {
@@ -155,24 +154,6 @@ export class StatisticController {
     return this.statisticService.getTopAssetsWithMostVulnerabilities(
       workspaceId,
     );
-  }
-
-  @Doc({
-    summary: 'Get inventory changes for a workspace',
-    description:
-      'Retrieves the number of assets and services discovered in the last 7 and 30 days, plus the most recently discovered assets.',
-    response: {
-      serialization: InventoryChangesResponseDto,
-    },
-    request: {
-      getWorkspaceId: true,
-    },
-  })
-  @Get('inventory-changes')
-  getInventoryChanges(
-    @WorkspaceId() workspaceId: string,
-  ): Promise<InventoryChangesResponseDto> {
-    return this.statisticService.getInventoryChanges(workspaceId);
   }
 
   @Doc({

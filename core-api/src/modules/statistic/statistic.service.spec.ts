@@ -6,6 +6,7 @@ import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 
 describe('StatisticService', () => {
   let service: StatisticService;
@@ -19,6 +20,7 @@ describe('StatisticService', () => {
     andWhere: jest.fn().mockReturnThis(),
     groupBy: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
     from: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     getRawMany: jest.fn(),
@@ -59,6 +61,10 @@ describe('StatisticService', () => {
     createNotification: jest.fn(),
   };
 
+  const mockTechnologyForwarderService = {
+    enrichTechnologies: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,6 +74,10 @@ describe('StatisticService', () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: WorkspacesService, useValue: mockWorkspacesService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        {
+          provide: TechnologyForwarderService,
+          useValue: mockTechnologyForwarderService,
+        },
       ],
     }).compile();
 
@@ -76,6 +86,43 @@ describe('StatisticService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('getTopTechnologies', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockQueryBuilder.getRawMany.mockResolvedValue([
+        { name: 'nginx:1.18', count: '15' },
+        { name: 'react', count: '3' },
+      ]);
+      mockTechnologyForwarderService.enrichTechnologies.mockResolvedValue([
+        { name: 'nginx', iconUrl: 'https://storage/cached-static/abc.svg' },
+      ]);
+    });
+
+    it('attaches iconUrl from the technology forwarder to each top technology', async () => {
+      const result = await service.getTopTechnologies('workspace-uuid');
+
+      expect(mockTechnologyForwarderService.enrichTechnologies).toHaveBeenCalledWith(
+        ['nginx', 'react'],
+      );
+      expect(result.technologies).toEqual([
+        {
+          name: 'nginx:1.18',
+          count: 15,
+          iconUrl: 'https://storage/cached-static/abc.svg',
+        },
+        { name: 'react', count: 3 },
+      ]);
+    });
+
+    it('leaves iconUrl unset when enrichment has no match', async () => {
+      mockTechnologyForwarderService.enrichTechnologies.mockResolvedValue([]);
+
+      const result = await service.getTopTechnologies('workspace-uuid');
+
+      expect(result.technologies[0]).toEqual({ name: 'nginx:1.18', count: 15 });
+    });
   });
 
   describe('getTlsStatistics', () => {

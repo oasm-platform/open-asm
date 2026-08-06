@@ -5,7 +5,6 @@ import { useStatisticControllerGetAssetLocations } from '@/services/apis/gen/que
 import { useState } from 'react';
 import CreateWorkspace from '../workspaces/create-workspace';
 import { AssetTrends } from './components/asset-trends';
-import InventoryChanges from './components/inventory-changes';
 import IpLocationsCard from './components/ip-locations-card';
 import IssuesTimeline from './components/issues-timeline';
 import RecentAssets from './components/recent-assets';
@@ -73,8 +72,7 @@ export default function Dashboard() {
               <RecentAssets />
             </div>
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <InventoryChanges />
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <TopPorts />
             <TopTechnologies />
           </div>

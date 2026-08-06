@@ -193,6 +193,97 @@ describe('AssetsService', () => {
       ).toHaveBeenCalledWith('asset_service.id', 'ASC');
     });
   });
+
+  describe('getHostAssets', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (mockAssetServiceRepository as any).groupBy = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).orderBy = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).limit = jest.fn().mockReturnThis();
+      (mockAssetServiceRepository as any).offset = jest.fn().mockReturnThis();
+      (mockAssetServiceRepository as any).getQuery = jest
+        .fn()
+        .mockReturnValue('SELECT 1');
+      (mockAssetServiceRepository as any).getParameters = jest
+        .fn()
+        .mockReturnValue({});
+      (mockAssetServiceRepository as any).getRawMany = jest
+        .fn()
+        .mockResolvedValue([]);
+      (mockDataSource as any).setParameters = jest.fn().mockReturnThis();
+      (mockDataSource as any).getRawOne = jest
+        .fn()
+        .mockResolvedValue({ count: '0' });
+    });
+
+    it('maps sortBy=createdAt to asset.createdAt so hosts sort by discovery time', async () => {
+      await service.getHostAssets(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(
+        (mockAssetServiceRepository as any).orderBy,
+      ).toHaveBeenCalledWith('asset.createdAt', 'DESC');
+      expect((mockAssetServiceRepository as any).select).toHaveBeenCalledWith(
+        expect.arrayContaining(['asset.createdAt']),
+      );
+    });
+
+    it('falls back to assetCount ordering for unknown sortBy values', async () => {
+      await service.getHostAssets(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'bogus',
+          sortOrder: 'ASC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(
+        (mockAssetServiceRepository as any).orderBy,
+      ).toHaveBeenCalledWith('"assetCount"', 'ASC');
+    });
+
+    it('maps createdAt from the raw row into the response DTO', async () => {
+      (mockAssetServiceRepository as any).getRawMany.mockResolvedValue([
+        {
+          asset_id: 'asset-uuid',
+          asset_value: 'api.x.com',
+          asset_targetId: 'target-uuid',
+          asset_isEnabled: true,
+          asset_createdAt: '2026-08-01T00:00:00.000Z',
+          assetCount: '4',
+        },
+      ]);
+
+      const result = await service.getHostAssets(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'assetCount',
+          sortOrder: 'DESC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(result.data[0]).toMatchObject({
+        host: 'api.x.com',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      });
+    });
+  });
+
   describe('getManyTls', () => {
     beforeEach(() => {
       jest.clearAllMocks();

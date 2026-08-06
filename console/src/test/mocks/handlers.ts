@@ -194,18 +194,6 @@ export const handlers = [
   http.get('/api/statistic/asset-locations', () => {
     return HttpResponse.json([]);
   }),
-  http.get('/api/statistic/inventory-changes', () => {
-    return HttpResponse.json({
-      assetsAdded7Days: 2,
-      assetsAdded30Days: 5,
-      servicesAdded7Days: 4,
-      servicesAdded30Days: 9,
-      recentAssets: [
-        { id: 'asset-new-1', value: 'new.example.com', createdAt: '2026-08-01T00:00:00Z' },
-        { id: 'asset-new-2', value: 'staging.example.com', createdAt: '2026-07-20T00:00:00Z' },
-      ],
-    });
-  }),
   http.get('/api/statistic/top-ports', () => {
     return HttpResponse.json({
       totalPorts: 12,
@@ -220,8 +208,8 @@ export const handlers = [
   http.get('/api/statistic/top-technologies', () => {
     return HttpResponse.json({
       technologies: [
-        { name: 'nginx', count: 6 },
-        { name: 'react', count: 4 },
+        { name: 'nginx', count: 6, iconUrl: '' },
+        { name: 'react', count: 4, iconUrl: '' },
       ],
     });
   }),

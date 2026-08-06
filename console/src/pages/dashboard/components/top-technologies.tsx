@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopTechnologies } from '@/services/apis/gen/queries';
-import { ChevronRight, Layers } from 'lucide-react';
+import { ChevronRight, Layers, Boxes } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 
 const TopTechnologies = () => {
@@ -77,14 +77,29 @@ const TopTechnologies = () => {
                     search: {
                       tab: 'technology',
                       page: 1,
-                      techs: item.name,
+                      pageSize: 1,
+                      filter: item.name,
                     },
                   })
                 }
               >
-                <div className="flex items-center justify-between text-sm">
-                  <span className="truncate pr-2 font-medium">{item.name}</span>
-                  <span className="flex items-center gap-1 font-mono text-muted-foreground">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    {item.iconUrl ? (
+                      <img
+                        src={item.iconUrl}
+                        alt={item.name}
+                        className="size-4 shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <Boxes className="size-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="truncate font-medium">{item.name}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1 font-mono text-muted-foreground">
                     {item.count}
                     <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
                   </span>

@@ -9,6 +9,12 @@ export class TechnologyCountDto {
     description: 'Number of services running this technology',
   })
   count: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'Icon URL for the technology, when available',
+  })
+  iconUrl?: string;
 }
 
 export class TopTechnologiesResponseDto {

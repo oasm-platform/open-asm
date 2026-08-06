@@ -1219,6 +1219,7 @@ export type GetHostAssetsDTO = {
   targetId: string;
   isEnabled: boolean;
   assetCount: number;
+  createdAt: string;
 };
 
 export type GetManyGetHostAssetsDTODto = {
@@ -1622,28 +1623,6 @@ export type TopAssetVulnerabilities = {
   value: string;
 };
 
-export type RecentAssetDto = {
-  /** The ID of the asset */
-  id: string;
-  /** The asset value */
-  value: string;
-  /** When the asset was first discovered */
-  createdAt: string;
-};
-
-export type InventoryChangesResponseDto = {
-  /** Number of assets discovered in the last 7 days */
-  assetsAdded7Days: number;
-  /** Number of assets discovered in the last 30 days */
-  assetsAdded30Days: number;
-  /** Number of services discovered in the last 7 days */
-  servicesAdded7Days: number;
-  /** Number of services discovered in the last 30 days */
-  servicesAdded30Days: number;
-  /** Up to 10 most recently discovered assets in the last 30 days */
-  recentAssets: RecentAssetDto[];
-};
-
 export type PortCountDto = {
   /** The port number */
   port: number;
@@ -1667,6 +1646,8 @@ export type TechnologyCountDto = {
   name: string;
   /** Number of services running this technology */
   count: number;
+  /** Icon URL for the technology, when available */
+  iconUrl?: string;
 };
 
 export type TopTechnologiesResponseDto = {
@@ -18890,163 +18871,6 @@ export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
     getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions(
       options,
     );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Retrieves the number of assets and services discovered in the last 7 and 30 days, plus the most recently discovered assets.
- * @summary Get inventory changes for a workspace
- */
-export const statisticControllerGetInventoryChanges = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<InventoryChangesResponseDto>(
-    { url: `/api/statistic/inventory-changes`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetInventoryChangesQueryKey = () => {
-  return [`/api/statistic/inventory-changes`] as const;
-};
-
-export const getStatisticControllerGetInventoryChangesQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getStatisticControllerGetInventoryChangesQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>
-  > = ({ signal }) =>
-    statisticControllerGetInventoryChanges(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetInventoryChangesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>
->;
-export type StatisticControllerGetInventoryChangesQueryError = unknown;
-
-export function useStatisticControllerGetInventoryChanges<
-  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetInventoryChanges<
-  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetInventoryChanges<
-  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get inventory changes for a workspace
- */
-
-export function useStatisticControllerGetInventoryChanges<
-  TData = Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetInventoryChanges>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getStatisticControllerGetInventoryChangesQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

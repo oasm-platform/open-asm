@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, MoreThanOrEqual } from 'typeorm';
-
 import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
-import { InventoryChangesResponseDto } from './dto/inventory-changes.dto';
 import { TopPortsResponseDto } from './dto/top-ports.dto';
 import { TopTechnologiesResponseDto } from './dto/top-technologies.dto';
+import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 
 import {
   DefaultWorkflow,
@@ -79,6 +78,7 @@ export class StatisticService {
     private redisService: RedisService,
     private workspacesService: WorkspacesService,
     private notificationsService: NotificationsService,
+    private technologyForwarderService: TechnologyForwarderService,
   ) {}
 
   /**
@@ -742,61 +742,6 @@ export class StatisticService {
     };
   }
 
-  /**
-   * Retrieves newly discovered assets and services within the last 7 and 30
-   * days, plus the most recently discovered assets, for a workspace.
-   */
-  async getInventoryChanges(
-    workspaceId: string,
-  ): Promise<InventoryChangesResponseDto> {
-    const since7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const since30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-    const assetRepo = this.dataSource.getRepository(Asset);
-    const serviceRepo = this.dataSource.getRepository(AssetService);
-
-    const assetBase = () =>
-      assetRepo
-        .createQueryBuilder('asset')
-        .innerJoin('asset.target', 'target')
-        .where('target.workspaceId = :workspaceId', { workspaceId });
-
-    const serviceBase = () =>
-      serviceRepo
-        .createQueryBuilder('assetService')
-        .innerJoin('assetService.asset', 'asset')
-        .innerJoin('asset.target', 'target')
-        .where('target.workspaceId = :workspaceId', { workspaceId });
-
-    const [assetsAdded7Days, assetsAdded30Days, recentAssets] =
-      await Promise.all([
-        assetBase().andWhere('asset.createdAt >= :since', { since: since7Days }).getCount(),
-        assetBase().andWhere('asset.createdAt >= :since', { since: since30Days }).getCount(),
-        assetBase()
-          .andWhere('asset.createdAt >= :since', { since: since30Days })
-          .select(['asset.id AS id', 'asset.value AS value', 'asset.createdAt AS "createdAt"'])
-          .orderBy('asset.createdAt', 'DESC')
-          .limit(10)
-          .getRawMany<{ id: string; value: string; createdAt: Date }>(),
-      ]);
-
-    const [servicesAdded7Days, servicesAdded30Days] = await Promise.all([
-      serviceBase()
-        .andWhere('assetService.createdAt >= :since', { since: since7Days })
-        .getCount(),
-      serviceBase()
-        .andWhere('assetService.createdAt >= :since', { since: since30Days })
-        .getCount(),
-    ]);
-
-    return {
-      assetsAdded7Days,
-      assetsAdded30Days,
-      servicesAdded7Days,
-      servicesAdded30Days,
-      recentAssets,
-    };
-  }
 
   /**
    * Retrieves the top 10 most exposed ports for a workspace, classified as
@@ -874,10 +819,21 @@ export class StatisticService {
         .limit(10)
         .getRawMany();
 
+    const techNames = rawResults.map(({ name }) => name.split(':')[0]);
+    const enriched = await this.technologyForwarderService.enrichTechnologies(
+      techNames,
+    );
+    const iconByTechName = new Map(
+      enriched
+        .filter((tech) => tech?.name)
+        .map((tech) => [tech.name, tech.iconUrl]),
+    );
+
     return {
       technologies: rawResults.map(({ name, count }) => ({
         name,
         count: Number(count),
+        iconUrl: iconByTechName.get(name.split(':')[0]),
       })),
     };
   }

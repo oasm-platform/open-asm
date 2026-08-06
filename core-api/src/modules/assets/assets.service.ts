@@ -600,6 +600,7 @@ export class AssetsService {
       host: 'asset_value',
       assetCount: '"assetCount"',
       isEnabled: 'asset.isEnabled',
+      createdAt: 'asset.createdAt',
     };
     query.sortBy = sortColumnMap[query.sortBy] ?? '"assetCount"';
 
@@ -609,6 +610,7 @@ export class AssetsService {
         'asset.value',
         'asset.targetId',
         'asset.isEnabled',
+        'asset.createdAt',
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
       .andWhere('asset.value IS NOT NULL')
@@ -641,6 +643,7 @@ export class AssetsService {
         asset_value: string;
         asset_targetId: string;
         asset_isEnabled: boolean;
+        asset_createdAt: string;
         assetCount: number;
       }) => {
         const obj = new GetHostAssetsDTO();
@@ -649,6 +652,7 @@ export class AssetsService {
         obj.targetId = item.asset_targetId;
         obj.isEnabled = item.asset_isEnabled;
         obj.assetCount = item.assetCount;
+        obj.createdAt = item.asset_createdAt;
         return obj;
       },
     );
