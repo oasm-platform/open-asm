@@ -26,6 +26,10 @@ vi.mock('recharts', () => {
   };
 });
 
+vi.mock('echarts-for-react/esm/core', () => ({
+  default: () => <div />,
+}));
+
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>

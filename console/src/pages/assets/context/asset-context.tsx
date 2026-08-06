@@ -126,7 +126,6 @@ export default function AssetProvider({
 
   const handleDateRangeChange = useCallback(
     (date: DateRange | undefined) => {
-      setDateRange(date);
       navigate({
         search: ((prev: Record<string, unknown>) => ({
           ...prev,

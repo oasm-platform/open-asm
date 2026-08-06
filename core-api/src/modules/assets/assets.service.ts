@@ -652,7 +652,7 @@ export class AssetsService {
         obj.targetId = item.asset_targetId;
         obj.isEnabled = item.asset_isEnabled;
         obj.assetCount = item.assetCount;
-        obj.createdAt = item.asset_createdAt;
+        obj.createdAt = new Date(item.asset_createdAt);
         return obj;
       },
     );

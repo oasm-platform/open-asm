@@ -279,7 +279,7 @@ describe('AssetsService', () => {
 
       expect(result.data[0]).toMatchObject({
         host: 'api.x.com',
-        createdAt: '2026-08-01T00:00:00.000Z',
+        createdAt: new Date('2026-08-01T00:00:00.000Z'),
       });
     });
   });

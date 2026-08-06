@@ -85,13 +85,17 @@ describe('CronScheduleBuilder', () => {
     const user = userEvent.setup();
     const { onChange } = renderBuilder();
     await user.click(screen.getByRole('button', { name: 'Weekly' }));
-    await user.click(screen.getByRole('button', { name: 'Mon' }));
-    await user.click(screen.getByRole('button', { name: 'Thu' }));
-    // Weekly preselects today; selected days are Mon+Thu+today. Local 00:00
+    // Weekly preselects today; clicking an already-selected day toggles it
+    // OFF, so pick two days that can never collide with today. Local 00:00
     // +07 -> 17:00 UTC the previous day shifts each weekday back one day.
-    const today = ((new Date().getDay() + 6) % 7) + 1;
+    const today = ((new Date().getDay() + 6) % 7) + 1; // 1=Mon .. 7=Sun
+    const others = WEEKDAY_LABELS.map((_, i) => i + 1).filter((d) => d !== today);
+    const picked = [others[0], others[3]];
+    for (const day of picked) {
+      await user.click(screen.getByRole('button', { name: WEEKDAY_LABELS[day - 1] }));
+    }
     const shiftBack = (d: number) => ((((d - 2) % 7) + 7) % 7) + 1;
-    const expected = [...new Set([1, 4, today].map(shiftBack))].sort().join(',');
+    const expected = [...new Set([...picked, today].map(shiftBack))].sort().join(',');
     expect(onChange).toHaveBeenLastCalledWith({
       cron: `0 17 * * ${expected}`,
       timezone: 'Asia/Ho_Chi_Minh',
