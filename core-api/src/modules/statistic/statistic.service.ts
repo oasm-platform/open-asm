@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, MoreThanOrEqual } from 'typeorm';
-
 import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
+import { TopPortsResponseDto } from './dto/top-ports.dto';
+import { TopTechnologiesResponseDto } from './dto/top-technologies.dto';
+import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 
 import {
   DefaultWorkflow,
@@ -76,6 +78,7 @@ export class StatisticService {
     private redisService: RedisService,
     private workspacesService: WorkspacesService,
     private notificationsService: NotificationsService,
+    private technologyForwarderService: TechnologyForwarderService,
   ) {}
 
   /**
@@ -669,8 +672,16 @@ export class StatisticService {
   async getTlsStatistics(
     workspaceId: string,
   ): Promise<TlsStatisticResponseDto> {
+    // One row per distinct certificate (same grouping as assets getManyTls),
+    // so the dashboard counts match the TLS tab total after clicking through.
+    // Grouping by (host, assetServiceId) instead would count the same cert
+    // once per port/service of the host.
     const rawSubQuery = `
-      SELECT DISTINCT ON (hr.tls->>'host', hr."assetServiceId")
+      SELECT DISTINCT ON (
+        hr.tls->>'host', hr.tls->>'sni', hr.tls->>'subject_dn', hr.tls->>'subject_cn',
+        hr.tls->>'issuer_dn', hr.tls->>'not_before', hr.tls->>'not_after',
+        hr.tls->>'tls_version', hr.tls->>'cipher', hr.tls->>'tls_connection', hr.tls->>'subject_an'
+      )
         NULLIF(hr.tls->>'not_after', '')::timestamp AS not_after,
         hr."createdAt" AS created_at
       FROM "http_responses" hr
@@ -679,7 +690,11 @@ export class StatisticService {
       INNER JOIN "targets" t ON t.id = a."targetId"
       WHERE hr.tls IS NOT NULL
         AND t."workspaceId" = :workspaceId
-      ORDER BY hr.tls->>'host', hr."assetServiceId", hr."createdAt" DESC
+      ORDER BY
+        hr.tls->>'host', hr.tls->>'sni', hr.tls->>'subject_dn', hr.tls->>'subject_cn',
+        hr.tls->>'issuer_dn', hr.tls->>'not_before', hr.tls->>'not_after',
+        hr.tls->>'tls_version', hr.tls->>'cipher', hr.tls->>'tls_connection', hr.tls->>'subject_an',
+        hr."createdAt" DESC
     `;
 
     const result = await this.dataSource
@@ -724,6 +739,102 @@ export class StatisticService {
       expireIn3Months: Number(result.expireIn3Months),
       wontExpireAnytimeSoon: Number(result.wontExpireAnytimeSoon),
       newCertificatesDiscovered: Number(result.newCertificatesDiscovered),
+    };
+  }
+
+
+  /**
+   * Retrieves the top 10 most exposed ports for a workspace, classified as
+   * standard (IANA well-known/registered, < 49152) or non-standard, plus
+   * distinct port totals.
+   */
+  async getTopPorts(workspaceId: string): Promise<TopPortsResponseDto> {
+    const baseQuery = (select: string) =>
+      this.dataSource
+        .createQueryBuilder()
+        .select(select)
+        .from(AssetService, 'assetService')
+        .innerJoin('assetService.asset', 'asset')
+        .innerJoin('asset.target', 'target')
+        .where('target.workspaceId = :workspaceId', { workspaceId });
+
+    const [totals, ports] = await Promise.all([
+      baseQuery(
+        `COUNT(DISTINCT assetService.port) AS total,
+         COUNT(DISTINCT CASE WHEN assetService.port >= 49152 THEN assetService.port END) AS nonstandard`,
+      ).getRawOne<{ total: string; nonstandard: string }>(),
+      baseQuery(
+        'assetService.port AS port, COUNT(assetService.id) AS count',
+      )
+        .addGroupBy('assetService.port')
+        .addOrderBy('count', 'DESC')
+        .addOrderBy('assetService.port', 'ASC')
+        .limit(10)
+        .getRawMany<{ port: string; count: string }>(),
+    ]);
+
+    return {
+      totalPorts: Number(totals?.total ?? 0),
+      nonstandardPorts: Number(totals?.nonstandard ?? 0),
+      ports: ports.map(({ port, count }) => ({
+        port: Number(port),
+        count: Number(count),
+        isStandard: Number(port) < 49152,
+      })),
+    };
+  }
+
+  /**
+   * Retrieves the top 10 technologies detected on the latest HTTP response of
+   * each service in a workspace, ranked by number of services running them.
+   */
+  async getTopTechnologies(
+    workspaceId: string,
+  ): Promise<TopTechnologiesResponseDto> {
+    const subQuery = this.dataSource
+      .createQueryBuilder()
+      .select('assetService.id', 'serviceId')
+      .addSelect('unnest(latest_http.tech)', 'tech')
+      .from(AssetService, 'assetService')
+      .innerJoin('assetService.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .innerJoin(
+        'assetService.httpResponses',
+        'latest_http',
+        'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
+      )
+      .where('target.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('latest_http.tech IS NOT NULL');
+
+    const rawResults: { name: string; count: string }[] =
+      await this.dataSource
+        .createQueryBuilder()
+        .select('sq.tech', 'name')
+        .addSelect('COUNT(DISTINCT sq."serviceId")', 'count')
+        .from(`(${subQuery.getQuery()})`, 'sq')
+        .setParameters(subQuery.getParameters())
+        .groupBy('sq.tech')
+        .orderBy('count', 'DESC')
+        .addOrderBy('sq.tech', 'ASC')
+        .limit(10)
+        .getRawMany();
+
+    const techNames = rawResults.map(({ name }) => name.split(':')[0]);
+    const enriched = await this.technologyForwarderService.enrichTechnologies(
+      techNames,
+    );
+    const iconByTechName = new Map(
+      enriched
+        .filter((tech) => tech?.name)
+        .map((tech) => [tech.name, tech.iconUrl]),
+    );
+
+    return {
+      technologies: rawResults.map(({ name, count }) => ({
+        name,
+        count: Number(count),
+        iconUrl: iconByTechName.get(name.split(':')[0]),
+      })),
     };
   }
 

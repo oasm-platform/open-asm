@@ -194,6 +194,25 @@ export const handlers = [
   http.get('/api/statistic/asset-locations', () => {
     return HttpResponse.json([]);
   }),
+  http.get('/api/statistic/top-ports', () => {
+    return HttpResponse.json({
+      totalPorts: 12,
+      nonstandardPorts: 2,
+      ports: [
+        { port: 443, count: 8, isStandard: true },
+        { port: 8080, count: 5, isStandard: true },
+        { port: 49152, count: 2, isStandard: false },
+      ],
+    });
+  }),
+  http.get('/api/statistic/top-technologies', () => {
+    return HttpResponse.json({
+      technologies: [
+        { name: 'nginx', count: 6, iconUrl: '' },
+        { name: 'react', count: 4, iconUrl: '' },
+      ],
+    });
+  }),
 
   // TLS Assets
   http.get('/api/assets/tls', () => {

@@ -6,7 +6,6 @@ import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -18,6 +17,7 @@ import {
 } from '@/components/ui/chart';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTimelineStatistics } from '@/services/apis/gen/queries';
+import { TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 
 const chartConfig = {
@@ -77,8 +77,10 @@ export function AssetTrends() {
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
-        <CardTitle>Asset trend</CardTitle>
-        <CardDescription>Trend overtime</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-primary" />
+          Asset trend
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="w-full h-[300px]">

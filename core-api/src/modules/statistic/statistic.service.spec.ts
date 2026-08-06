@@ -6,6 +6,7 @@ import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 
 describe('StatisticService', () => {
   let service: StatisticService;
@@ -19,10 +20,14 @@ describe('StatisticService', () => {
     andWhere: jest.fn().mockReturnThis(),
     groupBy: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     getRawMany: jest.fn(),
     getRawOne: jest.fn(),
     getQuery: jest.fn(),
+    getParameters: jest.fn().mockReturnValue({}),
+    setParameter: jest.fn().mockReturnThis(),
     setParameters: jest.fn().mockReturnThis(),
   };
 
@@ -56,6 +61,10 @@ describe('StatisticService', () => {
     createNotification: jest.fn(),
   };
 
+  const mockTechnologyForwarderService = {
+    enrichTechnologies: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -65,6 +74,10 @@ describe('StatisticService', () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: WorkspacesService, useValue: mockWorkspacesService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        {
+          provide: TechnologyForwarderService,
+          useValue: mockTechnologyForwarderService,
+        },
       ],
     }).compile();
 
@@ -73,5 +86,83 @@ describe('StatisticService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('getTopTechnologies', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockQueryBuilder.getRawMany.mockResolvedValue([
+        { name: 'nginx:1.18', count: '15' },
+        { name: 'react', count: '3' },
+      ]);
+      mockTechnologyForwarderService.enrichTechnologies.mockResolvedValue([
+        { name: 'nginx', iconUrl: 'https://storage/cached-static/abc.svg' },
+      ]);
+    });
+
+    it('attaches iconUrl from the technology forwarder to each top technology', async () => {
+      const result = await service.getTopTechnologies('workspace-uuid');
+
+      expect(mockTechnologyForwarderService.enrichTechnologies).toHaveBeenCalledWith(
+        ['nginx', 'react'],
+      );
+      expect(result.technologies).toEqual([
+        {
+          name: 'nginx:1.18',
+          count: 15,
+          iconUrl: 'https://storage/cached-static/abc.svg',
+        },
+        { name: 'react', count: 3 },
+      ]);
+    });
+
+    it('leaves iconUrl unset when enrichment has no match', async () => {
+      mockTechnologyForwarderService.enrichTechnologies.mockResolvedValue([]);
+
+      const result = await service.getTopTechnologies('workspace-uuid');
+
+      expect(result.technologies[0]).toEqual({ name: 'nginx:1.18', count: 15 });
+    });
+  });
+
+  describe('getTlsStatistics', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockQueryBuilder.getRawOne.mockResolvedValue({
+        alreadyExpired: '3',
+        expireInAMonth: '2',
+        expireIn3Months: '1',
+        wontExpireAnytimeSoon: '0',
+        newCertificatesDiscovered: '4',
+      });
+    });
+
+    it('deduplicates by full certificate columns so counts match the TLS tab totals', async () => {
+      await service.getTlsStatistics('workspace-uuid');
+
+      const fromCall = mockQueryBuilder.from.mock.calls[0];
+      // Normalize whitespace so multi-line template SQL still matches.
+      const sql = String(fromCall[0]).replace(/\s+/g, ' ');
+      // Same grouping as getManyTls: one row per distinct certificate, not
+      // per (host, assetServiceId) — otherwise a cert served on several ports
+      // of the same host is counted once per service and the dashboard card
+      // no longer matches the TLS tab total after clicking through.
+      expect(sql).toMatch(/DISTINCT ON\s*\(\s*hr\.tls->>'host'/);
+      expect(sql).toContain("hr.tls->>'sni'");
+      expect(sql).toContain("hr.tls->>'subject_an'");
+      expect(sql).not.toContain('assetServiceId)');
+    });
+
+    it('returns numeric buckets from the raw row', async () => {
+      const result = await service.getTlsStatistics('workspace-uuid');
+
+      expect(result).toEqual({
+        alreadyExpired: 3,
+        expireInAMonth: 2,
+        expireIn3Months: 1,
+        wontExpireAnytimeSoon: 0,
+        newCertificatesDiscovered: 4,
+      });
+    });
   });
 });

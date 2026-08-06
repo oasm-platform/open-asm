@@ -54,7 +54,10 @@ export default defineConfig(({ mode }) => {
               },
               workbox: {
                 globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
-                swDest: 'sw.js',
+                // No swDest here: the relative 'sw.js' would be resolved against
+                // the build cwd (console/) instead of the plugin's outDir,
+                // littering the project root with sw.js/workbox-*.js artifacts.
+                // Default keeps them inside dist/ (gitignored).
                 maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
               },
             }),

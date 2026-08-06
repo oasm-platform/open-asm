@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -51,8 +50,10 @@ export default function IssuesTimeline() {
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
-        <CardTitle>Issues Timeline</CardTitle>
-        <CardDescription>Tracking vulnerability counts </CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <Bug className="h-5 w-5 text-primary" />
+          Issues Timeline
+        </CardTitle>
       </CardHeader>
 
       <CardContent className="relative">
