@@ -2,7 +2,7 @@ import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import {
   Body,
@@ -14,7 +14,6 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { CreateInternalNetworkDto } from './dtos/create-internal-network.dto';
 import { CreateTargetsFromInterfacesDto } from './dtos/create-targets-from-interfaces.dto';
@@ -70,7 +69,7 @@ export class InternalNetworksController {
     },
   })
   @Post()
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('network.write')
   createInternalNetwork(
     @Body() dto: CreateInternalNetworkDto,
     @WorkspaceId() workspaceId: string,
@@ -95,7 +94,7 @@ export class InternalNetworksController {
     },
   })
   @Post('targets')
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('target.write')
   createTargetsFromInterfaces(
     @Body() dto: CreateTargetsFromInterfacesDto,
     @UserContext() user: UserContextPayload,
@@ -153,7 +152,7 @@ export class InternalNetworksController {
     },
   })
   @Patch(':id')
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('network.write')
   updateInternalNetworkById(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateInternalNetworkDto,
@@ -178,7 +177,7 @@ export class InternalNetworksController {
     },
   })
   @Delete(':id')
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('network.write')
   deleteInternalNetwork(
     @Param('id', ParseUUIDPipe) id: string,
     @UserContext() user: UserContextPayload,

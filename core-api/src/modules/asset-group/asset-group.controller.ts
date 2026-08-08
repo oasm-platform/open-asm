@@ -4,7 +4,7 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { JobRunType } from '@/common/enums/enum';
-import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -15,7 +15,6 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Asset } from '../assets/entities/assets.entity';
@@ -275,7 +274,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('workflow.write')
   @Post('workflows/:id/run')
   runGroupWorkflowScheduler(@Param() queryParams: IdQueryParamDto) {
     return this.assetGroupService.runGroupWorkflowScheduler(

@@ -9,7 +9,7 @@ import {
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { ToolCategory } from '@/common/enums/enum';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
-import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -239,7 +239,7 @@ export class JobsRegistryController {
     return this.jobsRegistryService.getJobHistoryDetail(workspaceId, id);
   }
 
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('job.write')
   @Doc({
     summary: 'Re-run a job',
     description:
@@ -259,7 +259,7 @@ export class JobsRegistryController {
     return this.jobsRegistryService.reRunJob(workspaceId, params.id);
   }
 
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('job.write')
   @Doc({
     summary: 'Cancel a job',
     description: 'Cancel a job by its ID in the specified workspace',
@@ -278,7 +278,7 @@ export class JobsRegistryController {
     return this.jobsRegistryService.cancelJob(workspaceId, params.id);
   }
 
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('job.delete')
   @Doc({
     summary: 'Delete a job',
     description: 'Delete a job by its ID in the specified workspace',

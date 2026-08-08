@@ -30,7 +30,16 @@ import {
 } from '@/components/ui/tooltip';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { Crown, MoreHorizontal } from 'lucide-react';
+import {
+  Crown,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  UserCog,
+  UserPlus,
+  X,
+} from 'lucide-react';
 import { PermissionGroupFormSheet } from './permission-group-form-sheet';
 import {
   useWorkspacesControllerCancelInvitation,
@@ -231,6 +240,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
                   disabled={isOwner}
                   onSelect={() => setEditingMemberId(row.original.id)}
                 >
+                  <UserCog className="h-4 w-4" />
                   Change permission
                 </DropdownMenuItem>
                 <ConfirmDialog
@@ -243,6 +253,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
                       className="text-destructive focus:text-destructive"
                       disabled={isOwner}
                     >
+                      <Trash2 className="h-4 w-4" />
                       Remove
                     </DropdownMenuItem>
                   }
@@ -260,7 +271,10 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
       <div className="flex justify-end">
         <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">Invite member</Button>
+            <Button size="sm">
+              <UserPlus className="h-4 w-4" />
+              Invite member
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <InviteMemberDialogContent
@@ -373,6 +387,7 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
               onConfirm={() => cancelInvitation({ invitationId: row.original.id })}
               trigger={
                 <Button variant="ghost" size="sm">
+                  <X className="h-4 w-4" />
                   Cancel
                 </Button>
               }
@@ -465,12 +480,13 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onSelect={() =>
-                    setFormSheet({ mode: 'edit', groupId: row.original.id })
-                  }
-                >
-                  Edit
-                </DropdownMenuItem>
+                    onSelect={() =>
+                      setFormSheet({ mode: 'edit', groupId: row.original.id })
+                    }
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
                 <ConfirmDialog
                   title="Delete permission group"
                   description={`Delete "${row.original.name}"? Members assigned this group will lose its permissions.`}
@@ -480,6 +496,7 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
                   }
                   trigger={
                     <DropdownMenuItem className="text-destructive focus:text-destructive">
+                      <Trash2 className="h-4 w-4" />
                       Delete
                     </DropdownMenuItem>
                   }
@@ -496,6 +513,7 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button size="sm" onClick={() => setFormSheet({ mode: 'create' })}>
+          <Plus className="h-4 w-4" />
           Create group
         </Button>
       </div>

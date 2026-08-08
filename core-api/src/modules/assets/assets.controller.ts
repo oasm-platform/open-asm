@@ -1,6 +1,6 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -11,7 +11,6 @@ import {
   Post,
   Query,
   Res,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -245,7 +244,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('asset.read')
   @Get('services/export')
   async exportServicesToCSV(
     @WorkspaceId() workspaceId: string,

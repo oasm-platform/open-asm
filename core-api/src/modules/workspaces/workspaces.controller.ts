@@ -3,11 +3,10 @@ import {
   UserContext,
   WorkspaceId,
 } from '@/common/decorators/app.decorator';
-import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { WorkspacePermissionGuard } from '@/common/guards/workspace-permission.guard';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -22,7 +21,6 @@ import {
   Query,
   Req,
   Res,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
@@ -84,8 +82,7 @@ export class WorkspacesController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.apikey'])
+  @WorkspaceAccess('workspace.apikey')
   @Get('api-key')
   getWorkspaceApiKey(
     @WorkspaceId() workspaceId: string,
@@ -105,8 +102,7 @@ export class WorkspacesController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.read'])
+  @WorkspaceAccess('workspace.read')
   @Get('configs')
   getWorkspaceConfigs(
     @WorkspaceId() workspaceId: string,
@@ -126,8 +122,7 @@ export class WorkspacesController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.config'])
+  @WorkspaceAccess('workspace.config')
   @Patch('configs')
   updateWorkspaceConfigs(
     @WorkspaceId() workspaceId: string,
@@ -175,8 +170,7 @@ export class WorkspacesController {
     response: { serialization: WorkspaceMembers, isArray: true },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['member.read'])
+  @WorkspaceAccess('member.read')
   @Get('members')
   getWorkspaceMembers(@WorkspaceId() workspaceId: string) {
     return this.workspacesService.getMembersWithPermissions(workspaceId);
@@ -189,8 +183,7 @@ export class WorkspacesController {
     response: { serialization: WorkspaceMembers },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['member.write'])
+  @WorkspaceAccess('member.write')
   @Patch('members/:memberId')
   updateMemberPermissions(
     @WorkspaceId() workspaceId: string,
@@ -213,8 +206,7 @@ export class WorkspacesController {
     response: { serialization: DefaultMessageResponseDto },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['member.write'])
+  @WorkspaceAccess('member.write')
   @Delete('members/:memberId')
   removeMember(
     @WorkspaceId() workspaceId: string,
@@ -235,12 +227,13 @@ export class WorkspacesController {
   @Doc({
     summary: 'Get permission catalog',
     description:
-      'Lists every permission resource with its selectable actions and labels. Used by the permission group editor. Does not require a specific workspace permission.',
+      'Lists every permission resource with its selectable actions and labels. Used by the permission group editor. Requires member.read.',
     response: {
       serialization: PermissionCatalogResourceDto,
       isArray: true,
     },
   })
+  @WorkspaceAccess('member.read')
   @Get('permissions/catalog')
   getPermissionCatalog() {
     return this.workspacesService.getPermissionCatalog();
@@ -249,12 +242,11 @@ export class WorkspacesController {
   @Doc({
     summary: 'Get permission groups',
     description:
-      'Lists the permission groups of the workspace. Requires workspace.read.',
+      'Lists the permission groups of the workspace. Requires member.read.',
     response: { serialization: WorkspacePermission, isArray: true },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.read'])
+  @WorkspaceAccess('member.read')
   @Get('permissions')
   getPermissionGroups(@WorkspaceId() workspaceId: string) {
     return this.workspacesService.getPermissionGroups(workspaceId);
@@ -267,8 +259,7 @@ export class WorkspacesController {
     response: { serialization: WorkspacePermission },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.write'])
+  @WorkspaceAccess('workspace.write')
   @Post('permissions')
   createPermissionGroup(
     @WorkspaceId() workspaceId: string,
@@ -284,8 +275,7 @@ export class WorkspacesController {
     response: { serialization: WorkspacePermission },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.write'])
+  @WorkspaceAccess('workspace.write')
   @Patch('permissions/:permissionId')
   updatePermissionGroup(
     @WorkspaceId() workspaceId: string,
@@ -306,8 +296,7 @@ export class WorkspacesController {
     response: { serialization: DefaultMessageResponseDto },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.write'])
+  @WorkspaceAccess('workspace.write')
   @Delete('permissions/:permissionId')
   deletePermissionGroup(
     @WorkspaceId() workspaceId: string,
@@ -330,8 +319,7 @@ export class WorkspacesController {
     response: { serialization: CreateInvitationsResponseDto },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['invitation.write'])
+  @WorkspaceAccess('invitation.write')
   @Post('invitations')
   createInvitations(
     @WorkspaceId() workspaceId: string,
@@ -348,12 +336,11 @@ export class WorkspacesController {
   @Doc({
     summary: 'List workspace invitations',
     description:
-      'Lists the invitations of the workspace. Pending invitations past their expiry are reported as expired. Requires invitation.read.',
+      'Lists the invitations of the workspace. Pending invitations past their expiry are reported as expired. Requires member.read.',
     response: { serialization: WorkspaceInvitation, isArray: true },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['invitation.read'])
+  @WorkspaceAccess('member.read')
   @Get('invitations')
   listInvitations(@WorkspaceId() workspaceId: string) {
     return this.workspacesService.listInvitations(workspaceId);
@@ -366,8 +353,7 @@ export class WorkspacesController {
     response: { serialization: DefaultMessageResponseDto },
     request: { getWorkspaceId: true },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['invitation.write'])
+  @WorkspaceAccess('invitation.write')
   @Post('invitations/:invitationId/cancel')
   cancelInvitation(
     @WorkspaceId() workspaceId: string,
@@ -449,8 +435,7 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.write'])
+  @WorkspaceAccess('workspace.write')
   @Patch(':id')
   updateWorkspace(
     @Param() { id }: IdQueryParamDto,
@@ -468,8 +453,7 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.delete'])
+  @WorkspaceAccess('workspace.delete')
   @Delete(':id')
   deleteWorkspace(
     @Param() { id }: IdQueryParamDto,
@@ -486,8 +470,7 @@ export class WorkspacesController {
       serialization: GetApiKeyResponseDto,
     },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.apikey'])
+  @WorkspaceAccess('workspace.apikey')
   @Post(':id/api-key/rotate')
   rotateApiKey(
     @Param() { id }: IdQueryParamDto,
@@ -504,8 +487,7 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @UseGuards(WorkspacePermissionGuard)
-  @WorkspacePermissions(['workspace.write'])
+  @WorkspaceAccess('workspace.write')
   @Patch(':id/archived')
   makeArchived(
     @Param() { id }: IdQueryParamDto,
