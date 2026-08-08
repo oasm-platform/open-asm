@@ -5,6 +5,7 @@ import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import GetAboutProject from './components/get-about-project';
 import McpConnect from './components/mcp-connect';
+import MembersSettings from './components/members-settings';
 import Preferences from './components/preferences';
 import SecuritySettings from './components/security-settings';
 import WorkspaceSettings from './components/workspace-settings';
@@ -58,6 +59,16 @@ export const settingsTabGroups: SettingsTabGroup[] = [
           description: 'Manage your workspace API keys',
         },
         component: <ApiKeysSettings />,
+      },
+      {
+        id: 'members',
+        label: 'Members',
+        path: '/settings/members',
+        content: {
+          title: 'Members',
+          description: 'Manage members, invitations and permission groups',
+        },
+        component: <MembersSettings />,
       },
     ],
   },

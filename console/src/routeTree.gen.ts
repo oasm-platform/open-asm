@@ -18,6 +18,7 @@ import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedReportsRouteImport } from './routes/_authed/reports'
 import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
 import { Route as AuthedWorkersRouteImport } from './routes/_authed/workers'
+import { Route as InviteTokenRouteImport } from './routes/invite/$token'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
@@ -53,6 +54,8 @@ import { Route as AuthedProvidersIdIndexRouteImport } from './routes/_authed/pro
 import { Route as AuthedProvidersIdEditRouteImport } from './routes/_authed/providers/$id/edit'
 import { Route as AuthedTargetsIdIndexRouteImport } from './routes/_authed/targets/$id/index'
 import { Route as AuthedTargetsIdTabRouteImport } from './routes/_authed/targets/$id/$tab'
+import { Route as SettingsMembersPermissionGroupsPermissionIdRouteImport } from './routes/settings/members/permission-groups/$permissionId'
+import { Route as SettingsMembersPermissionGroupsNewRouteImport } from './routes/settings/members/permission-groups/new'
 
 const SplatRoute = SplatRouteImport.update({
   id: '/$',
@@ -97,6 +100,11 @@ const AuthedWorkersRoute = AuthedWorkersRouteImport.update({
   id: '/workers',
   path: '/workers',
   getParentRoute: () => AuthedRoute,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
@@ -281,6 +289,18 @@ const AuthedTargetsIdTabRoute = AuthedTargetsIdTabRouteImport.update({
   path: '/targets/$id/$tab',
   getParentRoute: () => AuthedRoute,
 } as any)
+const SettingsMembersPermissionGroupsPermissionIdRoute =
+  SettingsMembersPermissionGroupsPermissionIdRouteImport.update({
+    id: '/members/permission-groups/$permissionId',
+    path: '/members/permission-groups/$permissionId',
+    getParentRoute: () => SettingsRoute,
+  } as any)
+const SettingsMembersPermissionGroupsNewRoute =
+  SettingsMembersPermissionGroupsNewRouteImport.update({
+    id: '/members/permission-groups/new',
+    path: '/members/permission-groups/new',
+    getParentRoute: () => SettingsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
@@ -291,6 +311,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
   '/workers': typeof AuthedWorkersRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/settings/': typeof SettingsIndexRoute
   '/admin/users': typeof AuthedAdminUsersRoute
@@ -322,6 +343,8 @@ export interface FileRoutesByFullPath {
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
+  '/settings/members/permission-groups/$permissionId': typeof SettingsMembersPermissionGroupsPermissionIdRoute
+  '/settings/members/permission-groups/new': typeof SettingsMembersPermissionGroupsNewRoute
   '/agents/$id/': typeof AuthedAgentsIdIndexRoute
   '/agents/conversations/': typeof AuthedAgentsConversationsIndexRoute
   '/providers/$id/': typeof AuthedProvidersIdIndexRoute
@@ -334,6 +357,7 @@ export interface FileRoutesByTo {
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
   '/workers': typeof AuthedWorkersRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/': typeof AuthedIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -366,6 +390,8 @@ export interface FileRoutesByTo {
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
+  '/settings/members/permission-groups/$permissionId': typeof SettingsMembersPermissionGroupsPermissionIdRoute
+  '/settings/members/permission-groups/new': typeof SettingsMembersPermissionGroupsNewRoute
   '/agents/$id': typeof AuthedAgentsIdIndexRoute
   '/agents/conversations': typeof AuthedAgentsConversationsIndexRoute
   '/providers/$id': typeof AuthedProvidersIdIndexRoute
@@ -381,6 +407,7 @@ export interface FileRoutesById {
   '/_authed/reports': typeof AuthedReportsRoute
   '/_authed/search': typeof AuthedSearchRoute
   '/_authed/workers': typeof AuthedWorkersRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/_authed/': typeof AuthedIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -413,6 +440,8 @@ export interface FileRoutesById {
   '/_authed/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/_authed/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/_authed/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
+  '/settings/members/permission-groups/$permissionId': typeof SettingsMembersPermissionGroupsPermissionIdRoute
+  '/settings/members/permission-groups/new': typeof SettingsMembersPermissionGroupsNewRoute
   '/_authed/agents/$id/': typeof AuthedAgentsIdIndexRoute
   '/_authed/agents/conversations/': typeof AuthedAgentsConversationsIndexRoute
   '/_authed/providers/$id/': typeof AuthedProvidersIdIndexRoute
@@ -429,6 +458,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/search'
     | '/workers'
+    | '/invite/$token'
     | '/settings/$tab'
     | '/settings/'
     | '/admin/users'
@@ -460,6 +490,8 @@ export interface FileRouteTypes {
     | '/jobs/runs/$id'
     | '/providers/$id/edit'
     | '/targets/$id/$tab'
+    | '/settings/members/permission-groups/$permissionId'
+    | '/settings/members/permission-groups/new'
     | '/agents/$id/'
     | '/agents/conversations/'
     | '/providers/$id/'
@@ -472,6 +504,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/search'
     | '/workers'
+    | '/invite/$token'
     | '/settings/$tab'
     | '/'
     | '/settings'
@@ -504,6 +537,8 @@ export interface FileRouteTypes {
     | '/jobs/runs/$id'
     | '/providers/$id/edit'
     | '/targets/$id/$tab'
+    | '/settings/members/permission-groups/$permissionId'
+    | '/settings/members/permission-groups/new'
     | '/agents/$id'
     | '/agents/conversations'
     | '/providers/$id'
@@ -518,6 +553,7 @@ export interface FileRouteTypes {
     | '/_authed/reports'
     | '/_authed/search'
     | '/_authed/workers'
+    | '/invite/$token'
     | '/settings/$tab'
     | '/_authed/'
     | '/settings/'
@@ -550,6 +586,8 @@ export interface FileRouteTypes {
     | '/_authed/jobs/runs/$id'
     | '/_authed/providers/$id/edit'
     | '/_authed/targets/$id/$tab'
+    | '/settings/members/permission-groups/$permissionId'
+    | '/settings/members/permission-groups/new'
     | '/_authed/agents/$id/'
     | '/_authed/agents/conversations/'
     | '/_authed/providers/$id/'
@@ -562,6 +600,7 @@ export interface RootRouteChildren {
   InitAdminRoute: typeof InitAdminRoute
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRouteWithChildren
+  InviteTokenRoute: typeof InviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -628,6 +667,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/workers'
       preLoaderRoute: typeof AuthedWorkersRouteImport
       parentRoute: typeof AuthedRoute
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/settings/': {
       id: '/settings/'
@@ -874,6 +920,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedTargetsIdTabRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/settings/members/permission-groups/$permissionId': {
+      id: '/settings/members/permission-groups/$permissionId'
+      path: '/members/permission-groups/$permissionId'
+      fullPath: '/settings/members/permission-groups/$permissionId'
+      preLoaderRoute: typeof SettingsMembersPermissionGroupsPermissionIdRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/members/permission-groups/new': {
+      id: '/settings/members/permission-groups/new'
+      path: '/members/permission-groups/new'
+      fullPath: '/settings/members/permission-groups/new'
+      preLoaderRoute: typeof SettingsMembersPermissionGroupsNewRouteImport
+      parentRoute: typeof SettingsRoute
+    }
   }
 }
 
@@ -964,11 +1024,17 @@ const AuthedRouteWithChildren =
 interface SettingsRouteChildren {
   SettingsTabRoute: typeof SettingsTabRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
+  SettingsMembersPermissionGroupsPermissionIdRoute: typeof SettingsMembersPermissionGroupsPermissionIdRoute
+  SettingsMembersPermissionGroupsNewRoute: typeof SettingsMembersPermissionGroupsNewRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsTabRoute: SettingsTabRoute,
   SettingsIndexRoute: SettingsIndexRoute,
+  SettingsMembersPermissionGroupsPermissionIdRoute:
+    SettingsMembersPermissionGroupsPermissionIdRoute,
+  SettingsMembersPermissionGroupsNewRoute:
+    SettingsMembersPermissionGroupsNewRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
@@ -981,6 +1047,7 @@ const rootRouteChildren: RootRouteChildren = {
   InitAdminRoute: InitAdminRoute,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRouteWithChildren,
+  InviteTokenRoute: InviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

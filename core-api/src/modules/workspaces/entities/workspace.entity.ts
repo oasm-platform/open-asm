@@ -21,6 +21,7 @@ import {
   Relation,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
+import { WorkspacePermission } from './workspace-permission.entity';
 
 @Entity('workspaces')
 @Index('IDX_workspaces_owner', ['owner'])
@@ -49,6 +50,12 @@ export class Workspace extends BaseEntity {
     (workspaceMembers) => workspaceMembers.workspace,
   )
   workspaceMembers: Relation<WorkspaceMembers[]>;
+
+  @OneToMany(
+    () => WorkspacePermission,
+    (permission) => permission.workspace,
+  )
+  permissions: Relation<WorkspacePermission[]>;
 
   @OneToMany(() => WorkspaceTool, (workspaceTool) => workspaceTool.workspace)
   workspaceTools: Relation<WorkspaceTool[]>;

@@ -1,7 +1,13 @@
-import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
+import {
+  Public,
+  UserContext,
+  WorkspaceId,
+} from '@/common/decorators/app.decorator';
+import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { WorkspacePermissionGuard } from '@/common/guards/workspace-permission.guard';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -16,11 +22,22 @@ import {
   Query,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
+import {
+  CreateInvitationsDto,
+  InvitationPreviewDto,
+  InvitationTokenDto,
+  PermissionCatalogResourceDto,
+  UpdateMemberPermissionsDto,
+  UpdatePermissionGroupDto,
+  CreatePermissionGroupDto,
+  CreateInvitationsResponseDto,
+} from './dto/workspace-access.dto';
 import {
   ArchiveWorkspaceDto,
   CreateWorkspaceDto,
@@ -29,6 +46,9 @@ import {
   UpdateWorkspaceDto,
   WorkspaceResponseDto,
 } from './dto/workspaces.dto';
+import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
+import { WorkspaceMembers } from './entities/workspace-members.entity';
+import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
 import { WorkspacesService } from './workspaces.service';
 
@@ -64,6 +84,8 @@ export class WorkspacesController {
       getWorkspaceId: true,
     },
   })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.apikey'])
   @Get('api-key')
   getWorkspaceApiKey(
     @WorkspaceId() workspaceId: string,
@@ -83,6 +105,8 @@ export class WorkspacesController {
       getWorkspaceId: true,
     },
   })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.read'])
   @Get('configs')
   getWorkspaceConfigs(
     @WorkspaceId() workspaceId: string,
@@ -102,6 +126,8 @@ export class WorkspacesController {
       getWorkspaceId: true,
     },
   })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.config'])
   @Patch('configs')
   updateWorkspaceConfigs(
     @WorkspaceId() workspaceId: string,
@@ -138,6 +164,258 @@ export class WorkspacesController {
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Member management (permission-based)
+  // -------------------------------------------------------------------------
+
+  @Doc({
+    summary: 'Get workspace members',
+    description:
+      'Lists all members of the workspace with their permission groups. Requires member.read.',
+    response: { serialization: WorkspaceMembers, isArray: true },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['member.read'])
+  @Get('members')
+  getWorkspaceMembers(@WorkspaceId() workspaceId: string) {
+    return this.workspacesService.getMembersWithPermissions(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Update member permissions',
+    description:
+      'Replaces the permission groups assigned to a member. The owner and the acting user cannot be modified. Requires member.write.',
+    response: { serialization: WorkspaceMembers },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['member.write'])
+  @Patch('members/:memberId')
+  updateMemberPermissions(
+    @WorkspaceId() workspaceId: string,
+    @Param('memberId') memberId: string,
+    @Body() dto: UpdateMemberPermissionsDto,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.workspacesService.updateMemberPermissions(
+      workspaceId,
+      memberId,
+      dto.permissionIds,
+      user.id,
+    );
+  }
+
+  @Doc({
+    summary: 'Remove workspace member',
+    description:
+      'Removes a member from the workspace. The owner and the acting user cannot be removed. Requires member.write.',
+    response: { serialization: DefaultMessageResponseDto },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['member.write'])
+  @Delete('members/:memberId')
+  removeMember(
+    @WorkspaceId() workspaceId: string,
+    @Param('memberId') memberId: string,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.workspacesService.removeMember(
+      workspaceId,
+      memberId,
+      user.id,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Permission groups
+  // -------------------------------------------------------------------------
+
+  @Doc({
+    summary: 'Get permission catalog',
+    description:
+      'Lists every permission resource with its selectable actions and labels. Used by the permission group editor. Does not require a specific workspace permission.',
+    response: {
+      serialization: PermissionCatalogResourceDto,
+      isArray: true,
+    },
+  })
+  @Get('permissions/catalog')
+  getPermissionCatalog() {
+    return this.workspacesService.getPermissionCatalog();
+  }
+
+  @Doc({
+    summary: 'Get permission groups',
+    description:
+      'Lists the permission groups of the workspace. Requires workspace.read.',
+    response: { serialization: WorkspacePermission, isArray: true },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.read'])
+  @Get('permissions')
+  getPermissionGroups(@WorkspaceId() workspaceId: string) {
+    return this.workspacesService.getPermissionGroups(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Create permission group',
+    description:
+      'Creates a permission group. The wildcard "*" is reserved for the system Admin group. Requires workspace.write.',
+    response: { serialization: WorkspacePermission },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.write'])
+  @Post('permissions')
+  createPermissionGroup(
+    @WorkspaceId() workspaceId: string,
+    @Body() dto: CreatePermissionGroupDto,
+  ) {
+    return this.workspacesService.createPermissionGroup(workspaceId, dto);
+  }
+
+  @Doc({
+    summary: 'Update permission group',
+    description:
+      'Updates the name or permission keys of a non-system group. Requires workspace.write.',
+    response: { serialization: WorkspacePermission },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.write'])
+  @Patch('permissions/:permissionId')
+  updatePermissionGroup(
+    @WorkspaceId() workspaceId: string,
+    @Param('permissionId') permissionId: string,
+    @Body() dto: UpdatePermissionGroupDto,
+  ) {
+    return this.workspacesService.updatePermissionGroup(
+      workspaceId,
+      permissionId,
+      dto,
+    );
+  }
+
+  @Doc({
+    summary: 'Delete permission group',
+    description:
+      'Deletes a non-system permission group. Members lose its permissions. Requires workspace.write.',
+    response: { serialization: DefaultMessageResponseDto },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.write'])
+  @Delete('permissions/:permissionId')
+  deletePermissionGroup(
+    @WorkspaceId() workspaceId: string,
+    @Param('permissionId') permissionId: string,
+  ) {
+    return this.workspacesService.deletePermissionGroup(
+      workspaceId,
+      permissionId,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Invitations
+  // -------------------------------------------------------------------------
+
+  @Doc({
+    summary: 'Create workspace invitations',
+    description:
+      'Invites existing users by email. The invitee receives an in-app notification with an accept/decline link. Emails without an account are skipped. Requires invitation.write.',
+    response: { serialization: CreateInvitationsResponseDto },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['invitation.write'])
+  @Post('invitations')
+  createInvitations(
+    @WorkspaceId() workspaceId: string,
+    @Body() dto: CreateInvitationsDto,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.workspacesService.createInvitations(
+      workspaceId,
+      user.id,
+      dto,
+    );
+  }
+
+  @Doc({
+    summary: 'List workspace invitations',
+    description:
+      'Lists the invitations of the workspace. Pending invitations past their expiry are reported as expired. Requires invitation.read.',
+    response: { serialization: WorkspaceInvitation, isArray: true },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['invitation.read'])
+  @Get('invitations')
+  listInvitations(@WorkspaceId() workspaceId: string) {
+    return this.workspacesService.listInvitations(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Cancel workspace invitation',
+    description:
+      'Cancels a pending invitation so its token can no longer be used. Requires invitation.write.',
+    response: { serialization: DefaultMessageResponseDto },
+    request: { getWorkspaceId: true },
+  })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['invitation.write'])
+  @Post('invitations/:invitationId/cancel')
+  cancelInvitation(
+    @WorkspaceId() workspaceId: string,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.workspacesService.cancelInvitation(workspaceId, invitationId);
+  }
+
+  @Doc({
+    summary: 'Accept workspace invitation',
+    description:
+      'Accepts an invitation using its token. Only the authenticated user whose email matches the invitation can accept.',
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  @Post('invitations/accept')
+  acceptInvitation(
+    @Body() dto: InvitationTokenDto,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.workspacesService.acceptInvitation(dto.token, user);
+  }
+
+  @Doc({
+    summary: 'Decline workspace invitation',
+    description:
+      'Declines an invitation using its token. Only the authenticated user whose email matches the invitation can decline.',
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  @Post('invitations/decline')
+  declineInvitation(
+    @Body() dto: InvitationTokenDto,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.workspacesService.declineInvitation(dto.token, user);
+  }
+
+  @Doc({
+    summary: 'Preview workspace invitation',
+    description:
+      'Public preview of an invitation by token. Exposes only the workspace name, invited email and expiry — never the token.',
+    response: { serialization: InvitationPreviewDto },
+  })
+  @Public()
+  @Get('invitations/:token')
+  getInvitationPreview(@Param('token') token: string) {
+    return this.workspacesService.getInvitationPreview(token);
+  }
+
   @Doc({
     summary: 'Get Workspace By ID',
     description:
@@ -171,6 +449,8 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.write'])
   @Patch(':id')
   updateWorkspace(
     @Param() { id }: IdQueryParamDto,
@@ -188,6 +468,8 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.delete'])
   @Delete(':id')
   deleteWorkspace(
     @Param() { id }: IdQueryParamDto,
@@ -204,6 +486,8 @@ export class WorkspacesController {
       serialization: GetApiKeyResponseDto,
     },
   })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.apikey'])
   @Post(':id/api-key/rotate')
   rotateApiKey(
     @Param() { id }: IdQueryParamDto,
@@ -220,6 +504,8 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @UseGuards(WorkspacePermissionGuard)
+  @WorkspacePermissions(['workspace.write'])
   @Patch(':id/archived')
   makeArchived(
     @Param() { id }: IdQueryParamDto,

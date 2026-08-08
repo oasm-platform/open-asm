@@ -16,7 +16,6 @@ import {
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerGetWorkspaces,
-  WorkspaceResponseDtoRole,
   type WorkspaceResponseDto,
 } from '@/services/apis/gen/queries';
 import { Crown, Plus, Target, Users } from 'lucide-react';
@@ -75,7 +74,7 @@ export default function Workspaces() {
               ))
             : (data?.data ?? []).map((workspace: WorkspaceResponseDto) => {
                 const isOwner =
-                  workspace.role === WorkspaceResponseDtoRole.owner;
+                  workspace.currentPermission?.includes('*') ?? false;
                 return (
                   <Card
                     key={workspace.id}
