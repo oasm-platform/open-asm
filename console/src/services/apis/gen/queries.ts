@@ -8482,7 +8482,7 @@ export const useWorkspacesControllerCreateInvitations = <
 };
 
 /**
- * Lists the invitations of the workspace. Pending invitations past their expiry are reported as expired. Requires member.read.
+ * Lists the pending invitations of the workspace. Requires member.read.
  * @summary List workspace invitations
  */
 export const workspacesControllerListInvitations = (

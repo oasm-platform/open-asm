@@ -1304,20 +1304,12 @@ export class WorkspacesService implements OnModuleInit {
   public async listInvitations(
     workspaceId: string,
   ): Promise<WorkspaceInvitation[]> {
-    // Persist the real EXPIRED status before reading, so stale PENDING rows
-    // (expired but never touched) are reflected as expired.
-    await this.expireDueInvitations();
-
-    // List the full manageable history: active pending invites plus
-    // expired/cancelled ones so the UI can offer resend.
+    // List only the active pending invites. Handled history (expired,
+    // cancelled, accepted, declined) is intentionally not exposed here.
     const invitations = await this.invitationRepository.find({
       where: {
         workspace: { id: workspaceId },
-        status: In([
-          InvitationStatus.PENDING,
-          InvitationStatus.EXPIRED,
-          InvitationStatus.CANCELLED,
-        ]),
+        status: InvitationStatus.PENDING,
       },
       relations: ['invitedBy', 'workspace'],
       order: { createdAt: 'DESC' },

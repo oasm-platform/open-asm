@@ -1481,27 +1481,7 @@ describe('WorkspacesService', () => {
       ).rejects.toThrow('Invitation not found or already handled');
     });
 
-    it('should persist the EXPIRED status for due invitations before listing', async () => {
-      (mockInvitationRepository.find as jest.Mock).mockResolvedValue([]);
-
-      await service.listInvitations(testWorkspaceId);
-
-      // Expiry sweep ran first: UPDATE ... SET status=EXPIRED WHERE PENDING and expired
-      const qb = (mockInvitationRepository.createQueryBuilder as jest.Mock)
-        .mock.results[0].value;
-      expect(qb.set).toHaveBeenCalledWith({
-        status: InvitationStatus.EXPIRED,
-      });
-      expect(mockInvitationRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: expect.anything(),
-          }),
-        }),
-      );
-    });
-
-    it('should list pending plus expired/cancelled invitations (resend history)', async () => {
+    it('should list only pending invitations', async () => {
       const futureExpiry = new Date(Date.now() + 60_000);
       const pendingInvitation = {
         ...makeInvitation({ expiresAt: futureExpiry }),
@@ -1526,12 +1506,29 @@ describe('WorkspacesService', () => {
       expect(mockInvitationRepository.find).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            status: expect.anything(),
+            status: InvitationStatus.PENDING,
           }),
         }),
       );
+      // No expiry sweep needed anymore — only PENDING rows are listed.
+      expect(mockInvitationRepository.createQueryBuilder).not.toHaveBeenCalled();
       expect(result).toHaveLength(1);
       expect(result[0].status).toBe(InvitationStatus.PENDING);
+    });
+
+    it('should exclude expired/cancelled invitations from the list', async () => {
+      (mockInvitationRepository.find as jest.Mock).mockResolvedValue([]);
+
+      const result = await service.listInvitations(testWorkspaceId);
+
+      expect(mockInvitationRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: InvitationStatus.PENDING,
+          }),
+        }),
+      );
+      expect(result).toEqual([]);
     });
 
     it('should expose no secrets in the public preview', async () => {

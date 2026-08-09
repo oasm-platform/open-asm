@@ -122,8 +122,9 @@ export class AgentsController {
   })
   getConnectedProviders(
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<LLMConfigWithProviderDto[]> {
-    return this.agentsService.getConnectedProviders(workspaceId);
+    return this.agentsService.getConnectedProviders(workspaceId, userId);
   }
 
   @WorkspaceAccess('agent.read')
@@ -141,8 +142,9 @@ export class AgentsController {
   async getProviderModels(
     @Param() { id }: IdQueryParamDto,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<ProviderModelDto[]> {
-    return this.agentsService.getModelsForProvider(id, workspaceId);
+    return this.agentsService.getModelsForProvider(id, workspaceId, userId);
   }
 
   @WorkspaceAccess('agent.write')
@@ -160,8 +162,9 @@ export class AgentsController {
     @Param() { id }: IdQueryParamDto,
     @Body() dto: UpdateLLMConfigDto,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<LLMConfigResponseDto> {
-    return this.agentsService.updateLLMConfig(id, dto, workspaceId);
+    return this.agentsService.updateLLMConfig(id, dto, workspaceId, userId);
   }
 
   @WorkspaceAccess('agent.write')
@@ -178,8 +181,9 @@ export class AgentsController {
   async deleteLLMConfig(
     @Param() { id }: IdQueryParamDto,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<DefaultMessageResponseDto> {
-    await this.agentsService.deleteLLMConfig(id, workspaceId);
+    await this.agentsService.deleteLLMConfig(id, workspaceId, userId);
     return { message: 'LLM config deleted successfully' };
   }
 
@@ -197,8 +201,9 @@ export class AgentsController {
   async setPreferredLLMConfig(
     @Param() { id }: IdQueryParamDto,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<LLMConfigResponseDto> {
-    return this.agentsService.setPreferredLLMConfig(id, workspaceId);
+    return this.agentsService.setPreferredLLMConfig(id, workspaceId, userId);
   }
 
   // ==========================================
@@ -219,8 +224,9 @@ export class AgentsController {
   async getConversation(
     @Param() { id }: IdQueryParamDto,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<ConversationResponseDto> {
-    return this.agentsService.getConversation(id, workspaceId);
+    return this.agentsService.getConversation(id, workspaceId, userId);
   }
 
   @WorkspaceAccess('agent.read')
@@ -234,8 +240,9 @@ export class AgentsController {
   async getConversations(
     @Query() query: GetManyBaseQueryParams,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ) {
-    return this.agentsService.getConversations(workspaceId, query);
+    return this.agentsService.getConversations(workspaceId, userId, query);
   }
 
   @WorkspaceAccess('agent.write')
@@ -253,8 +260,9 @@ export class AgentsController {
     @Param() { id }: IdQueryParamDto,
     @Body() dto: UpdateConversationDto,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<ConversationResponseDto> {
-    return this.agentsService.updateConversation(id, dto, workspaceId);
+    return this.agentsService.updateConversation(id, dto, workspaceId, userId);
   }
 
   @WorkspaceAccess('agent.write')
@@ -268,8 +276,9 @@ export class AgentsController {
   })
   async deleteAllConversations(
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<DefaultMessageResponseDto> {
-    await this.agentsService.deleteAllConversations(workspaceId);
+    await this.agentsService.deleteAllConversations(workspaceId, userId);
     return { message: 'All conversations deleted successfully' };
   }
 
@@ -287,8 +296,9 @@ export class AgentsController {
   async deleteConversation(
     @Param() { id }: IdQueryParamDto,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<DefaultMessageResponseDto> {
-    await this.agentsService.deleteConversation(id, workspaceId);
+    await this.agentsService.deleteConversation(id, workspaceId, userId);
     return { message: 'Conversation deleted successfully' };
   }
 
@@ -311,8 +321,9 @@ export class AgentsController {
     @Param() { id }: IdQueryParamDto,
     @Query() query: GetManyBaseQueryParams,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<GetManyBaseResponseDto<MessageResponseDto>> {
-    return this.agentsService.getMessages(id, workspaceId, query);
+    return this.agentsService.getMessages(id, workspaceId, userId, query);
   }
 
   @WorkspaceAccess('agent.read')
@@ -460,11 +471,13 @@ export class AgentsController {
     @Param('cid') conversationId: string,
     @Param('mid') messageId: string,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<DefaultMessageResponseDto> {
     await this.agentsService.deleteMessage(
       conversationId,
       messageId,
       workspaceId,
+      userId,
     );
     return { message: 'Message deleted successfully' };
   }

@@ -448,6 +448,7 @@ export class VulnerabilitiesService {
   async processVulnerabilityAnalysis(
     jobId: string,
     workspaceId: string,
+    userId: string,
   ): Promise<Vulnerability | undefined> {
     const vulnerability = await this.vulnerabilitiesRepository.findOne({
       where: { id: jobId },
@@ -467,6 +468,7 @@ export class VulnerabilitiesService {
       const analyzeResult = await this.agentsCompletionsService.vulAnalyze(
         vulnerabilityJson,
         workspaceId,
+        userId,
       );
 
       const hasMarkdownStructure =

@@ -1,4 +1,4 @@
-import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -184,10 +184,12 @@ export class AssetsController {
   async generateServiceTags(
     @Body() dto: GenerateServiceTagsDto,
     @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ) {
     const tags = await this.assetsService.generateServiceTags(
       dto.assetServiceId,
       workspaceId,
+      userId,
     );
     return { tags };
   }

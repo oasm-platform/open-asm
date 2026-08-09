@@ -370,7 +370,7 @@ export class WorkspacesController {
   @Doc({
     summary: 'List workspace invitations',
     description:
-      'Lists the invitations of the workspace. Pending invitations past their expiry are reported as expired. Requires member.read.',
+      'Lists the pending invitations of the workspace. Requires member.read.',
     response: { serialization: WorkspaceInvitation, isArray: true },
     request: { getWorkspaceId: true },
   })
