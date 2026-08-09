@@ -17,6 +17,18 @@ vi.mock('@/utils/authClient', () => ({
   })),
 }));
 
+vi.mock('@/hooks/usePermission', () => ({
+  usePermission: vi.fn(() => ({
+    permissions: ['*'],
+    isOwner: true,
+    hasPermission: () => true,
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
+
 vi.mock('@/pages/settings/components/workspace-settings', () => ({
   default: () => <div data-testid="workspace-settings">WorkspaceSettings</div>,
 }));
