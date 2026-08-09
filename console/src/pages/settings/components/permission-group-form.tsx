@@ -48,11 +48,25 @@ export function PermissionGroupForm({
   const [selectedKeys, setSelectedKeys] = useState<string[]>(initialPermissions);
 
   const toggleKey = (key: string) => {
-    setSelectedKeys((current) =>
-      current.includes(key)
-        ? current.filter((item) => item !== key)
-        : [...current, key],
-    );
+    setSelectedKeys((current) => {
+      const isChecked = current.includes(key);
+      if (isChecked) {
+        // {domain}.write implies {domain}.read — block unchecking read
+        // while write stays selected, otherwise the selection would lie.
+        const writeKey = key.endsWith('.read')
+          ? `${key.slice(0, -'.read'.length)}.write`
+          : null;
+        if (writeKey && current.includes(writeKey)) return current;
+        return current.filter((item) => item !== key);
+      }
+      const next = [...current, key];
+      // Checking {domain}.write also grants {domain}.read.
+      const readKey = key.endsWith('.write')
+        ? `${key.slice(0, -'.write'.length)}.read`
+        : null;
+      if (readKey && !current.includes(readKey)) next.push(readKey);
+      return next;
+    });
   };
 
   const canSave =
@@ -94,27 +108,25 @@ export function PermissionGroupForm({
               const someSelected = selectedCount > 0 && !allSelected;
               return (
                 <div key={resource.resource}>
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
-                    onClick={() =>
-                      setSelectedKeys((current) =>
-                        allSelected
-                          ? current.filter((key) => !resourceKeys.includes(key))
-                          : Array.from(
-                              new Set([...current, ...resourceKeys]),
-                            ),
-                      )
-                    }
-                  >
+                  <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground">
                     <Checkbox
                       checked={
                         someSelected ? 'indeterminate' : allSelected
                       }
-                      className="pointer-events-none"
+                      onCheckedChange={(checked) =>
+                        setSelectedKeys((current) =>
+                          checked
+                            ? Array.from(
+                                new Set([...current, ...resourceKeys]),
+                              )
+                            : current.filter(
+                                (key) => !resourceKeys.includes(key),
+                              ),
+                        )
+                      }
                     />
                     {resource.resource}
-                  </button>
+                  </label>
                   <div className="mt-1 grid gap-1">
                     {resource.actions.map((item) => {
                       const key = `${resource.resource}.${item.action}`;
@@ -146,7 +158,7 @@ export function PermissionGroupForm({
         <div className="flex flex-wrap gap-1">
           {selectedKeys.map((key) => (
             <Badge key={key} variant="secondary">
-              {key}
+              {key === '*' ? 'All permissions' : key}
               <button
                 type="button"
                 className="ml-1.5 text-muted-foreground hover:text-foreground"

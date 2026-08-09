@@ -79,6 +79,8 @@ interface DataTableProps<TData, TValue> {
   onCheck?: (selectedRows: TData[]) => void;
   /** Minimum number of rows to display (fills with empty placeholder rows) */
   minRows?: number;
+  /** Error content rendered in place of the empty-message row when set */
+  error?: React.ReactNode;
 }
 
 export function DataTable<TData, TValue>({
@@ -112,6 +114,7 @@ export function DataTable<TData, TValue>({
   showCheckBox = false,
   onCheck,
   minRows,
+  error,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -376,7 +379,7 @@ export function DataTable<TData, TValue>({
                   }
                   className="h-24 text-center text-muted-foreground"
                 >
-                  {emptyMessage}
+                  {error ?? emptyMessage}
                 </TableCell>
               </TableRow>
             )}

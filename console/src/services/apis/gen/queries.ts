@@ -333,16 +333,11 @@ export type CurrentPermissionResponseDto = {
   currentPermission: string[];
 };
 
-/**
- * @nullable
- */
-export type WorkspaceMemberUserDtoImage = { [key: string]: unknown } | null;
-
 export type WorkspaceMemberUserDto = {
   id: string;
   name: string;
   /** @nullable */
-  image?: WorkspaceMemberUserDtoImage;
+  image?: string | null;
 };
 
 export type WorkspacePermission = {
@@ -367,7 +362,11 @@ export type WorkspaceMembers = {
 };
 
 export type UpdateMemberPermissionsDto = {
-  /** Permission group ids to assign (replaces current groups) */
+  /**
+   * Permission group ids to assign (replaces current groups)
+   * @minItems 1
+   * @maxItems 50
+   */
   permissionIds: string[];
 };
 
@@ -384,26 +383,38 @@ export type PermissionCatalogResourceDto = {
 
 export type CreatePermissionGroupDto = {
   name: string;
-  /** Permission keys granted by this group. "*" is reserved for the system Admin group. */
+  /**
+   * Permission keys granted by this group. "*" is reserved for the system Admin group.
+   * @minItems 1
+   * @maxItems 50
+   */
   permissions: string[];
 };
 
 export type UpdatePermissionGroupDto = {
   name?: string;
+  /** @maxItems 50 */
   permissions?: string[];
 };
 
 export type CreateInvitationsResponseDto = {
-  /** Emails the invitation was created for */
-  invited: string[];
-  /** Emails skipped because no account matches them */
-  skipped: string[];
+  /** Number of emails the invitation was created for */
+  invited: number;
+  /** Number of emails skipped (no account matches, already a member, etc.) */
+  skipped: number;
 };
 
 export type CreateInvitationsDto = {
-  /** Emails of existing users to invite. Emails without an account are skipped. */
+  /**
+   * Emails of existing users to invite. Emails without an account are skipped.
+   * @maxItems 50
+   */
   emails: string[];
-  /** Permission group ids granted when the invitation is accepted. Groups that no longer exist are ignored. */
+  /**
+   * Permission group ids granted when the invitation is accepted. Groups that no longer exist are ignored.
+   * @minItems 1
+   * @maxItems 50
+   */
   permissionIds: string[];
 };
 
@@ -430,7 +441,10 @@ export type WorkspaceInvitation = {
 };
 
 export type InvitationTokenDto = {
-  /** Raw invite token from the notification link */
+  /**
+   * Raw invite token from the notification link
+   * @maxLength 128
+   */
   token: string;
 };
 

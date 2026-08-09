@@ -10,6 +10,7 @@ import { useSession } from '@/utils/authClient';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -36,6 +37,8 @@ export default function AcceptInvitePage({ token }: { token: string }) {
   const {
     data: preview,
     isLoading: isPreviewLoading,
+    isError,
+    error,
     refetch: refetchPreview,
   } = useWorkspacesControllerGetInvitationPreview(token, {
     query: {
@@ -50,6 +53,10 @@ export default function AcceptInvitePage({ token }: { token: string }) {
       mutation: {
         onSuccess: async () => {
           toast.success('Invitation accepted');
+          // Mark handled and refresh the preview so the stale Accept button
+          // disappears if the user navigates Back to this page.
+          setHandled(true);
+          refetchPreview();
           // Wait for the workspaces list to include the newly joined
           // workspace before switching, so the auto-select effect cannot
           // override the selection back to an old workspace.
@@ -78,6 +85,28 @@ export default function AcceptInvitePage({ token }: { token: string }) {
     return (
       <CenteredCard>
         <p className="text-sm text-muted-foreground">Loading invitation...</p>
+      </CenteredCard>
+    );
+  }
+
+  if (isError) {
+    const notFound = isAxiosError(error) && error.response?.status === 404;
+    return (
+      <CenteredCard>
+        <p className="text-sm text-muted-foreground">
+          {notFound
+            ? 'This invitation link is invalid or has expired.'
+            : 'Something went wrong while loading the invitation.'}
+        </p>
+        {!notFound && (
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => refetchPreview()}
+          >
+            Retry
+          </Button>
+        )}
       </CenteredCard>
     );
   }
@@ -143,7 +172,12 @@ export default function AcceptInvitePage({ token }: { token: string }) {
               <Button
                 className="w-full"
                 onClick={() =>
-                  navigate({ to: '/login', search: { redirect: location.href } })
+                  navigate({
+                    to: '/login',
+                    search: {
+                      redirect: location.pathname + location.search,
+                    },
+                  })
                 }
               >
                 Sign in

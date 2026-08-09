@@ -1,4 +1,5 @@
 import { PermissionGroupForm } from '@/pages/settings/components/permission-group-form';
+import { Card, CardContent } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerCreatePermissionGroup,
@@ -21,12 +22,13 @@ export default function NewPermissionGroupPage() {
   } = useWorkspaceState();
 
   const { data: catalog } = useWorkspacesControllerGetPermissionCatalog();
-  const { data: groups } = useWorkspacesControllerGetPermissionGroups({
-    query: {
-      queryKey: ['/api/workspaces/permissions', selectedWorkspaceId],
-      enabled: !!selectedWorkspaceId,
-    },
-  });
+  const { data: groups, isLoading } =
+    useWorkspacesControllerGetPermissionGroups({
+      query: {
+        queryKey: ['/api/workspaces/permissions', selectedWorkspaceId],
+        enabled: !!selectedWorkspaceId,
+      },
+    });
   const { mutate: createGroup, isPending } =
     useWorkspacesControllerCreatePermissionGroup({
       mutation: {
@@ -49,6 +51,29 @@ export default function NewPermissionGroupPage() {
       params: { tab: 'members' },
       search: { tab: 'permissions' },
     });
+
+  if (!selectedWorkspaceId) {
+    return (
+      <Card>
+        <CardContent className="py-10">
+          <p className="text-center text-muted-foreground">
+            No workspace selected. Please select a workspace to manage its
+            members.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full sm:w-3/4 xl:w-1/2">
+        <p className="text-sm text-muted-foreground">
+          Loading permission groups...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <PermissionGroupForm

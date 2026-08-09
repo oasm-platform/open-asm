@@ -1,4 +1,5 @@
 import { PermissionGroupForm } from '@/pages/settings/components/permission-group-form';
+import { Card, CardContent } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerGetPermissionCatalog,
@@ -55,6 +56,19 @@ export default function EditPermissionGroupPage({
       params: { tab: 'members' },
       search: { tab: 'permissions' },
     });
+
+  if (!selectedWorkspaceId) {
+    return (
+      <Card>
+        <CardContent className="py-10">
+          <p className="text-center text-muted-foreground">
+            No workspace selected. Please select a workspace to manage its
+            members.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (

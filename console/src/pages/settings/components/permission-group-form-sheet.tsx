@@ -95,6 +95,9 @@ export function PermissionGroupFormSheet({
         <PermissionGroupForm
           className="w-full sm:w-full xl:w-full"
           bare
+          // Remount when the editing group resolves so the form re-inits from
+          // the fetched group instead of showing stale/empty initial values.
+          key={editingGroup?.id ?? 'create'}
           catalog={catalog ?? []}
           groups={groups ?? []}
           title={

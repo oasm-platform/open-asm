@@ -22,7 +22,8 @@ export function usePermission() {
   const query = useWorkspacesControllerGetCurrentPermission({
     query: {
       enabled: Boolean(state.selectedWorkspaceId),
-      staleTime: 60_000,
+      // staleTime 0 (default): refetch on window focus, remount and workspace
+      // switch so permission changes by the admin show up without a reload.
     },
   });
 
@@ -32,7 +33,16 @@ export function usePermission() {
   );
 
   const hasPermission = useCallback(
-    (key: string) => permissions.includes(key),
+    (key: string) => {
+      // '*' wildcard (Admin/Owner) satisfies every permission key.
+      if (permissions.includes('*')) return true;
+      if (permissions.includes(key)) return true;
+      // {domain}.write implies {domain}.read
+      if (key.endsWith('.read')) {
+        return permissions.includes(`${key.slice(0, -'.read'.length)}.write`);
+      }
+      return false;
+    },
     [permissions],
   );
 
