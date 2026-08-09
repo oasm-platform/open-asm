@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayNotEmpty,
   ArrayUnique,
   IsArray,
@@ -47,12 +48,15 @@ export class WorkspaceMemberUserDto {
   @ApiProperty()
   name: string;
 
-  @ApiProperty({ required: false, nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   image?: string | null;
 }
 
 export class CreatePermissionGroupDto {
   @ApiProperty({ example: 'Viewer' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @MinLength(1)
   @MaxLength(100)
@@ -64,6 +68,8 @@ export class CreatePermissionGroupDto {
       'Permission keys granted by this group. "*" is reserved for the system Admin group.',
   })
   @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(50)
   @ArrayUnique()
   @IsString({ each: true })
   @Matches(PERMISSION_KEY_REGEX, {
@@ -76,6 +82,9 @@ export class CreatePermissionGroupDto {
 export class UpdatePermissionGroupDto {
   @ApiProperty({ required: false, example: 'Viewer' })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @MinLength(1)
   @MaxLength(100)
@@ -84,6 +93,7 @@ export class UpdatePermissionGroupDto {
   @ApiProperty({ required: false, example: ['group.read', 'target.read'] })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @ArrayUnique()
   @IsString({ each: true })
   @Matches(PERMISSION_KEY_REGEX, {
@@ -99,6 +109,8 @@ export class UpdateMemberPermissionsDto {
     description: 'Permission group ids to assign (replaces current groups)',
   })
   @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(50)
   @IsUUID('4', { each: true })
   permissionIds: string[];
 }
@@ -111,6 +123,7 @@ export class CreateInvitationsDto {
   })
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(50)
   @IsEmail({}, { each: true })
   @Transform(({ value }: { value: string[] }) =>
     Array.isArray(value) ? value.map((email) => email.toLowerCase()) : value,
@@ -123,6 +136,8 @@ export class CreateInvitationsDto {
       'Permission group ids granted when the invitation is accepted. Groups that no longer exist are ignored.',
   })
   @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(50)
   @IsUUID('4', { each: true })
   permissionIds: string[];
 }
@@ -131,6 +146,7 @@ export class InvitationTokenDto {
   @ApiProperty({ example: 'f3c2...', description: 'Raw invite token from the notification link' })
   @IsString()
   @MinLength(32)
+  @MaxLength(128)
   token: string;
 }
 
@@ -153,14 +169,15 @@ export class InvitationPreviewDto {
 
 export class CreateInvitationsResponseDto {
   @ApiProperty({
-    example: ['user@example.com'],
-    description: 'Emails the invitation was created for',
+    example: 2,
+    description: 'Number of emails the invitation was created for',
   })
-  invited: string[];
+  invited: number;
 
   @ApiProperty({
-    example: ['nobody@example.com'],
-    description: 'Emails skipped because no account matches them',
+    example: 1,
+    description:
+      'Number of emails skipped (no account matches, already a member, etc.)',
   })
-  skipped: string[];
+  skipped: number;
 }

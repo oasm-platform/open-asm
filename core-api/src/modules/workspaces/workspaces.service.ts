@@ -21,14 +21,16 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { Request, Response } from 'express';
-import { In, MoreThan, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { CreateNotificationDto } from '../notifications/dto/create-notification.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
 import { WorkflowsService } from '../workflows/workflows.service';
@@ -44,6 +46,7 @@ import {
 } from './dto/workspace-access.dto';
 import {
   CreateWorkspaceDto,
+  CurrentPermissionResponseDto,
   GetApiKeyResponseDto,
   GetManyWorkspacesDto,
   UpdateWorkspaceDto,
@@ -65,7 +68,21 @@ export const WILDCARD_PERMISSION = '*';
 
 @Injectable()
 export class WorkspacesService implements OnModuleInit {
+  private readonly logger = new Logger(WorkspacesService.name);
+
+  /**
+   * Hardening for the workspace selector cookie. Note: the console also sets
+   * `wid` via document.cookie (cannot set httpOnly), which replaces this cookie
+   * on the client — so httpOnly here only protects the value set by the API.
+   */
+  private readonly workspaceCookieOptions: Record<string, unknown> = {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  };
+
   constructor(
+    private readonly dataSource: DataSource,
     @InjectRepository(Workspace)
     private readonly repo: Repository<Workspace>,
     @InjectRepository(WorkspaceMembers)
@@ -111,26 +128,36 @@ export class WorkspacesService implements OnModuleInit {
     // Generate wrapped DEK via centralized encryption service
     const wrappedDEK = this.workspaceEncryptionService.generateWrappedDEK();
 
-    const newWorkspace = await this.repo.save({
-      id: newWorkspaceId,
-      name: dto.name,
-      description: dto?.description,
-      owner: { id },
-      dek: wrappedDEK,
-      dekAt: new Date(),
-      // apiKey: generateToken(API_KEY_LENGTH),
+    // Create the workspace, its owner membership and the system Admin group in
+    // a single transaction so a mid-way failure cannot leave an orphan
+    // workspace whose owner is locked out (no Admin group).
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Workspace).save({
+        id: newWorkspaceId,
+        name: dto.name,
+        description: dto?.description,
+        owner: { id },
+        dek: wrappedDEK,
+        dekAt: new Date(),
+        // apiKey: generateToken(API_KEY_LENGTH),
+      });
+
+      await manager.getRepository(WorkspaceMembers).save({
+        workspace: { id: newWorkspaceId },
+        user: { id },
+      });
+
+      await this.seedOwnerPermissionGroup(newWorkspaceId, id, manager);
     });
 
-    await this.workspaceMembersRepository.save({
-      workspace: newWorkspace,
-      user: { id },
-    });
+    await this.workflowsService.createDefaultWorkflows(newWorkspaceId);
 
-    await this.seedOwnerPermissionGroup(newWorkspace.id, id);
+    const created = await this.repo.findOne({ where: { id: newWorkspaceId } });
+    if (!created) {
+      throw new BadRequestException('Failed to create workspace');
+    }
 
-    await this.workflowsService.createDefaultWorkflows(newWorkspace.id);
-
-    return newWorkspace;
+    return created;
   }
 
   /**
@@ -222,7 +249,7 @@ export class WorkspacesService implements OnModuleInit {
 
     // Early return — skip count/members work when no results
     if (rawData.length === 0) {
-      res.cookie(WORKSPACE_COOKIE_NAME, '');
+      res.cookie(WORKSPACE_COOKIE_NAME, '', this.workspaceCookieOptions);
       return getManyResponse({ query, data: [], total: 0 });
     }
 
@@ -251,42 +278,7 @@ export class WorkspacesService implements OnModuleInit {
         ? workspaceId
         : defaultWorkspace;
 
-    // Batch-load the current user's memberships for all returned workspaces,
-    // joining their permission groups to compute currentPermission. The
-    // workspace relation is loaded because TypeORM does not hydrate the
-    // implicit workspaceId FK column onto the entity when relations are used.
-    const workspaceIds = mappedData.map((w) => w.id);
-    const memberships = await this.workspaceMembersRepository.find({
-      where: { workspace: { id: In(workspaceIds) }, user: { id } },
-      relations: [
-        'workspace',
-        'memberPermissions',
-        'memberPermissions.permission',
-      ],
-    });
-
-    const permissionsByWorkspace = new Map<string, string[]>();
-    for (const membership of memberships) {
-      const wsId = membership.workspace?.id;
-      if (!wsId) continue;
-      const keys: string[] = [];
-      for (const memberPermission of membership.memberPermissions ?? []) {
-        keys.push(...(memberPermission.permission?.permissions ?? []));
-      }
-      // Union of permission keys across the user's groups, deduped
-      const union = new Set([
-        ...(permissionsByWorkspace.get(wsId) ?? []),
-        ...keys,
-      ]);
-      permissionsByWorkspace.set(wsId, [...union]);
-    }
-
-    for (const item of mappedData) {
-      (item as unknown as { currentPermission: string[] }).currentPermission =
-        permissionsByWorkspace.get(item.id) ?? [];
-    }
-
-    res.cookie(WORKSPACE_COOKIE_NAME, selectedWorkspaceId);
+    res.cookie(WORKSPACE_COOKIE_NAME, selectedWorkspaceId, this.workspaceCookieOptions);
     return getManyResponse({ query, data: mappedData, total });
   }
 
@@ -548,11 +540,16 @@ export class WorkspacesService implements OnModuleInit {
    * Retrieves a workspace by its ID, but only if the user is a member of the workspace.
    * @param id - The ID of the workspace to retrieve.
    * @param userContext - The user's context data, which includes the user's ID.
+   * @param permissions - The requester's permission keys (set by the guard).
+   *   When provided, the workspaceMembers relation is only included for
+   *   holders of `member.read` or the `*` wildcard. Internal callers that omit
+   *   it keep the previous behaviour.
    * @returns The workspace, if found and the user is a member. Otherwise, null.
    */
   public async getWorkspaceById(
     id: string,
     userContext: UserContextPayload,
+    permissions?: string[],
   ): Promise<Workspace> {
     const userId = userContext.id;
 
@@ -573,6 +570,15 @@ export class WorkspacesService implements OnModuleInit {
 
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
+    }
+
+    if (permissions !== undefined) {
+      const canReadMembers =
+        permissions.includes(WILDCARD_PERMISSION) ||
+        permissions.includes('member.read');
+      if (!canReadMembers) {
+        delete (workspace as Partial<Workspace>).workspaceMembers;
+      }
     }
 
     return workspace;
@@ -701,31 +707,81 @@ export class WorkspacesService implements OnModuleInit {
   }
 
   /**
+   * Returns the union of permission keys of the current user in a workspace,
+   * computed from all their permission groups. Consumers that need the keys
+   * without the membership row (e.g. the current-permission endpoint) use this.
+   * @param workspaceId - The ID of the workspace.
+   * @param userId - The ID of the user.
+   * @returns The deduped permission keys of the user in the workspace.
+   * @throws NotFoundException if the user is not a member of the workspace.
+   */
+  public async getCurrentPermission(
+    workspaceId: string,
+    userId: string,
+  ): Promise<CurrentPermissionResponseDto> {
+    const { permissionKeys } = await this.getMembershipWithPermissions(
+      workspaceId,
+      userId,
+    );
+    return { currentPermission: permissionKeys };
+  }
+
+  /**
    * Seeds the system Admin permission group for a newly created workspace and
-   * assigns it to the creator.
+   * assigns it to the creator. Idempotent: safe to re-run after a partial
+   * failure (skips rows that already exist instead of throwing).
    * @param workspaceId - The ID of the workspace.
    * @param creatorId - The ID of the workspace creator (member row owner).
+   * @param manager - Optional transactional manager to join the workspace
+   *   creation transaction.
    */
   public async seedOwnerPermissionGroup(
     workspaceId: string,
     creatorId: string,
+    manager?: EntityManager,
   ): Promise<WorkspacePermission> {
-    const ownerGroup = await this.permissionRepository.save({
-      workspace: { id: workspaceId },
-      name: OWNER_PERMISSION_GROUP_NAME,
-      permissions: [WILDCARD_PERMISSION],
-      isSystem: true,
-    });
+    const permissionRepo = manager
+      ? manager.getRepository(WorkspacePermission)
+      : this.permissionRepository;
+    const memberRepo = manager
+      ? manager.getRepository(WorkspaceMembers)
+      : this.workspaceMembersRepository;
+    const memberPermissionRepo = manager
+      ? manager.getRepository(WorkspaceMemberPermission)
+      : this.memberPermissionRepository;
 
-    const member = await this.workspaceMembersRepository.findOne({
+    let ownerGroup = await permissionRepo.findOne({
+      where: { workspace: { id: workspaceId }, name: OWNER_PERMISSION_GROUP_NAME },
+    });
+    if (!ownerGroup) {
+      ownerGroup = await permissionRepo.save({
+        workspace: { id: workspaceId },
+        name: OWNER_PERMISSION_GROUP_NAME,
+        permissions: [WILDCARD_PERMISSION],
+        isSystem: true,
+      });
+    }
+
+    let member = await memberRepo.findOne({
       where: { workspace: { id: workspaceId }, user: { id: creatorId } },
     });
-    if (member) {
-      await this.memberPermissionRepository.save({
+    if (!member) {
+      member = await memberRepo.save({
+        workspace: { id: workspaceId },
+        user: { id: creatorId },
+      });
+    }
+
+    const existingAssignment = await memberPermissionRepo.findOne({
+      where: { member: { id: member.id }, permission: { id: ownerGroup.id } },
+    });
+    if (!existingAssignment) {
+      await memberPermissionRepo.save({
         member: { id: member.id },
         permission: { id: ownerGroup.id },
       });
     }
+
     return ownerGroup;
   }
 
@@ -756,6 +812,7 @@ export class WorkspacesService implements OnModuleInit {
   public async createPermissionGroup(
     workspaceId: string,
     dto: CreatePermissionGroupDto,
+    creatorId: string,
   ): Promise<WorkspacePermission> {
     if (dto.permissions.includes(WILDCARD_PERMISSION)) {
       throw new BadRequestException(
@@ -763,27 +820,39 @@ export class WorkspacesService implements OnModuleInit {
       );
     }
 
-    const existing = await this.permissionRepository.findOne({
-      where: { workspace: { id: workspaceId }, name: dto.name },
-    });
+    this.assertPermissionKeysValid(dto.permissions);
+    await this.assertCanGrantPermissionKeys(workspaceId, creatorId, dto.permissions);
+
+    const existing = await this.findPermissionGroupByNameCI(workspaceId, dto.name);
     if (existing) {
       throw new BadRequestException(
         'A permission group with this name already exists',
       );
     }
 
-    return this.permissionRepository.save({
-      workspace: { id: workspaceId },
-      name: dto.name,
-      permissions: dto.permissions,
-      isSystem: false,
-    });
+    try {
+      return await this.permissionRepository.save({
+        workspace: { id: workspaceId },
+        name: dto.name,
+        permissions: dto.permissions,
+        isSystem: false,
+      });
+    } catch (error) {
+      // Concurrent insert raced the unique (workspace, name) constraint.
+      if ((error as { code?: string })?.code === '23505') {
+        throw new BadRequestException(
+          'A permission group with this name already exists',
+        );
+      }
+      throw error;
+    }
   }
 
   public async updatePermissionGroup(
     workspaceId: string,
     permissionId: string,
     dto: UpdatePermissionGroupDto,
+    updaterId: string,
   ): Promise<WorkspacePermission> {
     const group = await this.getPermissionGroupInWorkspace(
       workspaceId,
@@ -799,11 +868,19 @@ export class WorkspacesService implements OnModuleInit {
       );
     }
 
+    // Reject an empty PATCH body instead of silently succeeding.
+    if (dto.name === undefined && dto.permissions === undefined) {
+      throw new BadRequestException('Nothing to update');
+    }
+
+    if (dto.permissions !== undefined) {
+      this.assertPermissionKeysValid(dto.permissions);
+      await this.assertCanGrantPermissionKeys(workspaceId, updaterId, dto.permissions);
+    }
+
     if (dto.name !== undefined && dto.name !== group.name) {
-      const duplicate = await this.permissionRepository.findOne({
-        where: { workspace: { id: workspaceId }, name: dto.name },
-      });
-      if (duplicate) {
+      const duplicate = await this.findPermissionGroupByNameCI(workspaceId, dto.name);
+      if (duplicate && duplicate.id !== permissionId) {
         throw new BadRequestException(
           'A permission group with this name already exists',
         );
@@ -814,7 +891,16 @@ export class WorkspacesService implements OnModuleInit {
       group.permissions = dto.permissions;
     }
 
-    return this.permissionRepository.save(group);
+    try {
+      return await this.permissionRepository.save(group);
+    } catch (error) {
+      if ((error as { code?: string })?.code === '23505') {
+        throw new BadRequestException(
+          'A permission group with this name already exists',
+        );
+      }
+      throw error;
+    }
   }
 
   public async deletePermissionGroup(
@@ -851,6 +937,96 @@ export class WorkspacesService implements OnModuleInit {
     return group;
   }
 
+  /**
+   * Case-insensitive group name lookup so "Viewer" and "viewer" collide.
+   */
+  private async findPermissionGroupByNameCI(
+    workspaceId: string,
+    name: string,
+  ): Promise<WorkspacePermission | null> {
+    const groups = await this.permissionRepository.find({
+      where: { workspace: { id: workspaceId } },
+    });
+    const normalized = name.toLowerCase();
+    return groups.find((group) => group.name.toLowerCase() === normalized) ?? null;
+  }
+
+  /**
+   * Flattens permission-catalog.json into the set of valid `domain.action`
+   * keys. Anything not in the catalog is rejected on group create/update.
+   */
+  private getAllPermissionKeys(): Set<string> {
+    const catalog = this.getPermissionCatalog();
+    const keys = new Set<string>();
+    for (const resource of catalog) {
+      for (const action of resource.actions) {
+        keys.add(`${resource.resource}.${action.action}`);
+      }
+    }
+    return keys;
+  }
+
+  private assertPermissionKeysValid(keys: string[]): void {
+    const valid = this.getAllPermissionKeys();
+    const unknown = [...new Set(keys)].filter((key) => !valid.has(key));
+    if (unknown.length > 0) {
+      throw new BadRequestException(
+        `Unknown permission key(s): ${unknown.join(', ')}`,
+      );
+    }
+  }
+
+  /**
+   * Privilege-escalation guard: a user may only create/update groups whose
+   * permission keys they already hold. A holder of the "*" wildcard can grant
+   * anything.
+   */
+  private async assertCanGrantPermissionKeys(
+    workspaceId: string,
+    userId: string,
+    keys: string[],
+  ): Promise<void> {
+    if (keys.length === 0) {
+      return;
+    }
+    const { permissionKeys } = await this.getMembershipWithPermissions(
+      workspaceId,
+      userId,
+    );
+    if (permissionKeys.includes(WILDCARD_PERMISSION)) {
+      return;
+    }
+    const holderKeys = new Set(permissionKeys);
+    const missing = [...new Set(keys)].filter((key) => !holderKeys.has(key));
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `You can only grant permission keys you already hold. Missing: ${missing.join(', ')}`,
+      );
+    }
+  }
+
+  /**
+   * Group-level variant used when assigning whole permission groups to
+   * members/invitees: every key of every assigned group must be held.
+   */
+  private assertCanGrantGroups(
+    holderKeys: string[],
+    groups: WorkspacePermission[],
+  ): void {
+    if (holderKeys.includes(WILDCARD_PERMISSION)) {
+      return;
+    }
+    const holderKeySet = new Set(holderKeys);
+    const offending = groups.filter((group) =>
+      (group.permissions ?? []).some((key) => !holderKeySet.has(key)),
+    );
+    if (offending.length > 0) {
+      throw new BadRequestException(
+        `You can only grant permission groups whose keys you hold. Offending group(s): ${offending.map((group) => group.name).join(', ')}`,
+      );
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Members
   // ---------------------------------------------------------------------------
@@ -876,6 +1052,12 @@ export class WorkspacesService implements OnModuleInit {
     permissionIds: string[],
     currentUserId: string,
   ): Promise<WorkspaceMembers> {
+    if (permissionIds.length === 0) {
+      throw new BadRequestException(
+        'At least one permission group is required',
+      );
+    }
+
     const member = await this.workspaceMembersRepository.findOne({
       where: { id: memberId, workspace: { id: workspaceId } },
       relations: ['user', 'memberPermissions', 'memberPermissions.permission'],
@@ -883,20 +1065,34 @@ export class WorkspacesService implements OnModuleInit {
     if (!member) {
       throw new NotFoundException('Workspace member not found');
     }
-    this.assertMemberMutable(member, currentUserId);
+    await this.assertMemberMutable(member, currentUserId, workspaceId);
 
-    const validIds = await this.filterValidPermissionIds(
+    // Validate every id against the workspace's groups — never silently drop.
+    const groups = await this.permissionRepository.find({
+      where: { id: In(permissionIds), workspace: { id: workspaceId } },
+    });
+    const validIds = new Set(groups.map((group) => group.id));
+    const invalidIds = permissionIds.filter((id) => !validIds.has(id));
+    if (invalidIds.length > 0) {
+      throw new BadRequestException(
+        `Unknown permission group(s): ${invalidIds.join(', ')}`,
+      );
+    }
+
+    // Privilege escalation guard: assigner must hold every key being granted.
+    const { permissionKeys } = await this.getMembershipWithPermissions(
       workspaceId,
-      permissionIds,
+      currentUserId,
     );
+    this.assertCanGrantGroups(permissionKeys, groups);
 
     // Replace the member's groups atomically so a failure mid-way cannot
     // leave the member with no permissions at all.
-    await this.repo.manager.transaction(async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       await manager.delete(WorkspaceMemberPermission, {
         member: { id: member.id },
       });
-      for (const permissionId of validIds) {
+      for (const permissionId of permissionIds) {
         await manager.save(WorkspaceMemberPermission, {
           member: { id: member.id },
           permission: { id: permissionId },
@@ -926,7 +1122,7 @@ export class WorkspacesService implements OnModuleInit {
     if (!member) {
       throw new NotFoundException('Workspace member not found');
     }
-    this.assertMemberMutable(member, currentUserId);
+    await this.assertMemberMutable(member, currentUserId, workspaceId);
 
     await this.workspaceMembersRepository.delete({ id: member.id });
 
@@ -935,11 +1131,14 @@ export class WorkspacesService implements OnModuleInit {
 
   /**
    * Guards against modifying the workspace owner or removing your own access.
+   * Owner protection is checked both via the system Admin group and via the
+   * workspace.ownerId, so it stays robust even if seeding ever failed.
    */
-  private assertMemberMutable(
+  private async assertMemberMutable(
     member: WorkspaceMembers,
     currentUserId: string,
-  ): void {
+    workspaceId: string,
+  ): Promise<void> {
     if (member.user?.id === currentUserId) {
       throw new ForbiddenException('You cannot modify your own membership');
     }
@@ -948,24 +1147,33 @@ export class WorkspacesService implements OnModuleInit {
     if (hasOwnerGroup) {
       throw new ForbiddenException('The workspace owner cannot be modified');
     }
+    const workspace = await this.repo.findOne({
+      where: { id: workspaceId },
+      relations: ['owner'],
+    });
+    if (workspace?.owner?.id === member.user?.id) {
+      throw new ForbiddenException('The workspace owner cannot be modified');
+    }
   }
 
-  private async filterValidPermissionIds(
+  /**
+   * Returns the non-system permission groups matching the given ids.
+   * System groups (Admin) are never assignable through invitation flows.
+   */
+  private async findValidPermissionGroups(
     workspaceId: string,
     permissionIds: string[],
-  ): Promise<string[]> {
+  ): Promise<WorkspacePermission[]> {
     if (permissionIds.length === 0) {
       return [];
     }
-    // System groups (Admin) are never assignable through member/invitation flows.
-    const groups = await this.permissionRepository.find({
+    return this.permissionRepository.find({
       where: {
         id: In(permissionIds),
         workspace: { id: workspaceId },
         isSystem: false,
       },
     });
-    return groups.map((group) => group.id);
   }
 
   // ---------------------------------------------------------------------------
@@ -988,11 +1196,24 @@ export class WorkspacesService implements OnModuleInit {
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
     }
+    if (workspace.archivedAt) {
+      throw new BadRequestException(
+        'Cannot invite members to an archived workspace',
+      );
+    }
 
-    const validPermissionIds = await this.filterValidPermissionIds(
+    // Privilege-escalation guard: the inviter must hold every key of every
+    // permission group being assigned to the invitees.
+    const validGroups = await this.findValidPermissionGroups(
       workspaceId,
       dto.permissionIds,
     );
+    const validPermissionIds = validGroups.map((group) => group.id);
+    const { permissionKeys } = await this.getMembershipWithPermissions(
+      workspaceId,
+      invitedById,
+    );
+    this.assertCanGrantGroups(permissionKeys, validGroups);
 
     // Skip users who are already members of the workspace (no invite needed).
     const invitedCandidates = emails.filter((email) =>
@@ -1018,13 +1239,10 @@ export class WorkspacesService implements OnModuleInit {
     const invitedEmails = invitedCandidates.filter(
       (email) => !memberUserIds.has(userByEmail.get(email)!.id),
     );
-    const skippedEmails = emails.filter((email) => {
-      const user = userByEmail.get(email);
-      return !user || memberUserIds.has(user.id);
-    });
+    const skippedCount = emails.length - invitedEmails.length;
     const tokenByEmail = new Map<string, string>();
 
-    await this.repo.manager.transaction(async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       for (const email of invitedEmails) {
         // Re-invite: expire any previous pending invitation for this email
         await manager.update(
@@ -1059,7 +1277,7 @@ export class WorkspacesService implements OnModuleInit {
     // invitee opens — they are not a member of the inviting workspace yet.
     for (const email of invitedEmails) {
       const user = userByEmail.get(email);
-      await this.notificationsService.createNotification({
+      await this.notifySafely({
         recipients: [user!.id],
         scope: NotificationScope.SYSTEM,
         type: NotificationType.WORKSPACE_INVITATION,
@@ -1071,17 +1289,27 @@ export class WorkspacesService implements OnModuleInit {
       });
     }
 
-    return { invited: invitedEmails, skipped: skippedEmails };
+    // Uniform counts only — never reveal which emails have accounts/memberships.
+    return { invited: invitedEmails.length, skipped: skippedCount };
   }
 
   public async listInvitations(
     workspaceId: string,
   ): Promise<WorkspaceInvitation[]> {
+    // Persist the real EXPIRED status before reading, so stale PENDING rows
+    // (expired but never touched) are reflected as expired.
+    await this.expireDueInvitations();
+
+    // List the full manageable history: active pending invites plus
+    // expired/cancelled ones so the UI can offer resend.
     const invitations = await this.invitationRepository.find({
       where: {
         workspace: { id: workspaceId },
-        status: InvitationStatus.PENDING,
-        expiresAt: MoreThan(new Date()),
+        status: In([
+          InvitationStatus.PENDING,
+          InvitationStatus.EXPIRED,
+          InvitationStatus.CANCELLED,
+        ]),
       },
       relations: ['invitedBy', 'workspace'],
       order: { createdAt: 'DESC' },
@@ -1089,11 +1317,13 @@ export class WorkspacesService implements OnModuleInit {
 
     return invitations.map((invitation) => ({
       ...invitation.toJSON(),
-      status: this.effectiveInvitationStatus(invitation),
+      status: invitation.status,
     })) as unknown as WorkspaceInvitation[];
   }
 
   public async getInvitationPreview(token: string): Promise<InvitationPreviewDto> {
+    await this.expireDueInvitations();
+
     const invitation = await this.findInvitationByToken(token);
     if (!invitation) {
       throw new NotFoundException('Invitation not found');
@@ -1103,7 +1333,7 @@ export class WorkspacesService implements OnModuleInit {
       workspaceId: invitation.workspace.id,
       workspaceName: invitation.workspace.name,
       email: invitation.email,
-      status: this.effectiveInvitationStatus(invitation),
+      status: invitation.status,
       expiresAt: invitation.expiresAt,
     };
   }
@@ -1116,8 +1346,13 @@ export class WorkspacesService implements OnModuleInit {
     if (!this.canAcceptInvitation(invitation, user.email)) {
       throw new BadRequestException('Invitation is invalid or expired');
     }
+    if (invitation!.workspace.archivedAt) {
+      throw new BadRequestException(
+        'Cannot join an archived workspace',
+      );
+    }
 
-    await this.repo.manager.transaction(async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       // Atomic one-time consume: only one concurrent accept wins
       const consumed = await manager.update(
         WorkspaceInvitation,
@@ -1136,10 +1371,29 @@ export class WorkspacesService implements OnModuleInit {
         },
       });
       if (!member) {
-        member = await memberRepository.save({
-          workspace: { id: invitation!.workspace.id },
-          user: { id: user.id },
-        });
+        try {
+          member = await memberRepository.save({
+            workspace: { id: invitation!.workspace.id },
+            user: { id: user.id },
+          });
+        } catch (error: unknown) {
+          // Concurrent accept of another invitation for the same user hits
+          // the unique (workspaceId, userId) constraint — reuse the winning
+          // membership instead of surfacing a raw 23505 → 500.
+          if ((error as { code?: string }).code === '23505') {
+            member = await memberRepository.findOne({
+              where: {
+                workspace: { id: invitation!.workspace.id },
+                user: { id: user.id },
+              },
+            });
+            if (!member) {
+              throw error;
+            }
+          } else {
+            throw error;
+          }
+        }
       }
 
       // Assign the permission groups chosen at invite time (groups still
@@ -1171,12 +1425,12 @@ export class WorkspacesService implements OnModuleInit {
       }
     });
 
-    await this.notificationsService.createNotification({
+    await this.notifySafely({
       recipients: [invitation!.invitedBy.id],
       scope: NotificationScope.SYSTEM,
       type: NotificationType.WORKSPACE_INVITATION,
       metadata: {
-        token,
+        // No token here: the inviter does not need the (now consumed) token.
         action: 'accepted',
         userName: user.name,
         workspaceName: invitation!.workspace.name,
@@ -1203,12 +1457,12 @@ export class WorkspacesService implements OnModuleInit {
       throw new BadRequestException('Invitation is invalid or expired');
     }
 
-    await this.notificationsService.createNotification({
+    await this.notifySafely({
       recipients: [invitation!.invitedBy.id],
       scope: NotificationScope.SYSTEM,
       type: NotificationType.WORKSPACE_INVITATION,
       metadata: {
-        token,
+        // No token here: the inviter does not need the (now consumed) token.
         action: 'declined',
         userName: user.name,
         workspaceName: invitation!.workspace.name,
@@ -1222,12 +1476,18 @@ export class WorkspacesService implements OnModuleInit {
     workspaceId: string,
     invitationId: string,
   ): Promise<DefaultMessageResponseDto> {
-    const deleted = await this.invitationRepository.delete({
-      id: invitationId,
-      workspace: { id: workspaceId },
-      status: InvitationStatus.PENDING,
-    });
-    if (!deleted.affected) {
+    // Keep the row for the audit trail: flip the status to CANCELLED instead
+    // of deleting, so the console's cancelled badge and InvitationStatus
+    // values stay consistent.
+    const updated = await this.invitationRepository.update(
+      {
+        id: invitationId,
+        workspace: { id: workspaceId },
+        status: InvitationStatus.PENDING,
+      },
+      { status: InvitationStatus.CANCELLED },
+    );
+    if (!updated.affected) {
       throw new NotFoundException('Invitation not found or already handled');
     }
 
@@ -1259,16 +1519,33 @@ export class WorkspacesService implements OnModuleInit {
     return true;
   }
 
-  private effectiveInvitationStatus(
-    invitation: WorkspaceInvitation,
-  ): InvitationStatus {
-    if (
-      invitation.status === InvitationStatus.PENDING &&
-      invitation.expiresAt.getTime() <= Date.now()
-    ) {
-      return InvitationStatus.EXPIRED;
+  /**
+   * Persists the EXPIRED status for pending invitations past their expiry, so
+   * list/preview reads reflect real status instead of computing it on the fly.
+   */
+  private async expireDueInvitations(): Promise<void> {
+    await this.invitationRepository
+      .createQueryBuilder()
+      .update(WorkspaceInvitation)
+      .set({ status: InvitationStatus.EXPIRED })
+      .where('status = :status', { status: InvitationStatus.PENDING })
+      .andWhere('"expiresAt" <= :now', { now: new Date() })
+      .execute();
+  }
+
+  /**
+   * Sends an invitation notification without letting a queue failure turn a
+   * successful DB write into a 500 for the caller.
+   */
+  private async notifySafely(body: CreateNotificationDto): Promise<void> {
+    try {
+      await this.notificationsService.createNotification(body);
+    } catch (error) {
+      this.logger.error(
+        'Failed to send workspace invitation notification',
+        error instanceof Error ? error.stack : String(error),
+      );
     }
-    return invitation.status;
   }
 
   public async getMemberOfWorkspaceByJobId(

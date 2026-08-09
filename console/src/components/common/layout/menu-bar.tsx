@@ -17,6 +17,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
+import { usePermission } from '@/hooks/usePermission';
 import { useSession } from '@/utils/authClient';
 import {
   Bug,
@@ -40,6 +41,8 @@ interface SubMenuItem {
   icon: React.ReactNode;
   url: string;
   isNew?: boolean;
+  /** Permission key required to see this item (e.g. 'target.read'). Omit to always show. */
+  permission?: string;
 }
 
 interface NavGroup {
@@ -86,6 +89,7 @@ export const menu: NavGroup[] = [
         title: 'Targets',
         icon: <Target />,
         url: '/targets',
+        permission: 'target.read',
       },
       {
         title: 'Groups',
@@ -97,6 +101,7 @@ export const menu: NavGroup[] = [
         title: 'Assets',
         icon: <CloudCheck />,
         url: '/assets',
+        permission: 'asset.read',
       },
       // {
       //   title: 'Internal networks',
@@ -159,6 +164,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { data } = useSession();
+  const { hasPermission } = usePermission();
 
   return (
     <Sidebar {...props} collapsible="icon">
@@ -172,20 +178,28 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent className="gap-1 px-2 py-2 md:gap-2">
         {menu
+          .map((group) => ({
+            ...group,
+            items: group.items.filter(
+              (sub) => !sub.permission || hasPermission(sub.permission),
+            ),
+          }))
           .filter(
-            (item) =>
-              !item.roles ||
-              item.roles.length === 0 ||
-              (data?.user.role != null && item.roles.includes(data.user.role)),
+            (group) =>
+              group.items.length > 0 &&
+              (!group.roles ||
+                group.roles.length === 0 ||
+                (data?.user.role != null &&
+                  group.roles.includes(data.user.role))),
           )
-          .map((item) => (
-            <SidebarGroup key={item.title} className="p-0">
+          .map((group) => (
+            <SidebarGroup key={group.title} className="p-0">
               <SidebarGroupContent>
                 <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
-                  {item.title}
+                  {group.title}
                 </SidebarGroupLabel>
                 <SidebarMenu className="mt-1 gap-0.5">
-                  {item.items.map((item) => {
+                  {group.items.map((item) => {
                     // Ensure all URLs are absolute for comparison
                     const toUrl = item.url;
                     const isActive =

@@ -317,8 +317,6 @@ export type WorkspaceResponseDto = {
   targetCount: number;
   /** Number of members in the workspace */
   memberCount: number;
-  /** Permission keys of the current user in the workspace, unioned across their permission groups */
-  currentPermission: string[];
 };
 
 export type GetManyWorkspaceResponseDtoDto = {
@@ -328,6 +326,11 @@ export type GetManyWorkspaceResponseDtoDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type CurrentPermissionResponseDto = {
+  /** Permission keys of the current user in the workspace, unioned across their permission groups */
+  currentPermission: string[];
 };
 
 /**
@@ -7262,6 +7265,163 @@ export const useWorkspacesControllerUpdateWorkspaceConfigs = <
 };
 
 /**
+ * Returns the permission keys of the authenticated user in the selected workspace, unioned across all their permission groups. Resolves the workspace from the X-Workspace-ID header or the wid cookie.
+ * @summary Get current workspace permissions
+ */
+export const workspacesControllerGetCurrentPermission = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<CurrentPermissionResponseDto>(
+    { url: `/api/workspaces/current-permission`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerGetCurrentPermissionQueryKey = () => {
+  return [`/api/workspaces/current-permission`] as const;
+};
+
+export const getWorkspacesControllerGetCurrentPermissionQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetCurrentPermissionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>
+  > = ({ signal }) =>
+    workspacesControllerGetCurrentPermission(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetCurrentPermissionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>
+>;
+export type WorkspacesControllerGetCurrentPermissionQueryError = unknown;
+
+export function useWorkspacesControllerGetCurrentPermission<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetCurrentPermission<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetCurrentPermission<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get current workspace permissions
+ */
+
+export function useWorkspacesControllerGetCurrentPermission<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetCurrentPermissionQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Lists all members of the workspace with their permission groups. Requires member.read.
  * @summary Get workspace members
  */
@@ -7608,7 +7768,7 @@ export const useWorkspacesControllerRemoveMember = <
 };
 
 /**
- * Lists every permission resource with its selectable actions and labels. Used by the permission group editor. Does not require a specific workspace permission.
+ * Lists every permission resource with its selectable actions and labels. Used by the permission group editor. Requires member.read.
  * @summary Get permission catalog
  */
 export const workspacesControllerGetPermissionCatalog = (
@@ -7765,7 +7925,7 @@ export function useWorkspacesControllerGetPermissionCatalog<
 }
 
 /**
- * Lists the permission groups of the workspace. Requires workspace.read.
+ * Lists the permission groups of the workspace. Requires member.read.
  * @summary Get permission groups
  */
 export const workspacesControllerGetPermissionGroups = (
@@ -8310,7 +8470,7 @@ export const useWorkspacesControllerCreateInvitations = <
 };
 
 /**
- * Lists the invitations of the workspace. Pending invitations past their expiry are reported as expired. Requires invitation.read.
+ * Lists the invitations of the workspace. Pending invitations past their expiry are reported as expired. Requires member.read.
  * @summary List workspace invitations
  */
 export const workspacesControllerListInvitations = (

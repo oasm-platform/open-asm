@@ -7,7 +7,10 @@ import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator'
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { UserContextPayload } from '@/common/interfaces/app.interface';
+import {
+  RequestWithMetadata,
+  UserContextPayload,
+} from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -43,6 +46,7 @@ import {
   GetManyWorkspacesDto,
   UpdateWorkspaceDto,
   WorkspaceResponseDto,
+  CurrentPermissionResponseDto,
 } from './dto/workspaces.dto';
 import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
@@ -102,7 +106,7 @@ export class WorkspacesController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('workspace.read')
+  @WorkspaceAccess('workspace.config')
   @Get('configs')
   getWorkspaceConfigs(
     @WorkspaceId() workspaceId: string,
@@ -156,6 +160,29 @@ export class WorkspacesController {
       userContextPayload,
       req,
       res,
+    );
+  }
+
+  @Doc({
+    summary: 'Get current workspace permissions',
+    description:
+      'Returns the permission keys of the authenticated user in the selected workspace, unioned across all their permission groups. Resolves the workspace from the X-Workspace-ID header or the wid cookie.',
+    response: {
+      serialization: CurrentPermissionResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess()
+  @Get('current-permission')
+  getCurrentPermission(
+    @WorkspaceId() workspaceId: string,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.workspacesService.getCurrentPermission(
+      workspaceId,
+      userContext.id,
     );
   }
 
@@ -264,8 +291,13 @@ export class WorkspacesController {
   createPermissionGroup(
     @WorkspaceId() workspaceId: string,
     @Body() dto: CreatePermissionGroupDto,
+    @UserContext() user: UserContextPayload,
   ) {
-    return this.workspacesService.createPermissionGroup(workspaceId, dto);
+    return this.workspacesService.createPermissionGroup(
+      workspaceId,
+      dto,
+      user.id,
+    );
   }
 
   @Doc({
@@ -281,11 +313,13 @@ export class WorkspacesController {
     @WorkspaceId() workspaceId: string,
     @Param('permissionId') permissionId: string,
     @Body() dto: UpdatePermissionGroupDto,
+    @UserContext() user: UserContextPayload,
   ) {
     return this.workspacesService.updatePermissionGroup(
       workspaceId,
       permissionId,
       dto,
+      user.id,
     );
   }
 
@@ -405,19 +439,22 @@ export class WorkspacesController {
   @Doc({
     summary: 'Get Workspace By ID',
     description:
-      'Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration.',
+      'Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration. Requires workspace.read; the member list is only included for member.read holders.',
     response: {
       serialization: Workspace,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get(':id')
   async getWorkspaceById(
     @Param() { id }: IdQueryParamDto,
     @UserContext() userContext: UserContextPayload,
+    @Req() req: Request,
   ) {
     const workspace = await this.workspacesService.getWorkspaceById(
       id,
       userContext,
+      (req as RequestWithMetadata).permissions,
     );
 
     if (!workspace) {

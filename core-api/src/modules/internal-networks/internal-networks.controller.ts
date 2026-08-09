@@ -46,6 +46,7 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('network.read')
   @Get()
   getManyInternalNetworks(
     @Query() query: GetManyInternalNetworksQueryDto,
@@ -113,6 +114,7 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('network.read')
   @Get(':id/network-interfaces')
   getManyNetworkInterfaces(
     @Param('id', ParseUUIDPipe) id: string,
@@ -132,6 +134,7 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('network.read')
   @Get(':id')
   getInternalNetworkById(
     @Param('id', ParseUUIDPipe) id: string,

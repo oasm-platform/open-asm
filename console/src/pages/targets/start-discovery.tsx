@@ -222,7 +222,7 @@ export default function StartDiscovery() {
   }
 
   return (
-    <Page title="Start discovery" isShowButtonGoBack>
+    <Page title="Start discovery" isShowButtonGoBack permission="target.write">
       <div className="max-w-4xl mx-auto py-6">
         <div className={`bg-card rounded-lg border ${targetTypeBg[targetType]} p-4`}>
           <div className="mb-6">

@@ -25,7 +25,7 @@ export default function CreateAgentPage() {
   };
 
   return (
-    <Page title="Connect Provider" isShowButtonGoBack>
+    <Page title="Connect Provider" isShowButtonGoBack permission="agent.write">
       <div className="max-w-4xl mx-auto py-6">
         <div className="bg-card rounded-lg border p-6">
           <div className="mb-6">

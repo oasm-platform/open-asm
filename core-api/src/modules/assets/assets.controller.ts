@@ -44,6 +44,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read')
   @Get()
   getAssetsInWorkspace(
     @Query() query: GetAssetsQueryDto,
@@ -62,6 +63,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read')
   @Get('/ip')
   getIpAssets(
     @Query() query: GetAssetsQueryDto,
@@ -80,6 +82,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read')
   @Get('/host')
   getHostAssets(
     @Query() query: GetAssetsQueryDto,
@@ -98,6 +101,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read')
   @Get('/port')
   getPortAssets(
     @Query() query: GetAssetsQueryDto,
@@ -116,6 +120,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read')
   @Get('/tech')
   getTechnologyAssets(
     @Query() query: GetAssetsQueryDto,
@@ -134,6 +139,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read')
   @Get('/status-code')
   getStatusCodeAssets(
     @Query() query: GetAssetsQueryDto,
@@ -153,6 +159,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read')
   @Get('/tls')
   getTlsAssets(
     @Query() query: GetTlsQueryDto,
@@ -172,6 +179,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.write')
   @Post('service/tag/generate')
   async generateServiceTags(
     @Body() dto: GenerateServiceTagsDto,
@@ -194,6 +202,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read')
   @Get(':id')
   getAssetById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
     return this.assetsService.getAssetById(id, workspaceId);
@@ -209,6 +218,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.write')
   @Patch(':id')
   updateAssetById(
     @Param('id') id: string,
@@ -225,6 +235,7 @@ export class AssetsController {
       serialization: GetAssetsResponseDto,
     },
   })
+  @WorkspaceAccess('asset.write')
   @Post('/toggle')
   toggleAsset(@Body() toggleAssetDto: ToggleAssetDto) {
     return this.assetsService.toggleAsset(

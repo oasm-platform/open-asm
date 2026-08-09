@@ -119,12 +119,5 @@
     "actions": [
       { "action": "execute", "description": "Use the AI Assistant" }
     ]
-  },
-  {
-    "resource": "user",
-    "actions": [
-      { "action": "read", "description": "View users" },
-      { "action": "write", "description": "Manage users" }
-    ]
   }
 ]

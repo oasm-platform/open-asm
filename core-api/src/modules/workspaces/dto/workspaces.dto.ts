@@ -65,7 +65,13 @@ export class WorkspaceResponseDto {
     example: 5,
   })
   memberCount: number;
+}
 
+/**
+ * Response DTO for the current user's permission keys in the selected
+ * workspace, unioned across their permission groups.
+ */
+export class CurrentPermissionResponseDto {
   @ApiProperty({
     description:
       'Permission keys of the current user in the workspace, unioned across their permission groups',

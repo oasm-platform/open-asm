@@ -81,6 +81,53 @@ describe('WorkspacePermissionGuard', () => {
     await expect(guard.canActivate(makeContext())).resolves.toBe(true);
   });
 
+  it('should pass when the member holds the write key for a required read key', async () => {
+    mockRequest.headers = { 'X-Workspace-Id': workspaceId };
+    mockReflector.getAllAndOverride.mockReturnValue(['target.read']);
+    mockWorkspacesService.getMembershipWithPermissions.mockResolvedValue({
+      membership: { id: randomUUID() } as WorkspaceMembers,
+      permissionKeys: ['target.write'],
+    });
+
+    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+  });
+
+  it('should pass when the member holds both the write and read keys for a read requirement', async () => {
+    mockRequest.headers = { 'X-Workspace-Id': workspaceId };
+    mockReflector.getAllAndOverride.mockReturnValue(['member.read']);
+    mockWorkspacesService.getMembershipWithPermissions.mockResolvedValue({
+      membership: { id: randomUUID() } as WorkspaceMembers,
+      permissionKeys: ['member.write', 'member.read'],
+    });
+
+    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+  });
+
+  it('should forbid when the write key belongs to a different domain than the required read key', async () => {
+    mockRequest.headers = { 'X-Workspace-Id': workspaceId };
+    mockWorkspacesService.getMembershipWithPermissions.mockResolvedValue({
+      membership: { id: randomUUID() } as WorkspaceMembers,
+      permissionKeys: ['target.write'],
+    });
+
+    await expect(guard.canActivate(makeContext())).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('should forbid when the requirement is not a read key and only the write key is held', async () => {
+    mockRequest.headers = { 'X-Workspace-Id': workspaceId };
+    mockReflector.getAllAndOverride.mockReturnValue(['target.delete']);
+    mockWorkspacesService.getMembershipWithPermissions.mockResolvedValue({
+      membership: { id: randomUUID() } as WorkspaceMembers,
+      permissionKeys: ['target.write'],
+    });
+
+    await expect(guard.canActivate(makeContext())).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
   it('should forbid when the member lacks the required key', async () => {
     mockRequest.headers = { 'X-Workspace-Id': workspaceId };
     mockWorkspacesService.getMembershipWithPermissions.mockResolvedValue({
@@ -104,8 +151,30 @@ describe('WorkspacePermissionGuard', () => {
     );
   });
 
-  it('should resolve the workspace id from the route :id param first', async () => {
+  it('should fall back to the route :id param when no header is present', async () => {
     mockRequest.params = { id: workspaceId };
+
+    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+    expect(mockWorkspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(
+      workspaceId,
+      userId,
+    );
+  });
+
+  it('should prefer the X-Workspace-Id header over the route :id param', async () => {
+    mockRequest.params = { id: randomUUID() };
+    mockRequest.headers = { 'X-Workspace-Id': workspaceId };
+
+    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+    expect(mockWorkspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(
+      workspaceId,
+      userId,
+    );
+  });
+
+  it('should prefer an explicit :workspaceId route param over the header', async () => {
+    mockRequest.params = { workspaceId };
+    mockRequest.headers = { 'X-Workspace-Id': randomUUID() };
 
     await expect(guard.canActivate(makeContext())).resolves.toBe(true);
     expect(mockWorkspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(

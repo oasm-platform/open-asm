@@ -1,4 +1,5 @@
 import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import {
@@ -69,6 +70,7 @@ export class AgentsController {
     private readonly agentsSkillsService: AgentsSkillsService,
   ) {}
 
+  @WorkspaceAccess('agent.read')
   @Get('modes')
   @Doc({
     summary: 'Get agent modes',
@@ -82,6 +84,7 @@ export class AgentsController {
     return this.agentsService.getAgentModesWithWorkers(workspaceId);
   }
 
+  @WorkspaceAccess('agent.write')
   @Post('llm-configs')
   @Doc({
     summary: 'Create LLM config',
@@ -97,6 +100,7 @@ export class AgentsController {
     return this.agentsService.createLLMConfig(dto, workspaceId, userId);
   }
 
+  @WorkspaceAccess('agent.read')
   @Get('providers')
   @Doc({
     summary: 'Get supported providers',
@@ -107,6 +111,7 @@ export class AgentsController {
     return this.agentsService.getProviders();
   }
 
+  @WorkspaceAccess('agent.read')
   @Get('providers/connected')
   @Doc({
     summary: 'Get connected providers',
@@ -121,6 +126,7 @@ export class AgentsController {
     return this.agentsService.getConnectedProviders(workspaceId);
   }
 
+  @WorkspaceAccess('agent.read')
   @Get('llm-configs/:id/models')
   @Doc({
     summary: 'List models for a provider config',
@@ -139,6 +145,7 @@ export class AgentsController {
     return this.agentsService.getModelsForProvider(id, workspaceId);
   }
 
+  @WorkspaceAccess('agent.write')
   @Patch('llm-configs/:id')
   @Doc({
     summary: 'Update LLM config',
@@ -157,6 +164,7 @@ export class AgentsController {
     return this.agentsService.updateLLMConfig(id, dto, workspaceId);
   }
 
+  @WorkspaceAccess('agent.write')
   @Delete('llm-configs/:id')
   @Doc({
     summary: 'Delete LLM config',
@@ -175,6 +183,7 @@ export class AgentsController {
     return { message: 'LLM config deleted successfully' };
   }
 
+  @WorkspaceAccess('agent.write')
   @Patch('llm-configs/:id/set-preferred')
   @Doc({
     summary: 'Set preferred LLM config',
@@ -196,6 +205,7 @@ export class AgentsController {
   // Conversation Endpoints
   // ==========================================
 
+  @WorkspaceAccess('agent.read')
   @Get('conversations/:id')
   @Doc({
     summary: 'Get conversation detail',
@@ -213,6 +223,7 @@ export class AgentsController {
     return this.agentsService.getConversation(id, workspaceId);
   }
 
+  @WorkspaceAccess('agent.read')
   @Get('conversations')
   @Doc({
     summary: 'List conversations',
@@ -227,6 +238,7 @@ export class AgentsController {
     return this.agentsService.getConversations(workspaceId, query);
   }
 
+  @WorkspaceAccess('agent.write')
   @Patch('conversations/:id')
   @Doc({
     summary: 'Update conversation',
@@ -245,6 +257,7 @@ export class AgentsController {
     return this.agentsService.updateConversation(id, dto, workspaceId);
   }
 
+  @WorkspaceAccess('agent.write')
   @Delete('conversations')
   @Doc({
     summary: 'Delete all conversations',
@@ -260,6 +273,7 @@ export class AgentsController {
     return { message: 'All conversations deleted successfully' };
   }
 
+  @WorkspaceAccess('agent.write')
   @Delete('conversations/:id')
   @Doc({
     summary: 'Delete conversation',
@@ -282,6 +296,7 @@ export class AgentsController {
   // Message / Chat Endpoints
   // ==========================================
 
+  @WorkspaceAccess('agent.read')
   @Get('conversations/:id/messages')
   @Doc({
     summary: 'Get messages',
@@ -300,6 +315,7 @@ export class AgentsController {
     return this.agentsService.getMessages(id, workspaceId, query);
   }
 
+  @WorkspaceAccess('ai.execute')
   @Post('messages/stream')
   @HttpCode(HttpStatus.OK)
   @Doc({
@@ -426,6 +442,7 @@ export class AgentsController {
     }
   }
 
+  @WorkspaceAccess('agent.write')
   @Delete('conversations/:cid/messages/:mid')
   @Doc({
     summary: 'Delete message',
@@ -452,6 +469,7 @@ export class AgentsController {
     return { message: 'Message deleted successfully' };
   }
 
+  @WorkspaceAccess('agent.read')
   @Get('mcp-configs')
   @Doc({
     summary: 'Get MCP configs',
@@ -465,6 +483,7 @@ export class AgentsController {
     return this.agentsService.getMCPConfig(workspaceId);
   }
 
+  @WorkspaceAccess('agent.write')
   @Put('mcp-configs/:name')
   @Doc({
     summary: 'Upsert MCP server',
@@ -483,6 +502,7 @@ export class AgentsController {
     return this.agentsService.upsertMCPServer(workspaceId, name, dto);
   }
 
+  @WorkspaceAccess('agent.write')
   @Delete('mcp-configs/:name')
   @Doc({
     summary: 'Delete MCP server',
@@ -501,6 +521,7 @@ export class AgentsController {
     return { message: 'MCP server deleted successfully' };
   }
 
+  @WorkspaceAccess('agent.write')
   @Patch('mcp-configs/:name/toggle')
   @Doc({
     summary: 'Toggle MCP server',
@@ -519,6 +540,7 @@ export class AgentsController {
     return this.agentsService.toggleMCPServer(workspaceId, name, dto.disabled);
   }
 
+  @WorkspaceAccess('agent.read')
   @Get('mcp-configs/:name/ping')
   @Doc({
     summary: 'Ping MCP server',
@@ -540,6 +562,7 @@ export class AgentsController {
   // Workspace Memory Endpoints
   // ==========================================
 
+  @WorkspaceAccess('agent.read')
   @Get('workspace-memory')
   @Doc({
     summary: 'Get workspace memory',
@@ -556,6 +579,7 @@ export class AgentsController {
     return this.agentsService.getWorkspaceMemory(workspaceId, userId, query);
   }
 
+  @WorkspaceAccess('agent.write')
   @Delete('workspace-memory/:id')
   @Doc({
     summary: 'Delete workspace memory',
@@ -579,6 +603,7 @@ export class AgentsController {
   // Skills Endpoints
   // ==========================================
 
+  @WorkspaceAccess('agent.read')
   @Get('skills')
   @Doc({
     summary: 'List skills',
@@ -590,6 +615,7 @@ export class AgentsController {
     return this.agentsSkillsService.getSkills(workspaceId);
   }
 
+  @WorkspaceAccess('agent.write')
   @Post('skills')
   @Doc({
     summary: 'Create skill',
@@ -606,6 +632,7 @@ export class AgentsController {
     return this.agentsSkillsService.createUserSkill(workspaceId, userId, dto);
   }
 
+  @WorkspaceAccess('agent.write')
   @Patch('skills/:id')
   @Doc({
     summary: 'Update skill',
@@ -630,6 +657,7 @@ export class AgentsController {
     );
   }
 
+  @WorkspaceAccess('agent.write')
   @Delete('skills/:id')
   @Doc({
     summary: 'Delete skill',
@@ -649,6 +677,7 @@ export class AgentsController {
     return { message: 'Skill deleted successfully' };
   }
 
+  @WorkspaceAccess('agent.write')
   @Patch('skills/:id/toggle')
   @Doc({
     summary: 'Toggle skill',

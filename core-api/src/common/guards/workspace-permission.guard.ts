@@ -15,9 +15,11 @@ import { RequestWithMetadata } from '../interfaces/app.interface';
  * Guards a handler against members lacking the required workspace permission
  * keys. Required keys are declared with `@WorkspacePermissions(...)`.
  *
- * Resolves the workspace id from the route `:id` param first, then falls back
- * to the `X-Workspace-ID` header / `wid` cookie. A member whose permission
- * groups grant `'*'` passes every check.
+ * Resolves the workspace id from an explicit `:workspaceId` route param first,
+ * then the `X-Workspace-ID` header / `wid` cookie, and finally falls back to
+ * the generic `:id` route param (workspaces module only — feature routes use
+ * entity ids in `:id`, so the header/cookie must win for them). A member whose
+ * permission groups grant `'*'` passes every check.
  */
 @Injectable()
 export class WorkspacePermissionGuard implements CanActivate {
@@ -35,8 +37,9 @@ export class WorkspacePermissionGuard implements CanActivate {
     }
 
     const workspaceId =
-      (request.params?.id as string | undefined) ??
-      getWorkspaceIdFromRequest(request);
+      (request.params?.workspaceId as string | undefined) ??
+      getWorkspaceIdFromRequest(request) ??
+      (request.params?.id as string | undefined);
     if (!workspaceId) {
       throw new ForbiddenException('Workspace ID not provided in headers');
     }
@@ -68,7 +71,15 @@ export class WorkspacePermissionGuard implements CanActivate {
 
     if (required && required.length > 0) {
       const hasWildcard = permissionKeys.includes('*');
-      const hasAll = required.every((key) => permissionKeys.includes(key));
+      const hasAll = required.every((key) => {
+        if (permissionKeys.includes(key)) return true;
+        // {domain}.write implies {domain}.read
+        if (key.endsWith('.read')) {
+          const writeKey = `${key.slice(0, -'.read'.length)}.write`;
+          return permissionKeys.includes(writeKey);
+        }
+        return false;
+      });
       if (!hasWildcard && !hasAll) {
         throw new ForbiddenException(
           'You do not have permission to perform this action',

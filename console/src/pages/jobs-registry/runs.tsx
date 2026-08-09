@@ -292,6 +292,7 @@ export default function Runs() {
   const navigate = useNavigate();
   return (
     <Page
+      permission="job.read"
       isShowButtonGoBack
       title={
         jobHistoryDetail?.jobHistoryName ||

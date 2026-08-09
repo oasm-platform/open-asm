@@ -15,6 +15,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { I18nLang } from 'nestjs-i18n';
 import { AuthGuard } from '@/common/guards/auth.guard';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
@@ -39,6 +40,7 @@ export class NotificationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('notification.read')
   @Get()
   async getNotifications(
     @UserContext() user: UserContextPayload,
@@ -79,6 +81,7 @@ export class NotificationsController {
     description:
       'Get the total count of unread notifications for the current user',
   })
+  @WorkspaceAccess('notification.read')
   @Get('unread-count')
   getUnreadCount(@UserContext() user: UserContextPayload) {
     return this.notificationsService.getUnreadCount(user.id);

@@ -36,7 +36,7 @@ export class WorkspaceInvitation extends BaseEntity {
   status: InvitationStatus;
 
   @ApiProperty({ example: '2026-08-13T00:00:00.000Z' })
-  @Column({ type: 'timestamp' })
+  @Column('timestamptz')
   expiresAt: Date;
 
   toJSON() {

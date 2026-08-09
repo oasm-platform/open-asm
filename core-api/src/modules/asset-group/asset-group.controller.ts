@@ -46,6 +46,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.read')
   @Get()
   getAll(
     @Query() query: GetAllAssetGroupsQueryDto,
@@ -64,6 +65,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.read')
   @Get(':id')
   getById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
     return this.assetGroupService.getAssetGroupById(id, workspaceId);
@@ -79,6 +81,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.write')
   @Patch(':id')
   updateAssetGroupById(
     @Param() param: IdQueryParamDto,
@@ -102,6 +105,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.write')
   @Post()
   create(
     @Body() createAssetGroupDto: CreateAssetGroupDto,
@@ -118,6 +122,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('group.write')
   @Post(':groupId/workflows')
   addManyWorkflows(
     @Param('groupId') groupId: string,
@@ -136,6 +141,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('group.write')
   @Post(':groupId/assets')
   addManyAssets(
     @Param('groupId') groupId: string,
@@ -154,6 +160,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('group.write')
   @Delete(':groupId/workflows')
   removeManyWorkflows(
     @Param('groupId') groupId: string,
@@ -172,6 +179,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('group.write')
   @Delete(':groupId/assets')
   removeManyAssets(
     @Param('groupId') groupId: string,
@@ -190,6 +198,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('group.write')
   @Delete(':id')
   delete(@Param('id') id: string) {
     return this.assetGroupService.delete(id);
@@ -206,6 +215,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.read')
   @Get(':assetGroupId/assets')
   getAssetsByAssetGroupsId(
     @Param('assetGroupId') assetGroupId: string,
@@ -230,6 +240,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.read')
   @Get(':assetGroupId/assets/not-in-group')
   getAssetsNotInAssetGroup(
     @Param('assetGroupId') assetGroupId: string,
@@ -251,6 +262,7 @@ export class AssetGroupController {
       serialization: AssetGroupWorkflow,
     },
   })
+  @WorkspaceAccess('group.write')
   @Patch('workflows/:id')
   updateAssetGroupWorkflow(
     @Param('id') assetGroupWorkflowId: string,

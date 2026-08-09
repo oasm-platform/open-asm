@@ -185,7 +185,7 @@ export function CreateAssetGroup() {
   ];
 
   return (
-    <Page>
+    <Page permission="group.write">
       <div className="h-full overflow-y-auto">
         <Card className="mx-auto w-full max-w-4xl max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent">
           <CardHeader className="max-sm:px-0">

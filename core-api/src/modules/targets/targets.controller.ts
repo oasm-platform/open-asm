@@ -43,6 +43,7 @@ export class TargetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('target.write')
   @Post('bulk')
   createMultipleTargets(
     @Body() dto: CreateMultipleTargetsDto,
@@ -67,6 +68,7 @@ export class TargetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('target.read')
   @Get()
   getTargetsInWorkspace(
     @Query() query: GetManyWorkspaceQueryParamsDto,
@@ -143,6 +145,7 @@ export class TargetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('target.read')
   @Get(':id')
   getTargetById(
     @Param() { id }: IdQueryParamDto,
@@ -159,6 +162,7 @@ export class TargetsController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('target.write')
   @Delete(':id/workspace/:workspaceId')
   deleteTarget(
     @Param() { id }: IdQueryParamDto,
@@ -181,6 +185,7 @@ export class TargetsController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('target.write')
   @Post(':id/re-scan')
   reScanTarget(@Param() { id }: IdQueryParamDto) {
     return this.targetsService.assetService.reScan(id);
@@ -194,6 +199,7 @@ export class TargetsController {
       serialization: Target,
     },
   })
+  @WorkspaceAccess('target.write')
   @Patch(':id')
   updateTarget(@Param() { id }: IdQueryParamDto, @Body() dto: UpdateTargetDto) {
     return this.targetsService.updateTarget(id, dto);

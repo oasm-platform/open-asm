@@ -25,13 +25,32 @@ export class CreateWorkspacePermissionTables1786002229271
       `CREATE INDEX "IDX_wmp_permissionId" ON "workspace_member_permissions" ("permissionId") `,
     );
     await queryRunner.query(
-      `CREATE TABLE "workspace_invitations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "email" text NOT NULL, "permissionIds" uuid array NOT NULL DEFAULT '{}', "tokenHash" text NOT NULL, "status" character varying NOT NULL DEFAULT 'pending', "expiresAt" TIMESTAMP NOT NULL, "workspaceId" uuid NOT NULL, "invitedById" uuid, CONSTRAINT "UQ_wi_tokenHash" UNIQUE ("tokenHash"), CONSTRAINT "PK_workspace_invitations" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "workspace_invitations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "email" text NOT NULL, "permissionIds" uuid array NOT NULL DEFAULT '{}', "tokenHash" text NOT NULL, "status" character varying NOT NULL DEFAULT 'pending', "expiresAt" TIMESTAMPTZ NOT NULL, "workspaceId" uuid NOT NULL, "invitedById" uuid, CONSTRAINT "UQ_wi_tokenHash" UNIQUE ("tokenHash"), CONSTRAINT "PK_workspace_invitations" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_wi_workspaceId" ON "workspace_invitations" ("workspaceId") `,
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_wi_email" ON "workspace_invitations" ("email") `,
+    );
+    // Dedupe pre-existing pending invitations before the partial unique index
+    // below: keep only the newest pending invite per (workspaceId, email).
+    await queryRunner.query(
+      `DELETE FROM "workspace_invitations"
+       WHERE "status" = 'pending'
+         AND "id" NOT IN (
+           SELECT "id" FROM (
+             SELECT DISTINCT ON ("workspaceId", lower("email")) "id"
+             FROM "workspace_invitations"
+             WHERE "status" = 'pending'
+             ORDER BY "workspaceId", lower("email"), "createdAt" DESC, "id" DESC
+           ) "keep"
+         )`,
+    );
+    // One pending invite per (workspaceId, email): guards the concurrent
+    // createInvitations double-insert race (code-level check is not atomic).
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_wi_workspace_email_pending" ON "workspace_invitations" ("workspaceId", lower("email")) WHERE "status" = 'pending'`,
     );
     await queryRunner.query(
       `ALTER TABLE "workspace_permissions" ADD CONSTRAINT "FK_wp_workspace" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
@@ -47,6 +66,16 @@ export class CreateWorkspacePermissionTables1786002229271
     );
     await queryRunner.query(
       `ALTER TABLE "workspace_invitations" ADD CONSTRAINT "FK_wi_invitedBy" FOREIGN KEY ("invitedById") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    // Dedupe pre-existing duplicate memberships before the unique index:
+    // keep the lowest id per (workspaceId, userId), else the index creation
+    // fails on production data with duplicates.
+    await queryRunner.query(
+      `DELETE FROM "workspace_members" a
+       USING "workspace_members" b
+       WHERE a."workspaceId" = b."workspaceId"
+         AND a."userId" = b."userId"
+         AND a."id" > b."id"`,
     );
     // Prevent duplicate memberships (double-accept race guard)
     await queryRunner.query(
@@ -75,6 +104,9 @@ export class CreateWorkspacePermissionTables1786002229271
     );
     await queryRunner.query(`DROP INDEX "public"."IDX_wi_email"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_wi_workspaceId"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_wi_workspace_email_pending"`,
+    );
     await queryRunner.query(`DROP TABLE "workspace_invitations"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_wmp_permissionId"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_wmp_member_permission"`);

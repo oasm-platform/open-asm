@@ -47,6 +47,7 @@ import { JobsRegistryService } from './jobs-registry.service';
 export class JobsRegistryController {
   constructor(private readonly jobsRegistryService: JobsRegistryService) {}
 
+  @WorkspaceAccess('job.read')
   @Doc({
     summary: 'Get Jobs',
     description: 'Retrieves a list of jobs that the user is a member of.',
@@ -65,6 +66,7 @@ export class JobsRegistryController {
     return this.jobsRegistryService.getManyJobs(workspaceId, query);
   }
 
+  @WorkspaceAccess('job.read')
   @Doc({
     summary: 'Get Jobs Timeline',
     description:
@@ -201,6 +203,7 @@ export class JobsRegistryController {
     );
   }
 
+  @WorkspaceAccess('job.read')
   @Doc({
     summary: 'Get Many Job Histories',
     description:
@@ -220,6 +223,7 @@ export class JobsRegistryController {
     return this.jobsRegistryService.getManyJobHistories(workspaceId, query);
   }
 
+  @WorkspaceAccess('job.read')
   @Doc({
     summary: 'Get Job History Detail',
     description:

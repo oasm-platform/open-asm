@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useSession } from '@/utils/authClient';
 import {
   useWorkspacesControllerGetWorkspaces,
   type WorkspaceResponseDto,
@@ -26,6 +27,7 @@ const PAGE_SIZE = 12;
 export default function Workspaces() {
   const navigate = useNavigate();
   const { handleSelectWorkspace } = useWorkspaceSelector();
+  const { data: session } = useSession();
 
   const { data, isLoading } = useWorkspacesControllerGetWorkspaces(
     {
@@ -74,7 +76,7 @@ export default function Workspaces() {
               ))
             : (data?.data ?? []).map((workspace: WorkspaceResponseDto) => {
                 const isOwner =
-                  workspace.currentPermission?.includes('*') ?? false;
+                  session?.user.id === workspace.ownerId;
                 return (
                   <Card
                     key={workspace.id}
