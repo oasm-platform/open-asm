@@ -66,7 +66,7 @@ export const menu: NavGroup[] = [
         title: 'New Chat',
         icon: <Sparkles />,
         url: '/agents',
-        permission: 'ai.execute',
+        permission: 'agent.read',
       },
     ],
   },

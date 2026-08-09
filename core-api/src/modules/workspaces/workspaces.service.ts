@@ -61,6 +61,10 @@ import { resolve } from 'path';
 
 /** Invitation validity window: 7 days */
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** ref tag used on workspace-invitation notifications so they can be located
+ * (and deleted once the invite is accepted/declined/cancelled) via refId =
+ * the invitation id. */
+const INVITATION_NOTIF_REF = 'workspace_invitation';
 /** Name of the system permission group granted to the workspace creator */
 export const OWNER_PERMISSION_GROUP_NAME = 'Admin';
 /** Wildcard permission key that grants every action */
@@ -1241,6 +1245,7 @@ export class WorkspacesService implements OnModuleInit {
     );
     const skippedCount = emails.length - invitedEmails.length;
     const tokenByEmail = new Map<string, string>();
+    const invitationIdByEmail = new Map<string, string>();
 
     await this.dataSource.transaction(async (manager) => {
       for (const email of invitedEmails) {
@@ -1257,7 +1262,7 @@ export class WorkspacesService implements OnModuleInit {
 
         const token = randomBytes(32).toString('hex');
         tokenByEmail.set(email, token);
-        await manager.save(
+        const invitation = await manager.save(
           WorkspaceInvitation,
           manager.create(WorkspaceInvitation, {
             workspace: { id: workspaceId },
@@ -1269,6 +1274,7 @@ export class WorkspacesService implements OnModuleInit {
             expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
           }),
         );
+        invitationIdByEmail.set(email, invitation.id);
       }
     });
 
@@ -1281,6 +1287,8 @@ export class WorkspacesService implements OnModuleInit {
         recipients: [user!.id],
         scope: NotificationScope.SYSTEM,
         type: NotificationType.WORKSPACE_INVITATION,
+        ref: INVITATION_NOTIF_REF,
+        refId: invitationIdByEmail.get(email) ?? '',
         metadata: {
           token: tokenByEmail.get(email) ?? '',
           workspaceName: workspace.name,
@@ -1437,6 +1445,13 @@ export class WorkspacesService implements OnModuleInit {
       },
     });
 
+    // The pending-invite notification sent to the invitee is no longer
+    // relevant once the invite is accepted — drop it.
+    await this.notificationsService.deleteByRef(
+      INVITATION_NOTIF_REF,
+      invitation!.id,
+    );
+
     return { message: 'Invitation accepted successfully' };
   }
 
@@ -1469,6 +1484,13 @@ export class WorkspacesService implements OnModuleInit {
       },
     });
 
+    // The pending-invite notification sent to the invitee is no longer
+    // relevant once the invite is declined — drop it.
+    await this.notificationsService.deleteByRef(
+      INVITATION_NOTIF_REF,
+      invitation!.id,
+    );
+
     return { message: 'Invitation declined successfully' };
   }
 
@@ -1490,6 +1512,13 @@ export class WorkspacesService implements OnModuleInit {
     if (!updated.affected) {
       throw new NotFoundException('Invitation not found or already handled');
     }
+
+    // The pending-invite notification sent to the invitee is no longer
+    // relevant once the inviter cancels the invite — drop it.
+    await this.notificationsService.deleteByRef(
+      INVITATION_NOTIF_REF,
+      invitationId,
+    );
 
     return { message: 'Invitation cancelled successfully' };
   }

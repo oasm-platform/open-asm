@@ -337,7 +337,7 @@ export type WorkspaceMemberUserDto = {
   id: string;
   name: string;
   /** @nullable */
-  image?: string | null;
+  image: string | null;
 };
 
 export type WorkspacePermission = {
@@ -362,11 +362,7 @@ export type WorkspaceMembers = {
 };
 
 export type UpdateMemberPermissionsDto = {
-  /**
-   * Permission group ids to assign (replaces current groups)
-   * @minItems 1
-   * @maxItems 50
-   */
+  /** Permission group ids to assign (replaces current groups) */
   permissionIds: string[];
 };
 
@@ -383,17 +379,12 @@ export type PermissionCatalogResourceDto = {
 
 export type CreatePermissionGroupDto = {
   name: string;
-  /**
-   * Permission keys granted by this group. "*" is reserved for the system Admin group.
-   * @minItems 1
-   * @maxItems 50
-   */
+  /** Permission keys granted by this group. "*" is reserved for the system Admin group. */
   permissions: string[];
 };
 
 export type UpdatePermissionGroupDto = {
   name?: string;
-  /** @maxItems 50 */
   permissions?: string[];
 };
 
@@ -405,16 +396,9 @@ export type CreateInvitationsResponseDto = {
 };
 
 export type CreateInvitationsDto = {
-  /**
-   * Emails of existing users to invite. Emails without an account are skipped.
-   * @maxItems 50
-   */
+  /** Emails of existing users to invite. Emails without an account are skipped. */
   emails: string[];
-  /**
-   * Permission group ids granted when the invitation is accepted. Groups that no longer exist are ignored.
-   * @minItems 1
-   * @maxItems 50
-   */
+  /** Permission group ids granted when the invitation is accepted. Groups that no longer exist are ignored. */
   permissionIds: string[];
 };
 
@@ -441,10 +425,7 @@ export type WorkspaceInvitation = {
 };
 
 export type InvitationTokenDto = {
-  /**
-   * Raw invite token from the notification link
-   * @maxLength 128
-   */
+  /** Raw invite token from the notification link */
   token: string;
 };
 
@@ -2247,6 +2228,8 @@ export type NotificationResponseDto = {
   message: string;
   url: string;
   workspaceId?: string;
+  ref?: string;
+  refId?: string;
 };
 
 export type GetManyNotificationResponseDtoDto = {
@@ -2298,6 +2281,10 @@ export type CreateNotificationDto = {
   type: CreateNotificationDtoType;
   /** Metadata for the notification content (variables for translation) */
   metadata?: CreateNotificationDtoMetadata;
+  /** Name of the feature this notification belongs to (e.g. "target"), used with refId to delete related notifications once the work is done */
+  ref?: string;
+  /** Identifier of the related feature record (e.g. "1234") */
+  refId?: string;
 };
 
 /**
@@ -3218,6 +3205,17 @@ export type NotificationsControllerGetNotificationsParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type NotificationsControllerDeleteNotificationsByRefParams = {
+  /**
+   * Name of the feature the notifications belong to
+   */
+  ref: string;
+  /**
+   * Identifier of the related feature record
+   */
+  refId: string;
 };
 
 export type IntegrationsControllerGetManyIntegrationsParams = {
@@ -9096,7 +9094,7 @@ export function useWorkspacesControllerGetInvitationPreview<
 }
 
 /**
- * Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration.
+ * Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration. Requires workspace.read; the member list is only included for member.read holders.
  * @summary Get Workspace By ID
  */
 export const workspacesControllerGetWorkspaceById = (
@@ -27464,6 +27462,103 @@ export const useNotificationsControllerMarkAsRead = <
 > => {
   return useMutation(
     getNotificationsControllerMarkAsReadMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Delete the current user's notification recipient records matching the given ref/refId (e.g. all notifications about target 1234 once the related work is completed). The notifications themselves are preserved for other recipients.
+ * @summary Delete notifications by ref
+ */
+export const notificationsControllerDeleteNotificationsByRef = (
+  params: NotificationsControllerDeleteNotificationsByRefParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/notifications/by-ref`, method: 'DELETE', params, signal },
+    options,
+  );
+};
+
+export const getNotificationsControllerDeleteNotificationsByRefMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof notificationsControllerDeleteNotificationsByRef>
+      >,
+      TError,
+      { params: NotificationsControllerDeleteNotificationsByRefParams },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotificationsByRef>>,
+    TError,
+    { params: NotificationsControllerDeleteNotificationsByRefParams },
+    TContext
+  > => {
+    const mutationKey = ['notificationsControllerDeleteNotificationsByRef'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof notificationsControllerDeleteNotificationsByRef>
+      >,
+      { params: NotificationsControllerDeleteNotificationsByRefParams }
+    > = (props) => {
+      const { params } = props ?? {};
+
+      return notificationsControllerDeleteNotificationsByRef(
+        params,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type NotificationsControllerDeleteNotificationsByRefMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotificationsByRef>>
+  >;
+
+export type NotificationsControllerDeleteNotificationsByRefMutationError =
+  unknown;
+
+/**
+ * @summary Delete notifications by ref
+ */
+export const useNotificationsControllerDeleteNotificationsByRef = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof notificationsControllerDeleteNotificationsByRef>
+      >,
+      TError,
+      { params: NotificationsControllerDeleteNotificationsByRefParams },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerDeleteNotificationsByRef>>,
+  TError,
+  { params: NotificationsControllerDeleteNotificationsByRefParams },
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerDeleteNotificationsByRefMutationOptions(options),
     queryClient,
   );
 };

@@ -68,7 +68,7 @@ describe('AgentsController workspace permission guards', () => {
     ['streamMessage', 'POST /messages/stream'],
   ];
 
-  it.each(execute)('%s (%s) requires ai.execute', (method, _route) => {
+  it.each(execute)('%s (%s) requires agent.read', (method, _route) => {
     const handler = (AgentsController.prototype as Record<string, unknown>)[
       method
     ] as object;
@@ -76,6 +76,6 @@ describe('AgentsController workspace permission guards', () => {
       handler,
       AgentsController,
     ]);
-    expect(required).toEqual(['ai.execute']);
+    expect(required).toEqual(['agent.read']);
   });
 });

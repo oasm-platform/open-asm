@@ -208,6 +208,7 @@ describe('WorkspacesService', () => {
 
     mockNotificationsService = {
       createNotification: jest.fn(),
+      deleteByRef: jest.fn(),
     };
 
     mockWorkflowsService = {

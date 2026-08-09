@@ -315,7 +315,7 @@ export class AgentsController {
     return this.agentsService.getMessages(id, workspaceId, query);
   }
 
-  @WorkspaceAccess('ai.execute')
+  @WorkspaceAccess('agent.read')
   @Post('messages/stream')
   @HttpCode(HttpStatus.OK)
   @Doc({

@@ -113,11 +113,5 @@
       { "action": "read", "description": "View workers" },
       { "action": "write", "description": "Manage workers" }
     ]
-  },
-  {
-    "resource": "ai",
-    "actions": [
-      { "action": "execute", "description": "Use the AI Assistant" }
-    ]
   }
 ]
