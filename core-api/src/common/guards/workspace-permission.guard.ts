@@ -12,14 +12,24 @@ import { getWorkspaceIdFromRequest } from '../decorators/workspace-id.decorator'
 import { RequestWithMetadata } from '../interfaces/app.interface';
 
 /**
+ * Metadata key for the per-route override declaring which route param holds the
+ * target workspace id. Set via `@WorkspaceAccess(..., { workspaceParam })`.
+ */
+export const WORKSPACE_ROUTE_PARAM = 'workspaceRouteParam';
+
+/**
  * Guards a handler against members lacking the required workspace permission
  * keys. Required keys are declared with `@WorkspacePermissions(...)`.
  *
- * Resolves the workspace id from an explicit `:workspaceId` route param first,
- * then the `X-Workspace-ID` header / `wid` cookie, and finally falls back to
- * the generic `:id` route param (workspaces module only — feature routes use
- * entity ids in `:id`, so the header/cookie must win for them). A member whose
- * permission groups grant `'*'` passes every check.
+ * Resolves the workspace id in this order:
+ *  1. an explicit `:workspaceId` route param;
+ *  2. the route param named by `WORKSPACE_ROUTE_PARAM` metadata
+ *     (`@WorkspaceAccess(..., { workspaceParam: 'id' })`) when configured —
+ *     used on `/workspaces/:id` routes where `:id` IS the target workspace;
+ *  3. the `X-Workspace-ID` header / `wid` cookie;
+ *  4. the generic `:id` route param (feature routes use entity ids in `:id`,
+ *     so the header/cookie wins for them unless step 2 is set).
+ * A member whose permission groups grant `'*'` passes every check.
  */
 @Injectable()
 export class WorkspacePermissionGuard implements CanActivate {
@@ -36,8 +46,16 @@ export class WorkspacePermissionGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
+    const workspaceParam = this.reflector.getAllAndOverride<string | undefined>(
+      WORKSPACE_ROUTE_PARAM,
+      [context.getHandler(), context.getClass()],
+    );
+
     const workspaceId =
       (request.params?.workspaceId as string | undefined) ??
+      (workspaceParam
+        ? (request.params?.[workspaceParam] as string | undefined)
+        : undefined) ??
       getWorkspaceIdFromRequest(request) ??
       (request.params?.id as string | undefined);
     if (!workspaceId) {

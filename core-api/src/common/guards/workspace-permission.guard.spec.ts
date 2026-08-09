@@ -5,7 +5,10 @@ import type { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
-import { WorkspacePermissionGuard } from './workspace-permission.guard';
+import {
+  WORKSPACE_ROUTE_PARAM,
+  WorkspacePermissionGuard,
+} from './workspace-permission.guard';
 
 describe('WorkspacePermissionGuard', () => {
   let guard: WorkspacePermissionGuard;
@@ -45,7 +48,9 @@ describe('WorkspacePermissionGuard', () => {
       }),
     };
     mockReflector = {
-      getAllAndOverride: jest.fn().mockReturnValue(['member.read']),
+      getAllAndOverride: jest.fn().mockImplementation((key: string) =>
+        key === WORKSPACE_ROUTE_PARAM ? undefined : ['member.read'],
+      ),
     };
 
     const module = await Test.createTestingModule({
@@ -175,6 +180,48 @@ describe('WorkspacePermissionGuard', () => {
   it('should prefer an explicit :workspaceId route param over the header', async () => {
     mockRequest.params = { workspaceId };
     mockRequest.headers = { 'X-Workspace-Id': randomUUID() };
+
+    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+    expect(mockWorkspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(
+      workspaceId,
+      userId,
+    );
+  });
+
+  it('should prefer the route :id param over the header when workspaceParam is configured', async () => {
+    const urlWorkspaceId = randomUUID();
+    mockReflector.getAllAndOverride.mockImplementation((key: string) =>
+      key === WORKSPACE_ROUTE_PARAM ? 'id' : ['member.read'],
+    );
+    mockRequest.params = { id: urlWorkspaceId };
+    mockRequest.headers = { 'X-Workspace-Id': workspaceId };
+
+    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+    expect(mockWorkspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(
+      urlWorkspaceId,
+      userId,
+    );
+  });
+
+  it('should prefer an explicit :workspaceId route param over workspaceParam', async () => {
+    mockReflector.getAllAndOverride.mockImplementation((key: string) =>
+      key === WORKSPACE_ROUTE_PARAM ? 'id' : ['member.read'],
+    );
+    mockRequest.params = { workspaceId, id: randomUUID() };
+    mockRequest.headers = { 'X-Workspace-Id': randomUUID() };
+
+    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+    expect(mockWorkspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(
+      workspaceId,
+      userId,
+    );
+  });
+
+  it('should pass the configured workspaceParam to membership check even without a header', async () => {
+    mockReflector.getAllAndOverride.mockImplementation((key: string) =>
+      key === WORKSPACE_ROUTE_PARAM ? 'id' : ['member.read'],
+    );
+    mockRequest.params = { id: workspaceId };
 
     await expect(guard.canActivate(makeContext())).resolves.toBe(true);
     expect(mockWorkspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(

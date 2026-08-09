@@ -444,7 +444,7 @@ export class WorkspacesController {
       serialization: Workspace,
     },
   })
-  @WorkspaceAccess('workspace.read')
+  @WorkspaceAccess('workspace.read', { workspaceParam: 'id' })
   @Get(':id')
   async getWorkspaceById(
     @Param() { id }: IdQueryParamDto,
@@ -472,7 +472,7 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @WorkspaceAccess('workspace.write')
+  @WorkspaceAccess('workspace.write', { workspaceParam: 'id' })
   @Patch(':id')
   updateWorkspace(
     @Param() { id }: IdQueryParamDto,
@@ -490,7 +490,7 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @WorkspaceAccess('workspace.delete')
+  @WorkspaceAccess('workspace.delete', { workspaceParam: 'id' })
   @Delete(':id')
   deleteWorkspace(
     @Param() { id }: IdQueryParamDto,
@@ -507,7 +507,7 @@ export class WorkspacesController {
       serialization: GetApiKeyResponseDto,
     },
   })
-  @WorkspaceAccess('workspace.apikey')
+  @WorkspaceAccess('workspace.apikey', { workspaceParam: 'id' })
   @Post(':id/api-key/rotate')
   rotateApiKey(
     @Param() { id }: IdQueryParamDto,
@@ -524,7 +524,7 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @WorkspaceAccess('workspace.write')
+  @WorkspaceAccess('workspace.write', { workspaceParam: 'id' })
   @Patch(':id/archived')
   makeArchived(
     @Param() { id }: IdQueryParamDto,
