@@ -12,16 +12,19 @@ describe('NotificationsController workspace permission guards', () => {
   it.each([
     ['getNotifications', 'GET /'],
     ['getUnreadCount', 'GET /unread-count'],
-  ])('%s (%s) requires notification.read', (method, _route) => {
-    const handler = (
-      NotificationsController.prototype as Record<string, unknown>
-    )[method] as object;
-    const required = reflector.getAllAndOverride(WorkspacePermissions, [
-      handler,
-      NotificationsController,
-    ]);
-    expect(required).toEqual(['notification.read']);
-  });
+  ])(
+    '%s (%s) is auth-only — no workspace permission required (per-recipient, invitees pre-membership)',
+    (method, _route) => {
+      const handler = (
+        NotificationsController.prototype as Record<string, unknown>
+      )[method] as object;
+      const required = reflector.getAllAndOverride(WorkspacePermissions, [
+        handler,
+        NotificationsController,
+      ]);
+      expect(required).toBeUndefined();
+    },
+  );
 
   it.each([
     ['createNotification', 'POST /'],

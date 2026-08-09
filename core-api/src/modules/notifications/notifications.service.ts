@@ -37,7 +37,7 @@ export class NotificationsService {
 
   async getNotifications(
     userId: string,
-    workspaceId: string,
+    workspaceId: string | undefined,
     query: GetManyBaseQueryParams,
     lang: string = 'en',
   ) {
@@ -47,7 +47,9 @@ export class NotificationsService {
       .leftJoinAndSelect('recipient.notification', 'notification')
       .where('recipient.userId = :userId', { userId })
       .andWhere(
-        '(notification.workspaceId = :workspaceId OR notification.workspaceId IS NULL)',
+        workspaceId
+          ? '(notification.workspaceId = :workspaceId OR notification.workspaceId IS NULL)'
+          : 'notification.workspaceId IS NULL',
         { workspaceId },
       )
       .orderBy('recipient.createdAt', 'DESC')
