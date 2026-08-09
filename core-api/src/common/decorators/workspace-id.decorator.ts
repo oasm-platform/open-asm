@@ -26,8 +26,13 @@ export const WorkspaceId = createParamDecorator<string | undefined>(
 );
 
 export function getWorkspaceIdFromRequest(req: Request): string | undefined {
-  return (
-    (req.headers[WORKSPACE_HEADER_NAME] as string) ||
-    (req.cookies?.wid as string | undefined)
-  );
+  // Node/Express normalizes incoming header names to lowercase, so a real
+  // request exposes `x-workspace-id` — never the camel-cased constant. Check
+  // both spellings so programmatic callers that set the canonical case still
+  // resolve.
+  const headerValue =
+    req.headers[WORKSPACE_HEADER_NAME] ??
+    req.headers[WORKSPACE_HEADER_NAME.toLowerCase()];
+  const raw = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  return raw || (req.cookies?.wid as string | undefined);
 }

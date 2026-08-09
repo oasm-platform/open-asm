@@ -1,91 +1,81 @@
-import type { TestingModule } from '@nestjs/testing';
-import { Test } from '@nestjs/testing';
+import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
+import { Reflector } from '@nestjs/core';
 import { AgentsController } from './agents.controller';
-import { AgentsService } from './agents.service';
-import { AgentsCompletionsService } from './agents.completions';
-import { AgentsSkillsService } from './agents.skills';
 
-jest.mock('@/common/guards/auth.guard', () => ({
-  AuthGuard: class MockAuthGuard {
-    canActivate() {
-      return true;
-    }
-  },
+jest.mock('better-auth/node', () => ({
+  fromNodeHeaders: jest.fn(),
 }));
 
-describe('AgentsController', () => {
-  let controller: AgentsController;
-  let mockAgentsService: Partial<AgentsService>;
+describe('AgentsController workspace permission guards', () => {
+  const reflector = new Reflector();
 
-  beforeEach(async () => {
-    mockAgentsService = {
-      getAgentModesWithWorkers: jest.fn().mockResolvedValue({
-        modes: [
-          {
-            id: 'ask',
-            name: 'ask',
-            description: 'Ask anything about security',
-          },
-        ],
-        workers: [],
-      }),
-    };
+  const read: Array<[string, string]> = [
+    ['getAgentModes', 'GET /modes'],
+    ['getProviders', 'GET /providers'],
+    ['getConnectedProviders', 'GET /providers/connected'],
+    ['getProviderModels', 'GET /llm-configs/:id/models'],
+    ['getConversation', 'GET /conversations/:id'],
+    ['getConversations', 'GET /conversations'],
+    ['getMessages', 'GET /conversations/:id/messages'],
+    ['getMCPConfig', 'GET /mcp-configs'],
+    ['pingMCPServer', 'GET /mcp-configs/:name/ping'],
+    ['getWorkspaceMemory', 'GET /workspace-memory'],
+    ['getSkills', 'GET /skills'],
+  ];
 
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [AgentsController],
-      providers: [
-        {
-          provide: AgentsService,
-          useValue: mockAgentsService,
-        },
-        {
-          provide: AgentsCompletionsService,
-          useValue: {},
-        },
-        {
-          provide: AgentsSkillsService,
-          useValue: {},
-        },
-      ],
-    }).compile();
+  const write: Array<[string, string]> = [
+    ['createLLMConfig', 'POST /llm-configs'],
+    ['updateLLMConfig', 'PATCH /llm-configs/:id'],
+    ['deleteLLMConfig', 'DELETE /llm-configs/:id'],
+    ['setPreferredLLMConfig', 'PATCH /llm-configs/:id/set-preferred'],
+    ['updateConversation', 'PATCH /conversations/:id'],
+    ['deleteAllConversations', 'DELETE /conversations'],
+    ['deleteConversation', 'DELETE /conversations/:id'],
+    ['deleteMessage', 'DELETE /conversations/:cid/messages/:mid'],
+    ['upsertMCPServer', 'PUT /mcp-configs/:name'],
+    ['deleteMCPServer', 'DELETE /mcp-configs/:name'],
+    ['toggleMCPServer', 'PATCH /mcp-configs/:name/toggle'],
+    ['deleteWorkspaceMemory', 'DELETE /workspace-memory/:id'],
+    ['createSkill', 'POST /skills'],
+    ['updateSkill', 'PATCH /skills/:id'],
+    ['deleteSkill', 'DELETE /skills/:id'],
+    ['toggleSkill', 'PATCH /skills/:id/toggle'],
+  ];
 
-    controller = module.get<AgentsController>(AgentsController);
+  it.each(read)('%s (%s) requires agent.read', (method, _route) => {
+    const handler = (AgentsController.prototype as Record<string, unknown>)[
+      method
+    ] as object;
+    const required = reflector.getAllAndOverride(WorkspacePermissions, [
+      handler,
+      AgentsController,
+    ]);
+    expect(required).toEqual(['agent.read']);
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
+  it.each(write)('%s (%s) requires agent.write', (method, _route) => {
+    const handler = (AgentsController.prototype as Record<string, unknown>)[
+      method
+    ] as object;
+    const required = reflector.getAllAndOverride(WorkspacePermissions, [
+      handler,
+      AgentsController,
+    ]);
+    expect(required).toEqual(['agent.write']);
   });
 
-  describe('getAgentModes', () => {
-    const testWorkspaceId = '550e8400-e29b-41d4-a716-446655440000';
+  const execute: Array<[string, string]> = [
+    ['streamMessage', 'POST /messages/stream'],
+  ];
 
-    it('should return object with modes and workers', async () => {
-      const result = await controller.getAgentModes(testWorkspaceId);
-
-      expect(result).toHaveProperty('modes');
-      expect(result).toHaveProperty('workers');
-      expect(Array.isArray(result.modes)).toBe(true);
-      expect(result.modes.length).toBeGreaterThan(0);
-      expect(result.modes[0]).toHaveProperty('id');
-      expect(result.modes[0]).toHaveProperty('name');
-      expect(result.modes[0]).toHaveProperty('description');
-    });
-
-    it('should contain ask mode', async () => {
-      const result = await controller.getAgentModes(testWorkspaceId);
-      const askMode = result.modes.find((m) => m.id === 'ask');
-
-      expect(askMode).toBeDefined();
-      expect(askMode?.name).toBe('ask');
-      expect(askMode?.description).toContain('security');
-    });
-
-    it('should call agentsService.getAgentModesWithWorkers with workspaceId', async () => {
-      await controller.getAgentModes(testWorkspaceId);
-
-      expect(
-        mockAgentsService.getAgentModesWithWorkers,
-      ).toHaveBeenCalledWith(testWorkspaceId);
-    });
+  it.each(execute)('%s (%s) requires agent.read', (method, _route) => {
+    const handler = (AgentsController.prototype as Record<string, unknown>)[
+      method
+    ] as object;
+    const required = reflector.getAllAndOverride(WorkspacePermissions, [
+      handler,
+      AgentsController,
+    ]);
+    expect(required).toEqual(['agent.read']);
   });
 });

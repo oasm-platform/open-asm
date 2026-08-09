@@ -3,8 +3,9 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
+import { Notification } from './entities/notification.entity';
 
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { RedisService } from '@/services/redis/redis.service';
@@ -20,6 +21,8 @@ export class NotificationsService {
     private notificationQueue: Queue,
     @InjectRepository(NotificationRecipient)
     private notificationRecipientRepo: Repository<NotificationRecipient>,
+    @InjectRepository(Notification)
+    private notificationRepo: Repository<Notification>,
     private readonly i18n: I18nService,
     private readonly redisService: RedisService,
   ) {}
@@ -34,7 +37,7 @@ export class NotificationsService {
 
   async getNotifications(
     userId: string,
-    workspaceId: string,
+    workspaceId: string | undefined,
     query: GetManyBaseQueryParams,
     lang: string = 'en',
   ) {
@@ -44,7 +47,9 @@ export class NotificationsService {
       .leftJoinAndSelect('recipient.notification', 'notification')
       .where('recipient.userId = :userId', { userId })
       .andWhere(
-        '(notification.workspaceId = :workspaceId OR notification.workspaceId IS NULL)',
+        workspaceId
+          ? '(notification.workspaceId = :workspaceId OR notification.workspaceId IS NULL)'
+          : 'notification.workspaceId IS NULL',
         { workspaceId },
       )
       .orderBy('recipient.createdAt', 'DESC')
@@ -56,6 +61,8 @@ export class NotificationsService {
         'notification.type',
         'notification.metadata',
         'notification.workspaceId',
+        'notification.ref',
+        'notification.refId',
       ])
       .skip(offset)
       .take(query.limit)
@@ -78,6 +85,8 @@ export class NotificationsService {
         message,
         url,
         workspaceId: n.notification.workspaceId ?? undefined,
+        ref: n.notification.ref ?? undefined,
+        refId: n.notification.refId ?? undefined,
       };
     });
     return getManyResponse({
@@ -119,5 +128,31 @@ export class NotificationsService {
 
   async deleteNotification(id: string, userId: string) {
     return this.notificationRecipientRepo.delete({ id, userId });
+  }
+
+  /**
+   * Deletes notifications tagged with the given {@link ref}/{@link refId}.
+   *
+   * Without {@link userId} this is a global cleanup — the Notification rows
+   * are removed and recipients cascade. With {@link userId} only that user's
+   * recipient records are removed, keeping the notification for other users
+   * (same semantics as {@link deleteNotification}).
+   */
+  async deleteByRef(ref: string, refId: string, userId?: string) {
+    const where = { ref, refId };
+
+    if (userId) {
+      const notifications = await this.notificationRepo.find({
+        where,
+        select: ['id'],
+      });
+      if (notifications.length === 0) return;
+      return this.notificationRecipientRepo.delete({
+        userId,
+        notificationId: In(notifications.map((n) => n.id)),
+      });
+    }
+
+    return this.notificationRepo.delete(where);
   }
 }

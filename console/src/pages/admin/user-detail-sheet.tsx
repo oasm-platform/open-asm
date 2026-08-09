@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { authClient, type User } from '@/utils/authClient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Ban, Check, Loader2, Pencil, Trash2, X } from 'lucide-react';
+import { Ban, Check, Loader2, Pencil, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -226,21 +226,6 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
     },
     onError: () => {
       toast.error('Failed to update user role.');
-    },
-  });
-
-  const { mutate: deleteUser, isPending: isDeleting } = useMutation({
-    mutationFn: async () => {
-      if (!aUser) return;
-      await authClient.admin.removeUser({ userId: aUser.id });
-    },
-    onSuccess: () => {
-      toast.success('User deleted successfully.');
-      onOpenChange(false);
-      return queryClient.invalidateQueries({ queryKey: ['users'] });
-    },
-    onError: () => {
-      toast.error('Failed to delete user.');
     },
   });
 
@@ -511,7 +496,7 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
                       description={
                         aUser.banned
                           ? 'Restore access to the project for this user'
-                          : 'Revoke access to the project for a set duration'
+                          : 'Revoke access to the project. Their workspace data is preserved.'
                       }
                       danger
                       action={
@@ -534,33 +519,6 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
                             >
                               <Ban className="h-3.5 w-3.5" />
                               {aUser.banned ? 'Unban user' : 'Ban user'}
-                            </Button>
-                          }
-                        />
-                      }
-                    />
-                  </div>
-                  <div className="px-4">
-                    <ActionRow
-                      label="Delete user"
-                      description="User will no longer have access to the project"
-                      danger
-                      action={
-                        <ConfirmDialog
-                          title="Delete User"
-                          description={`Are you sure you want to delete ${aUser.name}? This action cannot be undone.`}
-                          onConfirm={() => deleteUser()}
-                          confirmText="Delete"
-                          cancelText="Cancel"
-                          trigger={
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              className="gap-1.5"
-                              disabled={isDeleting}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Delete user
                             </Button>
                           }
                         />

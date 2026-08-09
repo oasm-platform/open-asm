@@ -1,5 +1,6 @@
 import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
 import { Public } from '@/common/decorators/app.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
@@ -85,6 +86,7 @@ export class WorkersController {
       serialization: GetManyResponseDto(WorkerInstance),
     },
   })
+  @WorkspaceAccess('worker.read')
   @Get()
   getWorkers(@Query() query: GetManyWorkersDto) {
     return this.workersService.getWorkers(query);

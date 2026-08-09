@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { usePermission } from '@/hooks/usePermission';
 import { filterTabGroups, settingsTabGroups } from '@/pages/settings/settings';
 import { useSession } from '@/utils/authClient';
 import { Link, useLocation } from '@tanstack/react-router';
@@ -15,7 +16,11 @@ export default function SettingsLayout({
 }: SettingsLayoutProps): JSX.Element {
   const location = useLocation();
   const { data } = useSession();
-  const visibleGroups = filterTabGroups(settingsTabGroups, data?.user.role);
+  const { hasPermission } = usePermission();
+  const visibleGroups = filterTabGroups(settingsTabGroups, {
+    userRole: data?.user.role,
+    hasPermission,
+  });
 
   // Determine if a tab is active based on current path
   const isActive = (path: string) => location.pathname.startsWith(path);

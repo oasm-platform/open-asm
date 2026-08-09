@@ -75,6 +75,7 @@ export function DetailTarget() {
 
   return (
     <Page
+      permission="target.read"
       title={<TargetSwitcher currentTargetId={target.id} currentTargetValue={target.value} />}
       isShowButtonGoBack
       header={

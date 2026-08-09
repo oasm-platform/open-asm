@@ -2,7 +2,7 @@ import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -16,7 +16,6 @@ import {
   Post,
   Query,
   Res,
-  UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -44,6 +43,7 @@ export class TargetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('target.write')
   @Post('bulk')
   createMultipleTargets(
     @Body() dto: CreateMultipleTargetsDto,
@@ -68,6 +68,7 @@ export class TargetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('target.read')
   @Get()
   getTargetsInWorkspace(
     @Query() query: GetManyWorkspaceQueryParamsDto,
@@ -87,7 +88,7 @@ export class TargetsController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('target.read')
   @Get('export')
   async exportTargetsToCSV(
     @WorkspaceId() workspaceId: string,
@@ -144,6 +145,7 @@ export class TargetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('target.read')
   @Get(':id')
   getTargetById(
     @Param() { id }: IdQueryParamDto,
@@ -160,6 +162,7 @@ export class TargetsController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('target.write')
   @Delete(':id/workspace/:workspaceId')
   deleteTarget(
     @Param() { id }: IdQueryParamDto,
@@ -182,6 +185,7 @@ export class TargetsController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('target.write')
   @Post(':id/re-scan')
   reScanTarget(@Param() { id }: IdQueryParamDto) {
     return this.targetsService.assetService.reScan(id);
@@ -195,6 +199,7 @@ export class TargetsController {
       serialization: Target,
     },
   })
+  @WorkspaceAccess('target.write')
   @Patch(':id')
   updateTarget(@Param() { id }: IdQueryParamDto, @Body() dto: UpdateTargetDto) {
     return this.targetsService.updateTarget(id, dto);

@@ -3,7 +3,7 @@ import { ListTargets } from './list-targets';
 
 const Targets = () => {
   return (
-    <Page title="Targets">
+    <Page title="Targets" permission="target.read">
       <ListTargets />
     </Page>
   );

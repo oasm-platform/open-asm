@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { usePermission } from '@/hooks/usePermission';
 import {
   useWorkspacesControllerDeleteWorkspace,
   useWorkspacesControllerUpdateWorkspace,
@@ -43,6 +44,7 @@ export default function WorkspaceSettings() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { selectedWorkspace, workspaces, refetch } = useWorkspaceSelector();
+  const { hasPermission, isLoading: permissionsLoading } = usePermission();
 
   const currentWorkspace = workspaces.find((ws) => ws.id === selectedWorkspace);
 
@@ -114,6 +116,18 @@ export default function WorkspaceSettings() {
     );
   }
 
+  if (permissionsLoading) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Loading permissions...
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!currentWorkspace) {
     return (
       <div className="space-y-4">
@@ -132,7 +146,8 @@ export default function WorkspaceSettings() {
   return (
     <div className="space-y-6">
       {/* Workspace Information Card */}
-      <Card>
+      {hasPermission('workspace.write') && (
+        <Card>
         <CardHeader>
           <CardTitle>Information</CardTitle>
         </CardHeader>
@@ -177,21 +192,25 @@ export default function WorkspaceSettings() {
           </Form>
         </CardContent>
       </Card>
+      )}
 
       {/* Configs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Configs</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <WorkspaceConfigs />
-        </CardContent>
-      </Card>
+      {hasPermission('workspace.config') && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Configs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <WorkspaceConfigs />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Danger Zone */}
-      <Card className="border-[0.5px] border-destructive">
-        <CardHeader>
-          <CardTitle className="text-destructive">Danger Zone</CardTitle>
+      {hasPermission('workspace.delete') && (
+        <Card className="border-[0.5px] border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Danger Zone</CardTitle>
           <CardDescription>
             Irreversible actions for this workspace
           </CardDescription>
@@ -221,6 +240,7 @@ export default function WorkspaceSettings() {
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

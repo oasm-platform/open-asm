@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { usePermission } from '@/hooks/usePermission';
+import AccessDenied from './access-denied';
 import { Button } from '../ui/button';
 
 interface PageProps {
@@ -10,6 +12,8 @@ interface PageProps {
   action?: React.ReactNode;
   isShowButtonGoBack?: boolean;
   className?: string;
+  /** Permission key required to view this page. Omit to allow any member. */
+  permission?: string;
 }
 const Page = ({
   children,
@@ -19,7 +23,10 @@ const Page = ({
   action,
   isShowButtonGoBack,
   className,
+  permission,
 }: PageProps) => {
+  const { hasPermission, isLoading } = usePermission();
+
   useEffect(() => {
     if (typeof title === 'string' && title) {
       document.title = `${title} | OASM`;
@@ -28,6 +35,8 @@ const Page = ({
       document.title = 'OASM';
     };
   }, [title]);
+
+  const canRender = !permission || hasPermission(permission);
 
   return (
     <div className={(className || '') + ' flex h-full flex-col gap-5'}>
@@ -63,7 +72,17 @@ const Page = ({
           </div>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {permission && isLoading ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : canRender ? (
+          children
+        ) : (
+          <AccessDenied />
+        )}
+      </div>
     </div>
   );
 };

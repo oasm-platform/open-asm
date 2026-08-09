@@ -38,6 +38,18 @@ const mockTools = [
 
 const { createMock } = vi.hoisted(() => ({ createMock: vi.fn() }));
 
+vi.mock('@/hooks/usePermission', () => ({
+  usePermission: () => ({
+    permissions: ['*'],
+    isOwner: true,
+    hasPermission: () => true,
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
   const actual = await importOriginal<
     typeof import('@/services/apis/gen/queries')

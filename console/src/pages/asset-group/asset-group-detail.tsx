@@ -43,6 +43,7 @@ export default function AssetGroupDetail() {
 
   return (
     <Page
+      permission="group.read"
       isShowButtonGoBack
       title={
         <div className="flex items-center gap-2">

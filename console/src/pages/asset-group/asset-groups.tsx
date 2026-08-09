@@ -81,7 +81,7 @@ export function AssetGroups() {
   const total = data?.total ?? 0;
 
   return (
-    <Page title="Groups">
+    <Page title="Groups" permission="group.read">
       <DataTable
         data={assetGroups}
         columns={columns}
