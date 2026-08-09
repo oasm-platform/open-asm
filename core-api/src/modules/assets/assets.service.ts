@@ -1120,7 +1120,7 @@ export class AssetsService {
 
     if (tags.length === 0) {
       throw new BadRequestException(
-        'AI model did not generate any tags. Ensure an LLM config is set up in your workspace.',
+        'AI model did not generate any tags. Ensure an LLM config is set up for your account.',
       );
     }
 

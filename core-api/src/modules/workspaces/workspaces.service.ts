@@ -28,7 +28,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { Request, Response } from 'express';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { CreateNotificationDto } from '../notifications/dto/create-notification.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -1310,6 +1310,7 @@ export class WorkspacesService implements OnModuleInit {
       where: {
         workspace: { id: workspaceId },
         status: InvitationStatus.PENDING,
+        expiresAt: MoreThan(new Date()),
       },
       relations: ['invitedBy', 'workspace'],
       order: { createdAt: 'DESC' },
