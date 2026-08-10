@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -16,14 +16,26 @@ import { RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import NoData from '@/components/ui/no-data';
-import { useAssetsControllerGetAssetGraph } from '@/services/apis/gen/queries';
+import {
+  useAssetsControllerGetAssetGraph,
+  useTargetsControllerGetTargetsInWorkspace,
+} from '@/services/apis/gen/queries';
 import {
   applyDagreLayout,
   type LayoutInputNode,
   type LayoutInputEdge,
+  type TopologyNodeData,
 } from './topology-types';
 import { TopologyNodeComponent } from './topology-node';
+import TopologyDetailSheet from './topology-detail-sheet';
 
 const nodeTypes = {
   target: TopologyNodeComponent,
@@ -35,6 +47,12 @@ const nodeTypes = {
   statusCode: TopologyNodeComponent,
 };
 
+interface SelectedGraphNode {
+  id: string;
+  type: string;
+  data: TopologyNodeData;
+}
+
 interface TopologyGraphProps {
   targetId?: string;
 }
@@ -42,9 +60,19 @@ interface TopologyGraphProps {
 function TopologyGraphInner({ targetId }: TopologyGraphProps) {
   const { fitView } = useReactFlow();
 
+  const [filterTargetId, setFilterTargetId] = useState<string | undefined>(
+    targetId,
+  );
+
+  const { data: targetsData } = useTargetsControllerGetTargetsInWorkspace({
+    limit: 100,
+  });
+
+  const targets = useMemo(() => targetsData?.data ?? [], [targetsData?.data]);
+
   const params = useMemo(
-    () => (targetId ? { targetId } : undefined),
-    [targetId],
+    () => (filterTargetId ? { targetId: filterTargetId } : undefined),
+    [filterTargetId],
   );
 
   const {
@@ -60,6 +88,7 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [selectedNode, setSelectedNode] = useState<SelectedGraphNode | null>(null);
 
   // Apply dagre layout whenever graph data changes
   useEffect(() => {
@@ -131,7 +160,25 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <Select
+          value={filterTargetId ?? '__all__'}
+          onValueChange={(v) =>
+            setFilterTargetId(v === '__all__' ? undefined : v)
+          }
+        >
+          <SelectTrigger size="sm" className="w-[180px]">
+            <SelectValue placeholder="All Targets" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Targets</SelectItem>
+            {targets.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.value}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           variant="outline"
           size="sm"
@@ -148,6 +195,8 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onNodeClick={(_, node) => setSelectedNode(node as unknown as SelectedGraphNode)}
+          onPaneClick={() => setSelectedNode(null)}
           fitView
           proOptions={{ hideAttribution: true }}
         >
@@ -156,6 +205,11 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
           <MiniMap />
         </ReactFlow>
       </div>
+      <TopologyDetailSheet
+        open={!!selectedNode}
+        setOpen={(o) => { if (!o) setSelectedNode(null); }}
+        node={selectedNode}
+      />
     </div>
   );
 }
