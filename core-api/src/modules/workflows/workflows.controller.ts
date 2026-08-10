@@ -9,14 +9,13 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
   UserContext,
   WorkspaceId,
 } from '../../common/decorators/app.decorator';
-import { WorkspaceOwnerGuard } from '../../common/guards/workspace-owner.guard';
+import { WorkspaceAccess } from '../../common/decorators/workspace-access.decorator';
 import { UserContextPayload } from '../../common/interfaces/app.interface';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import {
@@ -58,7 +57,7 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('workflow.read')
   @Get()
   async getManyWorkflows(
     @Query() query: GetManyWorkflowsQueryDto,
@@ -78,7 +77,7 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('workflow.write')
   @Post()
   async createWorkflow(
     @Body() createWorkflowDto: CreateWorkflowDto,
@@ -104,7 +103,7 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('workflow.read')
   @Get(':id')
   async getWorkspaceWorkflow(
     @Param('id') id: string,
@@ -124,7 +123,7 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('workflow.write')
   @Patch(':id')
   async updateWorkflow(
     @Param('id') id: string,
@@ -146,7 +145,7 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('workflow.write')
   @Delete(':id')
   async deleteWorkflow(
     @Param('id') id: string,

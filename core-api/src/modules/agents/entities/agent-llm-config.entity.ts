@@ -1,4 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
@@ -14,7 +15,7 @@ import { LLMProvider } from '../enums/agent.enums';
 
 @Entity('agent_llm_configs')
 @Index('IDX_llm_config_workspaceId', ['workspace'])
-@Index('IDX_llm_config_workspace_pref', ['workspace', 'isPreferred'])
+@Index('IDX_llm_config_workspace_user_pref', ['workspace', 'userId', 'isPreferred'])
 export class AgentLLMConfig extends BaseEntity {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()
@@ -24,6 +25,15 @@ export class AgentLLMConfig extends BaseEntity {
   @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Relation<Workspace>;
+
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  @IsUUID()
+  @Column({ type: 'uuid' })
+  userId: string;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId' })
+  user: Relation<User>;
 
   @ApiProperty({ example: 'My OpenAI key', required: false })
   @IsOptional()

@@ -16,6 +16,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 
 import { Public } from '@/common/decorators/app.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { GetIntegrationDto } from './dto/get-integration.dto';
@@ -45,6 +46,7 @@ export class IntegrationsController {
       serialization: SchemasResponseDto,
     },
   })
+  @WorkspaceAccess('integration.read')
   @Get('schemas')
   getSchemas() {
     const schema = this.integrationsService.getSchemas();
@@ -62,6 +64,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.write')
   @Post()
   createIntegration(
     @Body() dto: CreateIntegrationDto,
@@ -91,6 +94,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.read')
   @Get()
   getManyIntegrations(
     @Query() query: GetManyIntegrationsDto,
@@ -110,6 +114,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.read')
   @Get(':id')
   getIntegrationById(
     @Param() { id }: IdQueryParamDto,
@@ -129,6 +134,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.write')
   @Patch(':id')
   updateIntegration(
     @Param() { id }: IdQueryParamDto,
@@ -149,6 +155,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.write')
   @Delete(':id')
   deleteIntegration(
     @Param() { id }: IdQueryParamDto,
@@ -165,6 +172,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.write')
   @Post(':id/test')
   @HttpCode(200)
   testIntegration(
@@ -209,6 +217,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.write')
   @Post(':id/telegram/pairing')
   createTelegramPairing(
     @Param() { id }: IdQueryParamDto,
@@ -268,6 +277,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.read')
   @Get(':id/telegram/connects')
   getTelegramConnects(
     @Param() { id }: IdQueryParamDto,
@@ -287,6 +297,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.write')
   @Delete(':id/telegram/connects/:connectId')
   disconnectTelegramConnect(
     @Param('id') id: string,

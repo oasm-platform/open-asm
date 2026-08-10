@@ -12,7 +12,15 @@ export const Route = createFileRoute('/login')({
   component: Login,
   beforeLoad: async ({ context, search }) => {
     if (context.session) {
-      throw redirect({ to: search.redirect || '/' });
+      // Only allow in-app paths as the redirect target — an absolute URL
+      // (e.g. http://...) would be parsed as a router path and 404, and a
+      // protocol-relative URL ('//host') would be an open redirect.
+      const redirectTo =
+        search.redirect?.startsWith('/') &&
+        !search.redirect.startsWith('//')
+          ? search.redirect
+          : '/';
+      throw redirect({ to: redirectTo });
     }
 
     let metadata;

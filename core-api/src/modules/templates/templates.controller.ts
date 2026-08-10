@@ -1,5 +1,6 @@
 import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -35,6 +36,7 @@ export class TemplatesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('template.write')
   @Post()
   createTemplate(
     @Body() dto: CreateTemplateDTO,
@@ -49,6 +51,7 @@ export class TemplatesController {
     description: 'Upload a template to the storage',
     response: { serialization: UploadTemplateResponseDTO },
   })
+  @WorkspaceAccess('template.write')
   @Post('upload')
   uploadFile(@Body() template: UploadTemplateDTO) {
     return this.templateService.uploadFile(
@@ -65,6 +68,7 @@ export class TemplatesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('template.write')
   @Patch(':templateId/rename')
   renameFile(
     @WorkspaceId() workspaceId: string,
@@ -88,6 +92,7 @@ export class TemplatesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('template.read')
   @Get(':templateId')
   getTemplateById(
     @WorkspaceId() workspaceId: string,
@@ -109,6 +114,7 @@ export class TemplatesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('template.read')
   @Get()
   getAllTemplates(
     @Query() query: GetManyTemplatesQueryDTO,
@@ -129,6 +135,7 @@ export class TemplatesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('template.write')
   @Delete(':templateId')
   deleteTemplate(
     @WorkspaceId() workspaceId: string,

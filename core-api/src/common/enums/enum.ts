@@ -10,9 +10,12 @@ export enum Role {
   BOT = 'bot',
 }
 
-export enum WorkspaceRole {
-  OWNER = 'owner',
-  MEMBER = 'member',
+export enum InvitationStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  DECLINED = 'declined',
+  EXPIRED = 'expired',
+  CANCELLED = 'cancelled',
 }
 
 /**
@@ -150,6 +153,7 @@ export enum NotificationType {
   VULNERABILITY_ANALYSIS_COMPLETED = 'VULNERABILITY_ANALYSIS_COMPLETED',
   ASSET_NEW_DETECT = 'ASSET_NEW_DETECT',
   NEW_VULNERABILITY_FOUND = 'NEW_VULNERABILITY_FOUND',
+  WORKSPACE_INVITATION = 'WORKSPACE_INVITATION',
 }
 
 export enum Language {

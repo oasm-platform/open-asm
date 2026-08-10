@@ -1,5 +1,8 @@
+import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
+import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { StatisticController } from './statistic.controller';
 import { StatisticService } from './statistic.service';
 import type { GetStatisticQueryDto } from './dto/statistic.dto';
@@ -23,6 +26,10 @@ describe('StatisticController', () => {
         {
           provide: StatisticService,
           useValue: mockStatisticService,
+        },
+        {
+          provide: WorkspacesService,
+          useValue: {},
         },
       ],
     }).compile();
@@ -99,5 +106,36 @@ describe('StatisticController', () => {
       expect(result).toBe(expectedResult);
       expect(service.getTopTechnologies).toHaveBeenCalledWith(workspaceId);
     });
+  });
+});
+
+describe('StatisticController workspace permission guards', () => {
+  const reflector = new Reflector();
+
+  const cases: Array<[string, string, string[]]> = [
+    ['getStatistics', 'GET /', ['workspace.read']],
+    ['getTimelineStatistics', 'GET /timeline', ['workspace.read']],
+    ['getIssuesTimeline', 'GET /issues-timeline', ['workspace.read']],
+    ['getTopTagsAssets', 'GET /top-tags-assets', ['workspace.read']],
+    ['getAssetLocations', 'GET /asset-locations', ['workspace.read']],
+    ['getTlsStatistics', 'GET /tls', ['workspace.read']],
+    [
+      'getTopAssetsWithMostVulnerabilities',
+      'GET /top-assets-vulnerabilities',
+      ['workspace.read'],
+    ],
+    ['getTopPorts', 'GET /top-ports', ['workspace.read']],
+    ['getTopTechnologies', 'GET /top-technologies', ['workspace.read']],
+  ];
+
+  it.each(cases)('%s (%s) requires %j', (method, route, keys) => {
+    const handler = (StatisticController.prototype as Record<string, unknown>)[
+      method
+    ] as object;
+    const required = reflector.getAllAndOverride(WorkspacePermissions, [
+      handler,
+      StatisticController,
+    ]);
+    expect(required).toEqual(keys);
   });
 });

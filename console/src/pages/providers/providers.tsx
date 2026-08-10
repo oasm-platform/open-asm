@@ -14,6 +14,7 @@ export default function ProvidersPage() {
   return (
     <Page
       title="Tool Providers"
+      permission="agent.read"
       header={
         <div className="flex items-center justify-end">
           <Button variant="outline" onClick={handleCreateProvider}>

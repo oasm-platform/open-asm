@@ -4,7 +4,7 @@ import { ListAssets } from './list-assets';
 
 const Assets = () => {
   return (
-    <Page title="Assets">
+    <Page title="Assets" permission="asset.read">
       <AssetProvider>
         <ListAssets />
       </AssetProvider>

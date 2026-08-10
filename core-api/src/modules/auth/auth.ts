@@ -49,7 +49,16 @@ export const auth: unknown = betterAuth({
     freshAge: 10,
     modelName: 'sessions',
   },
-  disabledPaths: AUTH_IGNORE_ROUTERS,
+  // Deleting users is intentionally disabled: a user row deletion cascades
+  // through `workspaces.ownerId` (ON DELETE CASCADE) and would wipe every
+  // workspace they own along with all scan data. Admins ban instead.
+  // `/delete-user*` (self-service) is blocked too, for the same reason.
+  disabledPaths: [
+    ...AUTH_IGNORE_ROUTERS,
+    '/admin/remove-user',
+    '/delete-user',
+    '/delete-user/callback',
+  ],
   user: {
     modelName: 'users',
     additionalFields: {

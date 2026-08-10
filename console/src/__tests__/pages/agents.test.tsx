@@ -8,6 +8,18 @@ vi.mock('@/hooks/useWorkspaceSelector', () => ({
   })),
 }));
 
+vi.mock('@/hooks/usePermission', () => ({
+  usePermission: () => ({
+    permissions: ['*'],
+    isOwner: true,
+    hasPermission: () => true,
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock('@/hooks/use-llm-configs', () => ({
   useLLMConfigs: vi.fn(() => ({
     providers: [],

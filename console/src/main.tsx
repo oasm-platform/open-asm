@@ -16,6 +16,7 @@ import { TooltipProvider } from './components/ui/tooltip';
 import { router } from './router';
 import {
   getRootControllerGetMetadataQueryKey,
+  getWorkspacesControllerGetWorkspacesQueryOptions,
   useRootControllerGetMetadata,
 } from './services/apis/gen/queries';
 import './styles/index.css';
@@ -44,7 +45,6 @@ const queryClient = new QueryClient({
         );
       },
       refetchOnWindowFocus: import.meta.env.PROD,
-      staleTime: 10 * 1000,
     },
     mutations: {
       onError: (error) => {
@@ -133,6 +133,21 @@ function AppRouter() {
         });
       }
       return;
+    }
+
+    // Fresh session (e.g. login) — start loading the authed chunks in
+    // parallel with the session propagation that redirects to '/'.
+    if (session && !prevSession) {
+      router.preloadRoute({ to: '/' }).catch(() => {});
+      // Warm the workspaces query the _authed layout blocks on, so the
+      // redirect to '/' doesn't stall on a full-screen LoadingScreen.
+      queryClient.prefetchQuery(
+        getWorkspacesControllerGetWorkspacesQueryOptions({
+          limit: 100,
+          page: 1,
+          isArchived: false,
+        }),
+      );
     }
 
     // Invalidate on any session state change (null→valid, valid→valid).

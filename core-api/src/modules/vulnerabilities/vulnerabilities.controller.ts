@@ -1,5 +1,6 @@
 import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -44,6 +45,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.write')
   @Post('scan')
   scan(@Body() scanDto: ScanDto, @WorkspaceId() workspaceId: string) {
     return this.vulnerabilitiesService.scan(scanDto.targetId, workspaceId);
@@ -60,6 +62,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.read')
   @Get()
   async getVulnerabilities(
     @Query() query: GetVulnerabilitiesQueryDto,
@@ -76,10 +79,14 @@ export class VulnerabilitiesController {
       serialization: GetVulnerabilitiesStatisticsResponseDto,
     },
   })
+  @WorkspaceAccess('vulnerability.read')
   @Get('statistics')
   async getVulnerabilitiesStatistics(
     @Query() query: GetVulnerabilitiesStatisticsQueryDto,
+    @WorkspaceId() workspaceId: string,
   ) {
+    // Override the workspaceId from the query with the one from the header (guard-validated).
+    query.workspaceId = workspaceId;
     return this.vulnerabilitiesService.getVulnerabilitiesStatistics(query);
   }
 
@@ -94,6 +101,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.read')
   @Get(':id')
   getVulnerabilityById(
     @Param('id') id: string,
@@ -113,6 +121,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.write')
   @Post(':id/analyze')
   @HttpCode(HttpStatus.OK)
   async analyzeVulnerability(
@@ -140,6 +149,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.write')
   @Delete(':id/analyze')
   async deleteVulnerabilityAnalysis(
     @Param('id') id: string,
@@ -163,6 +173,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.write')
   @Post('dismiss')
   bulkDismissVulnerabilities(
     @WorkspaceId() workspaceId: string,
@@ -185,6 +196,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.write')
   @Post('reopen')
   bulkReopenVulnerabilities(
     @WorkspaceId() workspaceId: string,

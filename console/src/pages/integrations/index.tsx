@@ -146,6 +146,7 @@ export default function Integrations() {
 
   return (
     <Page
+      permission="integration.read"
       title="Integrations"
       description="Connect third-party applications to your workspace"
     >
