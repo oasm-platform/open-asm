@@ -22,6 +22,10 @@ import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { ToggleAssetDto } from './dto/toggle-asset.dto';
+import {
+  GetAssetGraphQueryDto,
+  AssetGraphResponseDto,
+} from './dto/graph.dto';
 import { GetTlsResponseDto, GetTlsQueryDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import {
@@ -160,6 +164,25 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetsService.getManyTls(query, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get asset topology graph',
+    description:
+      'Returns nodes and edges for the attack surface topology graph, workspace-scoped and optionally filtered by targetId.',
+    response: {
+      serialization: AssetGraphResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('/graph')
+  getAssetGraph(
+    @Query() query: GetAssetGraphQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getAssetGraph(query, workspaceId);
   }
 
   @Doc({
