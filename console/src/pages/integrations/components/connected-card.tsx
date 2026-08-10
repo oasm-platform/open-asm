@@ -59,6 +59,11 @@ export function ConnectedCard({
         <p className="text-sm text-muted-foreground">
           Connected {dayjs(integration.createdAt).fromNow()}
         </p>
+        {integration.lastRunAt && (
+          <p className="text-sm text-muted-foreground">
+            Last sync {dayjs(integration.lastRunAt).fromNow()}
+          </p>
+        )}
       </button>
 
       <DropdownMenu>

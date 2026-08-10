@@ -2219,6 +2219,11 @@ export type GetIntegrationDto = {
   description?: string;
   appType: string;
   category: string;
+  // TODO: regenerate via task gen-api when spec is fresh
+  /** 5-field cron expression (UTC) or "disabled" to turn scheduling off */
+  syncSchedule: string;
+  /** @nullable */
+  lastRunAt: string | null;
   /** Configuration with sensitive fields masked */
   config: GetIntegrationDtoConfig;
   workspaceId: string;
@@ -2241,6 +2246,9 @@ export type CreateIntegrationDto = {
   appType: string;
   /** Integration category */
   category: string;
+  // TODO: regenerate via task gen-api when spec is fresh
+  /** 5-field cron expression (UTC) or "disabled" to turn scheduling off */
+  syncSchedule?: string;
   /** App-specific configuration validated via JSON Schema */
   config: CreateIntegrationDtoConfig;
 };
@@ -26705,6 +26713,115 @@ export const useIntegrationsControllerTestIntegration = <
 > => {
   return useMutation(
     getIntegrationsControllerTestIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+// TODO: regenerate via task gen-api when spec is fresh
+export type IntegrationsControllerSyncIntegrationCounts = {
+  zones: number;
+  records: number;
+  wildcardZones: number;
+  targetsCreated: number;
+  assetsUpserted: number;
+};
+
+// TODO: regenerate via task gen-api when spec is fresh
+export type IntegrationsControllerSyncIntegrationResponse = {
+  success: boolean;
+  message: string;
+  counts: IntegrationsControllerSyncIntegrationCounts;
+};
+
+/**
+ * Triggers an immediate sync run for the integration and returns per-resource counts.
+ * @summary Sync an integration now
+ */
+export const integrationsControllerSyncIntegration = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<IntegrationsControllerSyncIntegrationResponse>(
+    {
+      url: `/api/integrations/${id}/sync`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerSyncIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerSyncIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return integrationsControllerSyncIntegration(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerSyncIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>
+>;
+export type IntegrationsControllerSyncIntegrationMutationBody = undefined;
+export type IntegrationsControllerSyncIntegrationMutationError = unknown;
+
+/**
+ * @summary Sync an integration now
+ */
+export const useIntegrationsControllerSyncIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerSyncIntegrationMutationOptions(options),
     queryClient,
   );
 };

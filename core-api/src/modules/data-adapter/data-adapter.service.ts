@@ -71,7 +71,36 @@ export class DataAdapterService {
   public async subdomains({
     data,
     job,
-  }: DataAdapterInput<Asset[]>): Promise<InsertResult | void> {
+  }: DataAdapterInput<Asset[]>): Promise<void> {
+    await this.upsertAssetsByTargetId(
+      job.asset.target.id,
+      data as Array<{ value: string; dnsRecords: Record<string, string[]> }>,
+    );
+  }
+
+  /**
+   * Upsert a batch of discovered assets under one target.
+   *
+   * - Deduplicates assets in memory by `value`.
+   * - Refreshes the target's primary asset: sets `isPrimary: true` and
+   *   replaces its `dnsRecords` with the records for the apex value (the
+   *   entry in `assets` whose value matches the primary asset's value).
+   * - Batch-inserts the assets with `.orIgnore()` so re-runs are idempotent
+   *   (REPLACE semantics for `dnsRecords` come from the primary refresh;
+   *   subdomain rows are only ever created).
+   *
+   * @param targetId - Target the assets belong to.
+   * @param assets - Discovered assets ({ value, dnsRecords }). Should include
+   *   the apex entry so the primary asset refresh can pick up apex records.
+   * @param isEnabled - Insert flag; defaults to the workspace config
+   *   `isAutoEnableAssetAfterDiscovered`.
+   * @returns The number of asset rows actually inserted.
+   */
+  public async upsertAssetsByTargetId(
+    targetId: string,
+    assets: Array<{ value: string; dnsRecords: Record<string, string[]> }>,
+    isEnabled?: boolean,
+  ): Promise<number> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -79,49 +108,58 @@ export class DataAdapterService {
     try {
       // Deduplicate data based on value
       const uniqueData = Array.from(
-        new Map(data.map((asset) => [asset.value, asset])).values(),
+        new Map(assets.map((asset) => [asset.value, asset])).values(),
       );
 
-      const primaryAssets = uniqueData.find(
-        (asset) => asset.value === job.asset.value,
-      );
-
-      // Update Asset
-      await queryRunner.manager
+      // Locate the primary asset so its value can select the apex dnsRecords
+      // from the batch (same semantics as the old `job.asset.value` lookup).
+      const primaryAsset = await queryRunner.manager
         .createQueryBuilder()
-        .update(Asset)
-        .where({ id: job.asset.id })
-        .set({ isPrimary: true, dnsRecords: primaryAssets?.dnsRecords })
-        .execute();
+        .select('asset.id', 'id')
+        .addSelect('asset.value', 'value')
+        .from(Asset, 'asset')
+        .where('asset.targetId = :targetId', { targetId })
+        .andWhere('asset.isPrimary = true')
+        .getRawOne<{ id: string; value: string }>();
+
+      // Update Asset — refresh the primary asset with the apex records
+      if (primaryAsset) {
+        const apexRecords = uniqueData.find(
+          (asset) => asset.value === primaryAsset.value,
+        );
+        await queryRunner.manager
+          .createQueryBuilder()
+          .update(Asset)
+          .where({ id: primaryAsset.id })
+          .set({ isPrimary: true, dnsRecords: apexRecords?.dnsRecords })
+          .execute();
+      }
 
       const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(
-        job.asset.target.id,
+        targetId,
       );
       const workspaceConfigs =
         await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
 
-      // const workspaceId =
       // Insert Assets
       const insertResult = await queryRunner.manager
         .createQueryBuilder()
         .insert()
         .into(Asset)
         .values(
-          uniqueData.map((asset) => {
-            const assetValues = { ...asset } as unknown as Record<string, string | number | boolean | object | null>;
-            delete assetValues.id;
-            return {
-              ...assetValues,
-              target: { id: job.asset.target.id },
-              isEnabled: workspaceConfigs.isAutoEnableAssetAfterDiscovered,
-            };
-          }),
+          uniqueData.map((asset) => ({
+            value: asset.value,
+            dnsRecords: asset.dnsRecords,
+            target: { id: targetId },
+            isEnabled:
+              isEnabled ?? workspaceConfigs.isAutoEnableAssetAfterDiscovered,
+          })),
         )
         .orIgnore()
         .execute();
 
       await queryRunner.commitTransaction();
-      return insertResult;
+      return insertResult.identifiers?.length ?? 0;
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;

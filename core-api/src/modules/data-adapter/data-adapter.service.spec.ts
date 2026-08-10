@@ -30,9 +30,13 @@ describe('DataAdapterService', () => {
       startTransaction: jest.fn(),
       manager: {
         createQueryBuilder: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn(),
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
@@ -40,6 +44,10 @@ describe('DataAdapterService', () => {
         orIgnore: jest.fn().mockReturnThis(),
         orUpdate: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue({
+          id: 'asset-id',
+          value: 'example.com',
+        }),
       },
       commitTransaction: jest.fn(),
       rollbackTransaction: jest.fn(),
@@ -240,7 +248,8 @@ describe('DataAdapterService', () => {
       expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();
-      expect(result).toEqual(mockInsertResult);
+      // subdomains() now delegates to upsertAssetsByTargetId and returns void
+      expect(result).toBeUndefined();
     });
 
     it('should rollback transaction on error', async () => {
@@ -264,6 +273,173 @@ describe('DataAdapterService', () => {
           job: mockJob,
         }),
       ).rejects.toThrow();
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+  });
+
+  describe('upsertAssetsByTargetId', () => {
+    const targetId = 'target-id';
+
+    const assets = [
+      { value: 'sub1.example.com', dnsRecords: { A: ['192.0.2.1'] } },
+      { value: 'sub2.example.com', dnsRecords: { A: ['192.0.2.2'] } },
+      // Duplicate value — deduped in memory before insert
+      { value: 'sub1.example.com', dnsRecords: { A: ['192.0.2.3'] } },
+    ];
+
+    function mockWorkspaceConfigs(isAutoEnable = true): void {
+      mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
+        'workspace-id',
+      );
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAutoEnableAssetAfterDiscovered: isAutoEnable,
+      });
+    }
+
+    it('should dedupe by value, refresh the primary asset, and return the inserted count', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'i1' }, { id: 'i2' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs();
+
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce(undefined) // Update Asset (primary refresh)
+        .mockResolvedValueOnce(mockInsertResult); // Insert Assets
+
+      const inserted = await service.upsertAssetsByTargetId(targetId, assets);
+
+      expect(mockQueryRunner.connect).toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+
+      // Dedupe: only 2 unique values inserted (sub1 + sub2)
+      const valuesArg = mockQueryRunner.manager
+        .createQueryBuilder()
+        .values.mock.calls[0][0] as Array<Record<string, unknown>>;
+      expect(valuesArg).toHaveLength(2);
+      expect(valuesArg.map((v) => v.value).sort()).toEqual([
+        'sub1.example.com',
+        'sub2.example.com',
+      ]);
+
+      // Each row linked to the target + default isEnabled from workspace config
+      for (const row of valuesArg) {
+        expect(row).toMatchObject({ target: { id: targetId }, isEnabled: true });
+      }
+
+      // Primary refresh used the primary asset value to pick apex records
+      const updateCall = mockQueryRunner.manager
+        .createQueryBuilder()
+        .update.mock.calls[0];
+      expect(updateCall).toEqual([expect.anything()]);
+
+      // Returned count = number of identifiers in the insert result
+      expect(inserted).toBe(2);
+    });
+
+    it('should refresh the primary asset with the dnsRecords of the matching apex value', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'i1' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs();
+      // Primary asset value is `example.com`
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .getRawOne.mockResolvedValueOnce({
+          id: 'primary-asset-id',
+          value: 'example.com',
+        });
+
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(mockInsertResult);
+
+      const withApex = [
+        { value: 'example.com', dnsRecords: { MX: ['10 mx.example.com'] } },
+        { value: 'www.example.com', dnsRecords: { A: ['192.0.2.2'] } },
+      ];
+
+      await service.upsertAssetsByTargetId(targetId, withApex);
+
+      const setCall = mockQueryRunner.manager
+        .createQueryBuilder()
+        .set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).toEqual({
+        isPrimary: true,
+        dnsRecords: { MX: ['10 mx.example.com'] },
+      });
+      const whereCall = mockQueryRunner.manager
+        .createQueryBuilder()
+        .where.mock.calls[1][0] as Record<string, unknown>;
+      expect(whereCall).toEqual({ id: 'primary-asset-id' });
+    });
+
+    it('should fall back to workspace config isAutoEnableAssetAfterDiscovered when isEnabled omitted', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'i1' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs(false); // config says auto-enable is false
+
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(mockInsertResult);
+
+      await service.upsertAssetsByTargetId(targetId, [
+        { value: 'sub.example.com', dnsRecords: { A: ['192.0.2.9'] } },
+      ]);
+
+      const valuesArg = mockQueryRunner.manager
+        .createQueryBuilder()
+        .values.mock.calls[0][0] as Array<Record<string, unknown>>;
+      expect(valuesArg[0].isEnabled).toBe(false);
+    });
+
+    it('should honor an explicit isEnabled argument over the workspace config', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'i1' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs(false);
+
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(mockInsertResult);
+
+      await service.upsertAssetsByTargetId(
+        targetId,
+        [{ value: 'sub.example.com', dnsRecords: { A: ['192.0.2.9'] } }],
+        true,
+      );
+
+      const valuesArg = mockQueryRunner.manager
+        .createQueryBuilder()
+        .values.mock.calls[0][0] as Array<Record<string, unknown>>;
+      expect(valuesArg[0].isEnabled).toBe(true);
+    });
+
+    it('should rollback transaction on error', async () => {
+      mockWorkspaceConfigs();
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockRejectedValueOnce(new Error('Database error'));
+
+      await expect(
+        service.upsertAssetsByTargetId(targetId, assets),
+      ).rejects.toThrow('Database error');
 
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();

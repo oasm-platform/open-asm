@@ -433,6 +433,28 @@ export class TargetsService implements OnModuleInit {
   }
 
   /**
+   * Looks up targets of a workspace by their values (single query).
+   * Used for idempotent lookups before creating targets (e.g. integration
+   * asset syncs). Returns only `id` + `value` of each match.
+   *
+   * @param workspaceId - The ID of the workspace.
+   * @param values - Target values to match against.
+   * @returns The matching targets (id + value).
+   */
+  public async findByWorkspaceAndValues(
+    workspaceId: string,
+    values: string[],
+  ): Promise<Target[]> {
+    if (values.length === 0) return [];
+    return this.repo
+      .createQueryBuilder('target')
+      .where('target.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('target.value IN (:...values)', { values })
+      .select(['target.id', 'target.value'])
+      .getMany();
+  }
+
+  /**
    * Retrieves a paginated list of targets associated with a specified workspace.
    *
    * @param id - The ID of the workspace for which to retrieve targets.

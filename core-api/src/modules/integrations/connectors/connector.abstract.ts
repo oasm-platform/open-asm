@@ -83,9 +83,12 @@ export abstract class CloudProviderConnector extends BaseConnector {
   /**
    * Synchronise assets from the cloud provider into the platform.
    *
+   * Implementations may return richer results (e.g. sync counts); the factory
+   * only awaits the promise, so the return type stays loose.
+   *
    * @param config - Connector configuration including API credentials, filters, etc.
    */
-  abstract syncAssets(config: ConnectorConfig): Promise<void>;
+  abstract syncAssets(config: ConnectorConfig): Promise<unknown>;
 }
 
 /**

@@ -130,6 +130,7 @@ export enum BullMQName {
   JOB_RESULT = 'job-result',
   ISSUE_CREATION = 'issue-creation',
   VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
+  INTEGRATION_SYNC_SCHEDULE = 'integration-sync-schedule',
 }
 
 export enum NotificationStatus {

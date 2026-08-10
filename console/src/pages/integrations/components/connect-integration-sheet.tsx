@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,6 +21,8 @@ import { Loader2, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { IntegrationLogo } from './integration-logo';
+
+const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 
 interface SchemaProperty {
   type?: string;
@@ -241,11 +244,15 @@ export function ConnectIntegrationSheet({
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [integrationName, setIntegrationName] = useState('');
+  const [syncSchedule, setSyncSchedule] = useState('disabled');
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
 
   // Reset form when sheet opens, populate defaults from schema
   useEffect(() => {
     if (open) {
       setIntegrationName(schema.title ?? '');
+      setSyncSchedule('disabled');
+      setScheduleEnabled(false);
       const defaults: Record<string, unknown> = {};
       for (const [key, prop] of Object.entries(schema.properties ?? {})) {
         if (key === 'app_type' || key === 'category') continue;
@@ -327,6 +334,7 @@ export function ConnectIntegrationSheet({
         name: integrationName.trim(),
         appType,
         category,
+        syncSchedule,
         config: formValues as Record<string, unknown>,
       },
     });
@@ -357,6 +365,46 @@ export function ConnectIntegrationSheet({
               onChange={(e) => setIntegrationName(e.target.value)}
             />
           </div>
+
+          {category === CLOUD_PROVIDER_CATEGORY && (
+            <div className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="sync-schedule-toggle"
+                    className="text-sm font-medium"
+                  >
+                    Sync schedule
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Optionally run automatic syncs on a schedule.
+                  </p>
+                </div>
+                <Switch
+                  id="sync-schedule-toggle"
+                  name="sync-schedule-toggle"
+                  checked={scheduleEnabled}
+                  onCheckedChange={(checked) => {
+                    setScheduleEnabled(checked);
+                    if (!checked) setSyncSchedule('disabled');
+                  }}
+                />
+              </div>
+              {scheduleEnabled && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs text-muted-foreground">
+                    Schedule (stored in UTC)
+                  </p>
+                  <CronScheduleBuilder
+                    defaultValue={
+                      syncSchedule === 'disabled' ? undefined : syncSchedule
+                    }
+                    onChange={({ cron }) => setSyncSchedule(cron)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {formProperties.length === 0 && (
             <p className="text-sm text-muted-foreground">

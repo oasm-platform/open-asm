@@ -13,17 +13,22 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   getIntegrationsControllerGetManyIntegrationsQueryKey,
+  useIntegrationsControllerSyncIntegration,
   useIntegrationsControllerTestIntegration,
   useIntegrationsControllerUpdateIntegration,
 } from '@/services/apis/gen/queries';
 import type { GetIntegrationDto } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Pencil, Play, X } from 'lucide-react';
+import dayjs from 'dayjs';
+import { formatCronLabel, getLocalTimezone } from '@/lib/cron-schedule';
+import { Loader2, Pencil, Play, RefreshCw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { SchemaOneOfItem } from '../index';
 import { IntegrationLogo } from './integration-logo';
 import { TelegramConnect } from './telegram-connect';
+
+const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 
 interface SchemaProperty {
   type?: string;
@@ -291,6 +296,33 @@ export function IntegrationDetailSheet({
       },
     });
 
+  const { mutate: syncIntegration, isPending: isSyncing } =
+    useIntegrationsControllerSyncIntegration({
+      mutation: {
+        onSuccess: (data) => {
+          const result = data as unknown as {
+            success: boolean;
+            message?: string;
+            counts?: Record<string, number>;
+          };
+          if (!result.success) {
+            toast.error(result.message ?? 'Sync failed');
+            return;
+          }
+          queryClient.invalidateQueries({
+            queryKey: getIntegrationsControllerGetManyIntegrationsQueryKey(),
+          });
+          const counts = result.counts ?? {};
+          toast.success(
+            `Sync completed — zones: ${counts.zones ?? 0}, records: ${counts.records ?? 0}, targets created: ${counts.targetsCreated ?? 0}, assets upserted: ${counts.assetsUpserted ?? 0}`,
+          );
+        },
+        onError: () => {
+          toast.error('Failed to sync integration');
+        },
+      },
+    });
+
   const { mutate: updateIntegration, isPending: isSaving } =
     useIntegrationsControllerUpdateIntegration({
       mutation: {
@@ -316,6 +348,14 @@ export function IntegrationDetailSheet({
     if (val === null || val === undefined) return '';
     return val;
   };
+
+  const scheduleLabel = integration.syncSchedule
+    ? (formatCronLabel(integration.syncSchedule, getLocalTimezone()) ??
+      integration.syncSchedule)
+    : '—';
+  const lastRunLabel = integration.lastRunAt
+    ? dayjs(integration.lastRunAt).format('MMM D, YYYY h:mm A')
+    : '—';
 
   // Group properties by ui:form:group
   const grouped = formProperties.reduce<
@@ -539,6 +579,41 @@ export function IntegrationDetailSheet({
                     ?.botUsername as string | undefined
                 }
               />
+            </div>
+          )}
+
+          {/* Sync section — only for cloud provider integrations */}
+          {integration.category === CLOUD_PROVIDER_CATEGORY && !isEditing && (
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">
+                    Sync schedule
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {scheduleLabel}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  disabled={isSyncing}
+                  onClick={() => syncIntegration({ id: integration.id })}
+                >
+                  {isSyncing ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                  {isSyncing ? 'Syncing...' : 'Sync now'}
+                </Button>
+              </div>
+              <div className="space-y-1 border-t pt-3">
+                <Label className="text-sm font-medium">Last sync</Label>
+                <p className="text-sm text-muted-foreground">
+                  {lastRunLabel}
+                </p>
+              </div>
             </div>
           )}
         </div>

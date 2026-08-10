@@ -767,4 +767,47 @@ describe('TargetsService', () => {
       );
     });
   });
+
+  describe('findByWorkspaceAndValues', () => {
+    it('should return targets filtered by workspace and values', async () => {
+      const builder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          { id: 'target-1', value: 'example.com' },
+          { id: 'target-2', value: 'example.net' },
+        ]),
+      };
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      const result = await service.findByWorkspaceAndValues('ws-1', [
+        'example.com',
+        'example.net',
+      ]);
+
+      expect(builder.where).toHaveBeenCalledWith(
+        'target.workspaceId = :workspaceId',
+        { workspaceId: 'ws-1' },
+      );
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        'target.value IN (:...values)',
+        { values: ['example.com', 'example.net'] },
+      );
+      expect(builder.select).toHaveBeenCalledWith(['target.id', 'target.value']);
+      expect(result).toEqual([
+        { id: 'target-1', value: 'example.com' },
+        { id: 'target-2', value: 'example.net' },
+      ]);
+    });
+
+    it('should return an empty array when no values are provided', async () => {
+      const result = await service.findByWorkspaceAndValues('ws-1', []);
+
+      expect(result).toEqual([]);
+      expect(mockTargetRepository.createQueryBuilder).not.toHaveBeenCalled();
+    });
+  });
 });

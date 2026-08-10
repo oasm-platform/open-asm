@@ -1,4 +1,9 @@
 import { IntegrationType } from '@/common/enums/enum';
+import { CloudflareConnector } from '../connectors/cloudflare.connector';
+import { registerConnector } from '../connectors/connector.registry';
+
+// Register connector class so the factory can resolve it by appType
+registerConnector('cloudflare', CloudflareConnector);
 
 /**
  * JSON Schema for Cloudflare integration configuration.
@@ -6,9 +11,10 @@ import { IntegrationType } from '@/common/enums/enum';
  */
 export const cloudflareSchema = {
   $id: 'cloudflare',
+  connector: { const: 'cloudflare' },
   type: 'object',
   title: 'Cloudflare',
-  isAvailable: false,
+  isAvailable: true,
   description: 'Connects to Cloudflare API for DNS and security management.',
   properties: {
     app_type: { const: 'cloudflare', title: 'App Type' },

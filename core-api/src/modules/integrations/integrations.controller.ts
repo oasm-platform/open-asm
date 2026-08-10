@@ -76,6 +76,7 @@ export class IntegrationsController {
       config: dto.config,
       workspaceId,
       userId,
+      syncSchedule: dto.syncSchedule,
     });
   }
 
@@ -172,6 +173,27 @@ export class IntegrationsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.integrationsService.testIntegration(id, workspaceId, dto);
+  }
+
+  @Doc({
+    summary: 'Run integration sync now',
+    description:
+      'Triggers an immediate asset sync for a cloud-provider integration (e.g. Cloudflare). Fetches zones + DNS records and ingests them as targets/assets, then returns the sync counts.',
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post(':id/sync')
+  @HttpCode(200)
+  async syncIntegration(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    const result = await this.integrationsService.syncIntegration(
+      id,
+      workspaceId,
+    );
+    return { success: true, message: 'Sync completed', counts: result };
   }
 
   // ─── Telegram-specific endpoints ───────────────────────────────

@@ -36,4 +36,18 @@ export class GetIntegrationDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiProperty({
+    description: 'Cron schedule for periodic asset sync (5-field cron or "disabled")',
+  })
+  syncSchedule: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Timestamp of the last successful periodic sync',
+  })
+  lastRunAt: Date | null;
+
+  // NOTE: syncJobId is intentionally NOT exposed — it is an internal
+  // implementation detail of the BullMQ repeat scheduler.
 }
