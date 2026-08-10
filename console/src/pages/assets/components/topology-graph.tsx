@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -7,15 +7,17 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useKeyPress,
   ReactFlowProvider,
   type Node,
   type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { RefreshCw } from 'lucide-react';
+import { Focus, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Select,
   SelectContent,
@@ -57,12 +59,23 @@ interface TopologyGraphProps {
   targetId?: string;
 }
 
+const EDGE_TYPE_LABELS: Record<string, string> = {
+  belongs_to: 'Belongs to',
+  resolves_to: 'Resolves to',
+  runs_on: 'Runs on',
+  uses: 'Uses',
+  has_tls: 'Has TLS',
+  returns: 'Returns',
+};
+
 function TopologyGraphInner({ targetId }: TopologyGraphProps) {
   const { fitView } = useReactFlow();
 
   const [filterTargetId, setFilterTargetId] = useState<string | undefined>(
     targetId,
   );
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
 
   const { data: targetsData } = useTargetsControllerGetTargetsInWorkspace({
     limit: 100,
@@ -78,6 +91,7 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
   const {
     data: graphData,
     isLoading,
+    isFetching,
     error,
     refetch,
   } = useAssetsControllerGetAssetGraph(params, {
@@ -88,26 +102,29 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [selectedNode, setSelectedNode] = useState<SelectedGraphNode | null>(null);
+  const [selectedNode, setSelectedNode] = useState<SelectedGraphNode | null>(
+    null,
+  );
 
-  // Apply dagre layout whenever graph data changes
-  useEffect(() => {
+  const applyLayout = useCallback(() => {
     if (!graphData) return;
 
     const inputNodes: LayoutInputNode[] = graphData.nodes.map((n) => ({
       id: n.id,
       type: n.type as LayoutInputNode['type'],
       data: {
-        label: (n.data as Record<string, unknown>)?.label as string ?? n.id,
-        metadata: (n.data as Record<string, unknown>)?.metadata as
-          | Record<string, unknown>
-          | undefined,
+        label:
+          ((n.data as Record<string, unknown>)?.label as string) ?? n.id,
+        metadata: (n.data as Record<string, unknown>)
+          ?.metadata as Record<string, unknown> | undefined,
       },
     }));
 
     const inputEdges: LayoutInputEdge[] = graphData.edges.map((e) => ({
       source: e.source,
       target: e.target,
+      data:
+        e.type || e.label ? { type: e.type, label: e.label } : undefined,
     }));
 
     const result = applyDagreLayout(
@@ -126,16 +143,95 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
       id: e.id,
       source: e.source,
       target: e.target,
+      data: e.data,
     }));
 
     setNodes(rfNodes);
     setEdges(rfEdges);
 
-    // Fit view after layout settles
     requestAnimationFrame(() => {
       fitView({ padding: 0.15 });
     });
   }, [graphData, setNodes, setEdges, fitView]);
+
+  useEffect(() => {
+    applyLayout();
+  }, [applyLayout]);
+
+  const connectedNodeIds = useMemo(() => {
+    if (!hoveredNodeId) return null;
+    const ids = new Set<string>([hoveredNodeId]);
+    for (const edge of edges) {
+      if (edge.source === hoveredNodeId) ids.add(edge.target);
+      if (edge.target === hoveredNodeId) ids.add(edge.source);
+    }
+    return ids;
+  }, [hoveredNodeId, edges]);
+
+  const displayNodes = useMemo(() => {
+    if (!connectedNodeIds) return nodes;
+    return nodes.map((n) => ({
+      ...n,
+      className: connectedNodeIds.has(n.id)
+        ? ''
+        : 'opacity-40 transition-opacity',
+    }));
+  }, [nodes, connectedNodeIds]);
+
+  const displayEdges = useMemo(() => {
+    if (!hoveredNodeId) return edges;
+    return edges.map((e) => ({
+      ...e,
+      className:
+        e.source === hoveredNodeId || e.target === hoveredNodeId
+          ? ''
+          : 'opacity-40 transition-opacity',
+    }));
+  }, [edges, hoveredNodeId]);
+
+  const hoveredEdgeLabel = useMemo(() => {
+    if (!hoveredEdgeId) return null;
+    const edge = edges.find((e) => e.id === hoveredEdgeId);
+    if (!edge) return null;
+    const rawType = (edge.data as Record<string, unknown> | undefined)
+      ?.type as string | undefined;
+    if (!rawType) return null;
+    return EDGE_TYPE_LABELS[rawType] ?? rawType;
+  }, [hoveredEdgeId, edges]);
+
+  const fPressed = useKeyPress('f');
+  const fPrevRef = useRef(false);
+  useEffect(() => {
+    if (fPressed && !fPrevRef.current) {
+      fitView({ duration: 500 });
+    }
+    fPrevRef.current = fPressed;
+  }, [fPressed, fitView]);
+
+  const rPressed = useKeyPress('r');
+  const rPrevRef = useRef(false);
+  useEffect(() => {
+    if (rPressed && !rPrevRef.current) {
+      applyLayout();
+    }
+    rPrevRef.current = rPressed;
+  }, [rPressed, applyLayout]);
+
+  const escPressed = useKeyPress('Escape');
+  const escPrevRef = useRef(false);
+  useEffect(() => {
+    if (escPressed && !escPrevRef.current) {
+      setSelectedNode(null);
+    }
+    escPrevRef.current = escPressed;
+  }, [escPressed]);
+
+  const handleNodeDoubleClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      fitView({ nodes: [{ id: node.id }], duration: 500, padding: 2 });
+    },
+    [fitView],
+  );
 
   if (isLoading) {
     return <Skeleton className="h-[600px] w-full" />;
@@ -182,20 +278,47 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
         <Button
           variant="outline"
           size="sm"
+          onClick={() => fitView({ duration: 500 })}
+        >
+          <Focus className="mr-1.5 size-3.5" />
+          Reset View
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => void refetch()}
         >
           <RefreshCw className="mr-1.5 size-3.5" />
           Refresh
         </Button>
       </div>
-      <div className="h-[calc(100vh-12rem)] w-full rounded-md border">
+      <div className="relative h-[calc(100vh-12rem)] w-full rounded-md border">
+        {isFetching && !isLoading && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/60">
+            <Spinner className="size-6" />
+          </div>
+        )}
+
+        {hoveredEdgeLabel && (
+          <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-md border bg-popover px-2.5 py-1 text-xs font-medium shadow-md">
+            {hoveredEdgeLabel}
+          </div>
+        )}
+
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={displayNodes}
+          edges={displayEdges}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeClick={(_, node) => setSelectedNode(node as unknown as SelectedGraphNode)}
+          onNodeClick={(_, node) =>
+            setSelectedNode(node as unknown as SelectedGraphNode)
+          }
+          onNodeMouseEnter={(_, node) => setHoveredNodeId(node.id)}
+          onNodeMouseLeave={() => setHoveredNodeId(null)}
+          onNodeDoubleClick={handleNodeDoubleClick}
+          onEdgeMouseEnter={(_, edge) => setHoveredEdgeId(edge.id)}
+          onEdgeMouseLeave={() => setHoveredEdgeId(null)}
           onPaneClick={() => setSelectedNode(null)}
           fitView
           proOptions={{ hideAttribution: true }}
@@ -207,7 +330,9 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
       </div>
       <TopologyDetailSheet
         open={!!selectedNode}
-        setOpen={(o) => { if (!o) setSelectedNode(null); }}
+        setOpen={(o) => {
+          if (!o) setSelectedNode(null);
+        }}
         node={selectedNode}
       />
     </div>
