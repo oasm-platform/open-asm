@@ -1,5 +1,8 @@
 import { Graph, layout } from '@dagrejs/dagre';
 
+const NODE_WIDTH = 180;
+const NODE_HEIGHT = 40;
+
 /** Framework-agnostic node shape matching the API DTO. */
 export type TopologyNodeData = {
   label: string;
@@ -103,7 +106,7 @@ export function applyDagreLayout(
   for (const node of graphData.nodes) {
     if (seenNodeIds.has(node.id)) continue;
     seenNodeIds.add(node.id);
-    g.setNode(node.id, { width: 180, height: 40 });
+    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
   }
 
   // Add edges — deduplicate by (source, target)
@@ -129,7 +132,7 @@ export function applyDagreLayout(
       positionedNodes.push({
         id: node.id,
         type: node.type,
-        position: { x: dagreNode.x, y: dagreNode.y },
+        position: { x: dagreNode.x - NODE_WIDTH / 2, y: dagreNode.y - NODE_HEIGHT / 2 },
         data: node.data,
       });
     }
