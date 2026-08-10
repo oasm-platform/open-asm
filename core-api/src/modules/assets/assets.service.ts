@@ -33,6 +33,12 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
+import {
+  AssetGraphResponseDto,
+  GetAssetGraphQueryDto,
+  GraphEdgeDto,
+  GraphNodeDto,
+} from './dto/graph.dto';
 import { GetTlsQueryDto, GetTlsResponseDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { AssetService } from './entities/asset-services.entity';
@@ -1178,5 +1184,372 @@ export class AssetsService {
         tls: service.httpResponses?.[0]?.tls || null,
       };
     });
+  }
+
+  /**
+   * Returns the full asset topology graph for a workspace.
+   *
+   * Builds nodes from 7 entity types (target, asset, ip, service,
+   * technology, tls, statusCode) and edges from FK relationships.
+   * Technology nodes are enriched via {@link TechnologyForwarderService}.
+   *
+   * @param query   Optional filters (targetId to scope to a single target).
+   * @param workspaceId  Workspace scope — every sub-query is filtered by this.
+   */
+  public async getAssetGraph(
+    query: GetAssetGraphQueryDto,
+    workspaceId: string,
+  ): Promise<AssetGraphResponseDto> {
+    const MAX_NODES = 500;
+    const MAX_EDGES = 1000;
+
+    const rawParams: string[] = [workspaceId];
+    let targetFilter = '';
+    if (query.targetId) {
+      rawParams.push(query.targetId);
+      targetFilter = `AND tgt.id = $${rawParams.length}`;
+    }
+
+    // ── 1. Target nodes ──────────────────────────────────────────────
+    const targetQb = this.targetRepo
+      .createQueryBuilder('t')
+      .where('t.workspaceId = :workspaceId', { workspaceId });
+    if (query.targetId) {
+      targetQb.andWhere('t.id = :targetId', { targetId: query.targetId });
+    }
+    const targets = await targetQb.getMany();
+
+    // ── 2. Asset nodes (with IP join) ────────────────────────────────
+    const assetQb = this.assetRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.ipAssets', 'ip')
+      .innerJoin('a.target', 'target')
+      .where('target.workspaceId = :workspaceId', { workspaceId });
+    if (query.targetId) {
+      assetQb.andWhere('target.id = :targetId', { targetId: query.targetId });
+    }
+    const assets = await assetQb.getMany();
+
+    // ── 3. IP nodes (collected from asset ipAssets) ──────────────────
+    const ipSet = new Set<string>();
+    for (const a of assets) {
+      if (a.ipAssets) {
+        for (const ip of a.ipAssets) {
+          if (ip.ipAddress) ipSet.add(ip.ipAddress);
+        }
+      }
+    }
+
+    // ── 4. Service nodes ─────────────────────────────────────────────
+    const serviceQb = this.assetServiceRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .where('target.workspaceId = :workspaceId', { workspaceId });
+    if (query.targetId) {
+      serviceQb.andWhere('target.id = :targetId', { targetId: query.targetId });
+    }
+    const services = await serviceQb.getMany();
+
+    // ── 5. Technology nodes (raw query + batch enrichment) ───────────
+    const techRows: { serviceId: string; tech: string }[] =
+      await this.dataSource.query(
+        `
+        SELECT
+          svc.id AS "serviceId",
+          t_raw.tech AS "tech"
+        FROM http_responses hr
+        INNER JOIN LATERAL unnest(hr.tech) AS t_raw(tech) ON TRUE
+        INNER JOIN asset_services svc ON svc.id = hr."assetServiceId"
+        INNER JOIN assets a ON a.id = svc."assetId"
+        INNER JOIN targets tgt ON tgt.id = a."targetId"
+        WHERE tgt."workspaceId" = $1
+          AND hr.tech IS NOT NULL
+          ${targetFilter}
+          AND hr.id = (
+            SELECT hr2.id FROM http_responses hr2
+            WHERE hr2."assetServiceId" = hr."assetServiceId"
+            ORDER BY hr2."createdAt" DESC LIMIT 1
+          )
+        `,
+        rawParams,
+      );
+
+    const techBaseNames = new Set<string>();
+    const serviceTechPairs: Array<{
+      serviceId: string;
+      baseName: string;
+    }> = [];
+    for (const row of techRows) {
+      const baseName = row.tech.split(':')[0];
+      techBaseNames.add(baseName);
+      serviceTechPairs.push({ serviceId: row.serviceId, baseName });
+    }
+
+    const uniqueBaseNames = [...techBaseNames];
+    const enrichedTechs =
+      await this.technologyForwarderService.enrichTechnologies(uniqueBaseNames);
+    const techEnrichmentMap = new Map(
+      enrichedTechs.map((t) => [t.name, t]),
+    );
+
+    // ── 6. TLS nodes (via entity repo) ──────────────────────────────
+    const tlsQb = this.tlsAssetsViewRepo
+      .createQueryBuilder('tls')
+      .leftJoinAndSelect('tls.assetService', 'assetService')
+      .leftJoinAndSelect('assetService.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .where('target.workspaceId = :workspaceId', { workspaceId });
+    if (query.targetId) {
+      tlsQb.andWhere('target.id = :targetId', { targetId: query.targetId });
+    }
+    const tlsRecords = await tlsQb.getMany();
+
+    // ── 7. StatusCode nodes (raw query) ─────────────────────────────
+    const statusServiceRows: { statusCode: number; serviceId: string }[] =
+      await this.dataSource.query(
+        `
+        SELECT DISTINCT
+          scv."statusCode" AS "statusCode",
+          scv."assetServiceId" AS "serviceId"
+        FROM status_code_asset_services_view scv
+        INNER JOIN asset_services svc ON svc.id = scv."assetServiceId"
+        INNER JOIN assets a ON a.id = svc."assetId"
+        INNER JOIN targets tgt ON tgt.id = a."targetId"
+        WHERE tgt."workspaceId" = $1
+          ${targetFilter}
+          AND svc."id" IN (
+            SELECT DISTINCT ON ("assetServiceId") "assetServiceId"
+            FROM http_responses
+            ORDER BY "assetServiceId", "createdAt" DESC
+          )
+          AND scv."statusCode" IS NOT NULL
+          AND scv."statusCode" != 0
+        `,
+        rawParams,
+      );
+
+    // ══════════════════════════════════════════════════════════════════
+    // Build nodes
+    // ══════════════════════════════════════════════════════════════════
+    const nodeMap = new Map<string, GraphNodeDto>();
+
+    for (const t of targets) {
+      const id = `target|${t.id}`;
+      nodeMap.set(id, {
+        id,
+        type: 'target',
+        data: { label: t.value, metadata: { id: t.id } },
+      });
+    }
+
+    for (const a of assets) {
+      const id = `asset|${a.id}`;
+      nodeMap.set(id, {
+        id,
+        type: 'asset',
+        data: {
+          label: a.value,
+          metadata: {
+            id: a.id,
+            targetId: a.targetId,
+            isEnabled: a.isEnabled,
+            dnsRecords: a.dnsRecords,
+            ipAddresses: a.ipAssets
+              ? a.ipAssets.map((ip) => ip.ipAddress)
+              : [],
+          },
+        },
+      });
+    }
+
+    for (const ip of ipSet) {
+      const id = `ip|${ip}`;
+      nodeMap.set(id, {
+        id,
+        type: 'ip',
+        data: { label: ip, metadata: { ip } },
+      });
+    }
+
+    for (const s of services) {
+      const id = `service|${s.id}`;
+      nodeMap.set(id, {
+        id,
+        type: 'service',
+        data: {
+          label: `${s.value}:${s.port}`,
+          metadata: {
+            id: s.id,
+            value: s.value,
+            port: s.port,
+            assetId: s.assetId,
+          },
+        },
+      });
+    }
+
+    for (const baseName of uniqueBaseNames) {
+      const id = `tech|${baseName}`;
+      const enriched = techEnrichmentMap.get(baseName);
+      nodeMap.set(id, {
+        id,
+        type: 'technology',
+        data: {
+          label: baseName,
+          metadata: enriched
+            ? {
+                name: enriched.name,
+                description: enriched.description,
+                iconUrl: enriched.iconUrl,
+                categoryNames: enriched.categoryNames,
+              }
+            : { name: baseName },
+        },
+      });
+    }
+
+    for (const tls of tlsRecords) {
+      const id = `tls|${tls.host}`;
+      nodeMap.set(id, {
+        id,
+        type: 'tls',
+        data: {
+          label: tls.host,
+          metadata: {
+            host: tls.host,
+            sni: tls.sni,
+            subjectDn: tls.subject_dn,
+            issuerDn: tls.issuer_dn,
+            notBefore: tls.not_before,
+            notAfter: tls.not_after,
+            tlsVersion: tls.tls_version,
+            cipher: tls.cipher,
+          },
+        },
+      });
+    }
+
+    for (const row of statusServiceRows) {
+      const id = `statusCode|${row.statusCode}`;
+      nodeMap.set(id, {
+        id,
+        type: 'statusCode',
+        data: {
+          label: String(row.statusCode),
+          metadata: { statusCode: row.statusCode },
+        },
+      });
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Build edges
+    // ══════════════════════════════════════════════════════════════════
+    const edgeSet = new Set<string>();
+    const edgeList: GraphEdgeDto[] = [];
+
+    const addEdge = (
+      source: string,
+      target: string,
+      type: string,
+    ): void => {
+      const key = `${source}->${target}`;
+      if (edgeSet.has(key)) return;
+      if (!nodeMap.has(source) || !nodeMap.has(target)) return;
+      edgeSet.add(key);
+      edgeList.push({
+        id: `e-${source}-${target}`,
+        source,
+        target,
+        type,
+      });
+    };
+
+    for (const a of assets) {
+      if (a.targetId) {
+        addEdge(`target|${a.targetId}`, `asset|${a.id}`, 'belongs_to');
+      }
+    }
+
+    for (const a of assets) {
+      if (a.ipAssets) {
+        for (const ip of a.ipAssets) {
+          if (ip.ipAddress) {
+            addEdge(`asset|${a.id}`, `ip|${ip.ipAddress}`, 'resolves_to');
+          }
+        }
+      }
+    }
+
+    for (const s of services) {
+      if (s.assetId) {
+        addEdge(`asset|${s.assetId}`, `service|${s.id}`, 'runs_on');
+      }
+    }
+
+    for (const pair of serviceTechPairs) {
+      addEdge(`service|${pair.serviceId}`, `tech|${pair.baseName}`, 'uses');
+    }
+
+    for (const tls of tlsRecords) {
+      if (tls.assetServiceId) {
+        addEdge(`service|${tls.assetServiceId}`, `tls|${tls.host}`, 'has_tls');
+      }
+    }
+
+    for (const row of statusServiceRows) {
+      addEdge(
+        `service|${row.serviceId}`,
+        `statusCode|${row.statusCode}`,
+        'returns',
+      );
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Dedup + cap + sort
+    // ══════════════════════════════════════════════════════════════════
+    const typePriority: Record<string, number> = {
+      target: 0,
+      asset: 1,
+      service: 2,
+      ip: 3,
+      technology: 4,
+      tls: 5,
+      statusCode: 6,
+    };
+
+    let nodeList = [...nodeMap.values()];
+    if (nodeList.length > MAX_NODES) {
+      nodeList.sort((a, b) => {
+        const pa = typePriority[a.type] ?? 99;
+        const pb = typePriority[b.type] ?? 99;
+        if (pa !== pb) return pa - pb;
+        return a.id.localeCompare(b.id);
+      });
+      nodeList = nodeList.slice(0, MAX_NODES);
+      const allowedIds = new Set(nodeList.map((n) => n.id));
+      const filteredEdges = edgeList.filter(
+        (e) => allowedIds.has(e.source) && allowedIds.has(e.target),
+      );
+      edgeList.length = 0;
+      edgeList.push(...filteredEdges);
+    }
+
+    if (edgeList.length > MAX_EDGES) {
+      edgeList.length = MAX_EDGES;
+    }
+
+    nodeList.sort((a, b) =>
+      a.type === b.type
+        ? a.id.localeCompare(b.id)
+        : a.type.localeCompare(b.type),
+    );
+    edgeList.sort((a, b) =>
+      a.source === b.source
+        ? a.target.localeCompare(b.target)
+        : a.source.localeCompare(b.source),
+    );
+
+    return { nodes: nodeList, edges: edgeList };
   }
 }
