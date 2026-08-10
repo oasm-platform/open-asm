@@ -1161,7 +1161,7 @@ export type ToolWithStatusDto = {
   id: string;
   name: string;
   logoUrl: string;
-  status: ToolWithStatusDtoStatus;
+  status?: ToolWithStatusDtoStatus;
 };
 
 export type JobHistoryDetailResponseDto = {

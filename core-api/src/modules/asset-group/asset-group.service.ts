@@ -284,6 +284,14 @@ export class AssetGroupService {
     const lastRunByWorkflow = new Map<string, AssetGroupLastRunDto>();
 
     for (const row of raw) {
+      // A job history with zero job rows (e.g. all jobs were deleted) is not
+      // a meaningful "last run": the status CASE falls through to 'pending',
+      // which would wrongly lock the group out of re-running. Skip it so the
+      // UI falls back to "Never".
+      if (parseInt(row.totalJobs, 10) === 0) {
+        continue;
+      }
+
       lastRunByWorkflow.set(row.workflowId, {
         id: row.id,
         createdAt: row.createdAt,
