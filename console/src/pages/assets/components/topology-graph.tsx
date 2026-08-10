@@ -68,7 +68,12 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
     const inputNodes: LayoutInputNode[] = graphData.nodes.map((n) => ({
       id: n.id,
       type: n.type as LayoutInputNode['type'],
-      data: { label: (n.data as Record<string, unknown>)?.label as string ?? n.id },
+      data: {
+        label: (n.data as Record<string, unknown>)?.label as string ?? n.id,
+        metadata: (n.data as Record<string, unknown>)?.metadata as
+          | Record<string, unknown>
+          | undefined,
+      },
     }));
 
     const inputEdges: LayoutInputEdge[] = graphData.edges.map((e) => ({
