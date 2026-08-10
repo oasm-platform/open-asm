@@ -21,6 +21,9 @@ const MAX_DNS_RECORDS_PAGES = 1000; // max 1000 dns_records pages per zone
 const MAX_REQUEST_ATTEMPTS = 3; // 429 retries per request
 const DEFAULT_RETRY_AFTER_SECONDS = 5;
 const MAX_RETRY_AFTER_SECONDS = 60;
+/** Per-request deadline: a hung Cloudflare connection must not stall the
+ * sync queue (one stuck repeat job would block every integration sync). */
+const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
  * The 7 record types the platform stores — same shape as the built-in
@@ -41,6 +44,8 @@ export interface SyncResult {
   wildcardZones: number;
   targetsCreated: number;
   assetsUpserted: number;
+  /** Set in test mode (__dryRun) only — the `status` from the token verify response. */
+  tokenStatus?: string;
 }
 
 /**
@@ -150,6 +155,37 @@ export class CloudflareConnector extends CloudProviderConnector {
     } = cfg;
 
     const status = zoneFilter?.status ?? 'active';
+
+    // Test mode: verify the credential with a single lightweight API call
+    // instead of a full zone/record sync. A failed verify (success=false) or
+    // a non-active token rejects here — that is the test failure signal.
+    if (__dryRun) {
+      const verify = await this.cfFetch<{ id: string; status: string }>(
+        apiToken,
+        '/user/tokens/verify',
+      );
+      if (verify.result.status !== 'active') {
+        throw new CloudflareSyncError(
+          `Cloudflare API token is not active (status: ${verify.result.status})`,
+        );
+      }
+      const result: SyncResult = {
+        zones: 0,
+        records: 0,
+        wildcardZones: 0,
+        targetsCreated: 0,
+        assetsUpserted: 0,
+        tokenStatus: verify.result.status,
+      };
+      this.logger.log(
+        `Cloudflare test finished for integration ${integrationId}: ${JSON.stringify(result)}`,
+      );
+      // Stash the counts on the config so runSync can return them to the API
+      // without coupling to the connector factory's result message.
+      cfg.__syncResult = result;
+      return result;
+    }
+
     const zones = await this.fetchAllZones(apiToken, status);
 
     const result: SyncResult = {
@@ -365,6 +401,7 @@ export class CloudflareConnector extends CloudProviderConnector {
       try {
         response = await fetch(url, {
           headers: { Authorization: `Bearer ${apiToken}` },
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
       } catch (error) {
         throw new CloudflareSyncError(

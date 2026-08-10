@@ -148,6 +148,7 @@ describe('IntegrationsController workspace permission guards', () => {
     ['updateIntegration', 'PATCH /:id', ['integration.write']],
     ['deleteIntegration', 'DELETE /:id', ['integration.write']],
     ['testIntegration', 'POST /:id/test', ['integration.write']],
+    ['syncIntegration', 'POST /:id/sync', ['integration.write']],
     [
       'createTelegramPairing',
       'POST /:id/telegram/pairing',

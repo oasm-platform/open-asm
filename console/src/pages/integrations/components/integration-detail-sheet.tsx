@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,7 +21,12 @@ import {
 import type { GetIntegrationDto } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { formatCronLabel, getLocalTimezone } from '@/lib/cron-schedule';
+import {
+  buildCronExpression,
+  DEFAULT_CRON_STATE,
+  formatCronLabel,
+  getLocalTimezone,
+} from '@/lib/cron-schedule';
 import { Loader2, Pencil, Play, RefreshCw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -29,6 +35,12 @@ import { IntegrationLogo } from './integration-logo';
 import { TelegramConnect } from './telegram-connect';
 
 const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
+
+/** Fallback cron used when the schedule toggle is on but no cron was captured yet. */
+const DEFAULT_SCHEDULE = buildCronExpression(
+  DEFAULT_CRON_STATE,
+  getLocalTimezone(),
+);
 
 interface SchemaProperty {
   type?: string;
@@ -244,11 +256,24 @@ export function IntegrationDetailSheet({
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
+  const [scheduleEnabled, setScheduleEnabled] = useState(
+    integration.syncSchedule !== 'disabled',
+  );
+  const [editSchedule, setEditSchedule] = useState(
+    integration.syncSchedule && integration.syncSchedule !== 'disabled'
+      ? integration.syncSchedule
+      : '',
+  );
 
   // Populate edit state when entering edit mode or when integration changes
   useEffect(() => {
     if (isEditing) {
       setEditName(integration.name);
+      const scheduleOn = integration.syncSchedule !== 'disabled';
+      setScheduleEnabled(scheduleOn);
+      setEditSchedule(
+        scheduleOn && integration.syncSchedule ? integration.syncSchedule : '',
+      );
       const values: Record<string, unknown> = {};
       for (const [key, prop] of Object.entries(schema.properties ?? {})) {
         if (key === 'app_type' || key === 'category') continue;
@@ -394,6 +419,13 @@ export function IntegrationDetailSheet({
       data: {
         name: editName.trim(),
         config: formValues as Record<string, unknown>,
+        ...(integration.category === CLOUD_PROVIDER_CATEGORY
+          ? {
+              syncSchedule: scheduleEnabled
+                ? editSchedule || DEFAULT_SCHEDULE
+                : 'disabled',
+            }
+          : {}),
       },
     });
   };
@@ -583,37 +615,78 @@ export function IntegrationDetailSheet({
           )}
 
           {/* Sync section — only for cloud provider integrations */}
-          {integration.category === CLOUD_PROVIDER_CATEGORY && !isEditing && (
+          {integration.category === CLOUD_PROVIDER_CATEGORY && (
             <div className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium">
-                    Sync schedule
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {scheduleLabel}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  disabled={isSyncing}
-                  onClick={() => syncIntegration({ id: integration.id })}
-                >
-                  {isSyncing ? (
-                    <Loader2 className="size-4 animate-spin" />
+              {isEditing ? (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="sync-schedule-toggle"
+                        className="text-sm font-medium"
+                      >
+                        Sync schedule
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Optionally run automatic syncs on a schedule.
+                      </p>
+                    </div>
+                    <Switch
+                      id="sync-schedule-toggle"
+                      name="sync-schedule-toggle"
+                      checked={scheduleEnabled}
+                      onCheckedChange={setScheduleEnabled}
+                    />
+                  </div>
+                  {scheduleEnabled ? (
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs text-muted-foreground">
+                        Schedule (stored in UTC)
+                      </p>
+                      <CronScheduleBuilder
+                        defaultValue={editSchedule || undefined}
+                        onChange={({ cron }) => setEditSchedule(cron)}
+                      />
+                    </div>
                   ) : (
-                    <RefreshCw className="size-4" />
+                    <p className="text-sm text-muted-foreground">
+                      No schedule — automatic syncs are off
+                    </p>
                   )}
-                  {isSyncing ? 'Syncing...' : 'Sync now'}
-                </Button>
-              </div>
-              <div className="space-y-1 border-t pt-3">
-                <Label className="text-sm font-medium">Last sync</Label>
-                <p className="text-sm text-muted-foreground">
-                  {lastRunLabel}
-                </p>
-              </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">
+                        Sync schedule
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        {scheduleLabel}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      disabled={isSyncing}
+                      onClick={() => syncIntegration({ id: integration.id })}
+                    >
+                      {isSyncing ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="size-4" />
+                      )}
+                      {isSyncing ? 'Syncing...' : 'Sync now'}
+                    </Button>
+                  </div>
+                  <div className="space-y-1 border-t pt-3">
+                    <Label className="text-sm font-medium">Last sync</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {lastRunLabel}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

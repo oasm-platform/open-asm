@@ -191,6 +191,7 @@ export class IntegrationsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('integration.write')
   @Post(':id/sync')
   @HttpCode(200)
   async syncIntegration(

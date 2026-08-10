@@ -217,4 +217,115 @@ describe('IntegrationDetailSheet', () => {
       screen.queryByRole('button', { name: /sync now/i }),
     ).not.toBeInTheDocument();
   });
+
+  it('shows a schedule editor in edit mode for cloud integrations', async () => {
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={cloudIntegration}
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+
+    // The sync-schedule toggle and the cron builder appear only in edit mode.
+    const toggle = await screen.findByRole('switch', {
+      name: /sync schedule/i,
+    });
+    expect(toggle).toBeInTheDocument();
+    expect(screen.getByText('Schedule')).toBeInTheDocument();
+  });
+
+  it('saving with a changed schedule sends syncSchedule in the update payload', async () => {
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={cloudIntegration}
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    await screen.findByRole('switch', { name: /sync schedule/i });
+    fireEvent.click(screen.getByRole('button', { name: 'Weekly' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(mocks.updateMutate).toHaveBeenCalled();
+    });
+    expect(mocks.updateMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'int-1',
+        data: expect.objectContaining({
+          name: 'Cloudflare',
+          // Weekly cron: "m h * * dow" — the original daily "0 17 * * *"
+          // would not match (dow must be an explicit weekday).
+          syncSchedule: expect.stringMatching(
+            /^\d{1,2} \d{1,2} \* \* \d(,\d)*$/,
+          ),
+        }),
+      }),
+    );
+  });
+
+  it('saving with the schedule disabled sends syncSchedule: "disabled"', async () => {
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={cloudIntegration}
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    const toggle = await screen.findByRole('switch', {
+      name: /sync schedule/i,
+    });
+
+    // Turn the schedule off, then save.
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(mocks.updateMutate).toHaveBeenCalled();
+    });
+    expect(mocks.updateMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'int-1',
+        data: expect.objectContaining({
+          syncSchedule: 'disabled',
+        }),
+      }),
+    );
+  });
+
+  it('edit mode for a non-cloud integration shows no schedule editor', async () => {
+    const slackIntegration: GetIntegrationDto = {
+      ...baseIntegration,
+      name: 'Slack',
+      appType: 'slack',
+      category: 'NOTIFICATION',
+      config: { webhookUrl: 'https://hooks.slack.com/x' },
+    };
+
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={slackIntegration}
+        schema={slackSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    await screen.findByLabelText(/integration name/i);
+
+    expect(screen.queryByText('Sync schedule')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
 });

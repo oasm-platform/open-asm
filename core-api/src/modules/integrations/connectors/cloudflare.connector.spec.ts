@@ -1,7 +1,7 @@
 import { CloudflareConnector, CloudflareSyncError } from './cloudflare.connector';
 
 /**
- * Connector fetch-layer tests (SC-CONN-1..7).
+ * Connector fetch-layer tests (SC-CONN-1..10).
  * Global fetch is mocked; service calls are mocked so ingestion does not touch DB.
  */
 
@@ -301,24 +301,74 @@ describe('CloudflareConnector', () => {
       expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
-    it('SC-CONN-7: __dryRun true — no DB write methods called, counts returned', async () => {
+    it('SC-CONN-7: test mode (__dryRun) — single token verify call, zero counts, tokenStatus, no DB writes', async () => {
       const connector = new CloudflareConnector();
       jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
 
-      mockFetch
-        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
-        .mockResolvedValueOnce(
-          mockResponse(recordsPage([record('A', 'www.example.com', '192.0.2.2')], 1, 1)),
-        );
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({
+          success: true,
+          errors: [],
+          result: { id: 'token-1', status: 'active' },
+        }),
+      );
 
       const config = makeConfig({ __dryRun: true });
       const result = await connector.syncAssets(config);
 
-      expect(result.zones).toBe(1);
-      expect(result.records).toBe(1);
+      // Exactly ONE lightweight API call — the token verify endpoint.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const url = String(mockFetch.mock.calls[0][0]);
+      expect(url).toMatch(/\/user\/tokens\/verify$/);
+      expect(url).not.toContain('/zones');
+      expect(url).not.toContain('/dns_records');
+
+      // Zero counts + token status from the verify response.
+      expect(result).toEqual({
+        zones: 0,
+        records: 0,
+        wildcardZones: 0,
+        targetsCreated: 0,
+        assetsUpserted: 0,
+        tokenStatus: 'active',
+      });
+
+      // No DB write methods called.
       expect(config.targetsService.findByWorkspaceAndValues).not.toHaveBeenCalled();
       expect(config.targetsService.createMultipleTargets).not.toHaveBeenCalled();
       expect(config.dataAdapterService.upsertAssetsByTargetId).not.toHaveBeenCalled();
+    });
+
+    it('SC-CONN-7a: test mode surfaces an invalid token as CloudflareSyncError', async () => {
+      const connector = new CloudflareConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({
+          success: false,
+          errors: [{ code: 1000, message: 'Invalid access token' }],
+          result: null,
+        }),
+      );
+
+      const config = makeConfig({ __dryRun: true });
+      const error = await connector.syncAssets(config).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CloudflareSyncError);
+      expect((error as Error).message).toContain('Invalid access token');
+    });
+
+    it('SC-CONN-7b: test mode rejects a non-active token status', async () => {
+      const connector = new CloudflareConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ success: true, result: { id: 't', status: 'disabled' } }),
+      );
+
+      const config = makeConfig({ __dryRun: true });
+      const error = await connector.syncAssets(config).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CloudflareSyncError);
+      expect((error as Error).message).toContain('not active');
     });
 
     it('SC-CONN-8: Cloudflare AAAA discard-prefix placeholders (100::) are dropped, real AAAA and A kept', async () => {
@@ -384,6 +434,30 @@ describe('CloudflareConnector', () => {
       expect(result.records).toBe(1); // still counted before normalization
       // No materialized assets → no upsert call (same as wildcard-only zone)
       expect(config.dataAdapterService.upsertAssetsByTargetId).not.toHaveBeenCalled();
+    });
+
+    it('SC-CONN-10: fetch init carries an AbortSignal and a timeout abort surfaces as CloudflareSyncError', async () => {
+      const connector = new CloudflareConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      // Capture the fetch init of the FIRST request, then make it reject the
+      // way AbortSignal.timeout does — one test proves both halves of the
+      // timeout plumbing.
+      let zoneInit: RequestInit | undefined;
+      mockFetch.mockImplementationOnce((url: unknown, init?: RequestInit) => {
+        zoneInit = init;
+        return Promise.reject(
+          new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+        );
+      });
+
+      const config = makeConfig();
+      await expect(connector.syncAssets(config)).rejects.toThrow(
+        CloudflareSyncError,
+      );
+      expect(zoneInit).toEqual(
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
     });
   });
 });

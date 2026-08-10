@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Repository } from 'typeorm';
 import type { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { IntegrationType } from '@/common/enums/enum';
@@ -181,6 +181,60 @@ describe('IntegrationsService', () => {
     });
   });
 
+  describe('F3: syncSchedule is only accepted for cloud-provider integrations', () => {
+    const notificationArgs = {
+      name: 'Slack',
+      appType: 'slack',
+      category: IntegrationType.NOTIFICATION,
+      config: { webhookUrl: 'https://hooks.slack.com/services/T000/B000/XXX' },
+      workspaceId: 'ws-1',
+      userId: 'user-1',
+    };
+
+    it('rejects a cron syncSchedule on create for a NOTIFICATION integration', async () => {
+      repoMock.save.mockResolvedValue(integrationEntity());
+
+      await expect(
+        service.createIntegration({
+          ...notificationArgs,
+          syncSchedule: '0 0 * * *',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
+    });
+
+    it('accepts "disabled" syncSchedule on create for any category', async () => {
+      repoMock.save.mockResolvedValue(
+        integrationEntity({
+          category: IntegrationType.NOTIFICATION,
+          syncSchedule: 'disabled',
+          syncJobId: null,
+        }),
+      );
+
+      const result = await service.createIntegration({
+        ...notificationArgs,
+        syncSchedule: 'disabled',
+      });
+
+      expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
+      expect(result.syncSchedule).toBe('disabled');
+    });
+
+    it('rejects a cron syncSchedule on update for a NOTIFICATION integration', async () => {
+      repoMock.findOne.mockResolvedValue(
+        integrationEntity({ category: IntegrationType.NOTIFICATION }),
+      );
+
+      await expect(
+        service.updateIntegration('integration-1', 'ws-1', {
+          syncSchedule: '0 0 * * *',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
+    });
+  });
+
   describe('SC-SCHED-5: deleteIntegration removes the scheduler first', () => {
     it('calls removeJobScheduler before deleting the row', async () => {
       repoMock.findOne.mockResolvedValue(integrationEntity());
@@ -218,7 +272,7 @@ describe('IntegrationsService', () => {
       );
       expect(runConnectorMock).not.toHaveBeenCalled();
       expect(result.success).toBe(true);
-      expect(result.message).toContain('Cloudflare sync OK (dry run)');
+      expect(result.message).toContain('cloudflare sync OK (dry run)');
       expect(result.message).toContain(JSON.stringify(syncResult));
     });
   });

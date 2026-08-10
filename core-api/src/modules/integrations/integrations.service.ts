@@ -10,6 +10,7 @@ import { IntegrationType } from '@/common/enums/enum';
 import type { WrapperType } from '@/common/types/app.types';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -111,6 +112,19 @@ export class IntegrationsService {
     syncSchedule?: string;
   }): Promise<GetIntegrationDto> {
     validateConfigOrThrow(args);
+
+    // Periodic syncs only make sense for cloud providers: the scheduler
+    // dispatches runConnector with CLOUD_PROVIDER, which notification/
+    // ticketing connectors do not implement (F3).
+    if (
+      args.syncSchedule &&
+      args.syncSchedule !== 'disabled' &&
+      args.category !== (IntegrationType.CLOUD_PROVIDER as string)
+    ) {
+      throw new BadRequestException(
+        'syncSchedule is only supported for CLOUD_PROVIDER integrations',
+      );
+    }
 
     const dek = await this.workspaceEncryption.getDEK(args.workspaceId);
     const encryptedConfig = encryptSensitiveConfigFields(args.config, dek);
@@ -296,7 +310,7 @@ export class IntegrationsService {
         success: true,
         category: integration.category,
         appType: integration.appType,
-        message: `Cloudflare sync OK (dry run): ${JSON.stringify(sync)}`,
+        message: `${integration.appType} sync OK (dry run): ${JSON.stringify(sync)}`,
         timestamp: new Date().toISOString(),
       };
     }
@@ -383,8 +397,16 @@ export class IntegrationsService {
     }
 
     // Re-register the periodic sync scheduler when the schedule changed
-    // (SC-SCHED-3/4).
+    // (SC-SCHED-3/4). Only cloud providers support schedules (F3).
     if (dto.syncSchedule !== undefined) {
+      if (
+        dto.syncSchedule !== 'disabled' &&
+        integration.category !== (IntegrationType.CLOUD_PROVIDER as string)
+      ) {
+        throw new BadRequestException(
+          'syncSchedule is only supported for CLOUD_PROVIDER integrations',
+        );
+      }
       await this.integrationSyncService.applySchedule(
         integration,
         dto.syncSchedule,

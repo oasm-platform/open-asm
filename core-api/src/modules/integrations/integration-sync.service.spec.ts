@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import type { Repository } from 'typeorm';
 import { IntegrationSyncService } from './integrations-sync.service';
@@ -225,6 +225,7 @@ describe('IntegrationSyncService', () => {
           where: {
             syncSchedule: expect.anything(),
             syncJobId: expect.anything(),
+            category: IntegrationType.CLOUD_PROVIDER,
           },
         }),
       );
@@ -267,7 +268,7 @@ describe('IntegrationSyncService', () => {
         decryptedConfig: { apiToken: 'tok' },
       });
       workspacesServiceMock.getWorkspacesByIds.mockResolvedValue([
-        { id: 'ws-1', ownerId: 'owner-1' },
+        { id: 'ws-1', owner: { id: 'owner-1' } },
       ]);
       runConnectorMock.mockReset();
       runConnectorMock.mockImplementation(
@@ -317,6 +318,36 @@ describe('IntegrationSyncService', () => {
           actingUserContext: expect.objectContaining({ id: 'user-1' }),
         }),
       );
+    });
+
+    it('falls back to the integration creator when the workspace owner relation is empty', async () => {
+      workspacesServiceMock.getWorkspacesByIds.mockResolvedValue([
+        { id: 'ws-1', owner: undefined },
+      ]);
+
+      await service.runSync('integration-1', 'ws-1');
+
+      expect(runConnectorMock).toHaveBeenCalledWith(
+        'cloudflare',
+        IntegrationType.CLOUD_PROVIDER,
+        expect.objectContaining({
+          actingUserContext: expect.objectContaining({ id: 'user-1' }),
+        }),
+      );
+    });
+
+    it('rejects a sync for a non-cloud integration before dispatching the connector', async () => {
+      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+        {
+          integration: integration({ category: IntegrationType.NOTIFICATION }),
+          decryptedConfig: { webhookUrl: 'https://hooks.slack.com/services/x' },
+        },
+      );
+
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(runConnectorMock).not.toHaveBeenCalled();
     });
 
     it('propagates NotFoundException when the integration is missing or in another workspace', async () => {

@@ -3,10 +3,16 @@ import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import type { WrapperType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { TargetsService } from '@/modules/targets/targets.service';
-import type { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { InjectQueue } from '@nestjs/bullmq';
-import { forwardRef, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
 import { IsNull, Not } from 'typeorm';
@@ -48,7 +54,13 @@ export class IntegrationSyncService implements OnModuleInit {
    */
   async onModuleInit(): Promise<void> {
     const pending = await this.integrationRepository.find({
-      where: { syncSchedule: Not('disabled'), syncJobId: IsNull() },
+      where: {
+        // Only cloud-provider integrations can ever have a sync scheduler —
+        // pre-existing rows of other categories are never re-scheduled (F3).
+        category: IntegrationType.CLOUD_PROVIDER,
+        syncSchedule: Not('disabled'),
+        syncJobId: IsNull(),
+      },
     });
 
     for (const integration of pending) {
@@ -153,6 +165,16 @@ export class IntegrationSyncService implements OnModuleInit {
         workspaceId,
       );
 
+    // Deepest gate: the BullMQ repeat processor can still deliver jobs for
+    // rows scheduled before the create/update gates existed. The connector
+    // dispatch below is hardcoded to CLOUD_PROVIDER, so anything else would
+    // fail every tick with "connector.syncAssets is not a function" (F3).
+    if (integration.category !== (IntegrationType.CLOUD_PROVIDER as string)) {
+      throw new BadRequestException(
+        'syncSchedule is only supported for CLOUD_PROVIDER integrations',
+      );
+    }
+
     const config = {
       ...decryptedConfig,
       integrationId,
@@ -193,11 +215,10 @@ export class IntegrationSyncService implements OnModuleInit {
 
   /**
    * Resolves the acting user for target creation. Scheduled syncs run without
-   * a request context, so we use the workspace owner — `ownerId` is TypeORM's
-   * implicit FK column for the `owner` relation (not declared on the entity).
-   * Falls back to the integration creator when the owner cannot be resolved
-   * (plan section 8: "Resolve workspace owner làm actingUserContext; nếu không
-   * tìm được → dùng user tạo integration").
+   * a request context, so we use the workspace owner (loaded via the `owner`
+   * relation on Workspace). Falls back to the integration creator when the
+   * owner cannot be resolved (plan section 8: "Resolve workspace owner làm
+   * actingUserContext; nếu không tìm được → dùng user tạo integration").
    */
   private async resolveActingUser(
     workspaceId: string,
@@ -206,9 +227,7 @@ export class IntegrationSyncService implements OnModuleInit {
     const [workspace] = await this.workspacesService.getWorkspacesByIds([
       workspaceId,
     ]);
-    const ownerId =
-      (workspace as (Workspace & { ownerId?: string }) | undefined)
-        ?.ownerId ?? integration.createdById;
+    const ownerId = workspace?.owner?.id ?? integration.createdById;
     return { id: ownerId } as UserContextPayload;
   }
 }
