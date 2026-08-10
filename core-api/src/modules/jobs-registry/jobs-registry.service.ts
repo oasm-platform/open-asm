@@ -1035,13 +1035,14 @@ export class JobsRegistryService {
       throw new NotFoundException('Job history not found');
     }
 
-    // Verify that the job history belongs to the workspace
+    // Verify that the job history belongs to the workspace via its workflow.
+    // The previous check joined through jobs → asset → target, which returns
+    // nothing for histories whose jobs were all deleted (the empty join
+    // yields no rows), wrongly producing a 404 for a valid history.
     const belongsToWorkspace = await this.jobHistoryRepo
       .createQueryBuilder('jobHistory')
-      .innerJoin('jobHistory.jobs', 'job')
-      .innerJoin('job.asset', 'jAsset')
-      .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspace', 'workspace')
+      .innerJoin('jobHistory.workflow', 'workflow')
+      .innerJoin('workflow.workspace', 'workspace')
       .where('jobHistory.id = :id', { id })
       .andWhere('workspace.id = :workspaceId', { workspaceId })
       .getExists();
@@ -1095,7 +1096,10 @@ export class JobsRegistryService {
       id: tool.id,
       name: tool.name,
       logoUrl: tool.logoUrl,
-      status: toolStatusMap.get(tool.id!) ?? JobStatus.PENDING,
+      // Undefined when the tool has no job rows in this history (e.g. all
+      // jobs deleted) — the UI renders no badge instead of a misleading
+      // "pending".
+      status: toolStatusMap.get(tool.id!),
     }));
 
     // Post-process: if a tool at a later index has completed, mark earlier
@@ -1108,7 +1112,6 @@ export class JobsRegistryService {
         tools[i].status = JobStatus.SKIPPED;
       }
     }
-
     const {
       id: historyId,
       createdAt,
