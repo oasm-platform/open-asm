@@ -119,6 +119,7 @@ export default function AgentConversationsPage() {
       title="Conversations"
       isShowButtonGoBack
       className="w-full md:w-2/3 lg:w-1/2 mx-auto"
+      permission="agent.read"
       action={
         conversations.length > 0 ? (
           <ConfirmDialog

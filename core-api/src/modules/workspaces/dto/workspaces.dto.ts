@@ -1,5 +1,4 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { WorkspaceRole } from '@/common/enums/enum';
 import { ApiProperty, PartialType, PickType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional } from 'class-validator';
@@ -66,49 +65,21 @@ export class WorkspaceResponseDto {
     example: 5,
   })
   memberCount: number;
+}
 
+/**
+ * Response DTO for the current user's permission keys in the selected
+ * workspace, unioned across their permission groups.
+ */
+export class CurrentPermissionResponseDto {
   @ApiProperty({
-    description: 'Role of the current user in the workspace',
-    enum: WorkspaceRole,
-    example: 'owner',
-  })
-  role: WorkspaceRole;
-
-  @ApiProperty({
-    description: 'Members of the workspace',
+    description:
+      'Permission keys of the current user in the workspace, unioned across their permission groups',
     type: 'array',
-    items: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        role: { type: 'string', enum: Object.values(WorkspaceRole) },
-        user: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            name: { type: 'string' },
-            image: { type: 'string', nullable: true },
-          },
-        },
-        createdAt: { type: 'string', format: 'date-time' },
-        updatedAt: { type: 'string', format: 'date-time' },
-      },
-    },
-    example: [
-      {
-        id: 'member-uuid',
-        role: 'owner',
-        user: { id: 'user-uuid', name: 'John Doe', image: null },
-      },
-    ],
+    items: { type: 'string' },
+    example: ['group.read', 'target.write'],
   })
-  workspaceMembers: {
-    id: string;
-    role: WorkspaceRole;
-    user?: { id: string; name: string; image?: string | null };
-    createdAt: Date;
-    updatedAt: Date;
-  }[];
+  currentPermission: string[];
 }
 
 export class WorkspaceStatisticsResponseDto {

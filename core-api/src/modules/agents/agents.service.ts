@@ -177,7 +177,7 @@ export class AgentsService {
 
     // First config in workspace becomes preferred automatically
     const totalConfigs = await this.llmConfigRepository.count({
-      where: { workspaceId },
+      where: { workspaceId, userId },
     });
     const isPreferred = totalConfigs === 0;
 
@@ -192,6 +192,7 @@ export class AgentsService {
 
     const config = this.llmConfigRepository.create({
       workspaceId,
+      userId,
       provider: dto.provider,
       name: dto.name,
       apiKey,
@@ -207,9 +208,10 @@ export class AgentsService {
 
   async getLLMProvidersStatus(
     workspaceId: string,
+    userId: string,
   ): Promise<LLMProviderStatusDto[]> {
     const configs = await this.llmConfigRepository.find({
-      where: { workspaceId },
+      where: { workspaceId, userId },
     });
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
@@ -237,9 +239,10 @@ export class AgentsService {
 
   async getConnectedProviders(
     workspaceId: string,
+    userId: string,
   ): Promise<LLMConfigWithProviderDto[]> {
     const configs = await this.llmConfigRepository.find({
-      where: { workspaceId },
+      where: { workspaceId, userId },
       order: { createdAt: 'ASC' },
     });
 
@@ -275,9 +278,10 @@ export class AgentsService {
     id: string,
     dto: UpdateLLMConfigDto,
     workspaceId: string,
+    userId: string,
   ): Promise<LLMConfigResponseDto> {
     const config = await this.llmConfigRepository.findOne({
-      where: { id, workspaceId },
+      where: { id, workspaceId, userId },
     });
 
     if (!config) {
@@ -299,9 +303,13 @@ export class AgentsService {
     return this.toLLMConfigResponse(saved, dek);
   }
 
-  async deleteLLMConfig(id: string, workspaceId: string): Promise<void> {
+  async deleteLLMConfig(
+    id: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
     const config = await this.llmConfigRepository.findOne({
-      where: { id, workspaceId },
+      where: { id, workspaceId, userId },
     });
 
     if (!config) {
@@ -314,18 +322,19 @@ export class AgentsService {
   async setPreferredLLMConfig(
     id: string,
     workspaceId: string,
+    userId: string,
   ): Promise<LLMConfigResponseDto> {
     const config = await this.llmConfigRepository.findOne({
-      where: { id, workspaceId },
+      where: { id, workspaceId, userId },
     });
 
     if (!config) {
       throw new NotFoundException('LLM config not found');
     }
 
-    // Unset all other preferred configs in workspace
+    // Unset all other preferred configs scoped to this member
     await this.llmConfigRepository.update(
-      { workspaceId, isPreferred: true },
+      { workspaceId, userId, isPreferred: true },
       { isPreferred: false },
     );
 
@@ -337,17 +346,27 @@ export class AgentsService {
 
   async getPreferredLLMConfig(
     workspaceId: string,
+    userId: string,
   ): Promise<AgentLLMConfig | null> {
     return this.llmConfigRepository.findOne({
-      where: { workspaceId, isPreferred: true },
+      where: { workspaceId, userId, isPreferred: true },
     });
   }
 
   async getModelsForProvider(
     configId: string,
     workspaceId: string,
+    userId: string,
   ): Promise<ProviderModelDto[]> {
     const cacheKey = `agents:models:${configId}`;
+
+    const config = await this.llmConfigRepository.findOne({
+      where: { id: configId, workspaceId, userId },
+    });
+
+    if (!config) {
+      throw new NotFoundException('LLM config not found');
+    }
 
     // Try to get from cache first
     try {
@@ -357,14 +376,6 @@ export class AgentsService {
       }
     } catch (error) {
       this.logger.warn(`Failed to read from Redis cache: ${error}`);
-    }
-
-    const config = await this.llmConfigRepository.findOne({
-      where: { id: configId, workspaceId },
-    });
-
-    if (!config) {
-      throw new NotFoundException('LLM config not found');
     }
 
     const provider = getLLMProviderConfig(config.provider);
@@ -391,9 +402,10 @@ export class AgentsService {
   async getConversation(
     id: string,
     workspaceId: string,
+    userId: string,
   ): Promise<ConversationResponseDto> {
     const conversation = await this.conversationRepository.findOne({
-      where: { id, workspaceId },
+      where: { id, workspaceId, createdBy: userId },
     });
 
     if (!conversation) {
@@ -427,11 +439,13 @@ export class AgentsService {
 
   async getConversations(
     workspaceId: string,
+    userId: string,
     query?: GetManyBaseQueryParams,
   ): Promise<GetManyBaseResponseDto<ConversationResponseDto>> {
     const qb = this.conversationRepository
       .createQueryBuilder('conversation')
-      .where('conversation.workspaceId = :workspaceId', { workspaceId });
+      .where('conversation.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('conversation.createdBy = :userId', { userId });
 
     if (query?.search) {
       qb.andWhere('conversation.title ILIKE :search', {
@@ -468,9 +482,10 @@ export class AgentsService {
     id: string,
     dto: UpdateConversationDto,
     workspaceId: string,
+    userId: string,
   ): Promise<ConversationResponseDto> {
     const conversation = await this.conversationRepository.findOne({
-      where: { id, workspaceId },
+      where: { id, workspaceId, createdBy: userId },
     });
 
     if (!conversation) {
@@ -492,9 +507,13 @@ export class AgentsService {
     };
   }
 
-  async deleteConversation(id: string, workspaceId: string): Promise<void> {
+  async deleteConversation(
+    id: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
     const conversation = await this.conversationRepository.findOne({
-      where: { id, workspaceId },
+      where: { id, workspaceId, createdBy: userId },
     });
 
     if (!conversation) {
@@ -505,12 +524,18 @@ export class AgentsService {
     await this.agentsMemories.stmClear(id);
   }
 
-  async deleteAllConversations(workspaceId: string): Promise<void> {
+  async deleteAllConversations(
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
     const conversations = await this.conversationRepository.find({
-      where: { workspaceId },
+      where: { workspaceId, createdBy: userId },
       select: ['id'],
     });
-    await this.conversationRepository.delete({ workspaceId });
+    await this.conversationRepository.delete({
+      workspaceId,
+      createdBy: userId,
+    });
     await Promise.all(
       conversations.map((c) => this.agentsMemories.stmClear(c.id)),
     );
@@ -519,11 +544,12 @@ export class AgentsService {
   async getMessages(
     conversationId: string,
     workspaceId: string,
+    userId: string,
     query?: GetManyBaseQueryParams,
   ): Promise<GetManyBaseResponseDto<MessageResponseDto>> {
-    // Verify conversation belongs to workspace
+    // Verify conversation belongs to workspace and current member
     const conversation = await this.conversationRepository.findOne({
-      where: { id: conversationId, workspaceId },
+      where: { id: conversationId, workspaceId, createdBy: userId },
     });
 
     if (!conversation) {
@@ -586,10 +612,11 @@ export class AgentsService {
     conversationId: string,
     messageId: string,
     workspaceId: string,
+    userId: string,
   ): Promise<void> {
-    // Verify conversation belongs to workspace
+    // Verify conversation belongs to the current member within the workspace
     const conversation = await this.conversationRepository.findOne({
-      where: { id: conversationId, workspaceId },
+      where: { id: conversationId, workspaceId, createdBy: userId },
     });
 
     if (!conversation) {

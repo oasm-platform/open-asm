@@ -2,5 +2,6 @@
   "WORKSPACE_CREATED": "/settings/workspaces",
   "VULNERABILITY_ANALYSIS_COMPLETED": "/vulnerabilities/{id}",
   "ASSET_NEW_DETECT": "/targets/{targetId}",
-  "NEW_VULNERABILITY_FOUND": "/targets/{targetId}/vulnerabilities"
+  "NEW_VULNERABILITY_FOUND": "/targets/{targetId}/vulnerabilities",
+  "WORKSPACE_INVITATION": "{action, select, created {/invite/{token}} accepted {/settings/members} declined {/settings/members} other {/invite/{token}}}"
 }

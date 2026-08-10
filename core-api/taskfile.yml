@@ -23,7 +23,7 @@ tasks:
     cmds:
       - pnpm run test
   # Run a single test file by name/path (keeps the same Jest config and
-  # --maxWorkers=50% limits as `task api:test`). Usage:
+  # --maxWorkers=50% + --workerIdleMemoryLimit + --silent limits as `task api:test`). Usage:
   #   task api:test:one SPEC=src/modules/storage/storage.service.spec.ts
   test:one:
     requires:
@@ -42,14 +42,14 @@ tasks:
   # Usage: task migration:generate MIGRATION_NAME=AddUserType
   migration:generate:
     cmds:
-      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- ../node_modules/typeorm/cli.js migration:generate -d src/database/database-config.ts src/database/migrations/{{.name}}
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:generate -d src/database/database-config.ts src/database/migrations/{{.name}}
   # Run all pending migrations
   # Executes all pending database migrations
   migration:run:
     cmds:
-      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- ../node_modules/typeorm/cli.js migration:run -d src/database/database-config.ts
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:run -d src/database/database-config.ts
   # Revert the last migration
   # Rolls back the most recently executed migration
   migration:revert:
     cmds:
-      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- ../node_modules/typeorm/cli.js migration:revert -d src/database/database-config.ts
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:revert -d src/database/database-config.ts

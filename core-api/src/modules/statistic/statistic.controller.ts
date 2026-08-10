@@ -1,4 +1,5 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, getSchemaPath } from '@nestjs/swagger';
@@ -29,6 +30,7 @@ export class StatisticController {
       serialization: StatisticResponseDto,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get()
   getStatistics(
     @Query() query: GetStatisticQueryDto,
@@ -47,6 +49,7 @@ export class StatisticController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get('timeline')
   getTimelineStatistics(
     @WorkspaceId() workspaceId: string,
@@ -65,6 +68,7 @@ export class StatisticController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get('issues-timeline')
   getIssuesTimeline(
     @WorkspaceId() workspaceId: string,
@@ -87,6 +91,7 @@ export class StatisticController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get('top-tags-assets')
   getTopTagsAssets(@WorkspaceId() workspaceId: string): Promise<TopTagAsset[]> {
     return this.statisticService.getTopTagsAssets(workspaceId);
@@ -107,6 +112,7 @@ export class StatisticController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get('asset-locations')
   getAssetLocations(
     @WorkspaceId() workspaceId: string,
@@ -125,6 +131,7 @@ export class StatisticController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get('tls')
   getTlsStatistics(
     @WorkspaceId() workspaceId: string,
@@ -147,6 +154,7 @@ export class StatisticController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get('top-assets-vulnerabilities')
   getTopAssetsWithMostVulnerabilities(
     @WorkspaceId() workspaceId: string,
@@ -167,6 +175,7 @@ export class StatisticController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get('top-ports')
   getTopPorts(@WorkspaceId() workspaceId: string): Promise<TopPortsResponseDto> {
     return this.statisticService.getTopPorts(workspaceId);
@@ -183,6 +192,7 @@ export class StatisticController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get('top-technologies')
   getTopTechnologies(
     @WorkspaceId() workspaceId: string,

@@ -58,7 +58,7 @@ export default function EditProviderPage() {
   }
 
   return (
-    <Page title="Edit Provider" isShowButtonGoBack>
+    <Page title="Edit Provider" isShowButtonGoBack permission="agent.write">
       <div className="max-w-4xl mx-auto py-6">
         <div className="bg-card rounded-lg border p-6">
           <div className="mb-6">

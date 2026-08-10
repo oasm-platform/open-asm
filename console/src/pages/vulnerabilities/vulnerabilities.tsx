@@ -7,7 +7,7 @@ import VulnerabilitiesStatistic from './vulnerabilites-statistic';
 const Vulnerabilities = () => {
   const { workspaces } = useWorkspaceSelector();
   return (
-    <Page title="Vulnerabilities">
+    <Page title="Vulnerabilities" permission="vulnerability.read">
       {workspaces.length === 0 ? (
         <CreateWorkspace />
       ) : (

@@ -33,11 +33,11 @@ export default function InternalNetworkDetail() {
   });
 
   if (networkLoading) {
-    return <Page title="Internal Network Detail">Loading...</Page>;
+    return <Page title="Internal Network Detail" permission="network.read">Loading...</Page>;
   }
 
   if (!network) {
-    return <Page title="Internal Network Detail">Network not found</Page>;
+    return <Page title="Internal Network Detail" permission="network.read">Network not found</Page>;
   }
 
   return (

@@ -1,4 +1,5 @@
 import { WorkspaceId } from '@/common/decorators/app.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -70,6 +71,7 @@ export class ToolsController {
       serialization: WorkspaceTool,
     },
   })
+  @WorkspaceAccess('workspace.write')
   @Post('add-to-workspace')
   async addToolToWorkspace(@Body() dto: AddToolToWorkspaceDto) {
     return this.toolsService.addToolToWorkspace(dto);
@@ -83,6 +85,7 @@ export class ToolsController {
       serialization: WorkspaceTool,
     },
   })
+  @WorkspaceAccess('workspace.write')
   @Post('install')
   async installTool(@Body() dto: InstallToolDto) {
     return this.toolsService.installTool(dto);
@@ -96,6 +99,7 @@ export class ToolsController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('workspace.write')
   @Post('uninstall')
   async uninstallTool(@Body() dto: InstallToolDto) {
     return this.toolsService.uninstallTool(dto);
@@ -126,6 +130,7 @@ export class ToolsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get()
   async getManyTools(
     @Query() query: ToolsQueryDto,
@@ -150,6 +155,7 @@ export class ToolsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get('installed')
   async getInstalledTools(
     @Query() dto: GetInstalledToolsDto,
@@ -169,6 +175,7 @@ export class ToolsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get(':id')
   getToolById(
     @Param() { id }: GetToolByIdDto,

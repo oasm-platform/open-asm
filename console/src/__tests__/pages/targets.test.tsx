@@ -1,9 +1,34 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/node';
 import Targets from '@/pages/targets/targets';
+
+const mockWorkspaces = [{ id: 'ws-1', name: 'Test Workspace' }];
+
+vi.mock('@/hooks/useWorkspaceSelector', () => ({
+  useWorkspaceSelector: () => ({
+    workspaces: mockWorkspaces,
+    selectedWorkspace: 'ws-1',
+    isLoading: false,
+  }),
+  useWorkspaceState: () => ({
+    state: { selectedWorkspaceId: 'ws-1' },
+  }),
+}));
+
+vi.mock('@/hooks/usePermission', () => ({
+  usePermission: () => ({
+    permissions: ['*'],
+    isOwner: true,
+    hasPermission: () => true,
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
 
 describe('Targets Page', () => {
   it('renders targets table with data', async () => {

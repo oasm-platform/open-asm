@@ -357,7 +357,7 @@ const ListWorkers = () => {
   const hasWorkspaceWorkers = (workspaceData?.data?.length ?? 0) > 0;
 
   return (
-    <Page title="Workers">
+    <Page title="Workers" permission="worker.read">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'global' | 'workspace')}>
         <div className="flex items-center justify-between">
           <TabsList>
