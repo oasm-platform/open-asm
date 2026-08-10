@@ -199,8 +199,6 @@ export type UpdateTargetDto = {
   scanSchedule: UpdateTargetDtoScanSchedule;
 };
 
-export type WorkspaceArchivedAt = { [key: string]: unknown };
-
 /**
  * Encrypted Data Encryption Key (DEK) for this workspace. Encrypted with system KEK. Null for workspaces created before envelope encryption.
  * @nullable
@@ -221,7 +219,8 @@ export type Workspace = {
   name: string;
   /** The description of the workspace */
   description: string;
-  archivedAt?: WorkspaceArchivedAt;
+  /** @nullable */
+  archivedAt?: string | null;
   /** Automatically scan and detect internet-facing assets (domains, IPs) in workspace networks */
   isAssetsDiscovery: boolean;
   /** Newly discovered assets become active immediately without manual review */
@@ -238,14 +237,13 @@ export type Workspace = {
   dekAt?: WorkspaceDekAt;
 };
 
-export type CreateWorkspaceDtoArchivedAt = { [key: string]: unknown };
-
 export type CreateWorkspaceDto = {
   /** The name of the workspace */
   name: string;
   /** The description of the workspace */
   description: string;
-  archivedAt?: CreateWorkspaceDtoArchivedAt;
+  /** @nullable */
+  archivedAt?: string | null;
 };
 
 export type GetApiKeyResponseDto = {
@@ -282,12 +280,6 @@ export type UpdateWorkspaceConfigsDto = {
  */
 export type WorkspaceResponseDtoDescription = { [key: string]: unknown } | null;
 
-/**
- * Archival timestamp
- * @nullable
- */
-export type WorkspaceResponseDtoArchivedAt = { [key: string]: unknown } | null;
-
 export type WorkspaceResponseDto = {
   /** Workspace ID */
   id: string;
@@ -306,7 +298,7 @@ export type WorkspaceResponseDto = {
    * Archival timestamp
    * @nullable
    */
-  archivedAt?: WorkspaceResponseDtoArchivedAt;
+  archivedAt?: string | null;
   /** Whether asset discovery is enabled */
   isAssetsDiscovery: boolean;
   /** Whether assets are auto-enabled after discovery */
@@ -448,14 +440,13 @@ export type InvitationPreviewDto = {
   expiresAt: string;
 };
 
-export type UpdateWorkspaceDtoArchivedAt = { [key: string]: unknown };
-
 export type UpdateWorkspaceDto = {
   /** The name of the workspace */
   name?: string;
   /** The description of the workspace */
   description?: string;
-  archivedAt?: UpdateWorkspaceDtoArchivedAt;
+  /** @nullable */
+  archivedAt?: string | null;
 };
 
 export type ArchiveWorkspaceDto = {
@@ -2302,11 +2293,6 @@ export type SchemasResponseDto = {
  */
 export type GetIntegrationDtoConfig = { [key: string]: unknown };
 
-/**
- * Timestamp of the last successful periodic sync
- */
-export type GetIntegrationDtoLastRunAt = { [key: string]: unknown };
-
 export type GetIntegrationDto = {
   id: string;
   name: string;
@@ -2321,8 +2307,11 @@ export type GetIntegrationDto = {
   updatedAt: string;
   /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
   syncSchedule: string;
-  /** Timestamp of the last successful periodic sync */
-  lastRunAt?: GetIntegrationDtoLastRunAt;
+  /**
+   * Timestamp of the last successful periodic sync
+   * @nullable
+   */
+  lastRunAt?: string | null;
 };
 
 /**

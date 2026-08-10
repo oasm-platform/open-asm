@@ -43,7 +43,10 @@ export class GetIntegrationDto {
   syncSchedule: string;
 
   @ApiProperty({
+    type: String,
+    format: 'date-time',
     required: false,
+    nullable: true,
     description: 'Timestamp of the last successful periodic sync',
   })
   lastRunAt: Date | null;

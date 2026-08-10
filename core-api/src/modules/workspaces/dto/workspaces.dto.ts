@@ -37,6 +37,8 @@ export class WorkspaceResponseDto {
   updatedAt: Date;
 
   @ApiProperty({
+    type: String,
+    format: 'date-time',
     description: 'Archival timestamp',
     required: false,
     nullable: true,

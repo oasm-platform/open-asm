@@ -66,7 +66,7 @@ export class Workspace extends BaseEntity {
   @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.workspace)
   workers: Relation<WorkerInstance[]>;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ type: String, format: 'date-time', required: false, nullable: true })
   @IsOptional()
   @IsDateString()
   @Column({ type: 'timestamp', nullable: true })
