@@ -15,7 +15,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { DataAdapterService } from './data-adapter.service';
+import { DataAdapterService, mergeDnsRecords } from './data-adapter.service';
 
 describe('DataAdapterService', () => {
   let service: DataAdapterService;
@@ -177,6 +177,44 @@ describe('DataAdapterService', () => {
     });
   });
 
+  describe('mergeDnsRecords', () => {
+    it('should union existing and incoming records per key, deduping values', () => {
+      expect(
+        mergeDnsRecords(
+          { A: ['1.2.3.4'], CNAME: ['c.example.com'] },
+          { A: ['1.2.3.4', '5.6.7.8'], NS: ['ns.example.com'] },
+        ),
+      ).toEqual({
+        A: ['1.2.3.4', '5.6.7.8'],
+        CNAME: ['c.example.com'],
+        NS: ['ns.example.com'],
+      });
+    });
+
+    it('should keep existing keys that are absent from the incoming batch', () => {
+      expect(
+        mergeDnsRecords(
+          { A: ['1.2.3.4'], SOA: ['soa.example.com'] },
+          { MX: ['10 mx.example.com'] },
+        ),
+      ).toEqual({
+        A: ['1.2.3.4'],
+        SOA: ['soa.example.com'],
+        MX: ['10 mx.example.com'],
+      });
+    });
+
+    it('should treat null/undefined existing or incoming records as empty', () => {
+      expect(mergeDnsRecords(null, { A: ['1.2.3.4'] })).toEqual({
+        A: ['1.2.3.4'],
+      });
+      expect(mergeDnsRecords({ A: ['1.2.3.4'] }, undefined)).toEqual({
+        A: ['1.2.3.4'],
+      });
+      expect(mergeDnsRecords(null, undefined)).toEqual({});
+    });
+  });
+
   describe('subdomains', () => {
     const mockJob = {
       asset: {
@@ -228,10 +266,11 @@ describe('DataAdapterService', () => {
       } as unknown as InsertResult;
 
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      // Apex value not in the batch → primary refresh update is skipped,
+      // so the only execute call is the asset insert
       mockQueryRunner.manager
         .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined) // Update Asset
-        .mockResolvedValueOnce(mockInsertResult); // Insert Assets
+        .execute.mockResolvedValueOnce(mockInsertResult);
       mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
         'workspace-id',
       );
@@ -254,12 +293,11 @@ describe('DataAdapterService', () => {
 
     it('should rollback transaction on error', async () => {
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      // Mock the first execute call (update Asset) to succeed
+      // No apex entry in the batch → the primary refresh update is skipped,
+      // so the single execute call (insert Assets) is the one that fails
       mockQueryRunner.manager
         .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined)
-        // Mock the second execute call (insert Assets) to fail
-        .mockRejectedValueOnce(new Error('Database error'));
+        .execute.mockRejectedValueOnce(new Error('Database error'));
       mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
         'workspace-id',
       );
@@ -298,7 +336,7 @@ describe('DataAdapterService', () => {
       });
     }
 
-    it('should dedupe by value, refresh the primary asset, and return the inserted count', async () => {
+    it('should dedupe by value and return the inserted count (primary refresh skipped when apex absent)', async () => {
       const mockInsertResult = {
         identifiers: [{ id: 'i1' }, { id: 'i2' }],
         generatedMaps: [],
@@ -308,8 +346,7 @@ describe('DataAdapterService', () => {
 
       mockQueryRunner.manager
         .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined) // Update Asset (primary refresh)
-        .mockResolvedValueOnce(mockInsertResult); // Insert Assets
+        .execute.mockResolvedValue(mockInsertResult); // Insert Assets only
 
       const inserted = await service.upsertAssetsByTargetId(targetId, assets);
 
@@ -333,38 +370,46 @@ describe('DataAdapterService', () => {
         expect(row).toMatchObject({ target: { id: targetId }, isEnabled: true });
       }
 
-      // Primary refresh used the primary asset value to pick apex records
-      const updateCall = mockQueryRunner.manager
-        .createQueryBuilder()
-        .update.mock.calls[0];
-      expect(updateCall).toEqual([expect.anything()]);
+      // No apex value in the batch → primary dnsRecords must not be touched
+      expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(1);
 
       // Returned count = number of identifiers in the insert result
       expect(inserted).toBe(2);
     });
 
-    it('should refresh the primary asset with the dnsRecords of the matching apex value', async () => {
+    it('should merge the apex dnsRecords into the primary existing dnsRecords (union + dedupe per key)', async () => {
       const mockInsertResult = {
         identifiers: [{ id: 'i1' }],
         generatedMaps: [],
         raw: [],
       } as unknown as InsertResult;
       mockWorkspaceConfigs();
-      // Primary asset value is `example.com`
+      // Primary asset value is `example.com` and already has discovered records
       mockQueryRunner.manager
         .createQueryBuilder()
         .getRawOne.mockResolvedValueOnce({
           id: 'primary-asset-id',
           value: 'example.com',
+          dnsRecords: { A: ['192.0.2.1'], SOA: ['ns1.example.com'] },
         });
 
       mockQueryRunner.manager
         .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(mockInsertResult);
+        .execute.mockResolvedValueOnce(undefined) // Update Asset (primary refresh)
+        .mockResolvedValueOnce(mockInsertResult); // Insert Assets
 
-      const withApex = [
-        { value: 'example.com', dnsRecords: { MX: ['10 mx.example.com'] } },
+      const withApex: Array<{
+        value: string;
+        dnsRecords: Record<string, string[]>;
+      }> = [
+        {
+          value: 'example.com',
+          dnsRecords: {
+            A: ['192.0.2.1', '5.6.7.8'], // duplicate of the existing A value
+            MX: ['10 mx.example.com'],
+          },
+        },
         { value: 'www.example.com', dnsRecords: { A: ['192.0.2.2'] } },
       ];
 
@@ -375,12 +420,80 @@ describe('DataAdapterService', () => {
         .set.mock.calls[0][0] as Record<string, unknown>;
       expect(setCall).toEqual({
         isPrimary: true,
-        dnsRecords: { MX: ['10 mx.example.com'] },
+        dnsRecords: {
+          A: ['192.0.2.1', '5.6.7.8'], // discovered IP survives, dup deduped, new one added
+          MX: ['10 mx.example.com'],
+          SOA: ['ns1.example.com'], // existing key kept despite not being in the batch
+        },
       });
       const whereCall = mockQueryRunner.manager
         .createQueryBuilder()
         .where.mock.calls[1][0] as Record<string, unknown>;
       expect(whereCall).toEqual({ id: 'primary-asset-id' });
+    });
+
+    it('should skip the primary dnsRecords update when the batch has no apex value', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'i1' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs();
+      // Primary asset already has discovered dnsRecords
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .getRawOne.mockResolvedValueOnce({
+          id: 'primary-asset-id',
+          value: 'example.com',
+          dnsRecords: { A: ['1.2.3.4'] },
+        });
+
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce(mockInsertResult); // Insert Assets only
+
+      const withoutApex = [
+        { value: 'www.example.com', dnsRecords: { A: ['192.0.2.2'] } },
+      ];
+
+      await service.upsertAssetsByTargetId(targetId, withoutApex);
+
+      // No apex entry in the batch → primary update must not run (no NULL clobber)
+      expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('should merge apex dnsRecords when the primary existing dnsRecords are NULL', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'i1' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs();
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .getRawOne.mockResolvedValueOnce({
+          id: 'primary-asset-id',
+          value: 'example.com',
+          dnsRecords: null,
+        });
+
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce(undefined) // Update Asset (primary refresh)
+        .mockResolvedValueOnce(mockInsertResult); // Insert Assets
+
+      const withApex = [{ value: 'example.com', dnsRecords: { A: ['1.2.3.4'] } }];
+
+      await service.upsertAssetsByTargetId(targetId, withApex);
+
+      const setCall = mockQueryRunner.manager
+        .createQueryBuilder()
+        .set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).toEqual({
+        isPrimary: true,
+        dnsRecords: { A: ['1.2.3.4'] },
+      });
     });
 
     it('should fall back to workspace config isAutoEnableAssetAfterDiscovered when isEnabled omitted', async () => {
@@ -393,8 +506,7 @@ describe('DataAdapterService', () => {
 
       mockQueryRunner.manager
         .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(mockInsertResult);
+        .execute.mockResolvedValueOnce(mockInsertResult); // Insert Assets only
 
       await service.upsertAssetsByTargetId(targetId, [
         { value: 'sub.example.com', dnsRecords: { A: ['192.0.2.9'] } },
@@ -416,8 +528,7 @@ describe('DataAdapterService', () => {
 
       mockQueryRunner.manager
         .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(mockInsertResult);
+        .execute.mockResolvedValueOnce(mockInsertResult); // Insert Assets only
 
       await service.upsertAssetsByTargetId(
         targetId,

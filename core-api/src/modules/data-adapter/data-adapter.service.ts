@@ -39,6 +39,32 @@ function normalizeTimestamp(val: unknown): Date | undefined {
   return undefined;
 }
 
+/**
+ * Merge the DNS records of the primary asset with freshly discovered apex
+ * records. Values are unioned per record type key (A, AAAA, CNAME, MX, NS,
+ * SOA, TXT) and deduped; keys present on only one side are kept. Null or
+ * undefined sides are treated as empty so a re-sync never wipes previously
+ * discovered records.
+ */
+export function mergeDnsRecords(
+  current: Record<string, string[]> | null | undefined,
+  incoming: Record<string, string[]> | null | undefined,
+): Record<string, string[]> {
+  const currentSafe = current ?? {};
+  const incomingSafe = incoming ?? {};
+  const merged: Record<string, string[]> = {};
+  const keys = new Set<string>([
+    ...Object.keys(currentSafe),
+    ...Object.keys(incomingSafe),
+  ]);
+  for (const key of keys) {
+    merged[key] = [
+      ...new Set([...(currentSafe[key] ?? []), ...(incomingSafe[key] ?? [])]),
+    ];
+  }
+  return merged;
+}
+
 @Injectable()
 export class DataAdapterService {
   private readonly logger = new Logger(DataAdapterService.name);
@@ -81,13 +107,15 @@ export class DataAdapterService {
   /**
    * Upsert a batch of discovered assets under one target.
    *
-   * - Deduplicates assets in memory by `value`.
-   * - Refreshes the target's primary asset: sets `isPrimary: true` and
-   *   replaces its `dnsRecords` with the records for the apex value (the
-   *   entry in `assets` whose value matches the primary asset's value).
-   * - Batch-inserts the assets with `.orIgnore()` so re-runs are idempotent
-   *   (REPLACE semantics for `dnsRecords` come from the primary refresh;
-   *   subdomain rows are only ever created).
+ * - Deduplicates assets in memory by `value`.
+ * - Refreshes the target's primary asset: sets `isPrimary: true` and merges
+ *   the records for the apex value (the entry in `assets` whose value matches
+ *   the primary asset's value) into its existing `dnsRecords` — never
+ *   replaces, so discovered records survive re-syncs; skipped entirely when
+ *   the apex is absent from the batch (no NULL clobber).
+ * - Batch-inserts the assets with `.orIgnore()` so re-runs are idempotent
+ *   (MERGE semantics for `dnsRecords` come from the primary refresh;
+ *   subdomain rows are only ever created).
    *
    * @param targetId - Target the assets belong to.
    * @param assets - Discovered assets ({ value, dnsRecords }). Should include
@@ -117,22 +145,39 @@ export class DataAdapterService {
         .createQueryBuilder()
         .select('asset.id', 'id')
         .addSelect('asset.value', 'value')
+        .addSelect('asset.dnsRecords', 'dnsRecords')
         .from(Asset, 'asset')
         .where('asset.targetId = :targetId', { targetId })
         .andWhere('asset.isPrimary = true')
-        .getRawOne<{ id: string; value: string }>();
+        .getRawOne<{
+          id: string;
+          value: string;
+          dnsRecords?: Record<string, string[]> | null;
+        }>();
 
-      // Update Asset — refresh the primary asset with the apex records
+      // Refresh the primary asset with the apex records — only when the apex
+      // is present in the batch. Merge (not replace) so discovered records
+      // survive re-syncs; skipping when the apex is absent avoids clobbering
+      // dnsRecords with NULL on re-runs (the isPrimary refresh is only
+      // relevant on first creation anyway).
       if (primaryAsset) {
         const apexRecords = uniqueData.find(
           (asset) => asset.value === primaryAsset.value,
         );
-        await queryRunner.manager
-          .createQueryBuilder()
-          .update(Asset)
-          .where({ id: primaryAsset.id })
-          .set({ isPrimary: true, dnsRecords: apexRecords?.dnsRecords })
-          .execute();
+        if (apexRecords) {
+          await queryRunner.manager
+            .createQueryBuilder()
+            .update(Asset)
+            .where({ id: primaryAsset.id })
+            .set({
+              isPrimary: true,
+              dnsRecords: mergeDnsRecords(
+                primaryAsset.dnsRecords,
+                apexRecords.dnsRecords,
+              ),
+            })
+            .execute();
+        }
       }
 
       const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(

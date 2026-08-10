@@ -320,5 +320,70 @@ describe('CloudflareConnector', () => {
       expect(config.targetsService.createMultipleTargets).not.toHaveBeenCalled();
       expect(config.dataAdapterService.upsertAssetsByTargetId).not.toHaveBeenCalled();
     });
+
+    it('SC-CONN-8: Cloudflare AAAA discard-prefix placeholders (100::) are dropped, real AAAA and A kept', async () => {
+      const connector = new CloudflareConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(
+            recordsPage(
+              [
+                // Cloudflare placeholder content for proxied/originless hostnames (RFC 6666)
+                record('AAAA', 'host.example.com', '100::'),
+                record('AAAA', 'host.example.com', '100::1'),
+                // Real, routable AAAA — must be kept
+                record('AAAA', 'host.example.com', '2606:4700:3037::6815:1234'),
+                // A record on the same hostname — must be kept
+                record('A', 'host.example.com', '192.0.2.1'),
+              ],
+              1,
+              1,
+            ),
+          ),
+        );
+
+      const config = makeConfig();
+      const result = await connector.syncAssets(config);
+
+      // Placeholders still counted in the raw record count (counted before normalization)
+      expect(result.records).toBe(4);
+
+      const upsertMock = config.dataAdapterService.upsertAssetsByTargetId;
+      expect(upsertMock).toHaveBeenCalledTimes(1);
+      const batch = upsertMock.mock.calls[0][1] as Array<{
+        value: string;
+        dnsRecords: Record<string, string[]>;
+      }>;
+      const host = batch.find((a) => a.value === 'host.example.com');
+      expect(host).toBeDefined();
+      // AAAA placeholder contents are expected to be dropped — NOT materialized
+      expect(host!.dnsRecords.AAAA).not.toContain('100::');
+      expect(host!.dnsRecords.AAAA).not.toContain('100::1');
+      expect(host!.dnsRecords.AAAA).toEqual(['2606:4700:3037::6815:1234']);
+      expect(host!.dnsRecords.A).toEqual(['192.0.2.1']);
+    });
+
+    it('SC-CONN-9: hostname whose ONLY record is a 100:: AAAA placeholder is not materialized (counted, not stored)', async () => {
+      const connector = new CloudflareConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(
+            recordsPage([record('AAAA', 'discard.example.com', '100::')], 1, 1),
+          ),
+        );
+
+      const config = makeConfig();
+      const result = await connector.syncAssets(config);
+
+      expect(result.records).toBe(1); // still counted before normalization
+      // No materialized assets → no upsert call (same as wildcard-only zone)
+      expect(config.dataAdapterService.upsertAssetsByTargetId).not.toHaveBeenCalled();
+    });
   });
 });

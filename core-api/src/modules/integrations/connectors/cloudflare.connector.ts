@@ -281,6 +281,13 @@ export class CloudflareConnector extends CloudProviderConnector {
         wildcardCount++;
         continue;
       }
+      // Cloudflare serves `100::` (RFC 6666 IPv6 discard prefix 0100::/64) as
+      // the AAAA content for proxied/originless hostnames — it is a placeholder,
+      // not a routable IP. Dropped exactly like wildcard names: counted in
+      // result.records (done earlier from records.length) but never materialized.
+      if (record.type === 'AAAA' && /^100(?=:|$)/i.test(record.content)) {
+        continue;
+      }
 
       // Names come back in punycode — keep verbatim (repo stores punycode too).
       let entry = byHostname.get(record.name);

@@ -2302,23 +2302,27 @@ export type SchemasResponseDto = {
  */
 export type GetIntegrationDtoConfig = { [key: string]: unknown };
 
+/**
+ * Timestamp of the last successful periodic sync
+ */
+export type GetIntegrationDtoLastRunAt = { [key: string]: unknown };
+
 export type GetIntegrationDto = {
   id: string;
   name: string;
   description?: string;
   appType: string;
   category: string;
-  // TODO: regenerate via task gen-api when spec is fresh
-  /** 5-field cron expression (UTC) or "disabled" to turn scheduling off */
-  syncSchedule: string;
-  /** @nullable */
-  lastRunAt: string | null;
   /** Configuration with sensitive fields masked */
   config: GetIntegrationDtoConfig;
   workspaceId: string;
   createdById: string;
   createdAt: string;
   updatedAt: string;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule: string;
+  /** Timestamp of the last successful periodic sync */
+  lastRunAt?: GetIntegrationDtoLastRunAt;
 };
 
 /**
@@ -2335,11 +2339,10 @@ export type CreateIntegrationDto = {
   appType: string;
   /** Integration category */
   category: string;
-  // TODO: regenerate via task gen-api when spec is fresh
-  /** 5-field cron expression (UTC) or "disabled" to turn scheduling off */
-  syncSchedule?: string;
   /** App-specific configuration validated via JSON Schema */
   config: CreateIntegrationDtoConfig;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule?: string;
 };
 
 export type GetManyGetIntegrationDtoDto = {
@@ -2363,6 +2366,8 @@ export type UpdateIntegrationDto = {
   description?: string;
   /** App-specific configuration validated via JSON Schema */
   config?: UpdateIntegrationDtoConfig;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule?: string;
 };
 
 export type TestIntegrationDto = {
@@ -28731,38 +28736,17 @@ export const useIntegrationsControllerTestIntegration = <
   );
 };
 
-// TODO: regenerate via task gen-api when spec is fresh
-export type IntegrationsControllerSyncIntegrationCounts = {
-  zones: number;
-  records: number;
-  wildcardZones: number;
-  targetsCreated: number;
-  assetsUpserted: number;
-};
-
-// TODO: regenerate via task gen-api when spec is fresh
-export type IntegrationsControllerSyncIntegrationResponse = {
-  success: boolean;
-  message: string;
-  counts: IntegrationsControllerSyncIntegrationCounts;
-};
-
 /**
- * Triggers an immediate sync run for the integration and returns per-resource counts.
- * @summary Sync an integration now
+ * Triggers an immediate asset sync for a cloud-provider integration (e.g. Cloudflare). Fetches zones + DNS records and ingests them as targets/assets, then returns the sync counts.
+ * @summary Run integration sync now
  */
 export const integrationsControllerSyncIntegration = (
   id: string,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<IntegrationsControllerSyncIntegrationResponse>(
-    {
-      url: `/api/integrations/${id}/sync`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal,
-    },
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/integrations/${id}/sync`, method: 'POST', signal },
     options,
   );
 };
@@ -28808,11 +28792,11 @@ export const getIntegrationsControllerSyncIntegrationMutationOptions = <
 export type IntegrationsControllerSyncIntegrationMutationResult = NonNullable<
   Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>
 >;
-export type IntegrationsControllerSyncIntegrationMutationBody = undefined;
+
 export type IntegrationsControllerSyncIntegrationMutationError = unknown;
 
 /**
- * @summary Sync an integration now
+ * @summary Run integration sync now
  */
 export const useIntegrationsControllerSyncIntegration = <
   TError = unknown,
