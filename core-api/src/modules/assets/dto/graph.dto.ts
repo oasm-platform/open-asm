@@ -22,6 +22,15 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsUUID } from 'class-validator';
 
+export type GraphNodeType =
+  | 'target'
+  | 'asset'
+  | 'ip'
+  | 'service'
+  | 'technology'
+  | 'tls'
+  | 'statusCode';
+
 // ---------------------------------------------------------------------------
 // Query DTO
 // ---------------------------------------------------------------------------
@@ -59,7 +68,7 @@ export class GraphNodeDto {
     ],
     description: 'Determines which group the node belongs to.',
   })
-  type: string;
+  type: GraphNodeType;
 
   @ApiProperty({
     description: 'Human-readable label rendered on the node.',
