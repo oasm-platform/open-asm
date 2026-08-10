@@ -27,6 +27,7 @@ describe('AssetsService', () => {
   let mockLlmConfigRepository: Partial<Repository<AgentLLMConfig>>;
   let mockWorkspaceEncryptionService: Partial<WorkspaceEncryptionService>;
   let mockDataSource: Partial<DataSource>;
+  let mockTlsAssetsViewRepository: Partial<Repository<TlsAssetsView>>;
 
   beforeEach(async () => {
     mockAssetRepository = {
@@ -84,6 +85,10 @@ describe('AssetsService', () => {
       findOne: jest.fn(),
     };
 
+    mockTlsAssetsViewRepository = {
+      createQueryBuilder: jest.fn(),
+    };
+
     mockDataSource = {
       createQueryBuilder: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
@@ -115,7 +120,7 @@ describe('AssetsService', () => {
         },
         {
           provide: getRepositoryToken(TlsAssetsView),
-          useValue: {},
+          useValue: mockTlsAssetsViewRepository,
         },
         {
           provide: getRepositoryToken(AgentLLMConfig),
@@ -379,6 +384,310 @@ describe('AssetsService', () => {
         'target.domain.re-scan',
         mockTarget,
       );
+    });
+  });
+
+  describe('getAssetGraph', () => {
+    const createMockQb = (data: unknown[]) => {
+      const qb: Record<string, unknown> = {};
+      qb.leftJoinAndSelect = jest.fn().mockReturnValue(qb);
+      qb.innerJoin = jest.fn().mockReturnValue(qb);
+      qb.leftJoin = jest.fn().mockReturnValue(qb);
+      qb.where = jest.fn().mockReturnValue(qb);
+      qb.andWhere = jest.fn().mockReturnValue(qb);
+      qb.getMany = jest.fn().mockResolvedValue(data);
+      return qb;
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('returns all 7 node types and correct edges with composite IDs', async () => {
+      const target = { id: 'target-1', value: 'example.com' };
+      const assets = [
+        {
+          id: 'asset-1',
+          value: '1.2.3.4',
+          targetId: 'target-1',
+          isEnabled: true,
+          dnsRecords: ['a.example.com'],
+          ipAssets: [{ ipAddress: '1.2.3.4' }],
+        },
+        {
+          id: 'asset-2',
+          value: '5.6.7.8',
+          targetId: 'target-1',
+          isEnabled: true,
+          dnsRecords: [],
+          ipAssets: [{ ipAddress: '5.6.7.8' }],
+        },
+      ];
+      const services = [
+        { id: 'svc-1', value: 'http', port: 80, assetId: 'asset-1' },
+        { id: 'svc-2', value: 'https', port: 443, assetId: 'asset-2' },
+      ];
+      const techRows = [
+        { serviceId: 'svc-1', tech: 'nginx:1.21' },
+        { serviceId: 'svc-2', tech: 'react:18' },
+      ];
+      const tlsRecords = [
+        {
+          host: 'example.com',
+          sni: 'example.com',
+          subject_dn: 'CN=example.com',
+          issuer_dn: 'CN=LE',
+          not_before: '2026-01-01',
+          not_after: '2026-12-31',
+          tls_version: 'TLSv1.3',
+          cipher: 'AES256',
+          assetServiceId: 'svc-1',
+        },
+      ];
+      const statusRows = [{ statusCode: 200, serviceId: 'svc-1' }];
+      const enrichedTechs = [
+        {
+          name: 'nginx',
+          description: 'Web server',
+          iconUrl: 'nginx.png',
+          categoryNames: ['Web'],
+        },
+        {
+          name: 'react',
+          description: 'JS library',
+          iconUrl: 'react.png',
+          categoryNames: ['Frontend'],
+        },
+      ];
+      // Mock query builders
+      (mockTargetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([target]));
+      (mockAssetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb(assets));
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb(services));
+      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb(tlsRecords));
+
+      mockDataSource.query = jest
+        .fn()
+        .mockResolvedValueOnce(techRows)
+        .mockResolvedValueOnce(statusRows);
+
+      mockTechnologyForwarderService.enrichTechnologies = jest
+        .fn()
+        .mockResolvedValue(enrichedTechs);
+
+      const result = await service.getAssetGraph({}, 'ws-1');
+
+      // ── Nodes ──────────────────────────────────────────────
+      const nodeIds = result.nodes.map((n) => n.id);
+      expect(nodeIds).toContain('target|target-1');
+      expect(nodeIds).toContain('asset|asset-1');
+      expect(nodeIds).toContain('asset|asset-2');
+      expect(nodeIds).toContain('ip|1.2.3.4');
+      expect(nodeIds).toContain('ip|5.6.7.8');
+      expect(nodeIds).toContain('service|svc-1');
+      expect(nodeIds).toContain('service|svc-2');
+      expect(nodeIds).toContain('tech|nginx');
+      expect(nodeIds).toContain('tech|react');
+      expect(nodeIds).toContain('tls|example.com');
+      expect(nodeIds).toContain('statusCode|200');
+      expect(result.nodes).toHaveLength(11);
+
+      const nodeById = new Map(result.nodes.map((n) => [n.id, n]));
+      expect(nodeById.get('target|target-1')!.type).toBe('target');
+      expect(nodeById.get('asset|asset-1')!.type).toBe('asset');
+      expect(nodeById.get('ip|1.2.3.4')!.type).toBe('ip');
+      expect(nodeById.get('service|svc-1')!.type).toBe('service');
+      expect(nodeById.get('tech|nginx')!.type).toBe('technology');
+      expect(nodeById.get('tls|example.com')!.type).toBe('tls');
+      expect(nodeById.get('statusCode|200')!.type).toBe('statusCode');
+
+      const techNode = nodeById.get('tech|nginx')!;
+      expect(techNode.data.metadata).toEqual(
+        expect.objectContaining({
+          name: 'nginx',
+          description: 'Web server',
+          iconUrl: 'nginx.png',
+          categoryNames: ['Web'],
+        }),
+      );
+
+      // ── Edges ──────────────────────────────────────────────
+      expect(result.edges).toHaveLength(10);
+
+      for (const edge of result.edges) {
+        expect(edge.id).toBe(`e-${edge.source}-${edge.target}`);
+      }
+
+      const nodeIdSet = new Set(nodeIds);
+      for (const edge of result.edges) {
+        expect(nodeIdSet.has(edge.source)).toBe(true);
+        expect(nodeIdSet.has(edge.target)).toBe(true);
+      }
+
+      const edgeTypes = result.edges.map((e) => `${e.source}→${e.target} [${e.type}]`);
+      expect(edgeTypes).toContain(
+        'target|target-1→asset|asset-1 [belongs_to]',
+      );
+      expect(edgeTypes).toContain(
+        'target|target-1→asset|asset-2 [belongs_to]',
+      );
+      expect(edgeTypes).toContain('asset|asset-1→ip|1.2.3.4 [resolves_to]');
+      expect(edgeTypes).toContain('asset|asset-2→ip|5.6.7.8 [resolves_to]');
+      expect(edgeTypes).toContain(
+        'asset|asset-1→service|svc-1 [runs_on]',
+      );
+      expect(edgeTypes).toContain(
+        'asset|asset-2→service|svc-2 [runs_on]',
+      );
+      expect(edgeTypes).toContain('service|svc-1→tech|nginx [uses]');
+      expect(edgeTypes).toContain('service|svc-2→tech|react [uses]');
+      expect(edgeTypes).toContain(
+        'service|svc-1→tls|example.com [has_tls]',
+      );
+      expect(edgeTypes).toContain(
+        'service|svc-1→statusCode|200 [returns]',
+      );
+    });
+
+    it('returns empty nodes and edges when workspace has no data', async () => {
+      (mockTargetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+      (mockAssetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+
+      mockDataSource.query = jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      mockTechnologyForwarderService.enrichTechnologies = jest
+        .fn()
+        .mockResolvedValue([]);
+
+      const result = await service.getAssetGraph({}, 'empty-ws');
+
+      expect(result).toEqual({ nodes: [], edges: [] });
+    });
+
+    it('passes targetId filter to repos and returns scoped data', async () => {
+      const target = { id: 'target-1', value: 'example.com' };
+      const asset = {
+        id: 'asset-1',
+        value: '1.2.3.4',
+        targetId: 'target-1',
+        isEnabled: true,
+        dnsRecords: [],
+        ipAssets: [{ ipAddress: '1.2.3.4' }],
+      };
+
+      (mockTargetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([target]));
+      (mockAssetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([asset]));
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+
+      mockDataSource.query = jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      mockTechnologyForwarderService.enrichTechnologies = jest
+        .fn()
+        .mockResolvedValue([]);
+
+      const result = await service.getAssetGraph(
+        { targetId: 'target-1' },
+        'ws-1',
+      );
+
+      const nodeIds = result.nodes.map((n) => n.id);
+      expect(nodeIds).toContain('target|target-1');
+      expect(nodeIds).toContain('asset|asset-1');
+      expect(nodeIds).toContain('ip|1.2.3.4');
+      expect(nodeIds.filter((id) => id.startsWith('target|'))).toHaveLength(1);
+      expect(nodeIds.filter((id) => id.startsWith('asset|'))).toHaveLength(1);
+
+      const targetQb = (mockTargetRepository as any).createQueryBuilder;
+      const targetQbInstance = targetQb.mock.results[0].value;
+      expect(targetQbInstance.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining(':targetId'),
+        expect.objectContaining({ targetId: 'target-1' }),
+      );
+    });
+
+    it('deduplicates edges with the same source and target', async () => {
+      const target = { id: 't1', value: 'example.com' };
+      const asset = {
+        id: 'a1',
+        value: '1.2.3.4',
+        targetId: 't1',
+        isEnabled: true,
+        dnsRecords: [],
+        ipAssets: [{ ipAddress: '1.2.3.4' }],
+      };
+      const svc = { id: 's1', value: 'http', port: 80, assetId: 'a1' };
+
+      const techRows = [
+        { serviceId: 's1', tech: 'nginx:1.21' },
+        { serviceId: 's1', tech: 'nginx:1.21' },
+      ];
+
+      (mockTargetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([target]));
+      (mockAssetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([asset]));
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([svc]));
+      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+
+      mockDataSource.query = jest
+        .fn()
+        .mockResolvedValueOnce(techRows)
+        .mockResolvedValueOnce([]);
+
+      mockTechnologyForwarderService.enrichTechnologies = jest
+        .fn()
+        .mockResolvedValue([
+          { name: 'nginx', description: '', iconUrl: '', categoryNames: [] },
+        ]);
+
+      const result = await service.getAssetGraph({}, 'ws-1');
+
+      const usesEdges = result.edges.filter((e) => e.type === 'uses');
+      expect(usesEdges).toHaveLength(1);
+      expect(usesEdges[0]).toEqual({
+        id: 'e-service|s1-tech|nginx',
+        source: 'service|s1',
+        target: 'tech|nginx',
+        type: 'uses',
+      });
     });
   });
 });
