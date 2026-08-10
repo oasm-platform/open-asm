@@ -93,6 +93,8 @@ export function TopologyNodeComponent({ data, id, selected }: NodeProps) {
 
   return (
     <div
+      role="treeitem"
+      aria-label={`${type} node: ${label}`}
       className="cursor-pointer rounded-md border-2 bg-card px-3 py-2 shadow-sm transition-shadow hover:shadow-md dark:bg-card"
       style={{
         borderColor: color,

@@ -292,7 +292,11 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
           Refresh
         </Button>
       </div>
-      <div className="relative h-[calc(100vh-12rem)] w-full rounded-md border">
+      <div
+        className="relative h-[calc(100vh-12rem)] w-full rounded-md border"
+        role="application"
+        aria-label="Asset topology graph canvas"
+      >
         {isFetching && !isLoading && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/60">
             <Spinner className="size-6" />
@@ -321,6 +325,9 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
           onEdgeMouseLeave={() => setHoveredEdgeId(null)}
           onPaneClick={() => setSelectedNode(null)}
           fitView
+          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.1}
+          maxZoom={4}
           proOptions={{ hideAttribution: true }}
         >
           <Background />
