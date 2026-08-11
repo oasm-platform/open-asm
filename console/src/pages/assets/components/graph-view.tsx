@@ -14,6 +14,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Focus, RefreshCw } from 'lucide-react';
+import { useTheme } from '@/components/ui/theme-provider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,28 +35,28 @@ import {
   applyDagreLayout,
   type LayoutInputNode,
   type LayoutInputEdge,
-  type TopologyNodeData,
-} from './topology-types';
-import { TopologyNodeComponent } from './topology-node';
-import TopologyDetailSheet from './topology-detail-sheet';
+  type GraphNodeData,
+} from './graph-types';
+import { GraphNodeComponent } from './graph-node';
+import GraphDetailSheet from './graph-detail-sheet';
 
 const nodeTypes = {
-  target: TopologyNodeComponent,
-  asset: TopologyNodeComponent,
-  ip: TopologyNodeComponent,
-  service: TopologyNodeComponent,
-  technology: TopologyNodeComponent,
-  tls: TopologyNodeComponent,
-  statusCode: TopologyNodeComponent,
+  target: GraphNodeComponent,
+  asset: GraphNodeComponent,
+  ip: GraphNodeComponent,
+  service: GraphNodeComponent,
+  technology: GraphNodeComponent,
+  tls: GraphNodeComponent,
+  statusCode: GraphNodeComponent,
 };
 
 interface SelectedGraphNode {
   id: string;
   type: string;
-  data: TopologyNodeData;
+  data: GraphNodeData;
 }
 
-interface TopologyGraphProps {
+interface AssetGraphProps {
   targetId?: string;
 }
 
@@ -68,8 +69,9 @@ const EDGE_TYPE_LABELS: Record<string, string> = {
   returns: 'Returns',
 };
 
-function TopologyGraphInner({ targetId }: TopologyGraphProps) {
+function AssetGraphInner({ targetId }: AssetGraphProps) {
   const { fitView } = useReactFlow();
+  const { resolvedTheme } = useTheme();
 
   const [filterTargetId, setFilterTargetId] = useState<string | undefined>(
     targetId,
@@ -241,7 +243,7 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
     return (
       <Alert variant="destructive">
         <AlertDescription className="flex items-center gap-2">
-          Failed to load topology graph.
+          Failed to load asset graph.
           <Button variant="outline" size="sm" onClick={() => void refetch()}>
             Retry
           </Button>
@@ -257,24 +259,26 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-end gap-2">
-        <Select
-          value={filterTargetId ?? '__all__'}
-          onValueChange={(v) =>
-            setFilterTargetId(v === '__all__' ? undefined : v)
-          }
-        >
-          <SelectTrigger size="sm" className="w-[180px]">
-            <SelectValue placeholder="All Targets" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">All Targets</SelectItem>
-            {targets.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.value}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!targetId && (
+          <Select
+            value={filterTargetId ?? '__all__'}
+            onValueChange={(v) =>
+              setFilterTargetId(v === '__all__' ? undefined : v)
+            }
+          >
+            <SelectTrigger size="sm" className="w-[180px]">
+              <SelectValue placeholder="All Targets" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Targets</SelectItem>
+              {targets.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.value}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -295,7 +299,7 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
       <div
         className="relative h-[calc(100vh-12rem)] w-full rounded-md border"
         role="application"
-        aria-label="Asset topology graph canvas"
+        aria-label="Asset graph canvas"
       >
         {isFetching && !isLoading && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/60">
@@ -329,13 +333,14 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
           minZoom={0.1}
           maxZoom={4}
           proOptions={{ hideAttribution: true }}
+          colorMode={resolvedTheme}
         >
           <Background />
           <Controls />
-          <MiniMap />
+          <MiniMap pannable zoomable />
         </ReactFlow>
       </div>
-      <TopologyDetailSheet
+      <GraphDetailSheet
         open={!!selectedNode}
         setOpen={(o) => {
           if (!o) setSelectedNode(null);
@@ -346,10 +351,10 @@ function TopologyGraphInner({ targetId }: TopologyGraphProps) {
   );
 }
 
-export default function TopologyGraph({ targetId }: TopologyGraphProps) {
+export default function AssetGraph({ targetId }: AssetGraphProps) {
   return (
     <ReactFlowProvider>
-      <TopologyGraphInner targetId={targetId} />
+      <AssetGraphInner targetId={targetId} />
     </ReactFlowProvider>
   );
 }

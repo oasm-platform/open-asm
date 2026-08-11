@@ -4,18 +4,18 @@ const NODE_WIDTH = 180;
 const NODE_HEIGHT = 40;
 
 /** Framework-agnostic node shape matching the API DTO. */
-export type TopologyNodeData = {
+export type GraphNodeData = {
   label: string;
   metadata?: Record<string, unknown>;
 };
 
 /** Edge data shape from the API. */
-export type TopologyEdgeData = {
+export type GraphEdgeData = {
   type?: string;
   label?: string;
 };
 
-/** All node types present in the topology graph. */
+/** All node types present in the graph. */
 export type NodeType =
   | 'target'
   | 'asset'
@@ -47,18 +47,18 @@ export const NODE_TYPE_ICONS: Record<NodeType, string> = {
   statusCode: 'Hash',
 };
 
-/** Input node extending TopologyNodeData with id and type for layout. */
+/** Input node extending GraphNodeData with id and type for layout. */
 export type LayoutInputNode = {
   id: string;
   type: NodeType;
-  data: TopologyNodeData;
+  data: GraphNodeData;
 };
 
 /** Input edge from the API. */
 export type LayoutInputEdge = {
   source: string;
   target: string;
-  data?: TopologyEdgeData;
+  data?: GraphEdgeData;
 };
 
 /** Output node positioned by dagre, compatible with React Flow. */
@@ -66,7 +66,7 @@ export type LayoutOutputNode = {
   id: string;
   type: NodeType;
   position: { x: number; y: number };
-  data: TopologyNodeData;
+  data: GraphNodeData;
 };
 
 /** Output edge compatible with React Flow. */
@@ -74,7 +74,7 @@ export type LayoutOutputEdge = {
   id: string;
   source: string;
   target: string;
-  data?: TopologyEdgeData;
+  data?: GraphEdgeData;
 };
 
 /** Result of the dagre layout pass. */
@@ -84,7 +84,7 @@ export type LayoutResult = {
 };
 
 /**
- * Compute a non-overlapping dagre layout for a topology graph.
+ * Compute a non-overlapping dagre layout for a graph.
  *
  * Nodes are deduplicated by id. Edges are deduplicated by (source, target)
  * pair before being passed to the layout engine.

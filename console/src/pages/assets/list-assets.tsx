@@ -11,7 +11,7 @@ import StatusCodeAssetsTab from './components/status-code-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
 import TlsAssetsTab from './components/tls-assets-tab';
-import { TopologyTab } from './components/topology-tab';
+import { GraphTab } from './components/graph-tab';
 
 export function ListAssets() {
   const tabList = [
@@ -51,9 +51,9 @@ export function ListAssets() {
       tab: <TlsAssetsTab />,
     },
     {
-      value: 'topology',
-      text: 'Topology',
-      tab: <TopologyTab />,
+      value: 'graph',
+      text: 'Graph',
+      tab: <GraphTab />,
     },
   ];
 

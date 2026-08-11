@@ -12,8 +12,8 @@ import {
 import {
   NODE_TYPE_COLORS,
   type NodeType,
-  type TopologyNodeData,
-} from './topology-types';
+  type GraphNodeData,
+} from './graph-types';
 
 /** Map lucide icon name strings (from NODE_TYPE_ICONS) to actual components. */
 const ICON_COMPONENTS: Record<NodeType, LucideIcon> = {
@@ -72,14 +72,14 @@ function getSubtitle(
 }
 
 /**
- * Custom topology node component for all 7 asset graph types.
+ * Custom graph node component for all 7 asset graph types.
  *
  * React Flow resolves the component via the `nodeTypes` map (one entry per
  * type, all pointing here), but does NOT pass `node.type` in `NodeProps`.
  * The visual type is derived from the composite ID prefix (`id.split('|')[0]`).
  */
-export function TopologyNodeComponent({ data, id, selected }: NodeProps) {
-  const nodeData = data as unknown as TopologyNodeData;
+export function GraphNodeComponent({ data, id, selected }: NodeProps) {
+  const nodeData = data as unknown as GraphNodeData;
   const label = nodeData.label ?? id;
   const type = resolveNodeType(id);
   const color = NODE_TYPE_COLORS[type];

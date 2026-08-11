@@ -10,19 +10,19 @@ import {
 import { cn } from '@/lib/utils';
 import { Maximize2 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
-import type { TopologyNodeData, NodeType } from './topology-types';
-import { NODE_TYPE_COLORS } from './topology-types';
+import type { GraphNodeData, NodeType } from './graph-types';
+import { NODE_TYPE_COLORS } from './graph-types';
 
-interface TopologyNode {
+interface GraphNode {
   id: string;
   type: string;
-  data: TopologyNodeData;
+  data: GraphNodeData;
 }
 
 interface Props {
   open: boolean;
   setOpen: (open: boolean) => void;
-  node: TopologyNode | null;
+  node: GraphNode | null;
 }
 
 function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -163,7 +163,7 @@ function renderDnsRecords(value: unknown): React.ReactNode {
   );
 }
 
-function MetadataPanel({ node }: { node: TopologyNode }) {
+function MetadataPanel({ node }: { node: GraphNode }) {
   const metadata = node.data.metadata ?? {};
   const nodeType = (node.type.split('|')[0] ?? node.id.split('|')[0]) as NodeType;
 
@@ -187,7 +187,7 @@ function MetadataPanel({ node }: { node: TopologyNode }) {
   }
 }
 
-export default function TopologyDetailSheet({ open, setOpen, node }: Props) {
+export default function GraphDetailSheet({ open, setOpen, node }: Props) {
   const navigate = useNavigate();
 
   const handleViewFullPage = () => {
