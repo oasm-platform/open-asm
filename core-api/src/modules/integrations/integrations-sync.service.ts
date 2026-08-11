@@ -128,7 +128,7 @@ export class IntegrationSyncService implements OnModuleInit {
    * Enqueues one manual sync for an integration (POST /:id/sync) and returns
    * immediately — the actual sync runs asynchronously in the processor.
    *
-   * The job name AND jobId are `manual-sync:<integrationId>`: the jobId is
+   * The job name AND jobId are `manual-sync-<integrationId>`: the jobId is
    * the BullMQ dedup key, so a second POST while the first job is still
    * waiting/active returns the existing job instead of scheduling a duplicate
    * sync. attempts: 1 (a manual sync is never retried) + removeOnComplete
@@ -138,7 +138,7 @@ export class IntegrationSyncService implements OnModuleInit {
     integrationId: string,
     workspaceId: string,
   ): Promise<{ jobId: string }> {
-    const jobId = `manual-sync:${integrationId}`;
+    const jobId = `manual-sync-${integrationId}`;
     const job = await this.queue.add(
       jobId,
       { integrationId, workspaceId },

@@ -9,7 +9,7 @@ import { IntegrationSyncService } from './integrations-sync.service';
  * { integrationId, workspaceId }. The job NAME is no longer always the
  * integration id: repeat jobs use the integration id (the BullMQ dedup key
  * for the scheduler), while manual jobs from POST /:id/sync are named
- * `manual-sync:<integrationId>` and deduped by their explicit jobId. The
+ * `manual-sync-<integrationId>` and deduped by their explicit jobId. The
  * processor only ever reads job.data, so both shapes are handled identically.
  *
  * Orphan guard: if the integration row is gone (deleted without cleaning up

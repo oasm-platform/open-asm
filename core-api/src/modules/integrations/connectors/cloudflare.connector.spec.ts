@@ -302,7 +302,7 @@ describe('CloudflareConnector', () => {
       expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
-    it('SC-CONN-7: test mode (__dryRun) — single token verify call, zero counts, tokenStatus, no DB writes', async () => {
+    it('SC-CONN-7: test mode (__dryRun) — single lightweight /zones call (per_page=1), zero counts, tokenStatus, no DB writes', async () => {
       const connector = new CloudflareConnector();
       jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
 
@@ -310,21 +310,36 @@ describe('CloudflareConnector', () => {
         mockResponse({
           success: true,
           errors: [],
-          result: { id: 'token-1', status: 'active' },
+          result: [
+            {
+              id: 'zone-1',
+              name: 'example.com',
+              status: 'active',
+              paused: false,
+              type: 'full',
+            },
+          ],
+          result_info: {
+            count: 1,
+            page: 1,
+            per_page: 1,
+            total_count: 1,
+            total_pages: 1,
+          },
         }),
       );
 
       const config = makeConfig({ __dryRun: true });
       const result = await connector.syncAssets(config);
 
-      // Exactly ONE lightweight API call — the token verify endpoint.
+      // Exactly ONE lightweight API call — the /zones endpoint with per_page=1.
       expect(mockFetch).toHaveBeenCalledTimes(1);
       const url = String(mockFetch.mock.calls[0][0]);
-      expect(url).toMatch(/\/user\/tokens\/verify$/);
-      expect(url).not.toContain('/zones');
+      expect(url).toMatch(/\/zones\?per_page=1&status=active/);
       expect(url).not.toContain('/dns_records');
+      expect(url).not.toContain('/user/tokens/verify');
 
-      // Zero counts + token status from the verify response.
+      // Zero counts + token status reflects the successful credential probe.
       expect(result).toEqual({
         zones: 0,
         records: 0,
@@ -356,20 +371,39 @@ describe('CloudflareConnector', () => {
       const error = await connector.syncAssets(config).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(CloudflareSyncError);
       expect((error as Error).message).toContain('Invalid access token');
+      // The failure surfaced through the lightweight /zones probe, not the
+      // (cfat_-incompatible) token verify endpoint.
+      expect(String(mockFetch.mock.calls[0][0])).toMatch(
+        /\/zones\?per_page=1&status=active/,
+      );
     });
 
-    it('SC-CONN-7b: test mode rejects a non-active token status', async () => {
+    it('SC-CONN-7b: test mode surfaces an HTTP 401 (bad/expired/disabled token) as CloudflareSyncError', async () => {
       const connector = new CloudflareConnector();
       jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
 
+      // A real 401 from the /zones probe — the actual failure signal for a
+      // bad/expired/disabled token (cfFetch throws CloudflareSyncError with
+      // the HTTP status + body snippet).
       mockFetch.mockResolvedValueOnce(
-        mockResponse({ success: true, result: { id: 't', status: 'disabled' } }),
+        mockResponse(
+          {
+            success: false,
+            errors: [{ code: 1000, message: 'Invalid API Token' }],
+            result: null,
+          },
+          401,
+        ),
       );
 
       const config = makeConfig({ __dryRun: true });
       const error = await connector.syncAssets(config).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(CloudflareSyncError);
-      expect((error as Error).message).toContain('not active');
+      expect((error as Error).message).toContain('401');
+      expect((error as Error).message).toContain(
+        '/zones?per_page=1&status=active',
+      );
+      expect((error as Error).message).toContain('Invalid API Token');
     });
 
     it('SC-CONN-8: Cloudflare AAAA discard-prefix placeholders (100::) are dropped, real AAAA and A kept', async () => {

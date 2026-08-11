@@ -55,7 +55,7 @@ export interface SyncResult {
   wildcardZones: number;
   targetsCreated: number;
   assetsUpserted: number;
-  /** Set in test mode (__dryRun) only — the `status` from the token verify response. */
+  /** Set in test mode (__dryRun) only — 'active' when the credential probe succeeds. */
   tokenStatus?: string;
 }
 
@@ -168,25 +168,25 @@ export class CloudflareConnector extends CloudProviderConnector {
     const status = 'active';
 
     // Test mode: verify the credential with a single lightweight API call
-    // instead of a full zone/record sync. A failed verify (success=false) or
-    // a non-active token rejects here — that is the test failure signal.
+    // instead of a full zone/record sync. The /zones endpoint (1 page, 1
+    // zone) is used instead of /user/tokens/verify because the newer `cfat_`
+    // Account API token format is not supported by the verify endpoint (it
+    // returns 401 for every valid cfat_ token), while /zones works with both
+    // token formats and also proves the zone:read permission the real sync
+    // needs. Any API failure (e.g. 401 on a bad/expired/disabled token)
+    // rejects here — that is the test failure signal.
     if (__dryRun) {
-      const verify = await this.cfFetch<{ id: string; status: string }>(
+      await this.cfFetch<CloudflareZone[]>(
         apiToken,
-        '/user/tokens/verify',
+        '/zones?per_page=1&status=active',
       );
-      if (verify.result.status !== 'active') {
-        throw new CloudflareSyncError(
-          `Cloudflare API token is not active (status: ${verify.result.status})`,
-        );
-      }
       const result: SyncResult = {
         zones: 0,
         records: 0,
         wildcardZones: 0,
         targetsCreated: 0,
         assetsUpserted: 0,
-        tokenStatus: verify.result.status,
+        tokenStatus: 'active',
       };
       this.logger.log(
         `Cloudflare test finished for integration ${integrationId}: ${JSON.stringify(result)}`,

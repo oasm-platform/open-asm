@@ -79,7 +79,7 @@ describe('IntegrationsService', () => {
       runSync: jest.fn().mockResolvedValue(syncResult),
       enqueueManualSync: jest
         .fn()
-        .mockResolvedValue({ jobId: 'manual-sync:integration-1' }),
+        .mockResolvedValue({ jobId: 'manual-sync-integration-1' }),
     };
 
     service = new IntegrationsService(
@@ -352,7 +352,7 @@ describe('IntegrationsService', () => {
         'ws-1',
       );
       expect(integrationSyncServiceMock.runSync).not.toHaveBeenCalled();
-      expect(result).toEqual({ jobId: 'manual-sync:integration-1' });
+      expect(result).toEqual({ jobId: 'manual-sync-integration-1' });
     });
 
     it('SC-API-1b: rejects non-cloud integrations before enqueueing', async () => {

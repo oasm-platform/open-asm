@@ -23,7 +23,7 @@ describe('IntegrationsController', () => {
     integrationsServiceMock = {
       syncIntegration: jest
         .fn()
-        .mockResolvedValue({ jobId: 'manual-sync:integration-1' }),
+        .mockResolvedValue({ jobId: 'manual-sync-integration-1' }),
       testIntegration: jest.fn(),
       createIntegration: jest.fn().mockResolvedValue({ id: 'integration-1' }),
     };
@@ -48,7 +48,7 @@ describe('IntegrationsController', () => {
     expect(response).toEqual({
       success: true,
       message: 'Sync queued',
-      jobId: 'manual-sync:integration-1',
+      jobId: 'manual-sync-integration-1',
     });
   });
 

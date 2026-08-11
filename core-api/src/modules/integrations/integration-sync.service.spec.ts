@@ -427,20 +427,26 @@ describe('IntegrationSyncService', () => {
 
   describe('SC-ENQUEUE-1/2: enqueueManualSync', () => {
     it('adds a manual-sync job with a deterministic jobId, attempts:1, removeOnComplete and returns the jobId', async () => {
-      queueMock.add.mockResolvedValue({ id: 'manual-sync:integration-1' });
+      queueMock.add.mockResolvedValue({ id: 'manual-sync-integration-1' });
 
       const result = await service.enqueueManualSync('integration-1', 'ws-1');
 
       expect(queueMock.add).toHaveBeenCalledWith(
-        'manual-sync:integration-1',
+        'manual-sync-integration-1',
         { integrationId: 'integration-1', workspaceId: 'ws-1' },
         {
-          jobId: 'manual-sync:integration-1',
+          jobId: 'manual-sync-integration-1',
           attempts: 1,
           removeOnComplete: true,
         },
       );
-      expect(result).toEqual({ jobId: 'manual-sync:integration-1' });
+      expect(result).toEqual({ jobId: 'manual-sync-integration-1' });
+
+      // BullMQ rejects custom jobIds containing ':' (Custom Id cannot contain
+      // : — job.js validateOptions), so the manual-sync jobId must never
+      // include one.
+      const jobIdArg = queueMock.add.mock.calls[0][2].jobId as string;
+      expect(jobIdArg).not.toContain(':');
     });
 
     it('falls back to the jobId string when the returned job carries no id', async () => {
@@ -448,11 +454,11 @@ describe('IntegrationSyncService', () => {
 
       const result = await service.enqueueManualSync('integration-1', 'ws-1');
 
-      expect(result).toEqual({ jobId: 'manual-sync:integration-1' });
+      expect(result).toEqual({ jobId: 'manual-sync-integration-1' });
     });
 
     it('SC-ENQUEUE-2: re-enqueuing the same integration reuses the same jobId (BullMQ dedupes → existing job)', async () => {
-      queueMock.add.mockResolvedValue({ id: 'manual-sync:integration-1' });
+      queueMock.add.mockResolvedValue({ id: 'manual-sync-integration-1' });
 
       const first = await service.enqueueManualSync('integration-1', 'ws-1');
       const second = await service.enqueueManualSync('integration-1', 'ws-1');
