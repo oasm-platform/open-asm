@@ -10,7 +10,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AppsTabContent } from './components/apps-tab-content';
 import { ConnectIntegrationSheet } from './components/connect-integration-sheet';
@@ -73,6 +73,13 @@ export default function Integrations() {
   const { data: connectedData } =
     useIntegrationsControllerGetManyIntegrations();
 
+  // Optional `tool` param: open the detail sheet for the matching integration
+  const tool = search.tool;
+  useEffect(() => {
+    if (!tool) return;
+    const found = connectedData?.data?.find((i) => i.appType === tool);
+    if (found) setDetailTarget(found);
+  }, [tool, connectedData]);
   const { mutate: deleteIntegration } =
     useIntegrationsControllerDeleteIntegration({
       mutation: {
@@ -206,7 +213,11 @@ export default function Integrations() {
           schema={detailSchema}
           open={!!detailTarget}
           onOpenChange={(open) => {
-            if (!open) setDetailTarget(null);
+            if (!open) {
+              setDetailTarget(null);
+              const { tool: _tool, ...rest } = search;
+              navigate({ search: rest as any, replace: true }); // eslint-disable-line @typescript-eslint/no-explicit-any
+            }
           }}
         />
       )}

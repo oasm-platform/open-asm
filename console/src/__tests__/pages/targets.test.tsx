@@ -43,10 +43,10 @@ describe('Targets Page', () => {
     });
 
     expect(screen.getByText('Target')).toBeInTheDocument();
-    expect(screen.getByText('Type')).toBeInTheDocument();
     expect(screen.getByText('Services')).toBeInTheDocument();
-    expect(screen.getByText('DOMAIN')).toBeInTheDocument();
-    expect(screen.getByText('IP')).toBeInTheDocument();
+    // Type and Source columns were removed
+    expect(screen.queryByText('Type')).not.toBeInTheDocument();
+    expect(screen.queryByText('Source')).not.toBeInTheDocument();
   });
 
   it('shows empty state when no targets', async () => {

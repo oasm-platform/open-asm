@@ -3,6 +3,7 @@ import { IntegrationType } from '@/common/enums/enum';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import type { DataAdapterService } from '../../data-adapter/data-adapter.service';
 import type { TargetType } from '../../targets/entities/target.entity';
+import { TargetSource } from '../../targets/entities/target.entity';
 import type { TargetsService } from '../../targets/targets.service';
 import {
   CloudProviderConnector,
@@ -278,6 +279,8 @@ export class CloudflareConnector extends CloudProviderConnector {
         { targets: [{ value: apex, type: 'DOMAIN' as TargetType }] },
         workspaceId,
         actingUserContext,
+        undefined,
+        TargetSource.CLOUDFLARE,
       );
       result.targetsCreated++;
       return created.created[0].id;

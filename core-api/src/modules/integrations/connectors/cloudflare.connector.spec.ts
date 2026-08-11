@@ -1,4 +1,5 @@
 import { CloudflareConnector, CloudflareSyncError } from './cloudflare.connector';
+import { TargetSource } from '../../targets/entities/target.entity';
 
 /**
  * Connector fetch-layer tests (SC-CONN-1..10).
@@ -457,6 +458,72 @@ describe('CloudflareConnector', () => {
       );
       expect(zoneInit).toEqual(
         expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+    });
+
+    it('SC-CONN-11: existing target — createMultipleTargets NOT called, source preserved', async () => {
+      const connector = new CloudflareConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(
+            recordsPage([record('A', 'example.com', '192.0.2.1')], 1, 1),
+          ),
+        );
+
+      // Default makeConfig(): every apex already has a target (no creates).
+      const config = makeConfig();
+
+      const result = await connector.syncAssets(config);
+
+      // Lookup path used → no create attempted → source of the existing
+      // target is never touched.
+      expect(result.targetsCreated).toBe(0);
+      expect(config.targetsService.findByWorkspaceAndValues).toHaveBeenCalledWith(
+        'ws-1',
+        ['example.com'],
+      );
+      expect(config.targetsService.createMultipleTargets).not.toHaveBeenCalled();
+    });
+
+    it('SC-CONN-12: missing target — createMultipleTargets called with TargetSource.CLOUDFLARE', async () => {
+      const connector = new CloudflareConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(
+            recordsPage([record('A', 'example.com', '192.0.2.1')], 1, 1),
+          ),
+        );
+
+      const findByWorkspaceAndValues = jest.fn().mockResolvedValue([]);
+      const createMultipleTargets = jest
+        .fn()
+        .mockResolvedValue({ created: [{ id: 'target-new' }] });
+      const config = makeConfig({
+        targetsService: { findByWorkspaceAndValues, createMultipleTargets },
+      });
+
+      const result = await connector.syncAssets(config);
+
+      expect(result.targetsCreated).toBe(1);
+      expect(createMultipleTargets).toHaveBeenCalledWith(
+        { targets: [{ value: 'example.com', type: 'DOMAIN' }] },
+        'ws-1',
+        config.actingUserContext,
+        undefined,
+        TargetSource.CLOUDFLARE,
+      );
+      // Regression guard: the source must NEVER land in internalNetworkId
+      // (4th arg) — it must reach the source slot (5th arg) so the created
+      // target carries the CLOUDFLARE source instead of defaulting to MANUAL.
+      expect(createMultipleTargets.mock.calls[0][3]).toBeUndefined();
+      expect(createMultipleTargets.mock.calls[0][4]).toBe(
+        TargetSource.CLOUDFLARE,
       );
     });
   });

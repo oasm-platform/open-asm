@@ -66,6 +66,17 @@ export const TargetType = {
   IP: 'IP',
 } as const;
 
+/**
+ * Where the target came from
+ */
+export type TargetSource = (typeof TargetSource)[keyof typeof TargetSource];
+
+export const TargetSource = {
+  MANUAL: 'MANUAL',
+  cloudflare: 'cloudflare',
+  INTERNAL_NETWORK: 'INTERNAL_NETWORK',
+} as const;
+
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
 export const JobStatus = {
@@ -96,6 +107,8 @@ export type Target = {
   value: string;
   /** The type of target (DOMAIN, CIDR, or IP) */
   type: TargetType;
+  /** Where the target came from */
+  source: TargetSource;
   lastDiscoveredAt: string;
   totalAssetServices: number;
   status: JobStatus;
@@ -129,6 +142,13 @@ export type CreateMultipleTargetsDto = {
   targets: CreateTargetDto[];
 };
 
+export type TargetSourceDto = {
+  /** Human-readable label of the target source */
+  source: string;
+  /** Icon URL for the source integration (empty string when the source has no icon) */
+  icon: string;
+};
+
 export type GetManyTargetResponseDtoScanSchedule =
   (typeof GetManyTargetResponseDtoScanSchedule)[keyof typeof GetManyTargetResponseDtoScanSchedule];
 
@@ -153,6 +173,7 @@ export type GetManyTargetResponseDto = {
   id: string;
   value: string;
   type: TargetType;
+  source: TargetSourceDto;
   reScanCount: number;
   scanSchedule: GetManyTargetResponseDtoScanSchedule;
   status: GetManyTargetResponseDtoStatus;

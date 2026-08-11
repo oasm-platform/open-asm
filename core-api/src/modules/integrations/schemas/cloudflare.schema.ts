@@ -15,6 +15,7 @@ export const cloudflareSchema = {
   type: 'object',
   title: 'Cloudflare',
   isAvailable: true,
+  icon: '/static/images/integrations/cloudflare.svg',
   description: 'Connects to Cloudflare API for DNS and security management.',
   properties: {
     app_type: { const: 'cloudflare', title: 'App Type' },

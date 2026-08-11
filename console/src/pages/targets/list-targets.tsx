@@ -14,8 +14,10 @@ import {
   useTargetsControllerGetTargetsInWorkspace,
 } from '@/services/apis/gen/queries';
 import { useState } from 'react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { Badge } from '@/components/ui/badge';
+import Image from '@/components/ui/image';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -26,11 +28,36 @@ import { ScopeFilter } from './components/scope-filter';
 import { StartDiscoveryButton } from './components/start-discovery-button';
 import { TargetTypeFilter } from './components/target-type-filter';
 
-const targetTypeColor: Record<string, string> = {
-  DOMAIN: 'border-blue-400 text-blue-400',
-  CIDR: 'border-emerald-400 text-emerald-400',
-  IP: 'border-amber-400 text-amber-400',
-};
+interface TargetSourceCellProps {
+  icon: string;
+  source: string;
+}
+
+/** Source icon: tooltip on hover, navigates to the integration on click. */
+function TargetSourceCell({ icon, source }: TargetSourceCellProps) {
+  const navigate = useNavigate();
+  // ponytail: appType parsed from icon path; cleaner would be exposing the raw source id in TargetSourceDto
+  const tool = icon.split('/').pop()?.replace(/.svg$/, '') ?? '';
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="flex cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate({
+              to: '/integrations',
+              search: { tab: 'connected', tool } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+            });
+          }}
+        >
+          <Image url={icon} width={16} height={16} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Sync from {source}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   {
@@ -39,6 +66,13 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
         <span className="font-medium">{row.getValue('value')}</span>
+
+        {row.original.source?.icon && (
+          <TargetSourceCell
+            icon={row.original.source.icon}
+            source={row.original.source.source}
+          />
+        )}
         {row.original.internalNetworkId && (
           <Badge variant="secondary" className="text-xs">
             Internal
@@ -46,18 +80,6 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
         )}
       </div>
     ),
-  },
-  {
-    accessorKey: 'type',
-    header: 'Type',
-    cell: ({ row }) => {
-      const type = row.original.type as TargetType;
-      return (
-        <Badge variant="outline" className={targetTypeColor[type]}>
-          {type}
-        </Badge>
-      );
-    },
   },
   {
     accessorKey: 'totalAssetServices',

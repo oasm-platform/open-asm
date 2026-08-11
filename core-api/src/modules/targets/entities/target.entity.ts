@@ -27,6 +27,18 @@ export enum TargetType {
   IP = 'IP',
 }
 
+/**
+ * Enum representing where a target originated.
+ * System-assigned at creation time; never overwritten on existing targets.
+ * Integration-backed values use the integration schema `$id` so the response
+ * can be enriched with the schema title + icon (see TargetSourceDto).
+ */
+export enum TargetSource {
+  MANUAL = 'MANUAL',
+  CLOUDFLARE = 'cloudflare',
+  INTERNAL_NETWORK = 'INTERNAL_NETWORK',
+}
+
 @Entity('targets')
 @Index('IDX_targets_value', ['value'])
 @Index('IDX_targets_internalNetworkId', ['internalNetwork'])
@@ -77,6 +89,19 @@ export class Target extends BaseEntity {
     default: TargetType.DOMAIN,
   })
   type: TargetType;
+
+  @ApiProperty({
+    enum: TargetSource,
+    enumName: 'TargetSource',
+    description: 'Where the target came from',
+    example: TargetSource.MANUAL,
+  })
+  @IsEnum(TargetSource)
+  @Column({
+    type: 'varchar',
+    default: TargetSource.MANUAL,
+  })
+  source: TargetSource;
 
   @ApiProperty()
   @Column({

@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { CloudflareConnector } from './cloudflare.connector';
+import { TargetSource } from '../../targets/entities/target.entity';
 
 /**
  * Ingestion algorithm tests (SC-ING-1..5).
@@ -135,6 +136,17 @@ describe('CloudflareConnector ingestion', () => {
       { targets: [{ value: 'example.com', type: 'DOMAIN' }] },
       'ws-1',
       services.actingUserContext,
+      undefined,
+      TargetSource.CLOUDFLARE,
+    );
+    // Regression guard: the source must NEVER land in internalNetworkId
+    // (4th arg) — it must reach the source slot (5th arg) so the created
+    // target carries the CLOUDFLARE source instead of defaulting to MANUAL.
+    expect(
+      services.targetsService.createMultipleTargets.mock.calls[0][3],
+    ).toBeUndefined();
+    expect(services.targetsService.createMultipleTargets.mock.calls[0][4]).toBe(
+      TargetSource.CLOUDFLARE,
     );
     expect(services.dataAdapterService.upsertAssetsByTargetId).toHaveBeenCalledTimes(1);
     expect(
