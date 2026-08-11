@@ -186,7 +186,6 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
         queryClient.invalidateQueries({ queryKey: ['/api/workspaces/members'] });
         invalidateWorkspaceQueries(queryClient);
       },
-      onError: () => toast.error('Failed to remove member'),
     },
   });
 
@@ -304,12 +303,12 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
           placeholder="Search members..."
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          className="max-w-xs"
+          className="h-9 max-w-xs"
         />
         {canInvite && (
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">
+              <Button size="sm" className="h-9">
                 <UserPlus className="h-4 w-4" />
                 Invite member
               </Button>
@@ -362,6 +361,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
 
 function InvitationsTab({ workspaceId }: { workspaceId: string }) {
   const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
   const { hasPermission } = usePermission();
   const {
     data: invitations,
@@ -381,11 +381,18 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
         toast.success('Invitation cancelled');
         invalidateWorkspaceQueries(queryClient);
       },
-      onError: () => toast.error('Failed to cancel invitation'),
     },
   });
 
   const canManageInvites = hasPermission('invitation.write');
+
+  const filteredInvitations = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return invitations ?? [];
+    return (invitations ?? []).filter((invitation) =>
+      invitation.email.toLowerCase().includes(query),
+    );
+  }, [invitations, search]);
 
   const { data: permissionGroups } = useWorkspacesControllerGetPermissionGroups({
     query: {
@@ -406,7 +413,6 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
         toast.success('Invitation resent');
         invalidateWorkspaceQueries(queryClient);
       },
-      onError: () => toast.error('Failed to resend invitation'),
     },
   });
 
@@ -517,22 +523,34 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <DataTable
-      columns={columns}
-      data={invitations ?? []}
-      isLoading={isLoading}
-      page={1}
-      pageSize={Math.max(invitations?.length ?? 0, 5)}
-      totalItems={invitations?.length ?? 0}
-      showPagination={false}
-      emptyMessage="No invitations sent."
-      error={isError ? <LoadError onRetry={() => refetch()} /> : undefined}
-    />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <Input
+          placeholder="Search invitations..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="h-9 max-w-xs"
+        />
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={filteredInvitations}
+        isLoading={isLoading}
+        page={1}
+        pageSize={Math.max(filteredInvitations.length, 5)}
+        totalItems={filteredInvitations.length}
+        showPagination={false}
+        emptyMessage="No invitations sent."
+        error={isError ? <LoadError onRetry={() => refetch()} /> : undefined}
+      />
+    </div>
   );
 }
 
 function PermissionsTab({ workspaceId }: { workspaceId: string }) {
   const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
   const [formSheet, setFormSheet] = useState<
     { mode: 'create' } | { mode: 'edit'; groupId: string } | null
   >(null);
@@ -561,11 +579,18 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
         queryClient.invalidateQueries({ queryKey: ['/api/workspaces/members'] });
         invalidateWorkspaceQueries(queryClient);
       },
-      onError: () => toast.error('Failed to delete permission group'),
     },
   });
 
   const canManageGroups = hasPermission('workspace.write');
+
+  const filteredGroups = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return groups ?? [];
+    return (groups ?? []).filter((group) =>
+      group.name.toLowerCase().includes(query),
+    );
+  }, [groups, search]);
 
   const columns: ColumnDef<WorkspacePermissionLike>[] = [
     {
@@ -642,9 +667,19 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2">
+        <Input
+          placeholder="Search permission groups..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="h-9 max-w-xs"
+        />
         {canManageGroups && (
-          <Button size="sm" onClick={() => setFormSheet({ mode: 'create' })}>
+          <Button
+            size="sm"
+            className="h-9"
+            onClick={() => setFormSheet({ mode: 'create' })}
+          >
             <Plus className="h-4 w-4" />
             Create group
           </Button>
@@ -653,11 +688,11 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
 
       <DataTable
         columns={columns}
-        data={groups ?? []}
+        data={filteredGroups}
         isLoading={isLoading}
         page={1}
-        pageSize={Math.max(groups?.length ?? 0, 5)}
-        totalItems={groups?.length ?? 0}
+        pageSize={Math.max(filteredGroups.length, 5)}
+        totalItems={filteredGroups.length}
         showPagination={false}
         emptyMessage="No permission groups in this workspace."
         error={isError ? <LoadError onRetry={() => refetch()} /> : undefined}
@@ -682,6 +717,7 @@ function InviteMemberDialogContent({
   onClose: () => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
+  const navigate = useNavigate();
   const [emailsText, setEmailsText] = useState('');
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const { mutate: createInvitations, isPending } =
@@ -700,7 +736,6 @@ function InviteMemberDialogContent({
           invalidateWorkspaceQueries(queryClient);
           onClose();
         },
-        onError: () => toast.error('Failed to create invitations'),
       },
     });
 
@@ -708,6 +743,8 @@ function InviteMemberDialogContent({
     .split(/[\s,]+/)
     .map((email) => email.trim().toLowerCase())
     .filter((email) => email.length > 0);
+
+  const invitableGroups = groups.filter((group) => !group.isSystem);
 
   return (
     <>
@@ -735,15 +772,27 @@ function InviteMemberDialogContent({
         </div>
         <div className="space-y-2">
           <Label>Permission groups</Label>
-          {groups.length === 0 ? (
+          {invitableGroups.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No permission groups yet. Create one in the Permissions tab.
+              No permission groups yet.{' '}
+              <button
+                type="button"
+                className="text-primary underline underline-offset-4 hover:text-primary/80"
+                onClick={() => {
+                  navigate({
+                    to: '/settings/$tab',
+                    params: { tab: 'members' },
+                    search: { tab: 'permissions' },
+                  });
+                  onClose();
+                }}
+              >
+                Create one in the Permissions tab.
+              </button>
             </p>
           ) : (
             <div className="grid gap-2">
-              {groups
-                .filter((group) => !group.isSystem)
-                .map((group) => (
+              {invitableGroups.map((group) => (
                   <label
                     key={group.id}
                     className="flex items-center gap-2 text-sm"
