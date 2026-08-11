@@ -12,7 +12,7 @@ import {
   GetManyInternalNetworksQueryDto,
   GetManyInternalNetworksResponseDto,
 } from './dtos/get-many-internal-networks.dto';
-import { Target, TargetType } from '../targets/entities/target.entity';
+import { Target, TargetSource, TargetType } from '../targets/entities/target.entity';
 import {
   GetManyNetworkInterfacesQueryDto,
   GetManyNetworkInterfacesResponseDto,
@@ -343,6 +343,7 @@ export class InternalNetworksService {
           workspaceId,
           user,
           internalNetworkId,
+          TargetSource.INTERNAL_NETWORK,
         );
       }
     }

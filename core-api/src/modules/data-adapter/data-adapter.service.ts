@@ -39,6 +39,32 @@ function normalizeTimestamp(val: unknown): Date | undefined {
   return undefined;
 }
 
+/**
+ * Merge the DNS records of the primary asset with freshly discovered apex
+ * records. Values are unioned per record type key (A, AAAA, CNAME, MX, NS,
+ * SOA, TXT) and deduped; keys present on only one side are kept. Null or
+ * undefined sides are treated as empty so a re-sync never wipes previously
+ * discovered records.
+ */
+export function mergeDnsRecords(
+  current: Record<string, string[]> | null | undefined,
+  incoming: Record<string, string[]> | null | undefined,
+): Record<string, string[]> {
+  const currentSafe = current ?? {};
+  const incomingSafe = incoming ?? {};
+  const merged: Record<string, string[]> = {};
+  const keys = new Set<string>([
+    ...Object.keys(currentSafe),
+    ...Object.keys(incomingSafe),
+  ]);
+  for (const key of keys) {
+    merged[key] = [
+      ...new Set([...(currentSafe[key] ?? []), ...(incomingSafe[key] ?? [])]),
+    ];
+  }
+  return merged;
+}
+
 @Injectable()
 export class DataAdapterService {
   private readonly logger = new Logger(DataAdapterService.name);
@@ -71,7 +97,44 @@ export class DataAdapterService {
   public async subdomains({
     data,
     job,
-  }: DataAdapterInput<Asset[]>): Promise<InsertResult | void> {
+  }: DataAdapterInput<Asset[]>): Promise<void> {
+    await this.upsertAssetsByTargetId(
+      job.asset.target.id,
+      data as Array<{ value: string; dnsRecords: Record<string, string[]> }>,
+    );
+  }
+
+  /**
+   * Upsert a batch of discovered assets under one target.
+   *
+ * - Deduplicates assets in memory by `value`.
+ * - Refreshes the target's primary asset: sets `isPrimary: true` and merges
+ *   the records for the apex value (the entry in `assets` whose value matches
+ *   the primary asset's value) into its existing `dnsRecords` — never
+ *   replaces, so discovered records survive re-syncs; skipped entirely when
+ *   the apex is absent from the batch (no NULL clobber).
+ * - Batch-inserts the assets with `.orIgnore()` so re-runs are idempotent
+ *   (MERGE semantics for `dnsRecords` come from the primary refresh;
+ *   subdomain rows are only ever created).
+   *
+   * @param targetId - Target the assets belong to.
+   * @param assets - Discovered assets ({ value, dnsRecords }). Should include
+   *   the apex entry so the primary asset refresh can pick up apex records.
+   * @param isEnabled - Insert flag; defaults to the workspace config
+   *   `isAutoEnableAssetAfterDiscovered`.
+   * @param opts - replaceDnsRecords: true makes the primary refresh REPLACE
+   *   (not merge) apex dnsRecords and switches the insert from `.orIgnore()`
+   *   to `.orUpdate(['dnsRecords'], ['value', 'targetId'])`, so re-syncs
+   *   remove records that disappeared upstream. Never overwrites isEnabled.
+   *   Omitted → merge + orIgnore (scanner subdomains() path unchanged).
+   * @returns The number of asset rows actually inserted.
+   */
+  public async upsertAssetsByTargetId(
+    targetId: string,
+    assets: Array<{ value: string; dnsRecords: Record<string, string[]> }>,
+    isEnabled?: boolean,
+    opts?: { replaceDnsRecords?: boolean },
+  ): Promise<number> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -79,49 +142,83 @@ export class DataAdapterService {
     try {
       // Deduplicate data based on value
       const uniqueData = Array.from(
-        new Map(data.map((asset) => [asset.value, asset])).values(),
+        new Map(assets.map((asset) => [asset.value, asset])).values(),
       );
 
-      const primaryAssets = uniqueData.find(
-        (asset) => asset.value === job.asset.value,
-      );
-
-      // Update Asset
-      await queryRunner.manager
+      // Locate the primary asset so its value can select the apex dnsRecords
+      // from the batch (same semantics as the old `job.asset.value` lookup).
+      const primaryAsset = await queryRunner.manager
         .createQueryBuilder()
-        .update(Asset)
-        .where({ id: job.asset.id })
-        .set({ isPrimary: true, dnsRecords: primaryAssets?.dnsRecords })
-        .execute();
+        .select('asset.id', 'id')
+        .addSelect('asset.value', 'value')
+        .addSelect('asset.dnsRecords', 'dnsRecords')
+        .from(Asset, 'asset')
+        .where('asset.targetId = :targetId', { targetId })
+        .andWhere('asset.isPrimary = true')
+        .getRawOne<{
+          id: string;
+          value: string;
+          dnsRecords?: Record<string, string[]> | null;
+        }>();
+
+      // Refresh the primary asset with the apex records — only when the apex
+      // is present in the batch. Merge (not replace) so discovered records
+      // survive re-syncs; skipping when the apex is absent avoids clobbering
+      // dnsRecords with NULL on re-runs (the isPrimary refresh is only
+      // relevant on first creation anyway). With replaceDnsRecords the apex
+      // records REPLACE the existing set (stale records disappear).
+      if (primaryAsset) {
+        const apexRecords = uniqueData.find(
+          (asset) => asset.value === primaryAsset.value,
+        );
+        if (apexRecords) {
+          await queryRunner.manager
+            .createQueryBuilder()
+            .update(Asset)
+            .where({ id: primaryAsset.id })
+            .set({
+              isPrimary: true,
+              dnsRecords: opts?.replaceDnsRecords
+                ? apexRecords.dnsRecords
+                : mergeDnsRecords(
+                    primaryAsset.dnsRecords,
+                    apexRecords.dnsRecords,
+                  ),
+            })
+            .execute();
+        }
+      }
 
       const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(
-        job.asset.target.id,
+        targetId,
       );
       const workspaceConfigs =
         await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
 
-      // const workspaceId =
-      // Insert Assets
-      const insertResult = await queryRunner.manager
+      // Insert Assets. Default: orIgnore (re-runs are idempotent; subdomain
+      // rows are only ever created). replaceDnsRecords: orUpdate on
+      // (value, targetId) so existing rows' dnsRecords are refreshed while
+      // isEnabled (and every other column) stays untouched.
+      const insertQb = queryRunner.manager
         .createQueryBuilder()
         .insert()
         .into(Asset)
         .values(
-          uniqueData.map((asset) => {
-            const assetValues = { ...asset } as unknown as Record<string, string | number | boolean | object | null>;
-            delete assetValues.id;
-            return {
-              ...assetValues,
-              target: { id: job.asset.target.id },
-              isEnabled: workspaceConfigs.isAutoEnableAssetAfterDiscovered,
-            };
-          }),
-        )
-        .orIgnore()
-        .execute();
+          uniqueData.map((asset) => ({
+            value: asset.value,
+            dnsRecords: asset.dnsRecords,
+            target: { id: targetId },
+            isEnabled:
+              isEnabled ?? workspaceConfigs.isAutoEnableAssetAfterDiscovered,
+          })),
+        );
+      const insertResult = await (opts?.replaceDnsRecords
+        ? insertQb.orUpdate(['dnsRecords'], ['value', 'targetId'])
+        : insertQb.orIgnore()
+      ).execute();
 
       await queryRunner.commitTransaction();
-      return insertResult;
+      return insertResult.identifiers?.length ?? 0;
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;

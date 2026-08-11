@@ -59,11 +59,21 @@ export function ConnectedCard({
         <p className="text-sm text-muted-foreground">
           Connected {dayjs(integration.createdAt).fromNow()}
         </p>
+        {integration.lastRunAt && (
+          <p className="text-sm text-muted-foreground">
+            Last sync {dayjs(integration.lastRunAt).fromNow()}
+          </p>
+        )}
       </button>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" className="shrink-0">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            aria-label="Integration actions"
+          >
             <MoreHorizontal className="size-4" />
           </Button>
         </DropdownMenuTrigger>

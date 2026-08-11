@@ -16,12 +16,14 @@ import { InternalNetwork } from './entities/internal-network.entity';
 import { NetworkInterface } from './entities/network-interface.entity';
 import { InternalNetworksService } from './internal-networks.service';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
+import { TargetType, TargetSource } from '../targets/entities/target.entity';
 
 describe('InternalNetworksService', () => {
   let service: InternalNetworksService;
   let internalNetworkRepo: Repository<InternalNetwork>;
   let networkInterfaceRepo: Repository<NetworkInterface>;
   let workspacesService: WorkspacesService;
+  let targetsService: { createMultipleTargets: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -34,6 +36,7 @@ describe('InternalNetworksService', () => {
             findOne: jest.fn(),
             save: jest.fn(),
             remove: jest.fn(),
+            findByIds: jest.fn(),
             createQueryBuilder: jest.fn().mockReturnValue({
               leftJoinAndSelect: jest.fn().mockReturnThis(),
               addSelect: jest.fn().mockReturnThis(),
@@ -89,6 +92,9 @@ describe('InternalNetworksService', () => {
       getRepositoryToken(NetworkInterface),
     );
     workspacesService = module.get<WorkspacesService>(WorkspacesService);
+    targetsService = module.get<TargetsService>(
+      TargetsService,
+    ) as unknown as { createMultipleTargets: jest.Mock };
   });
 
   it('should be defined', () => {
@@ -527,6 +533,48 @@ describe('InternalNetworksService', () => {
       jest.spyOn(internalNetworkRepo, 'findOne').mockResolvedValue(null);
 
       await expect(service.getInternalNetworkById(id, workspaceId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('createTargetsFromInterfaces', () => {
+    it('should create targets with TargetSource.INTERNAL_NETWORK', async () => {
+      // Arrange
+      const workspaceId = randomUUID();
+      const internalNetworkId = randomUUID();
+      const interfaceId = randomUUID();
+      const user = { id: randomUUID() };
+      const dto = { networkInterfaceIds: [interfaceId] };
+
+      jest
+        .spyOn(networkInterfaceRepo, 'findByIds')
+        .mockResolvedValue([
+          { id: interfaceId, internalNetworkId, cidr: '10.0.0.0/24' },
+        ] as any);
+      jest
+        .spyOn(internalNetworkRepo, 'findByIds')
+        .mockResolvedValue([{ id: internalNetworkId, workspaceId }] as any);
+      jest
+        .spyOn(workspacesService, 'getWorkspaceByIdAndOwner')
+        .mockResolvedValue({} as any);
+      targetsService.createMultipleTargets.mockResolvedValue({});
+
+      // Act
+      const result = await service.createTargetsFromInterfaces(
+        dto,
+        user as any,
+      );
+
+      // Assert
+      expect(result).toEqual({
+        message: 'Targets created successfully from network interfaces',
+      });
+      expect(targetsService.createMultipleTargets).toHaveBeenCalledWith(
+        { targets: [{ value: '10.0.0.0/24', type: TargetType.CIDR }] },
+        workspaceId,
+        user,
+        internalNetworkId,
+        TargetSource.INTERNAL_NETWORK,
+      );
     });
   });
 });

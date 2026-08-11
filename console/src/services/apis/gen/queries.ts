@@ -66,6 +66,17 @@ export const TargetType = {
   IP: 'IP',
 } as const;
 
+/**
+ * Where the target came from
+ */
+export type TargetSource = (typeof TargetSource)[keyof typeof TargetSource];
+
+export const TargetSource = {
+  MANUAL: 'MANUAL',
+  cloudflare: 'cloudflare',
+  INTERNAL_NETWORK: 'INTERNAL_NETWORK',
+} as const;
+
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
 export const JobStatus = {
@@ -96,6 +107,8 @@ export type Target = {
   value: string;
   /** The type of target (DOMAIN, CIDR, or IP) */
   type: TargetType;
+  /** Where the target came from */
+  source: TargetSource;
   lastDiscoveredAt: string;
   totalAssetServices: number;
   status: JobStatus;
@@ -129,6 +142,13 @@ export type CreateMultipleTargetsDto = {
   targets: CreateTargetDto[];
 };
 
+export type TargetSourceDto = {
+  /** Human-readable label of the target source */
+  source: string;
+  /** Icon URL for the source integration (empty string when the source has no icon) */
+  icon: string;
+};
+
 export type GetManyTargetResponseDtoScanSchedule =
   (typeof GetManyTargetResponseDtoScanSchedule)[keyof typeof GetManyTargetResponseDtoScanSchedule];
 
@@ -153,6 +173,7 @@ export type GetManyTargetResponseDto = {
   id: string;
   value: string;
   type: TargetType;
+  source: TargetSourceDto;
   reScanCount: number;
   scanSchedule: GetManyTargetResponseDtoScanSchedule;
   status: GetManyTargetResponseDtoStatus;
@@ -199,8 +220,6 @@ export type UpdateTargetDto = {
   scanSchedule: UpdateTargetDtoScanSchedule;
 };
 
-export type WorkspaceArchivedAt = { [key: string]: unknown };
-
 /**
  * Encrypted Data Encryption Key (DEK) for this workspace. Encrypted with system KEK. Null for workspaces created before envelope encryption.
  * @nullable
@@ -221,7 +240,8 @@ export type Workspace = {
   name: string;
   /** The description of the workspace */
   description: string;
-  archivedAt?: WorkspaceArchivedAt;
+  /** @nullable */
+  archivedAt?: string | null;
   /** Automatically scan and detect internet-facing assets (domains, IPs) in workspace networks */
   isAssetsDiscovery: boolean;
   /** Newly discovered assets become active immediately without manual review */
@@ -238,14 +258,13 @@ export type Workspace = {
   dekAt?: WorkspaceDekAt;
 };
 
-export type CreateWorkspaceDtoArchivedAt = { [key: string]: unknown };
-
 export type CreateWorkspaceDto = {
   /** The name of the workspace */
   name: string;
   /** The description of the workspace */
   description: string;
-  archivedAt?: CreateWorkspaceDtoArchivedAt;
+  /** @nullable */
+  archivedAt?: string | null;
 };
 
 export type GetApiKeyResponseDto = {
@@ -282,12 +301,6 @@ export type UpdateWorkspaceConfigsDto = {
  */
 export type WorkspaceResponseDtoDescription = { [key: string]: unknown } | null;
 
-/**
- * Archival timestamp
- * @nullable
- */
-export type WorkspaceResponseDtoArchivedAt = { [key: string]: unknown } | null;
-
 export type WorkspaceResponseDto = {
   /** Workspace ID */
   id: string;
@@ -306,7 +319,7 @@ export type WorkspaceResponseDto = {
    * Archival timestamp
    * @nullable
    */
-  archivedAt?: WorkspaceResponseDtoArchivedAt;
+  archivedAt?: string | null;
   /** Whether asset discovery is enabled */
   isAssetsDiscovery: boolean;
   /** Whether assets are auto-enabled after discovery */
@@ -448,14 +461,13 @@ export type InvitationPreviewDto = {
   expiresAt: string;
 };
 
-export type UpdateWorkspaceDtoArchivedAt = { [key: string]: unknown };
-
 export type UpdateWorkspaceDto = {
   /** The name of the workspace */
   name?: string;
   /** The description of the workspace */
   description?: string;
-  archivedAt?: UpdateWorkspaceDtoArchivedAt;
+  /** @nullable */
+  archivedAt?: string | null;
 };
 
 export type ArchiveWorkspaceDto = {
@@ -2314,6 +2326,13 @@ export type GetIntegrationDto = {
   createdById: string;
   createdAt: string;
   updatedAt: string;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule: string;
+  /**
+   * Timestamp of the last successful periodic sync
+   * @nullable
+   */
+  lastRunAt?: string | null;
 };
 
 /**
@@ -2332,6 +2351,8 @@ export type CreateIntegrationDto = {
   category: string;
   /** App-specific configuration validated via JSON Schema */
   config: CreateIntegrationDtoConfig;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule?: string;
 };
 
 export type GetManyGetIntegrationDtoDto = {
@@ -2355,6 +2376,8 @@ export type UpdateIntegrationDto = {
   description?: string;
   /** App-specific configuration validated via JSON Schema */
   config?: UpdateIntegrationDtoConfig;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule?: string;
 };
 
 export type TestIntegrationDto = {
@@ -28719,6 +28742,94 @@ export const useIntegrationsControllerTestIntegration = <
 > => {
   return useMutation(
     getIntegrationsControllerTestIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Triggers an immediate asset sync for a cloud-provider integration (e.g. Cloudflare). Fetches zones + DNS records and ingests them as targets/assets, then returns the sync counts.
+ * @summary Run integration sync now
+ */
+export const integrationsControllerSyncIntegration = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/integrations/${id}/sync`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerSyncIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerSyncIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return integrationsControllerSyncIntegration(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerSyncIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>
+>;
+
+export type IntegrationsControllerSyncIntegrationMutationError = unknown;
+
+/**
+ * @summary Run integration sync now
+ */
+export const useIntegrationsControllerSyncIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerSyncIntegrationMutationOptions(options),
     queryClient,
   );
 };

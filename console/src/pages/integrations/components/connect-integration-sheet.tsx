@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,6 +21,8 @@ import { Loader2, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { IntegrationLogo } from './integration-logo';
+
+const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 
 interface SchemaProperty {
   type?: string;
@@ -241,11 +244,19 @@ export function ConnectIntegrationSheet({
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [integrationName, setIntegrationName] = useState('');
+  const [syncSchedule, setSyncSchedule] = useState('disabled');
+  // Last cron authored in the builder, kept across toggle off/on so toggling
+  // the schedule off and back on does not silently reset the user's cron (U13).
+  const [draftCron, setDraftCron] = useState('');
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
 
   // Reset form when sheet opens, populate defaults from schema
   useEffect(() => {
     if (open) {
       setIntegrationName(schema.title ?? '');
+      setSyncSchedule('disabled');
+      setDraftCron('');
+      setScheduleEnabled(false);
       const defaults: Record<string, unknown> = {};
       for (const [key, prop] of Object.entries(schema.properties ?? {})) {
         if (key === 'app_type' || key === 'category') continue;
@@ -312,7 +323,8 @@ export function ConnectIntegrationSheet({
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!appType || !category) {
       toast.error('Invalid integration schema');
       return;
@@ -322,11 +334,31 @@ export function ConnectIntegrationSheet({
       return;
     }
 
+    // Client-side required validation: the server 400 would otherwise surface
+    // as a generic failure toast (U4).
+    const requiredFields = (schema.required ?? []).filter(
+      (key) => key !== 'app_type' && key !== 'category',
+    );
+    const missing = requiredFields.filter((key) => {
+      const value = formValues[key];
+      if (typeof value === 'string') return value.trim() === '';
+      return value === undefined || value === null;
+    });
+    if (missing.length > 0) {
+      toast.error(
+        'Please fill in required fields: ' + missing.join(', '),
+      );
+      return;
+    }
+
     createIntegration({
       data: {
         name: integrationName.trim(),
         appType,
         category,
+        // syncSchedule is only meaningful for cloud providers; omit it
+        // otherwise so other categories never send 'disabled' (U11).
+        ...(category === CLOUD_PROVIDER_CATEGORY ? { syncSchedule } : {}),
         config: formValues as Record<string, unknown>,
       },
     });
@@ -345,6 +377,8 @@ export function ConnectIntegrationSheet({
           )}
         </SheetHeader>
 
+        {/* Form so Enter in any text field triggers Connect (U15). */}
+        <form className="contents" onSubmit={handleSubmit}>
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="integration-name">
@@ -357,6 +391,47 @@ export function ConnectIntegrationSheet({
               onChange={(e) => setIntegrationName(e.target.value)}
             />
           </div>
+
+          {category === CLOUD_PROVIDER_CATEGORY && (
+            <div className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="sync-schedule-toggle"
+                    className="text-sm font-medium"
+                  >
+                    Sync schedule
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Optionally run automatic syncs on a schedule.
+                  </p>
+                </div>
+                <Switch
+                  id="sync-schedule-toggle"
+                  name="sync-schedule-toggle"
+                  checked={scheduleEnabled}
+                  onCheckedChange={(checked) => {
+                    setScheduleEnabled(checked);
+                    if (!checked) setSyncSchedule('disabled');
+                  }}
+                />
+              </div>
+              {scheduleEnabled && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs text-muted-foreground">
+                    Schedule (stored in UTC)
+                  </p>
+                  <CronScheduleBuilder
+                    defaultValue={draftCron || undefined}
+                    onChange={({ cron }) => {
+                      setSyncSchedule(cron);
+                      setDraftCron(cron);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {formProperties.length === 0 && (
             <p className="text-sm text-muted-foreground">
@@ -434,17 +509,19 @@ export function ConnectIntegrationSheet({
 
         <SheetFooter>
           <Button
+            type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isPending}
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isPending}>
+          <Button type="submit" disabled={isPending}>
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Connect
           </Button>
         </SheetFooter>
+        </form>
       </SheetContent>
     </Sheet>
   );

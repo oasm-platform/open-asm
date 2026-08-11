@@ -33,6 +33,10 @@ tasks:
         msg: SPEC must identify one test file
     cmds:
       - pnpm run test -- --runTestsByPath {{.SPEC}}
+  # Run e2e tests (boots full AppModule; needs postgres+redis running)
+  test:e2e:
+    cmds:
+      - pnpm run test:e2e
   clean:
     cmds:
       - rm -rf ./husky

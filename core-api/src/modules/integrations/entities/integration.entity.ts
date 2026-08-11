@@ -68,6 +68,18 @@ export class Integration extends BaseEntity {
   @Column('uuid', { nullable: true })
   createdById: string;
 
+  @ApiProperty({
+    description: 'Cron schedule for periodic asset sync (5-field cron or "disabled")',
+  })
+  @Column('varchar', { default: 'disabled' })
+  syncSchedule: string;
+
+  @Column('varchar', { nullable: true })
+  syncJobId: string | null;
+
+  @Column('timestamptz', { nullable: true })
+  lastRunAt: Date | null;
+
   @OneToMany(
     () => TelegramConnect,
     (telegramConnect) => telegramConnect.integration,

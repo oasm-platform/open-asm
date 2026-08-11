@@ -1,3 +1,4 @@
+import { IsCronSchedule } from '@/modules/asset-group/dto/cron-schedule.validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
@@ -31,4 +32,14 @@ export class CreateIntegrationDto {
   })
   @IsObject()
   config: Record<string, unknown>;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Cron schedule for periodic asset sync (5-field cron or "disabled")',
+    example: 'disabled',
+  })
+  @IsOptional()
+  @IsCronSchedule()
+  syncSchedule?: string;
 }
