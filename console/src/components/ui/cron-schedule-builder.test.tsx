@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
-import { WEEKDAY_LABELS } from '@/lib/cron-schedule';
+import {
+  WEEKDAY_LABELS,
+  formatNextRun,
+  getNextRun,
+} from '@/lib/cron-schedule';
 
 const renderBuilder = (props?: Partial<React.ComponentProps<typeof CronScheduleBuilder>>) => {
   const onChange = vi.fn();
@@ -54,10 +58,13 @@ describe('CronScheduleBuilder', () => {
     const user = userEvent.setup();
     const { onChange } = renderBuilder();
     await user.click(screen.getByRole('button', { name: 'Monthly' }));
-    // grid shows day 1..28 (never 29-31 so every month matches)
+    // grid shows day 1..31 so every calendar day can be expressed
     expect(screen.getByRole('button', { name: 'Day 1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Day 28' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Day 29' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Day 31' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Day 32' }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Day 1' }));
     await user.click(screen.getByRole('button', { name: 'Day 10' }));
     await user.click(screen.getByRole('button', { name: 'Day 26' }));
@@ -67,6 +74,33 @@ describe('CronScheduleBuilder', () => {
       cron: '0 17 9,25 * *',
       timezone: 'Asia/Ho_Chi_Minh',
     });
+  });
+
+  it('lets the user pick day 29-31 and emits them in the cron (U12)', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderBuilder({ timezone: 'UTC' });
+    await user.click(screen.getByRole('button', { name: 'Monthly' }));
+    await user.click(screen.getByRole('button', { name: 'Day 30' }));
+    // UTC avoids the local-to-UTC day shift, so 30 stays 30 in the cron.
+    expect(onChange).toHaveBeenLastCalledWith({
+      cron: expect.stringContaining('30') as unknown as string,
+      timezone: 'UTC',
+    });
+  });
+
+  it('renders the next run in the selected timezone, not the device timezone (U2)', () => {
+    renderBuilder({
+      timezone: 'Asia/Tokyo',
+      defaultValue: '0 12 * * *',
+    });
+    const nextRun = getNextRun('0 12 * * *', 'Asia/Tokyo');
+    expect(nextRun).not.toBeNull();
+    // Same helper the component must use, so this pins the exact rendering.
+    const expected = formatNextRun(nextRun!, 'Asia/Tokyo');
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    // The selected timezone's offset is embedded (Asia/Tokyo is UTC+9, no DST),
+    // unlike the previous device-timezone wall clock which had no annotation.
+    expect(expected).toContain('GMT+9');
   });
 
   it('preselects the current weekday when Weekly is chosen', async () => {

@@ -68,7 +68,12 @@ export function ConnectedCard({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" className="shrink-0">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            aria-label="Integration actions"
+          >
             <MoreHorizontal className="size-4" />
           </Button>
         </DropdownMenuTrigger>

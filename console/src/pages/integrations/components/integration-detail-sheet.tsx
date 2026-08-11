@@ -20,11 +20,11 @@ import {
 } from '@/services/apis/gen/queries';
 import type { GetIntegrationDto } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
 import {
   buildCronExpression,
   DEFAULT_CRON_STATE,
   formatCronLabel,
+  formatNextRun,
   getLocalTimezone,
 } from '@/lib/cron-schedule';
 import { Loader2, Pencil, Play, RefreshCw, X } from 'lucide-react';
@@ -36,11 +36,13 @@ import { TelegramConnect } from './telegram-connect';
 
 const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 
-/** Fallback cron used when the schedule toggle is on but no cron was captured yet. */
-const DEFAULT_SCHEDULE = buildCronExpression(
-  DEFAULT_CRON_STATE,
-  getLocalTimezone(),
-);
+/**
+ * Fallback cron used when the schedule toggle is on but no cron was captured
+ * yet. Computed lazily (not at module load) so DST-sensitive
+ * getLocalTimezone() reflects the time of day it is actually used (U9).
+ */
+const getDefaultSchedule = (): string =>
+  buildCronExpression(DEFAULT_CRON_STATE, getLocalTimezone());
 
 interface SchemaProperty {
   type?: string;
@@ -293,13 +295,6 @@ export function IntegrationDetailSheet({
     }
   }, [isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset edit state when sheet closes
-  useEffect(() => {
-    if (!open) {
-      setIsEditing(false);
-    }
-  }, [open]);
-
   const { mutate: testIntegration, isPending: isTesting } =
     useIntegrationsControllerTestIntegration({
       mutation: {
@@ -324,23 +319,13 @@ export function IntegrationDetailSheet({
   const { mutate: syncIntegration, isPending: isSyncing } =
     useIntegrationsControllerSyncIntegration({
       mutation: {
-        onSuccess: (data) => {
-          const result = data as unknown as {
-            success: boolean;
-            message?: string;
-            counts?: Record<string, number>;
-          };
-          if (!result.success) {
-            toast.error(result.message ?? 'Sync failed');
-            return;
-          }
+        onSuccess: () => {
+          // The backend enqueues a sync job and returns immediately; the
+          // list query refetches the fresh lastRunAt (U5).
           queryClient.invalidateQueries({
             queryKey: getIntegrationsControllerGetManyIntegrationsQueryKey(),
           });
-          const counts = result.counts ?? {};
-          toast.success(
-            `Sync completed — zones: ${counts.zones ?? 0}, records: ${counts.records ?? 0}, targets created: ${counts.targetsCreated ?? 0}, assets upserted: ${counts.assetsUpserted ?? 0}`,
-          );
+          toast.success('Sync started — it may take a few minutes');
         },
         onError: () => {
           toast.error('Failed to sync integration');
@@ -374,12 +359,15 @@ export function IntegrationDetailSheet({
     return val;
   };
 
-  const scheduleLabel = integration.syncSchedule
-    ? (formatCronLabel(integration.syncSchedule, getLocalTimezone()) ??
-      integration.syncSchedule)
-    : '—';
+  const scheduleLabel =
+    integration.syncSchedule && integration.syncSchedule !== 'disabled'
+      ? (formatCronLabel(integration.syncSchedule, getLocalTimezone()) ??
+        integration.syncSchedule)
+      : integration.syncSchedule === 'disabled'
+        ? 'No schedule — automatic syncs are off'
+        : '—';
   const lastRunLabel = integration.lastRunAt
-    ? dayjs(integration.lastRunAt).format('MMM D, YYYY h:mm A')
+    ? formatNextRun(new Date(integration.lastRunAt), getLocalTimezone())
     : '—';
 
   // Group properties by ui:form:group
@@ -408,7 +396,8 @@ export function IntegrationDetailSheet({
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!editName.trim()) {
       toast.error('Integration name is required');
       return;
@@ -422,7 +411,7 @@ export function IntegrationDetailSheet({
         ...(integration.category === CLOUD_PROVIDER_CATEGORY
           ? {
               syncSchedule: scheduleEnabled
-                ? editSchedule || DEFAULT_SCHEDULE
+                ? editSchedule || getDefaultSchedule()
                 : 'disabled',
             }
           : {}),
@@ -444,6 +433,11 @@ export function IntegrationDetailSheet({
           </div>
         </SheetHeader>
 
+        {/* Form so Enter in any text field triggers the primary action (U15). */}
+        <form
+          className="contents"
+          onSubmit={isEditing ? handleSave : undefined}
+        >
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="shrink-0">
@@ -520,6 +514,15 @@ export function IntegrationDetailSheet({
                           checked={value === true || value === 'true'}
                           disabled
                         />
+                      </div>
+                    ) : prop.format === 'password' ||
+                      prop['ui:widget'] === 'password' ? (
+                      // Never reveal the raw secret in view mode (U6): mask
+                      // it client-side even if the backend already masks.
+                      <div className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                        <span className="text-foreground break-words">
+                          {'****' + String(value).slice(-4)}
+                        </span>
                       </div>
                     ) : (
                       <div className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm">
@@ -666,9 +669,10 @@ export function IntegrationDetailSheet({
                       </p>
                     </div>
                     <Button
+                      type="button"
                       variant="outline"
                       className="gap-2"
-                      disabled={isSyncing}
+                      disabled={isSyncing || isSaving || isTesting}
                       onClick={() => syncIntegration({ id: integration.id })}
                     >
                       {isSyncing ? (
@@ -695,6 +699,7 @@ export function IntegrationDetailSheet({
           {isEditing ? (
             <div className="flex w-full gap-2">
               <Button
+                type="button"
                 variant="outline"
                 className="flex-1"
                 onClick={handleCancel}
@@ -703,9 +708,9 @@ export function IntegrationDetailSheet({
                 Cancel
               </Button>
               <Button
+                type="submit"
                 variant="default"
                 className="flex-1"
-                onClick={handleSave}
                 disabled={isSaving}
               >
                 {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
@@ -715,17 +720,20 @@ export function IntegrationDetailSheet({
           ) : (
             <div className="flex w-full gap-2">
               <Button
+                type="button"
                 variant="outline"
                 className="flex-1 gap-2"
                 onClick={() => setIsEditing(true)}
+                disabled={isSyncing}
               >
                 <Pencil className="size-4" />
                 Edit
               </Button>
               <Button
+                type="button"
                 variant="default"
                 className="flex-1 gap-2"
-                disabled={isTesting}
+                disabled={isTesting || isSyncing}
                 onClick={() =>
                   testIntegration({ id: integration.id, data: {} })
                 }
@@ -740,6 +748,7 @@ export function IntegrationDetailSheet({
             </div>
           )}
         </SheetFooter>
+        </form>
       </SheetContent>
     </Sheet>
   );

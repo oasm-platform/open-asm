@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import dayjs from 'dayjs';
-import { formatCronLabel, getLocalTimezone } from '@/lib/cron-schedule';
+import {
+  formatCronLabel,
+  formatNextRun,
+  getLocalTimezone,
+} from '@/lib/cron-schedule';
 import { renderWithProviders } from '@/test/utils';
 import type { GetIntegrationDto } from '@/services/apis/gen/queries';
 import { IntegrationDetailSheet } from '../components/integration-detail-sheet';
@@ -9,8 +12,12 @@ import { IntegrationDetailSheet } from '../components/integration-detail-sheet';
 const mocks = vi.hoisted(() => ({
   syncMutate: vi.fn(),
   syncOnSuccess: undefined as undefined | ((data: unknown) => void),
+  syncOnError: undefined as undefined | ((error: unknown) => void),
+  syncIsPending: false,
   testMutate: vi.fn(),
+  testIsPending: false,
   updateMutate: vi.fn(),
+  updateIsPending: false,
 }));
 
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
@@ -19,17 +26,21 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
     ...actual,
     useIntegrationsControllerTestIntegration: () => ({
       mutate: mocks.testMutate,
-      isPending: false,
+      isPending: mocks.testIsPending,
     }),
     useIntegrationsControllerUpdateIntegration: () => ({
       mutate: mocks.updateMutate,
-      isPending: false,
+      isPending: mocks.updateIsPending,
     }),
     useIntegrationsControllerSyncIntegration: (opts?: {
-      mutation?: { onSuccess?: (data: unknown) => void };
+      mutation?: {
+        onSuccess?: (data: unknown) => void;
+        onError?: (error: unknown) => void;
+      };
     }) => {
       mocks.syncOnSuccess = opts?.mutation?.onSuccess;
-      return { mutate: mocks.syncMutate, isPending: false };
+      mocks.syncOnError = opts?.mutation?.onError;
+      return { mutate: mocks.syncMutate, isPending: mocks.syncIsPending };
     },
   };
 });
@@ -40,6 +51,19 @@ vi.mock('sonner', () => ({
     error: vi.fn(),
   },
 }));
+
+beforeAll(() => {
+  // The U15 <form> wrapper makes Radix Switch render its hidden form input,
+  // which measures itself via useSize -> ResizeObserver (absent in jsdom).
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof ResizeObserver;
+});
 
 const cloudSchema = {
   $id: 'cloudflare',
@@ -93,9 +117,13 @@ describe('IntegrationDetailSheet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.syncOnSuccess = undefined;
+    mocks.syncOnError = undefined;
+    mocks.syncIsPending = false;
+    mocks.testIsPending = false;
+    mocks.updateIsPending = false;
   });
 
-  it('renders the human-readable sync schedule and formatted lastRunAt', async () => {
+  it('renders the human-readable sync schedule and timezone-annotated lastRunAt (U8)', async () => {
     renderWithProviders(
       <IntegrationDetailSheet
         integration={cloudIntegration}
@@ -114,9 +142,11 @@ describe('IntegrationDetailSheet', () => {
     expect(expectedLabel).not.toBeNull();
     expect(screen.getByText(expectedLabel!)).toBeInTheDocument();
 
+    // U8: the Last sync timestamp is rendered via formatNextRun so it carries
+    // the local timezone annotation instead of a bare wall-clock time.
     expect(
       screen.getByText(
-        dayjs('2026-08-09T10:00:00.000Z').format('MMM D, YYYY h:mm A'),
+        formatNextRun(new Date('2026-08-09T10:00:00.000Z'), tz),
       ),
     ).toBeInTheDocument();
   });
@@ -142,7 +172,7 @@ describe('IntegrationDetailSheet', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
-  it('renders the raw cron string when it cannot be formatted (disabled)', async () => {
+  it('shows the disabled-schedule copy instead of the raw "disabled" string (U3)', async () => {
     const disabled: GetIntegrationDto = {
       ...cloudIntegration,
       syncSchedule: 'disabled',
@@ -159,11 +189,39 @@ describe('IntegrationDetailSheet', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('disabled')).toBeInTheDocument();
+      expect(
+        screen.getByText('No schedule — automatic syncs are off'),
+      ).toBeInTheDocument();
     });
+    expect(screen.queryByText('disabled')).not.toBeInTheDocument();
   });
 
-  it('calls the sync mutation on "Sync now" and invalidates the list on success', async () => {
+  it('masks password-format config in view mode (U6)', async () => {
+    const withToken: GetIntegrationDto = {
+      ...cloudIntegration,
+      syncSchedule: 'disabled',
+      lastRunAt: null,
+      config: { apiToken: 'tok-12345678' },
+    };
+
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={withToken}
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('API Token')).toBeInTheDocument();
+    });
+    // Masked value: '****' + last 4 chars, never the raw secret.
+    expect(screen.getByText('****5678')).toBeInTheDocument();
+    expect(screen.queryByText('tok-12345678')).not.toBeInTheDocument();
+  });
+
+  it('calls the sync mutation on "Sync now", invalidates the list and shows the queued toast on success (U5)', async () => {
     const { queryClient } = renderWithProviders(
       <IntegrationDetailSheet
         integration={cloudIntegration}
@@ -173,6 +231,7 @@ describe('IntegrationDetailSheet', () => {
       />,
     );
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const toast = (await import('sonner')).toast;
 
     const syncButton = await screen.findByRole('button', {
       name: /sync now/i,
@@ -180,14 +239,37 @@ describe('IntegrationDetailSheet', () => {
     fireEvent.click(syncButton);
     expect(mocks.syncMutate).toHaveBeenCalledWith({ id: 'int-1' });
 
-    mocks.syncOnSuccess?.({
-      success: true,
-      message: 'Sync completed',
-      counts: { zones: 2, records: 5, wildcardZones: 1, targetsCreated: 3, assetsUpserted: 4 },
-    });
+    // The backend enqueues a job and responds immediately — no counts.
+    mocks.syncOnSuccess?.({ success: true, message: 'Sync queued' });
 
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalled();
+    });
+    expect(toast.success).toHaveBeenCalledWith(
+      'Sync started — it may take a few minutes',
+    );
+  });
+
+  it('shows an error toast when the sync mutation rejects (U5)', async () => {
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={cloudIntegration}
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+    const toast = (await import('sonner')).toast;
+
+    const syncButton = await screen.findByRole('button', {
+      name: /sync now/i,
+    });
+    fireEvent.click(syncButton);
+
+    mocks.syncOnError?.(new Error('boom'));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to sync integration');
     });
   });
 
@@ -327,5 +409,65 @@ describe('IntegrationDetailSheet', () => {
 
     expect(screen.queryByText('Sync schedule')).not.toBeInTheDocument();
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
+  it('pressing Enter in a text field saves the edit (U15)', async () => {
+    const { user } = renderWithProviders(
+      <IntegrationDetailSheet
+        integration={cloudIntegration}
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    const nameInput = await screen.findByLabelText(/integration name/i);
+
+    await user.type(nameInput, '{Enter}');
+
+    await waitFor(() => {
+      expect(mocks.updateMutate).toHaveBeenCalled();
+    });
+  });
+
+  it('disables Edit/Test/Sync while a sync is running (U16)', async () => {
+    mocks.syncIsPending = true;
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={cloudIntegration}
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /syncing/i }),
+      ).toBeDisabled();
+    });
+    expect(screen.getByRole('button', { name: /edit/i })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /test integration/i }),
+    ).toBeDisabled();
+  });
+
+  it('disables the Sync button while a test is running (U16)', async () => {
+    mocks.testIsPending = true;
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={cloudIntegration}
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /sync now/i }),
+      ).toBeDisabled();
+    });
   });
 });

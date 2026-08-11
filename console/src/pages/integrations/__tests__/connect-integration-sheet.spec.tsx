@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { toast } from 'sonner';
 import { renderWithProviders } from '@/test/utils';
 import { ConnectIntegrationSheet } from '../components/connect-integration-sheet';
 
@@ -24,6 +25,19 @@ vi.mock('sonner', () => ({
     error: vi.fn(),
   },
 }));
+
+beforeAll(() => {
+  // The U15 <form> wrapper makes Radix Switch render its hidden form input,
+  // which measures itself via useSize -> ResizeObserver (absent in jsdom).
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof ResizeObserver;
+});
 
 const cloudSchema = {
   $id: 'cloudflare',
@@ -53,6 +67,12 @@ const slackSchema = {
   },
   required: ['app_type', 'category', 'webhookUrl'],
   isAvailable: true,
+};
+
+const fillRequired = async (labelRegex: RegExp, value = 'secret-value') => {
+  fireEvent.change(screen.getByLabelText(labelRegex), {
+    target: { value },
+  });
 };
 
 describe('ConnectIntegrationSheet', () => {
@@ -107,6 +127,7 @@ describe('ConnectIntegrationSheet', () => {
         screen.getByRole('button', { name: /connect/i }),
       ).toBeInTheDocument();
     });
+    await fillRequired(/api token/i);
     fireEvent.click(screen.getByRole('button', { name: /connect/i }));
 
     await waitFor(() => {
@@ -118,7 +139,7 @@ describe('ConnectIntegrationSheet', () => {
         appType: 'cloudflare',
         category: 'CLOUD_PROVIDER',
         syncSchedule: 'disabled',
-        config: {},
+        config: { apiToken: 'secret-value' },
       },
     });
   });
@@ -137,6 +158,7 @@ describe('ConnectIntegrationSheet', () => {
         screen.getByRole('switch', { name: /sync schedule/i }),
       ).toBeInTheDocument();
     });
+    await fillRequired(/api token/i);
     fireEvent.click(screen.getByRole('switch', { name: /sync schedule/i }));
 
     // The cron builder mounts and emits its default schedule via onChange.
@@ -156,5 +178,100 @@ describe('ConnectIntegrationSheet', () => {
         }),
       }),
     );
+  });
+
+  it('blocks submit and lists missing required fields without calling the mutation (U4)', async () => {
+    renderWithProviders(
+      <ConnectIntegrationSheet
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /connect/i }),
+      ).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /connect/i }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Please fill in required fields: apiToken',
+      );
+    });
+    expect(mocks.createMutate).not.toHaveBeenCalled();
+  });
+
+  it('omits syncSchedule from the payload for non-cloud integrations (U11)', async () => {
+    renderWithProviders(
+      <ConnectIntegrationSheet
+        schema={slackSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /connect/i }),
+      ).toBeInTheDocument();
+    });
+    await fillRequired(/webhook url/i, 'https://hooks.slack.com/x');
+    fireEvent.click(screen.getByRole('button', { name: /connect/i }));
+
+    await waitFor(() => {
+      expect(mocks.createMutate).toHaveBeenCalled();
+    });
+    const payload = mocks.createMutate.mock.calls[0][0].data;
+    expect(payload).not.toHaveProperty('syncSchedule');
+  });
+
+  it('preserves the authored cron when the schedule toggle is turned off and on (U13)', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    const toggle = await screen.findByRole('switch', {
+      name: /sync schedule/i,
+    });
+    await user.click(toggle);
+
+    // Author a weekly cron in the builder.
+    await user.click(await screen.findByRole('button', { name: 'Weekly' }));
+    await screen.findByRole('button', { name: 'Mon' });
+
+    // Toggle off: the builder unmounts.
+    await user.click(screen.getByRole('switch', { name: /sync schedule/i }));
+    expect(
+      screen.queryByRole('button', { name: 'Weekly' }),
+    ).not.toBeInTheDocument();
+
+    // Toggle on: the builder must remount with the previously entered cron.
+    await user.click(screen.getByRole('switch', { name: /sync schedule/i }));
+    const weekly = await screen.findByRole('button', { name: 'Weekly' });
+    expect(weekly).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('submits when Enter is pressed in a text field (U15)', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet
+        schema={cloudSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: /connect/i });
+    await user.type(screen.getByLabelText(/api token/i), 'tok-123{Enter}');
+
+    await waitFor(() => {
+      expect(mocks.createMutate).toHaveBeenCalled();
+    });
   });
 });
