@@ -5,6 +5,7 @@ import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { AuditLog } from '../audit/audit-log.decorator';
 import {
   Body,
   Controller,
@@ -41,6 +42,18 @@ export class TargetsController {
     },
     request: {
       getWorkspaceId: true,
+    },
+  })
+  @AuditLog('target.created', {
+    // Best-effort changes from the body — record the requested target values,
+    // never echo back the full created entities.
+    changes: (body) => {
+      const dto = body as CreateMultipleTargetsDto | undefined;
+      const changes: Record<string, { after?: unknown }> = {};
+      if (dto?.targets && dto.targets.length > 0) {
+        changes.targets = { after: dto.targets.map((t) => t.value) };
+      }
+      return changes;
     },
   })
   @WorkspaceAccess('target.write')
@@ -162,6 +175,7 @@ export class TargetsController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @AuditLog('target.deleted')
   @WorkspaceAccess('target.write')
   @Delete(':id/workspace/:workspaceId')
   deleteTarget(
@@ -197,6 +211,17 @@ export class TargetsController {
       'Modifies the configuration and properties of an existing security testing target, allowing for dynamic adjustments to assessment parameters.',
     response: {
       serialization: Target,
+    },
+  })
+  @AuditLog('target.updated', {
+    // Best-effort changes from the body — only fields present in the request.
+    changes: (body) => {
+      const dto = body as UpdateTargetDto | undefined;
+      const changes: Record<string, { after?: unknown }> = {};
+      if (dto?.scanSchedule !== undefined) {
+        changes.scanSchedule = { after: dto.scanSchedule };
+      }
+      return changes;
     },
   })
   @WorkspaceAccess('target.write')

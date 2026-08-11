@@ -4,6 +4,7 @@ import { useNavigate, useParams } from '@tanstack/react-router';
 import { useEffect, useMemo, type JSX } from 'react';
 import { Loader2 } from 'lucide-react';
 import ApiKeysSettings from './components/api-keys-settings';
+import AuditLogSettings from './components/audit-log-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import GetAboutProject from './components/get-about-project';
 import McpConnect from './components/mcp-connect';
@@ -76,6 +77,17 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         },
         component: <MembersSettings />,
         permission: 'member.read',
+      },
+      {
+        id: 'audit',
+        label: 'Audit log',
+        path: '/settings/audit',
+        content: {
+          title: 'Audit log',
+          description: 'View and export workspace activity',
+        },
+        component: <AuditLogSettings />,
+        permission: 'audit.read',
       },
     ],
   },

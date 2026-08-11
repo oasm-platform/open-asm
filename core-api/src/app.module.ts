@@ -13,6 +13,7 @@ import {
 import * as path from 'path';
 import { icuFormatter } from './utils/icu-formatter';
 import { DatabaseModule } from './database/database.module';
+import { AuditModule } from './modules/audit/audit.module';
 import { CombineModule } from './modules/combine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { StorageModule } from './modules/storage/storage.module';
@@ -50,6 +51,7 @@ import { ServicesModule } from './services/services.module';
       inject: [ConfigService],
     }),
     DatabaseModule,
+    AuditModule,
     CombineModule,
     NotificationsModule,
     StorageModule,

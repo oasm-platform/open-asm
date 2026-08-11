@@ -19,6 +19,27 @@ export enum InvitationStatus {
 }
 
 /**
+ * Enum representing who performed an audit event.
+ * v1 only writes `user` (authenticated-session actions); the other values are
+ * reserved for v2 (api_key attribution, worker/system events, agent actions).
+ */
+export enum AuditActorType {
+  User = 'user',
+  ApiKey = 'api_key',
+  System = 'system',
+  Agent = 'agent',
+}
+
+/**
+ * Enum representing the outcome of an audited action.
+ */
+export enum AuditOutcome {
+  Success = 'success',
+  Failure = 'failure',
+  Denied = 'denied',
+}
+
+/**
  * Enum representing tool categories used in the system
  */
 export enum ToolCategory {
@@ -134,6 +155,7 @@ export enum BullMQName {
   ISSUE_CREATION = 'issue-creation',
   VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
   INTEGRATION_SYNC_SCHEDULE = 'integration-sync-schedule',
+  AUDIT_RETENTION = 'audit-retention',
 }
 
 export enum NotificationStatus {

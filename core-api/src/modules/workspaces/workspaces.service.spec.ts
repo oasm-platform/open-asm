@@ -13,6 +13,7 @@ import type { Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
@@ -32,6 +33,11 @@ describe('WorkspacesService', () => {
   let mockApiKeysService: Partial<ApiKeysService>;
   let mockNotificationsService: Partial<NotificationsService>;
   let mockWorkflowsService: Partial<WorkflowsService>;
+  let mockAuditService: {
+    recordInTx: jest.Mock;
+    pseudonymizeActor: jest.Mock;
+    buildActorContext: jest.Mock;
+  };
   let mockDataSource: Partial<DataSource>;
   let mockManager: any;
   let fixedTransactionalRepository: {
@@ -215,6 +221,12 @@ describe('WorkspacesService', () => {
       createDefaultWorkflows: jest.fn(),
     };
 
+    mockAuditService = {
+      recordInTx: jest.fn().mockResolvedValue({ id: randomUUID() }),
+      pseudonymizeActor: jest.fn().mockResolvedValue(undefined),
+      buildActorContext: jest.fn(),
+    };
+
     const mockWorkspaceEncryptionService = {
       generateWrappedDEK: jest.fn().mockReturnValue('wrapped-dek'),
     };
@@ -257,6 +269,10 @@ describe('WorkspacesService', () => {
         {
           provide: WorkflowsService,
           useValue: mockWorkflowsService,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
         {
           provide: DataSource,
@@ -619,7 +635,10 @@ describe('WorkspacesService', () => {
           isSystem: false,
         }),
       );
-      expect(mockPermissionRepository.save).toHaveBeenCalledWith(
+      // The insert now runs on the transaction manager so the audit row can
+      // commit atomically with the group (M4.1 explicit event wiring).
+      expect(mockManager.save).toHaveBeenCalledWith(
+        WorkspacePermission,
         expect.objectContaining({ workspace: { id: testWorkspaceId } }),
       );
     });
@@ -715,9 +734,7 @@ describe('WorkspacesService', () => {
       (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
         holderMembership,
       );
-      (mockPermissionRepository.save as jest.Mock).mockRejectedValue({
-        code: '23505',
-      });
+      (mockManager.save as jest.Mock).mockRejectedValue({ code: '23505' });
 
       await expect(
         service.createPermissionGroup(
@@ -1024,6 +1041,273 @@ describe('WorkspacesService', () => {
       await expect(
         service.removeMember(testWorkspaceId, memberId, testUserId),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('audit wiring — explicit events (M4.1)', () => {
+    const memberId = randomUUID();
+    const removedUserId = randomUUID();
+
+    // The controller passes this into the service (built via
+    // AuditService.buildActorContext(req)); the service must never call
+    // buildActorContext itself.
+    const auditContext = {
+      actorId: testUserId,
+      actorType: 'user',
+      actorName: 'Test User',
+      actorEmail: 'test@example.com',
+      sourceIp: '203.0.113.7',
+      userAgent: 'agent',
+      requestId: 'req-1',
+    };
+
+    const makeMember = (overrides: Record<string, unknown> = {}) => ({
+      id: memberId,
+      user: { id: removedUserId, name: 'Removed', image: null },
+      memberPermissions: [
+        { permission: { isSystem: false, permissions: ['group.read'] } },
+      ],
+      ...overrides,
+    });
+
+    it('deleteWorkspace records workspace.deleted in the same tx as the workspace delete', async () => {
+      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: testWorkspaceId,
+        name: 'Doomed',
+      });
+      // deleteAllTargetsFromWorkspace runs first (its own tx); stub its
+      // createQueryBuilder delete chain so only the workspace delete matters.
+      mockManager.getRepository.mockReturnValue({
+        createQueryBuilder: jest.fn().mockReturnValue({
+          delete: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          returning: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({ raw: [] }),
+        }),
+      });
+
+      const result = await service.deleteWorkspace(
+        testWorkspaceId,
+        testUserContext,
+        auditContext,
+      );
+
+      expect(result).toEqual({ message: 'Workspace deleted successfully' });
+      expect(mockManager.delete).toHaveBeenCalledWith(Workspace, {
+        id: testWorkspaceId,
+      });
+      expect(mockAuditService.recordInTx).toHaveBeenCalledTimes(1);
+      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
+        mockManager,
+        expect.objectContaining({
+          workspaceId: testWorkspaceId,
+          action: 'workspace.deleted',
+          resourceType: 'workspace',
+          resourceId: testWorkspaceId,
+          changes: { name: { after: 'Doomed' } },
+          actorId: testUserId,
+          actorName: 'Test User',
+        }),
+      );
+    });
+
+    it('removeMember records member.removed in the tx and pseudonymizes the removed user after commit (scenario 9)', async () => {
+      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
+        makeMember(),
+      );
+
+      const result = await service.removeMember(
+        testWorkspaceId,
+        memberId,
+        testUserId,
+        auditContext,
+      );
+
+      expect(result).toEqual({ message: 'Member removed successfully' });
+      // In-transaction audit row: actor = the acting user, target = removed
+      expect(mockManager.delete).toHaveBeenCalledWith(WorkspaceMembers, {
+        id: memberId,
+      });
+      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
+        mockManager,
+        expect.objectContaining({
+          workspaceId: testWorkspaceId,
+          action: 'member.removed',
+          resourceType: 'member',
+          resourceId: memberId,
+          metadata: { targetUserId: removedUserId },
+          actorId: testUserId,
+        }),
+      );
+      // GDPR sweep runs AFTER the tx commits
+      expect(mockAuditService.pseudonymizeActor).toHaveBeenCalledWith(
+        removedUserId,
+      );
+    });
+
+    it('removeMember still succeeds when pseudonymization fails (audit must not break the business request)', async () => {
+      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
+        makeMember(),
+      );
+      (mockAuditService.pseudonymizeActor).mockRejectedValue(
+        new Error('trigger blocked'),
+      );
+
+      await expect(
+        service.removeMember(testWorkspaceId, memberId, testUserId, auditContext),
+      ).resolves.toEqual({ message: 'Member removed successfully' });
+    });
+
+    it('updateMemberPermissions records member.permissions.updated with the before/after group ids', async () => {
+      const oldGroupId = randomUUID();
+      const newGroupId = randomUUID();
+      (mockWorkspaceMembersRepository.findOne as jest.Mock)
+        .mockResolvedValueOnce(
+          makeMember({
+            memberPermissions: [
+              {
+                permission: {
+                  id: oldGroupId,
+                  isSystem: false,
+                  permissions: ['group.read'],
+                },
+              },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce({
+          memberPermissions: [
+            { permission: { permissions: ['*'] } },
+          ],
+        })
+        .mockResolvedValueOnce(makeMember());
+      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
+        { id: newGroupId, permissions: ['group.read'] },
+      ]);
+
+      await service.updateMemberPermissions(
+        testWorkspaceId,
+        memberId,
+        [newGroupId],
+        testUserId,
+        auditContext,
+      );
+
+      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
+        mockManager,
+        expect.objectContaining({
+          workspaceId: testWorkspaceId,
+          action: 'member.permissions.updated',
+          resourceType: 'member',
+          resourceId: memberId,
+          changes: {
+            permissionIds: { before: [oldGroupId], after: [newGroupId] },
+          },
+          actorId: testUserId,
+        }),
+      );
+    });
+
+    it('createPermissionGroup records permission_group.created with name and permissions', async () => {
+      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
+        memberPermissions: [{ permission: { permissions: ['*'] } }],
+      });
+
+      const result = await service.createPermissionGroup(
+        testWorkspaceId,
+        { name: 'Viewer', permissions: ['group.read'] },
+        testUserId,
+        auditContext,
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({ name: 'Viewer', isSystem: false }),
+      );
+      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
+        mockManager,
+        expect.objectContaining({
+          workspaceId: testWorkspaceId,
+          action: 'permission_group.created',
+          resourceType: 'permission_group',
+          changes: {
+            name: { after: 'Viewer' },
+            permissions: { after: ['group.read'] },
+          },
+          actorId: testUserId,
+        }),
+      );
+    });
+
+    it('updatePermissionGroup records permission_group.updated with before/after permissions', async () => {
+      const group = {
+        id: randomUUID(),
+        name: 'Viewer',
+        isSystem: false,
+        permissions: ['group.read'],
+      };
+      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue(group);
+      // The updater holds "*" so the privilege-subset guard passes
+      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
+        memberPermissions: [{ permission: { permissions: ['*'] } }],
+      });
+
+      await service.updatePermissionGroup(
+        testWorkspaceId,
+        group.id,
+        { permissions: ['group.read', 'target.read'] },
+        testUserId,
+        auditContext,
+      );
+
+      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
+        mockManager,
+        expect.objectContaining({
+          workspaceId: testWorkspaceId,
+          action: 'permission_group.updated',
+          resourceType: 'permission_group',
+          resourceId: group.id,
+          changes: {
+            permissions: {
+              before: ['group.read'],
+              after: ['group.read', 'target.read'],
+            },
+          },
+          actorId: testUserId,
+        }),
+      );
+    });
+
+    it('deletePermissionGroup records permission_group.deleted with the group name', async () => {
+      const group = {
+        id: randomUUID(),
+        name: 'Viewer',
+        isSystem: false,
+        permissions: ['group.read'],
+      };
+      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue(group);
+
+      const result = await service.deletePermissionGroup(
+        testWorkspaceId,
+        group.id,
+        auditContext,
+      );
+
+      expect(result).toEqual({ message: 'Permission group deleted successfully' });
+      expect(mockManager.delete).toHaveBeenCalledWith(WorkspacePermission, {
+        id: group.id,
+        workspace: { id: testWorkspaceId },
+      });
+      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
+        mockManager,
+        expect.objectContaining({
+          workspaceId: testWorkspaceId,
+          action: 'permission_group.deleted',
+          resourceType: 'permission_group',
+          resourceId: group.id,
+          changes: { name: { after: 'Viewer' } },
+          actorId: testUserId,
+        }),
+      );
     });
   });
 
@@ -1679,6 +1963,14 @@ describe('WorkspacesService', () => {
           expect(action.description.trim().length).toBeGreaterThan(0);
         }
       }
+    });
+
+    it('catalog includes audit.read for the audit log endpoints', () => {
+      const catalog = service.getPermissionCatalog();
+      const audit = catalog.find((resource) => resource.resource === 'audit');
+      expect(audit).toBeDefined();
+      expect(audit!.actions.map((action) => action.action)).toContain('read');
+      expect(`${audit!.resource}.read`).toMatch(/^[a-z]+\.[a-z]+$/);
     });
   });
 

@@ -17,6 +17,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { AuditLog } from '../audit/audit-log.decorator';
 import { Asset } from '../assets/entities/assets.entity';
 import { AssetGroupService } from './asset-group.service';
 import { AddManyAssetsToAssetGroupDto } from './dto/add-many-assets-to-asset-group.dto';
@@ -104,6 +105,12 @@ export class AssetGroupController {
     request: {
       getWorkspaceId: true,
     },
+  })
+  @AuditLog('asset_group.created', {
+    // Best-effort changes from the body; name is required by the DTO.
+    changes: (body) => ({
+      name: { after: (body as { name?: string })?.name ?? '' },
+    }),
   })
   @WorkspaceAccess('group.write')
   @Post()
@@ -198,6 +205,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @AuditLog('asset_group.deleted')
   @WorkspaceAccess('group.write')
   @Delete(':id')
   delete(@Param('id') id: string) {

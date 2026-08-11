@@ -34,6 +34,8 @@ export interface ResultHandler {
 }
 
 export interface RequestWithMetadata extends Request {
+  /** Correlation id assigned by requestIdMiddleware (X-Request-Id round-trip). */
+  requestId: string;
   session: {
     token: string;
     expiresAt: Date;
