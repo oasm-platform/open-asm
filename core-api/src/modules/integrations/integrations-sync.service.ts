@@ -125,6 +125,29 @@ export class IntegrationSyncService implements OnModuleInit {
   }
 
   /**
+   * Enqueues one manual sync for an integration (POST /:id/sync) and returns
+   * immediately — the actual sync runs asynchronously in the processor.
+   *
+   * The job name AND jobId are `manual-sync:<integrationId>`: the jobId is
+   * the BullMQ dedup key, so a second POST while the first job is still
+   * waiting/active returns the existing job instead of scheduling a duplicate
+   * sync. attempts: 1 (a manual sync is never retried) + removeOnComplete
+   * (the completed job is dropped, so the next POST creates a fresh job).
+   */
+  async enqueueManualSync(
+    integrationId: string,
+    workspaceId: string,
+  ): Promise<{ jobId: string }> {
+    const jobId = `manual-sync:${integrationId}`;
+    const job = await this.queue.add(
+      jobId,
+      { integrationId, workspaceId },
+      { jobId, attempts: 1, removeOnComplete: true },
+    );
+    return { jobId: job.id ?? jobId };
+  }
+
+  /**
    * Applies a schedule to an integration: 'disabled' removes the scheduler,
    * any other value re-registers it (removing the old scheduler first when the
    * schedule changed). Persists the integration row.
@@ -153,6 +176,12 @@ export class IntegrationSyncService implements OnModuleInit {
    * Runs one asset sync for an integration: loads + decrypts the config,
    * dispatches the connector by appType and updates lastRunAt on success.
    * `dryRun` only fetches — no DB writes, no lastRunAt update.
+   *
+   * Note on job lifecycle: the processor's orphan guard covers QUEUED jobs
+   * (the row is gone before the worker picks the job up). An in-flight job
+   * may still finish its DB writes after the integration row is DELETEd —
+   * accepted: the writes are workspace-scoped (targets/assets of that
+   * workspace) and benign (same data a re-sync would produce).
    */
   async runSync(
     integrationId: string,
@@ -192,7 +221,10 @@ export class IntegrationSyncService implements OnModuleInit {
     );
 
     if (!result.success) {
-      throw new Error(result.error ?? result.message);
+      // BadRequestException (not a plain Error) so callers can distinguish a
+      // failed connector run (e.g. dry-run test → success:false result) from
+      // a programming error, and the HTTP layer maps it to a 400.
+      throw new BadRequestException(result.error ?? result.message);
     }
 
     if (!opts?.dryRun) {
@@ -214,11 +246,28 @@ export class IntegrationSyncService implements OnModuleInit {
   }
 
   /**
+   * Lightweight existence check for the sync processor's orphan guard.
+   * Workspace-scoped, selects only the id — NO config decryption, so a
+   * stale queued job never triggers DEK/decrypt work just to be dropped.
+   */
+  async integrationExists(
+    integrationId: string,
+    workspaceId: string,
+  ): Promise<boolean> {
+    const found = await this.integrationRepository.findOne({
+      where: { id: integrationId, workspaceId },
+      select: { id: true },
+    });
+    return Boolean(found);
+  }
+
+  /**
    * Resolves the acting user for target creation. Scheduled syncs run without
    * a request context, so we use the workspace owner (loaded via the `owner`
    * relation on Workspace). Falls back to the integration creator when the
    * owner cannot be resolved (plan section 8: "Resolve workspace owner làm
    * actingUserContext; nếu không tìm được → dùng user tạo integration").
+   * When BOTH are missing the sync cannot attribute its writes → reject.
    */
   private async resolveActingUser(
     workspaceId: string,
@@ -228,6 +277,11 @@ export class IntegrationSyncService implements OnModuleInit {
       workspaceId,
     ]);
     const ownerId = workspace?.owner?.id ?? integration.createdById;
+    if (!ownerId) {
+      throw new BadRequestException(
+        'Cannot resolve acting user for integration sync — workspace owner and integration creator are both missing',
+      );
+    }
     return { id: ownerId } as UserContextPayload;
   }
 }

@@ -1,7 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import type { IntegrationsService } from './integrations.service';
 import type { IntegrationSyncService } from './integrations-sync.service';
 import { IntegrationSyncProcessor } from './integration-sync.processor';
 
@@ -10,8 +8,10 @@ import { IntegrationSyncProcessor } from './integration-sync.processor';
  * The processor only orchestrates: guard → runSync.
  */
 describe('IntegrationSyncProcessor', () => {
-  let integrationSyncServiceMock: { runSync: jest.Mock };
-  let integrationsServiceMock: { getIntegrationById: jest.Mock };
+  let integrationSyncServiceMock: {
+    runSync: jest.Mock;
+    integrationExists: jest.Mock;
+  };
   let processor: IntegrationSyncProcessor;
   let warnSpy: jest.SpyInstance;
 
@@ -22,12 +22,13 @@ describe('IntegrationSyncProcessor', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    integrationSyncServiceMock = { runSync: jest.fn().mockResolvedValue(undefined) };
-    integrationsServiceMock = { getIntegrationById: jest.fn().mockResolvedValue({ id: 'integration-1' }) };
+    integrationSyncServiceMock = {
+      runSync: jest.fn().mockResolvedValue(undefined),
+      integrationExists: jest.fn().mockResolvedValue(true),
+    };
 
     processor = new IntegrationSyncProcessor(
       integrationSyncServiceMock as unknown as IntegrationSyncService,
-      integrationsServiceMock as unknown as IntegrationsService,
     );
   });
 
@@ -35,10 +36,10 @@ describe('IntegrationSyncProcessor', () => {
     warnSpy.mockRestore();
   });
 
-  it('delegates to runSync with the job payload when the integration exists', async () => {
+  it('SC-ORPHAN-2: delegates to runSync with the job payload when the integration exists', async () => {
     await processor.process(job);
 
-    expect(integrationsServiceMock.getIntegrationById).toHaveBeenCalledWith(
+    expect(integrationSyncServiceMock.integrationExists).toHaveBeenCalledWith(
       'integration-1',
       'ws-1',
     );
@@ -48,10 +49,8 @@ describe('IntegrationSyncProcessor', () => {
     );
   });
 
-  it('SC-SCHED-6: integration deleted before the processor runs → warns and returns, no crash', async () => {
-    integrationsServiceMock.getIntegrationById.mockRejectedValue(
-      new NotFoundException('Integration not found'),
-    );
+  it('SC-ORPHAN-1: integration deleted before the processor runs → warns and returns, no runSync', async () => {
+    integrationSyncServiceMock.integrationExists.mockResolvedValue(false);
 
     await expect(processor.process(job)).resolves.toBeUndefined();
 
@@ -61,9 +60,9 @@ describe('IntegrationSyncProcessor', () => {
     expect(integrationSyncServiceMock.runSync).not.toHaveBeenCalled();
   });
 
-  it('rethrows non-not-found errors from the guard', async () => {
+  it('rethrows guard errors (e.g. DB down) instead of swallowing them', async () => {
     const error = new Error('db down');
-    integrationsServiceMock.getIntegrationById.mockRejectedValue(error);
+    integrationSyncServiceMock.integrationExists.mockRejectedValue(error);
 
     await expect(processor.process(job)).rejects.toBe(error);
     expect(integrationSyncServiceMock.runSync).not.toHaveBeenCalled();
@@ -77,14 +76,14 @@ describe('IntegrationSyncProcessor', () => {
   });
 
   describe('DI metadata (bootstrap regression: UnknownDependenciesException)', () => {
-    it('emits real class constructors in design:paramtypes — no import-type erasure', () => {
+    it('emits the real class constructor in design:paramtypes — no import-type erasure', () => {
       const paramTypes = Reflect.getMetadata(
         'design:paramtypes',
         IntegrationSyncProcessor,
       ) as Array<{ name?: string } | undefined>;
       const names = paramTypes.map((t) => t?.name);
+      expect(names).toHaveLength(1);
       expect(names[0]).toBe('IntegrationSyncService');
-      expect(names[1]).toBe('IntegrationsService');
     });
   });
 });

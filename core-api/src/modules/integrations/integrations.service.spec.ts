@@ -29,6 +29,7 @@ describe('IntegrationsService', () => {
     applySchedule: jest.Mock;
     removeJobScheduler: jest.Mock;
     runSync: jest.Mock;
+    enqueueManualSync: jest.Mock;
   };
   let service: IntegrationsService;
 
@@ -76,6 +77,9 @@ describe('IntegrationsService', () => {
       applySchedule: jest.fn().mockResolvedValue(undefined),
       removeJobScheduler: jest.fn().mockResolvedValue(undefined),
       runSync: jest.fn().mockResolvedValue(syncResult),
+      enqueueManualSync: jest
+        .fn()
+        .mockResolvedValue({ jobId: 'manual-sync:integration-1' }),
     };
 
     service = new IntegrationsService(
@@ -131,6 +135,24 @@ describe('IntegrationsService', () => {
       await service.createIntegration({ ...createArgs, syncSchedule: 'disabled' });
 
       expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
+    });
+
+    it('SC-CREATE-1b: applySchedule failure → saved row removed (best-effort) and the error propagates', async () => {
+      repoMock.save.mockResolvedValue(integrationEntity());
+      const scheduleError = new Error('queue down');
+      integrationSyncServiceMock.applySchedule.mockRejectedValue(scheduleError);
+
+      await expect(
+        service.createIntegration({
+          ...createArgs,
+          syncSchedule: '0 0 * * *',
+        }),
+      ).rejects.toBe(scheduleError);
+
+      // Best-effort cleanup of the row that could not be scheduled
+      expect(repoMock.remove).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'integration-1' }),
+      );
     });
   });
 
@@ -275,6 +297,22 @@ describe('IntegrationsService', () => {
       expect(result.message).toContain('cloudflare sync OK (dry run)');
       expect(result.message).toContain(JSON.stringify(syncResult));
     });
+
+    it('SC-TEST-2b: cloud dry-run failure → success:false result with the error surfaced, no throw', async () => {
+      repoMock.findOne.mockResolvedValue(integrationEntity());
+      integrationSyncServiceMock.runSync.mockRejectedValue(
+        new BadRequestException('boom'),
+      );
+
+      const result = await service.testIntegration('integration-1', 'ws-1');
+
+      expect(result.success).toBe(false);
+      expect(result.category).toBe(IntegrationType.CLOUD_PROVIDER);
+      expect(result.appType).toBe('cloudflare');
+      expect(result.message).toBe('Connector test failed');
+      expect(result.error).toBe('boom');
+      expect(result.timestamp).toBeDefined();
+    });
   });
 
   describe('SC-API-4: testIntegration for non-cloud categories keeps the factory path', () => {
@@ -303,17 +341,29 @@ describe('IntegrationsService', () => {
     });
   });
 
-  describe('syncIntegration', () => {
-    it('verifies ownership then runs a live sync', async () => {
+  describe('syncIntegration (enqueue-and-return)', () => {
+    it('SC-API-1: verifies ownership then enqueues a manual sync — runSync is NOT called', async () => {
       repoMock.findOne.mockResolvedValue(integrationEntity());
 
       const result = await service.syncIntegration('integration-1', 'ws-1');
 
-      expect(integrationSyncServiceMock.runSync).toHaveBeenCalledWith(
+      expect(integrationSyncServiceMock.enqueueManualSync).toHaveBeenCalledWith(
         'integration-1',
         'ws-1',
       );
-      expect(result).toEqual(syncResult);
+      expect(integrationSyncServiceMock.runSync).not.toHaveBeenCalled();
+      expect(result).toEqual({ jobId: 'manual-sync:integration-1' });
+    });
+
+    it('SC-API-1b: rejects non-cloud integrations before enqueueing', async () => {
+      repoMock.findOne.mockResolvedValue(
+        integrationEntity({ category: IntegrationType.NOTIFICATION }),
+      );
+
+      await expect(
+        service.syncIntegration('integration-1', 'ws-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(integrationSyncServiceMock.enqueueManualSync).not.toHaveBeenCalled();
     });
 
     it('SC-API-2: propagates 404 when the integration is not in the workspace', async () => {
@@ -322,7 +372,7 @@ describe('IntegrationsService', () => {
       await expect(
         service.syncIntegration('nope', 'ws-1'),
       ).rejects.toThrow(NotFoundException);
-      expect(integrationSyncServiceMock.runSync).not.toHaveBeenCalled();
+      expect(integrationSyncServiceMock.enqueueManualSync).not.toHaveBeenCalled();
     });
   });
 });

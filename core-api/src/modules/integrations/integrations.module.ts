@@ -19,6 +19,11 @@ import { TelegramBotService } from './telegram-bot.service';
     TypeOrmModule.forFeature([Integration, TelegramConnect, User]),
     BullModule.registerQueue({
       name: BullMQName.INTEGRATION_SYNC_SCHEDULE,
+      defaultJobOptions: {
+        // Failed sync jobs are dropped, never accumulated (manual jobs also
+        // set removeOnComplete so completed runs vanish).
+        removeOnFail: true,
+      },
     }),
   ],
   controllers: [IntegrationsController],

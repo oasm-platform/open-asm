@@ -122,12 +122,18 @@ export class DataAdapterService {
    *   the apex entry so the primary asset refresh can pick up apex records.
    * @param isEnabled - Insert flag; defaults to the workspace config
    *   `isAutoEnableAssetAfterDiscovered`.
+   * @param opts - replaceDnsRecords: true makes the primary refresh REPLACE
+   *   (not merge) apex dnsRecords and switches the insert from `.orIgnore()`
+   *   to `.orUpdate(['dnsRecords'], ['value', 'targetId'])`, so re-syncs
+   *   remove records that disappeared upstream. Never overwrites isEnabled.
+   *   Omitted → merge + orIgnore (scanner subdomains() path unchanged).
    * @returns The number of asset rows actually inserted.
    */
   public async upsertAssetsByTargetId(
     targetId: string,
     assets: Array<{ value: string; dnsRecords: Record<string, string[]> }>,
     isEnabled?: boolean,
+    opts?: { replaceDnsRecords?: boolean },
   ): Promise<number> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -159,7 +165,8 @@ export class DataAdapterService {
       // is present in the batch. Merge (not replace) so discovered records
       // survive re-syncs; skipping when the apex is absent avoids clobbering
       // dnsRecords with NULL on re-runs (the isPrimary refresh is only
-      // relevant on first creation anyway).
+      // relevant on first creation anyway). With replaceDnsRecords the apex
+      // records REPLACE the existing set (stale records disappear).
       if (primaryAsset) {
         const apexRecords = uniqueData.find(
           (asset) => asset.value === primaryAsset.value,
@@ -171,10 +178,12 @@ export class DataAdapterService {
             .where({ id: primaryAsset.id })
             .set({
               isPrimary: true,
-              dnsRecords: mergeDnsRecords(
-                primaryAsset.dnsRecords,
-                apexRecords.dnsRecords,
-              ),
+              dnsRecords: opts?.replaceDnsRecords
+                ? apexRecords.dnsRecords
+                : mergeDnsRecords(
+                    primaryAsset.dnsRecords,
+                    apexRecords.dnsRecords,
+                  ),
             })
             .execute();
         }
@@ -186,8 +195,11 @@ export class DataAdapterService {
       const workspaceConfigs =
         await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
 
-      // Insert Assets
-      const insertResult = await queryRunner.manager
+      // Insert Assets. Default: orIgnore (re-runs are idempotent; subdomain
+      // rows are only ever created). replaceDnsRecords: orUpdate on
+      // (value, targetId) so existing rows' dnsRecords are refreshed while
+      // isEnabled (and every other column) stays untouched.
+      const insertQb = queryRunner.manager
         .createQueryBuilder()
         .insert()
         .into(Asset)
@@ -199,9 +211,11 @@ export class DataAdapterService {
             isEnabled:
               isEnabled ?? workspaceConfigs.isAutoEnableAssetAfterDiscovered,
           })),
-        )
-        .orIgnore()
-        .execute();
+        );
+      const insertResult = await (opts?.replaceDnsRecords
+        ? insertQb.orUpdate(['dnsRecords'], ['value', 'targetId'])
+        : insertQb.orIgnore()
+      ).execute();
 
       await queryRunner.commitTransaction();
       return insertResult.identifiers?.length ?? 0;

@@ -7,7 +7,7 @@ import { UpdateIntegrationDto } from './update-integration.dto';
 const validBase = {
   name: 'Cloudflare',
   appType: 'cloudflare',
-  category: 'cloud_provider',
+  category: 'CLOUD_PROVIDER',
   config: { apiToken: 'test-token' },
 };
 
@@ -52,6 +52,23 @@ describe('Integration schedule DTOs', () => {
       const dto = plainToInstance(UpdateIntegrationDto, {});
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);
+    });
+
+    // SC-DTO-OMIT: explicit undefined behaves like omission (200 no-op)
+    it('SC-DTO-OMIT: syncSchedule: undefined yields 0 validation errors', async () => {
+      const dto = plainToInstance(UpdateIntegrationDto, {
+        syncSchedule: undefined,
+      });
+      const errors = await validate(dto);
+      expect(errors).toHaveLength(0);
+    });
+
+    // SC-DTO-NULL: null is an explicit value, not an omission → 400
+    it('SC-DTO-NULL: syncSchedule: null is rejected with an error on syncSchedule', async () => {
+      const dto = plainToInstance(UpdateIntegrationDto, { syncSchedule: null });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].property).toBe('syncSchedule');
     });
   });
 

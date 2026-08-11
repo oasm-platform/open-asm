@@ -18,18 +18,12 @@ describe('IntegrationsController', () => {
   };
   let controller: IntegrationsController;
 
-  const syncResult = {
-    zones: 1,
-    records: 2,
-    wildcardZones: 0,
-    targetsCreated: 1,
-    assetsUpserted: 2,
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
     integrationsServiceMock = {
-      syncIntegration: jest.fn().mockResolvedValue(syncResult),
+      syncIntegration: jest
+        .fn()
+        .mockResolvedValue({ jobId: 'manual-sync:integration-1' }),
       testIntegration: jest.fn(),
       createIntegration: jest.fn().mockResolvedValue({ id: 'integration-1' }),
     };
@@ -41,7 +35,7 @@ describe('IntegrationsController', () => {
     );
   });
 
-  it('SC-API-1: POST :id/sync returns success with counts', async () => {
+  it('SC-API-1: POST :id/sync enqueues and returns the queued response with jobId', async () => {
     const response = await controller.syncIntegration(
       { id: 'integration-1' },
       'ws-1',
@@ -53,8 +47,8 @@ describe('IntegrationsController', () => {
     );
     expect(response).toEqual({
       success: true,
-      message: 'Sync completed',
-      counts: syncResult,
+      message: 'Sync queued',
+      jobId: 'manual-sync:integration-1',
     });
   });
 

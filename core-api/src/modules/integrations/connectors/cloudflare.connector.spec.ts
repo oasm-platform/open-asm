@@ -24,6 +24,7 @@ function mockResponse(
     json: () => Promise.resolve(body),
     text: () =>
       Promise.resolve(typeof body === 'string' ? body : JSON.stringify(body)),
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
   } as unknown as Response;
 }
 
@@ -71,7 +72,6 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     apiToken: 'test-token',
     workspaceId: 'ws-1',
     integrationId: 'integration-1',
-    zoneFilter: { status: 'active' },
     targetsService: {
       // Default: every queried apex already has a target (no creates needed)
       findByWorkspaceAndValues: jest.fn().mockImplementation(
@@ -525,6 +525,147 @@ describe('CloudflareConnector', () => {
       expect(createMultipleTargets.mock.calls[0][4]).toBe(
         TargetSource.CLOUDFLARE,
       );
+    });
+
+    it('SC-CONN-13: 5xx then success — retries with the 5xx default backoff when no retry-after header', async () => {
+      const connector = new CloudflareConnector();
+      const sleepSpy = jest
+        .spyOn(connector as any, 'sleep')
+        .mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse({}, 503))
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(recordsPage([record('A', 'example.com', '192.0.2.1')], 1, 1)),
+        );
+
+      const config = makeConfig();
+      const result = await connector.syncAssets(config);
+
+      expect(result.zones).toBe(1);
+      const zoneCalls = mockFetch.mock.calls.filter((call) =>
+        String(call[0]).includes('/zones?'),
+      );
+      expect(zoneCalls).toHaveLength(2); // 503 retried
+      // No retry-after header → DEFAULT_5XX_RETRY_AFTER_SECONDS (2s) backoff
+      expect(sleepSpy).toHaveBeenCalledWith(2 * 1000);
+    });
+
+    it('SC-CONN-13a: 5xx retry honors an explicit retry-after header', async () => {
+      const connector = new CloudflareConnector();
+      const sleepSpy = jest
+        .spyOn(connector as any, 'sleep')
+        .mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse({}, 502, { 'retry-after': '1' }))
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(recordsPage([record('A', 'example.com', '192.0.2.1')], 1, 1)),
+        );
+
+      const config = makeConfig();
+      await connector.syncAssets(config);
+
+      expect(sleepSpy).toHaveBeenCalledWith(1 * 1000);
+    });
+
+    it('SC-CONN-14: persistent 5xx (>3 attempts) rejects with CloudflareSyncError carrying the status and body snippet', async () => {
+      const connector = new CloudflareConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse('boom', 503))
+        .mockResolvedValueOnce(mockResponse('boom', 503))
+        .mockResolvedValueOnce(mockResponse('boom', 503));
+
+      const config = makeConfig();
+      const error = await connector.syncAssets(config).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CloudflareSyncError);
+      expect((error as Error).message).toContain('503');
+      expect((error as Error).message).toContain('boom'); // body snippet
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('SC-CONN-15: 429 with an HTTP-date retry-after — backoff computed from the delta', async () => {
+      const connector = new CloudflareConnector();
+      const sleepSpy = jest
+        .spyOn(connector as any, 'sleep')
+        .mockResolvedValue(undefined);
+
+      const retryDate = new Date(Date.now() + 3000).toUTCString();
+      mockFetch
+        .mockResolvedValueOnce(mockResponse({}, 429, { 'retry-after': retryDate }))
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(recordsPage([record('A', 'example.com', '192.0.2.1')], 1, 1)),
+        );
+
+      const config = makeConfig();
+      await connector.syncAssets(config);
+
+      expect(sleepSpy).toHaveBeenCalledWith(3 * 1000);
+    });
+
+    it('SC-CONN-16: 429 with retry-after "0" is clamped to a 1s backoff', async () => {
+      const connector = new CloudflareConnector();
+      const sleepSpy = jest
+        .spyOn(connector as any, 'sleep')
+        .mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse({}, 429, { 'retry-after': '0' }))
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(recordsPage([record('A', 'example.com', '192.0.2.1')], 1, 1)),
+        );
+
+      const config = makeConfig();
+      await connector.syncAssets(config);
+
+      expect(sleepSpy).toHaveBeenCalledWith(1 * 1000);
+    });
+
+    it('SC-CONN-17: 429 with no/useless retry-after falls back to the default 5s backoff', async () => {
+      const connector = new CloudflareConnector();
+      const sleepSpy = jest
+        .spyOn(connector as any, 'sleep')
+        .mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse({}, 429)) // no retry-after header
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(recordsPage([record('A', 'example.com', '192.0.2.1')], 1, 1)),
+        );
+
+      const config = makeConfig();
+      await connector.syncAssets(config);
+
+      expect(sleepSpy).toHaveBeenCalledWith(5 * 1000);
+    });
+
+    it('SC-CONN-18: response body is consumed (arrayBuffer) before a 429 retry', async () => {
+      const connector = new CloudflareConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      const arrayBuffer = jest.fn().mockResolvedValue(new ArrayBuffer(0));
+      mockFetch
+        .mockResolvedValueOnce(
+          Object.assign(mockResponse({}, 429, { 'retry-after': '1' }), {
+            arrayBuffer,
+          }),
+        )
+        .mockResolvedValueOnce(mockResponse(zonePage([ZONE_A], 1, 1)))
+        .mockResolvedValueOnce(
+          mockResponse(recordsPage([record('A', 'example.com', '192.0.2.1')], 1, 1)),
+        );
+
+      const config = makeConfig();
+      await connector.syncAssets(config);
+
+      expect(arrayBuffer).toHaveBeenCalled();
     });
   });
 });

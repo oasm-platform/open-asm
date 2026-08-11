@@ -20,7 +20,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import type { SyncResult } from './connectors/cloudflare.connector';
 import type { ConnectorTestResult } from './connectors/connector.factory';
 import { runConnector } from './connectors/connector.factory';
 import { GetIntegrationDto } from './dto/get-integration.dto';
@@ -142,9 +141,24 @@ export class IntegrationsService {
     const saved = await this.integrationRepository.save(entity);
 
     // Wire the periodic sync scheduler (SC-SCHED-1); 'disabled'/undefined
-    // keeps the entity default and creates no BullMQ job.
+    // keeps the entity default and creates no BullMQ job. If scheduling
+    // fails, the just-created row is removed best-effort so no orphaned
+    // integration survives without its scheduler, then the error propagates.
     if (args.syncSchedule && args.syncSchedule !== 'disabled') {
-      await this.integrationSyncService.applySchedule(saved, args.syncSchedule);
+      try {
+        await this.integrationSyncService.applySchedule(saved, args.syncSchedule);
+      } catch (error) {
+        try {
+          await this.integrationRepository.remove(saved);
+        } catch (cleanupError) {
+          this.logger.warn(
+            `Failed to remove integration ${saved.id} after schedule wiring failure: ${
+              cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+            }`,
+          );
+        }
+        throw error;
+      }
     }
 
     // Fire welcome message for notification integrations (best-effort)
@@ -301,18 +315,34 @@ export class IntegrationsService {
     }
 
     // Cloud providers are tested with a dry-run sync: fetch + count only, no
-    // DB writes and no lastRunAt update (SC-API-3).
+    // DB writes and no lastRunAt update (SC-API-3). A failed dry run is a
+    // normal test outcome (e.g. bad token) — reported as success:false
+    // instead of surfacing as an unhandled 400 (SC-TEST-2b).
     if (integration.category === (IntegrationType.CLOUD_PROVIDER as string)) {
-      const sync = await this.integrationSyncService.runSync(id, workspaceId, {
-        dryRun: true,
-      });
-      return {
-        success: true,
-        category: integration.category,
-        appType: integration.appType,
-        message: `${integration.appType} sync OK (dry run): ${JSON.stringify(sync)}`,
-        timestamp: new Date().toISOString(),
-      };
+      try {
+        const sync = await this.integrationSyncService.runSync(id, workspaceId, {
+          dryRun: true,
+        });
+        return {
+          success: true,
+          category: integration.category,
+          appType: integration.appType,
+          message: `${integration.appType} sync OK (dry run): ${JSON.stringify(sync)}`,
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          return {
+            success: false,
+            category: integration.category,
+            appType: integration.appType,
+            message: 'Connector test failed',
+            timestamp: new Date().toISOString(),
+            error: error.message,
+          };
+        }
+        throw error;
+      }
     }
 
     // Decrypt sensitive fields for the connector to use
@@ -498,16 +528,23 @@ export class IntegrationsService {
   }
 
   /**
-   * Runs an immediate asset sync for a cloud-provider integration.
-   * Verifies workspace ownership first (404 when missing or foreign), then
-   * delegates to the sync scheduler service. Used by POST /:id/sync.
+   * Enqueues an immediate asset sync for a cloud-provider integration
+   * (POST /:id/sync). Verifies workspace ownership first (404 when missing or
+   * foreign) and rejects non-cloud integrations (schedules only make sense
+   * for CLOUD_PROVIDER), then enqueues the job and returns its jobId — the
+   * sync itself runs asynchronously in IntegrationSyncProcessor.
    */
   async syncIntegration(
     id: string,
     workspaceId: string,
-  ): Promise<SyncResult> {
-    await this.getIntegrationById(id, workspaceId);
-    return this.integrationSyncService.runSync(id, workspaceId);
+  ): Promise<{ jobId: string }> {
+    const integration = await this.getIntegrationById(id, workspaceId);
+    if (integration.category !== (IntegrationType.CLOUD_PROVIDER as string)) {
+      throw new BadRequestException(
+        'syncSchedule is only supported for CLOUD_PROVIDER integrations',
+      );
+    }
+    return this.integrationSyncService.enqueueManualSync(id, workspaceId);
   }
 
   /**

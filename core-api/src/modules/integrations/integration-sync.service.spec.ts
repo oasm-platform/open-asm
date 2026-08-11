@@ -336,6 +336,24 @@ describe('IntegrationSyncService', () => {
       );
     });
 
+    it('SC-USER-1: rejects before dispatching when owner AND creator are both missing', async () => {
+      workspacesServiceMock.getWorkspacesByIds.mockResolvedValue([{}]);
+      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+        {
+          integration: integration({ createdById: null }),
+          decryptedConfig: { apiToken: 'tok' },
+        },
+      );
+
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
+        'acting user',
+      );
+      expect(runConnectorMock).not.toHaveBeenCalled();
+    });
+
     it('rejects a sync for a non-cloud integration before dispatching the connector', async () => {
       integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
         {
@@ -361,13 +379,16 @@ describe('IntegrationSyncService', () => {
       expect(runConnectorMock).not.toHaveBeenCalled();
     });
 
-    it('throws when the connector reports failure so the job records the error', async () => {
+    it('throws BadRequestException when the connector reports failure so the job records the error', async () => {
       runConnectorMock.mockResolvedValue({
         success: false,
         message: 'Connector test failed',
         error: 'boom',
       });
 
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
+        BadRequestException,
+      );
       await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
         'boom',
       );
@@ -401,6 +422,48 @@ describe('IntegrationSyncService', () => {
         targetsCreated: 0,
         assetsUpserted: 0,
       });
+    });
+  });
+
+  describe('SC-ENQUEUE-1/2: enqueueManualSync', () => {
+    it('adds a manual-sync job with a deterministic jobId, attempts:1, removeOnComplete and returns the jobId', async () => {
+      queueMock.add.mockResolvedValue({ id: 'manual-sync:integration-1' });
+
+      const result = await service.enqueueManualSync('integration-1', 'ws-1');
+
+      expect(queueMock.add).toHaveBeenCalledWith(
+        'manual-sync:integration-1',
+        { integrationId: 'integration-1', workspaceId: 'ws-1' },
+        {
+          jobId: 'manual-sync:integration-1',
+          attempts: 1,
+          removeOnComplete: true,
+        },
+      );
+      expect(result).toEqual({ jobId: 'manual-sync:integration-1' });
+    });
+
+    it('falls back to the jobId string when the returned job carries no id', async () => {
+      queueMock.add.mockResolvedValue({});
+
+      const result = await service.enqueueManualSync('integration-1', 'ws-1');
+
+      expect(result).toEqual({ jobId: 'manual-sync:integration-1' });
+    });
+
+    it('SC-ENQUEUE-2: re-enqueuing the same integration reuses the same jobId (BullMQ dedupes → existing job)', async () => {
+      queueMock.add.mockResolvedValue({ id: 'manual-sync:integration-1' });
+
+      const first = await service.enqueueManualSync('integration-1', 'ws-1');
+      const second = await service.enqueueManualSync('integration-1', 'ws-1');
+
+      expect(queueMock.add).toHaveBeenCalledTimes(2);
+      // Both adds carry the identical jobId → the queue returns the existing
+      // waiting job instead of scheduling a second one.
+      expect(queueMock.add.mock.calls[0][2]).toEqual(
+        queueMock.add.mock.calls[1][2],
+      );
+      expect(second).toEqual(first);
     });
   });
 

@@ -184,9 +184,9 @@ export class IntegrationsController {
   }
 
   @Doc({
-    summary: 'Run integration sync now',
+    summary: 'Enqueue an integration sync',
     description:
-      'Triggers an immediate asset sync for a cloud-provider integration (e.g. Cloudflare). Fetches zones + DNS records and ingests them as targets/assets, then returns the sync counts.',
+      'Queues an immediate asset sync for a cloud-provider integration (e.g. Cloudflare) and returns the jobId. The sync runs asynchronously: the connector fetches zones + DNS records and ingests them as targets/assets. A second call while the first job is still pending returns the same jobId (no duplicate sync).',
     request: {
       getWorkspaceId: true,
     },
@@ -198,11 +198,11 @@ export class IntegrationsController {
     @Param() { id }: IdQueryParamDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    const result = await this.integrationsService.syncIntegration(
+    const { jobId } = await this.integrationsService.syncIntegration(
       id,
       workspaceId,
     );
-    return { success: true, message: 'Sync completed', counts: result };
+    return { success: true, message: 'Sync queued', jobId };
   }
 
   // ─── Telegram-specific endpoints ───────────────────────────────

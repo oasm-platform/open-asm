@@ -555,6 +555,134 @@ describe('DataAdapterService', () => {
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();
     });
+
+    it('SC-ADAPTER-REPLACE-1: replaceDnsRecords — existing subdomain row dnsRecords overwritten, isEnabled NOT in the overwrite list', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'i1' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs();
+      // Primary asset exists but the batch has no apex value → primary
+      // refresh skipped; only the insert runs.
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .getRawOne.mockResolvedValueOnce({
+          id: 'primary-asset-id',
+          value: 'example.com',
+          dnsRecords: { A: ['1.2.3.4'] },
+        });
+
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce(mockInsertResult);
+
+      await service.upsertAssetsByTargetId(
+        targetId,
+        [{ value: 'sub.example.com', dnsRecords: { A: ['9.9.9.9'] } }],
+        undefined,
+        { replaceDnsRecords: true },
+      );
+
+      // orUpdate replaces orIgnore: conflict on (value, targetId), overwrite
+      // dnsRecords only — isEnabled of the existing row is untouched.
+      expect(mockQueryRunner.manager.orIgnore).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.orUpdate).toHaveBeenCalledWith(
+        ['dnsRecords'],
+        ['value', 'targetId'],
+      );
+      const valuesArg = mockQueryRunner.manager
+        .createQueryBuilder()
+        .values.mock.calls[0][0] as Array<Record<string, unknown>>;
+      expect(valuesArg[0]).toMatchObject({
+        value: 'sub.example.com',
+        dnsRecords: { A: ['9.9.9.9'] },
+        target: { id: targetId },
+      });
+      // Primary refresh not touched (apex absent from batch)
+      expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
+    });
+
+    it('SC-ADAPTER-REPLACE-2: replaceDnsRecords — primary dnsRecords replaced wholesale (old types removed)', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'i1' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs();
+      // Primary already has A + SOA; the new batch carries only A.
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .getRawOne.mockResolvedValueOnce({
+          id: 'primary-asset-id',
+          value: 'example.com',
+          dnsRecords: { A: ['1.2.3.4'], SOA: ['ns1.example.com'] },
+        });
+
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce(undefined) // Update Asset (primary refresh)
+        .mockResolvedValueOnce(mockInsertResult); // Insert Assets
+
+      await service.upsertAssetsByTargetId(
+        targetId,
+        [{ value: 'example.com', dnsRecords: { A: ['9.9.9.9'] } }],
+        undefined,
+        { replaceDnsRecords: true },
+      );
+
+      const setCall = mockQueryRunner.manager
+        .createQueryBuilder()
+        .set.mock.calls[0][0] as Record<string, unknown>;
+      // Replace, not merge: SOA is gone, only the fresh A survives.
+      expect(setCall).toEqual({
+        isPrimary: true,
+        dnsRecords: { A: ['9.9.9.9'] },
+      });
+    });
+
+    it('SC-ADAPTER-MERGE-1: regression — without the flag behavior is unchanged (merge + orIgnore, no row updates)', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'i1' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs();
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .getRawOne.mockResolvedValueOnce({
+          id: 'primary-asset-id',
+          value: 'example.com',
+          dnsRecords: { A: ['1.2.3.4'], SOA: ['ns1.example.com'] },
+        });
+
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce(undefined) // Update Asset (primary refresh)
+        .mockResolvedValueOnce(mockInsertResult); // Insert Assets
+
+      const withApex: Array<{
+        value: string;
+        dnsRecords: Record<string, string[]>;
+      }> = [
+        { value: 'example.com', dnsRecords: { A: ['9.9.9.9'] } },
+        { value: 'sub.example.com', dnsRecords: { A: ['192.0.2.2'] } },
+      ];
+
+      await service.upsertAssetsByTargetId(targetId, withApex);
+
+      // Existing-row writes still use orIgnore; nothing is overwritten.
+      expect(mockQueryRunner.manager.orIgnore).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.orUpdate).not.toHaveBeenCalled();
+      // Primary records still merge (SOA survives, A is unioned+deduped).
+      const setCall = mockQueryRunner.manager
+        .createQueryBuilder()
+        .set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).toEqual({
+        isPrimary: true,
+        dnsRecords: { A: ['1.2.3.4', '9.9.9.9'], SOA: ['ns1.example.com'] },
+      });
+    });
   });
 
   describe('httpResponses', () => {

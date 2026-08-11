@@ -1,4 +1,5 @@
 import { Logger, BadRequestException } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { IntegrationType } from '@/common/enums/enum';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import type { DataAdapterService } from '../../data-adapter/data-adapter.service';
@@ -16,11 +17,15 @@ import {
  */
 const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com/client/v4';
 const ZONES_PAGE_SIZE = 50; // API max per page
+// 5000 < Cloudflare's documented dns_records per_page max of 50000 (verified
+// against the Cloudflare v4 OpenAPI spec) — deliberately conservative so one
+// oversized zone cannot balloon a single response.
 const DNS_RECORDS_PAGE_SIZE = 5000; // API max per page
 const MAX_ZONES_PAGES = 2000; // max 2000 zone pages before we bail
 const MAX_DNS_RECORDS_PAGES = 1000; // max 1000 dns_records pages per zone
-const MAX_REQUEST_ATTEMPTS = 3; // 429 retries per request
-const DEFAULT_RETRY_AFTER_SECONDS = 5;
+const MAX_REQUEST_ATTEMPTS = 3; // 429/5xx retries per request
+const DEFAULT_RETRY_AFTER_SECONDS = 5; // 429 fallback when no usable header
+const DEFAULT_5XX_RETRY_AFTER_SECONDS = 2; // 5xx fallback when no usable header
 const MAX_RETRY_AFTER_SECONDS = 60;
 /** Per-request deadline: a hung Cloudflare connection must not stall the
  * sync queue (one stuck repeat job would block every integration sync). */
@@ -40,8 +45,13 @@ export type DnsRecords = Record<DnsRecordType, string[]>;
  * Result of one Cloudflare asset sync.
  */
 export interface SyncResult {
+  /** Zones fetched from the API (pre-status-filter count — includes any
+   * non-active zones that slipped through; the ingest loop skips them). */
   zones: number;
+  /** Raw DNS records fetched (pre-normalization — includes wildcards,
+   * unsupported types and 100:: placeholders that are later dropped). */
   records: number;
+  /** Count of wildcard (`*.`) records that were counted but not materialized. */
   wildcardZones: number;
   targetsCreated: number;
   assetsUpserted: number;
@@ -97,8 +107,6 @@ export interface CloudflareSyncConfig extends ConnectorConfig {
   apiToken: string;
   workspaceId: string;
   integrationId: string;
-  /** Optional filter for the zones list endpoint (e.g. { status: 'active' }). */
-  zoneFilter?: { status?: string };
   /** Test mode — fetch only, never write to the DB. */
   __dryRun?: boolean;
   /**
@@ -148,14 +156,16 @@ export class CloudflareConnector extends CloudProviderConnector {
       apiToken,
       workspaceId,
       integrationId,
-      zoneFilter,
       __dryRun,
       targetsService,
       dataAdapterService,
       actingUserContext,
     } = cfg;
 
-    const status = zoneFilter?.status ?? 'active';
+    // Only active zones are synced — the status is hardcoded (no per-sync
+    // config surface for zone status filtering; zones in other states are
+    // ignored by the ingest loop below).
+    const status = 'active';
 
     // Test mode: verify the credential with a single lightweight API call
     // instead of a full zone/record sync. A failed verify (success=false) or
@@ -212,8 +222,6 @@ export class CloudflareConnector extends CloudProviderConnector {
       const { byHostname, wildcardCount } = this.normalizeRecords(records);
       result.wildcardZones += wildcardCount;
 
-      if (__dryRun) continue;
-
       // a) Apex hostname → target (lookup or create with race guard).
       const apex = zone.name;
       const targetId = await this.ensureTarget(
@@ -237,10 +245,14 @@ export class CloudflareConnector extends CloudProviderConnector {
 
       // c) Upsert once per target. isEnabled is left to the data-adapter
       //    default (workspace config isAutoEnableAssetAfterDiscovered).
+      //    replaceDnsRecords: true → stale DNS records disappear on re-sync
+      //    instead of merging forever (F2).
       if (pending.length === 0) continue;
       const inserted = await dataAdapterService.upsertAssetsByTargetId(
         targetId,
         pending,
+        undefined,
+        { replaceDnsRecords: true },
       );
       result.assetsUpserted += inserted;
     }
@@ -258,7 +270,8 @@ export class CloudflareConnector extends CloudProviderConnector {
    * Ensure a Target exists for the zone apex. Returns the target id.
    * On a duplicate-creation race (another sync created the same target
    * between lookup and insert) the "Target already exists" BadRequestException
-   * is caught and the target is re-looked-up.
+   * OR the unique-constraint violation (Postgres 23505, surfaced as
+   * QueryFailedError.driverError.code) is caught and the target is re-looked-up.
    */
   private async ensureTarget(
     apex: string,
@@ -285,10 +298,8 @@ export class CloudflareConnector extends CloudProviderConnector {
       result.targetsCreated++;
       return created.created[0].id;
     } catch (error) {
-      if (
-        error instanceof BadRequestException &&
-        error.message.startsWith('Target already exists')
-      ) {
+      const isDuplicate = this.isDuplicateTargetError(error);
+      if (isDuplicate) {
         const reFound = await targetsService.findByWorkspaceAndValues(
           workspaceId,
           [apex],
@@ -298,6 +309,22 @@ export class CloudflareConnector extends CloudProviderConnector {
       }
       throw error;
     }
+  }
+
+  /** True when a create-target failure means "already exists" (app-level
+   * BadRequestException or a Postgres unique-constraint violation). */
+  private isDuplicateTargetError(error: unknown): boolean {
+    if (
+      error instanceof BadRequestException &&
+      error.message.startsWith('Target already exists')
+    ) {
+      return true;
+    }
+    if (error instanceof QueryFailedError) {
+      const driverError = error.driverError as { code?: string } | undefined;
+      return driverError?.code === '23505';
+    }
+    return false;
   }
 
   /**
@@ -388,7 +415,7 @@ export class CloudflareConnector extends CloudProviderConnector {
   }
 
   /**
-   * Single Cloudflare v4 request with 429 retry-after handling.
+   * Single Cloudflare v4 request with 429/5xx retry handling.
    * Up to MAX_REQUEST_ATTEMPTS attempts, then throws CloudflareSyncError.
    */
   private async cfFetch<T>(
@@ -414,17 +441,30 @@ export class CloudflareConnector extends CloudProviderConnector {
         );
       }
 
-      if (response.status === 429) {
+      // Transient failures: rate limit (429) and server errors (5xx) are
+      // retried with the retry-after header when present, else the per-class
+      // default backoff. The response body is consumed first so the
+      // connection can be reused for the retry.
+      if (response.status === 429 || response.status >= 500) {
         if (attempts >= MAX_REQUEST_ATTEMPTS) {
+          const bodySnippet = (await response.text()).slice(0, 500);
+          const kind =
+            response.status === 429 ? 'rate limited (429)' : `server error (${response.status})`;
           throw new CloudflareSyncError(
-            `Cloudflare API rate limited (429) after ${attempts} attempts for ${path}`,
+            `Cloudflare API ${kind} after ${attempts} attempts for ${path}: ${bodySnippet}`,
           );
         }
+        await response.arrayBuffer();
         const retryAfterSeconds = this.parseRetryAfter(response);
+        const backoffSeconds =
+          retryAfterSeconds ??
+          (response.status === 429
+            ? DEFAULT_RETRY_AFTER_SECONDS
+            : DEFAULT_5XX_RETRY_AFTER_SECONDS);
         this.logger.warn(
-          `Cloudflare API 429 for ${path}, retrying in ${retryAfterSeconds}s (attempt ${attempts}/${MAX_REQUEST_ATTEMPTS})`,
+          `Cloudflare API ${response.status} for ${path}, retrying in ${backoffSeconds}s (attempt ${attempts}/${MAX_REQUEST_ATTEMPTS})`,
         );
-        await this.sleep(retryAfterSeconds * 1000);
+        await this.sleep(backoffSeconds * 1000);
         continue;
       }
 
@@ -450,15 +490,27 @@ export class CloudflareConnector extends CloudProviderConnector {
     }
   }
 
-  /** Parse the `retry-after` header (seconds), clamped to a sane range. */
-  private parseRetryAfter(response: Response): number {
+  /**
+   * Parse the `retry-after` header. Returns the delay in seconds or null when
+   * the header is absent/unparseable.
+   * - Integer seconds (>= 0) → clamped to a minimum of 1s.
+   * - HTTP-date → ceil((dateMs - now) / 1000), clamped to a minimum of 1s.
+   * - Anything else → null (caller falls back to its default backoff).
+   * Both forms are capped at MAX_RETRY_AFTER_SECONDS.
+   */
+  private parseRetryAfter(response: Response): number | null {
     const raw = response.headers.get('retry-after');
-    const seconds = raw ? Number.parseInt(raw, 10) : Number.NaN;
-    const value =
-      Number.isFinite(seconds) && seconds > 0
-        ? seconds
-        : DEFAULT_RETRY_AFTER_SECONDS;
-    return Math.min(value, MAX_RETRY_AFTER_SECONDS);
+    if (!raw) return null;
+    const seconds = Number.parseInt(raw, 10);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(Math.max(seconds, 1), MAX_RETRY_AFTER_SECONDS);
+    }
+    const dateMs = Date.parse(raw);
+    if (!Number.isNaN(dateMs)) {
+      const secondsUntil = Math.ceil((dateMs - Date.now()) / 1000);
+      return Math.min(Math.max(secondsUntil, 1), MAX_RETRY_AFTER_SECONDS);
+    }
+    return null;
   }
 
   private async sleep(ms: number): Promise<void> {
