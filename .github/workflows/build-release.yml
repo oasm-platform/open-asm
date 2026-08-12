@@ -7,6 +7,15 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      fromTag:
+        description: 'Generate changelog from this tag (default: previous tag)'
+        required: false
+        type: string
+      toTag:
+        description: 'Generate changelog to this tag and create the draft release (required for manual release)'
+        required: false
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -59,23 +68,16 @@ jobs:
 
           ls -la dist/
 
-      - name: Generate changelog
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@v5
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          configuration: '.github/changelog-config.json'
-          toTag: ${{ github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Upload to Release
         uses: softprops/action-gh-release@v3
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.toTag != '')
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.toTag }}
           files: |
             worker/dist/*
-          body: ${{ steps.changelog.outputs.changelog }}
+          previous_tag: ${{ inputs.fromTag || '' }}
+          generate_release_notes: true
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
