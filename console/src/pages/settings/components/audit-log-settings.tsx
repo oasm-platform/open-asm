@@ -137,7 +137,10 @@ function AuditEventSheet({ event, onClose }: AuditEventSheetProps) {
       }}
     >
       <SheetContent className="w-full overflow-y-auto px-4 pb-4 sm:max-w-lg">
-        <SheetHeader>
+        {/* SheetHeader defaults to p-4; SheetContent already carries px-4, so
+            zero the header's own horizontal/bottom padding to keep the title
+            edge-aligned with the body content. */}
+        <SheetHeader className="px-0 pt-4 pb-0">
           <SheetTitle>{getAuditEventLabel(event.action)}</SheetTitle>
           <SheetDescription>{formatAbsoluteTime(event.occurredAt)}</SheetDescription>
         </SheetHeader>
