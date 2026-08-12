@@ -5,7 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
+import type { EntityManager, Repository } from 'typeorm';
 import { AuditEvent } from './entities/audit-event.entity';
 
 /** Rows outside the 90-day GDPR retention window (plan §9). */
