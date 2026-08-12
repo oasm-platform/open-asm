@@ -375,7 +375,8 @@ export class WorkspacesService implements OnModuleInit {
           action: 'workspace.deleted',
           resourceType: 'workspace',
           resourceId: id,
-          changes: { name: { after: workspace.name } },
+          // `workspace.name` is the state BEFORE the delete — label it `before`.
+          changes: { name: { before: workspace.name } },
           outcome: AuditOutcome.Success,
         });
       }
@@ -1002,7 +1003,8 @@ export class WorkspacesService implements OnModuleInit {
           action: 'permission_group.deleted',
           resourceType: 'permission_group',
           resourceId: permissionId,
-          changes: { name: { after: group.name } },
+          // `group.name` is the state BEFORE the delete — label it `before`.
+          changes: { name: { before: group.name } },
           outcome: AuditOutcome.Success,
         });
       }
@@ -1235,11 +1237,14 @@ export class WorkspacesService implements OnModuleInit {
 
     // Membership delete + audit row commit atomically; the removed member's
     // PII is pseudonymized AFTER commit so a GDPR-sweep failure can never
-    // roll back a successful removal.
+    // roll back a successful removal. The event id is passed to the sweep so
+    // it can also null metadata.targetUserId on the member.removed row itself
+    // (that row's actorId is the *acting* user, so the actor sweep misses it).
+    let removedEventId: string | undefined;
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(WorkspaceMembers, { id: member.id });
       if (auditContext) {
-        await this.auditService.recordInTx(manager, {
+        const event = await this.auditService.recordInTx(manager, {
           workspaceId,
           ...auditContext,
           action: 'member.removed',
@@ -1248,12 +1253,16 @@ export class WorkspacesService implements OnModuleInit {
           ...(member.user?.id ? { metadata: { targetUserId: member.user.id } } : {}),
           outcome: AuditOutcome.Success,
         });
+        removedEventId = event.id;
       }
     });
 
     if (member.user?.id) {
       try {
-        await this.auditService.pseudonymizeActor(member.user.id);
+        await this.auditService.pseudonymizeActor(
+          member.user.id,
+          removedEventId,
+        );
       } catch (error) {
         this.logger.error(
           'Failed to pseudonymize audit rows of removed member',

@@ -337,6 +337,40 @@ describe('AuditEventsController', () => {
       expect(fields[2]).toBe('');
       expect(fields[5]).toBe('');
     });
+
+    it.each(['=SUM(A1:A9)', '+cmd', '-2+3', '@import', '\tleading-tab', '\rleading-cr'])(
+      'neutralizes CSV formula injection for a field starting with %j (CWE-1236)',
+      (dangerous) => {
+        const row = makeEvent({ actorName: dangerous });
+        const csv = toAuditCsv([row]);
+        const line = csv.split('\n')[1];
+        // The exported actorName field must start with a single quote so the
+        // spreadsheet treats it as text, never as a formula.
+        const match = line.match(new RegExp(`(^|,)"?'${dangerous.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[,"]|$)`));
+        expect(match).not.toBeNull();
+      },
+    );
+
+    it('neutralizes formula injection in the userAgent column too', () => {
+      const row = makeEvent({ userAgent: '=HYPERLINK("http://evil")' });
+      const csv = toAuditCsv([row]);
+      const line = csv.split('\n')[1];
+      // RFC-quoted (contains ") with the apostrophe INSIDE the quotes, before
+      // the `=` — the exported field must never start with a formula char.
+      expect(line).toMatch(/"'=HYPERLINK\(/);
+    });
+
+    it('exports a header-only CSV for an empty row set (no data lines, no trailing blank line)', () => {
+      expect(toAuditCsv([])).toBe(
+        'id,occurredAt,actorId,actorType,actorName,actorEmail,action,resourceType,resourceId,outcome,sourceIp,userAgent,requestId,correlationId,changes,metadata',
+      );
+    });
+
+    it('serializes a Date-typed field through the ISO-formatting branch', () => {
+      const row = makeEvent({ actorName: new Date('2026-08-10T10:00:00.000Z') as unknown as string });
+      const csv = toAuditCsv([row]);
+      expect(csv.split('\n')[1]).toContain('2026-08-10T10:00:00.000Z');
+    });
   });
 
   describe('DTO validation (GetAuditEventsQueryDto)', () => {

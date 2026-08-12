@@ -115,7 +115,7 @@ export type AuditEventListResponseDto = {
 export type AppResponseSerialization = { [key: string]: unknown };
 
 export type AuditActionCatalogEntryDto = {
-  /** Machine action key, e.g. workspace.created (AUDIT_EVENTS) */
+  /** Machine action key, e.g. workspace.created (AUDIT_ACTION_CATALOG) */
   action: string;
   /** English display name, e.g. "Workspace created" */
   label: string;
@@ -5671,7 +5671,7 @@ export function useAuditEventsControllerGetAuditEvents<
 }
 
 /**
- * Action → display label pairs for the audit trail, derived from the backend AUDIT_EVENTS + AUDIT_EVENT_LABELS constants. No database access. Requires audit.read.
+ * Action → display label pairs for the audit trail, derived from the backend AUDIT_ACTION_CATALOG constant. No database access. Requires audit.read.
  * @summary List audit action catalog
  */
 export const auditEventsControllerGetAuditActions = (
@@ -5848,11 +5848,12 @@ export const auditEventsControllerExportAuditEvents = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<void>(
+  return orvalClient<Blob>(
     {
       url: `/api/workspaces/${id}/audit/export`,
       method: 'GET',
       params,
+      responseType: 'blob',
       signal,
     },
     options,

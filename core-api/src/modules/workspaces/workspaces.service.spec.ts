@@ -473,7 +473,12 @@ describe('WorkspacesService', () => {
 
       // Assert
       expect(result).toBeDefined();
-      // Default sortBy should be 'createdAt'
+      // The allowlist map rejects 'invalidField' → falls back to 'createdAt'.
+      const sqlQuery = (mockWorkspaceRepository.query as jest.Mock).mock
+        .calls[0][0] as string;
+      expect(sqlQuery).toContain('ORDER BY w."createdAt" DESC');
+      // And the invalid column name must never be interpolated into the SQL.
+      expect(sqlQuery).not.toContain('invalidField');
     });
 
     // Test case: Kiểm tra sortOrder mặc định khi không hợp lệ
@@ -495,7 +500,11 @@ describe('WorkspacesService', () => {
 
       // Assert
       expect(result).toBeDefined();
-      // Default sortOrder should be 'DESC' (ASC is converted to DESC)
+      // Only SortOrder.ASC maps to ASC; anything else (including garbage)
+      // falls back to DESC.
+      const sqlQuery = (mockWorkspaceRepository.query as jest.Mock).mock
+        .calls[0][0] as string;
+      expect(sqlQuery).toContain('ORDER BY w."createdAt" DESC');
     });
 
     // Test case: empty workspaces list
@@ -1104,11 +1113,66 @@ describe('WorkspacesService', () => {
           action: 'workspace.deleted',
           resourceType: 'workspace',
           resourceId: testWorkspaceId,
-          changes: { name: { after: 'Doomed' } },
+          changes: { name: { before: 'Doomed' } },
           actorId: testUserId,
           actorName: 'Test User',
         }),
       );
+    });
+
+    it('deleteWorkspace rolls back when the audit write fails mid-transaction (no success response, no committed state)', async () => {
+      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: testWorkspaceId,
+        name: 'Doomed',
+      });
+      mockManager.getRepository.mockReturnValue({
+        createQueryBuilder: jest.fn().mockReturnValue({
+          delete: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          returning: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({ raw: [] }),
+        }),
+      });
+      (mockAuditService.recordInTx).mockRejectedValueOnce(
+        new Error('audit write failed'),
+      );
+
+      await expect(
+        service.deleteWorkspace(testWorkspaceId, testUserContext, auditContext),
+      ).rejects.toThrow('audit write failed');
+
+      // The transaction callback rejected → in production the tx rolls back
+      // the workspace delete. Here we verify the failure propagates (the
+      // service must not swallow it and must not report success) and that the
+      // audit row was attempted only inside the same failed tx.
+      expect(mockManager.delete).toHaveBeenCalledWith(Workspace, {
+        id: testWorkspaceId,
+      });
+      expect(mockAuditService.recordInTx).toHaveBeenCalledTimes(1);
+    });
+
+    it('deleteWorkspace propagates a workspace-delete failure and never writes the audit row', async () => {
+      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: testWorkspaceId,
+        name: 'Doomed',
+      });
+      mockManager.getRepository.mockReturnValue({
+        createQueryBuilder: jest.fn().mockReturnValue({
+          delete: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          returning: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({ raw: [] }),
+        }),
+      });
+      (mockManager.delete as jest.Mock).mockRejectedValueOnce(
+        new Error('workspace delete failed'),
+      );
+
+      await expect(
+        service.deleteWorkspace(testWorkspaceId, testUserContext, auditContext),
+      ).rejects.toThrow('workspace delete failed');
+
+      expect(mockAuditService.recordInTx).not.toHaveBeenCalled();
     });
 
     it('removeMember records member.removed in the tx and pseudonymizes the removed user after commit (scenario 9)', async () => {
@@ -1139,9 +1203,12 @@ describe('WorkspacesService', () => {
           actorId: testUserId,
         }),
       );
-      // GDPR sweep runs AFTER the tx commits
+      // GDPR sweep runs AFTER the tx commits; the removed user's PII is
+      // swept from their own rows AND from the member.removed event row
+      // (metadata.targetUserId) via the event id returned by recordInTx.
       expect(mockAuditService.pseudonymizeActor).toHaveBeenCalledWith(
         removedUserId,
+        expect.any(String),
       );
     });
 
@@ -1304,7 +1371,7 @@ describe('WorkspacesService', () => {
           action: 'permission_group.deleted',
           resourceType: 'permission_group',
           resourceId: group.id,
-          changes: { name: { after: 'Viewer' } },
+          changes: { name: { before: 'Viewer' } },
           actorId: testUserId,
         }),
       );

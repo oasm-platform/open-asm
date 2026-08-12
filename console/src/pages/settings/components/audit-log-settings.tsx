@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Eye, FilterX, Loader2 } from 'lucide-react';
+import { Download, Eye, FilterX, Loader2 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import AccessDenied from '@/components/common/access-denied';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -31,7 +31,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { usePermission } from '@/hooks/usePermission';
-import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import {
+  useWorkspaceSelector,
+  useWorkspaceState,
+} from '@/hooks/useWorkspaceSelector';
 import useDebounce from '@/hooks/use-debounce';
 import {
   auditEventsControllerGetAuditEvents,
@@ -40,6 +43,7 @@ import {
   type AuditEventResponseDto,
   type AuditEventsControllerGetAuditEventsParams,
 } from '@/services/apis/gen/queries';
+import { axiosInstance } from '@/services/apis/axios-client';
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
 
@@ -96,6 +100,48 @@ function isForbiddenError(error: unknown): boolean {
     error !== null &&
     (error as { response?: { status?: number } }).response?.status === 403
   );
+}
+
+/**
+ * The export endpoint streams a CSV (responseType 'blob'), so a non-2xx error
+ * body arrives as a Blob too — e.g. the 400 "export capped at 10,000 rows"
+ * rejection. Read the Blob and surface the backend's message when possible.
+ */
+async function extractExportErrorMessage(err: unknown): Promise<string> {
+  const responseData = (err as { response?: { data?: unknown } })?.response
+    ?.data;
+  if (responseData instanceof Blob) {
+    try {
+      const text = await responseData.text();
+      const parsed = JSON.parse(text) as { message?: unknown };
+      if (typeof parsed.message === 'string') return parsed.message;
+      return text;
+    } catch {
+      // Not JSON — fall through to the generic message.
+    }
+  }
+  return err instanceof Error ? err.message : 'Please try again';
+}
+
+/**
+ * Fetch the audit CSV as a Blob. Deliberately does NOT use the orval-generated
+ * auditEventsControllerExportAuditEvents hook: core-api regenerates
+ * .open-api/open-api.json from its live swagger on every boot (main.ts), and
+ * the export controller carries no response @Doc — so a fresh spec types the
+ * hook as void/unknown and a regen would silently break the download. This
+ * wrapper pins the request (GET + responseType blob, same shape as the
+ * generated storage-download hook) and always yields real CSV bytes.
+ */
+async function fetchAuditExportBlob(
+  workspaceId: string,
+  params?: AuditEventsControllerGetAuditEventsParams,
+): Promise<Blob> {
+  // axiosInstance's response interceptor resolves to response.data (the Blob),
+  // not an AxiosResponse wrapper.
+  return axiosInstance.get(
+    `/api/workspaces/${workspaceId}/audit/export`,
+    { params, responseType: 'blob' },
+  ) as unknown as Promise<Blob>;
 }
 
 function actorDisplayName(event: AuditEventResponseDto): string {
@@ -263,6 +309,7 @@ export default function AuditLogSettings() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const { hasPermission, isLoading: permissionLoading } = usePermission();
+  const { workspaces } = useWorkspaceSelector();
 
   const [preset, setPreset] = useState<DatePreset>('all');
   const [from, setFrom] = useState<string | undefined>(undefined);
@@ -281,6 +328,14 @@ export default function AuditLogSettings() {
   const [selectedEvent, setSelectedEvent] = useState<AuditEventResponseDto | null>(
     null,
   );
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Staleness guard for pagination: bumped on every filter/workspace/reload
+  // change so an in-flight loadMore (or aborted first page) never appends
+  // old-filter rows to the new list. Combined with AbortController, stale
+  // requests are both ignored and cancelled at the network level.
+  const requestSeq = useRef(0);
+  const loadMoreAbortRef = useRef<AbortController | null>(null);
 
   // Action catalog from the backend (GET /workspaces/:id/audit/actions):
   // the source of truth for the action filter dropdown and row labels.
@@ -326,46 +381,63 @@ export default function AuditLogSettings() {
 
   useEffect(() => {
     if (!selectedWorkspaceId) return;
-    let cancelled = false;
+    const seq = ++requestSeq.current;
+    // A filter change invalidates any in-flight "load more" for the old filter.
+    loadMoreAbortRef.current?.abort();
+    const controller = new AbortController();
     setEvents([]);
     setNextCursor(null);
     setIsLoading(true);
     setError(null);
 
-    auditEventsControllerGetAuditEvents(selectedWorkspaceId, buildParams())
+    auditEventsControllerGetAuditEvents(
+      selectedWorkspaceId,
+      buildParams(),
+      undefined,
+      controller.signal,
+    )
       .then((res) => {
-        if (cancelled) return;
+        if (seq !== requestSeq.current) return;
         setEvents(res.data ?? []);
         setNextCursor(res.nextCursor ?? null);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err);
+        if (seq !== requestSeq.current) return;
+        setError(err);
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (seq === requestSeq.current) setIsLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [selectedWorkspaceId, buildParams, reloadKey]);
 
   const loadMore = useCallback(async () => {
     if (!selectedWorkspaceId || !nextCursor || isLoadingMore) return;
+    const seq = requestSeq.current;
+    const controller = new AbortController();
+    loadMoreAbortRef.current = controller;
     setIsLoadingMore(true);
     try {
-      const res = await auditEventsControllerGetAuditEvents(selectedWorkspaceId, {
-        ...buildParams(),
-        cursor: nextCursor,
-      });
+      const res = await auditEventsControllerGetAuditEvents(
+        selectedWorkspaceId,
+        { ...buildParams(), cursor: nextCursor },
+        undefined,
+        controller.signal,
+      );
+      // Filters changed while this page was in flight — discard the rows.
+      if (seq !== requestSeq.current || controller.signal.aborted) return;
       setEvents((prev) => [...prev, ...(res.data ?? [])]);
       setNextCursor(res.nextCursor ?? null);
     } catch (err) {
+      if (seq !== requestSeq.current || controller.signal.aborted) return;
       toast.error('Failed to load more events', {
-        description:
-          err instanceof Error ? err.message : 'Please try again',
+        description: err instanceof Error ? err.message : 'Please try again',
       });
     } finally {
+      if (loadMoreAbortRef.current === controller) {
+        loadMoreAbortRef.current = null;
+      }
       setIsLoadingMore(false);
     }
   }, [selectedWorkspaceId, nextCursor, isLoadingMore, buildParams]);
@@ -390,6 +462,48 @@ export default function AuditLogSettings() {
     setAction('all');
     setOutcome('all');
     setActorId('');
+  };
+
+  const handleExport = async () => {
+    if (!selectedWorkspaceId || isExporting) return;
+    setIsExporting(true);
+    try {
+      const blob = await fetchAuditExportBlob(selectedWorkspaceId, buildParams());
+      const csvText = await blob.text();
+      const rowCount = Math.max(
+        csvText.split('\n').filter((line) => line.trim() !== '').length - 1,
+        0,
+      );
+
+      const workspaceName = workspaces.find(
+        (ws) => ws.id === selectedWorkspaceId,
+      )?.name;
+      const safeName = (workspaceName || selectedWorkspaceId).replace(
+        /[^a-zA-Z0-9_-]+/g,
+        '-',
+      );
+      const filename = `audit-${safeName}-${new Date().toISOString().slice(0, 10)}.csv`;
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(
+        rowCount === 1 ? 'Exported 1 event' : `Exported ${rowCount} events`,
+      );
+    } catch (err) {
+      toast.error('Export failed', {
+        description: await extractExportErrorMessage(err),
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const columns = useMemo<ColumnDef<AuditEventResponseDto>[]>(
@@ -523,6 +637,23 @@ export default function AuditLogSettings() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-medium text-muted-foreground">Filters</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {isExporting ? 'Exporting…' : 'Export CSV'}
+          </Button>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1.5">
             <Label>Date range</Label>
@@ -596,19 +727,26 @@ export default function AuditLogSettings() {
         </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={events}
-        isLoading={isLoading}
-        page={1}
-        pageSize={Math.max(events.length, 5)}
-        totalItems={events.length}
-        showPagination={false}
-        emptyMessage="No audit events found."
-        error={
-          error ? <LoadError onRetry={() => setReloadKey((k) => k + 1)} /> : undefined
-        }
-      />
+      {/* Cap the rendered table height so an unbounded accumulated list
+          scrolls inside its own container instead of growing the page (DOM
+          still holds all rows — simple and keeps DataTable layout intact). */}
+      <div className="max-h-[65vh] overflow-y-auto overscroll-contain">
+        <DataTable
+          columns={columns}
+          data={events}
+          isLoading={isLoading}
+          page={1}
+          pageSize={Math.max(events.length, 5)}
+          totalItems={events.length}
+          showPagination={false}
+          emptyMessage="No audit events found."
+          error={
+            error ? (
+              <LoadError onRetry={() => setReloadKey((k) => k + 1)} />
+            ) : undefined
+          }
+        />
+      </div>
 
       {nextCursor && (
         <div className="flex justify-center">

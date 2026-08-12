@@ -6,6 +6,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
 import { DataSource } from 'typeorm';
+import { AuditInterceptor } from './audit.interceptor';
 import { AuditRetentionService } from './audit-retention.service';
 import { AuditService } from './audit.service';
 import { AuditEvent } from './entities/audit-event.entity';
@@ -116,5 +117,40 @@ describe('AuditModule boot (real DI graph)', () => {
       AuditRetentionService,
     ) as Array<unknown>;
     expect(paramtypes[1]).toBe(DataSource);
+  });
+
+  it('registers AuditInterceptor as a global APP_INTERCEPTOR', () => {
+    // Regression: the interceptor was wired via APP_INTERCEPTOR but nothing
+    // pinned the provider — deleting it left every test green while prod wrote
+    // zero audit events. Nest 11 does NOT keep the bare APP_INTERCEPTOR token
+    // in the module graph: DependenciesScanner.insertProvider re-keys global
+    // enhancers as `APP_INTERCEPTOR (UUID: <uuid>)` (scanner.js), so
+    // `moduleRef.get(APP_INTERCEPTOR)` throws UnknownElementException. Pin the
+    // real registration by scanning the module graph for the enhancer token
+    // and resolving it through DI (what Nest applies to every route).
+    const container = (
+      moduleRef as unknown as {
+        container: {
+          getModules: () => Map<
+            string,
+            { providers: Map<unknown, unknown> }
+          >;
+        };
+      }
+    ).container;
+    const enhancerToken = [...container.getModules().values()]
+      .flatMap((m) => [...m.providers.keys()])
+      .find((t) => String(t).startsWith('APP_INTERCEPTOR'));
+    expect(enhancerToken).toBeDefined();
+    const appInterceptor = moduleRef.get<AuditInterceptor>(enhancerToken!, {
+      strict: false,
+    });
+    expect(appInterceptor).toBeInstanceOf(AuditInterceptor);
+  });
+
+  it('marks AuditModule as @Global so AuditService is injectable anywhere', () => {
+    // @Global() writes GLOBAL_MODULE_METADATA ('__module:global__') on the
+    // class — not the literal string 'global'.
+    expect(Reflect.getMetadata('__module:global__', AuditModule)).toBe(true);
   });
 });

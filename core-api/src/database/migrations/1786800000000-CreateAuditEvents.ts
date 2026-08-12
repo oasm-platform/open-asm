@@ -46,13 +46,33 @@ export class CreateAuditEvents1786800000000 implements MigrationInterface {
     // Append-only enforcement with two GUC escape hatches for maintenance jobs:
     // - UPDATE allowed when app.audit_pii_sweep = 'on'  (pseudonymize actor PII)
     // - DELETE allowed when app.audit_retention = 'on'  (90-day retention purge)
+    //
+    // Fail-closed role gate (code review): the escape hatches additionally
+    // require the current user to be a superuser OR a member of the
+    // `audit_maintenance` role BEFORE any UPDATE/DELETE is allowed. A missing
+    // role (COALESCE(..., false)) denies the bypass — the GUC alone is never
+    // sufficient. TRUNCATE has no hatch: it is always blocked.
+    //
+    // NOTE (ops): CREATE ROLE cannot run inside a transaction, so this
+    // migration cannot provision `audit_maintenance` itself. Provision it
+    // cluster-wide (e.g. `CREATE ROLE audit_maintenance NOLOGIN`) and GRANT it
+    // to the application DB user — otherwise retention deletes and PII sweeps
+    // fail unless the app connects as a superuser.
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION "block_audit_mutation"() RETURNS trigger AS $$
+      DECLARE
+        is_maintenance boolean := COALESCE(
+          pg_has_role(current_user, (SELECT oid FROM pg_roles WHERE rolname = 'audit_maintenance'), 'MEMBER'),
+          false
+        );
+        is_superuser boolean := (SELECT rolsuper FROM pg_roles WHERE rolname = current_user);
       BEGIN
-        IF TG_OP = 'UPDATE' AND current_setting('app.audit_pii_sweep', true) = 'on' THEN
+        IF TG_OP = 'UPDATE' AND current_setting('app.audit_pii_sweep', true) = 'on'
+           AND (is_superuser OR is_maintenance) THEN
           RETURN NEW;
         END IF;
-        IF TG_OP = 'DELETE' AND current_setting('app.audit_retention', true) = 'on' THEN
+        IF TG_OP = 'DELETE' AND current_setting('app.audit_retention', true) = 'on'
+           AND (is_superuser OR is_maintenance) THEN
           RETURN OLD;
         END IF;
         RAISE EXCEPTION 'audit_events is append-only: % is forbidden', TG_OP;

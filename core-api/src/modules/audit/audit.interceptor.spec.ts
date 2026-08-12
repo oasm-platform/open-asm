@@ -222,4 +222,145 @@ describe('AuditInterceptor', () => {
       expect(auditService.auditSafely).not.toHaveBeenCalled();
     });
   });
+
+  describe('S12i extractor failures never break the request (code-review hardening)', () => {
+    it('handler succeeds while the changes extractor throws → response unaffected and NO audit row is written', async () => {
+      reflector.get.mockReturnValue({
+        action: 'target.created',
+        resourceId: (result: { id: string }) => result.id,
+        changes: () => {
+          throw new Error('changes extractor bug');
+        },
+      });
+      const next: CallHandler = { handle: () => of({ id: 't-1' }) };
+
+      const result = await firstValueFrom(interceptor.intercept(context, next));
+
+      expect(result).toEqual({ id: 't-1' });
+      expect(auditService.auditSafely).not.toHaveBeenCalled();
+    });
+
+    it('pre-handler-style metadata extractor that throws still lets the request complete normally', async () => {
+      reflector.get.mockReturnValue({
+        action: 'target.created',
+        metadata: () => {
+          throw new Error('metadata extractor bug');
+        },
+      });
+      const next: CallHandler = { handle: () => of({ id: 't-1' }) };
+
+      const result = await firstValueFrom(interceptor.intercept(context, next));
+
+      expect(result).toEqual({ id: 't-1' });
+      expect(auditService.auditSafely).not.toHaveBeenCalled();
+    });
+
+    it('handler throws a normal error → failure row written with resourceId from req.params.id', async () => {
+      request = makeRequest({ params: { id: 't-9' } });
+      context = buildContext();
+      reflector.get.mockReturnValue({ action: 'target.deleted' });
+      const next: CallHandler = {
+        handle: () => throwError(() => new Error('boom')),
+      };
+
+      await expect(
+        firstValueFrom(interceptor.intercept(context, next)),
+      ).rejects.toThrow('boom');
+      expect(auditService.auditSafely).toHaveBeenCalledTimes(1);
+      expect(auditService.auditSafely).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'target.deleted',
+          outcome: AuditOutcome.Failure,
+          workspaceId: 'ws-1',
+          resourceId: 't-9',
+        }),
+      );
+    });
+
+    it('changes/metadata extractors run exactly ONCE per request (post-handler, with the result)', async () => {
+      const changes = jest.fn().mockReturnValue({ name: { after: 'x' } });
+      const metadata = jest.fn().mockReturnValue({ count: 1 });
+      reflector.get.mockReturnValue({
+        action: 'target.created',
+        changes,
+        metadata,
+      });
+      const next: CallHandler = { handle: () => of({ id: 't-1' }) };
+
+      const result = await firstValueFrom(interceptor.intercept(context, next));
+
+      expect(result).toEqual({ id: 't-1' });
+      expect(changes).toHaveBeenCalledTimes(1);
+      expect(changes).toHaveBeenCalledWith(request.body, { id: 't-1' });
+      expect(metadata).toHaveBeenCalledTimes(1);
+      expect(metadata).toHaveBeenCalledWith(request.body, { id: 't-1' });
+      expect(auditService.auditSafely).toHaveBeenCalledTimes(1);
+    });
+
+    it('a resourceId extractor throw on the failure path skips the row (extractor bug ≠ failed request)', async () => {
+      request = makeRequest({ params: { id: 't-9' } });
+      context = buildContext();
+      reflector.get.mockReturnValue({
+        action: 'target.deleted',
+        resourceId: () => {
+          throw new Error('resourceId extractor bug');
+        },
+      });
+      const next: CallHandler = {
+        handle: () => throwError(() => new Error('boom')),
+      };
+
+      await expect(
+        firstValueFrom(interceptor.intercept(context, next)),
+      ).rejects.toThrow('boom');
+      expect(auditService.auditSafely).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('S12j api-key attribution (MCP_API_KEY_HEADER)', () => {
+    const API_KEY_HEADER = 'x-oasm-api-key';
+
+    it('emits an audit row with actorType api_key when the request carries the MCP API key header and no user session', async () => {
+      request = makeRequest({
+        session: undefined,
+        user: undefined,
+        headers: { [API_KEY_HEADER]: 'live-key-abc123' },
+      });
+      context = buildContext();
+      reflector.get.mockReturnValue({ action: 'target.created' });
+      auditService.buildActorContext.mockReturnValue({
+        actorId: undefined,
+        actorType: AuditActorType.ApiKey,
+        actorName: 'live-key-abc123',
+        sourceIp: '203.0.113.7',
+        requestId: 'req-1',
+      });
+      const next: CallHandler = { handle: () => of({ id: 't-1' }) };
+
+      const result = await firstValueFrom(interceptor.intercept(context, next));
+
+      expect(result).toEqual({ id: 't-1' });
+      expect(auditService.auditSafely).toHaveBeenCalledTimes(1);
+      expect(auditService.auditSafely).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorType: AuditActorType.ApiKey,
+          action: 'target.created',
+          outcome: AuditOutcome.Success,
+        }),
+      );
+    });
+
+    it('still skips when neither a user identity NOR the API key header is present', async () => {
+      request = makeRequest({ session: undefined, user: undefined });
+      context = buildContext();
+      reflector.get.mockReturnValue({ action: 'target.created' });
+      const next: CallHandler = { handle: () => of({ id: 't-1' }) };
+
+      const result = await firstValueFrom(interceptor.intercept(context, next));
+
+      expect(result).toEqual({ id: 't-1' });
+      expect(auditService.buildActorContext).not.toHaveBeenCalled();
+      expect(auditService.auditSafely).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -235,6 +235,56 @@ describe('AuditService', () => {
       expect(input.apiKey).toBe('sk-123');
       expect(input.nested.token).toBe('abc');
     });
+
+    it('redacts value-level secrets (sk-, AKIA, PEM headers, long secret-ish strings) to ***', () => {
+      const input = {
+        awsKey: 'AKIAIOSFODNN7EXAMPLE',
+        pem: '-----BEGIN PRIVATE KEY-----\nMIIE...',
+        note: 'AKIA-long-access-key-here',
+        longBlob: 'Mxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==',
+        ok: 'hello world',
+        short: 'abc',
+      };
+
+      const output = service.redactSecrets(input);
+
+      expect(output).toEqual({
+        awsKey: '***',
+        pem: '***',
+        note: '***',
+        longBlob: '***',
+        ok: 'hello world',
+        short: 'abc',
+      });
+    });
+
+    it('drops keys named authorization/bearer/passphrase/certificate/sshKey, recursively', () => {
+      const input = {
+        authorization: 'Bearer abc',
+        bearer: 'tok',
+        passphrase: 'p4ss',
+        certificate: 'cert-data',
+        sshKey: 'ssh-rsa AAAAB3Nza...',
+        inner: { authorization: 'x', fine: 1 },
+      };
+
+      expect(service.redactSecrets(input)).toEqual({ inner: { fine: 1 } });
+    });
+
+    it('recurses into arrays of objects and redacts value-level secrets inside arrays', () => {
+      const input = {
+        items: [
+          { apiKey: 'sk-1', name: 'first' },
+          { token: 'abc', name: 'second' },
+        ],
+        list: ['AKIAIOSFODNN7EXAMPLE', 'plain'],
+      };
+
+      expect(service.redactSecrets(input)).toEqual({
+        items: [{ name: 'first' }, { name: 'second' }],
+        list: ['***', 'plain'],
+      });
+    });
   });
 
   describe('S10 event dictionary', () => {
@@ -378,6 +428,52 @@ describe('AuditService', () => {
         requestId: 'req-2',
       });
     });
+
+    it('attributes the action to the API key (actorType api_key, null actorId) when no user identity exists', () => {
+      const req = {
+        headers: { 'x-oasm-api-key': 'oasm_live_1234' },
+        requestId: 'req-3',
+      } as unknown as RequestWithMetadata;
+
+      expect(service.buildActorContext(req)).toEqual({
+        actorId: undefined,
+        actorType: AuditActorType.ApiKey,
+        actorName: 'oasm_live_1234',
+        actorEmail: undefined,
+        sourceIp: undefined,
+        userAgent: undefined,
+        requestId: 'req-3',
+      });
+    });
+
+    it('truncates the API-key-derived actorName to 64 chars and caps userAgent at 512 chars', () => {
+      const longKey = 'k'.repeat(100);
+      const longAgent = 'a'.repeat(600);
+      const req = {
+        headers: { 'x-oasm-api-key': longKey, 'user-agent': longAgent },
+        requestId: 'req-4',
+      } as unknown as RequestWithMetadata;
+
+      const ctx = service.buildActorContext(req);
+
+      expect(ctx.actorType).toBe(AuditActorType.ApiKey);
+      expect(ctx.actorName).toBe('k'.repeat(64));
+      expect(ctx.userAgent).toBe('a'.repeat(512));
+    });
+
+    it('keeps actorType user when a user identity is present even with an API key header', () => {
+      const req = {
+        user: { id: 'u-1', name: 'Alice', email: 'alice@x.io' },
+        session: { userId: 'u-1' },
+        headers: { 'x-oasm-api-key': 'oasm_live_1234', 'user-agent': 'agent' },
+        requestId: 'req-5',
+      } as unknown as RequestWithMetadata;
+
+      const ctx = service.buildActorContext(req);
+
+      expect(ctx.actorType).toBe(AuditActorType.User);
+      expect(ctx.actorId).toBe('u-1');
+    });
   });
 
   describe('pseudonymizeActor', () => {
@@ -398,8 +494,29 @@ describe('AuditService', () => {
         expect.stringContaining(`"actorName" = 'Deleted user'`),
         ['u-1'],
       );
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining(`"userAgent" = NULL`),
+        ['u-1'],
+      );
       expect(query).toHaveBeenLastCalledWith(
         `SELECT set_config('app.audit_pii_sweep', 'off', true)`,
+      );
+    });
+
+    it('nulls metadata.targetUserId on a specific event when targetEventId is given', async () => {
+      const query = jest.fn().mockResolvedValue(undefined);
+      const manager = { query } as unknown as EntityManager;
+      mockDataSource.transaction.mockImplementation(
+        (cb: (m: EntityManager) => unknown) => cb(manager),
+      );
+
+      await service.pseudonymizeActor('u-1', 'evt-removal-1');
+
+      // The third SQL call (after PII UPDATE) nulls targetUserId on the
+      // specific member.removed event row.
+      expect(query).toHaveBeenCalledWith(
+        `UPDATE "audit_events" SET "metadata" = "metadata" - 'targetUserId' WHERE "id" = $1`,
+        ['evt-removal-1'],
       );
     });
   });
@@ -412,6 +529,40 @@ describe('AuditService', () => {
         occurredAt,
         id,
       });
+    });
+
+    it('rejects cursors containing non-base64url characters even when lenient decoding would succeed', () => {
+      const occurredAt = new Date('2026-08-10T10:00:00.000Z');
+      const valid = encodeCursor({ occurredAt, id: randomUUID() });
+      // Node's Buffer.from(base64url) silently IGNORES invalid characters, so
+      // this decodes identically to `valid` under lenient decoding — strict
+      // validation must still reject it.
+      expect(() => decodeCursor(`!${valid}`)).toThrow(BadRequestException);
+      expect(() => decodeCursor(`${valid}?`)).toThrow(BadRequestException);
+    });
+
+    it('rejects padded/non-canonical base64url cursors', () => {
+      const occurredAt = new Date('2026-08-10T10:00:00.000Z');
+      const valid = encodeCursor({ occurredAt, id: randomUUID() });
+      const padded = `${valid.slice(0, 4)}===${valid.slice(4)}`;
+      expect(() => decodeCursor(padded)).toThrow(BadRequestException);
+    });
+
+    it('rejects timestamps that are not strict ISO-8601 even when Date would parse them', () => {
+      const id = randomUUID();
+      const nonIso = [
+        // space separator instead of T — Date parses this, strict ISO rejects it
+        '2026-08-10 10:00:00.000Z',
+        // non-padded month/day — Date parses, strict ISO rejects
+        '2026-8-1T10:00:00.000Z',
+        // missing milliseconds — Date parses, strict ISO rejects
+        '2026-08-10T10:00:00Z',
+      ];
+      for (const iso of nonIso) {
+        expect(() =>
+          decodeCursor(Buffer.from(`${iso}|${id}`, 'utf8').toString('base64url')),
+        ).toThrow(BadRequestException);
+      }
     });
   });
 
@@ -566,6 +717,52 @@ describe('AuditService', () => {
 
       expect(result.data).toHaveLength(5);
       expect(result.nextCursor).toBeNull();
+    });
+
+    it('exactly limit rows yields no nextPageToken (boundary: limit rows → hasMore false)', async () => {
+      const rows = Array.from({ length: 20 }, (_, i) =>
+        makeEventRow({
+          occurredAt: new Date(Date.UTC(2026, 7, 10, 10, i)),
+        }),
+      );
+      stubRows(rows);
+
+      const result = await service.queryEvents(testWorkspaceId, { limit: 20 });
+
+      expect(result.data).toHaveLength(20);
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('limit+1 rows yields a nextPageToken that correctly continues the keyset', async () => {
+      const rows = Array.from({ length: 6 }, (_, i) =>
+        makeEventRow({
+          occurredAt: new Date(Date.UTC(2026, 7, 10, 10, i)),
+        }),
+      );
+      stubRows(rows);
+
+      const page1 = await service.queryEvents(testWorkspaceId, { limit: 5 });
+
+      expect(page1.data).toHaveLength(5);
+      expect(page1.nextCursor).toBe(
+        encodeCursor(rows[4]),
+      );
+
+      // Feed the cursor back for page 2 — verify the keyset condition.
+      stubRows([rows[5]]);
+      const page2 = await service.queryEvents(testWorkspaceId, {
+        limit: 5,
+        cursor: page1.nextCursor!,
+      });
+
+      expect(page2.data).toHaveLength(1);
+      expect(page2.data[0].id).toBe(rows[5].id);
+      expect(page2.nextCursor).toBeNull();
+      // Verify the keyset tuple was applied.
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(ae.occurredAt, ae.id) < (:cursorTs, :cursorId)',
+        expect.objectContaining({ cursorTs: rows[4].occurredAt }),
+      );
     });
   });
 

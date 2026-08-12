@@ -1,4 +1,5 @@
 import { AuditActorType, AuditOutcome } from '@/common/enums/enum';
+import { MCP_API_KEY_HEADER } from '@/common/constants/app.constants';
 import type { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,6 +14,15 @@ const CURSOR_SEPARATOR = '|';
 
 /** Hard ceiling for the CSV export (plan §7): beyond this → 400, narrow filters. */
 const EXPORT_MAX_ROWS = 10_000;
+
+/** Strict unpadded base64url alphabet — Node's lenient decoder ignores invalid chars. */
+const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+/**
+ * Strict ISO-8601 as emitted by encodeCursor (Date.prototype.toISOString):
+ * YYYY-MM-DDTHH:mm:ss.sssZ. `new Date()` alone accepts non-ISO inputs like
+ * '2026-08-10 10:00:00' — those must be rejected as malformed cursors.
+ */
+const CURSOR_ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 const CURSOR_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,14 +45,29 @@ export function encodeCursor(
 export function decodeCursor(
   cursor: string,
 ): { occurredAt: Date; id: string } {
+  // Strict base64url: reject any character outside the alphabet. Node's
+  // Buffer.from(cursor, 'base64url') silently IGNORES invalid chars (so
+  // '!<valid>' decodes fine) and accepts '=' padding — encodeCursor emits
+  // unpadded canonical base64url, so both are malformed.
+  if (!BASE64URL_RE.test(cursor)) {
+    throw new BadRequestException('Invalid cursor');
+  }
   const raw = Buffer.from(cursor, 'base64url').toString('utf8');
   const parts = raw.split(CURSOR_SEPARATOR);
   if (parts.length !== 2) {
     throw new BadRequestException('Invalid cursor');
   }
   const [iso, id] = parts;
+  // Strict ISO-8601 in the exact toISOString() shape; the round-trip check
+  // additionally rejects out-of-range dates that would otherwise normalize.
+  if (!CURSOR_ISO_RE.test(iso) || !CURSOR_UUID_RE.test(id)) {
+    throw new BadRequestException('Invalid cursor');
+  }
   const occurredAt = new Date(iso);
-  if (Number.isNaN(occurredAt.getTime()) || !CURSOR_UUID_RE.test(id)) {
+  if (
+    Number.isNaN(occurredAt.getTime()) ||
+    occurredAt.toISOString() !== iso
+  ) {
     throw new BadRequestException('Invalid cursor');
   }
   return { occurredAt, id };
@@ -90,7 +115,21 @@ export interface AuditContext {
  * key names (case-insensitive), applied recursively by `redactSecrets`.
  */
 const SECRET_KEY_RE =
-  /(secret|token|password|credential|api.?key|private.?key|access.?key)/i;
+  /(secret|token|password|credential|api.?key|private.?key|access.?key|authorization|bearer|passphrase|cert|ssh.?key)/i;
+
+/** Prefixes that mark a VALUE as a credential (OpenAI sk-, AWS AKIA, PEM). */
+const SECRET_VALUE_PREFIX_RE = /^(sk-|AKIA|-----BEGIN)/i;
+/**
+ * Long, delimiter-free strings are almost certainly keys or tokens. The
+ * threshold (40) is above UUID length (36) to avoid over-redacting resource
+ * identifiers while still catching the bulk of real-world API tokens
+ * (GitHub 'ghp_', Slack 'xoxb-', PATs, etc.).
+ */
+const SECRET_VALUE_LONG_RE = /^[A-Za-z0-9+/=_-]+$/;
+
+const looksLikeSecretValue = (value: string): boolean =>
+  SECRET_VALUE_PREFIX_RE.test(value) ||
+  (value.length >= 40 && SECRET_VALUE_LONG_RE.test(value));
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -161,30 +200,45 @@ export class AuditService {
 
   /**
    * Derives the actor + request context for an audited handler. v1 scope:
-   * actorType is ALWAYS User (api_key/agent attribution is deferred to v2).
-   * Prefers the current request's ip/user-agent over the session's login-time
-   * values (which can be stale). The result is also the `AuditContext` shape
-   * controllers pass into service methods for in-transaction writes.
+   * when the request carries a user session → actorType User, else actorType
+   * ApiKey (actorId null, actorName truncated from the API key header). Prefers
+   * the current request's ip/user-agent over the session's login-time values
+   * (which can be stale). The userAgent is capped at 512 chars.
    */
   buildActorContext(req: RequestWithMetadata): AuditContext {
     const headerUserAgent = req.headers['user-agent'];
+    const apiKeyHeader = req.headers?.[MCP_API_KEY_HEADER];
+    const hasUserIdentity = Boolean(
+      req.user?.id ?? req.session?.userId,
+    );
+    const apiKeyActorName =
+      typeof apiKeyHeader === 'string' && apiKeyHeader.length > 0
+        ? apiKeyHeader.slice(0, 64)
+        : 'API key';
     return {
       actorId: req.user?.id ?? req.session?.userId,
-      actorType: AuditActorType.User,
-      actorName: req.user?.name,
+      actorType: hasUserIdentity
+        ? AuditActorType.User
+        : AuditActorType.ApiKey,
+      actorName: hasUserIdentity ? req.user?.name : apiKeyActorName,
       actorEmail: req.user?.email,
       sourceIp: req.ip ?? req.session?.ipAddress ?? undefined,
       userAgent:
-        (typeof headerUserAgent === 'string' ? headerUserAgent : undefined) ??
-        req.session?.userAgent ??
-        undefined,
+        ((typeof headerUserAgent === 'string'
+          ? headerUserAgent
+          : undefined) ??
+          req.session?.userAgent ??
+          undefined)?.slice(0, 512),
       requestId: req.requestId,
     };
   }
 
   /**
-   * Deep copy that drops any key matching a secret pattern (recursively), so
-   * plaintext credentials never reach the audit JSONB payloads.
+   * Deep copy that (a) drops any key matching a secret pattern and (b)
+   * replaces values that look like credentials (sk-/AKIA/-----BEGIN prefixes,
+   * long delimiter-free strings) with '***' — recursively, including inside
+   * arrays of objects, so plaintext credentials never reach the audit JSONB
+   * payloads even when their key name is innocuous.
    */
   redactSecrets<T extends Record<string, unknown>>(obj: T): T {
     const copy: Record<string, unknown> = {};
@@ -193,13 +247,18 @@ export class AuditService {
         continue;
       }
       if (Array.isArray(value)) {
-        copy[key] = value.map((item: unknown) =>
-          isPlainObject(item)
-            ? this.redactSecrets(item)
-            : item,
-        );
+        copy[key] = value.map((item: unknown) => {
+          if (isPlainObject(item)) {
+            return this.redactSecrets(item);
+          }
+          return typeof item === 'string' && looksLikeSecretValue(item)
+            ? '***'
+            : item;
+        });
       } else if (isPlainObject(value)) {
         copy[key] = this.redactSecrets(value);
+      } else if (typeof value === 'string' && looksLikeSecretValue(value)) {
+        copy[key] = '***';
       } else {
         copy[key] = value;
       }
@@ -212,18 +271,32 @@ export class AuditService {
    * trigger only allows UPDATEs while `app.audit_pii_sweep='on'`; the GUC is
    * set with is_local=true so it is scoped to this explicit transaction and
    * dies with it (the explicit reset is belt-and-suspenders).
+   *
+   * `targetEventId` optionally points at the member.removed event row that
+   * carried the removed user's id in metadata.targetUserId (PII that survives
+   * the actor sweep because that row's actorId is the *acting* user) — it is
+   * nulled out in the same transaction.
    */
-  async pseudonymizeActor(actorId: string): Promise<void> {
+  async pseudonymizeActor(
+    actorId: string,
+    targetEventId?: string,
+  ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       await manager.query(
         `SELECT set_config('app.audit_pii_sweep', 'on', true)`,
       );
       await manager.query(
         `UPDATE "audit_events"
-         SET "actorName" = 'Deleted user', "actorEmail" = NULL, "sourceIp" = NULL
+         SET "actorName" = 'Deleted user', "actorEmail" = NULL, "sourceIp" = NULL, "userAgent" = NULL
          WHERE "actorId" = $1`,
         [actorId],
       );
+      if (targetEventId) {
+        await manager.query(
+          `UPDATE "audit_events" SET "metadata" = "metadata" - 'targetUserId' WHERE "id" = $1`,
+          [targetEventId],
+        );
+      }
       await manager.query(
         `SELECT set_config('app.audit_pii_sweep', 'off', true)`,
       );

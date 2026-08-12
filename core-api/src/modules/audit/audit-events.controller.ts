@@ -63,7 +63,12 @@ const toCsvField = (value: unknown): string => {
       : typeof value === 'string'
         ? value
         : JSON.stringify(value);
-  return /[",\r\n]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
+  // CWE-1236 (CSV formula injection): a field starting with = + - @ tab or CR
+  // would be evaluated as a formula by spreadsheet apps. Neutralize by
+  // prefixing a single quote — BEFORE RFC-quoting, so the exported field can
+  // never begin with a formula character.
+  const field = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return /[",\r\n]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
 };
 
 /** Serializes audit rows into CSV (header + one line per row). */
