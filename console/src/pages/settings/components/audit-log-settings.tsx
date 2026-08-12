@@ -136,7 +136,7 @@ function AuditEventSheet({ event, onClose }: AuditEventSheetProps) {
         if (!open) onClose();
       }}
     >
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent className="w-full overflow-y-auto px-4 pb-4 sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{getAuditEventLabel(event.action)}</SheetTitle>
           <SheetDescription>{formatAbsoluteTime(event.occurredAt)}</SheetDescription>

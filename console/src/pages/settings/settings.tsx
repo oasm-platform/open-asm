@@ -233,7 +233,7 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
   }
 
   return (
-    <div className="mx-auto w-full sm:w-3/4 xl:w-1/2">
+    <div className="mx-auto w-full sm:w-5/6 xl:w-2/3">
       {activeTab && (
         <div className="space-y-4">
           <div className="flex items-center flex-row justify-between">
