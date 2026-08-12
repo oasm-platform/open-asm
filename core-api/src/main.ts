@@ -24,6 +24,7 @@ import {
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
+import { requestIdMiddleware } from './common/middleware/request-id.middleware';
 import { mergeBetterAuthSpec } from './utils/mergeBetterAuth';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -31,6 +32,10 @@ async function bootstrap() {
     logger: ['log', 'error', 'warn', 'verbose'],
   });
   app.set('query parser', 'extended');
+
+  // First in the chain so every downstream middleware/guard/handler and the
+  // audit log share the same requestId (X-Request-Id round-trip).
+  app.use(requestIdMiddleware);
 
   app.useStaticAssets(path.join(__dirname, '..', 'public'), {
     prefix: '/api/static/',

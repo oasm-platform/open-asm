@@ -113,5 +113,11 @@
       { "action": "read", "description": "View workers" },
       { "action": "write", "description": "Manage workers" }
     ]
+  },
+  {
+    "resource": "audit",
+    "actions": [
+      { "action": "read", "description": "View and export the workspace audit log" }
+    ]
   }
 ]

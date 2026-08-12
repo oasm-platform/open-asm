@@ -29,6 +29,7 @@ import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
+import { AuditLog } from '../audit/audit-log.decorator';
 import { VulnerabilitiesService } from './vulnerabilities.service';
 
 @Controller('vulnerabilities')
@@ -173,6 +174,14 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('vulnerability.status.updated', {
+    // No before/after status is derivable decorator-only — the row carries the
+    // bulk action and the affected count (plan §4 row 21: high-evidence event).
+    metadata: (body) => {
+      const ids = (body as { ids?: string[] })?.ids;
+      return { action: 'dismiss', count: ids?.length ?? 0 };
+    },
+  })
   @WorkspaceAccess('vulnerability.write')
   @Post('dismiss')
   bulkDismissVulnerabilities(
@@ -194,6 +203,12 @@ export class VulnerabilitiesController {
       'Reopens multiple security vulnerabilities identified within the system, restoring them to active tracking and analysis.',
     request: {
       getWorkspaceId: true,
+    },
+  })
+  @AuditLog('vulnerability.bulk_updated', {
+    metadata: (body) => {
+      const ids = (body as { ids?: string[] })?.ids;
+      return { action: 'reopen', count: ids?.length ?? 0 };
     },
   })
   @WorkspaceAccess('vulnerability.write')

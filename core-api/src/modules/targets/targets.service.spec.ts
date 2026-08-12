@@ -1,4 +1,5 @@
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
+import { AuditOutcome } from '@/common/enums/enum';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -8,6 +9,8 @@ import { randomUUID } from 'crypto';
 import type { EntityManager, Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import type { Asset } from '../assets/entities/assets.entity';
+import type { AuditContext } from '../audit/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   Target,
@@ -23,6 +26,7 @@ describe('TargetsService', () => {
   let mockAssetsService: Partial<AssetsService>;
   let mockEventEmitter: Partial<EventEmitter2>;
   let mockQueue: Partial<Queue>;
+  let mockAuditService: { auditSafely: jest.Mock };
 
   beforeEach(async () => {
     mockTargetRepository = {
@@ -38,6 +42,7 @@ describe('TargetsService', () => {
       getRawMany: jest.fn(),
       getCount: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
       findOne: jest.fn(),
       findByIds: jest.fn(),
       manager: {
@@ -64,6 +69,10 @@ describe('TargetsService', () => {
       removeJobScheduler: jest.fn(),
     } as any;
 
+    mockAuditService = {
+      auditSafely: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TargetsService,
@@ -86,6 +95,10 @@ describe('TargetsService', () => {
         {
           provide: 'BullQueue_assets-discovery-schedule', // Queue name for BullMQ
           useValue: mockQueue,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();
@@ -1042,6 +1055,80 @@ describe('TargetsService', () => {
 
       expect(result).toEqual([]);
       expect(mockTargetRepository.createQueryBuilder).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteTarget', () => {
+    const workspaceId = randomUUID();
+    const id = randomUUID();
+    const userContext = {
+      id: randomUUID(),
+      name: 'Test User',
+      email: 'test@example.com',
+    } as unknown as UserContextPayload;
+    const auditContext: AuditContext = {
+      actorId: randomUUID(),
+      actorName: 'Test User',
+      actorEmail: 'test@example.com',
+      sourceIp: '127.0.0.1',
+      userAgent: 'jest',
+      requestId: randomUUID(),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (mockWorkspacesService.getWorkspaceByIdAndOwner as jest.Mock).mockResolvedValue(
+        undefined,
+      );
+      (mockTargetRepository.delete as jest.Mock).mockResolvedValue({ affected: 1 });
+    });
+
+    it('writes a target.deleted audit event with the deleted target as before-changes', async () => {
+      (mockTargetRepository.findOneBy as jest.Mock).mockResolvedValue({
+        id,
+        value: 'example.com',
+        type: TargetType.DOMAIN,
+        scanSchedule: null,
+      });
+
+      await service.deleteTarget(id, workspaceId, userContext, auditContext);
+
+      expect(mockAuditService.auditSafely).toHaveBeenCalledWith({
+        workspaceId,
+        ...auditContext,
+        action: 'target.deleted',
+        resourceType: 'target',
+        resourceId: id,
+        changes: {
+          value: { before: 'example.com' },
+          type: { before: TargetType.DOMAIN },
+        },
+        outcome: AuditOutcome.Success,
+      });
+    });
+
+    it('skips the audit write when no audit context is provided', async () => {
+      (mockTargetRepository.findOneBy as jest.Mock).mockResolvedValue({
+        id,
+        value: 'example.com',
+        type: TargetType.DOMAIN,
+        scanSchedule: null,
+      });
+
+      await service.deleteTarget(id, workspaceId, userContext);
+
+      expect(mockAuditService.auditSafely).not.toHaveBeenCalled();
+    });
+
+    it('does not write an audit event when the target does not exist', async () => {
+      (mockTargetRepository.findOneBy as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.deleteTarget(id, workspaceId, userContext, auditContext),
+      ).rejects.toThrow('Target not found in workspace');
+
+      expect(mockTargetRepository.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.auditSafely).not.toHaveBeenCalled();
     });
   });
 });

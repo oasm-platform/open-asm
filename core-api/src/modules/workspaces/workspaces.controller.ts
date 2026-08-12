@@ -27,6 +27,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
+import { AuditLog } from '../audit/audit-log.decorator';
+import { AuditService } from '../audit/audit.service';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
 import {
@@ -57,7 +59,10 @@ import { WorkspacesService } from './workspaces.service';
 @ApiTags('Workspaces')
 @Controller('workspaces')
 export class WorkspacesController {
-  constructor(private readonly workspacesService: WorkspacesService) {}
+  constructor(
+    private readonly workspacesService: WorkspacesService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Doc({
     summary: 'Create Workspace',
@@ -66,6 +71,14 @@ export class WorkspacesController {
     response: {
       serialization: Workspace,
     },
+  })
+  @AuditLog('workspace.created', {
+    // No request workspaceId exists yet — the new workspace comes from the result.
+    workspaceId: (result) => (result as { id?: string } | undefined)?.id,
+    resourceId: (result) => (result as { id?: string } | undefined)?.id,
+    changes: (body) => ({
+      name: { after: (body as { name?: string })?.name ?? '' },
+    }),
   })
   @Post()
   createWorkspace(
@@ -126,6 +139,7 @@ export class WorkspacesController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('workspace.config.updated')
   @WorkspaceAccess('workspace.config')
   @Patch('configs')
   updateWorkspaceConfigs(
@@ -217,12 +231,14 @@ export class WorkspacesController {
     @Param('memberId') memberId: string,
     @Body() dto: UpdateMemberPermissionsDto,
     @UserContext() user: UserContextPayload,
+    @Req() req: Request,
   ) {
     return this.workspacesService.updateMemberPermissions(
       workspaceId,
       memberId,
       dto.permissionIds,
       user.id,
+      this.auditService.buildActorContext(req as RequestWithMetadata),
     );
   }
 
@@ -239,11 +255,13 @@ export class WorkspacesController {
     @WorkspaceId() workspaceId: string,
     @Param('memberId') memberId: string,
     @UserContext() user: UserContextPayload,
+    @Req() req: Request,
   ) {
     return this.workspacesService.removeMember(
       workspaceId,
       memberId,
       user.id,
+      this.auditService.buildActorContext(req as RequestWithMetadata),
     );
   }
 
@@ -292,11 +310,13 @@ export class WorkspacesController {
     @WorkspaceId() workspaceId: string,
     @Body() dto: CreatePermissionGroupDto,
     @UserContext() user: UserContextPayload,
+    @Req() req: Request,
   ) {
     return this.workspacesService.createPermissionGroup(
       workspaceId,
       dto,
       user.id,
+      this.auditService.buildActorContext(req as RequestWithMetadata),
     );
   }
 
@@ -314,12 +334,14 @@ export class WorkspacesController {
     @Param('permissionId') permissionId: string,
     @Body() dto: UpdatePermissionGroupDto,
     @UserContext() user: UserContextPayload,
+    @Req() req: Request,
   ) {
     return this.workspacesService.updatePermissionGroup(
       workspaceId,
       permissionId,
       dto,
       user.id,
+      this.auditService.buildActorContext(req as RequestWithMetadata),
     );
   }
 
@@ -335,10 +357,12 @@ export class WorkspacesController {
   deletePermissionGroup(
     @WorkspaceId() workspaceId: string,
     @Param('permissionId') permissionId: string,
+    @Req() req: Request,
   ) {
     return this.workspacesService.deletePermissionGroup(
       workspaceId,
       permissionId,
+      this.auditService.buildActorContext(req as RequestWithMetadata),
     );
   }
 
@@ -352,6 +376,14 @@ export class WorkspacesController {
       'Invites existing users by email. The invitee receives an in-app notification with an accept/decline link. Emails without an account are skipped. Requires invitation.write.',
     response: { serialization: CreateInvitationsResponseDto },
     request: { getWorkspaceId: true },
+  })
+  @AuditLog('member.invited', {
+    resourceType: 'invitation',
+    // NEVER log raw emails — only the count. The response carries no ids,
+    // so invitationIds are omitted here (see M4.1 report).
+    metadata: (body) => ({
+      emailsCount: (body as { emails?: string[] })?.emails?.length ?? 0,
+    }),
   })
   @WorkspaceAccess('invitation.write')
   @Post('invitations')
@@ -386,6 +418,11 @@ export class WorkspacesController {
       'Cancels a pending invitation so its token can no longer be used. Requires invitation.write.',
     response: { serialization: DefaultMessageResponseDto },
     request: { getWorkspaceId: true },
+  })
+  @AuditLog('member.invitation.cancelled', {
+    resourceType: 'invitation',
+    // invitationId lives in the route param, which is NOT exposed to the
+    // decorator callbacks (body/result only) — omit + document (M4.1 report).
   })
   @WorkspaceAccess('invitation.write')
   @Post('invitations/:invitationId/cancel')
@@ -472,6 +509,25 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @AuditLog('workspace.updated', {
+    // Best-effort changes from the body — never echo back the full workspace.
+    changes: (body) => {
+      const dto = body as {
+        name?: string;
+        description?: string | null;
+        archivedAt?: string | Date | null;
+      };
+      const changes: Record<string, { after?: unknown }> = {};
+      if (dto.name !== undefined) changes.name = { after: dto.name };
+      if (dto.description !== undefined) {
+        changes.description = { after: dto.description };
+      }
+      if (dto.archivedAt !== undefined) {
+        changes.isArchived = { after: dto.archivedAt !== null };
+      }
+      return changes;
+    },
+  })
   @WorkspaceAccess('workspace.write', { workspaceParam: 'id' })
   @Patch(':id')
   updateWorkspace(
@@ -495,8 +551,13 @@ export class WorkspacesController {
   deleteWorkspace(
     @Param() { id }: IdQueryParamDto,
     @UserContext() userContext: UserContextPayload,
+    @Req() req: Request,
   ) {
-    return this.workspacesService.deleteWorkspace(id, userContext);
+    return this.workspacesService.deleteWorkspace(
+      id,
+      userContext,
+      this.auditService.buildActorContext(req as RequestWithMetadata),
+    );
   }
 
   @Doc({
@@ -507,6 +568,7 @@ export class WorkspacesController {
       serialization: GetApiKeyResponseDto,
     },
   })
+  @AuditLog('workspace.api_key.rotated')
   @WorkspaceAccess('workspace.apikey', { workspaceParam: 'id' })
   @Post(':id/api-key/rotate')
   rotateApiKey(
@@ -523,6 +585,13 @@ export class WorkspacesController {
     response: {
       serialization: DefaultMessageResponseDto,
     },
+  })
+  @AuditLog('workspace.updated', {
+    changes: (body) => ({
+      isArchived: {
+        after: (body as { isArchived?: boolean })?.isArchived ?? true,
+      },
+    }),
   })
   @WorkspaceAccess('workspace.write', { workspaceParam: 'id' })
   @Patch(':id/archived')

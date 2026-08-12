@@ -7,6 +7,7 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   ApiKeyType,
+  AuditOutcome,
   InvitationStatus,
   NotificationScope,
   NotificationType,
@@ -30,6 +31,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { AuditContext, AuditService } from '../audit/audit.service';
 import { CreateNotificationDto } from '../notifications/dto/create-notification.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
@@ -101,6 +103,7 @@ export class WorkspacesService implements OnModuleInit {
     private notificationsService: NotificationsService,
     private workflowsService: WorkflowsService,
     private workspaceEncryptionService: WorkspaceEncryptionService,
+    private auditService: AuditService,
   ) {}
 
   async onModuleInit() {}
@@ -352,11 +355,32 @@ export class WorkspacesService implements OnModuleInit {
   public async deleteWorkspace(
     id: string,
     _userContext: UserContextPayload,
+    auditContext?: AuditContext,
   ): Promise<DefaultMessageResponseDto> {
-    // Delete all targets associated with the workspace first
+    const workspace = await this.repo.findOne({ where: { id } });
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    // Delete all targets associated with the workspace first (own tx — the
+    // audit row must stay atomic with the workspace-row delete below).
     await this.deleteAllTargetsFromWorkspace(id);
 
-    await this.repo.delete({ id });
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(Workspace, { id });
+      if (auditContext) {
+        await this.auditService.recordInTx(manager, {
+          workspaceId: id,
+          ...auditContext,
+          action: 'workspace.deleted',
+          resourceType: 'workspace',
+          resourceId: id,
+          // `workspace.name` is the state BEFORE the delete — label it `before`.
+          changes: { name: { before: workspace.name } },
+          outcome: AuditOutcome.Success,
+        });
+      }
+    });
 
     return {
       message: 'Workspace deleted successfully',
@@ -821,6 +845,7 @@ export class WorkspacesService implements OnModuleInit {
     workspaceId: string,
     dto: CreatePermissionGroupDto,
     creatorId: string,
+    auditContext?: AuditContext,
   ): Promise<WorkspacePermission> {
     if (dto.permissions.includes(WILDCARD_PERMISSION)) {
       throw new BadRequestException(
@@ -839,11 +864,29 @@ export class WorkspacesService implements OnModuleInit {
     }
 
     try {
-      return await this.permissionRepository.save({
-        workspace: { id: workspaceId },
-        name: dto.name,
-        permissions: dto.permissions,
-        isSystem: false,
+      // Group insert + audit row (event 10, explicit) commit atomically.
+      return await this.dataSource.transaction(async (manager) => {
+        const group = await manager.save(WorkspacePermission, {
+          workspace: { id: workspaceId },
+          name: dto.name,
+          permissions: dto.permissions,
+          isSystem: false,
+        });
+        if (auditContext) {
+          await this.auditService.recordInTx(manager, {
+            workspaceId,
+            ...auditContext,
+            action: 'permission_group.created',
+            resourceType: 'permission_group',
+            resourceId: group.id,
+            changes: {
+              name: { after: group.name },
+              permissions: { after: group.permissions },
+            },
+            outcome: AuditOutcome.Success,
+          });
+        }
+        return group;
       });
     } catch (error) {
       // Concurrent insert raced the unique (workspace, name) constraint.
@@ -861,6 +904,7 @@ export class WorkspacesService implements OnModuleInit {
     permissionId: string,
     dto: UpdatePermissionGroupDto,
     updaterId: string,
+    auditContext?: AuditContext,
   ): Promise<WorkspacePermission> {
     const group = await this.getPermissionGroupInWorkspace(
       workspaceId,
@@ -886,6 +930,10 @@ export class WorkspacesService implements OnModuleInit {
       await this.assertCanGrantPermissionKeys(workspaceId, updaterId, dto.permissions);
     }
 
+    // Diff source for the audit row (event 11, explicit): permissions BEFORE
+    // this change, captured before the group object is mutated.
+    const beforePermissions = [...group.permissions];
+
     if (dto.name !== undefined && dto.name !== group.name) {
       const duplicate = await this.findPermissionGroupByNameCI(workspaceId, dto.name);
       if (duplicate && duplicate.id !== permissionId) {
@@ -900,7 +948,24 @@ export class WorkspacesService implements OnModuleInit {
     }
 
     try {
-      return await this.permissionRepository.save(group);
+      // Save + audit row commit atomically.
+      return await this.dataSource.transaction(async (manager) => {
+        const saved = await manager.save(WorkspacePermission, group);
+        if (auditContext) {
+          await this.auditService.recordInTx(manager, {
+            workspaceId,
+            ...auditContext,
+            action: 'permission_group.updated',
+            resourceType: 'permission_group',
+            resourceId: permissionId,
+            changes: {
+              permissions: { before: beforePermissions, after: group.permissions },
+            },
+            outcome: AuditOutcome.Success,
+          });
+        }
+        return saved;
+      });
     } catch (error) {
       if ((error as { code?: string })?.code === '23505') {
         throw new BadRequestException(
@@ -914,6 +979,7 @@ export class WorkspacesService implements OnModuleInit {
   public async deletePermissionGroup(
     workspaceId: string,
     permissionId: string,
+    auditContext?: AuditContext,
   ): Promise<DefaultMessageResponseDto> {
     const group = await this.getPermissionGroupInWorkspace(
       workspaceId,
@@ -924,9 +990,24 @@ export class WorkspacesService implements OnModuleInit {
       throw new ForbiddenException('System permission groups cannot be deleted');
     }
 
-    await this.permissionRepository.delete({
-      id: permissionId,
-      workspace: { id: workspaceId },
+    // Delete + audit row (event 12, explicit) commit atomically.
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(WorkspacePermission, {
+        id: permissionId,
+        workspace: { id: workspaceId },
+      });
+      if (auditContext) {
+        await this.auditService.recordInTx(manager, {
+          workspaceId,
+          ...auditContext,
+          action: 'permission_group.deleted',
+          resourceType: 'permission_group',
+          resourceId: permissionId,
+          // `group.name` is the state BEFORE the delete — label it `before`.
+          changes: { name: { before: group.name } },
+          outcome: AuditOutcome.Success,
+        });
+      }
     });
 
     return { message: 'Permission group deleted successfully' };
@@ -1059,6 +1140,7 @@ export class WorkspacesService implements OnModuleInit {
     memberId: string,
     permissionIds: string[],
     currentUserId: string,
+    auditContext?: AuditContext,
   ): Promise<WorkspaceMembers> {
     if (permissionIds.length === 0) {
       throw new BadRequestException(
@@ -1074,6 +1156,12 @@ export class WorkspacesService implements OnModuleInit {
       throw new NotFoundException('Workspace member not found');
     }
     await this.assertMemberMutable(member, currentUserId, workspaceId);
+
+    // Diff source for the audit row: the member's groups BEFORE this change.
+    const beforePermissionIds =
+      member.memberPermissions
+        ?.map((mp) => mp.permission?.id)
+        .filter((id): id is string => !!id) ?? [];
 
     // Validate every id against the workspace's groups — never silently drop.
     const groups = await this.permissionRepository.find({
@@ -1095,7 +1183,8 @@ export class WorkspacesService implements OnModuleInit {
     this.assertCanGrantGroups(permissionKeys, groups);
 
     // Replace the member's groups atomically so a failure mid-way cannot
-    // leave the member with no permissions at all.
+    // leave the member with no permissions at all. The audit row commits in
+    // the same transaction (event 9, explicit).
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(WorkspaceMemberPermission, {
         member: { id: member.id },
@@ -1104,6 +1193,19 @@ export class WorkspacesService implements OnModuleInit {
         await manager.save(WorkspaceMemberPermission, {
           member: { id: member.id },
           permission: { id: permissionId },
+        });
+      }
+      if (auditContext) {
+        await this.auditService.recordInTx(manager, {
+          workspaceId,
+          ...auditContext,
+          action: 'member.permissions.updated',
+          resourceType: 'member',
+          resourceId: member.id,
+          changes: {
+            permissionIds: { before: beforePermissionIds, after: permissionIds },
+          },
+          outcome: AuditOutcome.Success,
         });
       }
     });
@@ -1122,6 +1224,7 @@ export class WorkspacesService implements OnModuleInit {
     workspaceId: string,
     memberId: string,
     currentUserId: string,
+    auditContext?: AuditContext,
   ): Promise<DefaultMessageResponseDto> {
     const member = await this.workspaceMembersRepository.findOne({
       where: { id: memberId, workspace: { id: workspaceId } },
@@ -1132,7 +1235,41 @@ export class WorkspacesService implements OnModuleInit {
     }
     await this.assertMemberMutable(member, currentUserId, workspaceId);
 
-    await this.workspaceMembersRepository.delete({ id: member.id });
+    // Membership delete + audit row commit atomically; the removed member's
+    // PII is pseudonymized AFTER commit so a GDPR-sweep failure can never
+    // roll back a successful removal. The event id is passed to the sweep so
+    // it can also null metadata.targetUserId on the member.removed row itself
+    // (that row's actorId is the *acting* user, so the actor sweep misses it).
+    let removedEventId: string | undefined;
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(WorkspaceMembers, { id: member.id });
+      if (auditContext) {
+        const event = await this.auditService.recordInTx(manager, {
+          workspaceId,
+          ...auditContext,
+          action: 'member.removed',
+          resourceType: 'member',
+          resourceId: member.id,
+          ...(member.user?.id ? { metadata: { targetUserId: member.user.id } } : {}),
+          outcome: AuditOutcome.Success,
+        });
+        removedEventId = event.id;
+      }
+    });
+
+    if (member.user?.id) {
+      try {
+        await this.auditService.pseudonymizeActor(
+          member.user.id,
+          removedEventId,
+        );
+      } catch (error) {
+        this.logger.error(
+          'Failed to pseudonymize audit rows of removed member',
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
 
     return { message: 'Member removed successfully' };
   }

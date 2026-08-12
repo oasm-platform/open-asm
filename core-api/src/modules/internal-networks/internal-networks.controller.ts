@@ -27,6 +27,7 @@ import {
   GetManyNetworkInterfacesResponseDto,
 } from './dtos/get-many-network-interfaces.dto';
 import { UpdateInternalNetworkDto } from './dtos/update-internal-network.dto';
+import { AuditLog } from '../audit/audit-log.decorator';
 import { InternalNetworksService } from './internal-networks.service';
 
 @Controller('internal-networks')
@@ -68,6 +69,12 @@ export class InternalNetworksController {
     request: {
       getWorkspaceId: true,
     },
+  })
+  @AuditLog('network.created', {
+    // Best-effort changes from the body; the DTO carries only `name`.
+    changes: (body) => ({
+      name: { after: (body as { name?: string })?.name ?? '' },
+    }),
   })
   @Post()
   @WorkspaceAccess('network.write')
@@ -179,6 +186,7 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('network.deleted')
   @Delete(':id')
   @WorkspaceAccess('network.write')
   deleteInternalNetwork(

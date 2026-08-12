@@ -3,8 +3,13 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
-import { UserContextPayload } from '@/common/interfaces/app.interface';
+import {
+  RequestWithMetadata,
+  UserContextPayload,
+} from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { AuditLog } from '../audit/audit-log.decorator';
+import { AuditService } from '../audit/audit.service';
 import {
   Body,
   Controller,
@@ -15,6 +20,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -30,7 +36,10 @@ import { TargetsService } from './targets.service';
 
 @Controller('targets')
 export class TargetsController {
-  constructor(private readonly targetsService: TargetsService) {}
+  constructor(
+    private readonly targetsService: TargetsService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Doc({
     summary: 'Create multiple targets in bulk',
@@ -41,6 +50,18 @@ export class TargetsController {
     },
     request: {
       getWorkspaceId: true,
+    },
+  })
+  @AuditLog('target.created', {
+    // Best-effort changes from the body — record the requested target values,
+    // never echo back the full created entities.
+    changes: (body) => {
+      const dto = body as CreateMultipleTargetsDto | undefined;
+      const changes: Record<string, { after?: unknown }> = {};
+      if (dto?.targets && dto.targets.length > 0) {
+        changes.targets = { after: dto.targets.map((t) => t.value) };
+      }
+      return changes;
     },
   })
   @WorkspaceAccess('target.write')
@@ -162,6 +183,9 @@ export class TargetsController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  // target.deleted is written explicitly in TargetsService.deleteTarget (the
+  // interceptor cannot see the deleted entity), with the actor context built
+  // here from the request — see AuditService.buildActorContext.
   @WorkspaceAccess('target.write')
   @Delete(':id/workspace/:workspaceId')
   deleteTarget(
@@ -169,11 +193,13 @@ export class TargetsController {
     @Param('workspaceId', new ParseUUIDPipe({ version: '4' }))
     workspaceId: string,
     @UserContext() userContext: UserContextPayload,
+    @Req() req: RequestWithMetadata,
   ) {
     return this.targetsService.deleteTarget(
       id,
       workspaceId,
       userContext,
+      this.auditService.buildActorContext(req),
     );
   }
 
@@ -197,6 +223,17 @@ export class TargetsController {
       'Modifies the configuration and properties of an existing security testing target, allowing for dynamic adjustments to assessment parameters.',
     response: {
       serialization: Target,
+    },
+  })
+  @AuditLog('target.updated', {
+    // Best-effort changes from the body — only fields present in the request.
+    changes: (body) => {
+      const dto = body as UpdateTargetDto | undefined;
+      const changes: Record<string, { after?: unknown }> = {};
+      if (dto?.scanSchedule !== undefined) {
+        changes.scanSchedule = { after: dto.scanSchedule };
+      }
+      return changes;
     },
   })
   @WorkspaceAccess('target.write')

@@ -52,6 +52,7 @@ pids
 *.pid
 *.seed
 *.pid.lock
+audit-archive/
 
 # Worktrees
 .worktrees/

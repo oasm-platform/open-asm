@@ -17,6 +17,7 @@ import { ApiTags } from '@nestjs/swagger';
 
 import { Public } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
+import { AuditLog } from '../audit/audit-log.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { GetIntegrationDto } from './dto/get-integration.dto';
@@ -65,6 +66,15 @@ export class IntegrationsController {
     },
   })
   @WorkspaceAccess('integration.write')
+  @AuditLog('integration.connected', {
+    resourceId: (result) => (result as GetIntegrationDto | undefined)?.id,
+    changes: (body) => {
+      const appType = (body as CreateIntegrationDto | undefined)?.appType;
+      const changes: Record<string, { after?: unknown }> = {};
+      if (appType) changes.type = { after: appType };
+      return changes;
+    },
+  })
   @Post()
   createIntegration(
     @Body() dto: CreateIntegrationDto,
@@ -135,6 +145,23 @@ export class IntegrationsController {
     },
   })
   @WorkspaceAccess('integration.write')
+  @AuditLog('integration.settings.updated', {
+    resourceId: (result) => (result as GetIntegrationDto | undefined)?.id,
+    changes: (body) => {
+      const dto = body as UpdateIntegrationDto | undefined;
+      const changes: Record<string, { after?: unknown }> = {};
+      if (dto?.name !== undefined) {
+        changes.name = { after: dto.name };
+      }
+      if (dto?.description !== undefined) {
+        changes.description = { after: dto.description };
+      }
+      if (dto?.syncSchedule !== undefined) {
+        changes.syncSchedule = { after: dto.syncSchedule };
+      }
+      return changes;
+    },
+  })
   @Patch(':id')
   updateIntegration(
     @Param() { id }: IdQueryParamDto,
@@ -156,6 +183,7 @@ export class IntegrationsController {
     },
   })
   @WorkspaceAccess('integration.write')
+  @AuditLog('integration.disconnected')
   @Delete(':id')
   deleteIntegration(
     @Param() { id }: IdQueryParamDto,

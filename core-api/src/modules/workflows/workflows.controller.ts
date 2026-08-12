@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { AuditLog } from '../audit/audit-log.decorator';
 import {
   UserContext,
   WorkspaceId,
@@ -77,6 +78,12 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('workflow.created', {
+    resourceId: (result) => (result as Workflow | undefined)?.id,
+    changes: (body) => ({
+      name: { after: (body as CreateWorkflowDto | undefined)?.name ?? '' },
+    }),
+  })
   @WorkspaceAccess('workflow.write')
   @Post()
   async createWorkflow(
@@ -123,6 +130,15 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('workflow.updated', {
+    resourceId: (result) => (result as Workflow | undefined)?.id,
+    changes: (body) => {
+      const dto = body as UpdateWorkflowDto | undefined;
+      const changes: Record<string, { after?: unknown }> = {};
+      if (dto?.name !== undefined) changes.name = { after: dto.name };
+      return changes;
+    },
+  })
   @WorkspaceAccess('workflow.write')
   @Patch(':id')
   async updateWorkflow(
@@ -145,6 +161,7 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('workflow.deleted')
   @WorkspaceAccess('workflow.write')
   @Delete(':id')
   async deleteWorkflow(

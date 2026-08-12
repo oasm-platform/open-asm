@@ -62,6 +62,10 @@ export class WorkspacePermissionGuard implements CanActivate {
       throw new ForbiddenException('Workspace ID not provided in headers');
     }
 
+    // Publish the resolved id so downstream interceptors (audit log) can
+    // attribute the request to the workspace without re-resolving it.
+    request.workspaceId = workspaceId;
+
     let permissionKeys: string[];
     try {
       const resolved = await this.workspacesService.getMembershipWithPermissions(

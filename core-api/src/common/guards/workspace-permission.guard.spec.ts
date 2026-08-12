@@ -23,6 +23,7 @@ describe('WorkspacePermissionGuard', () => {
     cookies?: Record<string, string>;
     membership?: unknown;
     permissions?: unknown;
+    workspaceId?: string;
   };
 
   const workspaceId = randomUUID();
@@ -74,6 +75,23 @@ describe('WorkspacePermissionGuard', () => {
     );
     expect(mockRequest.membership).toBeDefined();
     expect(mockRequest.permissions).toEqual(['member.read']);
+  });
+
+  it('publishes the resolved workspace id on request.workspaceId (audit interceptor input)', async () => {
+    mockRequest.headers = { 'X-Workspace-Id': workspaceId };
+
+    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+    expect(mockRequest.workspaceId).toBe(workspaceId);
+  });
+
+  it('publishes the workspaceParam route param as request.workspaceId', async () => {
+    mockRequest.params = { id: workspaceId };
+    mockReflector.getAllAndOverride.mockImplementation((key: string) =>
+      key === WORKSPACE_ROUTE_PARAM ? 'id' : ['member.read'],
+    );
+
+    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+    expect(mockRequest.workspaceId).toBe(workspaceId);
   });
 
   it('should pass when the member holds the wildcard "*"', async () => {
@@ -243,5 +261,49 @@ describe('WorkspacePermissionGuard', () => {
     await expect(guard.canActivate(makeContext())).rejects.toThrow(
       ForbiddenException,
     );
+  });
+
+  describe('audit.read gating for the audit log endpoints (S4)', () => {
+    const requireAuditRead = () => {
+      mockReflector.getAllAndOverride.mockImplementation((key: string) =>
+        key === WORKSPACE_ROUTE_PARAM ? 'id' : ['audit.read'],
+      );
+      mockRequest.params = { id: workspaceId };
+    };
+
+    it('allows a member holding audit.read (resolving the workspace from :id)', async () => {
+      requireAuditRead();
+      mockWorkspacesService.getMembershipWithPermissions.mockResolvedValue({
+        membership: { id: randomUUID() } as WorkspaceMembers,
+        permissionKeys: ['audit.read'],
+      });
+
+      await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+      expect(
+        mockWorkspacesService.getMembershipWithPermissions,
+      ).toHaveBeenCalledWith(workspaceId, userId);
+    });
+
+    it('allows the "*" wildcard holder (owner)', async () => {
+      requireAuditRead();
+      mockWorkspacesService.getMembershipWithPermissions.mockResolvedValue({
+        membership: { id: randomUUID() } as WorkspaceMembers,
+        permissionKeys: ['*'],
+      });
+
+      await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+    });
+
+    it('forbids a member without audit.read', async () => {
+      requireAuditRead();
+      mockWorkspacesService.getMembershipWithPermissions.mockResolvedValue({
+        membership: { id: randomUUID() } as WorkspaceMembers,
+        permissionKeys: ['member.read'],
+      });
+
+      await expect(guard.canActivate(makeContext())).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
   });
 });

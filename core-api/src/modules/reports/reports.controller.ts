@@ -15,6 +15,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { AuditLog } from '../audit/audit-log.decorator';
 import type { Response } from 'express';
 import {
   GenerateSummaryReportBodyDto,
@@ -50,6 +51,7 @@ export class ReportsController {
     return this.reportsService.getMany(query, workspaceId);
   }
 
+  @AuditLog('report.exported', { metadata: () => ({ format: 'pdf' }) })
   @WorkspaceAccess('report.read')
   @Get('preview/summary')
   async previewSummaryReport(
@@ -100,6 +102,7 @@ export class ReportsController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('report.generated', { metadata: () => ({ reportType: 'summary' }) })
   @WorkspaceAccess('report.write')
   @Post('generate/summary')
   async generateSummaryReport(
@@ -168,6 +171,7 @@ export class ReportsController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('report.deleted')
   @WorkspaceAccess('report.write')
   @Delete(':id')
   async deleteReport(
