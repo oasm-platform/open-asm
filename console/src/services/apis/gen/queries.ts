@@ -114,6 +114,17 @@ export type AuditEventListResponseDto = {
 
 export type AppResponseSerialization = { [key: string]: unknown };
 
+export type AuditActionCatalogEntryDto = {
+  /** Machine action key, e.g. workspace.created (AUDIT_EVENTS) */
+  action: string;
+  /** English display name, e.g. "Workspace created" */
+  label: string;
+};
+
+export type AuditActionCatalogResponseDto = {
+  data: AuditActionCatalogEntryDto[];
+};
+
 /**
  * The type of target (DOMAIN, CIDR, or IP)
  */
@@ -5648,6 +5659,178 @@ export function useAuditEventsControllerGetAuditEvents<
   const queryOptions = getAuditEventsControllerGetAuditEventsQueryOptions(
     id,
     params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Action → display label pairs for the audit trail, derived from the backend AUDIT_EVENTS + AUDIT_EVENT_LABELS constants. No database access. Requires audit.read.
+ * @summary List audit action catalog
+ */
+export const auditEventsControllerGetAuditActions = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AuditActionCatalogResponseDto>(
+    { url: `/api/workspaces/${id}/audit/actions`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAuditEventsControllerGetAuditActionsQueryKey = (id: string) => {
+  return [`/api/workspaces/${id}/audit/actions`] as const;
+};
+
+export const getAuditEventsControllerGetAuditActionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAuditEventsControllerGetAuditActionsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>
+  > = ({ signal }) =>
+    auditEventsControllerGetAuditActions(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuditEventsControllerGetAuditActionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>
+>;
+export type AuditEventsControllerGetAuditActionsQueryError = unknown;
+
+export function useAuditEventsControllerGetAuditActions<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+          TError,
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuditEventsControllerGetAuditActions<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+          TError,
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuditEventsControllerGetAuditActions<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List audit action catalog
+ */
+
+export function useAuditEventsControllerGetAuditActions<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAuditEventsControllerGetAuditActionsQueryOptions(
+    id,
     options,
   );
 

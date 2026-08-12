@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
 import { toast } from 'sonner';
-import { Download, Eye, FilterX, Loader2 } from 'lucide-react';
+import { Eye, FilterX, Loader2 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import AccessDenied from '@/components/common/access-denied';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -34,14 +33,13 @@ import {
 import { usePermission } from '@/hooks/usePermission';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import useDebounce from '@/hooks/use-debounce';
-import { axiosInstance } from '@/services/apis/axios-client';
 import {
   auditEventsControllerGetAuditEvents,
+  useAuditEventsControllerGetAuditActions,
   AuditOutcome,
   type AuditEventResponseDto,
   type AuditEventsControllerGetAuditEventsParams,
 } from '@/services/apis/gen/queries';
-import { AUDIT_EVENT_LABELS, getAuditEventLabel } from '@/constants/audit-events';
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
 
@@ -66,10 +64,6 @@ const DATE_PRESETS = [
 ] as const;
 
 type DatePreset = (typeof DATE_PRESETS)[number]['value'];
-
-const ACTIONS = Object.entries(AUDIT_EVENT_LABELS).sort((a, b) =>
-  a[1].localeCompare(b[1]),
-);
 
 function formatRelativeTime(iso: string): string {
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -123,10 +117,11 @@ function LoadError({ onRetry }: { onRetry: () => void }) {
 
 interface AuditEventSheetProps {
   event: AuditEventResponseDto;
+  label: string;
   onClose: () => void;
 }
 
-function AuditEventSheet({ event, onClose }: AuditEventSheetProps) {
+function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
   const [showRaw, setShowRaw] = useState(false);
 
   return (
@@ -141,7 +136,7 @@ function AuditEventSheet({ event, onClose }: AuditEventSheetProps) {
             zero the header's own horizontal/bottom padding to keep the title
             edge-aligned with the body content. */}
         <SheetHeader className="px-0 pt-4 pb-0">
-          <SheetTitle>{getAuditEventLabel(event.action)}</SheetTitle>
+          <SheetTitle>{label}</SheetTitle>
           <SheetDescription>{formatAbsoluteTime(event.occurredAt)}</SheetDescription>
         </SheetHeader>
 
@@ -287,6 +282,36 @@ export default function AuditLogSettings() {
     null,
   );
 
+  // Action catalog from the backend (GET /workspaces/:id/audit/actions):
+  // the source of truth for the action filter dropdown and row labels.
+  // ponytail: fallback humanizes unknown actions instead of blocking render.
+  const { data: actionCatalog } = useAuditEventsControllerGetAuditActions(
+    selectedWorkspaceId,
+    { query: { enabled: !!selectedWorkspaceId } },
+  );
+
+  const actionLabelMap = useMemo(
+    () =>
+      new Map(
+        (actionCatalog?.data ?? []).map((entry) => [entry.action, entry.label]),
+      ),
+    [actionCatalog],
+  );
+
+  const getActionLabel = useCallback(
+    (action: string): string =>
+      actionLabelMap.get(action) ?? action.replace(/\./g, ' '),
+    [actionLabelMap],
+  );
+
+  const actionOptions = useMemo(
+    () =>
+      (actionCatalog?.data ?? [])
+        .slice()
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [actionCatalog],
+  );
+
   const buildParams = useCallback(
     (): AuditEventsControllerGetAuditEventsParams => ({
       limit: PAGE_SIZE,
@@ -367,50 +392,6 @@ export default function AuditLogSettings() {
     setActorId('');
   };
 
-  const handleExport = async () => {
-    if (!selectedWorkspaceId) return;
-    const toastId = toast.loading('Exporting data...');
-    try {
-      // Fresh axios instance (no interceptors) so the blob reaches the browser untouched.
-      const downloadAxios = axios.create({
-        baseURL: axiosInstance.defaults.baseURL,
-        withCredentials: true,
-      });
-      const res = await downloadAxios.get(
-        `/api/workspaces/${selectedWorkspaceId}/audit/export`,
-        {
-          responseType: 'blob',
-          params: buildParams(),
-          headers: {
-            Accept: 'text/csv,application/vnd.ms-excel,text/plain',
-            'X-Workspace-Id': selectedWorkspaceId,
-          },
-        },
-      );
-      if (res.status !== 200 || !res.data) {
-        throw new Error('Export failed');
-      }
-      const blob = res.data as Blob;
-      if (blob.size === 0) {
-        throw new Error('Export returned empty file');
-      }
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success('Export completed successfully!', { id: toastId });
-    } catch (err) {
-      toast.error('Export failed', {
-        description: err instanceof Error ? err.message : 'Please try again',
-        id: toastId,
-      });
-    }
-  };
-
   const columns = useMemo<ColumnDef<AuditEventResponseDto>[]>(
     () => [
       {
@@ -456,7 +437,7 @@ export default function AuditLogSettings() {
       {
         accessorKey: 'action',
         header: 'Action',
-        cell: ({ row }) => getAuditEventLabel(row.original.action),
+        cell: ({ row }) => getActionLabel(row.original.action),
       },
       {
         accessorKey: 'resourceType',
@@ -503,7 +484,7 @@ export default function AuditLogSettings() {
         ),
       },
     ],
-    [],
+    [getActionLabel],
   );
 
   if (!selectedWorkspaceId) {
@@ -566,9 +547,9 @@ export default function AuditLogSettings() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All actions</SelectItem>
-                {ACTIONS.map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
+                {actionOptions.map((entry) => (
+                  <SelectItem key={entry.action} value={entry.action}>
+                    {entry.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -611,15 +592,6 @@ export default function AuditLogSettings() {
               <FilterX className="h-4 w-4" />
               Clear
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleExport}
-              disabled={isLoading}
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </Button>
           </div>
         </div>
       </div>
@@ -657,6 +629,7 @@ export default function AuditLogSettings() {
       {selectedEvent && (
         <AuditEventSheet
           event={selectedEvent}
+          label={getActionLabel(selectedEvent.action)}
           onClose={() => setSelectedEvent(null)}
         />
       )}

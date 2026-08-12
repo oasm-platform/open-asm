@@ -3,9 +3,13 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
-import { UserContextPayload } from '@/common/interfaces/app.interface';
+import {
+  RequestWithMetadata,
+  UserContextPayload,
+} from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { AuditLog } from '../audit/audit-log.decorator';
+import { AuditService } from '../audit/audit.service';
 import {
   Body,
   Controller,
@@ -16,6 +20,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -31,7 +36,10 @@ import { TargetsService } from './targets.service';
 
 @Controller('targets')
 export class TargetsController {
-  constructor(private readonly targetsService: TargetsService) {}
+  constructor(
+    private readonly targetsService: TargetsService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Doc({
     summary: 'Create multiple targets in bulk',
@@ -175,7 +183,9 @@ export class TargetsController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @AuditLog('target.deleted')
+  // target.deleted is written explicitly in TargetsService.deleteTarget (the
+  // interceptor cannot see the deleted entity), with the actor context built
+  // here from the request — see AuditService.buildActorContext.
   @WorkspaceAccess('target.write')
   @Delete(':id/workspace/:workspaceId')
   deleteTarget(
@@ -183,11 +193,13 @@ export class TargetsController {
     @Param('workspaceId', new ParseUUIDPipe({ version: '4' }))
     workspaceId: string,
     @UserContext() userContext: UserContextPayload,
+    @Req() req: RequestWithMetadata,
   ) {
     return this.targetsService.deleteTarget(
       id,
       workspaceId,
       userContext,
+      this.auditService.buildActorContext(req),
     );
   }
 

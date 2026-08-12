@@ -16,11 +16,13 @@ import { plainToInstance } from 'class-transformer';
 import type { Request, Response } from 'express';
 import { AuditService } from './audit.service';
 import {
+  AuditActionCatalogResponseDto,
   AuditEventListResponseDto,
   AuditEventResponseDto,
   GetAuditEventsQueryDto,
 } from './dto/audit.dto';
 import { AuditEvent } from './entities/audit-event.entity';
+import { AUDIT_ACTION_CATALOG } from './constants/audit-events';
 
 /**
  * CSV column order (plan §7). changes/metadata are JSON-encoded; occurredAt
@@ -116,6 +118,33 @@ export class AuditEventsController {
     return {
       data: data.map((event) => plainToInstance(AuditEventResponseDto, event)),
       nextCursor,
+    };
+  }
+
+  /**
+   * Action catalog (action → display label). Pure constant — no DB access;
+   * the workspace param exists only so the guard can authorize the request.
+   * The console builds its action filter dropdown and table labels from this
+   * endpoint instead of a hardcoded client-side map.
+   */
+  @Doc({
+    summary: 'List audit action catalog',
+    description:
+      'Action → display label pairs for the audit trail, derived from the ' +
+      'backend AUDIT_ACTION_CATALOG constant. No database access. Requires ' +
+      'audit.read.',
+    response: {
+      serialization: AuditActionCatalogResponseDto,
+    },
+  })
+  @WorkspaceAccess('audit.read', { workspaceParam: 'id' })
+  @Get(':id/audit/actions')
+  getAuditActions(
+    // Consumed only by the route/guard; the catalog itself is workspace-agnostic.
+    @Param('id') _id: string,
+  ): AuditActionCatalogResponseDto {
+    return {
+      data: AUDIT_ACTION_CATALOG.map(({ action, label }) => ({ action, label })),
     };
   }
 

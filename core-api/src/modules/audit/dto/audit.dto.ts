@@ -172,3 +172,29 @@ export class AuditEventListResponseDto {
   @ApiProperty({ required: false, nullable: true, type: String })
   nextCursor: string | null;
 }
+
+/**
+ * One `action → display label` pair of the audit action catalog served by
+ * GET /workspaces/:id/audit/actions. The catalog is a pure constant (no DB):
+ * it is derived from AUDIT_ACTION_CATALOG so the console can render the
+ * action filter and row labels without a hardcoded map.
+ */
+export class AuditActionCatalogEntryDto {
+  @ApiProperty({
+    description: 'Machine action key, e.g. workspace.created (AUDIT_ACTION_CATALOG)',
+  })
+  action: string;
+
+  @ApiProperty({
+    description: 'English display name, e.g. "Workspace created"',
+  })
+  label: string;
+}
+
+/**
+ * Response envelope for the action catalog endpoint.
+ */
+export class AuditActionCatalogResponseDto {
+  @ApiProperty({ type: () => [AuditActionCatalogEntryDto] })
+  data: AuditActionCatalogEntryDto[];
+}

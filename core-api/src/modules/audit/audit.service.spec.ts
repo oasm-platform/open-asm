@@ -18,6 +18,7 @@ jest.mock('@/modules/reports/renderer/pdf-renderer', () => ({
   renderReportPdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
 }));
 import {
+  AUDIT_EVENT_LABELS,
   AUDIT_EVENTS,
   AUDIT_EVENTS_RE,
   AUDIT_WIRING,
@@ -247,6 +248,16 @@ describe('AuditService', () => {
       expect(Object.keys(AUDIT_WIRING).sort()).toEqual(
         [...AUDIT_EVENTS].sort(),
       );
+    });
+
+    it('AUDIT_EVENT_LABELS covers exactly the AUDIT_EVENTS dictionary in order (no missing, no extra, no drift)', () => {
+      expect(Object.keys(AUDIT_EVENT_LABELS)).toEqual([...AUDIT_EVENTS]);
+    });
+
+    it('every AUDIT_EVENT_LABELS value is a non-empty display string', () => {
+      for (const label of Object.values(AUDIT_EVENT_LABELS)) {
+        expect(label.trim().length).toBeGreaterThan(0);
+      }
     });
 
     it('every wiring entry names a non-empty controller and method', () => {

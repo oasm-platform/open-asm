@@ -40,11 +40,18 @@ describe('TargetsController audit wiring (M4.2 decorator events)', () => {
   it.each([
     ['createMultipleTargets', 'target.created'],
     ['updateTarget', 'target.updated'],
-    ['deleteTarget', 'target.deleted'],
   ] as const)('%s is wired to the %s event', (method, action) => {
     expect(auditConfig(TargetsController.prototype[method])).toEqual(
       expect.objectContaining({ action }),
     );
+  });
+
+  // deleteTarget is NOT decorator-wired: its audit event (with the deleted
+  // target's before-values) is written explicitly in TargetsService, where
+  // the entity is still in hand — the interceptor cannot see route params or
+  // the deleted row.
+  it('deleteTarget is not decorator-wired (service-side audit write)', () => {
+    expect(auditConfig(TargetsController.prototype.deleteTarget)).toBeUndefined();
   });
 
   describe('best-effort changes', () => {
@@ -77,12 +84,6 @@ describe('TargetsController audit wiring (M4.2 decorator events)', () => {
         scanSchedule: { after: 'DAILY' },
       });
       expect(changes?.({}, undefined)).toEqual({});
-    });
-
-    it('deleteTarget carries no changes (target name unavailable)', () => {
-      const config = auditConfig(TargetsController.prototype.deleteTarget);
-      expect(config).toEqual({ action: 'target.deleted' });
-      expect(config?.changes).toBeUndefined();
     });
   });
 });

@@ -1,62 +1,104 @@
 /**
  * v1 audit event dictionary (plan §4, rows 1–35 renumbered).
  *
+ * SINGLE SOURCE OF TRUTH: every action is declared exactly once, as an
+ * entry in `AUDIT_ACTION_CATALOG` — its key, display label, and the
+ * controller method that emits it. `AUDIT_EVENTS`, `AuditAction`,
+ * `AUDIT_EVENT_LABELS` and `AUDIT_WIRING` are derived from the catalog, so
+ * adding a new action is a one-line catalog entry and nothing else can
+ * drift.
+ *
  * Naming contract: `resource.action` in past tense, snake_case action,
- * lowercase resource. `AUDIT_WIRING` is the machine-readable map used by
- * scenario S11 to assert every wired event traces to a real controller
- * method (guard coverage is asserted on top in M4).
+ * lowercase resource. `AUDIT_WIRING` (derived) is the machine-readable map
+ * used by scenario S11 to assert every wired event traces to a real
+ * controller method (guard coverage is asserted on top in M4).
  */
-export const AUDIT_EVENTS = [
-  // workspaces (1–12)
-  'workspace.created',
-  'workspace.updated',
-  'workspace.deleted',
-  'workspace.config.updated',
-  'workspace.api_key.rotated',
-  'member.invited',
-  'member.invitation.cancelled',
-  'member.removed',
-  'member.permissions.updated',
-  'permission_group.created',
-  'permission_group.updated',
-  'permission_group.deleted',
-  // targets (13–15)
-  'target.created',
-  'target.updated',
-  'target.deleted',
-  // assets (16)
-  'asset.deleted',
-  // asset groups (17–18)
-  'asset_group.created',
-  'asset_group.deleted',
-  // internal networks (19–20)
-  'network.created',
-  'network.deleted',
-  // vulnerabilities (21–22)
-  'vulnerability.status.updated',
-  'vulnerability.bulk_updated',
-  // reports (23–25)
-  'report.generated',
-  'report.exported',
-  'report.deleted',
-  // jobs (26)
-  'job.cancelled',
-  // workflows (27–29)
-  'workflow.created',
-  'workflow.updated',
-  'workflow.deleted',
-  // integrations (30–32)
-  'integration.connected',
-  'integration.disconnected',
-  'integration.settings.updated',
-  // api keys (33–34)
-  'api_key.created',
-  'api_key.revoked',
-  // audit (35)
-  'audit.exported',
-] as const;
+export interface AuditActionEntry {
+  /** Machine action key, e.g. `workspace.created`. */
+  action: string;
+  /** English display name served via GET /workspaces/:id/audit/actions. */
+  label: string;
+  /** Controller class that emits the event (S11 wiring guard). */
+  controller: string;
+  /** Handler method on the controller that emits the event (S11). */
+  method: string;
+}
 
-export type AuditAction = (typeof AUDIT_EVENTS)[number];
+/**
+ * One entry per audit action. The `as const` keeps the action values as a
+ * literal union so `AuditAction` stays exhaustive; `satisfies` type-checks
+ * every entry shape. Adding a new action = one entry here.
+ */
+export const AUDIT_ACTION_CATALOG = [
+  // workspaces (1–12)
+  { action: 'workspace.created', label: 'Workspace created', controller: 'WorkspacesController', method: 'createWorkspace' },
+  { action: 'workspace.updated', label: 'Workspace updated', controller: 'WorkspacesController', method: 'updateWorkspace' },
+  { action: 'workspace.deleted', label: 'Deleted workspace', controller: 'WorkspacesController', method: 'deleteWorkspace' },
+  { action: 'workspace.config.updated', label: 'Updated workspace config', controller: 'WorkspacesController', method: 'updateWorkspaceConfigs' },
+  { action: 'workspace.api_key.rotated', label: 'Rotated API key', controller: 'WorkspacesController', method: 'rotateApiKey' },
+  { action: 'member.invited', label: 'Invited members', controller: 'WorkspacesController', method: 'createInvitations' },
+  { action: 'member.invitation.cancelled', label: 'Cancelled invitation', controller: 'WorkspacesController', method: 'cancelInvitation' },
+  { action: 'member.removed', label: 'Removed member', controller: 'WorkspacesController', method: 'removeMember' },
+  { action: 'member.permissions.updated', label: 'Changed member permissions', controller: 'WorkspacesController', method: 'updateMemberPermissions' },
+  { action: 'permission_group.created', label: 'Created permission group', controller: 'WorkspacesController', method: 'createPermissionGroup' },
+  { action: 'permission_group.updated', label: 'Updated permission group', controller: 'WorkspacesController', method: 'updatePermissionGroup' },
+  { action: 'permission_group.deleted', label: 'Deleted permission group', controller: 'WorkspacesController', method: 'deletePermissionGroup' },
+  // targets (13–15)
+  { action: 'target.created', label: 'Added scan target', controller: 'TargetsController', method: 'createMultipleTargets' },
+  { action: 'target.updated', label: 'Updated scan target', controller: 'TargetsController', method: 'updateTarget' },
+  { action: 'target.deleted', label: 'Deleted scan target', controller: 'TargetsController', method: 'deleteTarget' },
+  // assets (16)
+  { action: 'asset.deleted', label: 'Deleted asset', controller: 'AssetsController', method: 'deleteAsset' },
+  // asset groups (17–18)
+  { action: 'asset_group.created', label: 'Created asset group', controller: 'AssetGroupController', method: 'create' },
+  { action: 'asset_group.deleted', label: 'Deleted asset group', controller: 'AssetGroupController', method: 'delete' },
+  // internal networks (19–20)
+  { action: 'network.created', label: 'Created network', controller: 'InternalNetworksController', method: 'createInternalNetwork' },
+  { action: 'network.deleted', label: 'Deleted network', controller: 'InternalNetworksController', method: 'deleteInternalNetwork' },
+  // vulnerabilities (21–22)
+  { action: 'vulnerability.status.updated', label: 'Changed vulnerability status', controller: 'VulnerabilitiesController', method: 'bulkDismissVulnerabilities' },
+  { action: 'vulnerability.bulk_updated', label: 'Bulk updated vulnerabilities', controller: 'VulnerabilitiesController', method: 'bulkReopenVulnerabilities' },
+  // reports (23–25)
+  { action: 'report.generated', label: 'Generated report', controller: 'ReportsController', method: 'generateSummaryReport' },
+  { action: 'report.exported', label: 'Exported report', controller: 'ReportsController', method: 'previewSummaryReport' },
+  { action: 'report.deleted', label: 'Deleted report', controller: 'ReportsController', method: 'deleteReport' },
+  // jobs (26)
+  { action: 'job.cancelled', label: 'Cancelled job', controller: 'JobsRegistryController', method: 'cancelJob' },
+  // workflows (27–29)
+  { action: 'workflow.created', label: 'Created workflow', controller: 'WorkflowsController', method: 'createWorkflow' },
+  { action: 'workflow.updated', label: 'Updated workflow', controller: 'WorkflowsController', method: 'updateWorkflow' },
+  { action: 'workflow.deleted', label: 'Deleted workflow', controller: 'WorkflowsController', method: 'deleteWorkflow' },
+  // integrations (30–32)
+  { action: 'integration.connected', label: 'Connected integration', controller: 'IntegrationsController', method: 'createIntegration' },
+  { action: 'integration.disconnected', label: 'Disconnected integration', controller: 'IntegrationsController', method: 'deleteIntegration' },
+  { action: 'integration.settings.updated', label: 'Updated integration settings', controller: 'IntegrationsController', method: 'updateIntegration' },
+  // api keys (33–34)
+  { action: 'api_key.created', label: 'Created API key', controller: 'ApiKeysController', method: 'create' },
+  { action: 'api_key.revoked', label: 'Revoked API key', controller: 'ApiKeysController', method: 'revoke' },
+  // audit (35)
+  { action: 'audit.exported', label: 'Exported audit log', controller: 'AuditEventsController', method: 'exportAuditEvents' },
+] as const satisfies readonly AuditActionEntry[];
+
+/** Union of every catalog action key — the type for @AuditLog('...') and DTOs. */
+export type AuditAction = (typeof AUDIT_ACTION_CATALOG)[number]['action'];
+
+/**
+ * All action keys, in catalog order. Used by the query DTO (`@IsIn`) and the
+ * S10/S11 specs; derived, so it can never drift from the catalog.
+ */
+export const AUDIT_EVENTS = AUDIT_ACTION_CATALOG.map(
+  (entry) => entry.action,
+);
+
+/**
+ * English display names for every audit action — the source for the console
+ * UI (action filter dropdown + table/sheet labels), served via
+ * GET /workspaces/:id/audit/actions. Derived from the catalog; the S10 spec
+ * asserts key order/completeness can never drift.
+ */
+export const AUDIT_EVENT_LABELS = Object.fromEntries(
+  AUDIT_ACTION_CATALOG.map((entry) => [entry.action, entry.label]),
+) as Record<AuditAction, string>;
 
 /**
  * Validates `resource(.sub_resource).action` naming (e.g. `workspace.created`,
@@ -71,49 +113,18 @@ export const AUDIT_EVENTS_RE = /^[a-z_]+(\.[a-z_]+)+$/;
 
 /**
  * Static map action → controller class + method where the event will be
- * emitted (plan §6 wiring map). Controller/method names were verified against
- * the actual controllers. Entries whose endpoint does not exist in the v1
- * surface yet (asset delete, api key create/revoke, audit export) point at
- * the planned method on the module's main controller; S11 tracks them via its
- * NOT_YET_RESOLVABLE list until the endpoint lands (M3/M4).
+ * emitted (plan §6 wiring map). Derived from the catalog. Entries whose
+ * endpoint does not exist in the v1 surface yet (asset delete, api key
+ * create/revoke, audit export) point at the planned method on the module's
+ * main controller; S11 tracks them via its NOT_YET_RESOLVABLE list until the
+ * endpoint lands (M3/M4).
  */
 export const AUDIT_WIRING: Record<
   AuditAction,
   { controller: string; method: string }
-> = {
-  'workspace.created': { controller: 'WorkspacesController', method: 'createWorkspace' },
-  'workspace.updated': { controller: 'WorkspacesController', method: 'updateWorkspace' },
-  'workspace.deleted': { controller: 'WorkspacesController', method: 'deleteWorkspace' },
-  'workspace.config.updated': { controller: 'WorkspacesController', method: 'updateWorkspaceConfigs' },
-  'workspace.api_key.rotated': { controller: 'WorkspacesController', method: 'rotateApiKey' },
-  'member.invited': { controller: 'WorkspacesController', method: 'createInvitations' },
-  'member.invitation.cancelled': { controller: 'WorkspacesController', method: 'cancelInvitation' },
-  'member.removed': { controller: 'WorkspacesController', method: 'removeMember' },
-  'member.permissions.updated': { controller: 'WorkspacesController', method: 'updateMemberPermissions' },
-  'permission_group.created': { controller: 'WorkspacesController', method: 'createPermissionGroup' },
-  'permission_group.updated': { controller: 'WorkspacesController', method: 'updatePermissionGroup' },
-  'permission_group.deleted': { controller: 'WorkspacesController', method: 'deletePermissionGroup' },
-  'target.created': { controller: 'TargetsController', method: 'createMultipleTargets' },
-  'target.updated': { controller: 'TargetsController', method: 'updateTarget' },
-  'target.deleted': { controller: 'TargetsController', method: 'deleteTarget' },
-  'asset.deleted': { controller: 'AssetsController', method: 'deleteAsset' },
-  'asset_group.created': { controller: 'AssetGroupController', method: 'create' },
-  'asset_group.deleted': { controller: 'AssetGroupController', method: 'delete' },
-  'network.created': { controller: 'InternalNetworksController', method: 'createInternalNetwork' },
-  'network.deleted': { controller: 'InternalNetworksController', method: 'deleteInternalNetwork' },
-  'vulnerability.status.updated': { controller: 'VulnerabilitiesController', method: 'bulkDismissVulnerabilities' },
-  'vulnerability.bulk_updated': { controller: 'VulnerabilitiesController', method: 'bulkReopenVulnerabilities' },
-  'report.generated': { controller: 'ReportsController', method: 'generateSummaryReport' },
-  'report.exported': { controller: 'ReportsController', method: 'previewSummaryReport' },
-  'report.deleted': { controller: 'ReportsController', method: 'deleteReport' },
-  'job.cancelled': { controller: 'JobsRegistryController', method: 'cancelJob' },
-  'workflow.created': { controller: 'WorkflowsController', method: 'createWorkflow' },
-  'workflow.updated': { controller: 'WorkflowsController', method: 'updateWorkflow' },
-  'workflow.deleted': { controller: 'WorkflowsController', method: 'deleteWorkflow' },
-  'integration.connected': { controller: 'IntegrationsController', method: 'createIntegration' },
-  'integration.disconnected': { controller: 'IntegrationsController', method: 'deleteIntegration' },
-  'integration.settings.updated': { controller: 'IntegrationsController', method: 'updateIntegration' },
-  'api_key.created': { controller: 'ApiKeysController', method: 'create' },
-  'api_key.revoked': { controller: 'ApiKeysController', method: 'revoke' },
-  'audit.exported': { controller: 'AuditEventsController', method: 'exportAuditEvents' },
-};
+> = Object.fromEntries(
+  AUDIT_ACTION_CATALOG.map((entry) => [
+    entry.action,
+    { controller: entry.controller, method: entry.method },
+  ]),
+) as Record<AuditAction, { controller: string; method: string }>;

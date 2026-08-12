@@ -14,6 +14,7 @@ import { Reflector } from '@nestjs/core';
 import { randomUUID } from 'crypto';
 import type { AuditEvent } from './entities/audit-event.entity';
 import { AuditEventsController, toAuditCsv } from './audit-events.controller';
+import { AUDIT_EVENTS } from './constants/audit-events';
 import {
   AuditEventResponseDto,
   GetAuditEventsQueryDto,
@@ -248,6 +249,68 @@ describe('AuditEventsController', () => {
         ),
       ).rejects.toThrow(BadRequestException);
       expect(mockAuditService.auditSafely).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('S12 action catalog endpoint', () => {
+    const reflector = new Reflector();
+
+    it('returns one entry per AUDIT_EVENTS action, in dictionary order', () => {
+      const result = controller.getAuditActions();
+
+      expect(result.data).toHaveLength(AUDIT_EVENTS.length);
+      expect(result.data.map((entry) => entry.action)).toEqual([
+        ...AUDIT_EVENTS,
+      ]);
+    });
+
+    it('labels every action with a non-empty display name', () => {
+      const result = controller.getAuditActions();
+
+      for (const entry of result.data) {
+        expect(entry.label.trim().length).toBeGreaterThan(0);
+      }
+    });
+
+    it('returns unique action keys (no duplicates)', () => {
+      const result = controller.getAuditActions();
+
+      const actions = result.data.map((entry) => entry.action);
+      expect(new Set(actions).size).toBe(actions.length);
+    });
+
+    it('GET /:id/audit/actions requires audit.read', () => {
+      const keys =
+        reflector.getAllAndOverride(WorkspacePermissions, [
+          AuditEventsController.prototype.getAuditActions,
+          AuditEventsController,
+        ]) ?? [];
+      expect(keys).toContain('audit.read');
+    });
+
+    it('catalog handler is protected by the WorkspacePermissionGuard and resolves the workspace from :id', () => {
+      expect(
+        reflector.get(
+          '__guards__',
+          AuditEventsController.prototype.getAuditActions,
+        ),
+      ).toContain(WorkspacePermissionGuard);
+      expect(
+        reflector.get(
+          WORKSPACE_ROUTE_PARAM,
+          AuditEventsController.prototype.getAuditActions,
+        ),
+      ).toBe('id');
+    });
+
+    it('catalog endpoint is pure (no DB — the audit service is never touched)', () => {
+      const serviceMocks = Object.values(mockAuditService);
+
+      controller.getAuditActions();
+
+      for (const mock of serviceMocks) {
+        expect(mock).not.toHaveBeenCalled();
+      }
     });
   });
 
