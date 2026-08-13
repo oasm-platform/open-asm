@@ -32,7 +32,8 @@ import {
   useTargetsControllerGetTargetsInWorkspace,
 } from '@/services/apis/gen/queries';
 import {
-  applyDagreLayout,
+  applyForceLayout,
+  CLUSTER_COLORS,
   type LayoutInputNode,
   type LayoutInputEdge,
   type GraphNodeData,
@@ -111,42 +112,119 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
   const applyLayout = useCallback(() => {
     if (!graphData) return;
 
-    const inputNodes: LayoutInputNode[] = graphData.nodes.map((n) => ({
-      id: n.id,
-      type: n.type as LayoutInputNode['type'],
-      data: {
-        label:
-          ((n.data as Record<string, unknown>)?.label as string) ?? n.id,
-        metadata: (n.data as Record<string, unknown>)
-          ?.metadata as Record<string, unknown> | undefined,
-      },
-    }));
+    // Scope to IP↔domain mapping only: target/asset/ip nodes. belongs_to
+    // stays in the layout so each target's domains form one cohesive block;
+    // only resolves_to edges are ever rendered (wires go through IPs).
+    const visibleNodeTypes = new Set(['target', 'asset', 'ip']);
+    const visibleEdgeTypes = new Set(['belongs_to', 'resolves_to']);
 
-    const inputEdges: LayoutInputEdge[] = graphData.edges.map((e) => ({
-      source: e.source,
-      target: e.target,
-      data:
-        e.type || e.label ? { type: e.type, label: e.label } : undefined,
-    }));
+    const inputNodes: LayoutInputNode[] = graphData.nodes
+      .filter((n) => visibleNodeTypes.has(n.type))
+      .map((n) => ({
+        id: n.id,
+        type: n.type as LayoutInputNode['type'],
+        data: {
+          label:
+            ((n.data as Record<string, unknown>)?.label as string) ?? n.id,
+          metadata: (n.data as Record<string, unknown>)
+            ?.metadata as Record<string, unknown> | undefined,
+        },
+      }));
 
-    const result = applyDagreLayout(
-      { nodes: inputNodes, edges: inputEdges },
-      'TB',
-    );
+    const inputEdges: LayoutInputEdge[] = graphData.edges
+      .filter(
+        (e): e is typeof e & { type: string } =>
+          !!e.type && visibleEdgeTypes.has(e.type),
+      )
+      .map((e) => ({
+        source: e.source,
+        target: e.target,
+        data:
+          e.type || e.label ? { type: e.type, label: e.label } : undefined,
+      }));
+
+    const result = applyForceLayout({ nodes: inputNodes, edges: inputEdges });
+
+    // ── Cluster colors: one palette color per connected component, seeded
+    // from target nodes so each domain family renders as its own community.
+    // Computed over the visible mapping edges only.
+    const colorById = new Map<string, string>();
+    const adjacency = new Map<string, string[]>();
+    for (const e of inputEdges) {
+      const fromSource = adjacency.get(e.source) ?? [];
+      fromSource.push(e.target);
+      adjacency.set(e.source, fromSource);
+      const fromTarget = adjacency.get(e.target) ?? [];
+      fromTarget.push(e.source);
+      adjacency.set(e.target, fromTarget);
+    }
+    const paintComponent = (startId: string, color: string) => {
+      if (colorById.has(startId)) return;
+      const queue = [startId];
+      while (queue.length > 0) {
+        const id = queue.pop()!;
+        if (colorById.has(id)) continue;
+        colorById.set(id, color);
+        for (const neighbor of adjacency.get(id) ?? []) {
+          if (!colorById.has(neighbor)) queue.push(neighbor);
+        }
+      }
+    };
+    let clusterIndex = 0;
+    for (const node of inputNodes) {
+      if (node.type !== 'target') continue;
+      paintComponent(
+        node.id,
+        CLUSTER_COLORS[clusterIndex % CLUSTER_COLORS.length],
+      );
+      clusterIndex += 1;
+    }
+    for (const node of inputNodes) {
+      if (!colorById.has(node.id)) {
+        paintComponent(
+          node.id,
+          CLUSTER_COLORS[clusterIndex % CLUSTER_COLORS.length],
+        );
+        clusterIndex += 1;
+      }
+    }
+
+    // ── Alert dots: services that return 4xx/5xx status codes.
+    const alertIds = new Set<string>();
+    for (const e of graphData.edges) {
+      const [prefix, codeRaw] = e.target.split('|');
+      if (prefix === 'statusCode' && Number(codeRaw) >= 400) {
+        alertIds.add(e.source);
+      }
+    }
 
     const rfNodes: Node[] = result.nodes.map((n) => ({
       id: n.id,
       type: n.type,
       position: n.position,
-      data: n.data,
+      data: {
+        ...n.data,
+        clusterColor: colorById.get(n.id),
+        alert: alertIds.has(n.id),
+      },
     }));
 
-    const rfEdges: Edge[] = result.edges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      data: e.data,
-    }));
+    // Only draw IP↔domain wires. belongs_to edges still drive layout so each
+    // target's domains stay grouped, but they are not rendered — the only
+    // visible connections are the ones that go through an IP address.
+    const rfEdges: Edge[] = result.edges
+      .filter((e) => e.data?.type === 'resolves_to')
+      .map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        data: e.data,
+        style: {
+          stroke: colorById.get(e.source) ?? '#94a3b8',
+          strokeWidth: 1.2,
+          opacity: 0.55,
+        },
+      }));
 
     setNodes(rfNodes);
     setEdges(rfEdges);
@@ -182,13 +260,20 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
 
   const displayEdges = useMemo(() => {
     if (!hoveredNodeId) return edges;
-    return edges.map((e) => ({
-      ...e,
-      className:
-        e.source === hoveredNodeId || e.target === hoveredNodeId
-          ? ''
-          : 'opacity-40 transition-opacity',
-    }));
+    return edges.map((e) => {
+      const baseOpacity =
+        (e.style as { opacity?: number } | undefined)?.opacity ?? 0.55;
+      return {
+        ...e,
+        style: {
+          ...e.style,
+          opacity:
+            e.source === hoveredNodeId || e.target === hoveredNodeId
+              ? baseOpacity
+              : 0.12,
+        },
+      };
+    });
   }, [edges, hoveredNodeId]);
 
   const hoveredEdgeLabel = useMemo(() => {

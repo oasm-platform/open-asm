@@ -1203,8 +1203,8 @@ export class AssetsService {
     query: GetAssetGraphQueryDto,
     workspaceId: string,
   ): Promise<AssetGraphResponseDto> {
-    const MAX_NODES = 500;
-    const MAX_EDGES = 1000;
+    const MAX_NODES = 2000;
+    const MAX_EDGES = 4000;
 
     const rawParams: string[] = [workspaceId];
     let targetFilter = '';

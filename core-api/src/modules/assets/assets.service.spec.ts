@@ -637,6 +637,65 @@ describe('AssetsService', () => {
       );
     });
 
+    it('keeps ip nodes and resolves_to edges when nodes exceed the old 500 cap', async () => {
+      // A workspace whose node count is well above MAX_NODES: ip nodes must
+      // not be trimmed away, otherwise domain↔IP relationships vanish.
+      const target = { id: 't-big', value: 'big.example.com' };
+      const assetCount = 600;
+      const assets = Array.from({ length: assetCount }, (_, i) => ({
+        id: `asset-${i}`,
+        value: `a${i}.example.com`,
+        targetId: 't-big',
+        isEnabled: true,
+        dnsRecords: [],
+        ipAssets: [{ ipAddress: `10.0.0.${i}` }],
+      }));
+
+      (mockTargetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([target]));
+      (mockAssetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb(assets));
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+
+      mockDataSource.query = jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      mockTechnologyForwarderService.enrichTechnologies = jest
+        .fn()
+        .mockResolvedValue([]);
+
+      const result = await service.getAssetGraph({}, 'ws-big');
+
+      // All 600 ip nodes survive the node cap.
+      expect(result.nodes.filter((n) => n.type === 'ip')).toHaveLength(
+        assetCount,
+      );
+      expect(result.nodes).toHaveLength(1 + assetCount * 2);
+
+      // Every domain connects to its IP: domain↔IP relationship is visible.
+      expect(result.edges.filter((e) => e.type === 'resolves_to')).toHaveLength(
+        assetCount,
+      );
+      const edgeTypes = result.edges.map(
+        (e) => `${e.source}→${e.target} [${e.type}]`,
+      );
+      expect(edgeTypes).toContain(
+        'asset|asset-0→ip|10.0.0.0 [resolves_to]',
+      );
+      expect(edgeTypes).toContain(
+        `asset|asset-${assetCount - 1}→ip|10.0.0.${assetCount - 1} [resolves_to]`,
+      );
+    });
+
     it('deduplicates edges with the same source and target', async () => {
       const target = { id: 't1', value: 'example.com' };
       const asset = {
