@@ -24,8 +24,6 @@
     "@ai-sdk/react": "^3.0.146",
     "@base-ui/react": "^1.6.0",
     "@codemirror/lang-yaml": "^6.1.2",
-    "@dagrejs/dagre": "^3.1.1",
-    "@dagrejs/graphlib": "^4.0.5",
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-avatar": "^1.1.10",
