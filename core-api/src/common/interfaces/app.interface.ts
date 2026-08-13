@@ -1,4 +1,5 @@
 import type { Job } from '@/modules/jobs-registry/entities/job.entity';
+import type { WorkspaceMembers } from '@/modules/workspaces/entities/workspace-members.entity';
 import { IsString } from 'class-validator';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
@@ -33,6 +34,8 @@ export interface ResultHandler {
 }
 
 export interface RequestWithMetadata extends Request {
+  /** Correlation id assigned by requestIdMiddleware (X-Request-Id round-trip). */
+  requestId: string;
   session: {
     token: string;
     expiresAt: Date;
@@ -54,6 +57,10 @@ export interface RequestWithMetadata extends Request {
     role: Role;
   };
   workspaceId: string;
+  /** Membership row resolved by WorkspacePermissionGuard (or undefined when not run). */
+  membership?: WorkspaceMembers;
+  /** Union of permission keys from the member's permission groups (or undefined when not run). */
+  permissions?: string[];
 }
 
 export interface Technology {

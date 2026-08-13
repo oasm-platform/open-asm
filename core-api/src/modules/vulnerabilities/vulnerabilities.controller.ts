@@ -1,5 +1,6 @@
 import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -28,6 +29,7 @@ import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
+import { AuditLog } from '../audit/audit-log.decorator';
 import { VulnerabilitiesService } from './vulnerabilities.service';
 
 @Controller('vulnerabilities')
@@ -44,6 +46,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.write')
   @Post('scan')
   scan(@Body() scanDto: ScanDto, @WorkspaceId() workspaceId: string) {
     return this.vulnerabilitiesService.scan(scanDto.targetId, workspaceId);
@@ -60,6 +63,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.read')
   @Get()
   async getVulnerabilities(
     @Query() query: GetVulnerabilitiesQueryDto,
@@ -76,10 +80,14 @@ export class VulnerabilitiesController {
       serialization: GetVulnerabilitiesStatisticsResponseDto,
     },
   })
+  @WorkspaceAccess('vulnerability.read')
   @Get('statistics')
   async getVulnerabilitiesStatistics(
     @Query() query: GetVulnerabilitiesStatisticsQueryDto,
+    @WorkspaceId() workspaceId: string,
   ) {
+    // Override the workspaceId from the query with the one from the header (guard-validated).
+    query.workspaceId = workspaceId;
     return this.vulnerabilitiesService.getVulnerabilitiesStatistics(query);
   }
 
@@ -94,6 +102,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.read')
   @Get(':id')
   getVulnerabilityById(
     @Param('id') id: string,
@@ -113,6 +122,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.write')
   @Post(':id/analyze')
   @HttpCode(HttpStatus.OK)
   async analyzeVulnerability(
@@ -140,6 +150,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('vulnerability.write')
   @Delete(':id/analyze')
   async deleteVulnerabilityAnalysis(
     @Param('id') id: string,
@@ -163,6 +174,15 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('vulnerability.status.updated', {
+    // No before/after status is derivable decorator-only — the row carries the
+    // bulk action and the affected count (plan §4 row 21: high-evidence event).
+    metadata: (body) => {
+      const ids = (body as { ids?: string[] })?.ids;
+      return { action: 'dismiss', count: ids?.length ?? 0 };
+    },
+  })
+  @WorkspaceAccess('vulnerability.write')
   @Post('dismiss')
   bulkDismissVulnerabilities(
     @WorkspaceId() workspaceId: string,
@@ -185,6 +205,13 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('vulnerability.bulk_updated', {
+    metadata: (body) => {
+      const ids = (body as { ids?: string[] })?.ids;
+      return { action: 'reopen', count: ids?.length ?? 0 };
+    },
+  })
+  @WorkspaceAccess('vulnerability.write')
   @Post('reopen')
   bulkReopenVulnerabilities(
     @WorkspaceId() workspaceId: string,

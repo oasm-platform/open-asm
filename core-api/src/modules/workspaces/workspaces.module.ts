@@ -4,12 +4,21 @@ import { ApiKeysModule } from '../apikeys/apikeys.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
+import { WorkspacePermission } from './entities/workspace-permission.entity';
+import { WorkspaceMemberPermission } from './entities/workspace-member-permission.entity';
+import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspacesController } from './workspaces.controller';
 import { WorkspacesService } from './workspaces.service';
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Workspace, WorkspaceMembers]),
+    TypeOrmModule.forFeature([
+      Workspace,
+      WorkspaceMembers,
+      WorkspacePermission,
+      WorkspaceMemberPermission,
+      WorkspaceInvitation,
+    ]),
     ApiKeysModule,
     forwardRef(() => WorkflowsModule),
   ],

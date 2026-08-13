@@ -16,7 +16,7 @@ const { removeManyMock, assetsRef } = vi.hoisted(() => {
       id: 'asset-1',
       value: 'https://example.com',
       createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-02T00:00:00Z',
       targetId: 't-1',
       isPrimary: true,
       isEnabled: true,
@@ -35,6 +35,18 @@ const { removeManyMock, assetsRef } = vi.hoisted(() => {
   ];
   return { removeManyMock: vi.fn(), assetsRef: { value: baseAssets } };
 });
+
+vi.mock('@/hooks/usePermission', () => ({
+  usePermission: () => ({
+    permissions: ['*'],
+    isOwner: true,
+    hasPermission: () => true,
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
 
 const resetAssets = () => {
   assetsRef.value = [

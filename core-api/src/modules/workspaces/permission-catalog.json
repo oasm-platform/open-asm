@@ -1,0 +1,123 @@
+[
+  {
+    "resource": "workspace",
+    "actions": [
+      { "action": "read", "description": "View workspace information" },
+      { "action": "write", "description": "Update workspace settings" },
+      { "action": "delete", "description": "Delete the workspace" },
+      { "action": "config", "description": "View and update workspace configuration" },
+      { "action": "apikey", "description": "View and rotate the workspace API key" }
+    ]
+  },
+  {
+    "resource": "member",
+    "actions": [
+      { "action": "read", "description": "View workspace members" },
+      { "action": "write", "description": "Edit member permissions and remove members" }
+    ]
+  },
+  {
+    "resource": "invitation",
+    "actions": [
+      { "action": "read", "description": "View workspace invitations" },
+      { "action": "write", "description": "Invite members and cancel invitations" }
+    ]
+  },
+  {
+    "resource": "workflow",
+    "actions": [
+      { "action": "read", "description": "View workflows" },
+      { "action": "write", "description": "Create, edit and run workflows" }
+    ]
+  },
+  {
+    "resource": "group",
+    "actions": [
+      { "action": "read", "description": "View asset groups" },
+      { "action": "write", "description": "Create and edit asset groups" }
+    ]
+  },
+  {
+    "resource": "target",
+    "actions": [
+      { "action": "read", "description": "View scan targets" },
+      { "action": "write", "description": "Add and edit scan targets" }
+    ]
+  },
+  {
+    "resource": "asset",
+    "actions": [
+      { "action": "read", "description": "View assets" },
+      { "action": "write", "description": "Manage assets" }
+    ]
+  },
+  {
+    "resource": "vulnerability",
+    "actions": [
+      { "action": "read", "description": "View vulnerabilities" },
+      { "action": "write", "description": "Manage vulnerabilities and dismissals" }
+    ]
+  },
+  {
+    "resource": "network",
+    "actions": [
+      { "action": "read", "description": "View internal networks" },
+      { "action": "write", "description": "Create and edit internal networks" }
+    ]
+  },
+  {
+    "resource": "integration",
+    "actions": [
+      { "action": "read", "description": "View integrations" },
+      { "action": "write", "description": "Manage integrations" }
+    ]
+  },
+  {
+    "resource": "report",
+    "actions": [
+      { "action": "read", "description": "View reports" },
+      { "action": "write", "description": "Generate and manage reports" }
+    ]
+  },
+  {
+    "resource": "template",
+    "actions": [
+      { "action": "read", "description": "View templates" },
+      { "action": "write", "description": "Create and edit templates" }
+    ]
+  },
+  {
+    "resource": "agent",
+    "actions": [
+      { "action": "read", "description": "View agents" },
+      { "action": "write", "description": "Manage agents" }
+    ]
+  },
+  {
+    "resource": "notification",
+    "actions": [
+      { "action": "read", "description": "View notifications" }
+    ]
+  },
+  {
+    "resource": "job",
+    "actions": [
+      { "action": "read", "description": "View jobs" },
+      { "action": "write", "description": "Re-run and cancel jobs" },
+      { "action": "delete", "description": "Delete jobs" }
+    ]
+  },
+  {
+    "resource": "worker",
+    "actions": [
+      { "action": "read", "description": "View workers" },
+      { "action": "write", "description": "Manage workers" }
+    ]
+  },
+  {
+    "resource": "audit",
+    "actions": [
+      { "action": "read", "description": "View and export the workspace audit log" }
+    ]
+  }
+]

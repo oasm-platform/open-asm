@@ -544,6 +544,33 @@ describe('AssetGroupService', () => {
       expect(result.assetGroupWorkflows[0].lastRun).toBeNull();
     });
 
+    it('should set lastRun to null when the latest job history has no jobs (totalJobs = 0)', async () => {
+      mockJobHistoryRepo.createQueryBuilder.mockImplementation(() =>
+        createMockJobHistoryBuilder([
+          {
+            ...rawLastRun,
+            id: 'jh-empty',
+            totalJobs: '0',
+            status: 'PENDING',
+          },
+        ]),
+      );
+      mockAssetGroupRepo.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'Web Servers',
+        assetGroupWorkflows: [
+          {
+            id: 'agw-1',
+            workflow: { id: 'wf-1' },
+          },
+        ],
+      });
+
+      const result = await service.getAssetGroupById(groupId, workspaceId);
+
+      expect(result.assetGroupWorkflows[0].lastRun).toBeNull();
+    });
+
     it('should throw NotFoundException when the group does not belong to the workspace', async () => {
       mockAssetGroupRepo.findOne.mockResolvedValue(undefined);
 

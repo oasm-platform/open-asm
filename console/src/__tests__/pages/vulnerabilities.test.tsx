@@ -92,6 +92,21 @@ vi.mock('@/hooks/useWorkspaceSelector', () => ({
     selectedWorkspace: 'ws-1',
     isLoading: false,
   }),
+  useWorkspaceState: () => ({
+    state: { selectedWorkspaceId: 'ws-1' },
+  }),
+}));
+
+vi.mock('@/hooks/usePermission', () => ({
+  usePermission: () => ({
+    permissions: ['*'],
+    isOwner: true,
+    hasPermission: () => true,
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => {

@@ -26,6 +26,11 @@ tasks:
   test:
     cmds:
       - pnpm run test
+  # Run tests once (CI mode)
+  # Executes unit and integration tests a single time without watch mode
+  test:run:
+    cmds:
+      - pnpm run test:run {{.CLI_ARGS}}
   # API documentation generation
   # Generates API documentation after ensuring API server is ready
   # Waits for API server health check before generating docs

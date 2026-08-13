@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Sse,
   UseGuards,
 } from '@nestjs/common';
@@ -15,9 +16,12 @@ import { ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { I18nLang } from 'nestjs-i18n';
 import { AuthGuard } from '@/common/guards/auth.guard';
+import { getWorkspaceIdFromRequest } from '@/common/decorators/workspace-id.decorator';
 import { CreateNotificationDto } from './dto/create-notification.dto';
-import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
+import { DeleteNotificationByRefDto } from './dto/delete-notification-by-ref.dto';
+import { UserContext } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
+import type { Request } from 'express';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { NotificationResponseDto } from './dto/notification.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
@@ -42,10 +46,11 @@ export class NotificationsController {
   @Get()
   async getNotifications(
     @UserContext() user: UserContextPayload,
-    @WorkspaceId() workspaceId: string,
+    @Req() req: Request,
     @Query() query: GetManyBaseQueryParams,
     @I18nLang() lang: string,
   ) {
+    const workspaceId = getWorkspaceIdFromRequest(req);
     return this.notificationsService.getNotifications(
       user.id,
       workspaceId,
@@ -109,6 +114,26 @@ export class NotificationsController {
   @Patch(':id/read')
   markAsRead(@Param('id') id: string, @UserContext() user: UserContextPayload) {
     return this.notificationsService.markAsRead(id, user.id);
+  }
+
+  @Doc({
+    summary: 'Delete notifications by ref',
+    description:
+      'Delete the current user\'s notification recipient records matching ' +
+      'the given ref/refId (e.g. all notifications about target 1234 once ' +
+      'the related work is completed). The notifications themselves are ' +
+      'preserved for other recipients.',
+  })
+  @Delete('by-ref')
+  deleteNotificationsByRef(
+    @Query() query: DeleteNotificationByRefDto,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.notificationsService.deleteByRef(
+      query.ref,
+      query.refId,
+      user.id,
+    );
   }
 
   @Doc({

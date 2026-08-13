@@ -152,14 +152,16 @@ export class AgentsCompletionsService {
 
   private async getPreferredLLMConfig(
     workspaceId: string,
+    userId: string,
   ): Promise<AgentLLMConfig | null> {
     return this.llmConfigRepository.findOne({
-      where: { workspaceId, isPreferred: true },
+      where: { workspaceId, userId, isPreferred: true },
     });
   }
 
   private async resolveLLMConfig(
     workspaceId: string,
+    userId: string,
     provider?: string,
     model?: string,
   ): Promise<AgentLLMConfig> {
@@ -167,12 +169,16 @@ export class AgentsCompletionsService {
 
     if (model && provider) {
       llmConfig = await this.llmConfigRepository.findOne({
-        where: { workspaceId, provider: provider as LLMProvider },
+        where: {
+          workspaceId,
+          userId,
+          provider: provider as LLMProvider,
+        },
       });
     }
 
     if (!llmConfig) {
-      llmConfig = await this.getPreferredLLMConfig(workspaceId);
+      llmConfig = await this.getPreferredLLMConfig(workspaceId, userId);
     }
 
     if (!llmConfig) {
@@ -417,9 +423,10 @@ export class AgentsCompletionsService {
   async vulAnalyze(
     vulnerabilityJson: string,
     workspaceId: string,
+    userId: string,
   ): Promise<string> {
     try {
-      const llmConfig = await this.resolveLLMConfig(workspaceId);
+      const llmConfig = await this.resolveLLMConfig(workspaceId, userId);
 
       const prompt = this.getPrompt('VUL_ANALYZE.md', {
         VULNERABILITY_JSON: vulnerabilityJson,
@@ -463,8 +470,9 @@ export class AgentsCompletionsService {
 
   /**
    * Finds an existing conversation by ID or creates a new one.
-   * - If dto.conversationId exists in DB → reuse it
-   * - If dto.conversationId is provided but not found → create with that ID
+   * - If dto.conversationId exists in DB and belongs to the current member → reuse it
+   * - If dto.conversationId exists in DB but belongs to another member → throw (no leak, no takeover)
+   * - If dto.conversationId is provided but not found yet → create a new conversation with that ID
    * - If no conversationId → create a brand new conversation
    */
   private async getOrCreateConversation(
@@ -472,40 +480,32 @@ export class AgentsCompletionsService {
     workspaceId: string,
     userId: string,
   ): Promise<AgentConversation> {
-    // If conversationId is provided, try to find it in DB
     if (dto.conversationId) {
+      // Find by id + workspaceId only (not scoped to the member) so we can
+      // distinguish "exists but owned by another member" from "not found yet"
       const existing = await this.conversationRepository.findOne({
         where: { id: dto.conversationId, workspaceId },
       });
-      if (existing) {
-        return existing; // Return existing conversation
-      }
 
-      // Not found (client may have pre-generated the ID), create with that ID
-      const llmConfig = await this.resolveLLMConfig(
-        workspaceId,
-        dto.provider,
-        dto.model,
-      );
-      const newConversation = this.conversationRepository.create({
-        id: dto.conversationId,
-        workspaceId,
-        llmConfigId: llmConfig.id,
-        title: dto.question.slice(0, 500),
-        createdBy: userId,
-        agentMode: dto.agentMode,
-        workerId: dto.workerId,
-      });
-      return this.conversationRepository.save(newConversation);
+      if (existing) {
+        if (existing.createdBy === userId) {
+          return existing; // Return existing conversation
+        }
+        // Conversation belongs to another member — never reuse or expose it
+        throw new NotFoundException('Conversation not found');
+      }
     }
 
-    // No conversationId provided, create a new conversation
+    // No conversationId provided, or the provided one does not exist yet —
+    // create a new conversation (reusing the client-generated ID when given)
     const llmConfig = await this.resolveLLMConfig(
       workspaceId,
+      userId,
       dto.provider,
       dto.model,
     );
     const newConversation = this.conversationRepository.create({
+      ...(dto.conversationId ? { id: dto.conversationId } : {}),
       workspaceId,
       llmConfigId: llmConfig.id,
       title: dto.question.slice(0, 500),
@@ -561,10 +561,11 @@ export class AgentsCompletionsService {
     conversation: AgentConversation,
     dto: SendMessageDto,
     workspaceId: string,
+    userId: string,
   ): Promise<AgentLLMConfig> {
     // Get the base config from the conversation
     let llmConfig = await this.llmConfigRepository.findOne({
-      where: { id: conversation.llmConfigId, workspaceId },
+      where: { id: conversation.llmConfigId, workspaceId, userId },
     });
 
     if (!llmConfig) {
@@ -574,7 +575,7 @@ export class AgentsCompletionsService {
     // If user switched to a different provider, resolve the correct config
     if (dto.provider && (dto.provider as LLMProvider) !== llmConfig.provider) {
       const switchedConfig = await this.llmConfigRepository.findOne({
-        where: { workspaceId, provider: dto.provider as LLMProvider },
+        where: { workspaceId, userId, provider: dto.provider as LLMProvider },
       });
       if (switchedConfig) {
         llmConfig = switchedConfig;
@@ -1740,6 +1741,7 @@ export class AgentsCompletionsService {
       conversation,
       dto,
       workspaceId,
+      userId,
     );
 
     // Step 5: Map history to AI SDK message format

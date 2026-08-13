@@ -7,8 +7,16 @@ import {
 
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IntegrationType } from '@/common/enums/enum';
+import type { WrapperType } from '@/common/types/app.types';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -19,6 +27,7 @@ import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import type { TestIntegrationDto } from './dto/test-integration.dto';
 import type { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { Integration } from './entities/integration.entity';
+import { IntegrationSyncService } from './integrations-sync.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
   notificationTypeProperties,
@@ -34,6 +43,8 @@ export class IntegrationsService {
     @InjectRepository(Integration)
     private readonly integrationRepository: Repository<Integration>,
     private readonly workspaceEncryption: WorkspaceEncryptionService,
+    @Inject(forwardRef(() => IntegrationSyncService))
+    private readonly integrationSyncService: WrapperType<IntegrationSyncService>,
   ) {}
 
   /**
@@ -97,8 +108,22 @@ export class IntegrationsService {
     config: Record<string, unknown>;
     workspaceId: string;
     userId: string;
+    syncSchedule?: string;
   }): Promise<GetIntegrationDto> {
     validateConfigOrThrow(args);
+
+    // Periodic syncs only make sense for cloud providers: the scheduler
+    // dispatches runConnector with CLOUD_PROVIDER, which notification/
+    // ticketing connectors do not implement (F3).
+    if (
+      args.syncSchedule &&
+      args.syncSchedule !== 'disabled' &&
+      args.category !== (IntegrationType.CLOUD_PROVIDER as string)
+    ) {
+      throw new BadRequestException(
+        'syncSchedule is only supported for CLOUD_PROVIDER integrations',
+      );
+    }
 
     const dek = await this.workspaceEncryption.getDEK(args.workspaceId);
     const encryptedConfig = encryptSensitiveConfigFields(args.config, dek);
@@ -114,6 +139,27 @@ export class IntegrationsService {
     });
 
     const saved = await this.integrationRepository.save(entity);
+
+    // Wire the periodic sync scheduler (SC-SCHED-1); 'disabled'/undefined
+    // keeps the entity default and creates no BullMQ job. If scheduling
+    // fails, the just-created row is removed best-effort so no orphaned
+    // integration survives without its scheduler, then the error propagates.
+    if (args.syncSchedule && args.syncSchedule !== 'disabled') {
+      try {
+        await this.integrationSyncService.applySchedule(saved, args.syncSchedule);
+      } catch (error) {
+        try {
+          await this.integrationRepository.remove(saved);
+        } catch (cleanupError) {
+          this.logger.warn(
+            `Failed to remove integration ${saved.id} after schedule wiring failure: ${
+              cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+            }`,
+          );
+        }
+        throw error;
+      }
+    }
 
     // Fire welcome message for notification integrations (best-effort)
     if (args.category === (IntegrationType.NOTIFICATION as string)) {
@@ -268,6 +314,37 @@ export class IntegrationsService {
       throw new NotFoundException('Integration not found');
     }
 
+    // Cloud providers are tested with a dry-run sync: fetch + count only, no
+    // DB writes and no lastRunAt update (SC-API-3). A failed dry run is a
+    // normal test outcome (e.g. bad token) — reported as success:false
+    // instead of surfacing as an unhandled 400 (SC-TEST-2b).
+    if (integration.category === (IntegrationType.CLOUD_PROVIDER as string)) {
+      try {
+        const sync = await this.integrationSyncService.runSync(id, workspaceId, {
+          dryRun: true,
+        });
+        return {
+          success: true,
+          category: integration.category,
+          appType: integration.appType,
+          message: `${integration.appType} sync OK (dry run): ${JSON.stringify(sync)}`,
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          return {
+            success: false,
+            category: integration.category,
+            appType: integration.appType,
+            message: 'Connector test failed',
+            timestamp: new Date().toISOString(),
+            error: error.message,
+          };
+        }
+        throw error;
+      }
+    }
+
     // Decrypt sensitive fields for the connector to use
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
     const decryptedConfig = decryptSensitiveConfigFields(integration.config, dek);
@@ -299,6 +376,10 @@ export class IntegrationsService {
     if (!integration) {
       throw new NotFoundException('Integration not found');
     }
+
+    // Remove the periodic sync scheduler before deleting the row
+    // (SC-SCHED-5).
+    await this.integrationSyncService.removeJobScheduler(integration.id);
 
     await this.integrationRepository.remove(integration);
 
@@ -343,6 +424,23 @@ export class IntegrationsService {
       });
 
       integration.config = encryptSensitiveConfigFields(dto.config, dek);
+    }
+
+    // Re-register the periodic sync scheduler when the schedule changed
+    // (SC-SCHED-3/4). Only cloud providers support schedules (F3).
+    if (dto.syncSchedule !== undefined) {
+      if (
+        dto.syncSchedule !== 'disabled' &&
+        integration.category !== (IntegrationType.CLOUD_PROVIDER as string)
+      ) {
+        throw new BadRequestException(
+          'syncSchedule is only supported for CLOUD_PROVIDER integrations',
+        );
+      }
+      await this.integrationSyncService.applySchedule(
+        integration,
+        dto.syncSchedule,
+      );
     }
 
     const saved = await this.integrationRepository.save(integration);
@@ -424,7 +522,29 @@ export class IntegrationsService {
       createdById: integration.createdById,
       createdAt: integration.createdAt,
       updatedAt: integration.updatedAt,
+      syncSchedule: integration.syncSchedule,
+      lastRunAt: integration.lastRunAt,
     };
+  }
+
+  /**
+   * Enqueues an immediate asset sync for a cloud-provider integration
+   * (POST /:id/sync). Verifies workspace ownership first (404 when missing or
+   * foreign) and rejects non-cloud integrations (schedules only make sense
+   * for CLOUD_PROVIDER), then enqueues the job and returns its jobId — the
+   * sync itself runs asynchronously in IntegrationSyncProcessor.
+   */
+  async syncIntegration(
+    id: string,
+    workspaceId: string,
+  ): Promise<{ jobId: string }> {
+    const integration = await this.getIntegrationById(id, workspaceId);
+    if (integration.category !== (IntegrationType.CLOUD_PROVIDER as string)) {
+      throw new BadRequestException(
+        'syncSchedule is only supported for CLOUD_PROVIDER integrations',
+      );
+    }
+    return this.integrationSyncService.enqueueManualSync(id, workspaceId);
   }
 
   /**

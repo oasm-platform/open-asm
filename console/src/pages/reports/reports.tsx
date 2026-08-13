@@ -244,7 +244,7 @@ export default function Reports() {
   if (wsLoading) return null;
 
   return (
-    <Page title="Reports" action={null}>
+    <Page title="Reports" action={null} permission="report.read">
       <Dialog
         open={generateOpen}
         onOpenChange={(open) => {

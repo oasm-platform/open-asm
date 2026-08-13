@@ -1,5 +1,4 @@
 import { CalendarClockIcon, Clock } from 'lucide-react';
-import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { buttonVariants } from '@/components/ui/button-variants';
@@ -16,6 +15,7 @@ import {
   DEFAULT_CRON_STATE,
   buildCronExpression,
   formatCronLabel,
+  formatNextRun,
   getLocalTimezone,
   getNextRun,
   getTimezoneLabel,
@@ -59,7 +59,9 @@ const WEEKDAYS = [
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
-const MONTH_DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
+// Days 1-31: a monthly schedule may target the 29th-31st, so every calendar
+// day must be expressible (buildCronExpression drops out-of-range shifts).
+const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 /** Format a 0-23 hour as 12-hour clock with AM/PM (e.g. 0 -> '12 AM', 13 -> '1 PM'). */
 const formatHour = (hour: number) => {
@@ -364,7 +366,7 @@ export function CronScheduleBuilder({
               <p className="text-xs text-muted-foreground">Next run</p>
               <p className="text-sm font-medium text-foreground tabular-nums">
                 {nextRun
-                  ? dayjs(nextRun).format('DD/MM/YYYY HH:mm')
+                  ? formatNextRun(nextRun, tz)
                   : 'Schedule not available'}
               </p>
             </div>

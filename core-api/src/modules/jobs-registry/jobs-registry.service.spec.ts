@@ -538,6 +538,48 @@ describe('JobsRegistryService', () => {
       ]);
     });
 
+    it('should return detail for a history whose jobs were all deleted (ownership proven via workflow, tool status undefined)', async () => {
+      const mockTool = {
+        id: 'tool-uuid',
+        name: 'test-tool',
+        logoUrl: 'http://example.com/logo.png',
+      };
+
+      mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      // No job rows: the deleted-jobs scenario
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({
+        data: [mockTool],
+      });
+
+      const result = await service.getJobHistoryDetail(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(result).toEqual({
+        id: mockHistoryId,
+        workflowName: 'test-workflow',
+        jobHistoryName: 'test-job-history',
+        createdAt: mockJobHistory.createdAt,
+        updatedAt: mockJobHistory.updatedAt,
+        tools: [
+          {
+            id: 'tool-uuid',
+            name: 'test-tool',
+            logoUrl: 'http://example.com/logo.png',
+            status: undefined,
+          },
+        ],
+      });
+    });
+
     it('should throw NotFoundException when job history not found', async () => {
       mockJobHistoryRepository.findOne.mockResolvedValue(null);
 

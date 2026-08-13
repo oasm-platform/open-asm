@@ -10,7 +10,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AppsTabContent } from './components/apps-tab-content';
 import { ConnectIntegrationSheet } from './components/connect-integration-sheet';
@@ -73,6 +73,13 @@ export default function Integrations() {
   const { data: connectedData } =
     useIntegrationsControllerGetManyIntegrations();
 
+  // Optional `tool` param: open the detail sheet for the matching integration
+  const tool = search.tool;
+  useEffect(() => {
+    if (!tool) return;
+    const found = connectedData?.data?.find((i) => i.appType === tool);
+    if (found) setDetailTarget(found);
+  }, [tool, connectedData]);
   const { mutate: deleteIntegration } =
     useIntegrationsControllerDeleteIntegration({
       mutation: {
@@ -121,8 +128,20 @@ export default function Integrations() {
   const connectedIntegrations = connectedData?.data ?? [];
   const connectedTotal = connectedData?.total ?? 0;
 
+  // Re-derive the sheet's integration from the freshest list data instead of
+  // the snapshot captured at card-click time, so a sync-triggered refetch
+  // (new lastRunAt) is reflected in the open sheet (U1).
+  const detailIntegration = useMemo(() => {
+    if (!detailTarget) return null;
+    return (
+      connectedData?.data?.find((i) => i.id === detailTarget.id) ??
+      detailTarget
+    );
+  }, [detailTarget, connectedData]);
+
   const detailSchema =
-    detailTarget && appSchemas.find((s) => s.$id === detailTarget.appType);
+    detailIntegration &&
+    appSchemas.find((s) => s.$id === detailIntegration.appType);
 
   const formatCategory = (category: string): string => {
     return category
@@ -146,6 +165,7 @@ export default function Integrations() {
 
   return (
     <Page
+      permission="integration.read"
       title="Integrations"
       description="Connect third-party applications to your workspace"
     >
@@ -199,13 +219,17 @@ export default function Integrations() {
         />
       )}
 
-      {detailTarget && detailSchema && (
+      {detailIntegration && detailSchema && (
         <IntegrationDetailSheet
-          integration={detailTarget}
+          integration={detailIntegration}
           schema={detailSchema}
           open={!!detailTarget}
           onOpenChange={(open) => {
-            if (!open) setDetailTarget(null);
+            if (!open) {
+              setDetailTarget(null);
+              const { tool: _tool, ...rest } = search;
+              navigate({ search: rest as any, replace: true }); // eslint-disable-line @typescript-eslint/no-explicit-any
+            }
           }}
         />
       )}

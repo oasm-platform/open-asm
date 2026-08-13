@@ -292,6 +292,7 @@ export default function Runs() {
   const navigate = useNavigate();
   return (
     <Page
+      permission="job.read"
       isShowButtonGoBack
       title={
         jobHistoryDetail?.jobHistoryName ||
@@ -319,11 +320,13 @@ export default function Runs() {
                       className="rounded-full border"
                     />
                     <span className="font-medium text-sm">{tool.name}</span>
-                    <JobStatusBadge
-                      status={tool.status}
-                      onlyIcon
-                      className="px-0"
-                    />
+                    {tool.status && (
+                      <JobStatusBadge
+                        status={tool.status}
+                        onlyIcon
+                        className="px-0"
+                      />
+                    )}
                   </Link>
                   {index < jobHistoryDetail.tools.length - 1 && (
                     <ArrowRight

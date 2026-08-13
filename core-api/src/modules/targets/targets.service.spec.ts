@@ -1,4 +1,5 @@
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
+import { AuditOutcome } from '@/common/enums/enum';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -8,8 +9,14 @@ import { randomUUID } from 'crypto';
 import type { EntityManager, Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import type { Asset } from '../assets/entities/assets.entity';
+import type { AuditContext } from '../audit/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { Target, TargetType } from './entities/target.entity';
+import {
+  Target,
+  TargetSource,
+  TargetType,
+} from './entities/target.entity';
 import { TargetsService } from './targets.service';
 
 describe('TargetsService', () => {
@@ -19,6 +26,7 @@ describe('TargetsService', () => {
   let mockAssetsService: Partial<AssetsService>;
   let mockEventEmitter: Partial<EventEmitter2>;
   let mockQueue: Partial<Queue>;
+  let mockAuditService: { auditSafely: jest.Mock };
 
   beforeEach(async () => {
     mockTargetRepository = {
@@ -34,6 +42,7 @@ describe('TargetsService', () => {
       getRawMany: jest.fn(),
       getCount: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
       findOne: jest.fn(),
       findByIds: jest.fn(),
       manager: {
@@ -60,6 +69,10 @@ describe('TargetsService', () => {
       removeJobScheduler: jest.fn(),
     } as any;
 
+    mockAuditService = {
+      auditSafely: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TargetsService,
@@ -82,6 +95,10 @@ describe('TargetsService', () => {
         {
           provide: 'BullQueue_assets-discovery-schedule', // Queue name for BullMQ
           useValue: mockQueue,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();
@@ -236,6 +253,86 @@ describe('TargetsService', () => {
         mockWorkspacesService.getWorkspaceByIdAndOwner,
       ).toHaveBeenCalledWith(workspaceId, userContext);
       expect(mockEventEmitter.emit).toHaveBeenCalledTimes(3);
+    });
+
+    it('should default source to MANUAL on inserted rows when no source param is passed', async () => {
+      // Arrange
+      const dto = { targets: [{ value: 'manual-source.com' }] };
+      const createdTargets = [
+        {
+          id: randomUUID(),
+          value: 'manual-source.com',
+          type: TargetType.DOMAIN,
+          scanSchedule: 'DISABLED',
+        },
+      ] as unknown as Target[];
+
+      const mockManager = createMockEntityManager({
+        existingTargets: [],
+        createdTargets,
+      });
+
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(mockManager),
+        );
+
+      // Act
+      await service.createMultipleTargets(dto, workspaceId, userContext);
+
+      // Assert: inserted target rows carry source MANUAL
+      const insertedRows = (mockManager as any).createQueryBuilder().values.mock
+        .calls[0][0] as Array<Record<string, unknown>>;
+      expect(insertedRows).toHaveLength(1);
+      expect(insertedRows[0]).toMatchObject({
+        value: 'manual-source.com',
+        source: 'MANUAL',
+      });
+    });
+
+    it('should set source on inserted rows when passed as 5th arg', async () => {
+      // Arrange
+      const dto = { targets: [{ value: 'cloudflare-source.com' }] };
+      const createdTargets = [
+        {
+          id: randomUUID(),
+          value: 'cloudflare-source.com',
+          type: TargetType.DOMAIN,
+          scanSchedule: 'DISABLED',
+        },
+      ] as unknown as Target[];
+
+      const mockManager = createMockEntityManager({
+        existingTargets: [],
+        createdTargets,
+      });
+
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(mockManager),
+        );
+
+      // Act — explicit source passed as 5th param (internalNetworkId omitted)
+      await service.createMultipleTargets(
+        dto,
+        workspaceId,
+        userContext,
+        undefined,
+        TargetSource.CLOUDFLARE,
+      );
+
+      // Assert: inserted target rows carry the raw enum value 'cloudflare'
+      const insertedRows = (mockManager as any).createQueryBuilder().values.mock
+        .calls[0][0] as Array<Record<string, unknown>>;
+      expect(insertedRows).toHaveLength(1);
+      expect(insertedRows[0]).toMatchObject({
+        value: 'cloudflare-source.com',
+        source: 'cloudflare',
+      });
     });
 
     it('should throw BadRequestException when duplicate targets exist', async () => {
@@ -765,6 +862,273 @@ describe('TargetsService', () => {
       ).rejects.toThrow(
         'Invalid IP: "127.0.0.1" is a private/reserved IP address. Only public IP addresses are allowed.',
       );
+    });
+  });
+
+  describe('source field in target queries', () => {
+    const baseBuilder = () => ({
+      innerJoin: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      having: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      getCount: jest.fn().mockResolvedValue(0),
+      getRawMany: jest.fn().mockResolvedValue([]),
+    });
+
+    it('getTargetsInWorkspace select should include targets.source', async () => {
+      // Arrange
+      const builder = baseBuilder();
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      // Act
+      await service.getTargetsInWorkspace(
+        { page: 1, limit: 10, sortBy: 'value', sortOrder: 'ASC' },
+        'ws-1',
+      );
+
+      // Assert
+      expect(builder.select).toHaveBeenCalledWith(
+        expect.arrayContaining(['targets.source as "source"']),
+      );
+      expect(builder.groupBy).toHaveBeenCalledWith('targets.id');
+    });
+
+    it('getTargetsInWorkspace maps a MANUAL raw source to {source: "Manual", icon: ""}', async () => {
+      // Arrange
+      const builder = baseBuilder();
+      builder.getCount.mockResolvedValue(1);
+      builder.getRawMany.mockResolvedValue([
+        {
+          id: 'target-1',
+          value: 'manual.com',
+          source: 'MANUAL',
+          type: 'DOMAIN',
+        },
+      ]);
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      // Act
+      const result = await service.getTargetsInWorkspace(
+        { page: 1, limit: 10, sortBy: 'value', sortOrder: 'ASC' },
+        'ws-1',
+      );
+
+      // Assert: response row source is the mapped label/icon object
+      expect(result.data[0].source).toEqual({
+        source: 'Manual',
+        icon: '',
+      });
+    });
+
+    it('getTargetsInWorkspace maps a cloudflare raw source to the schema-driven label and icon', async () => {
+      // Arrange
+      const builder = baseBuilder();
+      builder.getCount.mockResolvedValue(1);
+      builder.getRawMany.mockResolvedValue([
+        {
+          id: 'target-2',
+          value: 'cloudflare-synced.com',
+          source: 'cloudflare',
+          type: 'DOMAIN',
+        },
+      ]);
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      // Act
+      const result = await service.getTargetsInWorkspace(
+        { page: 1, limit: 10, sortBy: 'value', sortOrder: 'ASC' },
+        'ws-1',
+      );
+
+      // Assert: raw 'cloudflare' (schema $id) resolves to schema title + icon
+      expect(result.data[0].source).toEqual({
+        source: 'Cloudflare',
+        icon: '/static/images/integrations/cloudflare.svg',
+      });
+    });
+
+    it('getTargetsInWorkspace maps an unknown raw source gracefully without throwing', async () => {
+      // Arrange
+      const builder = baseBuilder();
+      builder.getCount.mockResolvedValue(1);
+      builder.getRawMany.mockResolvedValue([
+        {
+          id: 'target-3',
+          value: 'legacy.com',
+          source: 'LEGACY',
+          type: 'DOMAIN',
+        },
+      ]);
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      // Act
+      const result = await service.getTargetsInWorkspace(
+        { page: 1, limit: 10, sortBy: 'value', sortOrder: 'ASC' },
+        'ws-1',
+      );
+
+      // Assert: unknown raw source passes through as label with no icon
+      expect(result.data[0].source).toEqual({
+        source: 'LEGACY',
+        icon: '',
+      });
+    });
+
+    it('getTargetById select and groupBy should include targets.source', async () => {
+      // Arrange
+      const builder = {
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue(null),
+      };
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      // Act
+      await service.getTargetById('target-1', 'ws-1');
+
+      // Assert
+      expect(builder.select).toHaveBeenCalledWith(
+        expect.arrayContaining(['targets.source as source']),
+      );
+      expect(builder.groupBy).toHaveBeenCalledWith(
+        expect.stringContaining('targets.source'),
+      );
+    });
+  });
+
+  describe('findByWorkspaceAndValues', () => {
+    it('should return targets filtered by workspace and values', async () => {
+      const builder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          { id: 'target-1', value: 'example.com' },
+          { id: 'target-2', value: 'example.net' },
+        ]),
+      };
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      const result = await service.findByWorkspaceAndValues('ws-1', [
+        'example.com',
+        'example.net',
+      ]);
+
+      expect(builder.where).toHaveBeenCalledWith(
+        'target.workspaceId = :workspaceId',
+        { workspaceId: 'ws-1' },
+      );
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        'target.value IN (:...values)',
+        { values: ['example.com', 'example.net'] },
+      );
+      expect(builder.select).toHaveBeenCalledWith(['target.id', 'target.value']);
+      expect(result).toEqual([
+        { id: 'target-1', value: 'example.com' },
+        { id: 'target-2', value: 'example.net' },
+      ]);
+    });
+
+    it('should return an empty array when no values are provided', async () => {
+      const result = await service.findByWorkspaceAndValues('ws-1', []);
+
+      expect(result).toEqual([]);
+      expect(mockTargetRepository.createQueryBuilder).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteTarget', () => {
+    const workspaceId = randomUUID();
+    const id = randomUUID();
+    const userContext = {
+      id: randomUUID(),
+      name: 'Test User',
+      email: 'test@example.com',
+    } as unknown as UserContextPayload;
+    const auditContext: AuditContext = {
+      actorId: randomUUID(),
+      actorName: 'Test User',
+      actorEmail: 'test@example.com',
+      sourceIp: '127.0.0.1',
+      userAgent: 'jest',
+      requestId: randomUUID(),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (mockWorkspacesService.getWorkspaceByIdAndOwner as jest.Mock).mockResolvedValue(
+        undefined,
+      );
+      (mockTargetRepository.delete as jest.Mock).mockResolvedValue({ affected: 1 });
+    });
+
+    it('writes a target.deleted audit event with the deleted target as before-changes', async () => {
+      (mockTargetRepository.findOneBy as jest.Mock).mockResolvedValue({
+        id,
+        value: 'example.com',
+        type: TargetType.DOMAIN,
+        scanSchedule: null,
+      });
+
+      await service.deleteTarget(id, workspaceId, userContext, auditContext);
+
+      expect(mockAuditService.auditSafely).toHaveBeenCalledWith({
+        workspaceId,
+        ...auditContext,
+        action: 'target.deleted',
+        resourceType: 'target',
+        resourceId: id,
+        changes: {
+          value: { before: 'example.com' },
+          type: { before: TargetType.DOMAIN },
+        },
+        outcome: AuditOutcome.Success,
+      });
+    });
+
+    it('skips the audit write when no audit context is provided', async () => {
+      (mockTargetRepository.findOneBy as jest.Mock).mockResolvedValue({
+        id,
+        value: 'example.com',
+        type: TargetType.DOMAIN,
+        scanSchedule: null,
+      });
+
+      await service.deleteTarget(id, workspaceId, userContext);
+
+      expect(mockAuditService.auditSafely).not.toHaveBeenCalled();
+    });
+
+    it('does not write an audit event when the target does not exist', async () => {
+      (mockTargetRepository.findOneBy as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.deleteTarget(id, workspaceId, userContext, auditContext),
+      ).rejects.toThrow('Target not found in workspace');
+
+      expect(mockTargetRepository.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.auditSafely).not.toHaveBeenCalled();
     });
   });
 });

@@ -21,6 +21,7 @@ import {
   Relation,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
+import { WorkspacePermission } from './workspace-permission.entity';
 
 @Entity('workspaces')
 @Index('IDX_workspaces_owner', ['owner'])
@@ -50,6 +51,12 @@ export class Workspace extends BaseEntity {
   )
   workspaceMembers: Relation<WorkspaceMembers[]>;
 
+  @OneToMany(
+    () => WorkspacePermission,
+    (permission) => permission.workspace,
+  )
+  permissions: Relation<WorkspacePermission[]>;
+
   @OneToMany(() => WorkspaceTool, (workspaceTool) => workspaceTool.workspace)
   workspaceTools: Relation<WorkspaceTool[]>;
 
@@ -59,7 +66,7 @@ export class Workspace extends BaseEntity {
   @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.workspace)
   workers: Relation<WorkerInstance[]>;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ type: String, format: 'date-time', required: false, nullable: true })
   @IsOptional()
   @IsDateString()
   @Column({ type: 'timestamp', nullable: true })

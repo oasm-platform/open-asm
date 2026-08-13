@@ -19,4 +19,10 @@ export class NotificationResponseDto {
 
   @ApiProperty({ required: false })
   workspaceId?: string;
+
+  @ApiProperty({ required: false })
+  ref?: string;
+
+  @ApiProperty({ required: false })
+  refId?: string;
 }

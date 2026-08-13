@@ -2,7 +2,7 @@ import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import {
   Body,
@@ -14,7 +14,6 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { CreateInternalNetworkDto } from './dtos/create-internal-network.dto';
 import { CreateTargetsFromInterfacesDto } from './dtos/create-targets-from-interfaces.dto';
@@ -28,6 +27,7 @@ import {
   GetManyNetworkInterfacesResponseDto,
 } from './dtos/get-many-network-interfaces.dto';
 import { UpdateInternalNetworkDto } from './dtos/update-internal-network.dto';
+import { AuditLog } from '../audit/audit-log.decorator';
 import { InternalNetworksService } from './internal-networks.service';
 
 @Controller('internal-networks')
@@ -47,6 +47,7 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('network.read')
   @Get()
   getManyInternalNetworks(
     @Query() query: GetManyInternalNetworksQueryDto,
@@ -69,8 +70,14 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('network.created', {
+    // Best-effort changes from the body; the DTO carries only `name`.
+    changes: (body) => ({
+      name: { after: (body as { name?: string })?.name ?? '' },
+    }),
+  })
   @Post()
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('network.write')
   createInternalNetwork(
     @Body() dto: CreateInternalNetworkDto,
     @WorkspaceId() workspaceId: string,
@@ -95,7 +102,7 @@ export class InternalNetworksController {
     },
   })
   @Post('targets')
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('target.write')
   createTargetsFromInterfaces(
     @Body() dto: CreateTargetsFromInterfacesDto,
     @UserContext() user: UserContextPayload,
@@ -114,6 +121,7 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('network.read')
   @Get(':id/network-interfaces')
   getManyNetworkInterfaces(
     @Param('id', ParseUUIDPipe) id: string,
@@ -133,6 +141,7 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('network.read')
   @Get(':id')
   getInternalNetworkById(
     @Param('id', ParseUUIDPipe) id: string,
@@ -153,7 +162,7 @@ export class InternalNetworksController {
     },
   })
   @Patch(':id')
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('network.write')
   updateInternalNetworkById(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateInternalNetworkDto,
@@ -177,8 +186,9 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('network.deleted')
   @Delete(':id')
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('network.write')
   deleteInternalNetwork(
     @Param('id', ParseUUIDPipe) id: string,
     @UserContext() user: UserContextPayload,

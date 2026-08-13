@@ -115,7 +115,7 @@ const JobsRegistryPage = () => {
   }
 
   return (
-    <Page title="Jobs Registry">
+    <Page title="Jobs Registry" permission="job.read">
       <DataTable
         isShowHeader={false}
         columns={columns}

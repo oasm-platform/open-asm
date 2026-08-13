@@ -3,7 +3,7 @@ import { ListInternalNetworks } from './list-internal-networks';
 
 export default function InternalNetworks() {
   return (
-    <Page title="Internal networks">
+    <Page title="Internal networks" permission="network.read">
       <ListInternalNetworks />
     </Page>
   );

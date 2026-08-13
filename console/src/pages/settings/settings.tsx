@@ -1,10 +1,14 @@
+import { usePermission } from '@/hooks/usePermission';
 import { useSession } from '@/utils/authClient';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { useEffect, useMemo, type JSX } from 'react';
+import { Loader2 } from 'lucide-react';
 import ApiKeysSettings from './components/api-keys-settings';
+import AuditLogSettings from './components/audit-log-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import GetAboutProject from './components/get-about-project';
 import McpConnect from './components/mcp-connect';
+import MembersSettings from './components/members-settings';
 import Preferences from './components/preferences';
 import SecuritySettings from './components/security-settings';
 import WorkspaceSettings from './components/workspace-settings';
@@ -22,6 +26,8 @@ interface SettingsTabItem {
   path: string;
   content?: TabContentProps;
   component?: JSX.Element;
+  /** Permission key required to see this tab (e.g. 'workspace.read'). Omit to always show. */
+  permission?: string;
 }
 
 interface SettingsTabGroup {
@@ -48,6 +54,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
           description: 'Manage your workspace settings',
         },
         component: <WorkspaceSettings />,
+        permission: 'workspace.read',
       },
       {
         id: 'apikeys',
@@ -58,6 +65,29 @@ export const settingsTabGroups: SettingsTabGroup[] = [
           description: 'Manage your workspace API keys',
         },
         component: <ApiKeysSettings />,
+        permission: 'workspace.apikey',
+      },
+      {
+        id: 'members',
+        label: 'Members',
+        path: '/settings/members',
+        content: {
+          title: 'Members',
+          description: 'Manage members, invitations and permission groups',
+        },
+        component: <MembersSettings />,
+        permission: 'member.read',
+      },
+      {
+        id: 'audit',
+        label: 'Audit log',
+        path: '/settings/audit',
+        content: {
+          title: 'Audit log',
+          description: 'View and export workspace activity',
+        },
+        component: <AuditLogSettings />,
+        permission: 'audit.read',
       },
     ],
   },
@@ -100,6 +130,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
           description: 'Connect to OASM server via MCP protocol',
         },
         component: <McpConnect />,
+        permission: 'workspace.apikey',
       },
     ],
   },
@@ -133,16 +164,30 @@ export const settingsTabGroups: SettingsTabGroup[] = [
   },
 ];
 
+interface FilterTabGroupsOptions {
+  userRole?: string | null | undefined;
+  hasPermission?: (key: string) => boolean;
+}
+
 export function filterTabGroups(
   groups: typeof settingsTabGroups,
-  userRole: string | null | undefined,
+  { userRole, hasPermission }: FilterTabGroupsOptions = {},
 ): typeof settingsTabGroups {
-  return groups.filter(
-    (group) =>
-      !group.roles ||
-      group.roles.length === 0 ||
-      (userRole != null && group.roles.includes(userRole)),
-  );
+  return groups
+    .map((group) => ({
+      ...group,
+      tabs: group.tabs.filter(
+        (tab) =>
+          !tab.permission || (hasPermission ? hasPermission(tab.permission) : false),
+      ),
+    }))
+    .filter(
+      (group) =>
+        group.tabs.length > 0 &&
+        (!group.roles ||
+          group.roles.length === 0 ||
+          (userRole != null && group.roles.includes(userRole))),
+    );
 }
 
 // Backward compatibility - flattened array of all tabs
@@ -152,27 +197,49 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
   const { tab } = useParams({ strict: false });
   const navigate = useNavigate();
   const { data } = useSession();
+  const { hasPermission, isLoading } = usePermission();
 
   const visibleTabs = useMemo(
     () =>
-      filterTabGroups(settingsTabGroups, data?.user.role).flatMap((group) =>
-        group.tabs.map((t) => ({ ...t, group: group.name })),
-      ),
-    [data?.user.role],
+      filterTabGroups(settingsTabGroups, {
+        userRole: data?.user.role,
+        hasPermission,
+      }).flatMap((group) => group.tabs.map((t) => ({ ...t, group: group.name }))),
+    [data?.user.role, hasPermission],
   );
 
   useEffect(() => {
-    if (!tab && defaultTab) {
-      navigate({ to: `/settings/${defaultTab}`, replace: true });
+    if (isLoading) {
+      return;
     }
-  }, [tab, defaultTab, navigate]);
+    const target = tab ?? defaultTab;
+    if (!target || !visibleTabs.some((t) => t.id === target)) {
+      navigate({
+        to: `/settings/${visibleTabs[0]?.id ?? 'general'}`,
+        replace: true,
+      });
+    }
+  }, [tab, defaultTab, navigate, visibleTabs, isLoading]);
 
   const currentTab = tab || defaultTab;
-  const activeTab =
-    visibleTabs.find((t) => t.id === currentTab) || visibleTabs[0];
+  const activeTab = visibleTabs.find((t) => t.id === currentTab) || visibleTabs[0];
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto w-full sm:w-3/4 xl:w-1/2">
+    <div
+      className={
+        activeTab?.id === 'audit'
+          ? 'mx-auto w-full sm:w-5/6 xl:w-2/3'
+          : 'mx-auto w-full sm:w-3/4 xl:w-1/2'
+      }
+    >
       {activeTab && (
         <div className="space-y-4">
           <div className="flex items-center flex-row justify-between">

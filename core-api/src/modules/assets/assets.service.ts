@@ -122,9 +122,10 @@ export class AssetsService {
   private async generateTagsWithAI(
     serviceData: string,
     workspaceId: string,
+    userId: string,
   ): Promise<string[]> {
     const llmConfig = await this.llmConfigRepository.findOne({
-      where: { workspaceId, isPreferred: true },
+      where: { workspaceId, userId, isPreferred: true },
     });
 
     if (!llmConfig) {
@@ -1077,6 +1078,7 @@ export class AssetsService {
   public async generateServiceTags(
     assetServiceId: string,
     workspaceId: string,
+    userId: string,
   ): Promise<string[]> {
     const assetService = await this.assetServiceRepo
       .createQueryBuilder('assetService')
@@ -1119,11 +1121,12 @@ export class AssetsService {
     const tags = await this.generateTagsWithAI(
       JSON.stringify(serviceContext, null, 2),
       workspaceId,
+      userId,
     );
 
     if (tags.length === 0) {
       throw new BadRequestException(
-        'AI model did not generate any tags. Ensure an LLM config is set up in your workspace.',
+        'AI model did not generate any tags. Ensure an LLM config is set up for your account.',
       );
     }
 

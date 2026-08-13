@@ -11,6 +11,7 @@ export const mockTargets = [
     id: 'target-1',
     value: 'example.com',
     type: 'DOMAIN',
+    source: { source: 'Manual', icon: '' },
     status: 'completed',
     totalAssetServices: 5,
     lastDiscoveredAt: '2026-01-01T00:00:00Z',
@@ -22,6 +23,10 @@ export const mockTargets = [
     id: 'target-2',
     value: '192.168.1.1',
     type: 'IP',
+    source: {
+      source: 'Cloudflare',
+      icon: '/static/images/integrations/cloudflare.svg',
+    },
     status: 'pending',
     totalAssetServices: 0,
     lastDiscoveredAt: '2026-01-01T00:00:00Z',

@@ -4,7 +4,7 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { JobRunType } from '@/common/enums/enum';
-import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -15,9 +15,9 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { AuditLog } from '../audit/audit-log.decorator';
 import { Asset } from '../assets/entities/assets.entity';
 import { AssetGroupService } from './asset-group.service';
 import { AddManyAssetsToAssetGroupDto } from './dto/add-many-assets-to-asset-group.dto';
@@ -47,6 +47,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.read')
   @Get()
   getAll(
     @Query() query: GetAllAssetGroupsQueryDto,
@@ -65,6 +66,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.read')
   @Get(':id')
   getById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
     return this.assetGroupService.getAssetGroupById(id, workspaceId);
@@ -80,6 +82,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.write')
   @Patch(':id')
   updateAssetGroupById(
     @Param() param: IdQueryParamDto,
@@ -103,6 +106,13 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('asset_group.created', {
+    // Best-effort changes from the body; name is required by the DTO.
+    changes: (body) => ({
+      name: { after: (body as { name?: string })?.name ?? '' },
+    }),
+  })
+  @WorkspaceAccess('group.write')
   @Post()
   create(
     @Body() createAssetGroupDto: CreateAssetGroupDto,
@@ -119,6 +129,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('group.write')
   @Post(':groupId/workflows')
   addManyWorkflows(
     @Param('groupId') groupId: string,
@@ -137,6 +148,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('group.write')
   @Post(':groupId/assets')
   addManyAssets(
     @Param('groupId') groupId: string,
@@ -155,6 +167,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('group.write')
   @Delete(':groupId/workflows')
   removeManyWorkflows(
     @Param('groupId') groupId: string,
@@ -173,6 +186,7 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @WorkspaceAccess('group.write')
   @Delete(':groupId/assets')
   removeManyAssets(
     @Param('groupId') groupId: string,
@@ -191,6 +205,8 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
+  @AuditLog('asset_group.deleted')
+  @WorkspaceAccess('group.write')
   @Delete(':id')
   delete(@Param('id') id: string) {
     return this.assetGroupService.delete(id);
@@ -207,6 +223,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.read')
   @Get(':assetGroupId/assets')
   getAssetsByAssetGroupsId(
     @Param('assetGroupId') assetGroupId: string,
@@ -231,6 +248,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('group.read')
   @Get(':assetGroupId/assets/not-in-group')
   getAssetsNotInAssetGroup(
     @Param('assetGroupId') assetGroupId: string,
@@ -252,6 +270,7 @@ export class AssetGroupController {
       serialization: AssetGroupWorkflow,
     },
   })
+  @WorkspaceAccess('group.write')
   @Patch('workflows/:id')
   updateAssetGroupWorkflow(
     @Param('id') assetGroupWorkflowId: string,
@@ -275,7 +294,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @UseGuards(WorkspaceOwnerGuard)
+  @WorkspaceAccess('workflow.write')
   @Post('workflows/:id/run')
   runGroupWorkflowScheduler(@Param() queryParams: IdQueryParamDto) {
     return this.assetGroupService.runGroupWorkflowScheduler(

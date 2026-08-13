@@ -55,6 +55,76 @@ type NonReadonly<T> = [T] extends [UnionToIntersection<T>]
     }
   : DistributeReadOnlyOverUnions<T>;
 
+export type AuditActorType =
+  (typeof AuditActorType)[keyof typeof AuditActorType];
+
+export const AuditActorType = {
+  user: 'user',
+  api_key: 'api_key',
+  system: 'system',
+  agent: 'agent',
+} as const;
+
+export type AuditOutcome = (typeof AuditOutcome)[keyof typeof AuditOutcome];
+
+export const AuditOutcome = {
+  success: 'success',
+  failure: 'failure',
+  denied: 'denied',
+} as const;
+
+export type AuditEventResponseDtoChanges = { [key: string]: unknown };
+
+export type AuditEventResponseDtoMetadata = { [key: string]: unknown };
+
+export type AuditEventResponseDto = {
+  id: string;
+  /** @nullable */
+  workspaceId?: string | null;
+  occurredAt: string;
+  /** @nullable */
+  actorId?: string | null;
+  actorType: AuditActorType;
+  /** @nullable */
+  actorName?: string | null;
+  /** @nullable */
+  actorEmail?: string | null;
+  action: string;
+  resourceType: string;
+  /** @nullable */
+  resourceId?: string | null;
+  outcome: AuditOutcome;
+  /** @nullable */
+  sourceIp?: string | null;
+  /** @nullable */
+  userAgent?: string | null;
+  /** @nullable */
+  requestId?: string | null;
+  /** @nullable */
+  correlationId?: string | null;
+  changes: AuditEventResponseDtoChanges;
+  metadata: AuditEventResponseDtoMetadata;
+};
+
+export type AuditEventListResponseDto = {
+  data: AuditEventResponseDto[];
+  /** @nullable */
+  nextCursor?: string | null;
+};
+
+export type AppResponseSerialization = { [key: string]: unknown };
+
+export type AuditActionCatalogEntryDto = {
+  /** Machine action key, e.g. workspace.created (AUDIT_ACTION_CATALOG) */
+  action: string;
+  /** English display name, e.g. "Workspace created" */
+  label: string;
+};
+
+export type AuditActionCatalogResponseDto = {
+  data: AuditActionCatalogEntryDto[];
+};
+
 /**
  * The type of target (DOMAIN, CIDR, or IP)
  */
@@ -64,6 +134,17 @@ export const TargetType = {
   DOMAIN: 'DOMAIN',
   CIDR: 'CIDR',
   IP: 'IP',
+} as const;
+
+/**
+ * Where the target came from
+ */
+export type TargetSource = (typeof TargetSource)[keyof typeof TargetSource];
+
+export const TargetSource = {
+  MANUAL: 'MANUAL',
+  cloudflare: 'cloudflare',
+  INTERNAL_NETWORK: 'INTERNAL_NETWORK',
 } as const;
 
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
@@ -96,6 +177,8 @@ export type Target = {
   value: string;
   /** The type of target (DOMAIN, CIDR, or IP) */
   type: TargetType;
+  /** Where the target came from */
+  source: TargetSource;
   lastDiscoveredAt: string;
   totalAssetServices: number;
   status: JobStatus;
@@ -115,8 +198,6 @@ export type BulkTargetResultDto = {
   totalSkipped: number;
 };
 
-export type AppResponseSerialization = { [key: string]: unknown };
-
 export type CreateTargetDto = {
   /** The target value (domain, IP address, or CIDR notation) */
   value: string;
@@ -127,6 +208,13 @@ export type CreateTargetDto = {
 export type CreateMultipleTargetsDto = {
   /** Array of target values to create. Supports DOMAIN (root domain), CIDR (/24 range only), and IP (single IP address) types. */
   targets: CreateTargetDto[];
+};
+
+export type TargetSourceDto = {
+  /** Human-readable label of the target source */
+  source: string;
+  /** Icon URL for the source integration (empty string when the source has no icon) */
+  icon: string;
 };
 
 export type GetManyTargetResponseDtoScanSchedule =
@@ -153,6 +241,7 @@ export type GetManyTargetResponseDto = {
   id: string;
   value: string;
   type: TargetType;
+  source: TargetSourceDto;
   reScanCount: number;
   scanSchedule: GetManyTargetResponseDtoScanSchedule;
   status: GetManyTargetResponseDtoStatus;
@@ -199,8 +288,6 @@ export type UpdateTargetDto = {
   scanSchedule: UpdateTargetDtoScanSchedule;
 };
 
-export type WorkspaceArchivedAt = { [key: string]: unknown };
-
 /**
  * Encrypted Data Encryption Key (DEK) for this workspace. Encrypted with system KEK. Null for workspaces created before envelope encryption.
  * @nullable
@@ -221,7 +308,8 @@ export type Workspace = {
   name: string;
   /** The description of the workspace */
   description: string;
-  archivedAt?: WorkspaceArchivedAt;
+  /** @nullable */
+  archivedAt?: string | null;
   /** Automatically scan and detect internet-facing assets (domains, IPs) in workspace networks */
   isAssetsDiscovery: boolean;
   /** Newly discovered assets become active immediately without manual review */
@@ -238,14 +326,13 @@ export type Workspace = {
   dekAt?: WorkspaceDekAt;
 };
 
-export type CreateWorkspaceDtoArchivedAt = { [key: string]: unknown };
-
 export type CreateWorkspaceDto = {
   /** The name of the workspace */
   name: string;
   /** The description of the workspace */
   description: string;
-  archivedAt?: CreateWorkspaceDtoArchivedAt;
+  /** @nullable */
+  archivedAt?: string | null;
 };
 
 export type GetApiKeyResponseDto = {
@@ -282,46 +369,6 @@ export type UpdateWorkspaceConfigsDto = {
  */
 export type WorkspaceResponseDtoDescription = { [key: string]: unknown } | null;
 
-/**
- * Archival timestamp
- * @nullable
- */
-export type WorkspaceResponseDtoArchivedAt = { [key: string]: unknown } | null;
-
-/**
- * Role of the current user in the workspace
- */
-export type WorkspaceResponseDtoRole =
-  (typeof WorkspaceResponseDtoRole)[keyof typeof WorkspaceResponseDtoRole];
-
-export const WorkspaceResponseDtoRole = {
-  owner: 'owner',
-  member: 'member',
-} as const;
-
-export type WorkspaceResponseDtoWorkspaceMembersItemRole =
-  (typeof WorkspaceResponseDtoWorkspaceMembersItemRole)[keyof typeof WorkspaceResponseDtoWorkspaceMembersItemRole];
-
-export const WorkspaceResponseDtoWorkspaceMembersItemRole = {
-  owner: 'owner',
-  member: 'member',
-} as const;
-
-export type WorkspaceResponseDtoWorkspaceMembersItemUser = {
-  id?: string;
-  name?: string;
-  /** @nullable */
-  image?: string | null;
-};
-
-export type WorkspaceResponseDtoWorkspaceMembersItem = {
-  id?: string;
-  role?: WorkspaceResponseDtoWorkspaceMembersItemRole;
-  user?: WorkspaceResponseDtoWorkspaceMembersItemUser;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
 export type WorkspaceResponseDto = {
   /** Workspace ID */
   id: string;
@@ -340,7 +387,7 @@ export type WorkspaceResponseDto = {
    * Archival timestamp
    * @nullable
    */
-  archivedAt?: WorkspaceResponseDtoArchivedAt;
+  archivedAt?: string | null;
   /** Whether asset discovery is enabled */
   isAssetsDiscovery: boolean;
   /** Whether assets are auto-enabled after discovery */
@@ -351,10 +398,6 @@ export type WorkspaceResponseDto = {
   targetCount: number;
   /** Number of members in the workspace */
   memberCount: number;
-  /** Role of the current user in the workspace */
-  role: WorkspaceResponseDtoRole;
-  /** Members of the workspace */
-  workspaceMembers: WorkspaceResponseDtoWorkspaceMembersItem[];
 };
 
 export type GetManyWorkspaceResponseDtoDto = {
@@ -366,14 +409,133 @@ export type GetManyWorkspaceResponseDtoDto = {
   pageCount: number;
 };
 
-export type UpdateWorkspaceDtoArchivedAt = { [key: string]: unknown };
+export type CurrentPermissionResponseDto = {
+  /** Permission keys of the current user in the workspace, unioned across their permission groups */
+  currentPermission: string[];
+};
+
+export type WorkspaceMemberUserDto = {
+  id: string;
+  name: string;
+  /** @nullable */
+  image: string | null;
+};
+
+export type WorkspacePermission = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Permission group name */
+  name: string;
+  /** Permission keys granted by this group. Wildcard "*" grants everything (system Admin group only). */
+  permissions: string[];
+  /** System groups (e.g. Admin) cannot be edited or deleted */
+  isSystem: boolean;
+};
+
+export type WorkspaceMembers = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  user?: WorkspaceMemberUserDto;
+  /** Permission groups assigned to this member */
+  permissionGroups?: WorkspacePermission[];
+};
+
+export type UpdateMemberPermissionsDto = {
+  /** Permission group ids to assign (replaces current groups) */
+  permissionIds: string[];
+};
+
+export type PermissionCatalogActionDto = {
+  /** Action name. Combined with the resource it forms the permission key, e.g. target.read */
+  action: string;
+  description: string;
+};
+
+export type PermissionCatalogResourceDto = {
+  resource: string;
+  actions: PermissionCatalogActionDto[];
+};
+
+export type CreatePermissionGroupDto = {
+  name: string;
+  /** Permission keys granted by this group. "*" is reserved for the system Admin group. */
+  permissions: string[];
+};
+
+export type UpdatePermissionGroupDto = {
+  name?: string;
+  permissions?: string[];
+};
+
+export type CreateInvitationsResponseDto = {
+  /** Number of emails the invitation was created for */
+  invited: number;
+  /** Number of emails skipped (no account matches, already a member, etc.) */
+  skipped: number;
+};
+
+export type CreateInvitationsDto = {
+  /** Emails of existing users to invite. Emails without an account are skipped. */
+  emails: string[];
+  /** Permission group ids granted when the invitation is accepted. Groups that no longer exist are ignored. */
+  permissionIds: string[];
+};
+
+export type WorkspaceInvitationStatus =
+  (typeof WorkspaceInvitationStatus)[keyof typeof WorkspaceInvitationStatus];
+
+export const WorkspaceInvitationStatus = {
+  pending: 'pending',
+  accepted: 'accepted',
+  declined: 'declined',
+  expired: 'expired',
+  cancelled: 'cancelled',
+} as const;
+
+export type WorkspaceInvitation = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  email: string;
+  /** Permission group ids to grant when the invitation is accepted */
+  permissionIds: string[];
+  status: WorkspaceInvitationStatus;
+  expiresAt: string;
+};
+
+export type InvitationTokenDto = {
+  /** Raw invite token from the notification link */
+  token: string;
+};
+
+export type InvitationPreviewDtoStatus =
+  (typeof InvitationPreviewDtoStatus)[keyof typeof InvitationPreviewDtoStatus];
+
+export const InvitationPreviewDtoStatus = {
+  pending: 'pending',
+  accepted: 'accepted',
+  declined: 'declined',
+  expired: 'expired',
+  cancelled: 'cancelled',
+} as const;
+
+export type InvitationPreviewDto = {
+  workspaceId: string;
+  workspaceName: string;
+  email: string;
+  status: InvitationPreviewDtoStatus;
+  expiresAt: string;
+};
 
 export type UpdateWorkspaceDto = {
   /** The name of the workspace */
   name?: string;
   /** The description of the workspace */
   description?: string;
-  archivedAt?: UpdateWorkspaceDtoArchivedAt;
+  /** @nullable */
+  archivedAt?: string | null;
 };
 
 export type ArchiveWorkspaceDto = {
@@ -1079,7 +1241,7 @@ export type ToolWithStatusDto = {
   id: string;
   name: string;
   logoUrl: string;
-  status: ToolWithStatusDtoStatus;
+  status?: ToolWithStatusDtoStatus;
 };
 
 export type JobHistoryDetailResponseDto = {
@@ -2194,6 +2356,8 @@ export type NotificationResponseDto = {
   message: string;
   url: string;
   workspaceId?: string;
+  ref?: string;
+  refId?: string;
 };
 
 export type GetManyNotificationResponseDtoDto = {
@@ -2228,6 +2392,7 @@ export const CreateNotificationDtoType = {
   VULNERABILITY_ANALYSIS_COMPLETED: 'VULNERABILITY_ANALYSIS_COMPLETED',
   ASSET_NEW_DETECT: 'ASSET_NEW_DETECT',
   NEW_VULNERABILITY_FOUND: 'NEW_VULNERABILITY_FOUND',
+  WORKSPACE_INVITATION: 'WORKSPACE_INVITATION',
 } as const;
 
 /**
@@ -2244,6 +2409,10 @@ export type CreateNotificationDto = {
   type: CreateNotificationDtoType;
   /** Metadata for the notification content (variables for translation) */
   metadata?: CreateNotificationDtoMetadata;
+  /** Name of the feature this notification belongs to (e.g. "target"), used with refId to delete related notifications once the work is done */
+  ref?: string;
+  /** Identifier of the related feature record (e.g. "1234") */
+  refId?: string;
 };
 
 /**
@@ -2273,6 +2442,13 @@ export type GetIntegrationDto = {
   createdById: string;
   createdAt: string;
   updatedAt: string;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule: string;
+  /**
+   * Timestamp of the last successful periodic sync
+   * @nullable
+   */
+  lastRunAt?: string | null;
 };
 
 /**
@@ -2291,6 +2467,8 @@ export type CreateIntegrationDto = {
   category: string;
   /** App-specific configuration validated via JSON Schema */
   config: CreateIntegrationDtoConfig;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule?: string;
 };
 
 export type GetManyGetIntegrationDtoDto = {
@@ -2314,6 +2492,8 @@ export type UpdateIntegrationDto = {
   description?: string;
   /** App-specific configuration validated via JSON Schema */
   config?: UpdateIntegrationDtoConfig;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule?: string;
 };
 
 export type TestIntegrationDto = {
@@ -2739,6 +2919,52 @@ export type Verification = {
   expiresAt: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AuditEventsControllerGetAuditEventsParams = {
+  /**
+   * Opaque keyset cursor (base64url of occurredAt ISO + id); page forward with the nextCursor of the previous response
+   */
+  cursor?: string;
+  /**
+   * @maximum 100
+   */
+  limit?: number;
+  actorId?: string;
+  /**
+   * Must be one of the AUDIT_EVENTS dictionary keys
+   */
+  action?: string;
+  /**
+   * @maxLength 32
+   */
+  resourceType?: string;
+  outcome?: AuditOutcome;
+  from?: string;
+  to?: string;
+};
+
+export type AuditEventsControllerExportAuditEventsParams = {
+  /**
+   * Opaque keyset cursor (base64url of occurredAt ISO + id); page forward with the nextCursor of the previous response
+   */
+  cursor?: string;
+  /**
+   * @maximum 100
+   */
+  limit?: number;
+  actorId?: string;
+  /**
+   * Must be one of the AUDIT_EVENTS dictionary keys
+   */
+  action?: string;
+  /**
+   * @maxLength 32
+   */
+  resourceType?: string;
+  outcome?: AuditOutcome;
+  from?: string;
+  to?: string;
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
@@ -3171,6 +3397,17 @@ export type NotificationsControllerGetNotificationsParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type NotificationsControllerDeleteNotificationsByRefParams = {
+  /**
+   * Name of the feature the notifications belong to
+   */
+  ref: string;
+  /**
+   * Identifier of the related feature record
+   */
+  refId: string;
 };
 
 export type IntegrationsControllerGetManyIntegrationsParams = {
@@ -5307,6 +5544,544 @@ const withQueryKey = <T extends object, K>(
 };
 
 /**
+ * Keyset-paginated audit trail for the workspace, newest first. Filters: actorId, action (dictionary-validated), resourceType, outcome, from, to. Requires audit.read.
+ * @summary List workspace audit events
+ */
+export const auditEventsControllerGetAuditEvents = (
+  id: string,
+  params?: AuditEventsControllerGetAuditEventsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AuditEventListResponseDto>(
+    { url: `/api/workspaces/${id}/audit`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAuditEventsControllerGetAuditEventsQueryKey = (
+  id: string,
+  params?: AuditEventsControllerGetAuditEventsParams,
+) => {
+  return [`/api/workspaces/${id}/audit`, ...(params ? [params] : [])] as const;
+};
+
+export const getAuditEventsControllerGetAuditEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AuditEventsControllerGetAuditEventsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAuditEventsControllerGetAuditEventsQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>
+  > = ({ signal }) =>
+    auditEventsControllerGetAuditEvents(id, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuditEventsControllerGetAuditEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>
+>;
+export type AuditEventsControllerGetAuditEventsQueryError = unknown;
+
+export function useAuditEventsControllerGetAuditEvents<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | AuditEventsControllerGetAuditEventsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+          TError,
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuditEventsControllerGetAuditEvents<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AuditEventsControllerGetAuditEventsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+          TError,
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuditEventsControllerGetAuditEvents<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AuditEventsControllerGetAuditEventsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List workspace audit events
+ */
+
+export function useAuditEventsControllerGetAuditEvents<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AuditEventsControllerGetAuditEventsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditEvents>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAuditEventsControllerGetAuditEventsQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Action → display label pairs for the audit trail, derived from the backend AUDIT_ACTION_CATALOG constant. No database access. Requires audit.read.
+ * @summary List audit action catalog
+ */
+export const auditEventsControllerGetAuditActions = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AuditActionCatalogResponseDto>(
+    { url: `/api/workspaces/${id}/audit/actions`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAuditEventsControllerGetAuditActionsQueryKey = (id: string) => {
+  return [`/api/workspaces/${id}/audit/actions`] as const;
+};
+
+export const getAuditEventsControllerGetAuditActionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAuditEventsControllerGetAuditActionsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>
+  > = ({ signal }) =>
+    auditEventsControllerGetAuditActions(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuditEventsControllerGetAuditActionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>
+>;
+export type AuditEventsControllerGetAuditActionsQueryError = unknown;
+
+export function useAuditEventsControllerGetAuditActions<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+          TError,
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuditEventsControllerGetAuditActions<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+          TError,
+          Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuditEventsControllerGetAuditActions<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List audit action catalog
+ */
+
+export function useAuditEventsControllerGetAuditActions<
+  TData = Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerGetAuditActions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAuditEventsControllerGetAuditActionsQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const auditEventsControllerExportAuditEvents = (
+  id: string,
+  params?: AuditEventsControllerExportAuditEventsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Blob>(
+    {
+      url: `/api/workspaces/${id}/audit/export`,
+      method: 'GET',
+      params,
+      responseType: 'blob',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAuditEventsControllerExportAuditEventsQueryKey = (
+  id: string,
+  params?: AuditEventsControllerExportAuditEventsParams,
+) => {
+  return [
+    `/api/workspaces/${id}/audit/export`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAuditEventsControllerExportAuditEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AuditEventsControllerExportAuditEventsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAuditEventsControllerExportAuditEventsQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>
+  > = ({ signal }) =>
+    auditEventsControllerExportAuditEvents(id, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuditEventsControllerExportAuditEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>
+>;
+export type AuditEventsControllerExportAuditEventsQueryError = unknown;
+
+export function useAuditEventsControllerExportAuditEvents<
+  TData = Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | AuditEventsControllerExportAuditEventsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+          TError,
+          Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuditEventsControllerExportAuditEvents<
+  TData = Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AuditEventsControllerExportAuditEventsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+          TError,
+          Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAuditEventsControllerExportAuditEvents<
+  TData = Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AuditEventsControllerExportAuditEventsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useAuditEventsControllerExportAuditEvents<
+  TData = Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AuditEventsControllerExportAuditEventsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof auditEventsControllerExportAuditEvents>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAuditEventsControllerExportAuditEventsQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Supports both DOMAIN (root domain) and CIDR (/24 range only) types. Returns detailed results including created targets and skipped values.
  * @summary Create multiple targets in bulk
  */
@@ -7232,7 +8007,1824 @@ export const useWorkspacesControllerUpdateWorkspaceConfigs = <
 };
 
 /**
- * Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration.
+ * Returns the permission keys of the authenticated user in the selected workspace, unioned across all their permission groups. Resolves the workspace from the X-Workspace-ID header or the wid cookie.
+ * @summary Get current workspace permissions
+ */
+export const workspacesControllerGetCurrentPermission = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<CurrentPermissionResponseDto>(
+    { url: `/api/workspaces/current-permission`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerGetCurrentPermissionQueryKey = () => {
+  return [`/api/workspaces/current-permission`] as const;
+};
+
+export const getWorkspacesControllerGetCurrentPermissionQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetCurrentPermissionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>
+  > = ({ signal }) =>
+    workspacesControllerGetCurrentPermission(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetCurrentPermissionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>
+>;
+export type WorkspacesControllerGetCurrentPermissionQueryError = unknown;
+
+export function useWorkspacesControllerGetCurrentPermission<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetCurrentPermission<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetCurrentPermission<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get current workspace permissions
+ */
+
+export function useWorkspacesControllerGetCurrentPermission<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetCurrentPermission>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetCurrentPermissionQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Lists all members of the workspace with their permission groups. Requires member.read.
+ * @summary Get workspace members
+ */
+export const workspacesControllerGetWorkspaceMembers = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspaceMembers[]>(
+    { url: `/api/workspaces/members`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerGetWorkspaceMembersQueryKey = () => {
+  return [`/api/workspaces/members`] as const;
+};
+
+export const getWorkspacesControllerGetWorkspaceMembersQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetWorkspaceMembersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>
+  > = ({ signal }) =>
+    workspacesControllerGetWorkspaceMembers(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetWorkspaceMembersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>
+>;
+export type WorkspacesControllerGetWorkspaceMembersQueryError = unknown;
+
+export function useWorkspacesControllerGetWorkspaceMembers<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceMembers<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceMembers<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace members
+ */
+
+export function useWorkspacesControllerGetWorkspaceMembers<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceMembers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetWorkspaceMembersQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Replaces the permission groups assigned to a member. The owner and the acting user cannot be modified. Requires member.write.
+ * @summary Update member permissions
+ */
+export const workspacesControllerUpdateMemberPermissions = (
+  memberId: string,
+  updateMemberPermissionsDto: UpdateMemberPermissionsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspaceMembers>(
+    {
+      url: `/api/workspaces/members/${memberId}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateMemberPermissionsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerUpdateMemberPermissionsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerUpdateMemberPermissions>>,
+    TError,
+    { memberId: string; data: UpdateMemberPermissionsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerUpdateMemberPermissions>>,
+  TError,
+  { memberId: string; data: UpdateMemberPermissionsDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerUpdateMemberPermissions'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerUpdateMemberPermissions>>,
+    { memberId: string; data: UpdateMemberPermissionsDto }
+  > = (props) => {
+    const { memberId, data } = props ?? {};
+
+    return workspacesControllerUpdateMemberPermissions(
+      memberId,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerUpdateMemberPermissionsMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workspacesControllerUpdateMemberPermissions>>
+  >;
+export type WorkspacesControllerUpdateMemberPermissionsMutationBody =
+  UpdateMemberPermissionsDto;
+export type WorkspacesControllerUpdateMemberPermissionsMutationError = unknown;
+
+/**
+ * @summary Update member permissions
+ */
+export const useWorkspacesControllerUpdateMemberPermissions = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerUpdateMemberPermissions>>,
+      TError,
+      { memberId: string; data: UpdateMemberPermissionsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerUpdateMemberPermissions>>,
+  TError,
+  { memberId: string; data: UpdateMemberPermissionsDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerUpdateMemberPermissionsMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Removes a member from the workspace. The owner and the acting user cannot be removed. Requires member.write.
+ * @summary Remove workspace member
+ */
+export const workspacesControllerRemoveMember = (
+  memberId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/workspaces/members/${memberId}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerRemoveMemberMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerRemoveMember>>,
+    TError,
+    { memberId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerRemoveMember>>,
+  TError,
+  { memberId: string },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerRemoveMember'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerRemoveMember>>,
+    { memberId: string }
+  > = (props) => {
+    const { memberId } = props ?? {};
+
+    return workspacesControllerRemoveMember(memberId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerRemoveMemberMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerRemoveMember>>
+>;
+
+export type WorkspacesControllerRemoveMemberMutationError = unknown;
+
+/**
+ * @summary Remove workspace member
+ */
+export const useWorkspacesControllerRemoveMember = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerRemoveMember>>,
+      TError,
+      { memberId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerRemoveMember>>,
+  TError,
+  { memberId: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerRemoveMemberMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Lists every permission resource with its selectable actions and labels. Used by the permission group editor. Requires member.read.
+ * @summary Get permission catalog
+ */
+export const workspacesControllerGetPermissionCatalog = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<PermissionCatalogResourceDto[]>(
+    { url: `/api/workspaces/permissions/catalog`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerGetPermissionCatalogQueryKey = () => {
+  return [`/api/workspaces/permissions/catalog`] as const;
+};
+
+export const getWorkspacesControllerGetPermissionCatalogQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetPermissionCatalogQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>
+  > = ({ signal }) =>
+    workspacesControllerGetPermissionCatalog(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetPermissionCatalogQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>
+>;
+export type WorkspacesControllerGetPermissionCatalogQueryError = unknown;
+
+export function useWorkspacesControllerGetPermissionCatalog<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetPermissionCatalog<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetPermissionCatalog<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get permission catalog
+ */
+
+export function useWorkspacesControllerGetPermissionCatalog<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetPermissionCatalog>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetPermissionCatalogQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Lists the permission groups of the workspace. Requires member.read.
+ * @summary Get permission groups
+ */
+export const workspacesControllerGetPermissionGroups = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspacePermission[]>(
+    { url: `/api/workspaces/permissions`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerGetPermissionGroupsQueryKey = () => {
+  return [`/api/workspaces/permissions`] as const;
+};
+
+export const getWorkspacesControllerGetPermissionGroupsQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetPermissionGroupsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>
+  > = ({ signal }) =>
+    workspacesControllerGetPermissionGroups(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetPermissionGroupsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>
+>;
+export type WorkspacesControllerGetPermissionGroupsQueryError = unknown;
+
+export function useWorkspacesControllerGetPermissionGroups<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetPermissionGroups<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetPermissionGroups<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get permission groups
+ */
+
+export function useWorkspacesControllerGetPermissionGroups<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetPermissionGroups>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetPermissionGroupsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Creates a permission group. The wildcard "*" is reserved for the system Admin group. Requires workspace.write.
+ * @summary Create permission group
+ */
+export const workspacesControllerCreatePermissionGroup = (
+  createPermissionGroupDto: CreatePermissionGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspacePermission>(
+    {
+      url: `/api/workspaces/permissions`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createPermissionGroupDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerCreatePermissionGroupMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerCreatePermissionGroup>>,
+    TError,
+    { data: CreatePermissionGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerCreatePermissionGroup>>,
+  TError,
+  { data: CreatePermissionGroupDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerCreatePermissionGroup'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerCreatePermissionGroup>>,
+    { data: CreatePermissionGroupDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workspacesControllerCreatePermissionGroup(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerCreatePermissionGroupMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workspacesControllerCreatePermissionGroup>>
+  >;
+export type WorkspacesControllerCreatePermissionGroupMutationBody =
+  CreatePermissionGroupDto;
+export type WorkspacesControllerCreatePermissionGroupMutationError = unknown;
+
+/**
+ * @summary Create permission group
+ */
+export const useWorkspacesControllerCreatePermissionGroup = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerCreatePermissionGroup>>,
+      TError,
+      { data: CreatePermissionGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerCreatePermissionGroup>>,
+  TError,
+  { data: CreatePermissionGroupDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerCreatePermissionGroupMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Updates the name or permission keys of a non-system group. Requires workspace.write.
+ * @summary Update permission group
+ */
+export const workspacesControllerUpdatePermissionGroup = (
+  permissionId: string,
+  updatePermissionGroupDto: UpdatePermissionGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspacePermission>(
+    {
+      url: `/api/workspaces/permissions/${permissionId}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updatePermissionGroupDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerUpdatePermissionGroupMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerUpdatePermissionGroup>>,
+    TError,
+    { permissionId: string; data: UpdatePermissionGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerUpdatePermissionGroup>>,
+  TError,
+  { permissionId: string; data: UpdatePermissionGroupDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerUpdatePermissionGroup'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerUpdatePermissionGroup>>,
+    { permissionId: string; data: UpdatePermissionGroupDto }
+  > = (props) => {
+    const { permissionId, data } = props ?? {};
+
+    return workspacesControllerUpdatePermissionGroup(
+      permissionId,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerUpdatePermissionGroupMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workspacesControllerUpdatePermissionGroup>>
+  >;
+export type WorkspacesControllerUpdatePermissionGroupMutationBody =
+  UpdatePermissionGroupDto;
+export type WorkspacesControllerUpdatePermissionGroupMutationError = unknown;
+
+/**
+ * @summary Update permission group
+ */
+export const useWorkspacesControllerUpdatePermissionGroup = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerUpdatePermissionGroup>>,
+      TError,
+      { permissionId: string; data: UpdatePermissionGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerUpdatePermissionGroup>>,
+  TError,
+  { permissionId: string; data: UpdatePermissionGroupDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerUpdatePermissionGroupMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes a non-system permission group. Members lose its permissions. Requires workspace.write.
+ * @summary Delete permission group
+ */
+export const workspacesControllerDeletePermissionGroup = (
+  permissionId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/workspaces/permissions/${permissionId}`,
+      method: 'DELETE',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerDeletePermissionGroupMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerDeletePermissionGroup>>,
+    TError,
+    { permissionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerDeletePermissionGroup>>,
+  TError,
+  { permissionId: string },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerDeletePermissionGroup'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerDeletePermissionGroup>>,
+    { permissionId: string }
+  > = (props) => {
+    const { permissionId } = props ?? {};
+
+    return workspacesControllerDeletePermissionGroup(
+      permissionId,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerDeletePermissionGroupMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workspacesControllerDeletePermissionGroup>>
+  >;
+
+export type WorkspacesControllerDeletePermissionGroupMutationError = unknown;
+
+/**
+ * @summary Delete permission group
+ */
+export const useWorkspacesControllerDeletePermissionGroup = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerDeletePermissionGroup>>,
+      TError,
+      { permissionId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerDeletePermissionGroup>>,
+  TError,
+  { permissionId: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerDeletePermissionGroupMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Invites existing users by email. The invitee receives an in-app notification with an accept/decline link. Emails without an account are skipped. Requires invitation.write.
+ * @summary Create workspace invitations
+ */
+export const workspacesControllerCreateInvitations = (
+  createInvitationsDto: CreateInvitationsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<CreateInvitationsResponseDto>(
+    {
+      url: `/api/workspaces/invitations`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createInvitationsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerCreateInvitationsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerCreateInvitations>>,
+    TError,
+    { data: CreateInvitationsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerCreateInvitations>>,
+  TError,
+  { data: CreateInvitationsDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerCreateInvitations'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerCreateInvitations>>,
+    { data: CreateInvitationsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workspacesControllerCreateInvitations(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerCreateInvitationsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerCreateInvitations>>
+>;
+export type WorkspacesControllerCreateInvitationsMutationBody =
+  CreateInvitationsDto;
+export type WorkspacesControllerCreateInvitationsMutationError = unknown;
+
+/**
+ * @summary Create workspace invitations
+ */
+export const useWorkspacesControllerCreateInvitations = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerCreateInvitations>>,
+      TError,
+      { data: CreateInvitationsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerCreateInvitations>>,
+  TError,
+  { data: CreateInvitationsDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerCreateInvitationsMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Lists the pending invitations of the workspace. Requires member.read.
+ * @summary List workspace invitations
+ */
+export const workspacesControllerListInvitations = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspaceInvitation[]>(
+    { url: `/api/workspaces/invitations`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerListInvitationsQueryKey = () => {
+  return [`/api/workspaces/invitations`] as const;
+};
+
+export const getWorkspacesControllerListInvitationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getWorkspacesControllerListInvitationsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerListInvitations>>
+  > = ({ signal }) =>
+    workspacesControllerListInvitations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerListInvitationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerListInvitations>>
+>;
+export type WorkspacesControllerListInvitationsQueryError = unknown;
+
+export function useWorkspacesControllerListInvitations<
+  TData = Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerListInvitations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerListInvitations<
+  TData = Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerListInvitations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerListInvitations<
+  TData = Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List workspace invitations
+ */
+
+export function useWorkspacesControllerListInvitations<
+  TData = Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerListInvitations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerListInvitationsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Cancels a pending invitation so its token can no longer be used. Requires invitation.write.
+ * @summary Cancel workspace invitation
+ */
+export const workspacesControllerCancelInvitation = (
+  invitationId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/workspaces/invitations/${invitationId}/cancel`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerCancelInvitationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerCancelInvitation>>,
+    TError,
+    { invitationId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerCancelInvitation>>,
+  TError,
+  { invitationId: string },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerCancelInvitation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerCancelInvitation>>,
+    { invitationId: string }
+  > = (props) => {
+    const { invitationId } = props ?? {};
+
+    return workspacesControllerCancelInvitation(invitationId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerCancelInvitationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerCancelInvitation>>
+>;
+
+export type WorkspacesControllerCancelInvitationMutationError = unknown;
+
+/**
+ * @summary Cancel workspace invitation
+ */
+export const useWorkspacesControllerCancelInvitation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerCancelInvitation>>,
+      TError,
+      { invitationId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerCancelInvitation>>,
+  TError,
+  { invitationId: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerCancelInvitationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Accepts an invitation using its token. Only the authenticated user whose email matches the invitation can accept.
+ * @summary Accept workspace invitation
+ */
+export const workspacesControllerAcceptInvitation = (
+  invitationTokenDto: InvitationTokenDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/workspaces/invitations/accept`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: invitationTokenDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerAcceptInvitationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerAcceptInvitation>>,
+    TError,
+    { data: InvitationTokenDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerAcceptInvitation>>,
+  TError,
+  { data: InvitationTokenDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerAcceptInvitation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerAcceptInvitation>>,
+    { data: InvitationTokenDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workspacesControllerAcceptInvitation(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerAcceptInvitationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerAcceptInvitation>>
+>;
+export type WorkspacesControllerAcceptInvitationMutationBody =
+  InvitationTokenDto;
+export type WorkspacesControllerAcceptInvitationMutationError = unknown;
+
+/**
+ * @summary Accept workspace invitation
+ */
+export const useWorkspacesControllerAcceptInvitation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerAcceptInvitation>>,
+      TError,
+      { data: InvitationTokenDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerAcceptInvitation>>,
+  TError,
+  { data: InvitationTokenDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerAcceptInvitationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Declines an invitation using its token. Only the authenticated user whose email matches the invitation can decline.
+ * @summary Decline workspace invitation
+ */
+export const workspacesControllerDeclineInvitation = (
+  invitationTokenDto: InvitationTokenDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/workspaces/invitations/decline`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: invitationTokenDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerDeclineInvitationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerDeclineInvitation>>,
+    TError,
+    { data: InvitationTokenDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerDeclineInvitation>>,
+  TError,
+  { data: InvitationTokenDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerDeclineInvitation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerDeclineInvitation>>,
+    { data: InvitationTokenDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workspacesControllerDeclineInvitation(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerDeclineInvitationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerDeclineInvitation>>
+>;
+export type WorkspacesControllerDeclineInvitationMutationBody =
+  InvitationTokenDto;
+export type WorkspacesControllerDeclineInvitationMutationError = unknown;
+
+/**
+ * @summary Decline workspace invitation
+ */
+export const useWorkspacesControllerDeclineInvitation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerDeclineInvitation>>,
+      TError,
+      { data: InvitationTokenDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerDeclineInvitation>>,
+  TError,
+  { data: InvitationTokenDto },
+  TContext
+> => {
+  return useMutation(
+    getWorkspacesControllerDeclineInvitationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Public preview of an invitation by token. Exposes only the workspace name, invited email and expiry — never the token.
+ * @summary Preview workspace invitation
+ */
+export const workspacesControllerGetInvitationPreview = (
+  token: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<InvitationPreviewDto>(
+    { url: `/api/workspaces/invitations/${token}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerGetInvitationPreviewQueryKey = (
+  token: string,
+) => {
+  return [`/api/workspaces/invitations/${token}`] as const;
+};
+
+export const getWorkspacesControllerGetInvitationPreviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+  TError = unknown,
+>(
+  token: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetInvitationPreviewQueryKey(token);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>
+  > = ({ signal }) =>
+    workspacesControllerGetInvitationPreview(token, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: token !== null && token !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetInvitationPreviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>
+>;
+export type WorkspacesControllerGetInvitationPreviewQueryError = unknown;
+
+export function useWorkspacesControllerGetInvitationPreview<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+  TError = unknown,
+>(
+  token: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetInvitationPreview<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+  TError = unknown,
+>(
+  token: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetInvitationPreview<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+  TError = unknown,
+>(
+  token: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Preview workspace invitation
+ */
+
+export function useWorkspacesControllerGetInvitationPreview<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+  TError = unknown,
+>(
+  token: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetInvitationPreview>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkspacesControllerGetInvitationPreviewQueryOptions(
+    token,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration. Requires workspace.read; the member list is only included for member.read holders.
  * @summary Get Workspace By ID
  */
 export const workspacesControllerGetWorkspaceById = (
@@ -25773,6 +28365,103 @@ export const useNotificationsControllerMarkAsRead = <
 };
 
 /**
+ * Delete the current user's notification recipient records matching the given ref/refId (e.g. all notifications about target 1234 once the related work is completed). The notifications themselves are preserved for other recipients.
+ * @summary Delete notifications by ref
+ */
+export const notificationsControllerDeleteNotificationsByRef = (
+  params: NotificationsControllerDeleteNotificationsByRefParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/notifications/by-ref`, method: 'DELETE', params, signal },
+    options,
+  );
+};
+
+export const getNotificationsControllerDeleteNotificationsByRefMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof notificationsControllerDeleteNotificationsByRef>
+      >,
+      TError,
+      { params: NotificationsControllerDeleteNotificationsByRefParams },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotificationsByRef>>,
+    TError,
+    { params: NotificationsControllerDeleteNotificationsByRefParams },
+    TContext
+  > => {
+    const mutationKey = ['notificationsControllerDeleteNotificationsByRef'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof notificationsControllerDeleteNotificationsByRef>
+      >,
+      { params: NotificationsControllerDeleteNotificationsByRefParams }
+    > = (props) => {
+      const { params } = props ?? {};
+
+      return notificationsControllerDeleteNotificationsByRef(
+        params,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type NotificationsControllerDeleteNotificationsByRefMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof notificationsControllerDeleteNotificationsByRef>>
+  >;
+
+export type NotificationsControllerDeleteNotificationsByRefMutationError =
+  unknown;
+
+/**
+ * @summary Delete notifications by ref
+ */
+export const useNotificationsControllerDeleteNotificationsByRef = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof notificationsControllerDeleteNotificationsByRef>
+      >,
+      TError,
+      { params: NotificationsControllerDeleteNotificationsByRefParams },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerDeleteNotificationsByRef>>,
+  TError,
+  { params: NotificationsControllerDeleteNotificationsByRefParams },
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerDeleteNotificationsByRefMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Delete a notification recipient record for the current user. The notification itself is preserved for other recipients.
  * @summary Delete a notification
  */
@@ -26928,6 +29617,94 @@ export const useIntegrationsControllerTestIntegration = <
 > => {
   return useMutation(
     getIntegrationsControllerTestIntegrationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Queues an immediate asset sync for a cloud-provider integration (e.g. Cloudflare) and returns the jobId. The sync runs asynchronously: the connector fetches zones + DNS records and ingests them as targets/assets. A second call while the first job is still pending returns the same jobId (no duplicate sync).
+ * @summary Enqueue an integration sync
+ */
+export const integrationsControllerSyncIntegration = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/integrations/${id}/sync`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerSyncIntegrationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerSyncIntegration'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return integrationsControllerSyncIntegration(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerSyncIntegrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>
+>;
+
+export type IntegrationsControllerSyncIntegrationMutationError = unknown;
+
+/**
+ * @summary Enqueue an integration sync
+ */
+export const useIntegrationsControllerSyncIntegration = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerSyncIntegration>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerSyncIntegrationMutationOptions(options),
     queryClient,
   );
 };

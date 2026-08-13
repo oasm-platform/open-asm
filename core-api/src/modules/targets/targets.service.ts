@@ -1,5 +1,5 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { BullMQName, CronSchedule, JobStatus, TargetScopeType } from '@/common/enums/enum';
+import { AuditOutcome, BullMQName, CronSchedule, JobStatus, TargetScopeType } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -16,6 +16,8 @@ import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import { Asset } from '../assets/entities/assets.entity';
+import type { AuditContext } from '../audit/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   BulkTargetResultDto,
@@ -23,7 +25,8 @@ import {
   GetManyWorkspaceQueryParamsDto,
   UpdateTargetDto,
 } from './dto/targets.dto';
-import { Target, TargetType } from './entities/target.entity';
+import { Target, TargetSource, TargetType } from './entities/target.entity';
+import { TargetSourceDto, toTargetSourceDto } from './target-source.dto';
 
 @Injectable()
 export class TargetsService implements OnModuleInit {
@@ -35,6 +38,7 @@ export class TargetsService implements OnModuleInit {
     private eventEmitter: EventEmitter2,
     @InjectQueue(BullMQName.ASSETS_DISCOVERY_SCHEDULE)
     private scanScheduleQueue: Queue<Target>,
+    private readonly auditService: AuditService,
   ) {}
 
   async onModuleInit() {
@@ -232,6 +236,7 @@ export class TargetsService implements OnModuleInit {
         'targets.id as id',
         'targets.value as value',
         'targets.type as type',
+        'targets.source as source',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         `COALESCE(COUNT(DISTINCT "assetService"."id"), 0) AS "totalAssetServices"`,
         'targets.scanSchedule as "scanSchedule"',
@@ -243,7 +248,7 @@ export class TargetsService implements OnModuleInit {
       END AS status`,
       ])
       .groupBy(
-        'targets.id, targets.value, targets.type, targets.lastDiscoveredAt, targets.scanSchedule',
+        'targets.id, targets.value, targets.type, targets.source, targets.lastDiscoveredAt, targets.scanSchedule',
       )
       .getRawOne()) as Target;
 
@@ -263,6 +268,7 @@ export class TargetsService implements OnModuleInit {
     workspaceId: string,
     userContext: UserContextPayload,
     internalNetworkId?: string,
+    source?: TargetSource,
   ): Promise<BulkTargetResultDto> {
     const { targets } = dto;
 
@@ -354,6 +360,7 @@ export class TargetsService implements OnModuleInit {
               type: t.type || TargetType.DOMAIN,
               internalNetworkId: internalNetworkId,
               workspaceId: workspaceId,
+              source: source ?? TargetSource.MANUAL,
             })),
           )
           .execute();
@@ -433,6 +440,28 @@ export class TargetsService implements OnModuleInit {
   }
 
   /**
+   * Looks up targets of a workspace by their values (single query).
+   * Used for idempotent lookups before creating targets (e.g. integration
+   * asset syncs). Returns only `id` + `value` of each match.
+   *
+   * @param workspaceId - The ID of the workspace.
+   * @param values - Target values to match against.
+   * @returns The matching targets (id + value).
+   */
+  public async findByWorkspaceAndValues(
+    workspaceId: string,
+    values: string[],
+  ): Promise<Target[]> {
+    if (values.length === 0) return [];
+    return this.repo
+      .createQueryBuilder('target')
+      .where('target.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('target.value IN (:...values)', { values })
+      .select(['target.id', 'target.value'])
+      .getMany();
+  }
+
+  /**
    * Retrieves a paginated list of targets associated with a specified workspace.
    *
    * @param id - The ID of the workspace for which to retrieve targets.
@@ -444,7 +473,12 @@ export class TargetsService implements OnModuleInit {
     workspaceId: string,
   ): Promise<
     GetManyBaseResponseDto<
-      Target & { totalAssetServices: number; status: string; duration: number }
+      Omit<Target, 'source'> & {
+        source: TargetSourceDto;
+        totalAssetServices: number;
+        status: string;
+        duration: number;
+      }
     >
   > {
     const { limit, page, sortBy, sortOrder, value, type, status, scope } = query;
@@ -463,6 +497,7 @@ export class TargetsService implements OnModuleInit {
         'targets.id as id',
         'targets.value as value',
         'targets.type as type',
+        'targets.source as "source"',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'targets.reScanCount as "reScanCount"',
         'targets.scanSchedule as "scanSchedule"',
@@ -526,7 +561,13 @@ if (scope !== undefined) {
 
     const targets = await queryBuilder.limit(limit).offset(offset).getRawMany();
 
-    return getManyResponse({ query, data: targets, total });
+    // Enrich each raw source value into its display DTO (label + icon).
+    const data = targets.map((row: Omit<Target, 'source'> & { source: unknown; duration: number }) => ({
+      ...row,
+      source: toTargetSourceDto(String(row.source)),
+    }));
+
+    return getManyResponse({ query, data, total });
   }
 
   /**
@@ -543,6 +584,7 @@ if (scope !== undefined) {
     id: string,
     workspaceId: string,
     userContext: UserContextPayload,
+    auditContext?: AuditContext,
   ) {
     await this.workspacesService.getWorkspaceByIdAndOwner(
       workspaceId,
@@ -556,6 +598,28 @@ if (scope !== undefined) {
     }
 
     await this.repo.delete(id);
+
+    // The interceptor cannot see the deleted entity (its changes config only
+    // receives body + result), so the before-state is recorded here, in the
+    // service, where the entity is still in hand. Best-effort like the
+    // interceptor path: a failing audit write must never fail the delete.
+    if (auditContext) {
+      await this.auditService.auditSafely({
+        workspaceId,
+        ...auditContext,
+        action: 'target.deleted',
+        resourceType: 'target',
+        resourceId: id,
+        changes: {
+          value: { before: target.value },
+          type: { before: target.type },
+          ...(target.scanSchedule
+            ? { scanSchedule: { before: target.scanSchedule } }
+            : {}),
+        },
+        outcome: AuditOutcome.Success,
+      });
+    }
 
     return { message: 'Target deleted successfully' };
   }

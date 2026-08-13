@@ -41,5 +41,23 @@ export class CreateNotificationDto {
   @IsObject()
   metadata?: Record<string, string>;
 
+  @ApiPropertyOptional({
+    description:
+      'Name of the feature this notification belongs to (e.g. "target"), ' +
+      'used with refId to delete related notifications once the work is done',
+    example: 'target',
+  })
+  @IsOptional()
+  @IsString()
+  ref?: string;
+
+  @ApiPropertyOptional({
+    description: 'Identifier of the related feature record (e.g. "1234")',
+    example: '1234',
+  })
+  @IsOptional()
+  @IsString()
+  refId?: string;
+
   workspaceId?: string;
 }

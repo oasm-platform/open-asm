@@ -1,5 +1,6 @@
 import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
@@ -43,6 +44,7 @@ export class IssuesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get()
   getMany(
     @Query() query: GetManyIssuesDto,
@@ -61,6 +63,7 @@ export class IssuesController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('workspace.write')
   @Post()
   create(
     @Body() createIssueDto: CreateIssueDto,
@@ -87,6 +90,7 @@ export class IssuesController {
       ],
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get(':id')
   getById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
     return this.issuesService.getById(id, workspaceId);
@@ -108,6 +112,7 @@ export class IssuesController {
       ],
     },
   })
+  @WorkspaceAccess('workspace.write')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -124,6 +129,7 @@ export class IssuesController {
       serialization: Issue,
     },
   })
+  @WorkspaceAccess('workspace.write')
   @Patch(':id/status')
   changeStatus(
     @Param() param: IdQueryParamDto,
@@ -144,6 +150,7 @@ export class IssuesController {
       serialization: IssueComment,
     },
   })
+  @WorkspaceAccess('workspace.write')
   @Post(':issueId/comments')
   createComment(
     @Param('issueId') issueId: string,
@@ -160,6 +167,7 @@ export class IssuesController {
       serialization: GetManyResponseDto(IssueComment),
     },
   })
+  @WorkspaceAccess('workspace.read')
   @Get(':issueId/comments')
   getCommentsByIssueId(
     @Param('issueId') issueId: string,
@@ -185,6 +193,7 @@ export class IssuesController {
       ],
     },
   })
+  @WorkspaceAccess('workspace.write')
   @Patch('comments/:id')
   updateCommentById(
     @Param('id') id: string,
@@ -211,6 +220,7 @@ export class IssuesController {
       ],
     },
   })
+  @WorkspaceAccess('workspace.write')
   @Delete('comments/:id')
   deleteCommentById(
     @Param('id') id: string,

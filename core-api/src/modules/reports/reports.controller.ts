@@ -1,5 +1,6 @@
 import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -14,6 +15,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { AuditLog } from '../audit/audit-log.decorator';
 import type { Response } from 'express';
 import {
   GenerateSummaryReportBodyDto,
@@ -40,6 +42,7 @@ export class ReportsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('report.read')
   @Get()
   getMany(
     @Query() query: GetManyReportsQueryDto,
@@ -48,6 +51,8 @@ export class ReportsController {
     return this.reportsService.getMany(query, workspaceId);
   }
 
+  @AuditLog('report.exported', { metadata: () => ({ format: 'pdf' }) })
+  @WorkspaceAccess('report.read')
   @Get('preview/summary')
   async previewSummaryReport(
     @Query() query: PreviewSummaryQueryDto,
@@ -66,6 +71,7 @@ export class ReportsController {
     res.end(buffer);
   }
 
+  @WorkspaceAccess('report.read')
   @Get('preview/vulnerability')
   async previewVulReport(
     @Query() query: PreviewVulQueryDto,
@@ -96,6 +102,8 @@ export class ReportsController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('report.generated', { metadata: () => ({ reportType: 'summary' }) })
+  @WorkspaceAccess('report.write')
   @Post('generate/summary')
   async generateSummaryReport(
     @Body() body: GenerateSummaryReportBodyDto,
@@ -128,6 +136,7 @@ export class ReportsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('report.write')
   @Post('generate/vulnerability')
   async generateVulReport(
     @Body() body: GenerateVulReportBodyDto,
@@ -162,6 +171,8 @@ export class ReportsController {
       getWorkspaceId: true,
     },
   })
+  @AuditLog('report.deleted')
+  @WorkspaceAccess('report.write')
   @Delete(':id')
   async deleteReport(
     @Param() params: IdQueryParamDto,

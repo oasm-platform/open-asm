@@ -12,6 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Target, TargetType } from '../entities/target.entity';
+import { TargetSourceDto } from '../target-source.dto';
 
 export class CreateTargetDto {
   @ApiProperty({
@@ -102,6 +103,9 @@ export class GetManyTargetResponseDto {
 
   @ApiProperty({ enum: TargetType, enumName: 'TargetType' })
   type: TargetType;
+
+  @ApiProperty({ type: TargetSourceDto })
+  source: TargetSourceDto;
 
   @ApiProperty()
   reScanCount: number;
