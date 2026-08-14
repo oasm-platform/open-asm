@@ -42,7 +42,7 @@ export default function Score() {
           <svg
             width="170"
             height="170"
-            viewBox="0 0 170"
+            viewBox="0 0 170 170"
             className="transform -rotate-90"
           >
             {/* Background circle */}
