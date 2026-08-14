@@ -47,3 +47,14 @@ export type User = BetterAuthUser & {
   banReason?: string | null;
   banExpires?: Date | null;
 };
+
+// True while a voluntary logout is in flight. Used to skip the session-expiry
+// toast/redirect and the login redirect param that would otherwise land the
+// user on a stale path (e.g. /workspaces/create) after re-login.
+export let isVoluntaryLogout = false;
+export const markVoluntaryLogout = () => {
+  isVoluntaryLogout = true;
+};
+export const resetVoluntaryLogout = () => {
+  isVoluntaryLogout = false;
+};
