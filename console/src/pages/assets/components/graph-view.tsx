@@ -41,6 +41,8 @@ import {
   type GraphNodeData,
 } from './graph-types';
 import { GraphNodeComponent, resolveNodeType } from './graph-node';
+import { GraphLegend } from './graph-legend';
+import { GraphNodeSearch } from './graph-node-search';
 import AssetDetailSheet from './asset-detail-sheet';
 import GraphDetailSheet from './graph-detail-sheet';
 
@@ -221,6 +223,8 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
   // Service nodes open the reusable service detail sheet (same one the
   // Services tab uses) — keyed by the raw service id.
   const [serviceDetailId, setServiceDetailId] = useState<string | null>(null);
+  // Legend overlay toggle; legend data derives from rendered target nodes.
+  const [showLegend, setShowLegend] = useState(false);
 
   // Mirrors the current React Flow node positions so applyLayout can preserve
   // them across refetches without depending on the `nodes` state directly (a
@@ -674,6 +678,27 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
     [],
   );
 
+  // Legend target swatches: from the rendered target nodes' injected color.
+  const legendTargets = useMemo(() => {
+    const targets: Array<{ label: string; color: string }> = [];
+    for (const n of nodes) {
+      if (n.type !== 'target') continue;
+      const data = n.data as GraphNodeData;
+      if (data.clusterColor) {
+        targets.push({ label: data.label, color: data.clusterColor });
+      }
+    }
+    return targets;
+  }, [nodes]);
+
+  // Node search: zoom straight to the picked node (same as double-click).
+  const handleNodeSearchSelect = useCallback(
+    (nodeId: string) => {
+      fitView({ nodes: [{ id: nodeId }], duration: 500, padding: 2 });
+    },
+    [fitView],
+  );
+
   if (isLoading) {
     return <Skeleton className="h-[600px] w-full" />;
   }
@@ -704,6 +729,16 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
             onValueChange={setFilterTargetId}
           />
         )}
+        <GraphNodeSearch nodes={nodes} onSelect={handleNodeSearchSelect} />
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-dashed"
+          onClick={() => setShowLegend((v) => !v)}
+          aria-pressed={showLegend}
+        >
+          Legend
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -750,6 +785,12 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
         {isFetching && !isLoading && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/60">
             <Spinner className="size-6" />
+          </div>
+        )}
+
+        {showLegend && (
+          <div className="absolute right-2 top-2 z-10">
+            <GraphLegend targets={legendTargets} />
           </div>
         )}
 

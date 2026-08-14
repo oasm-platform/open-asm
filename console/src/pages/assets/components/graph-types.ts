@@ -216,7 +216,10 @@ export function applyForceLayout(
     const index = groupAnchors.length;
     groupIndexByTarget.set(targetId, index);
     const angle = index * goldenAngle;
-    const radius = 320 + 460 * index;
+    // Rings are spaced generously (460 + 680*index) so target families that
+    // share no IP stay clearly separated; overlapping clouds were caused by
+    // the old 460px step being smaller than a family's own spread.
+    const radius = 460 + 680 * index;
     groupAnchors.push({
       x: centerX + Math.cos(angle) * radius,
       y: centerY + Math.sin(angle) * radius,
@@ -268,8 +271,8 @@ export function applyForceLayout(
   // ~4400/√n px for balanced spread, clamped so sparse graphs don't explode
   // and dense IP↔domain graphs keep readable spacing.
   const idealEdgeLength = Math.max(
-    320,
-    Math.min(460, 4400 / Math.sqrt(Math.max(n, 1))),
+    260,
+    Math.min(400, 3800 / Math.sqrt(Math.max(n, 1))),
   );
   const iterations = Math.max(80, Math.min(300, Math.round(120000 / n)));
   let temperature = 100;
@@ -367,10 +370,10 @@ export function applyForceLayout(
       let strength: number;
       if (groupIndex !== undefined) {
         anchor = groupAnchors[groupIndex];
-        strength = node.type === 'target' ? 0.02 : 0.02;
+        strength = node.type === 'target' ? 0.02 : 0.03;
       } else if (node.type === 'ip') {
         anchor = ipAnchorByIp.get(node.id) ?? { x: centerX, y: centerY };
-        strength = 0.012;
+        strength = 0.016;
       } else {
         anchor = { x: centerX, y: centerY };
         strength = 0.0008;
