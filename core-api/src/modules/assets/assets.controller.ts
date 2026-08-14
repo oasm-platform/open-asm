@@ -183,6 +183,7 @@ export class AssetsController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read')
   @Get('/graph')
   getAssetGraph(
     @Query() query: GetAssetGraphQueryDto,
@@ -215,6 +216,27 @@ export class AssetsController {
       userId,
     );
     return { tags };
+  }
+
+  @Doc({
+    summary: 'Get service nodes of an asset',
+    description:
+      'Returns the service nodes (and the asset→service runs_on edges) for a ' +
+      'single asset, used by the graph view to lazily expand a domain node.',
+    response: {
+      serialization: AssetGraphResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('asset.read')
+  @Get(':assetId/services')
+  getAssetServiceGraph(
+    @Param('assetId') assetId: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getAssetServiceGraph(assetId, workspaceId);
   }
 
   @Doc({

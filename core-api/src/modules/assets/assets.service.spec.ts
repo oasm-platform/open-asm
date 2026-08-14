@@ -696,6 +696,134 @@ describe('AssetsService', () => {
       );
     });
 
+    it('truncates edges by explicit type priority, not insertion order', async () => {
+      // Edge cap (MAX_EDGES=4000) must drop leaf edges (has_tls/returns)
+      // before structural ones (belongs_to/resolves_to/runs_on/uses) by
+      // explicit type priority — not by whatever order the builder loops
+      // happen to insert them in. Here leaf edges dominate the input
+      // (1200 structural + 300 has_tls + 9000 returns = 10500 > 4000), so
+      // every dropped edge must be a `returns` edge, and among the leaves
+      // has_tls (priority 4) must survive ahead of returns (priority 5).
+      const target = { id: 't-big', value: 'big.example.com' };
+      const assetCount = 300;
+      const assets = Array.from({ length: assetCount }, (_, i) => ({
+        id: `asset-${i}`,
+        value: `a${i}.example.com`,
+        targetId: 't-big',
+        isEnabled: true,
+        dnsRecords: [],
+        ipAssets: [{ ipAddress: `10.0.0.${i}` }],
+      }));
+      const services = Array.from({ length: assetCount }, (_, i) => ({
+        id: `svc-${i}`,
+        value: 'http',
+        port: 80,
+        assetId: `asset-${i}`,
+      }));
+      const techRows = Array.from({ length: assetCount }, (_, i) => ({
+        serviceId: `svc-${i}`,
+        tech: `tech-${i}:1.0`,
+      }));
+      const tlsRecords = Array.from({ length: assetCount }, (_, i) => ({
+        host: `h-${i}.example.com`,
+        sni: `h-${i}.example.com`,
+        subject_dn: 'CN=x',
+        issuer_dn: 'CN=y',
+        not_before: '2026-01-01',
+        not_after: '2026-12-31',
+        tls_version: 'TLSv1.3',
+        cipher: 'AES256',
+        assetServiceId: `svc-${i}`,
+      }));
+      // 30 status codes × 300 services = 9000 returns edges. Row order is
+      // the returns-edge insertion order; the last 6200 rows are the ones
+      // that must be dropped first.
+      const statusCodeCount = 30;
+      const statusRows: { statusCode: number; serviceId: string }[] = [];
+      for (let code = 1; code <= statusCodeCount; code++) {
+        for (let i = 0; i < assetCount; i++) {
+          statusRows.push({ statusCode: code, serviceId: `svc-${i}` });
+        }
+      }
+
+      (mockTargetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([target]));
+      (mockAssetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb(assets));
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb(services));
+      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb(tlsRecords));
+
+      mockDataSource.query = jest
+        .fn()
+        .mockResolvedValueOnce(techRows)
+        .mockResolvedValueOnce(statusRows);
+
+      mockTechnologyForwarderService.enrichTechnologies = jest
+        .fn()
+        .mockResolvedValue([]);
+
+      const result = await service.getAssetGraph({}, 'ws-big');
+
+      // ── Cap applied ─────────────────────────────────────────────
+      expect(result.edges).toHaveLength(4000);
+
+      const edgeByKey = new Map(
+        result.edges.map((e) => [`${e.source}->${e.target}`, e]),
+      );
+
+      // ── Structural group (priority 0-3) fully survives ──────────
+      const belongsTo = result.edges.filter((e) => e.type === 'belongs_to');
+      const resolvesTo = result.edges.filter((e) => e.type === 'resolves_to');
+      const runsOn = result.edges.filter((e) => e.type === 'runs_on');
+      const uses = result.edges.filter((e) => e.type === 'uses');
+      expect(belongsTo).toHaveLength(assetCount);
+      expect(resolvesTo).toHaveLength(assetCount);
+      expect(runsOn).toHaveLength(assetCount);
+      expect(uses).toHaveLength(assetCount);
+      expect(
+        edgeByKey.has(`target|t-big->asset|asset-${assetCount - 1}`),
+      ).toBe(true);
+      expect(
+        edgeByKey.has(
+          `asset|asset-${assetCount - 1}->ip|10.0.0.${assetCount - 1}`,
+        ),
+      ).toBe(true);
+      expect(
+        edgeByKey.has(
+          `asset|asset-${assetCount - 1}->service|svc-${assetCount - 1}`,
+        ),
+      ).toBe(true);
+      expect(
+        edgeByKey.has(
+          `service|svc-${assetCount - 1}->tech|tech-${assetCount - 1}`,
+        ),
+      ).toBe(true);
+
+      // ── has_tls (priority 4) survives ahead of returns ──────────
+      expect(result.edges.filter((e) => e.type === 'has_tls')).toHaveLength(
+        assetCount,
+      );
+
+      // ── returns (priority 5) is the only dropped type: the first
+      // 2500 rows survive, everything after the cap is cut ─────────
+      const returnsEdges = result.edges.filter((e) => e.type === 'returns');
+      expect(returnsEdges).toHaveLength(4000 - assetCount * 5);
+      // Code 9, first service: within the budget → survives.
+      expect(edgeByKey.has('service|svc-0->statusCode|9')).toBe(true);
+      // Code 9, service 99: last row inside the budget → survives.
+      expect(edgeByKey.has('service|svc-99->statusCode|9')).toBe(true);
+      // Code 9, service 100: exactly at the budget boundary → cut.
+      expect(edgeByKey.has('service|svc-100->statusCode|9')).toBe(false);
+      // Code 10 entirely: beyond the budget → cut.
+      expect(edgeByKey.has('service|svc-0->statusCode|10')).toBe(false);
+    });
+
     it('deduplicates edges with the same source and target', async () => {
       const target = { id: 't1', value: 'example.com' };
       const asset = {
@@ -747,6 +875,315 @@ describe('AssetsService', () => {
         target: 'tech|nginx',
         type: 'uses',
       });
+    });
+
+    it('only the latest http response status code per service is emitted', async () => {
+      const target = { id: 't1', value: 'example.com' };
+      const asset = {
+        id: 'a1',
+        value: '1.2.3.4',
+        targetId: 't1',
+        isEnabled: true,
+        dnsRecords: [],
+        ipAssets: [{ ipAddress: '1.2.3.4' }],
+      };
+      const svc = { id: 's1', value: 'http', port: 80, assetId: 'a1' };
+
+      // Two status rows for the same service: an old 500 and a newer 200.
+      // The SQL must correlate http_responses to the latest row per service,
+      // so only the newest status code survives the query.
+      const statusRows = [
+        { statusCode: 500, serviceId: 's1' },
+        { statusCode: 200, serviceId: 's1' },
+      ];
+
+      (mockTargetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([target]));
+      (mockAssetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([asset]));
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([svc]));
+      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+
+      mockDataSource.query = jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(statusRows);
+
+      mockTechnologyForwarderService.enrichTechnologies = jest
+        .fn()
+        .mockResolvedValue([]);
+
+      const result = await service.getAssetGraph({}, 'ws-1');
+
+      // (a) SQL contract: the status query must correlate the latest
+      // http_responses row per service instead of a membership-only subquery.
+      const statusSql = (mockDataSource.query as jest.Mock).mock.calls[1][0];
+      expect(statusSql).toContain('ORDER BY hr2."createdAt" DESC LIMIT 1');
+      expect(statusSql).toContain('hr2."assetServiceId" = hr."assetServiceId"');
+
+      // (b) The rows the query returns map 1:1 to statusCode nodes: every
+      // (serviceId, statusCode) pair yields exactly one node and one returns
+      // edge — no phantom or duplicated statusCode nodes.
+      const statusNodes = result.nodes.filter((n) => n.type === 'statusCode');
+      expect(statusNodes).toHaveLength(2);
+      const statusNodeIds = new Set(statusNodes.map((n) => n.id));
+      expect(statusNodeIds.has('statusCode|500')).toBe(true);
+      expect(statusNodeIds.has('statusCode|200')).toBe(true);
+      const returnsEdges = result.edges.filter((e) => e.type === 'returns');
+      expect(returnsEdges).toHaveLength(2);
+      for (const row of statusRows) {
+        expect(
+          returnsEdges.some(
+            (e) =>
+              e.source === `service|${row.serviceId}` &&
+              e.target === `statusCode|${row.statusCode}`,
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('service nodes carry data.alert=true when latest status code is 4xx/5xx and false otherwise', async () => {
+      const target = { id: 't1', value: 'example.com' };
+      const asset = {
+        id: 'a1',
+        value: '1.2.3.4',
+        targetId: 't1',
+        isEnabled: true,
+        dnsRecords: [],
+        ipAssets: [{ ipAddress: '1.2.3.4' }],
+      };
+      const services = [
+        { id: 's1', value: 'http', port: 80, assetId: 'a1' },
+        { id: 's2', value: 'https', port: 443, assetId: 'a1' },
+        { id: 's3', value: 'ftp', port: 21, assetId: 'a1' },
+      ];
+
+      // s1 has an erroring latest response, s2 is healthy, s3 has no status
+      // row at all — so only s1 must be flagged.
+      const statusRows = [
+        { statusCode: 500, serviceId: 's1' },
+        { statusCode: 200, serviceId: 's2' },
+      ];
+
+      (mockTargetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([target]));
+      (mockAssetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([asset]));
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb(services));
+      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+
+      mockDataSource.query = jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(statusRows);
+
+      mockTechnologyForwarderService.enrichTechnologies = jest
+        .fn()
+        .mockResolvedValue([]);
+
+      const result = await service.getAssetGraph({}, 'ws-1');
+
+      const nodeById = new Map(result.nodes.map((n) => [n.id, n]));
+      expect(nodeById.get('service|s1')!.data.alert).toBe(true);
+      expect(
+        (nodeById.get('service|s1')!.data.metadata as Record<string, unknown>)
+          .statusCode,
+      ).toBe(500);
+      expect(nodeById.get('service|s2')!.data.alert).toBe(false);
+      // A service with no status row must not be flagged.
+      expect(nodeById.get('service|s3')!.data.alert).toBe(false);
+    });
+
+    it('service node metadata includes lastScannedAt from the latest http response', async () => {
+      const target = { id: 't1', value: 'example.com' };
+      const asset = {
+        id: 'a1',
+        value: '1.2.3.4',
+        targetId: 't1',
+        isEnabled: true,
+        dnsRecords: [],
+        ipAssets: [{ ipAddress: '1.2.3.4' }],
+      };
+      const services = [
+        { id: 's1', value: 'http', port: 80, assetId: 'a1' },
+        { id: 's2', value: 'https', port: 443, assetId: 'a1' },
+      ];
+
+      // s1 has a scannedAt timestamp on its latest http response row; s2's
+      // row has none — so s1 must expose lastScannedAt and s2 must not.
+      const statusRows = [
+        {
+          statusCode: 200,
+          serviceId: 's1',
+          lastScannedAt: '2026-08-13T09:00:00.000Z',
+        },
+        { statusCode: 404, serviceId: 's2' },
+      ];
+
+      (mockTargetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([target]));
+      (mockAssetRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([asset]));
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb(services));
+      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(createMockQb([]));
+
+      mockDataSource.query = jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(statusRows);
+
+      mockTechnologyForwarderService.enrichTechnologies = jest
+        .fn()
+        .mockResolvedValue([]);
+
+      const result = await service.getAssetGraph({}, 'ws-1');
+
+      const nodeById = new Map(result.nodes.map((n) => [n.id, n]));
+      expect(nodeById.get('service|s1')!.data.metadata).toEqual(
+        expect.objectContaining({
+          lastScannedAt: '2026-08-13T09:00:00.000Z',
+        }),
+      );
+      // A service whose latest response row carries no scannedAt must not
+      // expose lastScannedAt on its node metadata.
+      expect(
+        (nodeById.get('service|s2')!.data.metadata as Record<string, unknown>)
+          .lastScannedAt,
+      ).toBeUndefined();
+    });
+  });
+
+  describe('getAssetServiceGraph', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockDataSource.query = jest.fn();
+    });
+
+    it('returns the service nodes and runs_on edges for the asset, workspace-scoped', async () => {
+      (mockAssetRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'asset-1',
+        value: 'example.com',
+        targetId: 'target-1',
+      });
+      (mockAssetServiceRepository.find as jest.Mock).mockResolvedValue([
+        { id: 'svc-1', value: 'http', port: 80, assetId: 'asset-1' },
+        { id: 'svc-2', value: 'https', port: 443, assetId: 'asset-1' },
+      ]);
+      (mockDataSource.query as jest.Mock).mockResolvedValue([]);
+
+      const result = await service.getAssetServiceGraph('asset-1', 'ws-1');
+
+      const nodeById = new Map(result.nodes.map((n) => [n.id, n]));
+      expect(nodeById.get('service|svc-1')).toMatchObject({
+        type: 'service',
+        data: { label: 'http' },
+      });
+      expect(nodeById.get('service|svc-2')).toMatchObject({
+        type: 'service',
+        data: { label: 'https' },
+      });
+      expect(
+        (nodeById.get('service|svc-1')!.data.metadata as Record<string, unknown>)
+          .assetId,
+      ).toBe('asset-1');
+
+      expect(result.edges).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            source: 'asset|asset-1',
+            target: 'service|svc-1',
+            type: 'runs_on',
+          }),
+          expect.objectContaining({
+            source: 'asset|asset-1',
+            target: 'service|svc-2',
+            type: 'runs_on',
+          }),
+        ]),
+      );
+
+      // Workspace scoping: the asset lookup must restrict to the workspace.
+      expect(mockAssetRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'asset-1',
+            target: { workspaceId: 'ws-1' },
+          }),
+        }),
+      );
+    });
+
+    it('throws NotFoundException when the asset does not belong to the workspace', async () => {
+      (mockAssetRepository.findOne as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.getAssetServiceGraph('asset-foreign', 'ws-1'),
+      ).rejects.toThrow('Asset not found');
+      expect(mockAssetServiceRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('marks service nodes alert=true when the latest http response is 4xx/5xx and attaches lastScannedAt', async () => {
+      (mockAssetRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'asset-1',
+        value: 'example.com',
+        targetId: 'target-1',
+      });
+      (mockAssetServiceRepository.find as jest.Mock).mockResolvedValue([
+        { id: 'svc-1', value: 'http', port: 80, assetId: 'asset-1' },
+      ]);
+      (mockDataSource.query as jest.Mock).mockResolvedValue([
+        {
+          statusCode: 503,
+          serviceId: 'svc-1',
+          lastScannedAt: '2026-08-13T09:00:00.000Z',
+        },
+      ]);
+
+      const result = await service.getAssetServiceGraph('asset-1', 'ws-1');
+
+      const nodeById = new Map(result.nodes.map((n) => [n.id, n]));
+      expect(nodeById.get('service|svc-1')!.data.alert).toBe(true);
+      expect(
+        (nodeById.get('service|svc-1')!.data.metadata as Record<string, unknown>)
+          .lastScannedAt,
+      ).toBe('2026-08-13T09:00:00.000Z');
+      expect(
+        (nodeById.get('service|svc-1')!.data.metadata as Record<string, unknown>)
+          .statusCode,
+      ).toBe(503);
+    });
+
+    it('returns empty nodes and edges when the asset has no services', async () => {
+      (mockAssetRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'asset-empty',
+        value: 'empty.example',
+        targetId: 'target-1',
+      });
+      (mockAssetServiceRepository.find as jest.Mock).mockResolvedValue([]);
+      (mockDataSource.query as jest.Mock).mockResolvedValue([]);
+
+      const result = await service.getAssetServiceGraph('asset-empty', 'ws-1');
+
+      expect(result.nodes).toEqual([]);
+      expect(result.edges).toEqual([]);
     });
   });
 });

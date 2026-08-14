@@ -121,3 +121,39 @@
     height: 0;
   }
 }
+
+/* ── Asset graph animations ─────────────────────────────────────────────
+ * `graph-dash` drives the dashed `returns` edges (animated alert links);
+ * `graph-glow-pulse` is the critical-service glow. Both are disabled for
+ * users who prefer reduced motion (JS also guards via useReducedMotion).
+ */
+@keyframes graph-dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.react-flow__edge.graph-edge-returns .react-flow__edge-path {
+  animation: graph-dash 1.4s linear infinite;
+}
+
+@keyframes graph-glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(239 68 68 / 0.45);
+  }
+  50% {
+    box-shadow: 0 0 14px 3px rgb(239 68 68 / 0.35);
+  }
+}
+
+[data-graph-glow='true'] {
+  animation: graph-glow-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__edge.graph-edge-returns .react-flow__edge-path,
+  [data-graph-glow='true'] {
+    animation: none;
+  }
+}

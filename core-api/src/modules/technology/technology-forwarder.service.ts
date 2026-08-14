@@ -549,6 +549,29 @@ export class TechnologyForwarderService implements OnModuleInit {
       return '';
     }
 
+    // The icon cache key is deliberately global — icons are static assets
+    // shared across every workspace, so a single fetch + upload per icon
+    // (CACHE_TTL) serves all workspaces and all viewers. The key never
+    // includes the workspace id, so it cannot collide with the
+    // workspace-scoped `technology:` cache.
+    const iconCacheKey = `icon:${iconName}`;
+
+    // Redis is a cache, never a dependency: a read failure degrades to a
+    // direct forward + upload (uncached), so icons keep working while Redis
+    // is down. Only real storage errors surface as an empty icon.
+    let cachedPath: string | null = null;
+    try {
+      cachedPath = await this.redisService.cacheClient.get(iconCacheKey);
+    } catch (error) {
+      this.logger.warn(
+        `Icon cache read failed for ${iconName}, proceeding uncached:`,
+        error,
+      );
+    }
+    if (cachedPath) {
+      return cachedPath;
+    }
+
     try {
       const { url, fileName } = this.buildIconPaths(iconName);
       const { buffer } = await this.storageService.forwardImage(url);
@@ -557,8 +580,25 @@ export class TechnologyForwarderService implements OnModuleInit {
         buffer,
         this.ICONS_BUCKET,
       );
+      const iconPath = `${STORAGE_BASE_PATH}/${uploadResult.path}`;
 
-      return `${STORAGE_BASE_PATH}/${uploadResult.path}`;
+      // Miss: persist the resulting path so the remote fetch + upload happen
+      // once per icon instead of on every graph poll. A failed write is
+      // non-fatal — the icon is served and simply re-uploaded next poll.
+      try {
+        await this.redisService.cacheClient.setex(
+          iconCacheKey,
+          this.CACHE_TTL,
+          iconPath,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Icon cache write failed for ${iconName} (serving uncached):`,
+          error,
+        );
+      }
+
+      return iconPath;
     } catch (error) {
       this.logger.error(`Error processing icon ${iconName}:`, error);
       return '';

@@ -76,6 +76,11 @@ export class GraphNodeDto {
   data: {
     label: string;
     metadata?: Record<string, unknown>;
+    /**
+     * Only set on service nodes: true when the latest http response for the
+     * service returned a 4xx/5xx status code.
+     */
+    alert?: boolean;
   };
 }
 

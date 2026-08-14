@@ -49,6 +49,13 @@
   --sidebar-accent-foreground: oklch(0.1805 0.0233 264.05);
   --sidebar-border: oklch(0.9276 0.0118 253.95);
   --sidebar-ring: oklch(0.6 0.2333 264.05);
+
+  --graph-canvas: oklch(0.985 0.005 264);
+  --graph-edge: oklch(0.73 0.025 260);
+  --graph-edge-alert: oklch(0.5771 0.2152 27.33);
+  --graph-node-ok: oklch(0.6486 0.1542 155.45);
+  --graph-node-warn: oklch(0.7625 0.1573 70.08);
+  --graph-node-danger: oklch(0.5771 0.2152 27.33);
 }
 
 .dark {
@@ -100,6 +107,13 @@
   --sidebar-accent-foreground: oklch(0.9674 0.0061 247.86);
   --sidebar-border: oklch(0.2924 0.018 264.05);
   --sidebar-ring: oklch(0.64 0.2333 264.05);
+
+  --graph-canvas: oklch(0.16 0.02 264);
+  --graph-edge: oklch(0.42 0.02 264);
+  --graph-edge-alert: oklch(0.6872 0.197 22.18);
+  --graph-node-ok: oklch(0.6962 0.1482 155.45);
+  --graph-node-warn: oklch(0.8041 0.1475 70.08);
+  --graph-node-danger: oklch(0.6872 0.197 22.18);
 }
 
 @theme inline {
@@ -154,4 +168,11 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-graph-canvas: var(--graph-canvas);
+  --color-graph-edge: var(--graph-edge);
+  --color-graph-edge-alert: var(--graph-edge-alert);
+  --color-graph-node-ok: var(--graph-node-ok);
+  --color-graph-node-warn: var(--graph-node-warn);
+  --color-graph-node-danger: var(--graph-node-danger);
 }

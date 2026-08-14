@@ -40,7 +40,11 @@ export default function IpLocationMap({ geoIp }: IpLocationMapProps) {
         touchZoom={false}
         boxZoom={false}
         dragging={false}
-        style={{ height: '100%', width: '100%' }}
+        style={{
+          height: '100%',
+          width: '100%',
+          background: 'transparent',
+        }}
       >
         <TileLayer
           detectRetina={true}
@@ -57,6 +61,9 @@ export default function IpLocationMap({ geoIp }: IpLocationMapProps) {
         }}
       />
       <style>{`
+        .leaflet-container {
+          background: transparent;
+        }
         .blink-marker {
           animation: blink-animation 1.5s infinite;
         }

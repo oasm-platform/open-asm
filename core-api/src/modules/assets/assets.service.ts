@@ -1220,7 +1220,7 @@ export class AssetsService {
     if (query.targetId) {
       targetQb.andWhere('t.id = :targetId', { targetId: query.targetId });
     }
-    const targets = await targetQb.getMany();
+    const targetsPromise = targetQb.getMany();
 
     // ── 2. Asset nodes (with IP join) ────────────────────────────────
     const assetQb = this.assetRepo
@@ -1231,17 +1231,7 @@ export class AssetsService {
     if (query.targetId) {
       assetQb.andWhere('target.id = :targetId', { targetId: query.targetId });
     }
-    const assets = await assetQb.getMany();
-
-    // ── 3. IP nodes (collected from asset ipAssets) ──────────────────
-    const ipSet = new Set<string>();
-    for (const a of assets) {
-      if (a.ipAssets) {
-        for (const ip of a.ipAssets) {
-          if (ip.ipAddress) ipSet.add(ip.ipAddress);
-        }
-      }
-    }
+    const assetsPromise = assetQb.getMany();
 
     // ── 4. Service nodes ─────────────────────────────────────────────
     const serviceQb = this.assetServiceRepo
@@ -1252,11 +1242,12 @@ export class AssetsService {
     if (query.targetId) {
       serviceQb.andWhere('target.id = :targetId', { targetId: query.targetId });
     }
-    const services = await serviceQb.getMany();
+    const servicesPromise = serviceQb.getMany();
 
-    // ── 5. Technology nodes (raw query + batch enrichment) ───────────
-    const techRows: { serviceId: string; tech: string }[] =
-      await this.dataSource.query(
+    // ── 5. Technology nodes (raw query — batch enrichment runs after
+    //       the parallel batch resolves, below) ───────────────────────
+    const techRowsPromise: Promise<{ serviceId: string; tech: string }[]> =
+      this.dataSource.query(
         `
         SELECT
           svc.id AS "serviceId",
@@ -1278,6 +1269,83 @@ export class AssetsService {
         rawParams,
       );
 
+    // ── 6. TLS nodes (via entity repo) ──────────────────────────────
+    const tlsQb = this.tlsAssetsViewRepo
+      .createQueryBuilder('tls')
+      .leftJoinAndSelect('tls.assetService', 'assetService')
+      .leftJoinAndSelect('assetService.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .where('target.workspaceId = :workspaceId', { workspaceId });
+    if (query.targetId) {
+      tlsQb.andWhere('target.id = :targetId', { targetId: query.targetId });
+    }
+    const tlsRecordsPromise = tlsQb.getMany();
+
+    // ── 7. StatusCode nodes (raw query) ─────────────────────────────
+    const statusServiceRowsPromise: Promise<
+      {
+        statusCode: number;
+        serviceId: string;
+        lastScannedAt?: string;
+      }[]
+    > = this.dataSource.query(
+      `
+        SELECT
+          scv."statusCode" AS "statusCode",
+          scv."assetServiceId" AS "serviceId",
+          hr."createdAt" AS "lastScannedAt"
+        FROM status_code_asset_services_view scv
+        INNER JOIN asset_services svc ON svc.id = scv."assetServiceId"
+        INNER JOIN assets a ON a.id = svc."assetId"
+        INNER JOIN targets tgt ON tgt.id = a."targetId"
+        INNER JOIN http_responses hr ON hr."assetServiceId" = scv."assetServiceId"
+          AND hr.id = (
+            SELECT hr2.id FROM http_responses hr2
+            WHERE hr2."assetServiceId" = hr."assetServiceId"
+            ORDER BY hr2."createdAt" DESC LIMIT 1
+          )
+        WHERE tgt."workspaceId" = $1
+          ${targetFilter}
+          AND scv."statusCode" IS NOT NULL
+          AND scv."statusCode" != 0
+        `,
+      rawParams,
+    );
+
+    // ══════════════════════════════════════════════════════════════════
+    // Resolve the six independent workspace-scoped queries concurrently
+    // (targets, assets, services, tech rows, TLS, status codes). The
+    // derived steps below — IP set from assets, batch enrichment from tech
+    // rows, alert ids from status rows — consume these results, so they run
+    // only after the batch settles. Promise.all preserves the input order.
+    // ══════════════════════════════════════════════════════════════════
+    const [
+      targets,
+      assets,
+      services,
+      techRows,
+      tlsRecords,
+      statusServiceRows,
+    ] = await Promise.all([
+      targetsPromise,
+      assetsPromise,
+      servicesPromise,
+      techRowsPromise,
+      tlsRecordsPromise,
+      statusServiceRowsPromise,
+    ]);
+
+    // ── 3. IP nodes (collected from asset ipAssets) ──────────────────
+    const ipSet = new Set<string>();
+    for (const a of assets) {
+      if (a.ipAssets) {
+        for (const ip of a.ipAssets) {
+          if (ip.ipAddress) ipSet.add(ip.ipAddress);
+        }
+      }
+    }
+
+    // ── 5. Technology enrichment (derived from the tech rows above) ──
     const techBaseNames = new Set<string>();
     const serviceTechPairs: Array<{
       serviceId: string;
@@ -1296,41 +1364,31 @@ export class AssetsService {
       enrichedTechs.map((t) => [t.name, t]),
     );
 
-    // ── 6. TLS nodes (via entity repo) ──────────────────────────────
-    const tlsQb = this.tlsAssetsViewRepo
-      .createQueryBuilder('tls')
-      .leftJoinAndSelect('tls.assetService', 'assetService')
-      .leftJoinAndSelect('assetService.asset', 'asset')
-      .innerJoin('asset.target', 'target')
-      .where('target.workspaceId = :workspaceId', { workspaceId });
-    if (query.targetId) {
-      tlsQb.andWhere('target.id = :targetId', { targetId: query.targetId });
-    }
-    const tlsRecords = await tlsQb.getMany();
+    // Services whose latest http response errored (4xx/5xx) — drives the
+    // `alert` flag on service nodes.
+    const alertServiceIds = new Set(
+      statusServiceRows
+        .filter((row) => row.statusCode >= 400)
+        .map((row) => row.serviceId),
+    );
 
-    // ── 7. StatusCode nodes (raw query) ─────────────────────────────
-    const statusServiceRows: { statusCode: number; serviceId: string }[] =
-      await this.dataSource.query(
-        `
-        SELECT DISTINCT
-          scv."statusCode" AS "statusCode",
-          scv."assetServiceId" AS "serviceId"
-        FROM status_code_asset_services_view scv
-        INNER JOIN asset_services svc ON svc.id = scv."assetServiceId"
-        INNER JOIN assets a ON a.id = svc."assetId"
-        INNER JOIN targets tgt ON tgt.id = a."targetId"
-        WHERE tgt."workspaceId" = $1
-          ${targetFilter}
-          AND svc."id" IN (
-            SELECT DISTINCT ON ("assetServiceId") "assetServiceId"
-            FROM http_responses
-            ORDER BY "assetServiceId", "createdAt" DESC
-          )
-          AND scv."statusCode" IS NOT NULL
-          AND scv."statusCode" != 0
-        `,
-        rawParams,
-      );
+    // Latest scan timestamp per service — the createdAt of the latest
+    // http_response for that service (same row the statusCode correlation
+    // selects). Drives the "scanned X ago" freshness chip on service nodes.
+    const lastScannedAtByServiceId = new Map<string, string>();
+    for (const row of statusServiceRows) {
+      if (row.lastScannedAt && !lastScannedAtByServiceId.has(row.serviceId)) {
+        lastScannedAtByServiceId.set(row.serviceId, row.lastScannedAt);
+      }
+    }
+    // Latest http status code per service — lets the graph view derive
+    // severity (warn 4xx / danger 5xx) without statusCode satellite nodes.
+    const statusCodeByServiceId = new Map<string, number>();
+    for (const row of statusServiceRows) {
+      if (!statusCodeByServiceId.has(row.serviceId)) {
+        statusCodeByServiceId.set(row.serviceId, row.statusCode);
+      }
+    }
 
     // ══════════════════════════════════════════════════════════════════
     // Build nodes
@@ -1377,17 +1435,22 @@ export class AssetsService {
 
     for (const s of services) {
       const id = `service|${s.id}`;
+      const lastScannedAt = lastScannedAtByServiceId.get(s.id);
+      const statusCode = statusCodeByServiceId.get(s.id);
       nodeMap.set(id, {
         id,
         type: 'service',
         data: {
-          label: `${s.value}:${s.port}`,
+          label: s.value,
           metadata: {
             id: s.id,
             value: s.value,
             port: s.port,
             assetId: s.assetId,
+            ...(lastScannedAt && { lastScannedAt }),
+            ...(statusCode !== undefined && { statusCode }),
           },
+          alert: alertServiceIds.has(s.id),
         },
       });
     }
@@ -1539,6 +1602,25 @@ export class AssetsService {
     }
 
     if (edgeList.length > MAX_EDGES) {
+      // Truncate by explicit edge-type priority, not insertion order: the
+      // structural spine (target→asset→ip→service→technology) must always
+      // survive before leaf attachments (has_tls, returns). The sort is
+      // stable, so edges of the same type keep their build order.
+      const edgeTypePriority: Record<string, number> = {
+        belongs_to: 0,
+        resolves_to: 1,
+        runs_on: 2,
+        uses: 3,
+        has_tls: 4,
+        returns: 5,
+      };
+      edgeList.sort((a, b) => {
+        // `type` is optional on the DTO — index with a fallback key so an
+        // untyped edge sorts with unknown types (priority 99).
+        const pa = edgeTypePriority[a.type ?? ''] ?? 99;
+        const pb = edgeTypePriority[b.type ?? ''] ?? 99;
+        return pa - pb;
+      });
       edgeList.length = MAX_EDGES;
     }
 
@@ -1555,4 +1637,112 @@ export class AssetsService {
 
     return { nodes: nodeList, edges: edgeList };
   }
+
+  /**
+   * Returns the service nodes (and the asset→service runs_on edges) for a
+   * single asset. Used by the graph view to lazily expand a domain node's
+   * child services. Scoped to the workspace: a foreign/unknown asset id
+   * throws NotFound.
+   */
+  public async getAssetServiceGraph(
+    assetId: string,
+    workspaceId: string,
+  ): Promise<AssetGraphResponseDto> {
+    // 1. The asset must exist inside the requesting workspace.
+    const asset = await this.assetRepo.findOne({
+      where: { id: assetId, target: { workspaceId } },
+    });
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    // 2. Services of this asset (workspace scope already guaranteed by the
+    //    asset lookup).
+    const services = await this.assetServiceRepo.find({
+      where: { assetId },
+    });
+    const serviceIds = services.map((svc) => svc.id);
+
+    // 3. Latest http status per service — drives the alert flag and the
+    //    lastScannedAt metadata (same correlation as the full graph).
+    let statusRows: {
+      statusCode: number;
+      serviceId: string;
+      lastScannedAt?: string;
+    }[] = [];
+    if (serviceIds.length > 0) {
+      statusRows = await this.dataSource.query(
+        `
+        SELECT
+          scv."statusCode" AS "statusCode",
+          scv."assetServiceId" AS "serviceId",
+          hr."createdAt" AS "lastScannedAt"
+        FROM status_code_asset_services_view scv
+        INNER JOIN asset_services svc ON svc.id = scv."assetServiceId"
+        INNER JOIN http_responses hr ON hr."assetServiceId" = scv."assetServiceId"
+          AND hr.id = (
+            SELECT hr2.id FROM http_responses hr2
+            WHERE hr2."assetServiceId" = hr."assetServiceId"
+            ORDER BY hr2."createdAt" DESC LIMIT 1
+          )
+        WHERE svc."assetId" = $1
+          AND scv."statusCode" IS NOT NULL
+          AND scv."statusCode" != 0
+        `,
+        [assetId],
+      );
+    }
+
+    const alertServiceIds = new Set(
+      statusRows
+        .filter((row) => row.statusCode >= 400)
+        .map((row) => row.serviceId),
+    );
+    const lastScannedAtByServiceId = new Map<string, string>();
+    for (const row of statusRows) {
+      if (row.lastScannedAt && !lastScannedAtByServiceId.has(row.serviceId)) {
+        lastScannedAtByServiceId.set(row.serviceId, row.lastScannedAt);
+      }
+    }
+    const statusCodeByServiceId = new Map<string, number>();
+    for (const row of statusRows) {
+      if (!statusCodeByServiceId.has(row.serviceId)) {
+        statusCodeByServiceId.set(row.serviceId, row.statusCode);
+      }
+    }
+
+    // 4. Build nodes + runs_on edges.
+    const nodes: GraphNodeDto[] = [];
+    const edges: GraphEdgeDto[] = [];
+    for (const svc of services) {
+      const id = `service|${svc.id}`;
+      const lastScannedAt = lastScannedAtByServiceId.get(svc.id);
+      const statusCode = statusCodeByServiceId.get(svc.id);
+      nodes.push({
+        id,
+        type: 'service',
+        data: {
+          label: svc.value,
+          metadata: {
+            id: svc.id,
+            value: svc.value,
+            port: svc.port,
+            assetId: svc.assetId,
+            ...(lastScannedAt && { lastScannedAt }),
+            ...(statusCode !== undefined && { statusCode }),
+          },
+          alert: alertServiceIds.has(svc.id),
+        },
+      });
+      edges.push({
+        id: `e-asset|${assetId}-${id}`,
+        source: `asset|${assetId}`,
+        target: id,
+        type: 'runs_on',
+      });
+    }
+
+    return { nodes, edges };
+  }
+
 }
