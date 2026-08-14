@@ -1496,6 +1496,54 @@ export type GetManyGetTlsResponseDtoDto = {
   pageCount: number;
 };
 
+/**
+ * Determines which group the node belongs to.
+ */
+export type GraphNodeDtoType =
+  (typeof GraphNodeDtoType)[keyof typeof GraphNodeDtoType];
+
+export const GraphNodeDtoType = {
+  target: 'target',
+  asset: 'asset',
+  ip: 'ip',
+  service: 'service',
+  technology: 'technology',
+  tls: 'tls',
+  statusCode: 'statusCode',
+} as const;
+
+/**
+ * Human-readable label rendered on the node.
+ */
+export type GraphNodeDtoData = { [key: string]: unknown };
+
+export type GraphNodeDto = {
+  /** Composite node ID (type|key). See module doc comment. */
+  id: string;
+  /** Determines which group the node belongs to. */
+  type: GraphNodeDtoType;
+  /** Human-readable label rendered on the node. */
+  data: GraphNodeDtoData;
+};
+
+export type GraphEdgeDto = {
+  /** Composite edge ID. */
+  id: string;
+  /** ID of the source node. */
+  source: string;
+  /** ID of the target node. */
+  target: string;
+  /** Edge type. */
+  type?: string;
+  /** Optional label for the edge. */
+  label?: string;
+};
+
+export type AssetGraphResponseDto = {
+  nodes: GraphNodeDto[];
+  edges: GraphEdgeDto[];
+};
+
 export type GenerateServiceTagsResponseDto = {
   /** The generated tags for the service */
   tags: string[];
@@ -3158,6 +3206,13 @@ export type AssetsControllerGetTlsAssetsParams = {
    * Filter TLS certs with not_after on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
+};
+
+export type AssetsControllerGetAssetGraphParams = {
+  /**
+   * When provided the response is scoped to this target and its direct neighbours.
+   */
+  targetId?: string;
 };
 
 export type WorkersControllerGetWorkersParams = {
@@ -16776,6 +16831,174 @@ export function useAssetsControllerGetTlsAssets<
 }
 
 /**
+ * Returns nodes and edges for the attack surface topology graph, workspace-scoped and optionally filtered by targetId.
+ * @summary Get asset topology graph
+ */
+export const assetsControllerGetAssetGraph = (
+  params?: AssetsControllerGetAssetGraphParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AssetGraphResponseDto>(
+    { url: `/api/assets/graph`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetAssetGraphQueryKey = (
+  params?: AssetsControllerGetAssetGraphParams,
+) => {
+  return [`/api/assets/graph`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetAssetGraphQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetAssetGraphParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetAssetGraphQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>
+  > = ({ signal }) =>
+    assetsControllerGetAssetGraph(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetAssetGraphQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>
+>;
+export type AssetsControllerGetAssetGraphQueryError = unknown;
+
+export function useAssetsControllerGetAssetGraph<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+  TError = unknown,
+>(
+  params: undefined | AssetsControllerGetAssetGraphParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetGraph<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetAssetGraphParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetGraph<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetAssetGraphParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get asset topology graph
+ */
+
+export function useAssetsControllerGetAssetGraph<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetAssetGraphParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetGraph>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetAssetGraphQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Analyzes the service data (HTTP responses, tech stack, TLS, etc.) using AI and generates descriptive tags. Replaces existing tags with AI-generated ones.
  * @summary Generate AI tags for a service
  */
@@ -16869,6 +17092,180 @@ export const useAssetsControllerGenerateServiceTags = <
     queryClient,
   );
 };
+
+/**
+ * Returns the service nodes (and the asset→service runs_on edges) for a single asset, used by the graph view to lazily expand a domain node.
+ * @summary Get service nodes of an asset
+ */
+export const assetsControllerGetAssetServiceGraph = (
+  assetId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AssetGraphResponseDto>(
+    { url: `/api/assets/${assetId}/services`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetAssetServiceGraphQueryKey = (
+  assetId: string,
+) => {
+  return [`/api/assets/${assetId}/services`] as const;
+};
+
+export const getAssetsControllerGetAssetServiceGraphQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+  TError = unknown,
+>(
+  assetId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetAssetServiceGraphQueryKey(assetId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>
+  > = ({ signal }) =>
+    assetsControllerGetAssetServiceGraph(assetId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: assetId !== null && assetId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetAssetServiceGraphQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>
+>;
+export type AssetsControllerGetAssetServiceGraphQueryError = unknown;
+
+export function useAssetsControllerGetAssetServiceGraph<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+  TError = unknown,
+>(
+  assetId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetServiceGraph<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+  TError = unknown,
+>(
+  assetId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetServiceGraph<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+  TError = unknown,
+>(
+  assetId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get service nodes of an asset
+ */
+
+export function useAssetsControllerGetAssetServiceGraph<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+  TError = unknown,
+>(
+  assetId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetServiceGraph>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetAssetServiceGraphQueryOptions(
+    assetId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * Retrieves a single asset by its ID.

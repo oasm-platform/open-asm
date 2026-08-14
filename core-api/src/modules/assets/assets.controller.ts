@@ -21,6 +21,10 @@ import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { ToggleAssetDto } from './dto/toggle-asset.dto';
+import {
+  GetAssetGraphQueryDto,
+  AssetGraphResponseDto,
+} from './dto/graph.dto';
 import { GetTlsResponseDto, GetTlsQueryDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import {
@@ -169,6 +173,26 @@ export class AssetsController {
   }
 
   @Doc({
+    summary: 'Get asset topology graph',
+    description:
+      'Returns nodes and edges for the attack surface topology graph, workspace-scoped and optionally filtered by targetId.',
+    response: {
+      serialization: AssetGraphResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('asset.read')
+  @Get('/graph')
+  getAssetGraph(
+    @Query() query: GetAssetGraphQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getAssetGraph(query, workspaceId);
+  }
+
+  @Doc({
     summary: 'Generate AI tags for a service',
     description:
       'Analyzes the service data (HTTP responses, tech stack, TLS, etc.) using AI and generates descriptive tags. Replaces existing tags with AI-generated ones.',
@@ -192,6 +216,27 @@ export class AssetsController {
       userId,
     );
     return { tags };
+  }
+
+  @Doc({
+    summary: 'Get service nodes of an asset',
+    description:
+      'Returns the service nodes (and the asset→service runs_on edges) for a ' +
+      'single asset, used by the graph view to lazily expand a domain node.',
+    response: {
+      serialization: AssetGraphResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('asset.read')
+  @Get(':assetId/services')
+  getAssetServiceGraph(
+    @Param('assetId') assetId: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getAssetServiceGraph(assetId, workspaceId);
   }
 
   @Doc({

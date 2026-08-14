@@ -18,6 +18,7 @@ describe('AssetsController workspace permission guards', () => {
     ['updateAssetById', 'PATCH /:id', ['asset.write']],
     ['toggleAsset', 'POST /toggle', ['asset.write']],
     ['exportServicesToCSV', 'GET /services/export', ['asset.read']],
+    ['getAssetServiceGraph', 'GET /:assetId/services', ['asset.read']],
   ];
 
   it.each(cases)('%s (%s) requires %j', (method, route, keys) => {
@@ -29,5 +30,17 @@ describe('AssetsController workspace permission guards', () => {
       AssetsController,
     ]);
     expect(required).toEqual(keys);
+  });
+});
+
+describe('GET /assets/graph access control', () => {
+  it('graph endpoint requires asset.read workspace access', () => {
+    const reflector = new Reflector();
+    const handler = AssetsController.prototype.getAssetGraph as object;
+    const required = reflector.getAllAndOverride(WorkspacePermissions, [
+      handler,
+      AssetsController,
+    ]);
+    expect(required).toEqual(['asset.read']);
   });
 });
