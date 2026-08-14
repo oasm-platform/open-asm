@@ -14,7 +14,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { authClient } from '@/utils/authClient';
+import { authClient, markVoluntaryLogout } from '@/utils/authClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { LogOut, Settings } from 'lucide-react';
@@ -36,6 +36,7 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
   }
 
   const handleLogout = async () => {
+    markVoluntaryLogout();
     await signOut({
       fetchOptions: {
         onSuccess: async () => {

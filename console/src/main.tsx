@@ -23,7 +23,13 @@ import './styles/index.css';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
-import { SESSION_QUERY_KEY, useSession, type User } from './utils/authClient';
+import {
+  SESSION_QUERY_KEY,
+  useSession,
+  type User,
+  isVoluntaryLogout,
+  resetVoluntaryLogout,
+} from './utils/authClient';
 
 // Deduplicate 401 handling — multiple queries may fail at once during logout.
 let isHandling401 = false;
@@ -61,7 +67,7 @@ const queryClient = new QueryClient({
     onError: (error) => {
       if (error instanceof AxiosError) {
         if (error.response?.status === 401) {
-          if (isHandling401 || !sessionLoaded) return;
+          if (isHandling401 || !sessionLoaded || isVoluntaryLogout) return;
           isHandling401 = true;
 
           toast.error('Session expired!');
@@ -109,17 +115,29 @@ function MetadataProvider({ children }: { children: React.ReactNode }) {
 
 function AppRouter() {
   const { data: session, isPending } = useSession();
-  const prevSessionRef = React.useRef(session);
+  // Init to undefined (not session) so the first effect run is detectable:
+  // on first render session is null, which would be indistinguishable from
+  // a later null state. The very first run must be skipped (see effect below).
+  const prevSessionRef = React.useRef<typeof session | undefined>(undefined);
 
   // Reset 401 guard immediately when a fresh session arrives (render phase)
   // to avoid race window where a query 401 fires before the effect runs.
   if (session && !prevSessionRef.current) {
     isHandling401 = false;
+    resetVoluntaryLogout();
   }
 
   useEffect(() => {
     const prevSession = prevSessionRef.current;
     prevSessionRef.current = session;
+
+    // RouterProvider has not mounted yet on the first run — the router
+    // singleton still holds context.session = null (router.tsx default).
+    // invalidate()/navigate() now would load the current URL as an authed
+    // route and redirect to /login (the reload flash). The initial route
+    // load already runs with the real session passed via RouterProvider's
+    // context prop.
+    if (prevSession === undefined) return;
 
     // Session just became null (e.g. logout) — navigate directly to
     // /login instead of letting _authed re-render and flash through
@@ -129,7 +147,9 @@ function AppRouter() {
       if (currentPath !== '/login') {
         router.navigate({
           to: '/login',
-          search: { redirect: router.history.location.href },
+          ...(isVoluntaryLogout
+            ? {}
+            : { search: { redirect: router.history.location.href } }),
         });
       }
       return;
@@ -192,4 +212,14 @@ function App() {
 
 const rootElement = document.getElementById('root')!;
 const root = ReactDOM.createRoot(rootElement);
+
+// Hand off from the index.html inline splash to React's LoadingScreen
+// (same logo+spinner layout → seamless fade).
+const bootSplash = document.getElementById('boot-splash');
+if (bootSplash) {
+  bootSplash.classList.add('hide');
+  bootSplash.addEventListener('transitionend', () => bootSplash.remove(), { once: true });
+  setTimeout(() => bootSplash.remove(), 500);
+}
+
 root.render(<App />);
