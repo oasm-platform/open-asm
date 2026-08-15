@@ -1,6 +1,7 @@
 import { createFileRoute, Navigate, Outlet, redirect, useLocation } from '@tanstack/react-router';
-import { LoadingScreen } from '@/components/ui/loading-screen';
+import { useEffect } from 'react';
 import ProtectedLayout from '@/components/common/layout/protect-layout';
+import { removeBootSplash } from '@/lib/boot-splash';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useSession } from '@/utils/authClient';
 
@@ -24,7 +25,14 @@ function AuthedLayout() {
   const { workspaces, isLoading: isWorkspaceLoading } = useWorkspaceSelector();
   const { pathname } = useLocation();
 
-  if (isWorkspaceLoading || !liveSession) return <LoadingScreen />;
+  // The HTML #boot-splash covers the screen until the workspace load
+  // finishes — remove it as soon as the layout is ready to render.
+  const isReady = !isWorkspaceLoading && !!liveSession;
+  useEffect(() => {
+    if (isReady) removeBootSplash();
+  }, [isReady]);
+
+  if (isWorkspaceLoading || !liveSession) return null;
 
   const isWorkspacesRoute = pathname.startsWith('/workspaces');
   if (!isWorkspacesRoute && (!workspaces || workspaces.length === 0)) {
