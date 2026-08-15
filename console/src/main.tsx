@@ -11,7 +11,6 @@ import { RouterProvider } from '@tanstack/react-router';
 import React, { StrictMode, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from './components/ui/theme-provider';
-import { LoadingScreen } from '@/components/ui/loading-screen';
 import { TooltipProvider } from './components/ui/tooltip';
 import { router } from './router';
 import {
@@ -23,6 +22,7 @@ import './styles/index.css';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
+import { removeBootSplash } from '@/lib/boot-splash';
 import {
   SESSION_QUERY_KEY,
   useSession,
@@ -160,7 +160,7 @@ function AppRouter() {
     if (session && !prevSession) {
       router.preloadRoute({ to: '/' }).catch(() => {});
       // Warm the workspaces query the _authed layout blocks on, so the
-      // redirect to '/' doesn't stall on a full-screen LoadingScreen.
+      // redirect to '/' doesn't stall behind the boot splash.
       queryClient.prefetchQuery(
         getWorkspacesControllerGetWorkspacesQueryOptions({
           limit: 100,
@@ -176,9 +176,26 @@ function AppRouter() {
     router.invalidate();
   }, [session]);
 
-  // Wait for session to load before rendering the router.
+  // The HTML #boot-splash covers the screen until the app is ready:
+  // - no session → login/init-admin render immediately → remove it now
+  // - session → the _authed layout removes it when its workspace load
+  //   finishes; this timeout is a fallback for non-_authed routes
+  //   (e.g. /settings) so the splash can never get stuck.
+  useEffect(() => {
+    if (isPending) return;
+    if (!session) {
+      removeBootSplash();
+      return;
+    }
+    const timeout = setTimeout(removeBootSplash, 800);
+    return () => clearTimeout(timeout);
+  }, [isPending, session]);
+
+  // Wait for session to load before rendering the router. The HTML
+  // #boot-splash covers the screen while we wait — nothing renders
+  // underneath until the session resolves.
   if (isPending) {
-    return <LoadingScreen />;
+    return null;
   }
 
   // Mark session as loaded so QueryCache.onError can safely redirect on 401.
@@ -212,14 +229,5 @@ function App() {
 
 const rootElement = document.getElementById('root')!;
 const root = ReactDOM.createRoot(rootElement);
-
-// Hand off from the index.html inline splash to React's LoadingScreen
-// (same logo+spinner layout → seamless fade).
-const bootSplash = document.getElementById('boot-splash');
-if (bootSplash) {
-  bootSplash.classList.add('hide');
-  bootSplash.addEventListener('transitionend', () => bootSplash.remove(), { once: true });
-  setTimeout(() => bootSplash.remove(), 500);
-}
 
 root.render(<App />);
