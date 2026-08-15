@@ -121,6 +121,7 @@ export default function MembersSettings() {
   const tab = MEMBERS_TAB_VALUES.includes(requestedTab)
     ? requestedTab
     : 'members';
+  const inviteRequested = Boolean((search as Record<string, unknown>).invite);
   const handleTabChange = (value: string) => {
     navigate({
       search: ((prev: Record<string, unknown>) => ({
@@ -139,7 +140,10 @@ export default function MembersSettings() {
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
         </TabsList>
         <TabsContent value="members" className="pt-4">
-          <MembersTab workspaceId={selectedWorkspaceId} />
+          <MembersTab
+            workspaceId={selectedWorkspaceId}
+            defaultInviteOpen={inviteRequested}
+          />
         </TabsContent>
         <TabsContent value="invitations" className="pt-4">
           <InvitationsTab workspaceId={selectedWorkspaceId} />
@@ -152,9 +156,15 @@ export default function MembersSettings() {
   );
 }
 
-function MembersTab({ workspaceId }: { workspaceId: string }) {
+function MembersTab({
+  workspaceId,
+  defaultInviteOpen = false,
+}: {
+  workspaceId: string;
+  defaultInviteOpen?: boolean;
+}) {
   const queryClient = useQueryClient();
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(defaultInviteOpen);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const { hasPermission } = usePermission();

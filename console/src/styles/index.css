@@ -157,3 +157,21 @@
     animation: none;
   }
 }
+
+/* Sidebar scrollbar — visible on hover so short screens reveal there is more menu below */
+[data-sidebar='content'] {
+  scrollbar-color: transparent transparent;
+}
+[data-sidebar='content']:hover {
+  scrollbar-color: var(--sidebar-border) transparent;
+}
+[data-sidebar='content']::-webkit-scrollbar {
+  width: 6px;
+}
+[data-sidebar='content']::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: transparent;
+}
+[data-sidebar='content']:hover::-webkit-scrollbar-thumb {
+  background: var(--sidebar-border);
+}
