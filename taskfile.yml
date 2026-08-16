@@ -10,6 +10,9 @@ includes:
   worker:
     taskfile: ./worker/taskfile.yml
     dir: ./worker
+  worker-node:
+    taskfile: ./worker-node/taskfile.yml
+    dir: ./worker-node
 
 tasks:
   # Development environment setup and start

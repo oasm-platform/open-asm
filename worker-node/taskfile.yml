@@ -1,0 +1,48 @@
+version: '3'
+
+tasks:
+  # ==========================================
+  # DEVELOPMENT TASKS
+  # ==========================================
+  dev:
+    cmds:
+      - go run ./cmd/worker-node
+
+  # ==========================================
+  # BUILD TASKS
+  # ==========================================
+  build:
+    cmds:
+      - go build -o bin/worker-node ./cmd/worker-node
+
+  check:
+    cmds:
+      - go build ./...
+
+  clean:
+    cmds:
+      - rm -rf bin/
+
+  # ==========================================
+  # UTILITY TASKS
+  # ==========================================
+
+  # Install dependencies (Go modules)
+  install:
+    cmds:
+      - go mod tidy
+
+  # Run tests
+  test:
+    cmds:
+      - go test ./...
+
+  # Format code
+  format:
+    cmds:
+      - go fmt ./...
+
+  # Run linter
+  lint:
+    cmds:
+      - go vet ./...
