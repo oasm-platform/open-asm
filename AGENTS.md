@@ -19,7 +19,7 @@ Before substantial work:
 Monorepo with 3 services:
 - `core-api/` — NestJS 11 backend (TypeScript). REST API, DB layer, auth, gRPC server, BullMQ queues, AI/LLM integration (AI SDK, LangGraph, MCP).
 - `console/` — React 19 frontend (TypeScript/Vite/Tailwind v4). TanStack Query, orval for API client gen, shadcn/radix-ui components.
-- `worker/` — Go-based scanning workers (cobra CLI + viper config). Two entry points: `cmd/cli` (CLI mode) and `cmd/app` (app mode). Uses `oasm-sdk-go` for API calls, gRPC to core-api, go-rod for browser automation.
+- `worker/` — Go-based scanning workers (cobra CLI + viper config). Two entry points: `cmd/cli` (CLI mode) and `cmd/app` (app mode). Calls core-api directly via gRPC (client in `worker/internal/grpcclient/` over generated stubs from `grpc-client/go`), go-rod for browser automation.
 
 Root `package.json` is an npm workspace for `core-api` + `console` only. Worker is Go (separate toolchain).
 
@@ -63,7 +63,7 @@ task migration:revert
 task docker-compose  # Full stack (API, Console, 3 workers, DB, Redis, geo-ip)
 ```
 
-**Important**: `task gen-api` must be run after **any** API contract change. It regenerates `console/src/services/apis/gen/queries.ts` from `.open-api/open-api.json`. The worker uses a separate Go SDK (`oasm-sdk-go`) — update that independently.
+**Important**: `task gen-api` must be run after **any** API contract change. It regenerates `console/src/services/apis/gen/queries.ts` from `.open-api/open-api.json`. The worker uses the generated Go stubs in `grpc-client/go` — regenerate with `task proto`.
 
 ## Local Dev Setup
 

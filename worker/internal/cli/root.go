@@ -30,7 +30,7 @@ func App() error {
 	defer stop()
 
 	// Save real stdout/stderr for Bubbletea, redirect to /dev/null
-	// so oasm-sdk-go internal logs don't interfere with TUI rendering
+	// so library stderr output doesn't interfere with TUI rendering
 	realStdout := os.Stdout
 	realStderr := os.Stderr
 	if devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0); err == nil {
@@ -44,7 +44,7 @@ func App() error {
 		close(events)
 	}()
 
-	// TUI renders to the real stdout, SDK logs go to /dev/null
+	// TUI renders to the real stdout, library logs go to /dev/null
 	m := tui.NewModel(cfg, events)
 	p := tea.NewProgram(m, tea.WithOutput(realStdout))
 
@@ -83,7 +83,7 @@ func AppHeadless() error {
 
 	// Headless mode: no TUI. Pass nil events channel.
 	// TuiLogger falls back to writing formatted logs to stderr.
-	// oasm-sdk-go internal logs also go to stderr — fine for Docker.
+	// Library stderr output also goes to stderr — fine for Docker.
 	worker.Start(ctx, cfg, nil)
 	return nil
 }
