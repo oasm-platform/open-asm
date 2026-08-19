@@ -10,12 +10,13 @@ import (
 	"time"
 
 	"github.com/go-rod/rod"
-	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	pb "github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
+
+	"oasm-worker/internal/grpcclient"
 )
 
-func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string, events chan<- TuiEvent) {
-	job, err := client.JobsNext(ctx)
+func processJob(ctx context.Context, grpcClient *grpcclient.Client, browser *rod.Browser, toolPath string, events chan<- TuiEvent) {
+	job, err := grpcClient.NextJob(ctx)
 	if err != nil {
 		NewTuiLogger(events, "Jobs").ErrorE("Failed to pull job", err)
 		return
@@ -66,7 +67,7 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 			ErrorMsg: "No command provided by Core",
 			Duration: time.Since(startTime),
 		})
-		submitCategoryError(ctx, client, events, job.Id, category, "No command provided by Core")
+		submitCategoryError(ctx, grpcClient, events, job.Id, category, "No command provided by Core")
 		return
 	}
 
@@ -91,7 +92,7 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 				ErrorMsg: fmt.Sprintf("Screenshot error: %v", err),
 				Duration: time.Since(startTime),
 			})
-			submitCategoryError(ctx, client, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", err))
+			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", err))
 			return
 		}
 
@@ -119,11 +120,11 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 				ErrorMsg: fmt.Sprintf("JSON error: %v", err),
 				Duration: time.Since(startTime),
 			})
-			submitCategoryError(ctx, client, events, job.Id, category, fmt.Sprintf("JSON error: %v", err))
+			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("JSON error: %v", err))
 			return
 		}
 
-		if submitErr := submitCategoryResult(ctx, client, job.Id, category, false, string(jsonBytes)); submitErr != nil {
+		if submitErr := submitCategoryResult(ctx, grpcClient, job.Id, category, false, string(jsonBytes)); submitErr != nil {
 			completed = true
 			NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit screenshot result", job.Id), submitErr)
 			Emit(events, TuiEvent{
@@ -174,7 +175,7 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 			}
 		}
 
-		if submitErr := submitCategoryResult(ctx, client, job.Id, category, isError, outStr); submitErr != nil {
+		if submitErr := submitCategoryResult(ctx, grpcClient, job.Id, category, isError, outStr); submitErr != nil {
 			completed = true
 			NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit result", job.Id), submitErr)
 			Emit(events, TuiEvent{
@@ -191,31 +192,31 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 
 // submitCategoryResult submits the command output to the appropriate category-specific endpoint.
 // Falls back to the deprecated generic endpoint for unknown categories.
-func submitCategoryResult(ctx context.Context, client *oasm.Client, jobID, category string, isError bool, raw string) error {
+func submitCategoryResult(ctx context.Context, grpcClient *grpcclient.Client, jobID, category string, isError bool, raw string) error {
 	switch category {
 	case "subdomains":
-		return client.JobsSubdomainsResult(ctx, jobID, isError, raw, nil)
+		return grpcClient.SubmitSubdomainsResult(ctx, jobID, isError, raw, nil)
 	case "http_probe":
-		return client.JobsHttpProbeResult(ctx, jobID, isError, raw, nil)
+		return grpcClient.SubmitHttpProbeResult(ctx, jobID, isError, raw, nil)
 	case "ports_scanner":
-		return client.JobsPortsResult(ctx, jobID, isError, raw, nil)
+		return grpcClient.SubmitPortsResult(ctx, jobID, isError, raw, nil)
 	case "vulnerabilities":
-		return client.JobsVulnerabilitiesResult(ctx, jobID, isError, raw, nil)
+		return grpcClient.SubmitVulnerabilitiesResult(ctx, jobID, isError, raw, nil)
 	case "screenshot":
-		return client.JobsScreenshotResult(ctx, jobID, isError, raw)
+		return grpcClient.SubmitScreenshotResult(ctx, jobID, isError, raw)
 	default:
 		// Unknown category — use the deprecated generic endpoint
 		payload := &pb.DataPayloadResult{
 			Error: isError,
 			Raw:   &raw,
 		}
-		return client.JobsResult(ctx, jobID, payload)
+		return grpcClient.SubmitResult(ctx, jobID, payload)
 	}
 }
 
 // submitCategoryError submits an error to the appropriate category-specific endpoint.
-func submitCategoryError(ctx context.Context, client *oasm.Client, events chan<- TuiEvent, jobID, category, errMsg string) {
-	if submitErr := submitCategoryResult(ctx, client, jobID, category, true, errMsg); submitErr != nil {
+func submitCategoryError(ctx context.Context, grpcClient *grpcclient.Client, events chan<- TuiEvent, jobID, category, errMsg string) {
+	if submitErr := submitCategoryResult(ctx, grpcClient, jobID, category, true, errMsg); submitErr != nil {
 		NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit error", jobID), submitErr)
 	}
 }

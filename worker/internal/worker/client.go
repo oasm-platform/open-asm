@@ -12,8 +12,9 @@ import (
 	"github.com/go-co-op/gocron"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
-	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	"github.com/oasm-platform/open-asm/grpc-client/go/workers"
+
+	"oasm-worker/internal/grpcclient"
 )
 
 var (
@@ -21,8 +22,10 @@ var (
 	activeJobs   = make(map[string]struct{})
 )
 
-func connectInternalNetwork(client *oasm.Client, network string) error {
-	networkInfos, err := GetNetworkInfos()
+func connectInternalNetwork(ctx context.Context, grpcClient *grpcclient.Client, network string, events chan<- TuiEvent) error {
+	log := NewTuiLogger(events, "Network")
+
+	networkInfos, err := GetNetworkInfos(log)
 	if err != nil {
 		return fmt.Errorf("failed to get network infos: %w", err)
 	}
@@ -38,15 +41,8 @@ func connectInternalNetwork(client *oasm.Client, network string) error {
 		})
 	}
 
-	req := &workers.ConnectInternalNetworkRequest{
-		WorkerId:          client.WorkerID(),
-		NetworkId:         network,
-		NetworkInterfaces: networkInterfaces,
-	}
-
-	_, err = client.Workers().ConnectInternalNetwork(client.WithAuth(context.Background()), req)
-	if err != nil {
-		return fmt.Errorf("error connecting internal network: %w", err)
+	if err := grpcClient.ConnectInternalNetwork(ctx, network, networkInterfaces); err != nil {
+		return err
 	}
 
 	return nil
@@ -56,11 +52,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	log := NewTuiLogger(events, "System")
 	screenshotLog = NewTuiLogger(events, "Screenshot")
 
-	client, err := oasm.NewClient(
-		oasm.WithApiKey(cfg.ApiKey),
-		oasm.WithGRPCHost(fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort)),
-		oasm.WithToolPath(cfg.ToolPath),
-	)
+	grpcClient, err := grpcclient.NewClient(cfg.ApiKey, fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort), cfg.ToolPath, log)
 	if err != nil {
 		log.ErrorE("Failed to create OASM client", err)
 		return
@@ -129,7 +121,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		case semaphore <- struct{}{}:
 			wg.Go(func() {
 				defer func() { <-semaphore }()
-				processJob(currentCtx, client, browser, toolPath, events)
+				processJob(currentCtx, grpcClient, browser, toolPath, events)
 			})
 		default:
 		}
@@ -165,13 +157,13 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 					Emit(events, TuiEvent{
 						Type:     EventConnected,
-						WorkerID: client.WorkerID(),
+						WorkerID: grpcClient.WorkerID(),
 						Host:     cfg.GrpcHost,
 						Port:     cfg.GrpcPort,
 					})
 
 					if cfg.Network != "" {
-						if err := connectInternalNetwork(client, cfg.Network); err != nil {
+						if err := connectInternalNetwork(sessionCtx, grpcClient, cfg.Network, events); err != nil {
 							log.ErrorE("Failed to connect internal network", err)
 							stateMu.Unlock()
 							continue
@@ -179,13 +171,13 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 						log.Success("Connected to internal network: %s", cfg.Network)
 					}
 
-					if err := client.WorkerDownloadTools(sessionCtx); err != nil {
+					if err := grpcClient.DownloadTools(sessionCtx); err != nil {
 						log.ErrorE("Download tools failed", err)
 						stateMu.Unlock()
 						continue
 					}
 
-					go startRemoteExecuteHandler(sessionCtx, client, workspaceRoot, toolPath, events)
+					go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events)
 
 					if !schedulerStarted {
 						scheduler.StartAsync()
@@ -207,7 +199,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		}
 	}()
 
-	go client.WorkerConnect(workerCtx, ready)
+	go grpcClient.Connect(workerCtx, ready)
 
 	ticker := time.NewTicker(time.Second)
 	go func() {

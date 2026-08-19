@@ -10,8 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	pb "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+
+	"oasm-worker/internal/grpcclient"
 )
 
 type sessionSandbox struct {
@@ -68,7 +69,7 @@ func (s *sessionSandbox) close() error {
 	return os.RemoveAll(s.rootPath)
 }
 
-func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent) {
+func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent) {
 	log := NewTuiLogger(events, "RemoteExec")
 
 	for {
@@ -81,7 +82,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 
 		log.Info("Subscribing to remote execute stream...")
 
-		handler, err := client.RemoteExecuteSubscribe(ctx)
+		handler, err := grpcClient.RemoteExecuteSubscribe(ctx)
 		if err != nil {
 			log.ErrorE("Failed to subscribe, retrying in 5s", err)
 
@@ -95,7 +96,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 			}
 		}
 
-		log.Success("Remote execute stream connected (worker: %s)", client.WorkerID())
+		log.Success("Remote execute stream connected (worker: %s)", grpcClient.WorkerID())
 
 		activeSessions := make(map[string]*sessionSandbox)
 		var sessionsMu sync.Mutex
@@ -192,7 +193,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 	}
 }
 
-func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, sessionID string, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
+func executeRemoteCommand(ctx context.Context, handler *grpcclient.RemoteExecuteHandler, sessionID string, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
 	log := NewTuiLogger(events, "RemoteExec")
 	log.Info("Executing in session %s: %s", sessionID, command)
 

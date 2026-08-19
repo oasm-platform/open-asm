@@ -231,7 +231,7 @@ func (l *TuiLogger) emit(level, msg string, args ...any) {
 	}
 
 	// Headless mode: no TUI channel — write directly to stderr.
-	// oasm-sdk-go logs are still redirected to /dev/null by the caller.
+	// library stderr output is still redirected to /dev/null by the caller.
 	if l.events == nil {
 		ts := time.Now().Format(time.RFC3339)
 		fmt.Fprintf(os.Stderr, "[%s] %-7s [%s] %s\n", ts, level, l.source, formatted)

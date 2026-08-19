@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/oasm-platform/oasm-sdk-go/oasm"
+	"oasm-worker/internal/grpcclient"
 )
 
 type NetworkInfo struct {
@@ -26,8 +26,8 @@ type interfaceCandidate struct {
 	score int
 }
 
-func GetNetworkInfos() ([]NetworkInfo, error) {
-	l := oasm.NewLogger("Network")
+func GetNetworkInfos(logger grpcclient.Logger) ([]NetworkInfo, error) {
+	l := logger
 	l.Verbose("Starting network interface detection")
 
 	ifaces, err := net.Interfaces()
