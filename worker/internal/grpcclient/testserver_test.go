@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	jobsRegistry "github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
-	workers "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	jobsRegistry "oasm-worker/internal/gen/jobs_registry"
+	workers "oasm-worker/internal/gen/workers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

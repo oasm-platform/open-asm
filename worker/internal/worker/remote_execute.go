@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	pb "oasm-worker/internal/gen/workers"
 
 	"oasm-worker/internal/grpcclient"
 )

@@ -9,13 +9,11 @@ require (
 	github.com/go-rod/rod v0.116.2
 	github.com/go-rod/stealth v0.4.9
 	github.com/joho/godotenv v1.5.1
-	github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260721032108-cb532c9df20f
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	google.golang.org/grpc v1.80.0
+	google.golang.org/protobuf v1.36.11
 )
-
-replace github.com/oasm-platform/open-asm/grpc-client/go => ../grpc-client/go
 
 require (
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
@@ -52,6 +50,5 @@ require (
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )

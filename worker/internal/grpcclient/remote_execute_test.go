@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	workers "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 func TestRemoteExecuteSubscribe(t *testing.T) {

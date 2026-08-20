@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	jobsRegistry "github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
+	jobsRegistry "oasm-worker/internal/gen/jobs_registry"
 )
 
 // NextJob pulls the next job from the registry.

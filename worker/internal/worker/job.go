@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/go-rod/rod"
-	pb "github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
+	pb "oasm-worker/internal/gen/jobs_registry"
 
 	"oasm-worker/internal/grpcclient"
 )

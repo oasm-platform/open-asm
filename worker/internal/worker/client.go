@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
-	"github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	"oasm-worker/internal/gen/workers"
 
 	"oasm-worker/internal/grpcclient"
 )

@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	jobRegistryPb "github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
-	workerPb "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	jobRegistryPb "oasm-worker/internal/gen/jobs_registry"
+	workerPb "oasm-worker/internal/gen/workers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

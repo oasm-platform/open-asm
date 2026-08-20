@@ -16,7 +16,7 @@ import (
 	"runtime"
 	"strings"
 
-	workers "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 // DownloadTools resolves the tool directory, downloads and extracts every

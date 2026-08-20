@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	workers "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 // RemoteExecuteHandler wraps the RemoteExecuteSubscribe stream and the

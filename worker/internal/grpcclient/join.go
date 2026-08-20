@@ -6,7 +6,7 @@ import (
 	"os"
 	"runtime"
 
-	workers "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 // Join registers this worker with the core-api server using the client's API

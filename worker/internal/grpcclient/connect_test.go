@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	workers "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	workers "oasm-worker/internal/gen/workers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

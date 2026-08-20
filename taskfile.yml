@@ -76,10 +76,10 @@ tasks:
 
   proto:
     cmds:
-      - mkdir -p grpc-client/go grpc-client/ts
+      - mkdir -p worker/internal/gen/jobs_registry worker/internal/gen/workers
       - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
       - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-      - cd core-api && pnpm exec protoc -I src/proto src/proto/*.proto --go_out=../grpc-client/go --go-grpc_out=../grpc-client/go --ts_out=../grpc-client/ts
+      - cd core-api && pnpm exec protoc -I src/proto src/proto/*.proto --go_out=../worker/internal/gen --go-grpc_out=../worker/internal/gen
 
   # Project initialization
   # Sets up environment files and initializes the development environment

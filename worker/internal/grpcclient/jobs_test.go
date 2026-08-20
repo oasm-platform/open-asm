@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	jobsRegistry "github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
+	jobsRegistry "oasm-worker/internal/gen/jobs_registry"
 )
 
 func TestNextJob_ReturnsJob(t *testing.T) {

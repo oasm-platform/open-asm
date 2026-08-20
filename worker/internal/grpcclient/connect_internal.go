@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	workers "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 // ConnectInternalNetwork reports the worker's network interfaces for the
