@@ -14,9 +14,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	workers "oasm-worker/internal/gen/workers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 // newToolClient returns a test server whose client points at a fresh tool dir.

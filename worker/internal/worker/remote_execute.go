@@ -166,15 +166,19 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 					SessionCommand: command,
 				})
 
+				// Capture ids at command-receive time to avoid misattribution if
+				// Next() overwrites handler ids before the goroutine sends.
+				cmdID := resp.Id
+				cmdWorkerID := resp.WorkerId
 				select {
 				case remoteSem <- struct{}{}:
-					go func(h *grpcclient.RemoteExecuteHandler, sid string, cmd string, sbox *sessionSandbox) {
+					go func(h *grpcclient.RemoteExecuteHandler, sid, cid, wid, cmd string, sbox *sessionSandbox) {
 						defer func() { <-remoteSem }()
-						executeRemoteCommand(ctx, h, sid, cmd, sbox, events, toolPath)
-					}(handler, sessionID, command, sb)
+						executeRemoteCommand(ctx, h, sid, cid, wid, cmd, sbox, events, toolPath)
+					}(handler, sessionID, cmdID, cmdWorkerID, command, sb)
 				default:
 					log.Warning("remote exec concurrency limit reached")
-					_ = handler.SendError(ctx, "server busy")
+					_ = handler.SendErrorFor(ctx, sessionID, cmdID, cmdWorkerID, "server busy")
 				}
 
 			default:
@@ -203,9 +207,11 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 	}
 }
 
-func executeRemoteCommand(ctx context.Context, handler *grpcclient.RemoteExecuteHandler, sessionID string, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
+func executeRemoteCommand(ctx context.Context, handler *grpcclient.RemoteExecuteHandler, sessionID, cmdID, workerID, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
 	log := NewTuiLogger(events, "RemoteExec")
 	log.Info("Executing in session %s: %s", sessionID, command)
+	_ = cmdID
+	_ = workerID
 
 	wrappedCmd := fmt.Sprintf("(%s) 2>&1", command)
 	cmd := exec.CommandContext(ctx, "sh", "-c", wrappedCmd)

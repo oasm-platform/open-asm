@@ -252,10 +252,15 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 					go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events)
 
-					var pollerCtx context.Context
-					pollerCtx, pollerCancel = context.WithCancel(sessionCtx)
-					go pollLoop(pollerCtx)
-					log.Success("Job poller started (concurrency: %d)", cfg.MaxConcurrency)
+					if pollerCancel != nil {
+						// Dedup: reconnect may emit ready=true without intervening disconnect.
+						log.Warning("Poller already running, skipping duplicate start")
+					} else {
+						var pollerCtx context.Context
+						pollerCtx, pollerCancel = context.WithCancel(sessionCtx)
+						go pollLoop(pollerCtx)
+						log.Success("Job poller started (concurrency: %d)", cfg.MaxConcurrency)
+					}
 				} else {
 					log.Warning("Disconnected from core, suspending...")
 					if pollerCancel != nil {

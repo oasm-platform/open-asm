@@ -6,13 +6,13 @@ import (
 	"sync"
 	"testing"
 
-	jobsRegistry "oasm-worker/internal/gen/jobs_registry"
-	workers "oasm-worker/internal/gen/workers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
+	jobsRegistry "oasm-worker/internal/gen/jobs_registry"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 // --- Hook-driven fake WorkersService ---

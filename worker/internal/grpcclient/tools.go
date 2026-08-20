@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -69,7 +70,7 @@ func (c *Client) DownloadTools(ctx context.Context) error {
 	for _, toolURL := range registry.ToolPaths {
 		fileName := filepath.Base(toolURL)
 		h := sha256.Sum256([]byte(toolURL))
-		stateKey := hex.EncodeToString(h[:4]) + "_" + fileName
+		stateKey := hex.EncodeToString(h[:8]) + "_" + fileName
 
 		var hitFiles []string
 		var hit bool
@@ -77,6 +78,9 @@ func (c *Client) DownloadTools(ctx context.Context) error {
 			hitFiles = v
 			hit = true
 		} else if v, ok := oldState[fileName]; ok {
+			// ponytail: migration fallback for state files keyed by bare filename (pre-hash format).
+			// Only trusted when the extracted files still exist; stale-entry risk if the tool URL
+			// changed but kept the same filename — job is re-downloaded if any cached file is missing.
 			hitFiles = v
 			hit = true
 		}
@@ -196,8 +200,15 @@ func (c *Client) downloadAndExtractSingleTool(ctx context.Context, url, destDir,
 		os.Remove(tempFile)
 		return nil, fmt.Errorf("incomplete download: expected %d bytes but got sparse file up to %d", totalWritten, maxEnd)
 	}
-	_ = file.Sync()
-	file.Close()
+	if err := file.Sync(); err != nil {
+		file.Close()
+		os.Remove(tempFile)
+		return nil, fmt.Errorf("failed to sync temporary file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(tempFile)
+		return nil, fmt.Errorf("failed to close temporary file: %w", err)
+	}
 	c.logger.Success("Download completed: %s", tempFile)
 
 	c.logger.Info("Extracting %s...", fileName)
@@ -229,22 +240,32 @@ func (c *Client) extractZip(srcZip, destDir string) ([]string, error) {
 	}
 	defer r.Close()
 
+	cleanDest := filepath.Clean(destDir)
 	for _, f := range r.File {
 		if isIgnoredFile(f.Name) {
 			continue
 		}
 
-		target := filepath.Join(destDir, f.Name)
-		if !isWithinDir(target, destDir) {
+		entry, ok := normalizeEntry(f.Name)
+		if !ok {
+			return nil, fmt.Errorf("illegal file path: %s", f.Name)
+		}
+
+		target := filepath.Join(cleanDest, filepath.FromSlash(entry))
+		if !isWithinDir(target, cleanDest) {
 			return nil, fmt.Errorf("illegal file path: %s", f.Name)
 		}
 
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(target, 0o755)
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return nil, err
+			}
 			continue
 		}
 
-		os.MkdirAll(filepath.Dir(target), 0o755)
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return nil, err
+		}
 
 		outFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR|os.O_TRUNC, f.Mode())
 		if err != nil {
@@ -271,10 +292,19 @@ func (c *Client) extractZip(srcZip, destDir string) ([]string, error) {
 			_ = os.Chmod(target, f.Mode())
 		}
 
-		extractedFiles = append(extractedFiles, f.Name)
-		c.logger.Verbose("Extracted: %s", f.Name)
+		extractedFiles = append(extractedFiles, entry)
+		c.logger.Verbose("Extracted: %s", entry)
 	}
 	return extractedFiles, nil
+}
+
+func normalizeEntry(name string) (string, bool) {
+	// Archives use forward slashes; normalize with path, not filepath (Windows backslash breaks filepath.Clean).
+	entry := path.Clean(name)
+	if path.IsAbs(entry) || entry == ".." || strings.HasPrefix(entry, "../") {
+		return "", false
+	}
+	return entry, true
 }
 
 // extractTarGz extracts a tar.gz archive into destDir with path traversal guards.
@@ -293,6 +323,7 @@ func (c *Client) extractTarGz(srcGzip, destDir string) ([]string, error) {
 	defer gzr.Close()
 
 	tr := tar.NewReader(gzr)
+	cleanDest := filepath.Clean(destDir)
 
 	for {
 		header, err := tr.Next()
@@ -307,8 +338,14 @@ func (c *Client) extractTarGz(srcGzip, destDir string) ([]string, error) {
 			continue
 		}
 
-		target := filepath.Join(destDir, header.Name)
-		if !isWithinDir(target, destDir) {
+		var ok bool
+		entry, ok := normalizeEntry(header.Name)
+		if !ok {
+			return nil, fmt.Errorf("illegal file path: %s", header.Name)
+		}
+
+		target := filepath.Join(cleanDest, filepath.FromSlash(entry))
+		if !isWithinDir(target, cleanDest) {
 			return nil, fmt.Errorf("illegal file path: %s", header.Name)
 		}
 
@@ -339,7 +376,7 @@ func (c *Client) extractTarGz(srcGzip, destDir string) ([]string, error) {
 				_ = os.Chmod(target, os.FileMode(header.Mode))
 			}
 
-			extractedFiles = append(extractedFiles, header.Name)
+			extractedFiles = append(extractedFiles, entry)
 			c.logger.Verbose("Extracted: %s", header.Name)
 		}
 	}

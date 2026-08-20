@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	jobRegistryPb "oasm-worker/internal/gen/jobs_registry"
-	workerPb "oasm-worker/internal/gen/workers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	jobRegistryPb "oasm-worker/internal/gen/jobs_registry"
+	workerPb "oasm-worker/internal/gen/workers"
 )
 
 // Client wraps the gRPC connection to core-api and the generated service

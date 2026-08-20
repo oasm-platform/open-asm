@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	workers "oasm-worker/internal/gen/workers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 func TestJoin_StoresWorkerIDAndToken(t *testing.T) {

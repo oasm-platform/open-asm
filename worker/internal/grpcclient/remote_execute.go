@@ -89,6 +89,26 @@ func (h *RemoteExecuteHandler) SendError(ctx context.Context, errMsg string) err
 	return h.SendResult(ctx, workers.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR, []byte(errMsg), 0)
 }
 
+// SendErrorFor sends an error attributed to a specific session/id, avoiding
+// misattribution when SendError is called concurrently with Next updates.
+func (h *RemoteExecuteHandler) SendErrorFor(ctx context.Context, sessionID, id, workerID, errMsg string) error {
+	req := &workers.RemoteExecuteResultStream{
+		Id:        id,
+		SessionId: sessionID,
+		Type:      workers.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR,
+		Data:      []byte(errMsg),
+	}
+	resp, err := h.client.workers.RemoteExecuteResult(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to send remote execute result: %w", err)
+	}
+	if !resp.Success {
+		return fmt.Errorf("server rejected the result: %s", resp.Message)
+	}
+	_ = workerID
+	return nil
+}
+
 // ID returns the id of the most recently received event.
 func (h *RemoteExecuteHandler) ID() string { return h.id }
 
