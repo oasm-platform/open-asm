@@ -18,6 +18,15 @@ vi.mock('@/utils/workspaceState', () => ({
 vi.mock('@/utils/cookie', () => ({
   setCookie: vi.fn(),
   deleteCookie: vi.fn(),
+  getCookie: vi.fn(() => null),
+}));
+
+vi.mock('@/utils/authClient', () => ({
+  useSession: vi.fn(() => ({
+    data: { user: { id: 'user-1', email: 'admin@test.com', name: 'Test Admin', role: 'admin' } },
+    isPending: false,
+    error: null,
+  })),
 }));
 
 const { useWorkspacesControllerGetWorkspaces } = await import('@/services/apis/gen/queries');

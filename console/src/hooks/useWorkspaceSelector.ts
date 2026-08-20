@@ -1,7 +1,7 @@
 import { useSession } from '@/utils/authClient';
 import { useWorkspacesControllerGetWorkspaces } from '@/services/apis/gen/queries';
 import { setGlobalWorkspaceId } from '@/utils/workspaceState';
-import { setCookie, deleteCookie } from '@/utils/cookie';
+import { getCookie, setCookie, deleteCookie } from '@/utils/cookie';
 import { useQueryClient } from '@tanstack/react-query';
 import React from 'react';
 import createState from './createState'; // adjust path as needed
@@ -66,7 +66,7 @@ export function useWorkspaceSelector() {
     [queryClient, setSelectedWorkspace],
   );
 
-  // Auto-select workspace logic
+  // Auto-select workspace logic — honors `wid` cookie so reload keeps user's choice
   React.useEffect(() => {
     if (response?.data && response.data.length > 0) {
       const workspaceIds = response.data.map((ws) => ws.id);
@@ -78,8 +78,13 @@ export function useWorkspaceSelector() {
       if (currentSelectedId && workspaceIds.includes(currentSelectedId)) {
         finalSelectedId = currentSelectedId;
       } else {
-        // Otherwise, select the first workspace
-        finalSelectedId = response.data[0].id;
+        // Honor `wid` cookie before falling back to first workspace
+        const wid = getCookie('wid');
+        if (wid && workspaceIds.includes(wid)) {
+          finalSelectedId = wid;
+        } else {
+          finalSelectedId = response.data[0].id;
+        }
       }
 
       setGlobalWorkspaceId(finalSelectedId);
