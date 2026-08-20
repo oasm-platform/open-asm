@@ -321,10 +321,14 @@ export default function McpConnect() {
   // ---- Actions ----
 
   const copyConfig = useCallback(async () => {
-    await navigator.clipboard.writeText(copyConfigJson);
-    setCopied(true);
-    toast.success('Configuration copied to clipboard');
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(copyConfigJson);
+      setCopied(true);
+      toast.success('Configuration copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy configuration');
+    }
   }, [copyConfigJson]);
 
   const openInClient = useCallback(() => {
