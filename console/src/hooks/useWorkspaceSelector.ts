@@ -1,3 +1,4 @@
+import { useSession } from '@/utils/authClient';
 import { useWorkspacesControllerGetWorkspaces } from '@/services/apis/gen/queries';
 import { setGlobalWorkspaceId } from '@/utils/workspaceState';
 import { setCookie, deleteCookie } from '@/utils/cookie';
@@ -31,6 +32,8 @@ export const useWorkspaceState = createState<WorkspaceState>(
 );
 
 export function useWorkspaceSelector() {
+  const { data: session } = useSession();
+  const enabled = Boolean(session?.user);
   const {
     data: response,
     isLoading,
@@ -41,12 +44,9 @@ export function useWorkspaceSelector() {
       page: 1,
       isArchived: false,
     },
-    // {
-    //   query: {
-    //     queryKey: ['workspaces'],
-    //     staleTime: 1000 * 60 * 5,
-    //   },
-    // },
+    {
+      query: { enabled },
+    },
   );
 
   const { state, setSelectedWorkspace, clearSelectedWorkspace } =
