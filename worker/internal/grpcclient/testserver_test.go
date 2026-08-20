@@ -105,13 +105,13 @@ func (f *fakeWorkersService) RemoteExecuteResult(ctx context.Context, req *worke
 type fakeJobsRegistryService struct {
 	jobsRegistry.UnimplementedJobsRegistryServiceServer
 
-	nextFn               func(ctx context.Context, req *jobsRegistry.Worker) (*jobsRegistry.Job, error)
-	resultFn             func(ctx context.Context, req *jobsRegistry.JobResultRequest) (*jobsRegistry.JobResponse, error)
-	resultSubdomainsFn   func(ctx context.Context, req *jobsRegistry.SubdomainResultRequest) (*jobsRegistry.JobResponse, error)
-	resultHttpProbeFn    func(ctx context.Context, req *jobsRegistry.HttpProbeResultRequest) (*jobsRegistry.JobResponse, error)
-	resultPortsFn        func(ctx context.Context, req *jobsRegistry.PortsResultRequest) (*jobsRegistry.JobResponse, error)
-	resultVulnsFn        func(ctx context.Context, req *jobsRegistry.VulnerabilitiesResultRequest) (*jobsRegistry.JobResponse, error)
-	resultScreenshotFn   func(ctx context.Context, req *jobsRegistry.ScreenshotResultRequest) (*jobsRegistry.JobResponse, error)
+	nextFn             func(ctx context.Context, req *jobsRegistry.Worker) (*jobsRegistry.Job, error)
+	resultFn           func(ctx context.Context, req *jobsRegistry.JobResultRequest) (*jobsRegistry.JobResponse, error)
+	resultSubdomainsFn func(ctx context.Context, req *jobsRegistry.SubdomainResultRequest) (*jobsRegistry.JobResponse, error)
+	resultHttpProbeFn  func(ctx context.Context, req *jobsRegistry.HttpProbeResultRequest) (*jobsRegistry.JobResponse, error)
+	resultPortsFn      func(ctx context.Context, req *jobsRegistry.PortsResultRequest) (*jobsRegistry.JobResponse, error)
+	resultVulnsFn      func(ctx context.Context, req *jobsRegistry.VulnerabilitiesResultRequest) (*jobsRegistry.JobResponse, error)
+	resultScreenshotFn func(ctx context.Context, req *jobsRegistry.ScreenshotResultRequest) (*jobsRegistry.JobResponse, error)
 
 	mu           sync.Mutex
 	lastMetadata metadata.MD // captured from incoming context

@@ -15,14 +15,14 @@ import (
 	"oasm-worker/internal/grpcclient"
 )
 
-func processJob(ctx context.Context, grpcClient *grpcclient.Client, browser *rod.Browser, toolPath string, events chan<- TuiEvent) {
+func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent) bool {
 	job, err := grpcClient.NextJob(ctx)
 	if err != nil {
 		NewTuiLogger(events, "Jobs").ErrorE("Failed to pull job", err)
-		return
+		return false
 	}
 	if job == nil || job.Id == "" {
-		return
+		return false
 	}
 
 	startTime := time.Now()
@@ -68,7 +68,7 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, browser *rod
 			Duration: time.Since(startTime),
 		})
 		submitCategoryError(ctx, grpcClient, events, job.Id, category, "No command provided by Core")
-		return
+		return true
 	}
 
 	NewTuiLogger(events, "Jobs").Info("[%s] Executing: %s (category: %s)", job.Id, cmdStr, category)
@@ -76,6 +76,25 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, browser *rod
 	if after, ok := strings.CutPrefix(cmdStr, "screenshot "); ok {
 		url := strings.TrimSpace(after)
 
+		browser, err := getBrowser()
+		if err != nil {
+			completed = true
+			Emit(events, TuiEvent{
+				Type:          EventActivity,
+				Source:        "Jobs",
+				ActivityLevel: "warning",
+				Message:       fmt.Sprintf("Screenshot failed (browser init): %v", err),
+			})
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  false,
+				ErrorMsg: fmt.Sprintf("Screenshot error (browser init): %v", err),
+				Duration: time.Since(startTime),
+			})
+			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error (browser init): %v", err))
+			return true
+		}
 		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
 		if err != nil {
 			completed = true
@@ -93,7 +112,7 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, browser *rod
 				Duration: time.Since(startTime),
 			})
 			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", err))
-			return
+			return true
 		}
 
 		resultData := struct {
@@ -121,7 +140,7 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, browser *rod
 				Duration: time.Since(startTime),
 			})
 			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("JSON error: %v", err))
-			return
+			return true
 		}
 
 		if submitErr := submitCategoryResult(ctx, grpcClient, job.Id, category, false, string(jsonBytes)); submitErr != nil {
@@ -134,9 +153,9 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, browser *rod
 				ErrorMsg: submitErr.Error(),
 				Duration: time.Since(startTime),
 			})
-			return
+			return true
 		}
-		return
+		return true
 	} else {
 		var cmd *exec.Cmd
 		if runtime.GOOS == "windows" {
@@ -185,9 +204,10 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, browser *rod
 				ErrorMsg: submitErr.Error(),
 				Duration: time.Since(startTime),
 			})
-			return
+			return true
 		}
 	}
+	return true
 }
 
 // submitCategoryResult submits the command output to the appropriate category-specific endpoint.

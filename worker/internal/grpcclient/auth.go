@@ -20,6 +20,9 @@ type tokenAuth struct {
 func (a *tokenAuth) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
+	if a.token == "" {
+		return nil, nil
+	}
 	return map[string]string{workerTokenHeader: a.token}, nil
 }
 

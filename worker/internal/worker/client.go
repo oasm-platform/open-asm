@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-co-op/gocron"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/oasm-platform/open-asm/grpc-client/go/workers"
@@ -58,23 +57,53 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		return
 	}
 
-	log.Info("Initializing headless browser...")
-	l := launcher.New().Leakless(false).Headless(true)
-
-	if _, err := os.Stat("/usr/bin/chromium"); err == nil {
-		log.Verbose("Using system chromium at /usr/bin/chromium")
-		l = l.Bin("/usr/bin/chromium")
-	} else if _, err := os.Stat("/usr/bin/chromium-browser"); err == nil {
-		log.Verbose("Using system chromium at /usr/bin/chromium-browser")
-		l = l.Bin("/usr/bin/chromium-browser")
-	} else if _, err := os.Stat("/usr/bin/google-chrome"); err == nil {
-		log.Verbose("Using system chromium at /usr/bin/google-chrome")
-		l = l.Bin("/usr/bin/google-chrome")
-	} else {
-		log.Verbose("No system chromium found, go-rod will download Chrome automatically")
+	// ponytail: lazy browser singleton — avoids ~300MB chromium resident when no screenshot jobs.
+	var (
+		browserOnce    sync.Once
+		lazyBrowser    *rod.Browser
+		lazyLauncher   *launcher.Launcher
+		browserInitErr error
+	)
+	getBrowser := func() (*rod.Browser, error) {
+		browserOnce.Do(func() {
+			log.Info("Initializing headless browser (lazy)...")
+			l := launcher.New().Leakless(false).Headless(true)
+			if _, err := os.Stat("/usr/bin/chromium"); err == nil {
+				log.Verbose("Using system chromium at /usr/bin/chromium")
+				l = l.Bin("/usr/bin/chromium")
+			} else if _, err := os.Stat("/usr/bin/chromium-browser"); err == nil {
+				log.Verbose("Using system chromium at /usr/bin/chromium-browser")
+				l = l.Bin("/usr/bin/chromium-browser")
+			} else if _, err := os.Stat("/usr/bin/google-chrome"); err == nil {
+				log.Verbose("Using system chromium at /usr/bin/google-chrome")
+				l = l.Bin("/usr/bin/google-chrome")
+			} else {
+				log.Verbose("No system chromium found, go-rod will download Chrome automatically")
+			}
+			lazyLauncher = l
+			url, err := l.Launch()
+			if err != nil {
+				browserInitErr = fmt.Errorf("browser launch failed: %w", err)
+				return
+			}
+			b := rod.New().ControlURL(url)
+			if err := b.Connect(); err != nil {
+				browserInitErr = fmt.Errorf("browser connect failed: %w", err)
+				// Best-effort cleanup on connect failure
+				l.Cleanup()
+				l.Kill()
+				return
+			}
+			lazyBrowser = b
+		})
+		if browserInitErr != nil {
+			return nil, browserInitErr
+		}
+		if lazyBrowser == nil {
+			return nil, fmt.Errorf("browser not initialized")
+		}
+		return lazyBrowser, nil
 	}
-
-	browser := rod.New().ControlURL(l.MustLaunch()).MustConnect()
 
 	workspaceRoot, err := filepath.Abs(cfg.WorkspaceRoot)
 	if err != nil {
@@ -98,37 +127,81 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	defer workerCancel()
 
 	var (
-		stateMu          sync.Mutex
-		sessionCtx       context.Context
-		sessionCancel    context.CancelFunc
-		schedulerStarted bool
+		stateMu       sync.Mutex
+		sessionCtx    context.Context
+		sessionCancel context.CancelFunc
+		pollerCancel  context.CancelFunc
 	)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
-	scheduler := gocron.NewScheduler(time.UTC)
 	var wg sync.WaitGroup
 
-	_, err = scheduler.Every(1).Second().Do(func() {
-		stateMu.Lock()
-		currentCtx := sessionCtx
-		stateMu.Unlock()
-
-		if currentCtx == nil || currentCtx.Err() != nil {
-			return
+	pollLoop := func(pollerCtx context.Context) {
+		backoff := time.Second
+		const maxBackoff = 5 * time.Second
+		hadJobCh := make(chan bool, 64)
+		timer := time.NewTimer(backoff)
+		defer timer.Stop()
+		for {
+			select {
+			case <-pollerCtx.Done():
+				return
+			case <-ctx.Done():
+				return
+			case hadJob := <-hadJobCh:
+				if hadJob {
+					backoff = time.Second
+				} else {
+					backoff *= 2
+					if backoff > maxBackoff {
+						backoff = maxBackoff
+					}
+				}
+			case <-timer.C:
+				// Apply any pending feedback before choosing next interval
+				select {
+				case hadJob := <-hadJobCh:
+					if hadJob {
+						backoff = time.Second
+					} else {
+						backoff *= 2
+						if backoff > maxBackoff {
+							backoff = maxBackoff
+						}
+					}
+				default:
+				}
+				stateMu.Lock()
+				cur := sessionCtx
+				stateMu.Unlock()
+				if cur == nil || cur.Err() != nil {
+					backoff *= 2
+					if backoff > maxBackoff {
+						backoff = maxBackoff
+					}
+					timer.Reset(backoff)
+					continue
+				}
+				select {
+				case semaphore <- struct{}{}:
+					wg.Add(1)
+					go func(sc context.Context) {
+						defer func() {
+							<-semaphore
+							wg.Done()
+						}()
+						hadJob := processJob(sc, grpcClient, getBrowser, toolPath, events)
+						select {
+						case hadJobCh <- hadJob:
+						default:
+						}
+					}(cur)
+					timer.Reset(backoff)
+				default:
+					timer.Reset(500 * time.Millisecond)
+				}
+			}
 		}
-
-		select {
-		case semaphore <- struct{}{}:
-			wg.Go(func() {
-				defer func() { <-semaphore }()
-				processJob(currentCtx, grpcClient, browser, toolPath, events)
-			})
-		default:
-		}
-	})
-	if err != nil {
-		log.ErrorE("Failed to schedule job", err)
-		return
 	}
 
 	go func() {
@@ -179,13 +252,16 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 					go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events)
 
-					if !schedulerStarted {
-						scheduler.StartAsync()
-						log.Success("Job poller started (concurrency: %d)", cfg.MaxConcurrency)
-						schedulerStarted = true
-					}
+					var pollerCtx context.Context
+					pollerCtx, pollerCancel = context.WithCancel(sessionCtx)
+					go pollLoop(pollerCtx)
+					log.Success("Job poller started (concurrency: %d)", cfg.MaxConcurrency)
 				} else {
 					log.Warning("Disconnected from core, suspending...")
+					if pollerCancel != nil {
+						pollerCancel()
+						pollerCancel = nil
+					}
 					sessionCtx = nil
 					sessionCancel = nil
 
@@ -230,8 +306,10 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	<-ctx.Done()
 	log.Info("Signal received, stopping...")
 
-	scheduler.Stop()
-	log.Info("Scheduler stopped, waiting for jobs...")
+	if pollerCancel != nil {
+		pollerCancel()
+	}
+	log.Info("Poller stopped, waiting for jobs...")
 
 	wg.Wait()
 	log.Info("All jobs finished")
@@ -242,11 +320,15 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	}
 	stateMu.Unlock()
 
-	if err := browser.Close(); err != nil {
-		log.Warning("Browser close: %v", err)
+	if lazyBrowser != nil {
+		if err := lazyBrowser.Close(); err != nil {
+			log.Warning("Browser close: %v", err)
+		}
 	}
-	l.Kill()
-	l.Cleanup()
+	if lazyLauncher != nil {
+		lazyLauncher.Kill()
+		lazyLauncher.Cleanup()
+	}
 	log.Success("Shutdown complete")
 
 	workerCancel()

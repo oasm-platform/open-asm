@@ -27,7 +27,7 @@ func TestRemoteExecuteSubscribe(t *testing.T) {
 	}
 	event, err := h.Next(context.Background())
 
-	// Then: the CONNECTED event is received and its ids are tracked
+	// Then: the CONNECTED event is received but ids are not tracked (only COMMAND tracks)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -37,8 +37,8 @@ func TestRemoteExecuteSubscribe(t *testing.T) {
 	if event.Type != workers.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED {
 		t.Errorf("expected CONNECTED event, got %v", event.Type)
 	}
-	if h.ID() != "cmd-1" || h.SessionID() != "sess-1" || h.WorkerID() != "w-1" {
-		t.Errorf("handler did not track ids: id=%q session=%q worker=%q", h.ID(), h.SessionID(), h.WorkerID())
+	if h.ID() != "" || h.SessionID() != "" || h.WorkerID() != "" {
+		t.Errorf("CONNECTED should not track ids: id=%q session=%q worker=%q", h.ID(), h.SessionID(), h.WorkerID())
 	}
 }
 

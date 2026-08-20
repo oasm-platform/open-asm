@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -108,6 +110,15 @@ func writeState(t *testing.T, toolDir string, state map[string][]string) {
 	}
 }
 
+func stateForBase(state map[string][]string, base string) ([]string, bool) {
+	for k, v := range state {
+		if k == base || strings.HasSuffix(k, "_"+base) {
+			return v, true
+		}
+	}
+	return nil, false
+}
+
 // emptyManifest returns a GetManifest hook that yields no init commands.
 func emptyManifest(ctx context.Context, req *workers.GetManifestRequest) (*workers.GetManifestResponse, error) {
 	return &workers.GetManifestResponse{}, nil
@@ -171,7 +182,7 @@ func TestDownloadTools_ZipExtraction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected extracted binary: %v", err)
 	}
-	if info.Mode().Perm()&0o111 == 0 {
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
 		t.Errorf("expected executable permissions, got %v", info.Mode().Perm())
 	}
 	data, err := os.ReadFile(binPath)
@@ -182,7 +193,7 @@ func TestDownloadTools_ZipExtraction(t *testing.T) {
 		t.Errorf("unexpected content: %q", data)
 	}
 	state := loadToolState(filepath.Join(toolDir, ".tool_versions.json"))
-	files, ok := state["nuclei.zip"]
+	files, ok := stateForBase(state, "nuclei.zip")
 	if !ok {
 		t.Fatal("expected state entry for nuclei.zip")
 	}
@@ -213,7 +224,7 @@ func TestDownloadTools_TarGzExtraction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected extracted binary: %v", err)
 	}
-	if info.Mode().Perm()&0o111 == 0 {
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
 		t.Errorf("expected executable permissions, got %v", info.Mode().Perm())
 	}
 	data, err := os.ReadFile(binPath)
@@ -224,7 +235,7 @@ func TestDownloadTools_TarGzExtraction(t *testing.T) {
 		t.Errorf("unexpected content: %q", data)
 	}
 	state := loadToolState(filepath.Join(toolDir, ".tool_versions.json"))
-	files, ok := state["subfinder.tar.gz"]
+	files, ok := stateForBase(state, "subfinder.tar.gz")
 	if !ok {
 		t.Fatal("expected state entry for subfinder.tar.gz")
 	}
@@ -286,7 +297,7 @@ func TestDownloadTools_IgnoredFilesSkipped(t *testing.T) {
 		t.Errorf("binary should be extracted: %v", statErr)
 	}
 	state := loadToolState(filepath.Join(toolDir, ".tool_versions.json"))
-	if files := state["tool.zip"]; len(files) != 1 || files[0] != "bin/tool" {
+	if files, _ := stateForBase(state, "tool.zip"); len(files) != 1 || files[0] != "bin/tool" {
 		t.Errorf("expected state [bin/tool], got %v", files)
 	}
 }
@@ -327,15 +338,18 @@ func TestDownloadTools_CleanupObsolete(t *testing.T) {
 		t.Errorf("current tool file must be kept: %v", statErr)
 	}
 	state := loadToolState(filepath.Join(toolDir, ".tool_versions.json"))
-	if _, ok := state["obsolete.zip"]; ok {
+	if _, ok := stateForBase(state, "obsolete.zip"); ok {
 		t.Error("obsolete.zip must be pruned from state")
 	}
-	if files := state["current.zip"]; len(files) != 1 || files[0] != currentFile {
+	if files, _ := stateForBase(state, "current.zip"); len(files) != 1 || files[0] != currentFile {
 		t.Errorf("expected state %v for current.zip, got %v", []string{currentFile}, files)
 	}
 }
 
 func TestDownloadTools_InitCommands(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("init script exec not supported on windows")
+	}
 	// Given: a cached tool plus an executable init script in the tool dir
 	srv, toolDir := newToolClient(t)
 	extracted := filepath.Join("nuclei", "bin", "nuclei")

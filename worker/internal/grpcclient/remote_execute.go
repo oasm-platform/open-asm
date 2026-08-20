@@ -28,8 +28,10 @@ func (c *Client) RemoteExecuteSubscribe(ctx context.Context) (*RemoteExecuteHand
 	return &RemoteExecuteHandler{stream: stream, client: c}, nil
 }
 
-// Next blocks for the next event on the stream, updating the tracked ids from
-// every received message. Returns (nil, nil) when the stream closes cleanly.
+// Next blocks for the next event on the stream, updating the tracked ids only
+// for COMMAND events so CONNECTED/PING messages do not overwrite the ids
+// used by subsequent SendStdout/SendError. Returns (nil, nil) when the stream
+// closes cleanly.
 func (h *RemoteExecuteHandler) Next(ctx context.Context) (*workers.RemoteExecuteSubscribeResponse, error) {
 	resp, err := h.stream.Recv()
 	if err == io.EOF {
@@ -38,7 +40,9 @@ func (h *RemoteExecuteHandler) Next(ctx context.Context) (*workers.RemoteExecute
 	if err != nil {
 		return nil, fmt.Errorf("failed to receive remote execute event: %w", err)
 	}
-	if resp != nil {
+	// Only track ids for COMMAND events; other types (CONNECTED/PING) may
+	// carry empty ids and would misattribute subsequent results.
+	if resp != nil && resp.Type == workers.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND {
 		h.sessionID = resp.SessionId
 		h.id = resp.Id
 		h.workerID = resp.WorkerId

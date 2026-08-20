@@ -1,9 +1,9 @@
 package worker
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,6 +71,7 @@ func (s *sessionSandbox) close() error {
 
 func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent) {
 	log := NewTuiLogger(events, "RemoteExec")
+	remoteSem := make(chan struct{}, 16)
 
 	for {
 		select {
@@ -165,7 +166,16 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 					SessionCommand: command,
 				})
 
-				go executeRemoteCommand(ctx, handler, sessionID, command, sb, events, toolPath)
+				select {
+				case remoteSem <- struct{}{}:
+					go func(h *grpcclient.RemoteExecuteHandler, sid string, cmd string, sbox *sessionSandbox) {
+						defer func() { <-remoteSem }()
+						executeRemoteCommand(ctx, h, sid, cmd, sbox, events, toolPath)
+					}(handler, sessionID, command, sb)
+				default:
+					log.Warning("remote exec concurrency limit reached")
+					_ = handler.SendError(ctx, "server busy")
+				}
 
 			default:
 				log.Warning("Unknown remote execute event type: %v", resp.Type)
@@ -216,26 +226,30 @@ func executeRemoteCommand(ctx context.Context, handler *grpcclient.RemoteExecute
 		return
 	}
 
-	scanner := bufio.NewScanner(stdoutPipe)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		line = append(line, '\n')
-
-		if sendErr := handler.SendStdout(ctx, line); sendErr != nil {
-			log.ErrorE("Failed to stream output", sendErr)
-			return
+	buf := make([]byte, 32*1024)
+	for {
+		n, readErr := stdoutPipe.Read(buf)
+		if n > 0 {
+			chunk := make([]byte, n)
+			copy(chunk, buf[:n])
+			if sendErr := handler.SendStdout(ctx, chunk); sendErr != nil {
+				log.ErrorE("Failed to stream output", sendErr)
+				return
+			}
+			Emit(events, TuiEvent{
+				Type:          EventSessionOutput,
+				SessionID:     sessionID,
+				SessionOutput: string(chunk),
+				SessionStream: "stdout",
+			})
 		}
-
-		Emit(events, TuiEvent{
-			Type:          EventSessionOutput,
-			SessionID:     sessionID,
-			SessionOutput: string(line),
-			SessionStream: "stdout",
-		})
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.ErrorE("Error reading from pipe", err)
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			log.ErrorE("Error reading from pipe", readErr)
+			break
+		}
 	}
 
 	exitCode := int32(0)
