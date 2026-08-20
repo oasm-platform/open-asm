@@ -238,7 +238,7 @@ function highlightJson(json: string) {
       )
       // standalone strings (array items etc.)
       .replace(
-        /(?<=[\[,]\s*)("(?:[^"\\]|\\.)*")/g,
+        /(?<=[[,]\s*)("(?:[^"\\]|\\.)*")/g,
         '<span class="text-green-400">$1</span>',
       )
       // numbers
