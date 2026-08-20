@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useWorkspaceSelector, useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { setGlobalWorkspaceId } from '@/utils/workspaceState';
-import { setCookie, deleteCookie } from '@/utils/cookie';
+import { setCookie, deleteCookie, getCookie } from '@/utils/cookie';
 import React from 'react';
 
 vi.mock('@/services/apis/gen/queries', () => ({
@@ -18,6 +18,15 @@ vi.mock('@/utils/workspaceState', () => ({
 vi.mock('@/utils/cookie', () => ({
   setCookie: vi.fn(),
   deleteCookie: vi.fn(),
+  getCookie: vi.fn(() => null),
+}));
+
+vi.mock('@/utils/authClient', () => ({
+  useSession: vi.fn(() => ({
+    data: { user: { id: 'user-1', email: 'admin@test.com', name: 'Test Admin', role: 'admin' } },
+    isPending: false,
+    error: null,
+  })),
 }));
 
 const { useWorkspacesControllerGetWorkspaces } = await import('@/services/apis/gen/queries');
@@ -128,6 +137,33 @@ describe('useWorkspaceSelector', () => {
   it('auto-selects first workspace when none is selected', () => {
     const workspaces = [{ id: 'ws-1', name: 'Workspace 1' }];
     setupWorkspaceQuery(workspaces);
+
+    const { wrapper } = createWrapper();
+    renderHook(() => useWorkspaceSelector(), { wrapper });
+
+    expect(setGlobalWorkspaceId).toHaveBeenCalledWith('ws-1');
+    expect(setCookie).toHaveBeenCalledWith('wid', 'ws-1');
+  });
+
+  it('honors wid cookie when no workspace is selected (reload)', () => {
+    const workspaces = [
+      { id: 'ws-1', name: 'Workspace 1' },
+      { id: 'ws-2', name: 'Workspace 2' },
+    ];
+    setupWorkspaceQuery(workspaces);
+    vi.mocked(getCookie).mockReturnValue('ws-2');
+
+    const { wrapper } = createWrapper();
+    renderHook(() => useWorkspaceSelector(), { wrapper });
+
+    expect(setGlobalWorkspaceId).toHaveBeenCalledWith('ws-2');
+    expect(setCookie).toHaveBeenCalledWith('wid', 'ws-2');
+  });
+
+  it('falls back to first workspace when wid cookie is stale', () => {
+    const workspaces = [{ id: 'ws-1', name: 'Workspace 1' }];
+    setupWorkspaceQuery(workspaces);
+    vi.mocked(getCookie).mockReturnValue('ws-stale');
 
     const { wrapper } = createWrapper();
     renderHook(() => useWorkspaceSelector(), { wrapper });

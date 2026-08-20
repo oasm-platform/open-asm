@@ -4,6 +4,25 @@ import Dashboard from '@/pages/dashboard/dashboard';
 import { server } from '@/test/mocks/node';
 import { http, HttpResponse } from 'msw';
 
+vi.mock('@/utils/authClient', () => ({
+  useSession: () => ({
+    data: { user: { id: 'user-1', email: 'admin@test.com', name: 'Test Admin', role: 'admin' } },
+    isPending: false,
+    error: null,
+  }),
+  authClient: {
+    getSession: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null }),
+    signIn: { email: vi.fn() },
+    signOut: vi.fn(),
+    admin: {},
+  },
+  SESSION_QUERY_KEY: ['auth', 'session'],
+  sessionQueryOptions: { queryKey: ['auth', 'session'] },
+  isVoluntaryLogout: false,
+  markVoluntaryLogout: vi.fn(),
+  resetVoluntaryLogout: vi.fn(),
+}));
+
 vi.mock('recharts', () => {
   const Mock = () => <div />;
   const MockWithChildren = ({ children }: { children?: React.ReactNode }) => (
