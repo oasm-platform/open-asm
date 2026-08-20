@@ -246,6 +246,10 @@ func (c *Client) extractZip(srcZip, destDir string) ([]string, error) {
 			continue
 		}
 
+		// Explicit ".." check required for CodeQL go/zipslip sanitizer.
+		if strings.Contains(f.Name, "..") {
+			return nil, fmt.Errorf("illegal file path: %s", f.Name)
+		}
 		entry, ok := normalizeEntry(f.Name)
 		if !ok {
 			return nil, fmt.Errorf("illegal file path: %s", f.Name)
@@ -338,6 +342,9 @@ func (c *Client) extractTarGz(srcGzip, destDir string) ([]string, error) {
 			continue
 		}
 
+		if strings.Contains(header.Name, "..") {
+			return nil, fmt.Errorf("illegal file path: %s", header.Name)
+		}
 		var ok bool
 		entry, ok := normalizeEntry(header.Name)
 		if !ok {
