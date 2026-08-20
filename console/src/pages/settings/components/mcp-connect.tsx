@@ -41,6 +41,7 @@ interface McpClient {
 function baseConfig(baseUrl: string, apiKey: string) {
   return {
     'oasm-platform': {
+      type: 'http' as const,
       url: `${baseUrl}/api/mcp`,
       headers: { 'x-oasm-api-key': apiKey },
     },
@@ -220,39 +221,53 @@ const MCP_CLIENTS: McpClient[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Syntax-highlighted config viewer (simple JSON colorizer)
+// Syntax-highlighted config viewer — tokenizes without regex/DOM injection
+//                           so values containing colons (e.g. headers) render correctly
 // ---------------------------------------------------------------------------
 
-function highlightJson(json: string) {
-  // Simple line-by-line JSON coloring
-  return json.split('\n').map((line, i) => {
-    const colored = line
-      // strings (keys & values)
-      .replace(
-        /("(?:[^"\\]|\\.)*")\s*:/g,
-        '<span class="text-blue-400">$1</span>:',
-      )
-      .replace(
-        /:\s*("(?:[^"\\]|\\.)*")/g,
-        ': <span class="text-green-400">$1</span>',
-      )
-      // standalone strings (array items etc.)
-      .replace(
-        /(?<=[[,]\s*)("(?:[^"\\]|\\.)*")/g,
-        '<span class="text-green-400">$1</span>',
-      )
-      // numbers
-      .replace(
-        /:\s*(\d+)/g,
-        ': <span class="text-amber-400">$1</span>',
-      )
-      // booleans
-      .replace(
-        /\b(true|false|null)\b/g,
-        '<span class="text-purple-400">$1</span>',
-      );
-    return { lineNum: i + 1, html: colored };
-  });
+type HlPart = string | { c: string; t: string };
+
+function tokenizeJsonLine(line: string): HlPart[] {
+  const parts: HlPart[] = [];
+  // Match one quoted string, number, or boolean at the next position; plain
+  // punctuation/whitespace is emitted as a raw string part.
+  const re =
+    /("(?:[^"\\]|\\.)*")\s*:|("(?:[^"\\]|\\.)*")|(\b(?:true|false|null)\b)|(\b-?\d+(?:\.\d+)?(?:e[+-]?\d+)?\b)|./g;
+  let m: RegExpExecArray | null;
+  let last = 0;
+  let afterColon = false;
+  while ((m = re.exec(line)) !== null) {
+    if (m.index !== last) {
+      parts.push(line.slice(last, m.index));
+    }
+    last = re.lastIndex;
+    const tok = m[0];
+    if (m[1] !== undefined) {
+      // Quoted key (has trailing colon) — keys are blue
+      parts.push({ c: 'text-blue-400', t: m[1] });
+      const col = tok.slice(m[1].length); // ":" + ws
+      if (col) parts.push(col);
+      afterColon = true;
+    } else if (m[2] !== undefined) {
+      // Quoted string value — green
+      parts.push({ c: 'text-green-400', t: m[2] });
+      afterColon = false;
+    } else if (m[3] !== undefined) {
+      parts.push({ c: 'text-purple-400', t: m[3] });
+      afterColon = false;
+    } else if (m[4] !== undefined) {
+      parts.push({ c: 'text-amber-400', t: m[4] });
+      afterColon = false;
+    } else if (tok === ':' && !afterColon) {
+      // Top-level separator between blocks (rare in this JSON) — keep plain
+      parts.push(tok);
+    } else {
+      parts.push(tok);
+      if (tok.trim()) afterColon = false;
+    }
+  }
+  if (last < line.length) parts.push(line.slice(last));
+  return parts;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,11 +295,11 @@ export default function McpConnect() {
   );
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const apiKey = apiKeyData?.apiKey ?? 'YOUR_API_KEY';
-
-  // Display config shows a placeholder alias; copying substitutes the real key
+  // Empty string must also fall back to the placeholder; real key only on copy.
+  const apiKey = (apiKeyData?.apiKey ?? '').trim() || 'YOUR_API_KEY';
   const displayApiKey = 'YOUR_API_KEY';
 
+  // Display config shows placeholder; copy substitutes the real key
   const configJson = useMemo(
     () => selectedClient.generateConfig(baseUrl, displayApiKey),
     [selectedClient, baseUrl],
@@ -295,7 +310,13 @@ export default function McpConnect() {
     [selectedClient, baseUrl, apiKey],
   );
 
-  const highlighted = useMemo(() => highlightJson(configJson), [configJson]);
+  const highlightedLines = useMemo(
+    () => configJson.split('\n').map((line, i) => ({
+      lineNum: i + 1,
+      parts: tokenizeJsonLine(line),
+    })),
+    [configJson],
+  );
 
   // ---- Actions ----
 
@@ -307,16 +328,13 @@ export default function McpConnect() {
   }, [copyConfigJson]);
 
   const openInClient = useCallback(() => {
-    // Attempt deep-links for known clients
     const deepLinks: Record<string, string> = {
-      vscode: `vscode://vscode.json?%7B%22command%22%3A%22workbench.action.openSettings%22%7D`,
       cursor: `cursor://open?file=mcp.json`,
     };
     const link = deepLinks[selectedClientId];
     if (link) {
       window.open(link, '_blank');
     } else {
-      // Fallback: just copy
       copyConfig();
     }
   }, [selectedClientId, copyConfig]);
@@ -418,15 +436,22 @@ export default function McpConnect() {
         {/* Code area */}
         <div className="overflow-x-auto">
           <pre className="p-4 text-sm font-mono leading-relaxed">
-            {highlighted.map(({ lineNum, html }) => (
+            {highlightedLines.map(({ lineNum, parts }) => (
               <div key={lineNum} className="flex">
                 <span className="inline-block w-8 shrink-0 select-none text-right pr-4 text-muted-foreground/50">
                   {lineNum}
                 </span>
-                <span
-                  className="flex-1"
-                  dangerouslySetInnerHTML={{ __html: html }}
-                />
+                <span className="flex-1">
+                  {parts.map((p, i) =>
+                    typeof p === 'string' ? (
+                      <span key={i}>{p}</span>
+                    ) : (
+                      <span key={i} className={p.c}>
+                        {p.t}
+                      </span>
+                    ),
+                  )}
+                </span>
               </div>
             ))}
           </pre>
