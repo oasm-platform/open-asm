@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -24,9 +25,21 @@ var userAgents = []string{
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.0.0 Safari/537.36",
 }
 
+// ponytail: single global RNG (sync.Once + Mutex) replaces per-call New+Seed alloc.
+var (
+	uaOnce sync.Once
+	uaRng  *rand.Rand
+	uaMu   sync.Mutex
+)
+
 func getRandomUserAgent() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return userAgents[r.Intn(len(userAgents))]
+	uaOnce.Do(func() {
+		uaRng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	})
+	uaMu.Lock()
+	n := uaRng.Intn(len(userAgents))
+	uaMu.Unlock()
+	return userAgents[n]
 }
 
 func formatURL(target string) string {
@@ -50,7 +63,7 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 	if err != nil {
 		return "", fmt.Errorf("failed to create stealth page: %w", err)
 	}
-	defer page.MustClose()
+	defer func() { _ = page.Close() }()
 
 	_ = page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
 		Width:             1920,

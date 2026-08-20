@@ -1,17 +1,18 @@
 package worker
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/oasm-platform/oasm-sdk-go/oasm"
-	pb "github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	pb "oasm-worker/internal/gen/workers"
+
+	"oasm-worker/internal/grpcclient"
 )
 
 type sessionSandbox struct {
@@ -68,8 +69,9 @@ func (s *sessionSandbox) close() error {
 	return os.RemoveAll(s.rootPath)
 }
 
-func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent) {
+func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent) {
 	log := NewTuiLogger(events, "RemoteExec")
+	remoteSem := make(chan struct{}, 16)
 
 	for {
 		select {
@@ -81,7 +83,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 
 		log.Info("Subscribing to remote execute stream...")
 
-		handler, err := client.RemoteExecuteSubscribe(ctx)
+		handler, err := grpcClient.RemoteExecuteSubscribe(ctx)
 		if err != nil {
 			log.ErrorE("Failed to subscribe, retrying in 5s", err)
 
@@ -95,7 +97,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 			}
 		}
 
-		log.Success("Remote execute stream connected (worker: %s)", client.WorkerID())
+		log.Success("Remote execute stream connected (worker: %s)", grpcClient.WorkerID())
 
 		activeSessions := make(map[string]*sessionSandbox)
 		var sessionsMu sync.Mutex
@@ -164,7 +166,20 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 					SessionCommand: command,
 				})
 
-				go executeRemoteCommand(ctx, handler, sessionID, command, sb, events, toolPath)
+				// Capture ids at command-receive time to avoid misattribution if
+				// Next() overwrites handler ids before the goroutine sends.
+				cmdID := resp.Id
+				cmdWorkerID := resp.WorkerId
+				select {
+				case remoteSem <- struct{}{}:
+					go func(h *grpcclient.RemoteExecuteHandler, sid, cid, wid, cmd string, sbox *sessionSandbox) {
+						defer func() { <-remoteSem }()
+						executeRemoteCommand(ctx, h, sid, cid, wid, cmd, sbox, events, toolPath)
+					}(handler, sessionID, cmdID, cmdWorkerID, command, sb)
+				default:
+					log.Warning("remote exec concurrency limit reached")
+					_ = handler.SendErrorFor(ctx, sessionID, cmdID, cmdWorkerID, "server busy")
+				}
 
 			default:
 				log.Warning("Unknown remote execute event type: %v", resp.Type)
@@ -192,9 +207,11 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 	}
 }
 
-func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, sessionID string, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
+func executeRemoteCommand(ctx context.Context, handler *grpcclient.RemoteExecuteHandler, sessionID, cmdID, workerID, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
 	log := NewTuiLogger(events, "RemoteExec")
 	log.Info("Executing in session %s: %s", sessionID, command)
+	_ = cmdID
+	_ = workerID
 
 	wrappedCmd := fmt.Sprintf("(%s) 2>&1", command)
 	cmd := exec.CommandContext(ctx, "sh", "-c", wrappedCmd)
@@ -215,26 +232,30 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 		return
 	}
 
-	scanner := bufio.NewScanner(stdoutPipe)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		line = append(line, '\n')
-
-		if sendErr := handler.SendStdout(ctx, line); sendErr != nil {
-			log.ErrorE("Failed to stream output", sendErr)
-			return
+	buf := make([]byte, 32*1024)
+	for {
+		n, readErr := stdoutPipe.Read(buf)
+		if n > 0 {
+			chunk := make([]byte, n)
+			copy(chunk, buf[:n])
+			if sendErr := handler.SendStdout(ctx, chunk); sendErr != nil {
+				log.ErrorE("Failed to stream output", sendErr)
+				return
+			}
+			Emit(events, TuiEvent{
+				Type:          EventSessionOutput,
+				SessionID:     sessionID,
+				SessionOutput: string(chunk),
+				SessionStream: "stdout",
+			})
 		}
-
-		Emit(events, TuiEvent{
-			Type:          EventSessionOutput,
-			SessionID:     sessionID,
-			SessionOutput: string(line),
-			SessionStream: "stdout",
-		})
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.ErrorE("Error reading from pipe", err)
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			log.ErrorE("Error reading from pipe", readErr)
+			break
+		}
 	}
 
 	exitCode := int32(0)
