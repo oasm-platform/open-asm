@@ -24,6 +24,11 @@ type Config struct {
 	Network        string    `mapstructure:"network"`
 	WorkspaceRoot  string    `mapstructure:"workspace_root"`
 	TLS            TLSConfig `mapstructure:",squash"`
+
+	// Connector server — Docker containers connect back to the worker via this gRPC endpoint.
+	ConnectorPort  int    `mapstructure:"connector_port"`  // gRPC port for connectors, default 50051
+	ConnectorAddr  string `mapstructure:"connector_addr"`  // listen address, default "0.0.0.0:50051"
+	ConnectorToken string `mapstructure:"connector_token"` // shared secret for connector auth, empty = no auth
 }
 
 func LoadConfig() (*Config, error) {
@@ -40,6 +45,9 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("grpc_port", 16276)
 	viper.SetDefault("tool_path", "oasm-tools")
 	viper.SetDefault("workspace_root", "agent-sessions")
+	viper.SetDefault("connector_port", 50051)
+	viper.SetDefault("connector_addr", "0.0.0.0:50051")
+	viper.SetDefault("connector_token", "")
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {

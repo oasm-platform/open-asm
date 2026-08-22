@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"oasm-worker/internal/config"
+	"oasm-worker/internal/connector"
 	"os"
 	"path/filepath"
 	"sync"
@@ -281,6 +282,25 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	}()
 
 	go grpcClient.Connect(workerCtx, ready)
+
+	// Start connector gRPC server for Docker connectors.
+	// Non-fatal: worker can still operate legacy path without connector server.
+	proxy := connector.NewProxy()
+	connectorServer, err := connector.NewServer(
+		fmt.Sprintf(":%d", cfg.ConnectorPort),
+		proxy,
+		cfg.ConnectorToken,
+	)
+	if err != nil {
+		log.Error("connector server init failed (non-fatal): %v", err)
+	} else {
+		go func() {
+			log.Success("connector server listening on %s", connectorServer.Addr())
+			if err := connectorServer.Serve(workerCtx); err != nil {
+				log.Warning("connector server stopped: %v", err)
+			}
+		}()
+	}
 
 	ticker := time.NewTicker(time.Second)
 	go func() {

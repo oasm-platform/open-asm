@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package connector;
+
+option go_package = "./connector";
+
+message Register {
+  string token = 1;
+}
+
+message RegisterAck {
+  bool accepted = 1;
+  string reason = 2;
+}
+
+message ExecuteJob {
+  string execution_id = 1;
+  string job_id = 2;
+  string tool = 3;
+  string image = 4;
+  string trace_id = 5;
+  map<string, string> inputs = 6;
+}
+
+message Cancel {
+  string execution_id = 1;
+}
+
+message Result {
+  string execution_id = 1;
+  bytes data = 2;
+  bool is_error = 3;
+}
+
+message Done {
+  string execution_id = 1;
+  string error = 2;
+}
+
+// Connector → Worker messages (client stream)
+message ConnectorMessage {
+  oneof message {
+    Register register = 1;
+    Result result = 2;
+    Done done = 3;
+  }
+}
+
+// Worker → Connector messages (server stream)
+message WorkerMessage {
+  oneof message {
+    RegisterAck register_ack = 1;
+    ExecuteJob execute = 2;
+    Cancel cancel = 3;
+  }
+}
+
+service ConnectorService {
+  // Bidirectional streaming: connector connects and exchanges messages
+  rpc Connect(stream ConnectorMessage) returns (stream WorkerMessage);
+}

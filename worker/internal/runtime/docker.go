@@ -2,8 +2,11 @@ package runtime
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -12,13 +15,15 @@ import (
 // DockerRuntime implements ExecutionRuntime via Docker Engine API over docker.sock.
 // ponytail: no CLI, no docker binary exec, only Engine API via github.com/docker/docker/client.
 type DockerRuntime struct {
-	cli  *client.Client
-	host string // e.g. unix:///var/run/docker.sock (from WORKER_DOCKER_HOST)
+	cli            *client.Client
+	host           string // e.g. unix:///var/run/docker.sock (from WORKER_DOCKER_HOST)
+	connectorAddr  string // Worker's gRPC server address for connectors (e.g. host.docker.internal:50051)
+	connectorToken string // shared secret for connector authentication
 }
 
 // NewDockerRuntime creates a DockerRuntime dialing via docker.sock.
 // host defaults to unix:///var/run/docker.sock; WORKER_DOCKER_HOST env overrides.
-func NewDockerRuntime(host string) (*DockerRuntime, error) {
+func NewDockerRuntime(host, connectorAddr, connectorToken string) (*DockerRuntime, error) {
 	if host == "" {
 		host = "unix:///var/run/docker.sock"
 	}
@@ -30,12 +35,29 @@ func NewDockerRuntime(host string) (*DockerRuntime, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DockerRuntime{cli: cli, host: host}, nil
+	return &DockerRuntime{
+		cli:            cli,
+		host:           host,
+		connectorAddr:  connectorAddr,
+		connectorToken: connectorToken,
+	}, nil
 }
 
 // NewDockerRuntimeWithClient creates a DockerRuntime with an existing client (for tests).
-func NewDockerRuntimeWithClient(cli *client.Client) *DockerRuntime {
-	return &DockerRuntime{cli: cli, host: "test"}
+func NewDockerRuntimeWithClient(cli *client.Client, connectorAddr, connectorToken string) *DockerRuntime {
+	return &DockerRuntime{
+		cli:            cli,
+		host:           "test",
+		connectorAddr:  connectorAddr,
+		connectorToken: connectorToken,
+	}
+}
+
+// generateExecID produces a random hex string for execution tracking.
+func generateExecID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOpts) (Handle, error) {
@@ -48,11 +70,67 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	if d.cli == nil {
 		return Handle{}, fmt.Errorf("docker client not initialized")
 	}
-	// ponytail: real impl would ImagePull if not present, then ContainerCreate with limits, read-only rootfs, no-new-privs, trace label
-	// spec.Image is the manifest-resolved connector image (SDK+tool, ghcr.io/open-asm/connector-<tool>:<version>), not the upstream tool image — built from oasm-connectors/<category>/<tool>/Dockerfile (e.g. vulnerabilities/nuclei/Dockerfile)
-	_ = container.Config{Image: spec.Image, Labels: map[string]string{"trace_id": opts.TraceID}}
-	_ = container.HostConfig{}
-	return Handle{ID: "docker-" + spec.Tool, Labels: map[string]string{"trace_id": opts.TraceID}}, nil
+
+	// Build env vars: Worker connection params + execution metadata.
+	execID := generateExecID()
+	env := []string{
+		"WORKER_GRPC_ADDR=" + d.connectorAddr,
+		"WORKER_TOKEN=" + d.connectorToken,
+		"EXECUTION_ID=" + execID,
+		"JOB_ID=" + spec.Tool,
+		"TOOL=" + spec.Tool,
+		"TRACE_ID=" + opts.TraceID,
+	}
+
+	// Inject connector inputs as INPUT_<KEY>=<VALUE> env vars.
+	for k, v := range spec.Inputs {
+		env = append(env, "INPUT_"+strings.ToUpper(k)+"="+fmt.Sprintf("%v", v))
+	}
+
+	// Container config: image, env, labels for lifecycle management.
+	config := &container.Config{
+		Image: spec.Image,
+		Env:   env,
+		Labels: map[string]string{
+			"trace_id":     opts.TraceID,
+			"tool":         spec.Tool,
+			"oasm-managed": "true",
+		},
+	}
+
+	// Host config: resource limits + security hardening.
+	// CPU: opts.CPU in millicores → NanoCPUs (1 millicore = 1e6 nanocpus).
+	// Memory: opts.Memory in MB → bytes. MemorySwap = Memory disables swap.
+	hostConfig := &container.HostConfig{
+		Resources: container.Resources{
+			NanoCPUs:   int64(opts.CPU) * 1e6,
+			Memory:     int64(opts.Memory) * 1024 * 1024,
+			MemorySwap: int64(opts.Memory) * 1024 * 1024,
+		},
+		SecurityOpt:    []string{"no-new-privileges:true"},
+		ReadonlyRootfs: false, // connectors may need to write temp files
+	}
+
+	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
+	if err != nil {
+		return Handle{}, fmt.Errorf("container create: %w", err)
+	}
+
+	containerID := resp.ID
+
+	// Start the container. Clean up on failure so we don't leak containers.
+	if err := d.cli.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
+		_ = d.cli.ContainerRemove(context.Background(), containerID, container.RemoveOptions{Force: true})
+		return Handle{}, fmt.Errorf("container start: %w", err)
+	}
+
+	return Handle{
+		ID: containerID,
+		Labels: map[string]string{
+			"trace_id": opts.TraceID,
+			"tool":     spec.Tool,
+		},
+	}, nil
 }
 
 func (d *DockerRuntime) Start(ctx context.Context, h Handle) error {
