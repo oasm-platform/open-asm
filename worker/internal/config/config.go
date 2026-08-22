@@ -7,14 +7,23 @@ import (
 	"github.com/spf13/viper"
 )
 
+type TLSConfig struct {
+	Enabled    bool   `mapstructure:"tls_enabled"`
+	CAFile     string `mapstructure:"tls_ca_file"`
+	CertFile   string `mapstructure:"tls_cert_file"`
+	KeyFile    string `mapstructure:"tls_key_file"`
+	ServerName string `mapstructure:"tls_server_name"`
+}
+
 type Config struct {
-	ApiKey         string `mapstructure:"api_key"`
-	MaxConcurrency int    `mapstructure:"max_concurrency"`
-	GrpcHost       string `mapstructure:"grpc_host"`
-	GrpcPort       int    `mapstructure:"grpc_port"`
-	ToolPath       string `mapstructure:"tool_path"`
-	Network        string `mapstructure:"network"`
-	WorkspaceRoot  string `mapstructure:"workspace_root"`
+	ApiKey         string    `mapstructure:"api_key"`
+	MaxConcurrency int       `mapstructure:"max_concurrency"`
+	GrpcHost       string    `mapstructure:"grpc_host"`
+	GrpcPort       int       `mapstructure:"grpc_port"`
+	ToolPath       string    `mapstructure:"tool_path"`
+	Network        string    `mapstructure:"network"`
+	WorkspaceRoot  string    `mapstructure:"workspace_root"`
+	TLS            TLSConfig `mapstructure:",squash"`
 }
 
 func LoadConfig() (*Config, error) {

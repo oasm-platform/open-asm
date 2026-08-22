@@ -81,6 +81,13 @@ func AppHeadless() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// ponytail: graceful shutdown — signal.NotifyContext cancels ctx on SIGINT/SIGTERM;
+	// transport.Close() + runtime.CleanupAll() wired in Phase 3 (execution/manager).
+	go func() {
+		<-ctx.Done()
+		// ponytail: transport.Close() + runtime.CleanupAll() wired in Phase 3
+	}()
+
 	// Headless mode: no TUI. Pass nil events channel.
 	// TuiLogger falls back to writing formatted logs to stderr.
 	// Library stderr output also goes to stderr — fine for Docker.
