@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -71,21 +72,9 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		return Handle{}, fmt.Errorf("docker client not initialized")
 	}
 
-	// Build env vars: Worker connection params + execution metadata.
+	// Build env vars for the container.
 	execID := generateExecID()
-	env := []string{
-		"WORKER_GRPC_ADDR=" + d.connectorAddr,
-		"WORKER_TOKEN=" + d.connectorToken,
-		"EXECUTION_ID=" + execID,
-		"JOB_ID=" + spec.Tool,
-		"TOOL=" + spec.Tool,
-		"TRACE_ID=" + opts.TraceID,
-	}
-
-	// Inject connector inputs as INPUT_<KEY>=<VALUE> env vars.
-	for k, v := range spec.Inputs {
-		env = append(env, "INPUT_"+strings.ToUpper(k)+"="+fmt.Sprintf("%v", v))
-	}
+	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID)
 
 	// Container config: image, env, labels for lifecycle management.
 	config := &container.Config{
@@ -178,4 +167,32 @@ func (d *DockerRuntime) Cleanup(ctx context.Context, h Handle) error {
 	}
 	_ = d.cli.ContainerRemove(ctx, h.ID, container.RemoveOptions{Force: true})
 	return nil
+}
+
+// buildContainerEnv constructs the env var slice for a connector container.
+func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID string) []string {
+	env := []string{
+		"WORKER_GRPC_ADDR=" + connectorAddr,
+		"WORKER_TOKEN=" + connectorToken,
+		"EXECUTION_ID=" + execID,
+		"JOB_ID=" + spec.JobID,
+		"TOOL=" + spec.Tool,
+		"TRACE_ID=" + spec.TraceID,
+	}
+
+	// Inject connector config profile as OASM_CONFIG JSON when present.
+	if len(spec.Config) > 0 {
+		if b, err := json.Marshal(spec.Config); err == nil {
+			env = append(env, "OASM_CONFIG="+string(b))
+		} else {
+			fmt.Fprintf(os.Stderr, "WARNING: failed to marshal OASM_CONFIG for job %s: %v\n", spec.JobID, err)
+		}
+	}
+
+	// Inject connector inputs as INPUT_<KEY>=<VALUE> env vars.
+	for k, v := range spec.Inputs {
+		env = append(env, "INPUT_"+strings.ToUpper(k)+"="+fmt.Sprintf("%v", v))
+	}
+
+	return env
 }

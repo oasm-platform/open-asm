@@ -159,6 +159,26 @@ export class WorkersService {
   }
 
   /**
+   * Maps gRPC WorkerRunMode enum (numeric or string) to a stored string value.
+   * Numeric: 0→null (UNKNOWN), 1→'cli', 2→'node'.
+   * String: 'cli'→'cli', 'node'→'node', anything else→null.
+   * This is intentionally defensive — accepts both the proto numeric enum
+   * and plain strings for forward compatibility.
+   */
+  private mapRunMode(mode?: number | string): string | null {
+    if (mode === undefined || mode === null) return null;
+    if (typeof mode === 'number') {
+      if (mode === 1) return 'cli';
+      if (mode === 2) return 'node';
+      return null; // 0 or any other value → null (UNKNOWN)
+    }
+    const lower = String(mode).toLowerCase();
+    if (lower === 'cli') return 'cli';
+    if (lower === 'node') return 'node';
+    return null;
+  }
+
+  /**
    * Retrieves a paginated list of workers.
    *
    * @param query - The query parameters for filtering and pagination,
@@ -169,7 +189,7 @@ export class WorkersService {
   public async getWorkers(
     query: GetManyWorkersDto,
   ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
-    const { page, limit, sortOrder, workspaceId, enabledAgentMode, scope } =
+    const { page, limit, sortOrder, workspaceId, enabledAgentMode, scope, runMode } =
       query;
     let { sortBy } = query;
     if (!sortBy) {
@@ -240,6 +260,13 @@ export class WorkersService {
       // If no workspaceId and no enabledAgentMode filter, include only cloud workers
       queryBuilder.andWhere('w."scope" = :cloudScope', {
         cloudScope: WorkerScope.CLOUD,
+      });
+    }
+
+    // Add runMode filter if provided
+    if (runMode) {
+      queryBuilder.andWhere('w."runMode" = :runModeFilter', {
+        runModeFilter: runMode,
       });
     }
 
@@ -337,6 +364,7 @@ export class WorkersService {
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
     const { apiKey, signature, token, metadata, ipAddress } = dto;
+    const runMode = this.mapRunMode(metadata?.mode);
 
     // 1. Validate signature first (mandatory)
     const workerSignature =
@@ -367,19 +395,27 @@ export class WorkersService {
       });
       if (existingWorker) {
         await this.fallbackWorkerRejoin(existingWorker.id);
+        const updates: Record<string, unknown> = {};
         if (ipAddress) {
-          await this.repo.update({ id: existingWorker.id }, { ipAddress });
+          updates.ipAddress = ipAddress;
         }
-        return existingWorker;
+        // Update runMode only if changed
+        if (runMode !== existingWorker.runMode) {
+          updates.runMode = runMode;
+        }
+        if (Object.keys(updates).length > 0) {
+          await this.repo.update({ id: existingWorker.id }, updates);
+        }
+        return this.repo.findOne({ where: { id: existingWorker.id } }) as Promise<WorkerInstance>;
       }
     }
 
     // 5. Create new worker after successful authentication
     if (isCloudWorker) {
-      return this.createCloudWorker(metadata, ipAddress);
+      return this.createCloudWorker(metadata, ipAddress, runMode);
     }
 
-    return this.createRegularWorker(apiKey, metadata, ipAddress);
+    return this.createRegularWorker(apiKey, metadata, ipAddress, runMode);
   }
 
   /**
@@ -391,6 +427,7 @@ export class WorkersService {
   private async createCloudWorker(
     metadata?: WorkerJoinDto['metadata'],
     ipAddress?: string,
+    runMode?: string | null,
   ): Promise<WorkerInstance> {
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
@@ -403,6 +440,7 @@ export class WorkersService {
       name: metadata?.name,
       os: metadata?.os,
       ipAddress,
+      runMode: runMode ?? null,
     };
 
     await this.repo.save(data);
@@ -429,6 +467,7 @@ export class WorkersService {
     apiKey: string,
     metadata?: WorkerJoinDto['metadata'],
     ipAddress?: string,
+    runMode?: string | null,
   ): Promise<WorkerInstance> {
     const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
       where: { key: apiKey },
@@ -456,6 +495,7 @@ export class WorkersService {
       name: metadata?.name,
       os: metadata?.os,
       ipAddress,
+      runMode: runMode ?? null,
     };
 
     await this.repo.save(data);

@@ -17,6 +17,7 @@ type Client struct {
 	conn     *grpc.ClientConn
 	apiKey   string
 	toolPath string
+	runMode  string // "cli", "node", or "" (unknown)
 	logger   Logger
 	auth     *tokenAuth
 
@@ -94,3 +95,9 @@ func (c *Client) workersClient() workerPb.WorkersServiceClient { return c.worker
 
 // jobsClient returns the JobsRegistryService stub.
 func (c *Client) jobsClient() jobRegistryPb.JobsRegistryServiceClient { return c.jobs }
+
+// SetRunMode stores the worker run mode ("cli", "node", or "") which is
+// sent in metadata during Join. Must be called before Connect.
+func (c *Client) SetRunMode(mode string) {
+	c.runMode = mode
+}

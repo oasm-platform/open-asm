@@ -10,6 +10,8 @@ type JobSpec struct {
 	Inputs  map[string]any
 	Limits  map[string]any
 	TraceID string
+	Config  map[string]any // connector config profile passed through from proto
+	JobID   string         // proto Job ID, distinct from Tool name
 }
 
 type RuntimeOpts struct {

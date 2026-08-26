@@ -1676,6 +1676,40 @@ export type GetManyToolDto = {
   pageCount: number;
 };
 
+export type ToolConfigProfile = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Tool-specific configuration object
+ */
+export type CreateProfileDtoConfig = { [key: string]: unknown };
+
+export type CreateProfileDto = {
+  /** Profile name (unique per tool) */
+  name: string;
+  /** Tool-specific configuration object */
+  config: CreateProfileDtoConfig;
+  /** Set as default profile */
+  isDefault?: boolean;
+};
+
+/**
+ * Tool-specific configuration object
+ */
+export type UpdateProfileDtoConfig = { [key: string]: unknown };
+
+export type UpdateProfileDto = {
+  /** Profile name (unique per tool) */
+  name?: string;
+  /** Tool-specific configuration object */
+  config?: UpdateProfileDtoConfig;
+  /** Set as default profile */
+  isDefault?: boolean;
+};
+
 export type SearchData = {
   assets: Asset[];
   targets: Target[];
@@ -19798,6 +19832,745 @@ export const useToolsControllerRotateToolApiKey = <
 > => {
   return useMutation(
     getToolsControllerRotateToolApiKeyMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Creates a new configuration profile for a tool in the workspace. Config is validated against the tool schema, secrets are encrypted at rest.
+ * @summary Create a config profile
+ */
+export const toolConfigProfilesControllerCreate = (
+  toolId: string,
+  createProfileDto: CreateProfileDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolConfigProfile>(
+    {
+      url: `/api/tools/${toolId}/config-profiles`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createProfileDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerCreateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
+    TError,
+    { toolId: string; data: CreateProfileDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
+  TError,
+  { toolId: string; data: CreateProfileDto },
+  TContext
+> => {
+  const mutationKey = ['toolConfigProfilesControllerCreate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
+    { toolId: string; data: CreateProfileDto }
+  > = (props) => {
+    const { toolId, data } = props ?? {};
+
+    return toolConfigProfilesControllerCreate(toolId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolConfigProfilesControllerCreateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>
+>;
+export type ToolConfigProfilesControllerCreateMutationBody = CreateProfileDto;
+export type ToolConfigProfilesControllerCreateMutationError = unknown;
+
+/**
+ * @summary Create a config profile
+ */
+export const useToolConfigProfilesControllerCreate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
+      TError,
+      { toolId: string; data: CreateProfileDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
+  TError,
+  { toolId: string; data: CreateProfileDto },
+  TContext
+> => {
+  return useMutation(
+    getToolConfigProfilesControllerCreateMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Lists all configuration profiles for a tool in the workspace. Sensitive values are masked.
+ * @summary List config profiles
+ */
+export const toolConfigProfilesControllerList = (
+  toolId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolConfigProfile[]>(
+    { url: `/api/tools/${toolId}/config-profiles`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerListQueryKey = (toolId: string) => {
+  return [`/api/tools/${toolId}/config-profiles`] as const;
+};
+
+export const getToolConfigProfilesControllerListQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getToolConfigProfilesControllerListQueryKey(toolId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerList>>
+  > = ({ signal }) =>
+    toolConfigProfilesControllerList(toolId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: toolId !== null && toolId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolConfigProfilesControllerListQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerList>>
+>;
+export type ToolConfigProfilesControllerListQueryError = unknown;
+
+export function useToolConfigProfilesControllerList<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+          TError,
+          Awaited<ReturnType<typeof toolConfigProfilesControllerList>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolConfigProfilesControllerList<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+          TError,
+          Awaited<ReturnType<typeof toolConfigProfilesControllerList>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolConfigProfilesControllerList<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List config profiles
+ */
+
+export function useToolConfigProfilesControllerList<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolConfigProfilesControllerListQueryOptions(
+    toolId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves a single configuration profile by ID. Sensitive values are masked.
+ * @summary Get a config profile
+ */
+export const toolConfigProfilesControllerGetOne = (
+  toolId: string,
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolConfigProfile>(
+    {
+      url: `/api/tools/${toolId}/config-profiles/${id}`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerGetOneQueryKey = (
+  toolId: string,
+  id: string,
+) => {
+  return [`/api/tools/${toolId}/config-profiles/${id}`] as const;
+};
+
+export const getToolConfigProfilesControllerGetOneQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getToolConfigProfilesControllerGetOneQueryKey(toolId, id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>
+  > = ({ signal }) =>
+    toolConfigProfilesControllerGetOne(toolId, id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      toolId !== null &&
+      toolId !== undefined &&
+      id !== null &&
+      id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolConfigProfilesControllerGetOneQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>
+>;
+export type ToolConfigProfilesControllerGetOneQueryError = unknown;
+
+export function useToolConfigProfilesControllerGetOne<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+          TError,
+          Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolConfigProfilesControllerGetOne<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+          TError,
+          Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolConfigProfilesControllerGetOne<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a config profile
+ */
+
+export function useToolConfigProfilesControllerGetOne<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolConfigProfilesControllerGetOneQueryOptions(
+    toolId,
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Updates an existing configuration profile. Config is re-validated against the tool schema, secrets are re-encrypted.
+ * @summary Update a config profile
+ */
+export const toolConfigProfilesControllerUpdate = (
+  toolId: string,
+  id: string,
+  updateProfileDto: UpdateProfileDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolConfigProfile>(
+    {
+      url: `/api/tools/${toolId}/config-profiles/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateProfileDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerUpdateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+    TError,
+    { toolId: string; id: string; data: UpdateProfileDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+  TError,
+  { toolId: string; id: string; data: UpdateProfileDto },
+  TContext
+> => {
+  const mutationKey = ['toolConfigProfilesControllerUpdate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+    { toolId: string; id: string; data: UpdateProfileDto }
+  > = (props) => {
+    const { toolId, id, data } = props ?? {};
+
+    return toolConfigProfilesControllerUpdate(toolId, id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolConfigProfilesControllerUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>
+>;
+export type ToolConfigProfilesControllerUpdateMutationBody = UpdateProfileDto;
+export type ToolConfigProfilesControllerUpdateMutationError = unknown;
+
+/**
+ * @summary Update a config profile
+ */
+export const useToolConfigProfilesControllerUpdate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+      TError,
+      { toolId: string; id: string; data: UpdateProfileDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+  TError,
+  { toolId: string; id: string; data: UpdateProfileDto },
+  TContext
+> => {
+  return useMutation(
+    getToolConfigProfilesControllerUpdateMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes a configuration profile. Allowed unconditionally (job pull falls back to default later).
+ * @summary Delete a config profile
+ */
+export const toolConfigProfilesControllerRemove = (
+  toolId: string,
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/tools/${toolId}/config-profiles/${id}`,
+      method: 'DELETE',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerRemoveMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+    TError,
+    { toolId: string; id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+  TError,
+  { toolId: string; id: string },
+  TContext
+> => {
+  const mutationKey = ['toolConfigProfilesControllerRemove'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+    { toolId: string; id: string }
+  > = (props) => {
+    const { toolId, id } = props ?? {};
+
+    return toolConfigProfilesControllerRemove(toolId, id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolConfigProfilesControllerRemoveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>
+>;
+
+export type ToolConfigProfilesControllerRemoveMutationError = unknown;
+
+/**
+ * @summary Delete a config profile
+ */
+export const useToolConfigProfilesControllerRemove = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+      TError,
+      { toolId: string; id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+  TError,
+  { toolId: string; id: string },
+  TContext
+> => {
+  return useMutation(
+    getToolConfigProfilesControllerRemoveMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Sets a profile as the default for its tool. Transactionally unsets the previous default.
+ * @summary Set default profile
+ */
+export const toolConfigProfilesControllerSetDefault = (
+  toolId: string,
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolConfigProfile>(
+    {
+      url: `/api/tools/${toolId}/config-profiles/${id}/set-default`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerSetDefaultMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+    TError,
+    { toolId: string; id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+  TError,
+  { toolId: string; id: string },
+  TContext
+> => {
+  const mutationKey = ['toolConfigProfilesControllerSetDefault'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+    { toolId: string; id: string }
+  > = (props) => {
+    const { toolId, id } = props ?? {};
+
+    return toolConfigProfilesControllerSetDefault(toolId, id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolConfigProfilesControllerSetDefaultMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>
+>;
+
+export type ToolConfigProfilesControllerSetDefaultMutationError = unknown;
+
+/**
+ * @summary Set default profile
+ */
+export const useToolConfigProfilesControllerSetDefault = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+      TError,
+      { toolId: string; id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+  TError,
+  { toolId: string; id: string },
+  TContext
+> => {
+  return useMutation(
+    getToolConfigProfilesControllerSetDefaultMutationOptions(options),
     queryClient,
   );
 };

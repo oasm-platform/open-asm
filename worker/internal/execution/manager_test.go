@@ -74,3 +74,53 @@ func TestManagerEnforcesConcurrency(t *testing.T) {
 		t.Fatalf("expected max concurrency error, got %v", err)
 	}
 }
+
+func TestManagerSubmitPassesConfigAndJobID(t *testing.T) {
+	rt := runtime.NewFakeRuntime()
+	m := NewManager(rt, 2)
+	cfg := map[string]any{"proxy": true, "rateLimit": float64(100)}
+	spec := JobSpec{
+		Tool:   "nuclei",
+		Image:  "ghcr.io/open-asm/nuclei:1.0.0",
+		JobID:  "job-abc-123",
+		Config: cfg,
+	}
+	id, err := m.Submit(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+	if id == "" {
+		t.Fatal("empty id")
+	}
+	// FakeRuntime should have captured exactly one Create call.
+	if len(rt.CreateSpecs) != 1 {
+		t.Fatalf("expected 1 Create call, got %d", len(rt.CreateSpecs))
+	}
+	got := rt.CreateSpecs[0]
+	if got.JobID != "job-abc-123" {
+		t.Fatalf("expected JobID passthrough 'job-abc-123', got %q", got.JobID)
+	}
+	if got.Config == nil {
+		t.Fatal("expected Config passthrough, got nil")
+	}
+	if got.Config["proxy"] != true {
+		t.Fatalf("expected Config.proxy=true, got %v", got.Config["proxy"])
+	}
+	if got.Config["rateLimit"] != float64(100) {
+		t.Fatalf("expected Config.rateLimit=100, got %v", got.Config["rateLimit"])
+	}
+}
+
+func TestManagerSubmitNilConfigStaysNil(t *testing.T) {
+	rt := runtime.NewFakeRuntime()
+	m := NewManager(rt, 2)
+	spec := JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0.0"}
+	_, err := m.Submit(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+	got := rt.CreateSpecs[0]
+	if got.Config != nil {
+		t.Fatalf("expected nil Config, got %v", got.Config)
+	}
+}

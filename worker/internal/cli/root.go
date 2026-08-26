@@ -21,6 +21,7 @@ func App() error {
 	if err != nil {
 		return fmt.Errorf("fail to load config: %v", err)
 	}
+	cfg.Mode = "cli"
 
 	if cfg.ApiKey == "" {
 		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
@@ -73,6 +74,7 @@ func AppHeadless() error {
 	if err != nil {
 		return fmt.Errorf("fail to load config: %v", err)
 	}
+	cfg.Mode = "node"
 
 	if cfg.ApiKey == "" {
 		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")

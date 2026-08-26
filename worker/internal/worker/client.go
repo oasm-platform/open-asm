@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"oasm-worker/internal/config"
 	"oasm-worker/internal/connector"
+	"oasm-worker/internal/execution"
+	"oasm-worker/internal/runtime"
 	"os"
 	"path/filepath"
 	"sync"
@@ -57,6 +59,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		log.ErrorE("Failed to create OASM client", err)
 		return
 	}
+	grpcClient.SetRunMode(cfg.Mode)
 
 	// ponytail: lazy browser singleton — avoids ~300MB chromium resident when no screenshot jobs.
 	var (
@@ -132,6 +135,11 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		sessionCtx    context.Context
 		sessionCancel context.CancelFunc
 		pollerCancel  context.CancelFunc
+
+		// proxy and mgr are initialized after connector server setup but
+		// declared here so the pollLoop closure can capture them by reference.
+		proxy *connector.Proxy
+		mgr   *execution.Manager
 	)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
@@ -187,11 +195,13 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 				case semaphore <- struct{}{}:
 					wg.Add(1)
 					go func(sc context.Context) {
-						defer func() {
-							<-semaphore
-							wg.Done()
-						}()
-						hadJob := processJob(sc, grpcClient, getBrowser, toolPath, events)
+						defer wg.Done()
+						releaseSem := func() { <-semaphore }
+						hadJob, usedAsync := processJob(sc, grpcClient, getBrowser, toolPath, events, mgr, proxy, releaseSem)
+						if !usedAsync {
+							releaseSem() // Legacy: release at return
+						}
+						// Connector path: semaphore released by completion handler asynchronously.
 						select {
 						case hadJobCh <- hadJob:
 						default:
@@ -285,7 +295,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 	// Start connector gRPC server for Docker connectors.
 	// Non-fatal: worker can still operate legacy path without connector server.
-	proxy := connector.NewProxy()
+	proxy = connector.NewProxy()
 	connectorServer, err := connector.NewServer(
 		fmt.Sprintf(":%d", cfg.ConnectorPort),
 		proxy,
@@ -301,6 +311,24 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			}
 		}()
 	}
+
+	// Construct Docker runtime + execution manager for connector (image-based) jobs.
+	// ponytail: when legacy command path retires, limit moves into Manager and semaphore dies.
+	// Manager maxConcurrency=0 (unlimited) — the worker semaphore at :137 is the SOLE
+	// concurrency gate for both legacy and connector paths.
+	var mgrInit *execution.Manager
+	if proxy != nil {
+		// ponytail: ConnectorAddr is the listen address; for Docker containers this should be
+		// host.docker.internal:PORT. Add WORKER_CONNECTOR_EXTERNAL_ADDR when listen != external.
+		dockerRT, err := runtime.NewDockerRuntime("", cfg.ConnectorAddr, cfg.ConnectorToken)
+		if err != nil {
+			log.Error("docker runtime init failed (non-fatal): %v", err)
+		} else {
+			mgrInit = execution.NewManager(dockerRT, 0)
+			log.Success("execution manager ready (Docker runtime, unlimited concurrency)")
+		}
+	}
+	mgr = mgrInit
 
 	ticker := time.NewTicker(time.Second)
 	go func() {

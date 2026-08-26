@@ -16,6 +16,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Post,
   Query,
@@ -27,6 +28,8 @@ import { AuditLog } from '../audit/audit-log.decorator';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
@@ -46,7 +49,13 @@ import { JobsRegistryService } from './jobs-registry.service';
 
 @Controller('jobs-registry')
 export class JobsRegistryController {
-  constructor(private readonly jobsRegistryService: JobsRegistryService) {}
+  private readonly logger = new Logger(JobsRegistryController.name);
+
+  constructor(
+    private readonly jobsRegistryService: JobsRegistryService,
+    private readonly connectorRegistry: ConnectorRegistryService,
+    private readonly toolConfigProfilesService: ToolConfigProfilesService,
+  ) {}
 
   @WorkspaceAccess('job.read')
   @Doc({
@@ -305,18 +314,51 @@ export class JobsRegistryController {
 
   @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('JobsRegistryService', 'Next')
-  async next(worker: { id: string }): Promise<{
-    id: string;
-    asset: Asset;
-    command?: string;
-    category?: string;
-  }> {
+  async next(
+    worker: { id: string },
+  ): Promise<Record<string, unknown>> {
     const job = await this.jobsRegistryService.getNextJob(worker.id);
 
     if (!job) {
-      return { id: '', asset: {} as Asset, command: '' };
+      return { id: '', asset: {}, command: '' };
     }
 
+    // Connector path: tool metadata present → look up registry
+    const connectorEntry = job.tool
+      ? this.connectorRegistry.getConnector(job.tool.name)
+      : null;
+
+    if (connectorEntry?.image) {
+      let config: Record<string, unknown> | undefined;
+      try {
+        config =
+          await this.toolConfigProfilesService.resolveConfigForDispatch(
+            job.workspaceId!,
+            job.tool!.id,
+            job.configProfileId,
+          );
+      } catch {
+        // Never log decrypted payload — generic message only
+        this.logger.warn('profile decrypt failed');
+      }
+
+      const response: Record<string, unknown> = {
+        id: job.id,
+        asset: job.asset,
+        category: job.category,
+        tool: connectorEntry.name,
+        image: connectorEntry.image,
+        inputs: { target: job.asset.value },
+      };
+
+      if (config && Object.keys(config).length > 0) {
+        response.config = config;
+      }
+
+      return response;
+    }
+
+    // Legacy path — byte-for-byte compatible
     return {
       id: job.id,
       asset: job.asset,

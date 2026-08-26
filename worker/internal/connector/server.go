@@ -112,21 +112,36 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 		return err
 	}
 
-	// Step 2: Read loop — receive results and done messages
+	// Step 2: Read loop — receive results and done messages.
+	// Track execution IDs seen on this stream so we can clean up if the
+	// stream breaks (container crash, network error) without a Done message.
+	seenExecIDs := make(map[string]bool)
 	for {
 		msg, err := stream.Recv()
 		if err == io.EOF {
-			// Connector closed its send side gracefully.
+			// Stream ended without Done — clean up tracked executions.
+			for execID := range seenExecIDs {
+				s.proxy.OnConnectorDown(execID)
+			}
 			return nil
 		}
 		if err != nil {
+			// Stream error — clean up tracked executions.
+			for execID := range seenExecIDs {
+				s.proxy.OnConnectorDown(execID)
+			}
 			return err
 		}
 
 		switch m := msg.Message.(type) {
 		case *pb.ConnectorMessage_Result:
+			seenExecIDs[m.Result.ExecutionId] = true
 			s.proxy.ForwardResult(m.Result.ExecutionId, m.Result.Data)
 		case *pb.ConnectorMessage_Done:
+			if m.Done.Error != "" {
+				s.proxy.SetError(m.Done.ExecutionId, m.Done.Error)
+			}
+			delete(seenExecIDs, m.Done.ExecutionId)
 			s.proxy.OnConnectorDown(m.Done.ExecutionId)
 			return nil
 		}

@@ -69,6 +69,98 @@ func TestJoin_SendsAPIKeyAndMetadata(t *testing.T) {
 	if call.metadata.Os == nil || *call.metadata.Os == "" {
 		t.Error("expected metadata os to be set")
 	}
+	// Default runMode is empty → UNKNOWN
+	if call.mode != workers.WorkerRunMode_WORKER_RUN_MODE_UNKNOWN {
+		t.Errorf("expected default mode UNKNOWN, got %v", call.mode)
+	}
+}
+
+func TestJoin_SendsMode_CLI(t *testing.T) {
+	// Given: client with mode set to "cli"
+	srv := newTestServer(t)
+	srv.workersSrv.joinFn = func(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
+		return &workers.JoinResponse{WorkerId: "w-1", WorkerToken: "tok-1"}, nil
+	}
+	srv.client.SetRunMode("cli")
+
+	// When: Join is called
+	if err := srv.client.Join(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Then: mode is CLI
+	srv.workersSrv.mu.Lock()
+	defer srv.workersSrv.mu.Unlock()
+	call := srv.workersSrv.joinCalls[0]
+	if call.mode != workers.WorkerRunMode_WORKER_RUN_MODE_CLI {
+		t.Errorf("expected mode CLI, got %v", call.mode)
+	}
+}
+
+func TestJoin_SendsMode_Node(t *testing.T) {
+	// Given: client with mode set to "node"
+	srv := newTestServer(t)
+	srv.workersSrv.joinFn = func(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
+		return &workers.JoinResponse{WorkerId: "w-1", WorkerToken: "tok-1"}, nil
+	}
+	srv.client.SetRunMode("node")
+
+	// When: Join is called
+	if err := srv.client.Join(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Then: mode is NODE
+	srv.workersSrv.mu.Lock()
+	defer srv.workersSrv.mu.Unlock()
+	call := srv.workersSrv.joinCalls[0]
+	if call.mode != workers.WorkerRunMode_WORKER_RUN_MODE_NODE {
+		t.Errorf("expected mode NODE, got %v", call.mode)
+	}
+}
+
+func TestJoin_SendsMode_UnknownNonEmpty(t *testing.T) {
+	// Given: client with unrecognized mode value
+	srv := newTestServer(t)
+	srv.workersSrv.joinFn = func(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
+		return &workers.JoinResponse{WorkerId: "w-1", WorkerToken: "tok-1"}, nil
+	}
+	srv.client.SetRunMode("weird-value")
+
+	// When: Join is called
+	if err := srv.client.Join(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Then: unknown non-empty maps to UNKNOWN
+	srv.workersSrv.mu.Lock()
+	defer srv.workersSrv.mu.Unlock()
+	call := srv.workersSrv.joinCalls[0]
+	if call.mode != workers.WorkerRunMode_WORKER_RUN_MODE_UNKNOWN {
+		t.Errorf("expected mode UNKNOWN for unrecognized value, got %v", call.mode)
+	}
+}
+
+func TestJoin_SendsMode_CaseInsensitive(t *testing.T) {
+	// Given: client with uppercase mode "CLI"
+	srv := newTestServer(t)
+	srv.workersSrv.joinFn = func(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
+		return &workers.JoinResponse{WorkerId: "w-1", WorkerToken: "tok-1"}, nil
+	}
+	srv.client.SetRunMode("CLI")
+
+	// When: Join is called
+	if err := srv.client.Join(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Then: uppercase "CLI" still maps to CLI
+	srv.workersSrv.mu.Lock()
+	defer srv.workersSrv.mu.Unlock()
+	call := srv.workersSrv.joinCalls[0]
+	if call.mode != workers.WorkerRunMode_WORKER_RUN_MODE_CLI {
+		t.Errorf("expected mode CLI for uppercase input, got %v", call.mode)
+	}
 }
 
 func TestConnect_FailingJoin_RetriesAndEmitsFalse(t *testing.T) {

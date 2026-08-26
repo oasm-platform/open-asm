@@ -29,6 +29,7 @@ type Config struct {
 	ConnectorPort  int    `mapstructure:"connector_port"`  // gRPC port for connectors, default 50051
 	ConnectorAddr  string `mapstructure:"connector_addr"`  // listen address, default "0.0.0.0:50051"
 	ConnectorToken string `mapstructure:"connector_token"` // shared secret for connector auth, empty = no auth
+	Mode           string `mapstructure:"mode"`            // worker run mode: "cli", "node", or "" (unknown)
 }
 
 func LoadConfig() (*Config, error) {
@@ -48,6 +49,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("connector_port", 50051)
 	viper.SetDefault("connector_addr", "0.0.0.0:50051")
 	viper.SetDefault("connector_token", "")
+	viper.SetDefault("mode", "")
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {

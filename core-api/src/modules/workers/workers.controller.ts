@@ -131,7 +131,7 @@ export class WorkersController {
       apiKey: string;
       signature: string;
       token?: string;
-      metadata?: { name?: string; os?: string };
+      metadata?: { name?: string; os?: string; mode?: number | string };
     },
     call: GrpcCall,
   ): Promise<{ workerId: string; workerToken: string }> {

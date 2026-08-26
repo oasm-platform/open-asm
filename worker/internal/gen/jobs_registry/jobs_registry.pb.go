@@ -123,11 +123,17 @@ func (x *Worker) GetId() string {
 }
 
 type Job struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Asset         *Asset                 `protobuf:"bytes,2,opt,name=asset,proto3" json:"asset,omitempty"`
-	Command       *string                `protobuf:"bytes,3,opt,name=command,proto3,oneof" json:"command,omitempty"`
-	Category      string                 `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Asset *Asset                 `protobuf:"bytes,2,opt,name=asset,proto3" json:"asset,omitempty"`
+	// Deprecated: Marked as deprecated in jobs_registry.proto.
+	Command  *string `protobuf:"bytes,3,opt,name=command,proto3,oneof" json:"command,omitempty"`
+	Category string  `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`
+	// NEW — connector execution spec
+	Tool          string           `protobuf:"bytes,5,opt,name=tool,proto3" json:"tool,omitempty"`
+	Image         string           `protobuf:"bytes,6,opt,name=image,proto3" json:"image,omitempty"`   // core resolves from manifest registry
+	Inputs        *structpb.Struct `protobuf:"bytes,7,opt,name=inputs,proto3" json:"inputs,omitempty"` // {target: "..."} per-run
+	Config        *structpb.Struct `protobuf:"bytes,8,opt,name=config,proto3" json:"config,omitempty"` // decrypted profile JSON per-profile
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -176,6 +182,7 @@ func (x *Job) GetAsset() *Asset {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in jobs_registry.proto.
 func (x *Job) GetCommand() string {
 	if x != nil && x.Command != nil {
 		return *x.Command
@@ -188,6 +195,34 @@ func (x *Job) GetCategory() string {
 		return x.Category
 	}
 	return ""
+}
+
+func (x *Job) GetTool() string {
+	if x != nil {
+		return x.Tool
+	}
+	return ""
+}
+
+func (x *Job) GetImage() string {
+	if x != nil {
+		return x.Image
+	}
+	return ""
+}
+
+func (x *Job) GetInputs() *structpb.Struct {
+	if x != nil {
+		return x.Inputs
+	}
+	return nil
+}
+
+func (x *Job) GetConfig() *structpb.Struct {
+	if x != nil {
+		return x.Config
+	}
+	return nil
 }
 
 type JobResponse struct {
@@ -1694,12 +1729,16 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\n" +
 	"\x13jobs_registry.proto\x12\rjobs_registry\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\x18\n" +
 	"\x06Worker\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x88\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x98\x02\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
-	"\x05asset\x18\x02 \x01(\v2\x14.jobs_registry.AssetR\x05asset\x12\x1d\n" +
-	"\acommand\x18\x03 \x01(\tH\x00R\acommand\x88\x01\x01\x12\x1a\n" +
-	"\bcategory\x18\x04 \x01(\tR\bcategoryB\n" +
+	"\x05asset\x18\x02 \x01(\v2\x14.jobs_registry.AssetR\x05asset\x12!\n" +
+	"\acommand\x18\x03 \x01(\tB\x02\x18\x01H\x00R\acommand\x88\x01\x01\x12\x1a\n" +
+	"\bcategory\x18\x04 \x01(\tR\bcategory\x12\x12\n" +
+	"\x04tool\x18\x05 \x01(\tR\x04tool\x12\x14\n" +
+	"\x05image\x18\x06 \x01(\tR\x05image\x12/\n" +
+	"\x06inputs\x18\a \x01(\v2\x17.google.protobuf.StructR\x06inputs\x12/\n" +
+	"\x06config\x18\b \x01(\v2\x17.google.protobuf.StructR\x06configB\n" +
 	"\n" +
 	"\b_command\"'\n" +
 	"\vJobResponse\x12\x18\n" +
@@ -1907,53 +1946,55 @@ var file_jobs_registry_proto_goTypes = []any{
 	(*Asset)(nil),                        // 15: jobs_registry.Asset
 	(*HttpResponse)(nil),                 // 16: jobs_registry.HttpResponse
 	(*Vulnerability)(nil),                // 17: jobs_registry.Vulnerability
-	(*timestamppb.Timestamp)(nil),        // 18: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),              // 19: google.protobuf.Struct
+	(*structpb.Struct)(nil),              // 18: google.protobuf.Struct
+	(*timestamppb.Timestamp)(nil),        // 19: google.protobuf.Timestamp
 }
 var file_jobs_registry_proto_depIdxs = []int32{
 	15, // 0: jobs_registry.Job.asset:type_name -> jobs_registry.Asset
-	12, // 1: jobs_registry.SubdomainResultRequest.assets:type_name -> jobs_registry.AssetList
-	16, // 2: jobs_registry.HttpProbeResultRequest.http_response:type_name -> jobs_registry.HttpResponse
-	13, // 3: jobs_registry.PortsResultRequest.numbers:type_name -> jobs_registry.NumberList
-	14, // 4: jobs_registry.VulnerabilitiesResultRequest.vulnerabilities:type_name -> jobs_registry.VulnerabilityList
-	10, // 5: jobs_registry.JobResultRequest.data:type_name -> jobs_registry.UpdateResultDto
-	11, // 6: jobs_registry.UpdateResultDto.data:type_name -> jobs_registry.DataPayloadResult
-	12, // 7: jobs_registry.DataPayloadResult.assets:type_name -> jobs_registry.AssetList
-	16, // 8: jobs_registry.DataPayloadResult.http_response:type_name -> jobs_registry.HttpResponse
-	13, // 9: jobs_registry.DataPayloadResult.numbers:type_name -> jobs_registry.NumberList
-	14, // 10: jobs_registry.DataPayloadResult.vulnerabilities:type_name -> jobs_registry.VulnerabilityList
-	15, // 11: jobs_registry.AssetList.values:type_name -> jobs_registry.Asset
-	17, // 12: jobs_registry.VulnerabilityList.values:type_name -> jobs_registry.Vulnerability
-	18, // 13: jobs_registry.Asset.created_at:type_name -> google.protobuf.Timestamp
-	18, // 14: jobs_registry.Asset.updated_at:type_name -> google.protobuf.Timestamp
-	19, // 15: jobs_registry.Asset.dns_records:type_name -> google.protobuf.Struct
-	18, // 16: jobs_registry.HttpResponse.created_at:type_name -> google.protobuf.Timestamp
-	18, // 17: jobs_registry.HttpResponse.timestamp:type_name -> google.protobuf.Timestamp
-	19, // 18: jobs_registry.HttpResponse.tls:type_name -> google.protobuf.Struct
-	19, // 19: jobs_registry.HttpResponse.header:type_name -> google.protobuf.Struct
-	19, // 20: jobs_registry.HttpResponse.knowledgebase:type_name -> google.protobuf.Struct
-	0,  // 21: jobs_registry.Vulnerability.severity:type_name -> jobs_registry.Severity
-	18, // 22: jobs_registry.Vulnerability.publication_date:type_name -> google.protobuf.Timestamp
-	18, // 23: jobs_registry.Vulnerability.modification_date:type_name -> google.protobuf.Timestamp
-	1,  // 24: jobs_registry.JobsRegistryService.Next:input_type -> jobs_registry.Worker
-	9,  // 25: jobs_registry.JobsRegistryService.Result:input_type -> jobs_registry.JobResultRequest
-	4,  // 26: jobs_registry.JobsRegistryService.ResultSubdomains:input_type -> jobs_registry.SubdomainResultRequest
-	5,  // 27: jobs_registry.JobsRegistryService.ResultHttpProbe:input_type -> jobs_registry.HttpProbeResultRequest
-	6,  // 28: jobs_registry.JobsRegistryService.ResultPorts:input_type -> jobs_registry.PortsResultRequest
-	7,  // 29: jobs_registry.JobsRegistryService.ResultVulnerabilities:input_type -> jobs_registry.VulnerabilitiesResultRequest
-	8,  // 30: jobs_registry.JobsRegistryService.ResultScreenshot:input_type -> jobs_registry.ScreenshotResultRequest
-	2,  // 31: jobs_registry.JobsRegistryService.Next:output_type -> jobs_registry.Job
-	3,  // 32: jobs_registry.JobsRegistryService.Result:output_type -> jobs_registry.JobResponse
-	3,  // 33: jobs_registry.JobsRegistryService.ResultSubdomains:output_type -> jobs_registry.JobResponse
-	3,  // 34: jobs_registry.JobsRegistryService.ResultHttpProbe:output_type -> jobs_registry.JobResponse
-	3,  // 35: jobs_registry.JobsRegistryService.ResultPorts:output_type -> jobs_registry.JobResponse
-	3,  // 36: jobs_registry.JobsRegistryService.ResultVulnerabilities:output_type -> jobs_registry.JobResponse
-	3,  // 37: jobs_registry.JobsRegistryService.ResultScreenshot:output_type -> jobs_registry.JobResponse
-	31, // [31:38] is the sub-list for method output_type
-	24, // [24:31] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	18, // 1: jobs_registry.Job.inputs:type_name -> google.protobuf.Struct
+	18, // 2: jobs_registry.Job.config:type_name -> google.protobuf.Struct
+	12, // 3: jobs_registry.SubdomainResultRequest.assets:type_name -> jobs_registry.AssetList
+	16, // 4: jobs_registry.HttpProbeResultRequest.http_response:type_name -> jobs_registry.HttpResponse
+	13, // 5: jobs_registry.PortsResultRequest.numbers:type_name -> jobs_registry.NumberList
+	14, // 6: jobs_registry.VulnerabilitiesResultRequest.vulnerabilities:type_name -> jobs_registry.VulnerabilityList
+	10, // 7: jobs_registry.JobResultRequest.data:type_name -> jobs_registry.UpdateResultDto
+	11, // 8: jobs_registry.UpdateResultDto.data:type_name -> jobs_registry.DataPayloadResult
+	12, // 9: jobs_registry.DataPayloadResult.assets:type_name -> jobs_registry.AssetList
+	16, // 10: jobs_registry.DataPayloadResult.http_response:type_name -> jobs_registry.HttpResponse
+	13, // 11: jobs_registry.DataPayloadResult.numbers:type_name -> jobs_registry.NumberList
+	14, // 12: jobs_registry.DataPayloadResult.vulnerabilities:type_name -> jobs_registry.VulnerabilityList
+	15, // 13: jobs_registry.AssetList.values:type_name -> jobs_registry.Asset
+	17, // 14: jobs_registry.VulnerabilityList.values:type_name -> jobs_registry.Vulnerability
+	19, // 15: jobs_registry.Asset.created_at:type_name -> google.protobuf.Timestamp
+	19, // 16: jobs_registry.Asset.updated_at:type_name -> google.protobuf.Timestamp
+	18, // 17: jobs_registry.Asset.dns_records:type_name -> google.protobuf.Struct
+	19, // 18: jobs_registry.HttpResponse.created_at:type_name -> google.protobuf.Timestamp
+	19, // 19: jobs_registry.HttpResponse.timestamp:type_name -> google.protobuf.Timestamp
+	18, // 20: jobs_registry.HttpResponse.tls:type_name -> google.protobuf.Struct
+	18, // 21: jobs_registry.HttpResponse.header:type_name -> google.protobuf.Struct
+	18, // 22: jobs_registry.HttpResponse.knowledgebase:type_name -> google.protobuf.Struct
+	0,  // 23: jobs_registry.Vulnerability.severity:type_name -> jobs_registry.Severity
+	19, // 24: jobs_registry.Vulnerability.publication_date:type_name -> google.protobuf.Timestamp
+	19, // 25: jobs_registry.Vulnerability.modification_date:type_name -> google.protobuf.Timestamp
+	1,  // 26: jobs_registry.JobsRegistryService.Next:input_type -> jobs_registry.Worker
+	9,  // 27: jobs_registry.JobsRegistryService.Result:input_type -> jobs_registry.JobResultRequest
+	4,  // 28: jobs_registry.JobsRegistryService.ResultSubdomains:input_type -> jobs_registry.SubdomainResultRequest
+	5,  // 29: jobs_registry.JobsRegistryService.ResultHttpProbe:input_type -> jobs_registry.HttpProbeResultRequest
+	6,  // 30: jobs_registry.JobsRegistryService.ResultPorts:input_type -> jobs_registry.PortsResultRequest
+	7,  // 31: jobs_registry.JobsRegistryService.ResultVulnerabilities:input_type -> jobs_registry.VulnerabilitiesResultRequest
+	8,  // 32: jobs_registry.JobsRegistryService.ResultScreenshot:input_type -> jobs_registry.ScreenshotResultRequest
+	2,  // 33: jobs_registry.JobsRegistryService.Next:output_type -> jobs_registry.Job
+	3,  // 34: jobs_registry.JobsRegistryService.Result:output_type -> jobs_registry.JobResponse
+	3,  // 35: jobs_registry.JobsRegistryService.ResultSubdomains:output_type -> jobs_registry.JobResponse
+	3,  // 36: jobs_registry.JobsRegistryService.ResultHttpProbe:output_type -> jobs_registry.JobResponse
+	3,  // 37: jobs_registry.JobsRegistryService.ResultPorts:output_type -> jobs_registry.JobResponse
+	3,  // 38: jobs_registry.JobsRegistryService.ResultVulnerabilities:output_type -> jobs_registry.JobResponse
+	3,  // 39: jobs_registry.JobsRegistryService.ResultScreenshot:output_type -> jobs_registry.JobResponse
+	33, // [33:40] is the sub-list for method output_type
+	26, // [26:33] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_jobs_registry_proto_init() }

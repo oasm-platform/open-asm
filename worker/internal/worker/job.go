@@ -7,22 +7,39 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-rod/rod"
 	pb "oasm-worker/internal/gen/jobs_registry"
 
+	"oasm-worker/internal/connector"
+	"oasm-worker/internal/execution"
 	"oasm-worker/internal/grpcclient"
 )
 
-func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent) bool {
+// bridgeEntry links a Docker execution back to the originating job.
+// Stored in bridge map; accessed by processConnectorJob (Submit time) and
+// handleConnectorResult (completion time).
+type bridgeEntry struct {
+	jobID    string
+	category string
+	release  func() // semaphore release callback — called only by completion handler
+}
+
+var (
+	bridgeMu sync.Mutex
+	bridge   = make(map[string]*bridgeEntry) // executionID → entry
+)
+
+func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
 	job, err := grpcClient.NextJob(ctx)
 	if err != nil {
 		NewTuiLogger(events, "Jobs").ErrorE("Failed to pull job", err)
-		return false
+		return false, false
 	}
 	if job == nil || job.Id == "" {
-		return false
+		return false, false
 	}
 
 	startTime := time.Now()
@@ -36,6 +53,16 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 		AssetValue: job.GetAsset().GetValue(),
 	})
 
+	category := job.GetCategory()
+
+	// Connector path: image-based execution via Docker runtime.
+	// processJob returns immediately after Submit; cleanup runs asynchronously
+	// in handleConnectorResult when the container exits or connector signals Done.
+	if img := job.GetImage(); img != "" && mgr != nil {
+		return processConnectorJob(ctx, job, grpcClient, events, mgr, proxy, releaseSem, startTime, category)
+	}
+
+	// Legacy path: command-based execution (screenshot or shell).
 	activeJobsMu.Lock()
 	activeJobs[job.Id] = struct{}{}
 	activeJobsMu.Unlock()
@@ -56,8 +83,6 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 		}
 	}()
 
-	category := job.GetCategory()
-
 	if cmdStr == "" {
 		completed = true
 		Emit(events, TuiEvent{
@@ -68,7 +93,7 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 			Duration: time.Since(startTime),
 		})
 		submitCategoryError(ctx, grpcClient, events, job.Id, category, "No command provided by Core")
-		return true
+		return true, false
 	}
 
 	NewTuiLogger(events, "Jobs").Info("[%s] Executing: %s (category: %s)", job.Id, cmdStr, category)
@@ -93,7 +118,7 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 				Duration: time.Since(startTime),
 			})
 			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error (browser init): %v", err))
-			return true
+			return true, false
 		}
 		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
 		if err != nil {
@@ -112,7 +137,7 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 				Duration: time.Since(startTime),
 			})
 			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", err))
-			return true
+			return true, false
 		}
 
 		resultData := struct {
@@ -140,7 +165,7 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 				Duration: time.Since(startTime),
 			})
 			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("JSON error: %v", err))
-			return true
+			return true, false
 		}
 
 		if submitErr := submitCategoryResult(ctx, grpcClient, job.Id, category, false, string(jsonBytes)); submitErr != nil {
@@ -153,9 +178,9 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 				ErrorMsg: submitErr.Error(),
 				Duration: time.Since(startTime),
 			})
-			return true
+			return true, false
 		}
-		return true
+		return true, false
 	} else {
 		var cmd *exec.Cmd
 		if runtime.GOOS == "windows" {
@@ -204,10 +229,10 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 				ErrorMsg: submitErr.Error(),
 				Duration: time.Since(startTime),
 			})
-			return true
+			return true, false
 		}
 	}
-	return true
+	return true, false
 }
 
 // submitCategoryResult submits the command output to the appropriate category-specific endpoint.
@@ -239,4 +264,120 @@ func submitCategoryError(ctx context.Context, grpcClient *grpcclient.Client, eve
 	if submitErr := submitCategoryResult(ctx, grpcClient, jobID, category, true, errMsg); submitErr != nil {
 		NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit error", jobID), submitErr)
 	}
+}
+
+// processConnectorJob submits an image-based job to the Docker runtime via Manager.
+// Returns immediately after Submit (fire-and-forget); cleanup runs asynchronously
+// in handleConnectorResult when the container exits or connector signals Done.
+func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func(), startTime time.Time, category string) (bool, bool) {
+	log := NewTuiLogger(events, "Jobs")
+
+	// Map proto Struct → Go map for inputs and config.
+	var inputsMap map[string]any
+	if in := job.GetInputs(); in != nil {
+		inputsMap = in.AsMap()
+	}
+	var configMap map[string]any
+	if c := job.GetConfig(); c != nil {
+		configMap = c.AsMap()
+	}
+
+	spec := execution.JobSpec{
+		Tool:   job.GetTool(),
+		Image:  job.GetImage(),
+		Inputs: inputsMap,
+		Config: configMap,
+		JobID:  job.Id,
+	}
+
+	execID, err := mgr.Submit(ctx, spec)
+	if err != nil {
+		log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector job", job.Id), err)
+		Emit(events, TuiEvent{
+			Type:     EventJobCompleted,
+			JobID:    job.Id,
+			Success:  false,
+			ErrorMsg: fmt.Sprintf("Submit failed: %v", err),
+			Duration: time.Since(startTime),
+		})
+		return true, false // hadJob=true (job was pulled), caller releases semaphore
+	}
+
+	// Add to activeJobs for metrics tracking.
+	activeJobsMu.Lock()
+	activeJobs[job.Id] = struct{}{}
+	activeJobsMu.Unlock()
+
+	// Register bridge entry: links executionID → job for result routing.
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{
+		jobID:    job.Id,
+		category: category,
+		release:  releaseSem,
+	}
+	bridgeMu.Unlock()
+
+	// Register proxy channel for streaming results from connector.
+	resultCh := make(chan []byte, 16)
+	proxy.Register(execID, resultCh)
+
+	log.Info("[%s] Connector job submitted: execID=%s image=%s", job.Id, execID, job.GetImage())
+
+	// Start completion handler goroutine — fire-and-forget.
+	go handleConnectorResult(ctx, execID, grpcClient, events, proxy, resultCh, startTime)
+
+	return true, true // hadJob, usedAsync — completion handler releases semaphore
+}
+
+// handleConnectorResult drains results from the connector proxy channel,
+// submits them to the appropriate category endpoint, and performs cleanup
+// when the channel closes (Done message or connector disconnect).
+func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcclient.Client, events chan<- TuiEvent, proxy *connector.Proxy, resultCh <-chan []byte, startTime time.Time) {
+	bridgeMu.Lock()
+	entry, ok := bridge[execID]
+	bridgeMu.Unlock()
+	if !ok {
+		return
+	}
+	defer entry.release()
+
+	log := NewTuiLogger(events, "Jobs")
+
+	// Drain results from connector until channel closes (Done or disconnect).
+	for data := range resultCh {
+		if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(data)); err != nil {
+			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector result", entry.jobID), err)
+		}
+	}
+
+	// Channel closed: connector finished (Done) or disconnected.
+	// Cleanup and release resources.
+	activeJobsMu.Lock()
+	delete(activeJobs, entry.jobID)
+	activeJobsMu.Unlock()
+
+	bridgeMu.Lock()
+	delete(bridge, execID)
+	bridgeMu.Unlock()
+
+	proxy.Unregister(execID)
+
+	// Check if connector reported an error via Done message.
+	errMsg, hasError := proxy.PopError(execID)
+
+	Emit(events, TuiEvent{
+		Type:     EventJobCompleted,
+		JobID:    entry.jobID,
+		Success:  !hasError,
+		ErrorMsg: errMsg,
+		Duration: time.Since(startTime),
+	})
+
+	if hasError && errMsg != "" {
+		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, errMsg)
+		log.Warning("[%s] Connector job failed: execID=%s error=%s", entry.jobID, execID, errMsg)
+	} else {
+		log.Info("[%s] Connector job completed: execID=%s", entry.jobID, execID)
+	}
+
 }

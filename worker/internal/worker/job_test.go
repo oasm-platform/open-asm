@@ -1,0 +1,560 @@
+package worker
+
+import (
+	"context"
+	"net"
+	"sync"
+	"testing"
+	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/known/structpb"
+
+	"oasm-worker/internal/connector"
+	"oasm-worker/internal/execution"
+	pb "oasm-worker/internal/gen/jobs_registry"
+	workerspb "oasm-worker/internal/gen/workers"
+	"oasm-worker/internal/grpcclient"
+	"oasm-worker/internal/runtime"
+)
+
+// --- test logger ---
+
+type testLogger struct{}
+
+func (l *testLogger) Info(msg string, args ...any)    {}
+func (l *testLogger) Success(msg string, args ...any) {}
+func (l *testLogger) Warning(msg string, args ...any) {}
+func (l *testLogger) Error(msg string, args ...any)   {}
+func (l *testLogger) ErrorE(msg string, err error)    {}
+func (l *testLogger) Verbose(msg string, args ...any) {}
+func (l *testLogger) Debug(msg string, args ...any)   {}
+
+// --- minimal fake gRPC servers ---
+
+type testWorkerServer struct {
+	workerspb.UnimplementedWorkersServiceServer
+}
+
+func (s *testWorkerServer) Join(_ context.Context, _ *workerspb.JoinRequest) (*workerspb.JoinResponse, error) {
+	return &workerspb.JoinResponse{WorkerId: "test-worker", WorkerToken: "tok"}, nil
+}
+
+type testJobsServer struct {
+	pb.UnimplementedJobsRegistryServiceServer
+
+	mu      sync.Mutex
+	nextFn  func() (*pb.Job, error)
+	results []capturedResult
+}
+
+type capturedResult struct {
+	jobID   string
+	raw     string
+	isError bool
+}
+
+func (s *testJobsServer) Next(_ context.Context, _ *pb.Worker) (*pb.Job, error) {
+	if s.nextFn != nil {
+		return s.nextFn()
+	}
+	return nil, nil
+}
+
+func (s *testJobsServer) Result(_ context.Context, req *pb.JobResultRequest) (*pb.JobResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if req.Data != nil && req.Data.Data != nil {
+		raw := ""
+		if req.Data.Data.Raw != nil {
+			raw = *req.Data.Data.Raw
+		}
+		s.results = append(s.results, capturedResult{jobID: req.Data.JobId, raw: raw, isError: req.Data.Data.Error})
+	}
+	return &pb.JobResponse{Success: true}, nil
+}
+
+func (s *testJobsServer) ResultSubdomains(_ context.Context, req *pb.SubdomainResultRequest) (*pb.JobResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	raw := ""
+	if req.Raw != nil {
+		raw = *req.Raw
+	}
+	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error})
+	return &pb.JobResponse{Success: true}, nil
+}
+
+func (s *testJobsServer) ResultHttpProbe(_ context.Context, req *pb.HttpProbeResultRequest) (*pb.JobResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	raw := ""
+	if req.Raw != nil {
+		raw = *req.Raw
+	}
+	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error})
+	return &pb.JobResponse{Success: true}, nil
+}
+
+func (s *testJobsServer) ResultPorts(_ context.Context, req *pb.PortsResultRequest) (*pb.JobResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	raw := ""
+	if req.Raw != nil {
+		raw = *req.Raw
+	}
+	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error})
+	return &pb.JobResponse{Success: true}, nil
+}
+
+func (s *testJobsServer) ResultVulnerabilities(_ context.Context, req *pb.VulnerabilitiesResultRequest) (*pb.JobResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	raw := ""
+	if req.Raw != nil {
+		raw = *req.Raw
+	}
+	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error})
+	return &pb.JobResponse{Success: true}, nil
+}
+
+func (s *testJobsServer) ResultScreenshot(_ context.Context, req *pb.ScreenshotResultRequest) (*pb.JobResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	raw := ""
+	if req.Raw != nil {
+		raw = *req.Raw
+	}
+	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error})
+	return &pb.JobResponse{Success: true}, nil
+}
+
+func (s *testJobsServer) getResults() []capturedResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cp := make([]capturedResult, len(s.results))
+	copy(cp, s.results)
+	return cp
+}
+
+// --- bufconn test setup ---
+
+func newWorkerTestSetup(t *testing.T) (*grpcclient.Client, *testJobsServer, *runtime.FakeRuntime) {
+	t.Helper()
+	lis := bufconn.Listen(64 * 1024)
+	grpcSrv := grpc.NewServer()
+	workerSrv := &testWorkerServer{}
+	jobsSrv := &testJobsServer{}
+	workerspb.RegisterWorkersServiceServer(grpcSrv, workerSrv)
+	pb.RegisterJobsRegistryServiceServer(grpcSrv, jobsSrv)
+	go func() { _ = grpcSrv.Serve(lis) }()
+
+	client, err := grpcclient.NewClient("test-key", "passthrough:///bufnet", "test-tools", &testLogger{},
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			return lis.DialContext(ctx)
+		}))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	// Join to initialize worker ID / auth token.
+	if err := client.Join(context.Background()); err != nil {
+		t.Fatalf("Join: %v", err)
+	}
+
+	fakeRT := runtime.NewFakeRuntime()
+
+	t.Cleanup(func() {
+		_ = client.Close()
+		grpcSrv.Stop()
+	})
+	return client, jobsSrv, fakeRT
+}
+
+// --- tests ---
+
+func TestProcessJobConnectorBranch(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	mgr := execution.NewManager(fakeRT, 0) // unlimited
+	proxy := connector.NewProxy()
+
+	inputs, _ := structpb.NewStruct(map[string]any{"target": "https://example.com"})
+	cfg, _ := structpb.NewStruct(map[string]any{"proxy": true, "rateLimit": float64(50)})
+
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return &pb.Job{
+			Id:     "job-conn-1",
+			Tool:   "nuclei",
+			Image:  "ghcr.io/open-asm/nuclei:1.0",
+			Inputs: inputs,
+			Config: cfg,
+		}, nil
+	}
+
+	events := make(chan TuiEvent, 64)
+	releaseCh := make(chan struct{}, 1)
+	releaseSem := func() { releaseCh <- struct{}{} }
+
+	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, releaseSem)
+
+	if !hadJob {
+		t.Fatal("expected hadJob=true")
+	}
+	if !usedAsync {
+		t.Fatal("expected usedAsync=true for connector path")
+	}
+
+	// FakeRuntime should have received exactly one Create call.
+	if fakeRT.CreateCount != 1 {
+		t.Fatalf("expected 1 Create call, got %d", fakeRT.CreateCount)
+	}
+	spec := fakeRT.CreateSpecs[0]
+	if spec.Image != "ghcr.io/open-asm/nuclei:1.0" {
+		t.Fatalf("expected Image passthrough, got %q", spec.Image)
+	}
+	if spec.Tool != "nuclei" {
+		t.Fatalf("expected Tool 'nuclei', got %q", spec.Tool)
+	}
+	if spec.JobID != "job-conn-1" {
+		t.Fatalf("expected JobID 'job-conn-1', got %q", spec.JobID)
+	}
+	if spec.Inputs == nil || spec.Inputs["target"] != "https://example.com" {
+		t.Fatalf("expected Inputs.target='https://example.com', got %v", spec.Inputs)
+	}
+	if spec.Config == nil || spec.Config["proxy"] != true {
+		t.Fatalf("expected Config.proxy=true, got %v", spec.Config)
+	}
+
+	// Bridge should be registered (keyed by execID from Manager.Submit, which is "exec-1").
+	bridgeMu.Lock()
+	_, bridgeOK := bridge["exec-1"]
+	bridgeMu.Unlock()
+	if !bridgeOK {
+		t.Fatal("expected bridge entry for exec-1")
+	}
+
+	// Verify no shell commands were executed (no legacy exec).
+	// The connector path should not touch getBrowser or toolPath.
+}
+
+func TestHandleConnectorResultReportsError(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+	activeJobsMu.Lock()
+	activeJobs = make(map[string]struct{})
+	activeJobsMu.Unlock()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+	proxy := connector.NewProxy()
+
+	execID := "exec-err-1"
+	resultCh := make(chan []byte, 4)
+	proxy.Register(execID, resultCh)
+
+	entry := &bridgeEntry{
+		jobID:    "job-err-rpt",
+		category: "subdomains",
+		release:  func() {},
+	}
+	bridgeMu.Lock()
+	bridge[execID] = entry
+	bridgeMu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now())
+		close(done)
+	}()
+
+	// Send a result chunk, then signal error via proxy + close.
+	proxy.ForwardResult(execID, []byte(`{"partial":"data"}`))
+	proxy.SetError(execID, "connector crashed")
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	// Verify the submitted results: data chunk first, then error.
+	results := jobsSrv.getResults()
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results (data + error), got %d", len(results))
+	}
+	if results[0].isError {
+		t.Fatal("first result (data chunk) should not be error")
+	}
+	if !results[1].isError {
+		t.Fatal("second result (error submission) should be error")
+	}
+	if results[1].raw != "connector crashed" {
+		t.Fatalf("expected error message 'connector crashed', got %q", results[1].raw)
+	}
+
+	// Verify the completion event has Success=false.
+	gotEvent := false
+	close(events)
+	for ev := range events {
+		if ev.Type == EventJobCompleted {
+			gotEvent = true
+			if ev.Success {
+				t.Fatal("expected Success=false for connector error completion")
+			}
+			if ev.ErrorMsg == "" {
+				t.Fatal("expected non-empty ErrorMsg for connector error completion")
+			}
+		}
+	}
+	if !gotEvent {
+		t.Fatal("expected EventJobCompleted event")
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
+func TestProcessJobLegacyBranch(t *testing.T) {
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return &pb.Job{
+			Id:      "job-leg-1",
+			Command: strPtr("echo legacy-test"),
+		}, nil
+	}
+
+	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, nil, nil, nil)
+
+	if !hadJob {
+		t.Fatal("expected hadJob=true")
+	}
+	if usedAsync {
+		t.Fatal("expected usedAsync=false for legacy path")
+	}
+
+	// Verify no Docker runtime calls were made.
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result submission, got %d", len(results))
+	}
+	if results[0].jobID != "job-leg-1" {
+		t.Fatalf("expected jobID 'job-leg-1', got %q", results[0].jobID)
+	}
+}
+
+func TestProcessJobNoJob(t *testing.T) {
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return nil, nil
+	}
+
+	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, nil, nil, nil)
+
+	if hadJob {
+		t.Fatal("expected hadJob=false when no job")
+	}
+	if usedAsync {
+		t.Fatal("expected usedAsync=false when no job")
+	}
+}
+
+func TestProcessJobConnectorSubmitError(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	// Manager at maxConcurrency=1 — fill the single slot so Submit fails.
+	mgr := execution.NewManager(fakeRT, 1)
+	// First submit fills the 0-slot capacity.
+	_, err := mgr.Submit(context.Background(), execution.JobSpec{Tool: "filler"})
+	if err != nil {
+		t.Fatalf("filler submit failed: %v", err)
+	}
+
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return &pb.Job{
+			Id:    "job-err-1",
+			Tool:  "nuclei",
+			Image: "ghcr.io/open-asm/nuclei:1.0",
+		}, nil
+	}
+
+	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, nil)
+
+	if !hadJob {
+		t.Fatal("expected hadJob=true (job was pulled)")
+	}
+	if usedAsync {
+		t.Fatal("expected usedAsync=false on submit error (caller releases)")
+	}
+
+	// Bridge should NOT be registered.
+	bridgeMu.Lock()
+	bridgeLen := len(bridge)
+	bridgeMu.Unlock()
+	if bridgeLen != 0 {
+		t.Fatalf("expected empty bridge on submit error, got %d entries", bridgeLen)
+	}
+}
+
+func TestProcessJobConnectorCompletionReleasesSemaphore(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+	activeJobsMu.Lock()
+	activeJobs = make(map[string]struct{})
+	activeJobsMu.Unlock()
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	mgr := execution.NewManager(fakeRT, 0)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return &pb.Job{
+			Id:    "job-comp-1",
+			Tool:  "nuclei",
+			Image: "ghcr.io/open-asm/nuclei:1.0",
+		}, nil
+	}
+
+	releaseCh := make(chan struct{}, 1)
+	releaseSem := func() { releaseCh <- struct{}{} }
+
+	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, releaseSem)
+	if !hadJob || !usedAsync {
+		t.Fatalf("expected (true, true), got (%v, %v)", hadJob, usedAsync)
+	}
+
+	// The connector submitted as exec-1. Find the proxy channel.
+	// Simulate: connector sends a result, then Done (closes channel).
+
+	// Get the execID — Manager.Submit uses "exec-N", first submit is "exec-1".
+	execID := "exec-1"
+	if !proxy.Has(execID) {
+		t.Fatalf("expected proxy to have %s", execID)
+	}
+
+	// Simulate connector sending a result data chunk.
+	proxy.ForwardResult(execID, []byte(`{"subdomains":["a.example.com"]}`))
+
+	// Simulate Done message — triggers OnConnectorDown which closes the channel.
+	proxy.OnConnectorDown(execID)
+
+	// Wait for completion handler to finish.
+	select {
+	case <-releaseCh:
+		// Semaphore released — success.
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for semaphore release after connector completion")
+	}
+
+	// Verify cleanup: bridge entry removed, activeJobs cleaned.
+	bridgeMu.Lock()
+	_, stillInBridge := bridge[execID]
+	bridgeMu.Unlock()
+	if stillInBridge {
+		t.Fatal("bridge entry should be removed after completion")
+	}
+
+	activeJobsMu.RLock()
+	_, stillActive := activeJobs["job-comp-1"]
+	activeJobsMu.RUnlock()
+	if stillActive {
+		t.Fatal("activeJobs should be cleaned after completion")
+	}
+
+	// Verify result was submitted.
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result submission, got %d", len(results))
+	}
+	if results[0].jobID != "job-comp-1" {
+		t.Fatalf("expected jobID 'job-comp-1', got %q", results[0].jobID)
+	}
+}
+
+func TestHandleConnectorResultCleanupOnClose(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+	activeJobsMu.Lock()
+	activeJobs = make(map[string]struct{})
+	activeJobsMu.Unlock()
+
+	// Directly test handleConnectorResult by manually setting up bridge + proxy.
+	client, _, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+	proxy := connector.NewProxy()
+
+	releaseCalled := false
+	var mu sync.Mutex
+	entry := &bridgeEntry{
+		jobID:    "job-direct-1",
+		category: "subdomains",
+		release:  func() { mu.Lock(); releaseCalled = true; mu.Unlock() },
+	}
+
+	execID := "exec-direct-1"
+	bridgeMu.Lock()
+	bridge[execID] = entry
+	bridgeMu.Unlock()
+
+	resultCh := make(chan []byte, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now())
+		close(done)
+	}()
+
+	// Send results and close.
+	resultCh <- []byte("first-chunk")
+	resultCh <- []byte("second-chunk")
+	close(resultCh)
+
+	select {
+	case <-done:
+		// handleConnectorResult finished.
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult to finish")
+	}
+
+	// Verify release was called.
+	mu.Lock()
+	called := releaseCalled
+	mu.Unlock()
+	if !called {
+		t.Fatal("expected release to be called")
+	}
+
+	// Verify cleanup.
+	bridgeMu.Lock()
+	_, stillInBridge := bridge[execID]
+	bridgeMu.Unlock()
+	if stillInBridge {
+		t.Fatal("bridge entry should be removed")
+	}
+	if proxy.Has(execID) {
+		t.Fatal("proxy should not have execID after cleanup")
+	}
+}

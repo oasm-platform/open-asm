@@ -11,16 +11,18 @@ type FakeRuntime struct {
 	handles     map[string]Handle
 	CancelCalls []string
 	CreateCount int
+	CreateSpecs []JobSpec // captured specs from Create calls
 }
 
 func NewFakeRuntime() *FakeRuntime {
 	return &FakeRuntime{handles: map[string]Handle{}}
 }
 
-func (f *FakeRuntime) Create(_ context.Context, _ JobSpec, _ RuntimeOpts) (Handle, error) {
+func (f *FakeRuntime) Create(_ context.Context, spec JobSpec, _ RuntimeOpts) (Handle, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.CreateCount++
+	f.CreateSpecs = append(f.CreateSpecs, spec)
 	h := Handle{ID: fmt.Sprintf("fake-%d", f.CreateCount)}
 	f.handles[h.ID] = h
 	return h, nil

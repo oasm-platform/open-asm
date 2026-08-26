@@ -33,8 +33,13 @@ message Worker {
 message Job {
   string id = 1;
   Asset asset = 2;
-  optional string command = 3;
+  optional string command = 3 [deprecated = true];
   string category = 4;
+  // NEW — connector execution spec
+  string tool = 5;
+  string image = 6;                      // core resolves from manifest registry
+  google.protobuf.Struct inputs = 7;     // {target: "..."} per-run
+  google.protobuf.Struct config = 8;     // decrypted profile JSON per-profile
 }
 
 message JobResponse {

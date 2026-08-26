@@ -121,6 +121,12 @@ export class Job extends BaseEntity {
   command?: string;
 
   /**
+   * Reference to the tool config profile used for this job.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  configProfileId?: string;
+
+  /**
    * The asset service this job belongs to.
    */
   @ApiProperty()

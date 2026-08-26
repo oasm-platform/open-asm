@@ -30,14 +30,24 @@ func NewManager(rt runtime.ExecutionRuntime, maxConcurrency int) *Manager {
 func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if len(m.execs) >= m.maxConcurrency {
+	// maxConcurrency <= 0 means unlimited — worker semaphore is the sole concurrency gate.
+	if m.maxConcurrency > 0 && len(m.execs) >= m.maxConcurrency {
 		return "", fmt.Errorf("max concurrency reached")
 	}
 	// Monotonic counter (not len(execs)): Cancel deletes entries, so a size-derived
 	// ID collides with and overwrites a still-running execution.
 	m.nextID++
 	id := fmt.Sprintf("exec-%d", m.nextID)
-	h, err := m.rt.Create(ctx, runtime.JobSpec{Tool: spec.Tool, Image: spec.Image, Version: spec.Version, Inputs: spec.Inputs, Limits: spec.Limits, TraceID: spec.TraceID}, runtime.RuntimeOpts{TraceID: spec.TraceID})
+	h, err := m.rt.Create(ctx, runtime.JobSpec{
+		Tool:    spec.Tool,
+		Image:   spec.Image,
+		Version: spec.Version,
+		Inputs:  spec.Inputs,
+		Limits:  spec.Limits,
+		TraceID: spec.TraceID,
+		Config:  spec.Config,
+		JobID:   spec.JobID,
+	}, runtime.RuntimeOpts{TraceID: spec.TraceID})
 	if err != nil {
 		return "", err
 	}

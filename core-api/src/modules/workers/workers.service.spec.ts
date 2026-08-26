@@ -267,4 +267,228 @@ describe('WorkersService', () => {
       expect(mockWorkerInstanceRepository.delete).not.toHaveBeenCalled();
     });
   });
+
+  describe('join - runMode', () => {
+    const WORKER_SIG = 'test-sig';
+
+    beforeEach(() => {
+      // Default config: empty signature (matches empty from worker), no cloud key
+      (mockConfigService.get as jest.Mock).mockImplementation(
+        (key: string) => {
+          if (key === 'WORKER_SIGNATURE') return WORKER_SIG;
+          if (key === 'OASM_CLOUD_APIKEY') return '';
+          return undefined;
+        },
+      );
+    });
+
+    it('should save runMode "node" when join with numeric mode=2', async () => {
+      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
+        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
+      );
+      (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
+        (data: Record<string, unknown>) => data,
+      );
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
+        (opts: Record<string, unknown>) => {
+          const where = opts.where as Record<string, unknown> | undefined;
+          if (where?.token) return null;
+          return { id: 'w-1', token: 'tok-new', runMode: 'node' };
+        },
+      );
+      (mockWorkerInstanceRepository as any).manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const result = await service.join({
+        apiKey: 'api-key-1',
+        signature: WORKER_SIG,
+        metadata: { name: 'test', os: 'linux', mode: 2 },
+      });
+
+      const saveCall = (mockWorkerInstanceRepository.save as jest.Mock).mock
+        .calls[0][0];
+      expect(saveCall.runMode).toBe('node');
+      expect(result.runMode).toBe('node');
+    });
+
+    it('should save runMode "cli" when join with numeric mode=1', async () => {
+      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
+        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
+      );
+      (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
+        (data: Record<string, unknown>) => data,
+      );
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
+        (opts: Record<string, unknown>) => {
+          const where = opts.where as Record<string, unknown> | undefined;
+          if (where?.token) return null;
+          return { id: 'w-1', token: 'tok-new', runMode: 'cli' };
+        },
+      );
+      (mockWorkerInstanceRepository as any).manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const result = await service.join({
+        apiKey: 'api-key-1',
+        signature: WORKER_SIG,
+        metadata: { name: 'test', os: 'linux', mode: 1 },
+      });
+
+      const saveCall = (mockWorkerInstanceRepository.save as jest.Mock).mock
+        .calls[0][0];
+      expect(saveCall.runMode).toBe('cli');
+      expect(result.runMode).toBe('cli');
+    });
+
+    it('should save runMode null when join with no mode (legacy worker)', async () => {
+      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
+        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
+      );
+      (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
+        (data: Record<string, unknown>) => data,
+      );
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
+        (opts: Record<string, unknown>) => {
+          const where = opts.where as Record<string, unknown> | undefined;
+          if (where?.token) return null;
+          return { id: 'w-1', token: 'tok-new', runMode: null };
+        },
+      );
+      (mockWorkerInstanceRepository as any).manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const result = await service.join({
+        apiKey: 'api-key-1',
+        signature: WORKER_SIG,
+        metadata: { name: 'test', os: 'linux' },
+        // mode is undefined — legacy worker
+      });
+
+      const saveCall = (mockWorkerInstanceRepository.save as jest.Mock).mock
+        .calls[0][0];
+      expect(saveCall.runMode).toBeNull();
+      expect(result.runMode).toBeNull();
+    });
+
+    it('should update runMode on token rejoin when mode changed', async () => {
+      const existingWorker = {
+        id: 'w-existing',
+        token: 'tok-existing',
+        runMode: 'cli',
+      };
+      const updatedWorker = {
+        ...existingWorker,
+        runMode: 'node',
+      };
+      // API key must be valid for the join to pass validation
+      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
+        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
+      );
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
+        (opts: Record<string, unknown>) => {
+          const where = opts.where as Record<string, unknown> | undefined;
+          if (where?.token === 'tok-existing') return existingWorker;
+          if (where?.id === 'w-existing') return updatedWorker;
+          return null;
+        },
+      );
+      (mockWorkerInstanceRepository.update as jest.Mock).mockResolvedValue(
+        undefined,
+      );
+      (mockWorkerInstanceRepository as any).manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const result = await service.join({
+        apiKey: 'api-key-1',
+        signature: WORKER_SIG,
+        token: 'tok-existing',
+        metadata: { name: 'test', os: 'linux', mode: 2 },
+      });
+
+      expect(mockWorkerInstanceRepository.update).toHaveBeenCalledWith(
+        { id: 'w-existing' },
+        expect.objectContaining({ runMode: 'node' }),
+      );
+      expect(result.runMode).toBe('node');
+    });
+
+    it('should NOT update runMode on token rejoin when mode unchanged', async () => {
+      const existingWorker = {
+        id: 'w-existing',
+        token: 'tok-existing',
+        runMode: 'node',
+      };
+      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
+        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
+      );
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
+        (opts: Record<string, unknown>) => {
+          const where = opts.where as Record<string, unknown> | undefined;
+          if (where?.token === 'tok-existing') return existingWorker;
+          return null;
+        },
+      );
+      (mockWorkerInstanceRepository.update as jest.Mock).mockResolvedValue(
+        undefined,
+      );
+      (mockWorkerInstanceRepository as any).manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      await service.join({
+        apiKey: 'api-key-1',
+        signature: WORKER_SIG,
+        token: 'tok-existing',
+        metadata: { name: 'test', os: 'linux', mode: 2 },
+      });
+
+      expect(mockWorkerInstanceRepository.update).not.toHaveBeenCalledWith(
+        { id: 'w-existing' },
+        expect.objectContaining({ runMode: expect.anything() }),
+      );
+    });
+  });
+
+  describe('getWorkers - runMode filter', () => {
+    it('should include runMode in response when present', async () => {
+      const workerNode = {
+        id: 'w-1',
+        runMode: 'node',
+        type: 'BUILT_IN',
+        scope: 'CLOUD',
+      };
+
+      (mockWorkerInstanceRepository.createQueryBuilder as jest.Mock).mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[workerNode], 1]),
+      });
+
+      (mockJobsRegistryService.repo as any).count = jest
+        .fn()
+        .mockResolvedValue(0);
+      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
+        data: [],
+      });
+
+      const result = await service.getWorkers({
+        page: 1,
+        limit: 10,
+        runMode: 'node',
+      } as any);
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].runMode).toBe('node');
+    });
+  });
 });

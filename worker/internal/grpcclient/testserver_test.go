@@ -39,11 +39,16 @@ type fakeWorkersService struct {
 type joinCall struct {
 	apiKey   string
 	metadata *workers.WorkerMetadata
+	mode     workers.WorkerRunMode // extracted from metadata.Mode for convenience
 }
 
 func (f *fakeWorkersService) Join(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
 	f.mu.Lock()
-	f.joinCalls = append(f.joinCalls, joinCall{apiKey: req.ApiKey, metadata: req.Metadata})
+	mode := workers.WorkerRunMode_WORKER_RUN_MODE_UNKNOWN
+	if req.Metadata != nil && req.Metadata.Mode != nil {
+		mode = *req.Metadata.Mode
+	}
+	f.joinCalls = append(f.joinCalls, joinCall{apiKey: req.ApiKey, metadata: req.Metadata, mode: mode})
 	f.mu.Unlock()
 	if f.joinFn != nil {
 		return f.joinFn(ctx, req)

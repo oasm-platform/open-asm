@@ -36,7 +36,9 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import { StorageService } from '../storage/storage.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
+import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { ToolsService } from '../tools/tools.service';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
@@ -45,7 +47,7 @@ import { JobListItemDto } from './dto/job-list-item.dto';
 import {
   CreateJobs,
   GetManyJobsQueryParams,
-  GetNextJobResponseDto,
+  GetNextJobResult,
   JobTimelineItem,
   JobTimelineQueryResult,
   JobTimelineResponseDto,
@@ -100,6 +102,8 @@ export class JobsRegistryService {
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
     private eventEmitter: EventEmitter2,
     private workspaceService: WorkspacesService,
+    private readonly connectorRegistry: ConnectorRegistryService,
+    private readonly toolConfigProfilesService: ToolConfigProfilesService,
   ) {}
   public async getManyJobs(
     workspaceId: string,
@@ -176,6 +180,7 @@ export class JobsRegistryService {
     jobName,
     isPublishEvent,
     jobRunType,
+    configProfileId,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
@@ -183,6 +188,19 @@ export class JobsRegistryService {
 
     if (!tool.category) {
       throw new Error('Tool category is required for creating a job');
+    }
+
+    // Detect connector jobs: Tool.name IS the connector slug
+    const connectorEntry = this.connectorRegistry.getConnector(tool.name);
+    const isConnector = !!connectorEntry?.image;
+
+    // Validate configProfileId belongs to same workspace AND tool
+    if (isConnector && configProfileId) {
+      await this.toolConfigProfilesService.assertProfileOwnership(
+        workspaceId,
+        configProfileId,
+        tool.id!,
+      );
     }
 
     if (
@@ -252,11 +270,14 @@ export class JobsRegistryService {
           tool,
           priority: priority ?? 4,
           jobHistory,
-          command: bindingCommand(defaultCommand ?? '', {
-            // Use the default command template for HTTP_PROBE
-            value: assetService.value,
-            port: assetService.port.toString(),
-          }),
+          command: isConnector
+            ? undefined
+            : bindingCommand(defaultCommand ?? '', {
+                // Use the default command template for HTTP_PROBE
+                value: assetService.value,
+                port: assetService.port.toString(),
+              }),
+          configProfileId: isConnector ? configProfileId : undefined,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
@@ -291,9 +312,12 @@ export class JobsRegistryService {
           tool,
           priority: priority ?? 4,
           jobHistory,
-          command: bindingCommand(defaultCommand ?? '', {
-            value: asset.value,
-          }),
+          command: isConnector
+            ? undefined
+            : bindingCommand(defaultCommand ?? '', {
+                value: asset.value,
+              }),
+          configProfileId: isConnector ? configProfileId : undefined,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
@@ -415,7 +439,7 @@ export class JobsRegistryService {
    */
   public async getNextJob(
     workerId: string,
-  ): Promise<GetNextJobResponseDto | null> {
+  ): Promise<GetNextJobResult | null> {
     // [OPT-2] Fetch worker OUTSIDE transaction to reduce lock hold time
     const worker = await this.dataSource.getRepository(WorkerInstance).findOne({
       where: { id: workerId },
@@ -510,7 +534,7 @@ export class JobsRegistryService {
 
       await queryRunner.commitTransaction();
 
-      return {
+      const base: GetNextJobResult = {
         id: job.id,
         category: job.category,
         createdAt: job.createdAt,
@@ -519,6 +543,15 @@ export class JobsRegistryService {
         command: job.command,
         asset: job.asset,
       };
+
+      // Connector support: include tool metadata for non-built-in workers
+      if (!isBuiltInTools && worker.tool) {
+        base.tool = { id: worker.tool.id!, name: worker.tool.name };
+        base.workspaceId = worker.workspace.id;
+        base.configProfileId = job.configProfileId;
+      }
+
+      return base;
     } catch (error) {
       Logger.error(
         'Error in getNextJob',
