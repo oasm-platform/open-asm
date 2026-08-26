@@ -15,7 +15,7 @@ const BuiltInTools = () => {
       renderButton={() => (
         <Button color="green" disabled={true}>
           <CheckCircle className="w-4 h-4" />
-          Installed
+          Added
         </Button>
       )}
     />
