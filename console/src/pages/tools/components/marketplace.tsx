@@ -4,11 +4,18 @@ import ToolsList from '../tools-list';
 import ToolInstallButton from './tool-install-button';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
-const Marketplace = () => {
+interface MarketplaceProps {
+  toolType?: string;
+}
+
+const Marketplace = ({ toolType }: MarketplaceProps) => {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
-  const { data, isLoading } = useToolsControllerGetManyTools();
+  const { data, isLoading } = useToolsControllerGetManyTools(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    toolType ? ({ type: toolType } as any) : undefined,
+  );
   return (
     <div>
       <ToolsList

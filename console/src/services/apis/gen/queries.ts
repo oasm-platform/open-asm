@@ -1031,6 +1031,7 @@ export type ToolType = (typeof ToolType)[keyof typeof ToolType];
 export const ToolType = {
   built_in: 'built_in',
   provider: 'provider',
+  connector: 'connector',
 } as const;
 
 export type Tool = {
@@ -1574,6 +1575,7 @@ export type WorkerInstanceType =
 export const WorkerInstanceType = {
   built_in: 'built_in',
   provider: 'provider',
+  connector: 'connector',
 } as const;
 
 export type WorkerInstanceScope =
@@ -3286,6 +3288,7 @@ export type ToolsControllerGetManyToolsType =
 export const ToolsControllerGetManyToolsType = {
   built_in: 'built_in',
   provider: 'provider',
+  connector: 'connector',
 } as const;
 
 export type ToolsControllerGetManyToolsCategory =

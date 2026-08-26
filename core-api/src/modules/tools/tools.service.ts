@@ -18,6 +18,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { In, Repository } from 'typeorm';
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import { ApiKeysService } from '../apikeys/apikeys.service';
@@ -32,6 +34,8 @@ import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
+import { StorageService } from '../storage/storage.service';
+import { JobPriority } from '@/common/enums/enum';
 import { builtInTools } from './tools-provider/built-in-tools';
 import { officialSupportTools } from './tools-provider/official-support-tools';
 @Injectable()
@@ -55,6 +59,8 @@ export class ToolsService implements OnModuleInit {
     private readonly workersService: WrapperType<WorkersService>,
 
     private readonly redisLockService: RedisLockService,
+
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -141,13 +147,13 @@ export class ToolsService implements OnModuleInit {
         ...officialSupportToolsToInsert,
       ];
 
-      // Insert tools using upsert to avoid duplicates
+      // Insert tools using upsert to avoid duplicates — unique is (name, type)
       await this.toolsRepository
         .createQueryBuilder()
         .insert()
         .orUpdate({
-          conflict_target: ['name'],
-          overwrite: ['description', 'logoUrl', 'version', 'priority'],
+          conflict_target: ['name', 'type'],
+          overwrite: ['description', 'logoUrl', 'version', 'priority', 'category'],
         })
         .values(toolsToInsert)
         .execute();
@@ -159,9 +165,239 @@ export class ToolsService implements OnModuleInit {
         10_000,
         () => this.removeOrphanBuiltInTools(),
       );
+
+      // Sync connector tools from manifest.json (logo stored as path, upload base64 after commit)
+      await this.syncConnectorTools();
     } catch (error) {
       Logger.error('Error initializing built-in tools:', error);
     }
+  }
+
+  private mapConnectorCapabilityToCategory(capabilities: string[] | undefined): ToolCategory | undefined {
+    if (!capabilities || capabilities.length === 0) return ToolCategory.VULNERABILITIES;
+    const cap = capabilities[0]?.toLowerCase();
+    switch (cap) {
+      case 'subdomains':
+        return ToolCategory.SUBDOMAINS;
+      case 'http_probe':
+        return ToolCategory.HTTP_PROBE;
+      case 'ports_scanner':
+      case 'port_scanner':
+        return ToolCategory.PORTS_SCANNER;
+      case 'vulnerabilities':
+        return ToolCategory.VULNERABILITIES;
+      case 'screenshot':
+        return ToolCategory.SCREENSHOT;
+      default:
+        return ToolCategory.VULNERABILITIES;
+    }
+  }
+
+  /**
+   * Sync connector tools from resources/connectors/manifest.json.
+   * - logoUrl is stored as path /connectors/<slug>.png (not base64)
+   * - After DB commit, returns only tools inserted/updated in this run for logo upload
+   * - Uploads base64 logos to StorageService (bucket: system) ensuring files exist when used
+   */
+  private async syncConnectorTools(): Promise<Tool[]> {
+    const manifestPath = path.resolve(
+      process.cwd(),
+      'resources',
+      'connectors',
+      'manifest.json',
+    );
+
+    let raw: string;
+    try {
+      raw = await fs.readFile(manifestPath, 'utf-8');
+    } catch {
+      Logger.warn(`Connector manifest not found at ${manifestPath} — skipping connector sync`);
+      return [];
+    }
+
+    let manifest: { connectors?: Array<Record<string, unknown>> };
+    try {
+      manifest = JSON.parse(raw) as { connectors?: Array<Record<string, unknown>> };
+    } catch {
+      Logger.warn(`Connector manifest at ${manifestPath} contains invalid JSON — skipping connector sync`);
+      return [];
+    }
+
+    const connectors = manifest.connectors;
+    if (!Array.isArray(connectors) || connectors.length === 0) {
+      Logger.warn(`Connector manifest at ${manifestPath} has no connectors — skipping`);
+      return [];
+    }
+
+    type ToolInsert = Omit<
+      Tool,
+      | 'workspaceTools'
+      | 'jobs'
+      | 'vulnerabilities'
+      | 'assetTags'
+      | 'provider'
+      | 'apiKey'
+      | 'workers'
+      | 'parser'
+      | 'isInstalled'
+      | 'availableWorkersCount'
+    >;
+
+    const connectorEntries: Array<{ insert: ToolInsert; logoBase64?: string }> = [];
+
+    for (const rawEntry of connectors) {
+      const slug = String((rawEntry['slug'] as string) ?? (rawEntry['name'] as string) ?? '').toLowerCase();
+      if (!slug) continue;
+      const name = slug;
+      const description =
+        (rawEntry['description'] as string) ??
+        (rawEntry['shortDescription'] as string) ??
+        '';
+      const version = (rawEntry['version'] as string) ?? '';
+      const logoBase64 = rawEntry['logo'] as string | undefined;
+      const capabilities = rawEntry['capabilities'] as string[] | undefined;
+      const category = this.mapConnectorCapabilityToCategory(capabilities);
+
+      const logoUrl = `/connectors/${name}.png`;
+
+      const insert: ToolInsert = {
+        id: randomUUID(),
+        name,
+        description,
+        category,
+        version,
+        logoUrl,
+        isBuiltIn: false,
+        isOfficialSupport: false,
+        type: WorkerType.CONNECTOR,
+        priority: JobPriority.MEDIUM,
+      };
+
+      connectorEntries.push({ insert, logoBase64 });
+    }
+
+    if (connectorEntries.length === 0) return [];
+
+    // Determine which connectors need insert/update by comparing with existing DB state
+    const existingConnectors = await this.toolsRepository.find({
+      where: { type: WorkerType.CONNECTOR },
+    });
+    const existingMap = new Map<string, Tool>();
+    for (const t of existingConnectors) {
+      if (t.name) existingMap.set(t.name, t);
+    }
+
+    const toUpsert: ToolInsert[] = [];
+    const logoMap = new Map<string, string>();
+
+    for (const { insert, logoBase64 } of connectorEntries) {
+      const existing = existingMap.get(insert.name);
+      if (logoBase64) {
+        logoMap.set(insert.name, logoBase64);
+      }
+
+      if (!existing) {
+        toUpsert.push(insert);
+        continue;
+      }
+
+      const needsUpdate =
+        existing.description !== insert.description ||
+        existing.version !== insert.version ||
+        existing.logoUrl !== insert.logoUrl ||
+        existing.category !== insert.category ||
+        existing.priority !== insert.priority;
+
+      if (needsUpdate) {
+        // Preserve existing id for update path? Upsert will handle via (name,type) but we keep new id for insert; TypeORM will ignore id on conflict and update existing row.
+        // Ensure we keep the same priority/category logic — just push insert.
+        toUpsert.push(insert);
+      }
+    }
+
+    if (toUpsert.length === 0) {
+      Logger.log('Connector tools sync: no changes detected');
+      // Still cleanup orphans
+      await this.redisLockService.withLock('connector-tools-sync', 10_000, () =>
+        this.removeOrphanConnectorTools(connectorEntries.map((e) => e.insert.name)),
+      );
+      return [];
+    }
+
+    // Commit to DB — returns only tools that were inserted/updated in this transaction
+    await this.toolsRepository
+      .createQueryBuilder()
+      .insert()
+      .orUpdate({
+        conflict_target: ['name', 'type'],
+        overwrite: ['description', 'logoUrl', 'version', 'priority', 'category'],
+      })
+      .values(toUpsert)
+      .execute();
+
+    // Fetch the committed rows (only those we just upserted)
+    const committedTools = await this.toolsRepository.find({
+      where: {
+        name: In(toUpsert.map((t) => t.name)),
+        type: WorkerType.CONNECTOR,
+      },
+    });
+
+    // Upload logos only for committed tools that have base64
+    const uploads: Promise<unknown>[] = [];
+    for (const tool of committedTools) {
+      const base64 = logoMap.get(tool.name);
+      if (!base64) continue;
+      try {
+        // Strip data URI prefix if present
+        const cleanBase64 = base64.includes(',') ? base64.split(',').pop()! : base64;
+        const buffer = Buffer.from(cleanBase64, 'base64');
+        if (buffer.length === 0) continue;
+        const fileName = `connectors/${tool.name}.png`;
+        uploads.push(
+          this.storageService
+            .uploadFile(fileName, buffer, 'system')
+            .then(() => Logger.log(`Uploaded connector logo for ${tool.name} -> ${fileName}`))
+            .catch((err) => Logger.warn(`Failed to upload connector logo for ${tool.name}: ${err instanceof Error ? err.message : String(err)}`)),
+        );
+      } catch (err) {
+        Logger.warn(`Failed to decode logo for ${tool.name}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    if (uploads.length > 0) {
+      await Promise.allSettled(uploads);
+    }
+
+    // Cleanup orphans after successful sync
+    await this.redisLockService.withLock('connector-tools-sync', 10_000, () =>
+      this.removeOrphanConnectorTools(connectorEntries.map((e) => e.insert.name)),
+    );
+
+    Logger.log(`Connector tools sync: committed ${committedTools.length} tool(s)`);
+    return committedTools;
+  }
+
+  private async removeOrphanConnectorTools(currentNames: string[]): Promise<void> {
+    const dbConnectors = await this.toolsRepository.find({
+      where: { type: WorkerType.CONNECTOR },
+    });
+    const orphans = dbConnectors.filter((t) => !currentNames.includes(t.name));
+    if (orphans.length === 0) return;
+    const orphanIds = orphans.map((t) => t.id!) .filter(Boolean);
+    if (orphanIds.length === 0) return;
+
+    await this.workspaceToolRepository
+      .createQueryBuilder()
+      .delete()
+      .where('"toolId" IN (:...orphanIds)', { orphanIds })
+      .execute();
+
+    await this.toolsRepository.delete({ id: In(orphanIds) });
+
+    Logger.log(
+      `Removed ${orphans.length} orphan connector tool(s): ${orphans.map((t) => t.name).join(', ')}`,
+    );
   }
 
   /**
@@ -469,14 +705,14 @@ export class ToolsService implements OnModuleInit {
   }
 
   /**
-   * Create a new tool.
-   * @param {CreateToolDto} dto - The tool creation data.
-   * @returns {Promise<Tool>} The created tool.
-   */
+    * Create a new tool.
+    * @param {CreateToolDto} dto - The tool creation data.
+    * @returns {Promise<Tool>} The created tool.
+    */
   async createTool(dto: CreateToolDto): Promise<Tool> {
-    // Check if a tool with the same name already exists
+    // Check if a tool with the same name + type already exists (unique is name+type since connector support)
     const existingTool = await this.toolsRepository.findOne({
-      where: { name: dto.name },
+      where: { name: dto.name, type: WorkerType.PROVIDER },
     });
 
     if (existingTool) {

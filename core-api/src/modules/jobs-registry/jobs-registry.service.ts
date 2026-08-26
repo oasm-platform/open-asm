@@ -462,7 +462,7 @@ export class JobsRegistryService {
       const queryBuilder = queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
-        .innerJoin('asset.target', 'target')
+        .innerJoinAndSelect('asset.target', 'target')
         .leftJoin('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
         // [OPT-1] Use addOrderBy for compound sort (priority first, then createdAt)
@@ -547,7 +547,8 @@ export class JobsRegistryService {
       // Connector support: include tool metadata for non-built-in workers
       if (!isBuiltInTools && worker.tool) {
         base.tool = { id: worker.tool.id!, name: worker.tool.name };
-        base.workspaceId = worker.workspace.id;
+        // Connector workers have no workspace — derive from job's target instead
+        base.workspaceId = job.asset.target?.workspaceId;
         base.configProfileId = job.configProfileId;
       }
 
