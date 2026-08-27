@@ -63,6 +63,37 @@
         "memory": "512Mi",
         "timeoutSeconds": 600
       }
+    },
+    {
+      "name": "Nessus",
+      "slug": "nessus",
+      "version": "10.8.0",
+      "image": "ghcr.io/open-asm/connector-nessus:10.8.0",
+      "author": "oasm",
+      "license": "commercial",
+      "shortDescription": "Tenable Nessus vulnerability scanner",
+      "description": "Nessus is the world's No. 1 vulnerability scanning solution. Connector runs Nessus scans against targets to detect vulnerabilities, misconfigurations and compliance issues.",
+      "capabilities": [
+        "vulnerabilities"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false
+      },
+      "resourceDefaults": {
+        "cpu": "500m",
+        "memory": "512Mi",
+        "timeoutSeconds": 600
+      }
     }
   ]
 }
