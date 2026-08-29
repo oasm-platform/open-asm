@@ -150,7 +150,9 @@ describe('AssetGroupService', () => {
     createQueryBuilder: jest.fn(),
   };
 
-  const mockToolsService = {};
+  const mockToolsService = {
+    getProfileToolIds: jest.fn().mockResolvedValue(new Set()),
+  };
 
   const mockJobsRegistryService = {};
 
@@ -373,6 +375,117 @@ describe('AssetGroupService', () => {
         NotFoundException,
       );
       expect(mockWorkflowRepo.save).not.toHaveBeenCalled();
+    });
+
+    // ── Connector profile validation ─────────────────────────────────
+    it('should throw BadRequestException when connector tool lacks config profile', async () => {
+      const connectorTool = {
+        id: 'tool-connector',
+        name: 'nuclei',
+        type: 'connector',
+        isBuiltIn: false,
+      };
+      const dto = {
+        name: 'Web Servers',
+        toolIds: ['tool-connector'],
+      } as CreateAssetGroupDto;
+
+      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined); // name check
+      mockManager.find.mockResolvedValue([connectorTool]);
+
+      // Mock toolsService batched profile lookup to report no profile
+      (mockToolsService as any).getProfileToolIds = jest
+        .fn()
+        .mockResolvedValue(new Set());
+
+      await expect(service.create(dto, workspaceId)).rejects.toThrow(
+        /requires a configuration profile/i,
+      );
+    });
+
+    it('should allow connector tool with config profile', async () => {
+      const connectorTool = {
+        id: 'tool-connector',
+        name: 'nuclei',
+        type: 'connector',
+        isBuiltIn: false,
+      };
+      const dto = {
+        name: 'Web Servers',
+        toolIds: ['tool-connector'],
+      } as CreateAssetGroupDto;
+
+      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined); // name check
+      mockAssetGroupRepo.findOne.mockResolvedValue({ id: groupId });
+      mockManager.find.mockResolvedValue([connectorTool]);
+      mockWorkflowRepo.create.mockImplementation((data) => data);
+      mockWorkflowRepo.save.mockResolvedValue({ id: 'workflow-1' });
+      mockWorkflowRepo.findByIds.mockResolvedValue([{ id: 'workflow-1' }]);
+      mockAssetGroupWorkflowRepo.find.mockResolvedValue([]);
+      mockScanScheduleQueue.add.mockResolvedValue({ repeatJobKey: 'repeat-key-1' });
+
+      // Mock toolsService batched profile lookup to report a profile
+      (mockToolsService as any).getProfileToolIds = jest
+        .fn()
+        .mockResolvedValue(new Set(['tool-connector']));
+
+      const result = await service.create(dto, workspaceId);
+      expect(result.id).toBe(groupId);
+    });
+
+    it('should allow built-in tool without config profile', async () => {
+      const builtInTool = {
+        id: 'tool-builtin',
+        name: 'subfinder',
+        type: 'built_in',
+        isBuiltIn: true,
+      };
+      const dto = {
+        name: 'Web Servers',
+        toolIds: ['tool-builtin'],
+      } as CreateAssetGroupDto;
+
+      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined); // name check
+      mockAssetGroupRepo.findOne.mockResolvedValue({ id: groupId });
+      mockManager.find.mockResolvedValue([builtInTool]);
+      mockWorkflowRepo.create.mockImplementation((data) => data);
+      mockWorkflowRepo.save.mockResolvedValue({ id: 'workflow-1' });
+      mockWorkflowRepo.findByIds.mockResolvedValue([{ id: 'workflow-1' }]);
+      mockAssetGroupWorkflowRepo.find.mockResolvedValue([]);
+      mockScanScheduleQueue.add.mockResolvedValue({ repeatJobKey: 'repeat-key-1' });
+
+      const result = await service.create(dto, workspaceId);
+      expect(result.id).toBe(groupId);
+    });
+
+    it('should query config profiles once for multiple connector tools', async () => {
+      const connectorA = { id: 'tool-a', name: 'nuclei', type: 'connector', isBuiltIn: false };
+      const connectorB = { id: 'tool-b', name: 'wpscan', type: 'connector', isBuiltIn: false };
+      const dto = {
+        name: 'Web Servers',
+        toolIds: ['tool-a', 'tool-b'],
+      } as CreateAssetGroupDto;
+
+      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined); // name check
+      mockAssetGroupRepo.findOne.mockResolvedValue({ id: groupId });
+      mockManager.find.mockResolvedValue([connectorA, connectorB]);
+      mockWorkflowRepo.create.mockImplementation((data) => data);
+      mockWorkflowRepo.save.mockResolvedValue({ id: 'workflow-1' });
+      mockWorkflowRepo.findByIds.mockResolvedValue([{ id: 'workflow-1' }]);
+      mockAssetGroupWorkflowRepo.find.mockResolvedValue([]);
+      mockScanScheduleQueue.add.mockResolvedValue({ repeatJobKey: 'repeat-key-1' });
+      (mockToolsService as any).getProfileToolIds = jest
+        .fn()
+        .mockResolvedValue(new Set(['tool-a', 'tool-b']));
+
+      const result = await service.create(dto, workspaceId);
+      expect(result.id).toBe(groupId);
+      // Single batched profile lookup for both connector ids
+      expect((mockToolsService as any).getProfileToolIds).toHaveBeenCalledTimes(1);
+      expect((mockToolsService as any).getProfileToolIds).toHaveBeenCalledWith(
+        workspaceId,
+        ['tool-a', 'tool-b'],
+      );
     });
   });
 

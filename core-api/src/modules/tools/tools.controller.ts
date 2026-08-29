@@ -14,9 +14,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { CreateToolDto } from './dto/create-tool.dto';
-import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { GetToolByIdDto } from './dto/get-tool-by-id.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
@@ -185,31 +183,19 @@ export class ToolsController {
   }
 
   @Doc({
-    summary: 'Get tool API key',
+    summary: 'Get tool config schema',
     description:
-      'Retrieves the authentication API key for accessing the specified security tool.',
-    response: {
-      serialization: GetApiKeyResponseDto,
-    },
+      'Returns the effective JSON Schema for a tool\'s configuration. Uses configSchema when present, falls back to inputsSchema.',
     request: {
       getWorkspaceId: true,
     },
   })
-  @Get(':id/api-key')
-  getToolApiKey(@Param() { id }: IdQueryParamDto) {
-    return this.toolsService.getToolApiKey(id);
-  }
-
-  @Doc({
-    summary: 'Rotate tool API key',
-    description:
-      'Regenerates a new API key for the specified security tool, invalidating the previous key.',
-    response: {
-      serialization: GetApiKeyResponseDto,
-    },
-  })
-  @Post(':id/api-key/rotate')
-  rotateToolApiKey(@Param() { id }: IdQueryParamDto) {
-    return this.toolsService.rotateToolApiKey(id);
+  @WorkspaceAccess('workspace.read')
+  @Get(':id/schema')
+  getToolSchema(
+    @Param() { id }: GetToolByIdDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.toolsService.getToolSchema(id, workspaceId);
   }
 }

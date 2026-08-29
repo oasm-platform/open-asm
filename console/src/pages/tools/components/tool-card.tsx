@@ -8,9 +8,17 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
-import type { Tool } from '@/services/apis/gen/queries';
-import { Verified } from 'lucide-react';
+import {
+  ToolsControllerGetManyToolsType,
+  type Tool,
+} from '@/services/apis/gen/queries';
+import { AlertTriangle, Verified } from 'lucide-react';
 import React from 'react';
+
+/** Backend-augmented fields not yet in orval-generated Tool type. */
+interface ToolWithConfig extends Tool {
+  hasConfigProfile?: boolean;
+}
 
 interface ToolCardProps {
   tool: Tool;
@@ -91,9 +99,6 @@ const ToolCard = ({ tool, button }: ToolCardProps) => {
           <div className="shrink-0">{button}</div>
         </div>
         <div className="flex items-center gap-2">
-          {/* <Badge variant="secondary" className="text-xs font-normal px-2 py-1">
-                        {tool.version || 'N/A'}
-                    </Badge> */}
           <Badge variant="secondary" className="text-xs font-normal px-2 py-1">
             {tool.category
               ? tool.category
@@ -102,6 +107,16 @@ const ToolCard = ({ tool, button }: ToolCardProps) => {
                   .join(' ')
               : 'N/A'}
           </Badge>
+          {tool.type === ToolsControllerGetManyToolsType.connector &&
+            (tool as ToolWithConfig).hasConfigProfile === false && (
+              <Badge
+                variant="secondary"
+                className="gap-1 text-xs font-normal px-2 py-1 text-yellow-700 bg-yellow-50 border-yellow-200"
+              >
+                <AlertTriangle className="size-3" />
+                Needs config
+              </Badge>
+            )}
         </div>
         <TooltipProvider>
           <Tooltip>

@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto';
 import { LessThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -72,6 +73,8 @@ export class WorkersService {
     private redisService: RedisService,
 
     private aliveStreamManager: AliveStreamManager,
+
+    private readonly connectorRegistry: ConnectorRegistryService,
   ) {}
 
   /**
@@ -172,9 +175,12 @@ export class WorkersService {
       if (mode === 2) return 'node';
       return null; // 0 or any other value → null (UNKNOWN)
     }
+    // gRPC loader uses enums:String → proto enum arrives as name string
     const lower = String(mode).toLowerCase();
     if (lower === 'cli') return 'cli';
     if (lower === 'node') return 'node';
+    if (lower === 'worker_run_mode_cli') return 'cli';
+    if (lower === 'worker_run_mode_node') return 'node';
     return null;
   }
 
@@ -276,7 +282,26 @@ export class WorkersService {
       .take(limit)
       .getManyAndCount();
 
-    // Get current jobs count and active tools for each worker
+    // All workers show all available tools (built-in + connector).
+    // Hoisted above the per-worker map: one query for built-in tools and one
+    // manifest read total, shared by every worker in the page (findings #3).
+    const [builtInTools, connectorList] = await Promise.all([
+      this.toolsService.getBuiltInTools(),
+      Promise.resolve(this.connectorRegistry.getAllConnectors()),
+    ]);
+
+    // Connector entries carry an honest shape: CONNECTOR type (not BUILT_IN),
+    // category derived from capabilities via the shared mapper (#2), and the
+    // stored logo path served by ConnectorLogoController instead of raw base64
+    // (#8). id stays the stable slug consumed by the console (#7).
+    const connectorTools: Tool[] = connectorList.map((c) => ({
+      id: c.slug,
+      name: c.name,
+      category: ToolsService.mapConnectorCapabilityToCategory(c.capabilities),
+      type: WorkerType.CONNECTOR,
+      logoUrl: c.logo ? `/connectors/${c.slug}.png` : undefined,
+    })) as Tool[];
+
     const workersWithJobCount = await Promise.all(
       workers.map(async (worker) => {
         const count = await this.jobsRegistryService['repo'].count({
@@ -286,16 +311,7 @@ export class WorkersService {
           },
         });
 
-        // Determine active tools based on worker type
-        let tools: Tool[] = [];
-        if (worker.type === WorkerType.BUILT_IN) {
-          // For BUILT_IN workers, return all built-in tools
-          const builtInTools = await this.toolsService.getBuiltInTools();
-          tools = builtInTools.data;
-        } else if (worker.tool) {
-          // For PROVIDER workers, return the current tool as array
-          tools = [worker.tool];
-        }
+        const tools: Tool[] = [...builtInTools.data, ...connectorTools];
 
         return {
           ...worker,

@@ -1,6 +1,5 @@
 import { forwardRef, Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ApiKeysModule } from '../apikeys/apikeys.module';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
@@ -17,7 +16,6 @@ import { ToolsService } from './tools.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Tool, WorkspaceTool, Asset, Vulnerability, ToolConfigProfile]),
-    ApiKeysModule,
     forwardRef(() => WorkersModule),
     ConnectorsModule,
   ],

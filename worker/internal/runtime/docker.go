@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 )
@@ -99,6 +101,15 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		SecurityOpt:    []string{"no-new-privileges:true"},
 		ReadonlyRootfs: false, // connectors may need to write temp files
 	}
+
+	// Pull image if not present locally.
+	pullReader, err := d.cli.ImagePull(ctx, spec.Image, types.ImagePullOptions{})
+	if err != nil {
+		return Handle{}, fmt.Errorf("image pull %s: %w", spec.Image, err)
+	}
+	// Drain the pull output (required to complete the pull).
+	_, _ = io.Copy(io.Discard, pullReader)
+	pullReader.Close()
 
 	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
 	if err != nil {

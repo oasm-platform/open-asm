@@ -35,7 +35,8 @@ export class ToolConfigProfilesService {
   ) {}
 
   /**
-   * Resolves the connector slug for a given tool row.
+   * Resolves the connector schema for a given tool row.
+   * Falls back to inputsSchema when configSchema is absent.
    * Tool.name IS the connector slug (e.g. "nuclei").
    */
   private async resolveConnectorSchema(toolId: string) {
@@ -49,15 +50,17 @@ export class ToolConfigProfilesService {
         `Unknown tool "${tool.name}" -- cannot validate config`,
       );
     }
-    if (!entry.configSchema) {
+    // Fallback: configSchema ?? inputsSchema
+    const schema = entry.configSchema ?? entry.inputsSchema;
+    if (!schema) {
       throw new BadRequestException(
-        `Tool "${tool.name}" has no configSchema -- cannot validate config`,
+        `Tool "${tool.name}" has no config schema or inputs schema -- cannot validate config`,
       );
     }
     return {
       tool,
-      schema: entry.configSchema,
-      sensitiveFields: getSensitiveFields(entry.configSchema),
+      schema,
+      sensitiveFields: getSensitiveFields(schema),
     };
   }
 
@@ -88,8 +91,11 @@ export class ToolConfigProfilesService {
     const entry = this.connectorRegistry.getConnector(
       (profile.tool).name,
     );
-    if (!entry?.configSchema) return profile;
-    const sensitiveFields = getSensitiveFields(entry.configSchema);
+    if (!entry) return profile;
+    // Fallback: configSchema ?? inputsSchema for sensitive field detection
+    const schema = entry.configSchema ?? entry.inputsSchema;
+    if (!schema) return profile;
+    const sensitiveFields = getSensitiveFields(schema);
     if (sensitiveFields.length === 0) return profile;
     const copy = { ...profile, config: maskProfile(profile.config, sensitiveFields) };
     return copy;
@@ -311,9 +317,11 @@ export class ToolConfigProfilesService {
     if (!tool) return undefined;
 
     const entry = this.connectorRegistry.getConnector(tool.name);
-    if (!entry?.configSchema) return profile.config;
+    // Fallback: configSchema ?? inputsSchema
+    const schema = entry?.configSchema ?? entry?.inputsSchema;
+    if (!schema) return profile.config;
 
-    const sensitiveFields = getSensitiveFields(entry.configSchema);
+    const sensitiveFields = getSensitiveFields(schema);
     if (sensitiveFields.length === 0) return profile.config;
 
     const dek = await this.encryptionService.getDEK(workspaceId);

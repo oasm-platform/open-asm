@@ -137,17 +137,20 @@ func (c *Client) DownloadTools(ctx context.Context) error {
 	manifest, err := c.workersClient().GetManifest(ctx, &workers.GetManifestRequest{})
 	if err != nil {
 		c.logger.ErrorE("Failed to retrieve GetManifest for init commands", err)
-	} else if len(manifest.InitCommands) > 0 {
-		c.logger.Info("Executing %d initialization commands", len(manifest.InitCommands))
-		for _, cmdStr := range manifest.InitCommands {
-			if err := c.runInitCommand(ctx, cmdStr, absToolPath); err != nil {
-				c.logger.ErrorE("Init command failed: "+cmdStr, err)
-				return err
-			}
-		}
-		c.logger.Success("All init commands executed successfully")
 	} else {
-		c.logger.Debug("GetManifest success, but no init commands to execute")
+		if len(manifest.InitCommands) > 0 {
+			c.logger.Info("Executing %d initialization commands", len(manifest.InitCommands))
+			for _, cmdStr := range manifest.InitCommands {
+				if err := c.runInitCommand(ctx, cmdStr, absToolPath); err != nil {
+					c.logger.ErrorE("Init command failed: "+cmdStr, err)
+					return err
+				}
+			}
+			c.logger.Success("All init commands executed successfully")
+		} else {
+			c.logger.Debug("GetManifest success, but no init commands to execute")
+		}
+
 	}
 
 	return nil

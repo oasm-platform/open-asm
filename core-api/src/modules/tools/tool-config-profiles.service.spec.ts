@@ -155,6 +155,92 @@ describe('ToolConfigProfilesService', () => {
     ).rejects.toThrow(/unknown tool/i);
   });
 
+  it('create — no effective schema throws with inputs schema message', async () => {
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'wpscan',
+      slug: 'wpscan',
+      // neither configSchema nor inputsSchema present
+    });
+    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
+
+    await expect(
+      service.create(wsId, toolId, { name: 'x', config: {} }),
+    ).rejects.toThrow(
+      'Tool "wpscan" has no config schema or inputs schema -- cannot validate config',
+    );
+  });
+
+  // ── Fallback: configSchema absent → inputsSchema used ────────────
+  it('create — uses inputsSchema fallback when configSchema absent', async () => {
+    const inputsSchema = {
+      type: 'object',
+      properties: { target: { type: 'string', format: 'uri' } },
+      required: ['target'],
+    };
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'wpscan', slug: 'wpscan',
+      // no configSchema — should fall back to inputsSchema
+      inputsSchema,
+    });
+    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
+    profilesRepo.findOne.mockResolvedValue(null);
+    profilesRepo.save.mockImplementation((p) => p);
+    profilesRepo.create.mockImplementation((p) => p);
+
+    const result = await service.create(wsId, toolId, {
+      name: 'default',
+      config: { target: 'https://example.com' },
+    });
+    expect(result).toBeDefined();
+    expect(profilesRepo.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('create — rejects invalid config against inputsSchema fallback', async () => {
+    const inputsSchema = {
+      type: 'object',
+      properties: { target: { type: 'string', format: 'uri' } },
+      required: ['target'],
+    };
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'wpscan', slug: 'wpscan',
+      inputsSchema,
+    });
+    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
+    profilesRepo.findOne.mockResolvedValue(null);
+
+    // Missing required 'target' field — should fail validation
+    await expect(
+      service.create(wsId, toolId, { name: 'bad', config: {} }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  // ── maskConfig uses fallback schema ────────────────────────────────
+  it('list — masks sensitive fields from inputsSchema fallback', async () => {
+    const inputsSchemaWithPassword = {
+      type: 'object',
+      properties: {
+        apiKey: { type: 'string', 'ui:widget': 'password' },
+        target: { type: 'string' },
+      },
+    };
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'wpscan', slug: 'wpscan',
+      inputsSchema: inputsSchemaWithPassword,
+      // no configSchema
+    });
+    const profile = mockProfile({
+      config: { apiKey: 'secretvalue123', target: 'example.com' },
+    });
+    profilesRepo.find.mockResolvedValue([profile]);
+
+    const result = await service.list(wsId, toolId);
+
+    expect(result).toHaveLength(1);
+    const cfg = result[0].config;
+    expect(cfg.apiKey).toMatch(/^\*\*\*\*/);
+    expect(cfg.target).toBe('example.com');
+  });
+
   it('create — isDefault defaults to false', async () => {
     (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
       name: 'nuclei', slug: 'nuclei', configSchema: nucleiSchema,

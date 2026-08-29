@@ -93,9 +93,9 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'GetManifest')
-  grpcGetManifest(): { initCommands: string[] } {
+  grpcGetManifest() {
     return {
-      initCommands: ['nuclei -ut --silent'],
+      initCommands: [],
     };
   }
 

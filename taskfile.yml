@@ -128,7 +128,7 @@ tasks:
     cmds:
       - task: api:migration:revert
 
-  # Tải manifest connector mới nhất từ repo oasm-connectors (nhánh develop)
+  # Sync latest connectors manifest
   sync-connectors:
     cmds:
       - node scripts/sync-tool-manifest.mjs

@@ -149,10 +149,11 @@ describe('ToolsService — legacy PROVIDER → CONNECTOR migration', () => {
       workspaceToolRepo as unknown as Repository<WorkspaceTool>,
       {} as any,
       {} as any,
-      {} as any,
       workersService as any,
       redisLockService as any,
       storageService as any,
+      {} as any, // profilesRepo — not used by sync paths under test
+      {} as any, // connectorRegistry — not used by sync paths under test
     );
   });
 

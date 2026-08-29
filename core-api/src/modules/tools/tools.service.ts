@@ -1,11 +1,6 @@
 import type { WrapperType } from '@/common/types/app.types';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import {
-  ApiKeyType,
-  ToolCategory,
-  WorkerScope,
-  WorkerType,
-} from '@/common/enums/enum';
+import { ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
@@ -22,21 +17,21 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { In, Repository } from 'typeorm';
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
-import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkersService } from '../workers/workers.service';
 import { CreateToolDto } from './dto/create-tool.dto';
-import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
+import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
 import { StorageService } from '../storage/storage.service';
 import { JobPriority } from '@/common/enums/enum';
 import { builtInTools } from './tools-provider/built-in-tools';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 @Injectable()
 export class ToolsService implements OnModuleInit {
   constructor(
@@ -52,14 +47,17 @@ export class ToolsService implements OnModuleInit {
     @InjectRepository(Vulnerability)
     public readonly vulnerabilityRepo: Repository<Vulnerability>,
 
-    private readonly apiKeysService: ApiKeysService,
-
     @Inject(forwardRef(() => WorkersService))
     private readonly workersService: WrapperType<WorkersService>,
 
     private readonly redisLockService: RedisLockService,
 
     private readonly storageService: StorageService,
+
+    @InjectRepository(ToolConfigProfile)
+    private readonly profilesRepo: Repository<ToolConfigProfile>,
+
+    private readonly connectorRegistry: ConnectorRegistryService,
   ) {}
 
   /**
@@ -190,7 +188,7 @@ export class ToolsService implements OnModuleInit {
     }
   }
 
-  private mapConnectorCapabilityToCategory(capabilities: string[] | undefined): ToolCategory | undefined {
+  public static mapConnectorCapabilityToCategory(capabilities: string[] | undefined): ToolCategory | undefined {
     if (!capabilities || capabilities.length === 0) return ToolCategory.VULNERABILITIES;
     const cap = capabilities[0]?.toLowerCase();
     switch (cap) {
@@ -273,7 +271,7 @@ export class ToolsService implements OnModuleInit {
       const version = (rawEntry['version'] as string) ?? '';
       const logoBase64 = rawEntry['logo'] as string | undefined;
       const capabilities = rawEntry['capabilities'] as string[] | undefined;
-      const category = this.mapConnectorCapabilityToCategory(capabilities);
+      const category = ToolsService.mapConnectorCapabilityToCategory(capabilities);
 
       const logoUrl = `/connectors/${name}.png`;
 
@@ -604,6 +602,61 @@ export class ToolsService implements OnModuleInit {
   }
 
   /**
+   * Checks whether at least one ToolConfigProfile exists for a workspace+tool pair.
+   */
+  async hasProfile(workspaceId: string, toolId: string): Promise<boolean> {
+    const profile = await this.profilesRepo.findOne({
+      where: {
+        workspace: { id: workspaceId },
+        tool: { id: toolId },
+      },
+    });
+    return !!profile;
+  }
+
+  /**
+   * Returns the set of tool ids that have at least one ToolConfigProfile
+   * for the given workspace. Batch variant of hasProfile — a single query
+   * with an In-operator instead of one findOne per tool (N+1, #4).
+   */
+  async getProfileToolIds(
+    workspaceId: string,
+    toolIds: string[],
+  ): Promise<Set<string>> {
+    if (!toolIds || toolIds.length === 0) return new Set<string>();
+    const profiles = await this.profilesRepo.find({
+      where: {
+        workspace: { id: workspaceId },
+        tool: { id: In(toolIds) },
+      },
+      relations: ['tool'],
+    });
+    return new Set(
+      profiles
+        .map((p) => p.tool.id)
+        .filter((id): id is string => Boolean(id)),
+    );
+  }
+
+  /**
+   * Resolves the effective schema for a tool (connector or built-in).
+   * Returns { schema, source } or throws if tool not found / unknown connector.
+   */
+  async getToolSchema(
+    toolId: string,
+    workspaceId?: string,
+  ): Promise<{ schema: Record<string, unknown> | null; source: 'configSchema' | 'inputsSchema' | null }> {
+    const tool = await this.getToolById(toolId, workspaceId);
+    const result = this.connectorRegistry.getEffectiveSchema(tool.name);
+    if (result.source === null && tool.type !== WorkerType.BUILT_IN) {
+      throw new BadRequestException(
+        `Unknown connector slug "${tool.name}"`,
+      );
+    }
+    return result;
+  }
+
+  /**
    * Add a tool to a workspace.
    * @throws BadRequestException if the tool already exists in this workspace.
    * @returns The newly created workspace-tool entry.
@@ -757,21 +810,49 @@ export class ToolsService implements OnModuleInit {
               ...tool,
               isInstalled: true,
               availableWorkersCount,
+              isReady: true,
             };
           }
 
           const workspaceTool = installedTools.find(
             (wt) => wt.tool.id === tool.id,
           );
+          const isInstalled = !!workspaceTool?.isEnabled;
           return {
             ...tool,
-            isInstalled: !!workspaceTool?.isEnabled,
+            isInstalled,
             availableWorkersCount,
           };
         }),
       );
 
-      return getManyResponse({ query, data: toolsWithInstalledFlag, total });
+      // Batch config-profile lookup for installed connectors (single query
+      // with In-operator instead of one findOne per tool, #4)
+      const installedConnectorIds = toolsWithInstalledFlag
+        .filter(
+          (tool) =>
+            tool.type !== WorkerType.BUILT_IN && tool.isInstalled,
+        )
+        .map((tool) => tool.id)
+        .filter((id): id is string => Boolean(id));
+      const profileToolIds = await this.getProfileToolIds(
+        workspaceId,
+        installedConnectorIds,
+      );
+
+      const toolsWithProfiles = toolsWithInstalledFlag.map((tool) => {
+        if (tool.type === WorkerType.BUILT_IN || !tool.isInstalled) {
+          return tool;
+        }
+        const hasConfigProfile = profileToolIds.has(tool.id!);
+        return {
+          ...tool,
+          hasConfigProfile,
+          isReady: hasConfigProfile,
+        };
+      });
+
+      return getManyResponse({ query, data: toolsWithProfiles, total });
     } else {
       // Original behavior when no workspaceId is provided
       const [data, total] = await this.toolsRepository.findAndCount({
@@ -816,9 +897,30 @@ export class ToolsService implements OnModuleInit {
       }
     });
 
+    // Enrich with readiness flags (batched profile lookup, #4)
+    const profileToolIds = workspaceId
+      ? await this.getProfileToolIds(
+          workspaceId,
+          combinedTools
+            .filter((tool) => tool.type !== WorkerType.BUILT_IN)
+            .map((tool) => tool.id!)
+            .filter(Boolean),
+        )
+      : new Set<string>();
+
+    const enrichedTools = combinedTools.map((tool) => {
+      if (tool.type === WorkerType.BUILT_IN) {
+        return { ...tool, isReady: true };
+      }
+      const hasConfigProfile = workspaceId
+        ? profileToolIds.has(tool.id!)
+        : false;
+      return { ...tool, hasConfigProfile, isReady: hasConfigProfile };
+    });
+
     return {
-      data: combinedTools,
-      total: combinedTools.length,
+      data: enrichedTools,
+      total: enrichedTools.length,
     };
   }
 
@@ -838,9 +940,10 @@ export class ToolsService implements OnModuleInit {
       throw new NotFoundException(`Tool with ID "${id}" not found.`);
     }
 
-    // If tool is built-in, it's always considered installed
+    // If tool is built-in, it's always considered installed and ready
     if (tool.type === WorkerType.BUILT_IN) {
       tool.isInstalled = true;
+      tool.isReady = true;
       return tool;
     }
 
@@ -855,6 +958,15 @@ export class ToolsService implements OnModuleInit {
 
       // Add isInstalled flag to the tool
       tool.isInstalled = !!workspaceTool;
+
+      // Add hasConfigProfile and isReady flags
+      const hasConfigProfile = await this.hasProfile(workspaceId, tool.id!);
+      tool.hasConfigProfile = hasConfigProfile;
+      tool.isReady = hasConfigProfile;
+    } else {
+      // Without workspaceId, profile status is unknown
+      tool.hasConfigProfile = null;
+      tool.isReady = false;
     }
 
     return tool;
@@ -890,60 +1002,6 @@ export class ToolsService implements OnModuleInit {
     });
 
     return this.toolsRepository.save(tool);
-  }
-
-  /**
-   * Retrieves the API key for a tool.
-   * @param toolId The ID of the tool to retrieve the API key for.
-   * @returns The API key for the tool.
-   */
-  public async getToolApiKey(toolId: string): Promise<GetApiKeyResponseDto> {
-    const tool = await this.toolsRepository.findOne({
-      where: { id: toolId },
-    });
-
-    if (!tool) {
-      throw new NotFoundException(`Tool with ID "${toolId}" not found.`);
-    }
-
-    const apiKey = await this.apiKeysService.getCurrentApiKey(
-      ApiKeyType.TOOL,
-      toolId,
-    );
-
-    if (!apiKey) {
-      return this.rotateToolApiKey(toolId);
-    }
-
-    return {
-      apiKey: apiKey.key,
-    };
-  }
-
-  /**
-   * Regenerates the API key for a tool.
-   * @param toolId The ID of the tool to regenerate the API key for.
-   * @returns The new API key for the tool.
-   */
-  public async rotateToolApiKey(toolId: string): Promise<GetApiKeyResponseDto> {
-    const tool = await this.toolsRepository.findOne({
-      where: { id: toolId },
-    });
-
-    if (!tool) {
-      throw new NotFoundException(`Tool with ID "${toolId}" not found.`);
-    }
-
-    const apiKey = await this.apiKeysService.create({
-      name: `API Key for tool ${toolId}`,
-      type: ApiKeyType.TOOL,
-      ref: toolId,
-    });
-    await this.toolsRepository.update(toolId, { apiKey });
-
-    return {
-      apiKey: apiKey.key,
-    };
   }
 
   /**

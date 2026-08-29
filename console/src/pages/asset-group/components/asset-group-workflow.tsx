@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ToolSelector } from '@/components/common/tool-selector';
+import type { ToolSelectorItem } from '@/components/common/tool-selector';
 import {
   Card,
   CardContent,
@@ -109,6 +110,21 @@ export default function AssetGroupWorkflow({
       .map((tool) => tool.id),
   );
 
+  /** Per-tool state: connector without config → disabled. */
+  const getToolState = (tool: ToolSelectorItem) => {
+    const fullTool = toolById[tool.id];
+    if (
+      fullTool?.type === ToolsControllerGetManyToolsType.connector &&
+      (fullTool as Record<string, unknown>).hasConfigProfile === false
+    ) {
+      return {
+        disabled: true,
+        tooltip: 'Configure this tool before adding it to a group.',
+      };
+    }
+    return { disabled: false };
+  };
+
   // Get the workflow that contains a specific tool
   const getWorkflowContainingTool = (toolName: string) => {
     return workflows.find((groupWorkflow) => {
@@ -202,6 +218,18 @@ export default function AssetGroupWorkflow({
         setIsProcessing(false);
       }
     } else {
+      // Connector without config profile — block addition
+      const fullTool = toolById[tool.id];
+      if (
+        fullTool?.type === ToolsControllerGetManyToolsType.connector &&
+        (fullTool as Record<string, unknown>).hasConfigProfile === false
+      ) {
+        toast.error(
+          'Tool requires a configuration profile. Go to Tools detail to configure.',
+        );
+        return;
+      }
+
       // If tool is not in group, check if group already has a workflow
       const existingWorkflow = getCurrentWorkflow()?.workflow ?? null;
 
@@ -484,6 +512,7 @@ export default function AssetGroupWorkflow({
                 const tool = toolById[id];
                 if (tool && !isProcessing) handleToolClick(tool);
               }}
+              getToolState={getToolState}
             />
           )}
         </CardContent>

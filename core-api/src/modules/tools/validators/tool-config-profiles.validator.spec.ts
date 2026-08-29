@@ -143,7 +143,7 @@ describe('validateProfileOrThrow', () => {
     mockGetConnector.mockReturnValue({
       name: 'wpscan',
       slug: 'wpscan',
-      // no configSchema
+      // no configSchema, no inputsSchema
     });
 
     expect(() =>
@@ -160,6 +160,70 @@ describe('validateProfileOrThrow', () => {
         'wpscan',
         {},
       ),
-    ).toThrow(/no.*configSchema/i);
+    ).toThrow(/no config schema or inputs schema/i);
+  });
+
+  it('missing schemas error mentions inputs schema', () => {
+    mockGetConnector.mockReturnValue({
+      name: 'wpscan',
+      slug: 'wpscan',
+      // neither configSchema nor inputsSchema present
+    });
+
+    expect(() =>
+      validateProfileOrThrow(
+        { getConnector: ConnectorRegistryService.prototype.getConnector } as ConnectorRegistryService,
+        'wpscan',
+        {},
+      ),
+    ).toThrow(
+      'Tool "wpscan" has no config schema or inputs schema -- cannot validate config',
+    );
+  });
+
+  // ── Fallback: configSchema absent → inputsSchema used ─────────────
+  it('passes valid config against inputsSchema fallback when configSchema absent', () => {
+    mockGetConnector.mockReturnValue({
+      name: 'wpscan',
+      slug: 'wpscan',
+      // no configSchema — should fall back to inputsSchema
+      inputsSchema: {
+        type: 'object',
+        properties: {
+          target: { type: 'string', format: 'uri' },
+        },
+        required: ['target'],
+      },
+    });
+
+    expect(() =>
+      validateProfileOrThrow(
+        { getConnector: ConnectorRegistryService.prototype.getConnector } as ConnectorRegistryService,
+        'wpscan',
+        { target: 'https://example.com' },
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects invalid config against inputsSchema fallback', () => {
+    mockGetConnector.mockReturnValue({
+      name: 'wpscan',
+      slug: 'wpscan',
+      inputsSchema: {
+        type: 'object',
+        properties: {
+          target: { type: 'string', format: 'uri' },
+        },
+        required: ['target'],
+      },
+    });
+
+    expect(() =>
+      validateProfileOrThrow(
+        { getConnector: ConnectorRegistryService.prototype.getConnector } as ConnectorRegistryService,
+        'wpscan',
+        {},
+      ),
+    ).toThrow(BadRequestException);
   });
 });

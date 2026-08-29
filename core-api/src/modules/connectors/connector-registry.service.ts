@@ -70,4 +70,32 @@ export class ConnectorRegistryService implements OnModuleInit {
   getConnector(slug: string): ConnectorManifestEntry | null {
     return this.connectorsBySlug.get(slug) ?? null;
   }
+
+  getAllConnectors(): ConnectorManifestEntry[] {
+    return Array.from(this.connectorsBySlug.values());
+  }
+
+  /**
+   * Returns configSchema when present, otherwise falls back to inputsSchema.
+   * Returns null when the connector is unknown or has neither schema.
+   */
+  getConnectorSchema(slug: string): Record<string, unknown> | null {
+    const entry = this.getConnector(slug);
+    if (!entry) return null;
+    return entry.configSchema ?? entry.inputsSchema ?? null;
+  }
+
+  /**
+   * Returns the effective schema plus its source for the given connector.
+   * source is 'configSchema' | 'inputsSchema' | null.
+   */
+  getEffectiveSchema(
+    slug: string,
+  ): { schema: Record<string, unknown> | null; source: 'configSchema' | 'inputsSchema' | null } {
+    const entry = this.getConnector(slug);
+    if (!entry) return { schema: null, source: null };
+    if (entry.configSchema) return { schema: entry.configSchema, source: 'configSchema' };
+    if (entry.inputsSchema) return { schema: entry.inputsSchema, source: 'inputsSchema' };
+    return { schema: null, source: null };
+  }
 }

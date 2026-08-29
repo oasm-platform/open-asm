@@ -112,6 +112,59 @@ describe('ConnectorRegistryService', () => {
     it('should return null for an unknown slug', () => {
       expect(service.getConnector('nonexistent')).toBeNull();
     });
+
+    // ── getConnectorSchema ───────────────────────────────────────────
+    describe('getConnectorSchema', () => {
+      it('should return configSchema when present (nuclei has both)', () => {
+        const schema = service.getConnectorSchema('nuclei');
+        expect(schema).toEqual({
+          type: 'object',
+          properties: { templates: { type: 'string' } },
+        });
+      });
+
+      it('should fall back to inputsSchema when configSchema is absent (wpscan)', () => {
+        const schema = service.getConnectorSchema('wpscan');
+        expect(schema).toEqual({
+          type: 'object',
+          properties: { target: { type: 'string' } },
+        });
+      });
+
+      it('should return null for an unknown slug', () => {
+        expect(service.getConnectorSchema('nonexistent')).toBeNull();
+      });
+    });
+
+    // ── getEffectiveSchema ───────────────────────────────────────────
+    describe('getEffectiveSchema', () => {
+      it('should return configSchema with source "configSchema" when present', () => {
+        const result = service.getEffectiveSchema('nuclei');
+        expect(result).toEqual({
+          schema: {
+            type: 'object',
+            properties: { templates: { type: 'string' } },
+          },
+          source: 'configSchema',
+        });
+      });
+
+      it('should return inputsSchema with source "inputsSchema" when configSchema absent', () => {
+        const result = service.getEffectiveSchema('wpscan');
+        expect(result).toEqual({
+          schema: {
+            type: 'object',
+            properties: { target: { type: 'string' } },
+          },
+          source: 'inputsSchema',
+        });
+      });
+
+      it('should return null schema with null source for unknown slug', () => {
+        const result = service.getEffectiveSchema('nonexistent');
+        expect(result).toEqual({ schema: null, source: null });
+      });
+    });
   });
 
   describe('onModuleInit — graceful degradation', () => {

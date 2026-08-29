@@ -132,4 +132,10 @@ export class Tool {
 
   @ApiProperty({ required: false })
   availableWorkersCount?: number;
+
+  @ApiProperty({ required: false })
+  hasConfigProfile?: boolean | null;
+
+  @ApiProperty({ required: false })
+  isReady?: boolean;
 }

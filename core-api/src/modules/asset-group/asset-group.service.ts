@@ -1,6 +1,6 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { BullMQName, CronSchedule, JobRunType, JobStatus } from '@/common/enums/enum';
+import { BullMQName, CronSchedule, JobRunType, JobStatus, WorkerType } from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -454,6 +454,30 @@ export class AssetGroupService {
       throw new NotFoundException(
         `One or more tools with IDs "${missingToolIds.join(', ')}" not found`,
       );
+    }
+
+    // Validate connector tools have at least one config profile.
+    // Single batched profile lookup (In-operator) instead of one
+    // getToolById (~2-3 queries) per connector tool (#10).
+    const connectorTools = tools.filter(
+      (tool) => tool.type === WorkerType.CONNECTOR,
+    );
+    if (connectorTools.length > 0) {
+      const connectorIds = connectorTools
+        .map((tool) => tool.id)
+        .filter((id): id is string => Boolean(id));
+      const profiledToolIds = await this.toolsService.getProfileToolIds(
+        workspaceId,
+        connectorIds,
+      );
+      const missingProfileTool = connectorTools.find(
+        (tool) => !profiledToolIds.has(tool.id!),
+      );
+      if (missingProfileTool) {
+        throw new BadRequestException(
+          `Tool ${missingProfileTool.name} requires a configuration profile`,
+        );
+      }
     }
 
     const workflowName = `Group Workflow - ${groupId}`;

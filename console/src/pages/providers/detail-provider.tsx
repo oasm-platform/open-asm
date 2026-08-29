@@ -1,6 +1,5 @@
 import Page from '@/components/common/page';
 import { CreateToolDialog } from '@/components/tools/create-tool-dialog';
-import { ToolApiKeyDialog } from '@/components/tools/tool-api-key-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -14,7 +13,6 @@ import {
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Tool } from '@/services/apis/gen/queries';
 import {
-  ToolsControllerGetManyToolsType,
   useProvidersControllerDeleteProvider,
   useProvidersControllerGetProvider,
   useToolsControllerGetManyTools,
@@ -78,20 +76,6 @@ const toolColumns: ColumnDef<Tool>[] = [
     cell: ({ row }) => {
       const value: string = row.getValue('version');
       return <div>{value || '-'}</div>;
-    },
-  },
-  {
-    id: 'apiKey',
-    header: 'API',
-    cell: ({ row }) => {
-      if (row.original.type === ToolsControllerGetManyToolsType.built_in) {
-        return (
-          <Button variant="outline" disabled>
-            Built-in
-          </Button>
-        );
-      }
-      return <ToolApiKeyDialog tool={row.original} />;
     },
   },
 ];

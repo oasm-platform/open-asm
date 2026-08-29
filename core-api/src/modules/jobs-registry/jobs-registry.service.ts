@@ -34,7 +34,6 @@ import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { StorageService } from '../storage/storage.service';
-import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { ToolsService } from '../tools/tools.service';
@@ -463,7 +462,7 @@ export class JobsRegistryService {
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
         .innerJoinAndSelect('asset.target', 'target')
-        .leftJoin('jobs.tool', 'tool')
+        .leftJoinAndSelect('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
         // [OPT-1] Use addOrderBy for compound sort (priority first, then createdAt)
         .orderBy('jobs.priority', 'DESC')
@@ -475,9 +474,11 @@ export class JobsRegistryService {
       }
 
       if (isBuiltInTools) {
-        const builtInToolsName = builtInTools.map((tool) => tool.name);
+        // For BUILT_IN workers, include both built-in tools AND connector tools
+        const connectorTools = this.connectorRegistry.getAllConnectors().map((c) => c.name);
+        const allowedToolNames = [...builtInTools.map((tool) => tool.name), ...connectorTools];
         queryBuilder.andWhere('tool.name IN (:...names)', {
-          names: builtInToolsName,
+          names: allowedToolNames,
         });
 
         if (worker.scope !== WorkerScope.CLOUD) {
@@ -521,8 +522,12 @@ export class JobsRegistryService {
       }
 
       if (isBuiltInTools && !job.command) {
-        await queryRunner.rollbackTransaction();
-        return null;
+        // Check if this is a connector tool (which has no command by design)
+        const isConnector = !!this.connectorRegistry.getConnector(job.tool?.name ?? '');
+        if (!isConnector) {
+          await queryRunner.rollbackTransaction();
+          return null;
+        }
       }
 
       // [OPT-5] Use update() instead of save() — direct SQL, no extra SELECT
@@ -547,7 +552,12 @@ export class JobsRegistryService {
       // Connector support: include tool metadata for non-built-in workers
       if (!isBuiltInTools && worker.tool) {
         base.tool = { id: worker.tool.id!, name: worker.tool.name };
-        // Connector workers have no workspace — derive from job's target instead
+        // Connector workers have no workspace — derive from job's target instead, fallback to worker workspace for backward compat
+        base.workspaceId = job.asset.target?.workspaceId ?? (worker.workspace as { id?: string })?.id;
+        base.configProfileId = job.configProfileId;
+      } else if (isBuiltInTools && job.tool) {
+        // Connector job picked up by BUILT_IN worker
+        base.tool = { id: job.tool.id!, name: job.tool.name };
         base.workspaceId = job.asset.target?.workspaceId;
         base.configProfileId = job.configProfileId;
       }
@@ -1125,7 +1135,7 @@ export class JobsRegistryService {
           );
           return tool;
         })
-        .filter((tool): tool is Tool => tool !== undefined) ?? []
+        .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined) ?? []
     ).map((tool) => ({
       id: tool.id,
       name: tool.name,
