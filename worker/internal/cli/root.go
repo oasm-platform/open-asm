@@ -98,14 +98,47 @@ func AppHeadless() error {
 }
 
 func Execute() {
+	if err := rootCommand("cli").Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+// rootCommand builds the worker CLI command. The default mode ("cli" or
+// "node") selects between the interactive TUI and the headless worker node
+// when no --mode flag is given.
+func rootCommand(defaultMode string) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "oasm-worker",
 		Short: "OASM Worker is an attack surface management agent",
-		Long:  `OASM Worker is a high-performance agent used for attack surface management tasks.`,
+		Long: `OASM Worker is a high-performance agent used for attack surface management tasks.
+
+The worker runs in one of two modes, reported to core-api when it joins:
+
+  cli   (default) Interactive TUI worker. Launch with '--mode cli' (or simply
+        without a --mode flag) and configure via the flags below or their
+        WORKER_* environment variable equivalents.
+
+  node  Headless worker node for Docker / production deployments. Launch with
+        '--mode node' and configure via the flags below or WORKER_* environment
+        variables (WORKER_API_KEY, WORKER_MAX_CONCURRENCY, WORKER_GRPC_HOST,
+        WORKER_GRPC_PORT, WORKER_TOOL_PATH, WORKER_NETWORK).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return App()
+			mode, err := cmd.Flags().GetString("mode")
+			if err != nil {
+				return err
+			}
+			switch mode {
+			case "cli":
+				return App()
+			case "node":
+				return AppHeadless()
+			default:
+				return fmt.Errorf("invalid --mode %q: must be %q or %q", mode, "cli", "node")
+			}
 		},
 	}
+
+	rootCmd.Flags().String("mode", defaultMode, "Worker run mode: \"cli\" (interactive TUI) or \"node\" (headless worker node)")
 
 	rootCmd.Flags().String("api-key", "", "API key for authentication")
 	viper.BindPFlag("api_key", rootCmd.Flags().Lookup("api-key"))
@@ -125,7 +158,5 @@ func Execute() {
 	rootCmd.Flags().String("network", "", "Network ID for internal network connection")
 	viper.BindPFlag("network", rootCmd.Flags().Lookup("network"))
 
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
-	}
+	return rootCmd
 }
