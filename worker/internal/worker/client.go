@@ -293,42 +293,46 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 	go grpcClient.Connect(workerCtx, ready)
 
-	// Start connector gRPC server for Docker connectors.
-	// Non-fatal: worker can still operate legacy path without connector server.
-	proxy = connector.NewProxy()
-	connectorServer, err := connector.NewServer(
-		fmt.Sprintf(":%d", cfg.ConnectorPort),
-		proxy,
-		cfg.ConnectorToken,
-	)
-	if err != nil {
-		log.Error("connector server init failed (non-fatal): %v", err)
-	} else {
-		go func() {
-			log.Success("connector server listening on %s", connectorServer.Addr())
-			if err := connectorServer.Serve(workerCtx); err != nil {
-				log.Warning("connector server stopped: %v", err)
-			}
-		}()
-	}
-
-	// Construct Docker runtime + execution manager for connector (image-based) jobs.
-	// ponytail: when legacy command path retires, limit moves into Manager and semaphore dies.
-	// Manager maxConcurrency=0 (unlimited) — the worker semaphore at :137 is the SOLE
-	// concurrency gate for both legacy and connector paths.
-	var mgrInit *execution.Manager
-	if proxy != nil {
-		// ponytail: ConnectorAddr is the listen address; for Docker containers this should be
-		// host.docker.internal:PORT. Add WORKER_CONNECTOR_EXTERNAL_ADDR when listen != external.
-		dockerRT, err := runtime.NewDockerRuntime("", cfg.ConnectorAddr, cfg.ConnectorToken)
+	// Connector machinery (gRPC server + Docker runtime) only for node mode.
+	// CLI workers may not have Docker installed — they run built-in tools only.
+	if cfg.Mode == "node" {
+		// Start connector gRPC server for Docker connectors.
+		// Non-fatal: worker can still operate legacy path without connector server.
+		proxy = connector.NewProxy()
+		connectorServer, err := connector.NewServer(
+			fmt.Sprintf(":%d", cfg.ConnectorPort),
+			proxy,
+			cfg.ConnectorToken,
+		)
 		if err != nil {
-			log.Error("docker runtime init failed (non-fatal): %v", err)
+			log.Error("connector server init failed (non-fatal): %v", err)
 		} else {
-			mgrInit = execution.NewManager(dockerRT, 0)
-			log.Success("execution manager ready (Docker runtime, unlimited concurrency)")
+			go func() {
+				log.Success("connector server listening on %s", connectorServer.Addr())
+				if err := connectorServer.Serve(workerCtx); err != nil {
+					log.Warning("connector server stopped: %v", err)
+				}
+			}()
 		}
+
+		// Construct Docker runtime + execution manager for connector (image-based) jobs.
+		// ponytail: when legacy command path retires, limit moves into Manager and semaphore dies.
+		// Manager maxConcurrency=0 (unlimited) — the worker semaphore at :145 is the SOLE
+		// concurrency gate for both legacy and connector paths.
+		var mgrInit *execution.Manager
+		if proxy != nil {
+			// ponytail: ConnectorAddr is the listen address; for Docker containers this should be
+			// host.docker.internal:PORT. Add WORKER_CONNECTOR_EXTERNAL_ADDR when listen != external.
+			dockerRT, err := runtime.NewDockerRuntime("", cfg.ConnectorAddr, cfg.ConnectorToken)
+			if err != nil {
+				log.Error("docker runtime init failed (non-fatal): %v", err)
+			} else {
+				mgrInit = execution.NewManager(dockerRT, 0)
+				log.Success("execution manager ready (Docker runtime, unlimited concurrency)")
+			}
+		}
+		mgr = mgrInit
 	}
-	mgr = mgrInit
 
 	ticker := time.NewTicker(time.Second)
 	go func() {

@@ -311,7 +311,12 @@ export class WorkersService {
           },
         });
 
-        const tools: Tool[] = [...builtInTools.data, ...connectorTools];
+        // Only node-mode workers run Docker connectors; CLI/legacy workers may
+        // not have Docker installed, so they get built-in tools only.
+        const tools: Tool[] =
+          worker.runMode === 'node'
+            ? [...builtInTools.data, ...connectorTools]
+            : [...builtInTools.data];
 
         return {
           ...worker,

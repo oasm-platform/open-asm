@@ -474,9 +474,14 @@ export class JobsRegistryService {
       }
 
       if (isBuiltInTools) {
-        // For BUILT_IN workers, include both built-in tools AND connector tools
-        const connectorTools = this.connectorRegistry.getAllConnectors().map((c) => c.name);
-        const allowedToolNames = [...builtInTools.map((tool) => tool.name), ...connectorTools];
+        // Node-mode workers run Docker connectors (image-based jobs).
+        // CLI/legacy workers may lack Docker, so connector (image) tools are
+        // only eligible for node-mode workers.
+        const allowedToolNames = builtInTools.map((tool) => tool.name);
+        if (worker.runMode === 'node') {
+          const connectorTools = this.connectorRegistry.getAllConnectors().map((c) => c.name);
+          allowedToolNames.push(...connectorTools);
+        }
         queryBuilder.andWhere('tool.name IN (:...names)', {
           names: allowedToolNames,
         });

@@ -1519,6 +1519,7 @@ describe('JobsRegistryService', () => {
         scope: WorkerScope.LOCAL,
         workspace: { id: 'ws-2' },
         tool: null,
+        runMode: 'node',
       };
       const mockJob = {
         id: 'job-conn-1',
@@ -1556,6 +1557,7 @@ describe('JobsRegistryService', () => {
         scope: WorkerScope.CLOUD,
         workspace: { id: 'ws-3' },
         tool: null,
+        runMode: 'node',
       };
 
       mockConnectorRegistryService.getAllConnectors.mockReturnValue([
@@ -1578,6 +1580,72 @@ describe('JobsRegistryService', () => {
       expect(namesFilter).toBeDefined();
       expect(namesFilter![1].names).toEqual(
         expect.arrayContaining(['subfinder', 'httpx', 'naabu', 'screenshot', 'nuclei', 'wpscan']),
+      );
+    });
+
+    it('should NOT include connector tool names in allowed filter for cli-mode BUILT_IN worker', async () => {
+      const mockWorker = {
+        id: 'worker-bi-filter-cli',
+        type: WorkerType.BUILT_IN,
+        scope: WorkerScope.CLOUD,
+        workspace: { id: 'ws-3' },
+        tool: null,
+        runMode: 'cli',
+      };
+
+      mockConnectorRegistryService.getAllConnectors.mockReturnValue([
+        { name: 'nuclei' },
+        { name: 'wpscan' },
+      ]);
+
+      mockDataSource.getRepository.mockReturnValue({
+        findOne: jest.fn().mockResolvedValue(mockWorker),
+      });
+      mockQBGetOne.mockResolvedValue(null); // No jobs available
+
+      await service.getNextJob('worker-bi-filter-cli');
+
+      const andWhereCalls = mockQueryRunner.manager.createQueryBuilder().andWhere.mock.calls;
+      const namesFilter = andWhereCalls.find(
+        (call: any[]) => typeof call[0] === 'string' && call[0].includes('IN (:...names)'),
+      );
+      expect(namesFilter).toBeDefined();
+      // CLI workers cannot run Docker connectors — only built-in tool names allowed
+      expect(namesFilter![1].names).toEqual(
+        expect.arrayContaining(['subfinder', 'httpx', 'naabu', 'screenshot']),
+      );
+      expect(namesFilter![1].names).not.toEqual(
+        expect.arrayContaining(['nuclei', 'wpscan']),
+      );
+    });
+
+    it('should NOT include connector tool names for BUILT_IN worker without runMode (legacy)', async () => {
+      const mockWorker = {
+        id: 'worker-bi-filter-legacy',
+        type: WorkerType.BUILT_IN,
+        scope: WorkerScope.CLOUD,
+        workspace: { id: 'ws-3' },
+        tool: null,
+      };
+
+      mockConnectorRegistryService.getAllConnectors.mockReturnValue([
+        { name: 'nuclei' },
+      ]);
+
+      mockDataSource.getRepository.mockReturnValue({
+        findOne: jest.fn().mockResolvedValue(mockWorker),
+      });
+      mockQBGetOne.mockResolvedValue(null);
+
+      await service.getNextJob('worker-bi-filter-legacy');
+
+      const andWhereCalls = mockQueryRunner.manager.createQueryBuilder().andWhere.mock.calls;
+      const namesFilter = andWhereCalls.find(
+        (call: any[]) => typeof call[0] === 'string' && call[0].includes('IN (:...names)'),
+      );
+      expect(namesFilter).toBeDefined();
+      expect(namesFilter![1].names).not.toEqual(
+        expect.arrayContaining(['nuclei']),
       );
     });
 
@@ -1624,6 +1692,7 @@ describe('JobsRegistryService', () => {
         scope: WorkerScope.CLOUD,
         workspace: { id: 'ws-1' },
         tool: null,
+        runMode: 'node',
       };
       const mockJob = {
         id: 'job-conn-s1',
