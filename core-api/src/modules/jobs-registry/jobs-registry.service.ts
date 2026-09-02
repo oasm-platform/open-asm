@@ -479,7 +479,11 @@ export class JobsRegistryService {
         // only eligible for node-mode workers.
         const allowedToolNames = builtInTools.map((tool) => tool.name);
         if (worker.runMode === 'node') {
-          const connectorTools = this.connectorRegistry.getAllConnectors().map((c) => c.name);
+          // DB tool rows store the connector SLUG as `name` (e.g. 'nuclei'),
+          // while the manifest display name is capitalized ('Nuclei'). The
+          // `tool.name IN (:...names)` filter must use slugs or connector
+          // jobs never match and stay PENDING forever.
+          const connectorTools = this.connectorRegistry.getAllConnectors().map((c) => c.slug);
           allowedToolNames.push(...connectorTools);
         }
         queryBuilder.andWhere('tool.name IN (:...names)', {

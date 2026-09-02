@@ -31,12 +31,15 @@ interface ToolInstallButtonProps {
   tool: Tool;
   workspaceId: string;
   onInstallChange?: () => void;
+  /** Render config affordances (Configure button / gear icon / config sheet). Defaults to true (tool detail). */
+  showConfig?: boolean;
 }
 
 const ToolInstallButton = ({
   tool,
   workspaceId,
   onInstallChange,
+  showConfig = true,
 }: ToolInstallButtonProps) => {
   const [isInstalled, setIsInstalled] = useState(tool.isInstalled);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -57,9 +60,9 @@ const ToolInstallButton = ({
   const hasConfigProfile =
     isConnector && Boolean((tool as ToolWithConfig).hasConfigProfile);
 
-  // Fetch existing profiles only when we may need to edit one
+  // Fetch existing profiles only when we may need to edit one (tool detail)
   const { data: profilesRaw } = useToolConfigProfilesControllerList(tool.id, {
-    query: { enabled: isInstalled && hasConfigProfile },
+    query: { enabled: showConfig && isInstalled && hasConfigProfile },
   });
 
   const profiles = (profilesRaw ?? []) as unknown as ProfileWithMeta[];
@@ -158,7 +161,7 @@ const ToolInstallButton = ({
         onSuccess: () => {
           toast.success("Tool added successfully");
           if (onInstallChange) onInstallChange();
-          setIsConfigOpen(true);
+          if (showConfig) setIsConfigOpen(true);
         },
         onError: () => {
           setIsInstalled(false);
@@ -174,10 +177,12 @@ const ToolInstallButton = ({
     if (isInstalled && !hasConfigProfile) {
       return (
         <>
-          <Button variant="outline" onClick={() => setIsConfigOpen(true)}>
-            <Settings className="mr-2 h-4 w-4" />
-            Configure
-          </Button>
+          {showConfig && (
+            <Button variant="outline" onClick={() => setIsConfigOpen(true)}>
+              <Settings className="mr-2 h-4 w-4" />
+              Configure
+            </Button>
+          )}
           <ConfirmDialog
             title="Remove Tool"
             description={`Are you sure you want to remove "${tool.name}"?`}
@@ -198,13 +203,15 @@ const ToolInstallButton = ({
               </Button>
             }
           />
-          <ToolConnectorConfigSheet
-            open={isConfigOpen}
-            onOpenChange={setIsConfigOpen}
-            tool={tool}
-            initialData={initialData}
-            onSuccess={onInstallChange}
-          />
+          {showConfig && (
+            <ToolConnectorConfigSheet
+              open={isConfigOpen}
+              onOpenChange={setIsConfigOpen}
+              tool={tool}
+              initialData={initialData}
+              onSuccess={onInstallChange}
+            />
+          )}
         </>
       );
     }
@@ -215,14 +222,16 @@ const ToolInstallButton = ({
       <>
         {isInstalled ? (
           <>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label={`Edit configuration for ${tool.name}`}
-              onClick={() => setIsConfigOpen(true)}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
+            {showConfig && (
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label={`Edit configuration for ${tool.name}`}
+                onClick={() => setIsConfigOpen(true)}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
             <ConfirmDialog
               title="Remove Tool"
               description={`Are you sure you want to remove "${tool.name}"?`}
@@ -260,13 +269,15 @@ const ToolInstallButton = ({
             )}
           </Button>
         )}
-        <ToolConnectorConfigSheet
-          open={isConfigOpen}
-          onOpenChange={setIsConfigOpen}
-          tool={tool}
-          initialData={initialData}
-          onSuccess={onInstallChange}
-        />
+        {showConfig && (
+          <ToolConnectorConfigSheet
+            open={isConfigOpen}
+            onOpenChange={setIsConfigOpen}
+            tool={tool}
+            initialData={initialData}
+            onSuccess={onInstallChange}
+          />
+        )}
       </>
     );
   }

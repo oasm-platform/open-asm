@@ -6,10 +6,11 @@ type Proxy struct {
 	mu     sync.RWMutex
 	chans  map[string]chan []byte
 	errors map[string]string
+	done   map[string]bool
 }
 
 func NewProxy() *Proxy {
-	return &Proxy{chans: map[string]chan []byte{}, errors: map[string]string{}}
+	return &Proxy{chans: map[string]chan []byte{}, errors: map[string]string{}, done: map[string]bool{}}
 }
 
 func (p *Proxy) Register(execID string, ch chan []byte) {
@@ -62,6 +63,24 @@ func (p *Proxy) PopError(execID string) (string, bool) {
 		delete(p.errors, execID)
 	}
 	return msg, ok
+}
+
+// MarkDone records that the connector sent a clean Done message for execID.
+func (p *Proxy) MarkDone(execID string) {
+	p.mu.Lock()
+	p.done[execID] = true
+	p.mu.Unlock()
+}
+
+// PopDone reports and clears whether Done was received for execID.
+func (p *Proxy) PopDone(execID string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	ok := p.done[execID]
+	if ok {
+		delete(p.done, execID)
+	}
+	return ok
 }
 
 // OnConnectorDown closes the channel for execID and removes it.

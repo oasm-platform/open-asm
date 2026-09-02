@@ -236,6 +236,61 @@ func TestBuildContainerEnvNilConfig(t *testing.T) {
 	}
 }
 
+// resolveHost precedence tests: explicit arg > WORKER_DOCKER_HOST > DOCKER_HOST > platform default.
+
+func TestResolveHostWindowsDefaultUsesNpipe(t *testing.T) {
+	got := resolveHost("", "", "", "windows")
+	want := "npipe:////./pipe/docker_engine"
+	if got != want {
+		t.Fatalf("resolveHost() on windows with no env = %q, want %q (Docker Desktop npipe)", got, want)
+	}
+}
+
+func TestResolveHostLinuxDefaultUsesUnixSocket(t *testing.T) {
+	got := resolveHost("", "", "", "linux")
+	want := "unix:///var/run/docker.sock"
+	if got != want {
+		t.Fatalf("resolveHost() on linux with no env = %q, want %q", got, want)
+	}
+}
+
+func TestResolveHostPreservesExistingDockerHostEnv(t *testing.T) {
+	got := resolveHost("", "tcp://127.0.0.1:2375", "", "windows")
+	want := "tcp://127.0.0.1:2375"
+	if got != want {
+		t.Fatalf("resolveHost() must keep a pre-set DOCKER_HOST (no clobber) = %q, want %q", got, want)
+	}
+}
+
+func TestResolveHostWorkerDockerHostWinsOverDockerHost(t *testing.T) {
+	got := resolveHost("", "tcp://127.0.0.1:2375", "npipe:////./pipe/docker_engine", "linux")
+	want := "npipe:////./pipe/docker_engine"
+	if got != want {
+		t.Fatalf("resolveHost() WORKER_DOCKER_HOST must override DOCKER_HOST = %q, want %q", got, want)
+	}
+}
+
+func TestResolveHostExplicitHostArgWinsOverAll(t *testing.T) {
+	got := resolveHost("tcp://127.0.0.1:2375", "npipe:////./pipe/docker_engine", "unix:///var/run/docker.sock", "windows")
+	want := "tcp://127.0.0.1:2375"
+	if got != want {
+		t.Fatalf("resolveHost() explicit host arg must win over envs = %q, want %q", got, want)
+	}
+}
+
+// Docker host resolution must never mutate the process environment (a pre-set
+// DOCKER_HOST must survive NewDockerRuntime untouched).
+func TestDockerRuntimeNeverClobbersDockerHostEnv(t *testing.T) {
+	data, err := os.ReadFile("docker.go")
+	if err != nil {
+		t.Fatalf("read docker.go: %v", err)
+	}
+	src := string(data)
+	if strings.Contains(src, `os.Setenv("DOCKER_HOST"`) || strings.Contains(src, "os.Setenv(`DOCKER_HOST`") {
+		t.Fatalf("docker.go must never Setenv DOCKER_HOST (would clobber a pre-set value)")
+	}
+}
+
 func TestBuildContainerEnvInputs(t *testing.T) {
 	spec := JobSpec{
 		JobID:   "j-in",

@@ -142,6 +142,7 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 				s.proxy.SetError(m.Done.ExecutionId, m.Done.Error)
 			}
 			delete(seenExecIDs, m.Done.ExecutionId)
+			s.proxy.MarkDone(m.Done.ExecutionId)
 			s.proxy.OnConnectorDown(m.Done.ExecutionId)
 			return nil
 		}

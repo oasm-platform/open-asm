@@ -24,7 +24,11 @@ const Marketplace = ({ toolType }: MarketplaceProps) => {
         icon={<LayoutGrid className="w-6 h-6" />}
         title="Marketplace"
         renderButton={(tool) => (
-          <ToolInstallButton tool={tool} workspaceId={selectedWorkspaceId} />
+          <ToolInstallButton
+            tool={tool}
+            workspaceId={selectedWorkspaceId}
+            showConfig={false}
+          />
         )}
       />
     </div>

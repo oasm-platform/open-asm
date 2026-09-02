@@ -1560,9 +1560,11 @@ describe('JobsRegistryService', () => {
         runMode: 'node',
       };
 
+      // Registry fixtures mirror manifest.json entries: name is the display
+      // name, slug is the key the DB tool rows store as `name`.
       mockConnectorRegistryService.getAllConnectors.mockReturnValue([
-        { name: 'nuclei' },
-        { name: 'wpscan' },
+        { name: 'nuclei', slug: 'nuclei' },
+        { name: 'wpscan', slug: 'wpscan' },
       ]);
 
       mockDataSource.getRepository.mockReturnValue({
@@ -1581,6 +1583,78 @@ describe('JobsRegistryService', () => {
       expect(namesFilter![1].names).toEqual(
         expect.arrayContaining(['subfinder', 'httpx', 'naabu', 'screenshot', 'nuclei', 'wpscan']),
       );
+    });
+
+    it('S1 — returns lowercase-slug connector job for node-mode built_in worker when registry name is capitalized', async () => {
+      // Pins THE bug: the DB tool row stores the connector SLUG as name
+      // ('nuclei'), while the registry's display name is capitalized
+      // ('Nuclei'). The `tool.name IN (:...names)` filter must be built from
+      // slugs, otherwise connector jobs never match and getNextJob returns null
+      // while the node worker polls forever.
+      const mockWorker = {
+        id: 'worker-bi-slug-s1',
+        type: WorkerType.BUILT_IN,
+        scope: WorkerScope.CLOUD,
+        workspace: { id: 'ws-1' },
+        tool: null,
+        runMode: 'node',
+      };
+      const mockJob = {
+        id: 'job-conn-slug-s1',
+        category: ToolCategory.VULNERABILITIES,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        priority: 4,
+        command: undefined, // Connector jobs have no command
+        asset: {
+          id: 'asset-slug-s1',
+          value: 'example.com',
+          target: { workspaceId: 'ws-1' },
+        },
+        tool: { id: 'tool-nuclei', name: 'nuclei' },
+        configProfileId: 'profile-slug-s1',
+      };
+
+      // Registry fixture mirrors manifest.json: display name capitalized,
+      // slug lowercase (the key of the connectorsBySlug map).
+      mockConnectorRegistryService.getAllConnectors.mockReturnValue([
+        { name: 'Nuclei', slug: 'nuclei' },
+        { name: 'WPScan - WordPress Security Scanner', slug: 'wpscan' },
+      ]);
+      mockConnectorRegistryService.getConnector.mockImplementation(
+        (name: string) =>
+          name === 'nuclei'
+            ? { name: 'Nuclei', slug: 'nuclei', image: 'nuclei:latest' }
+            : null,
+      );
+
+      mockDataSource.getRepository.mockReturnValue({
+        findOne: jest.fn().mockResolvedValue(mockWorker),
+      });
+
+      // Faithfully simulate the SQL filter: getOne only returns the job when
+      // the job's tool name is present in the allowed names list.
+      mockQBGetOne.mockImplementation(() => {
+        const andWhereCalls = mockQueryRunner.manager
+          .createQueryBuilder()
+          .andWhere.mock.calls;
+        const namesFilter = andWhereCalls.find(
+          (call: any[]) =>
+            typeof call[0] === 'string' && call[0].includes('IN (:...names)'),
+        );
+        const allowed: string[] = namesFilter?.[1]?.names ?? [];
+        return allowed.includes(mockJob.tool.name) ? mockJob : null;
+      });
+
+      const result = await service.getNextJob('worker-bi-slug-s1');
+
+      // RED state (name-based list): allowed contains 'Nuclei' not 'nuclei'
+      // => job filtered out => null. GREEN (slug-based list): job returned.
+      expect(result).not.toBeNull();
+      expect(result!.tool).toEqual({ id: 'tool-nuclei', name: 'nuclei' });
+      expect(result!.workspaceId).toBe('ws-1');
+      expect(result!.configProfileId).toBe('profile-slug-s1');
+      expect(result!.command).toBeUndefined();
     });
 
     it('should NOT include connector tool names in allowed filter for cli-mode BUILT_IN worker', async () => {

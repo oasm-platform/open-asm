@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -270,13 +271,14 @@ func TestHandleConnectorResultReportsError(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now())
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil)
 		close(done)
 	}()
 
 	// Send a result chunk, then signal error via proxy + close.
 	proxy.ForwardResult(execID, []byte(`{"partial":"data"}`))
 	proxy.SetError(execID, "connector crashed")
+	proxy.MarkDone(execID)
 	proxy.OnConnectorDown(execID)
 
 	select {
@@ -411,6 +413,18 @@ func TestProcessJobConnectorSubmitError(t *testing.T) {
 	if bridgeLen != 0 {
 		t.Fatalf("expected empty bridge on submit error, got %d entries", bridgeLen)
 	}
+
+	// The failed submit must be reported back to Core so the job is finalized.
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result submission for submit error, got %d", len(results))
+	}
+	if !results[0].isError {
+		t.Fatal("expected isError=true for submit error result")
+	}
+	if results[0].jobID != "job-err-1" {
+		t.Fatalf("expected jobID 'job-err-1', got %q", results[0].jobID)
+	}
 }
 
 func TestProcessJobConnectorCompletionReleasesSemaphore(t *testing.T) {
@@ -455,7 +469,8 @@ func TestProcessJobConnectorCompletionReleasesSemaphore(t *testing.T) {
 	// Simulate connector sending a result data chunk.
 	proxy.ForwardResult(execID, []byte(`{"subdomains":["a.example.com"]}`))
 
-	// Simulate Done message — triggers OnConnectorDown which closes the channel.
+	// Simulate Done message — server marks Done, then OnConnectorDown closes the channel.
+	proxy.MarkDone(execID)
 	proxy.OnConnectorDown(execID)
 
 	// Wait for completion handler to finish.
@@ -523,7 +538,7 @@ func TestHandleConnectorResultCleanupOnClose(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now())
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil)
 		close(done)
 	}()
 
@@ -556,5 +571,225 @@ func TestHandleConnectorResultCleanupOnClose(t *testing.T) {
 	}
 	if proxy.Has(execID) {
 		t.Fatal("proxy should not have execID after cleanup")
+	}
+}
+
+func TestHandleConnectorResultConnectTimeout(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+	activeJobsMu.Lock()
+	activeJobs = make(map[string]struct{})
+	activeJobsMu.Unlock()
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+	proxy := connector.NewProxy()
+
+	// A real Manager so the handler can Cancel the stuck execution.
+	mgr := execution.NewManager(fakeRT, 0)
+	execID, err := mgr.Submit(context.Background(), execution.JobSpec{Tool: "nuclei"})
+	if err != nil {
+		t.Fatalf("mgr.Submit: %v", err)
+	}
+
+	releaseCalled := false
+	var mu sync.Mutex
+	entry := &bridgeEntry{
+		jobID:    "job-timeout-1",
+		category: "subdomains",
+		release:  func() { mu.Lock(); releaseCalled = true; mu.Unlock() },
+	}
+	bridgeMu.Lock()
+	bridge[execID] = entry
+	bridgeMu.Unlock()
+
+	resultCh := make(chan []byte, 4)
+	proxy.Register(execID, resultCh)
+
+	activeJobsMu.Lock()
+	activeJobs[entry.jobID] = struct{}{}
+	activeJobsMu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), 100*time.Millisecond, mgr)
+		close(done)
+	}()
+
+	// Send nothing — the connector never connects; the timeout must fire.
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult connect timeout")
+	}
+
+	mu.Lock()
+	called := releaseCalled
+	mu.Unlock()
+	if !called {
+		t.Fatal("expected release to be called after connect timeout")
+	}
+
+	if fakeRT.CancelCallCount() != 1 {
+		t.Fatalf("expected 1 Cancel call, got %d", fakeRT.CancelCallCount())
+	}
+	if proxy.Has(execID) {
+		t.Fatal("proxy should not have execID after connect timeout")
+	}
+	bridgeMu.Lock()
+	_, stillInBridge := bridge[execID]
+	bridgeMu.Unlock()
+	if stillInBridge {
+		t.Fatal("bridge entry should be removed after connect timeout")
+	}
+
+	// The failure must be reported to Core so it can finalize the job.
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected 1 error result, got %d", len(results))
+	}
+	if !results[0].isError {
+		t.Fatal("expected isError=true for connect timeout")
+	}
+	if !strings.Contains(results[0].raw, "did not connect") {
+		t.Fatalf("expected raw to contain 'did not connect', got %q", results[0].raw)
+	}
+	if results[0].jobID != "job-timeout-1" {
+		t.Fatalf("expected jobID 'job-timeout-1', got %q", results[0].jobID)
+	}
+}
+
+func TestHandleConnectorResultEmptyCleanDoneSubmitsEmptyResult(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+	activeJobsMu.Lock()
+	activeJobs = make(map[string]struct{})
+	activeJobsMu.Unlock()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+	proxy := connector.NewProxy()
+
+	releaseCalled := false
+	var mu sync.Mutex
+	entry := &bridgeEntry{
+		jobID:    "job-empty-1",
+		category: "subdomains",
+		release:  func() { mu.Lock(); releaseCalled = true; mu.Unlock() },
+	}
+	execID := "exec-empty-1"
+	bridgeMu.Lock()
+	bridge[execID] = entry
+	bridgeMu.Unlock()
+
+	resultCh := make(chan []byte, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil)
+		close(done)
+	}()
+
+	// Clean Done: no results, no error.
+	proxy.MarkDone(execID)
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	mu.Lock()
+	called := releaseCalled
+	mu.Unlock()
+	if !called {
+		t.Fatal("expected release to be called")
+	}
+
+	// An empty clean Done must still finalize the job in Core.
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected 1 empty result submission, got %d", len(results))
+	}
+	if results[0].isError {
+		t.Fatal("expected isError=false for clean empty completion")
+	}
+	if results[0].raw != "" {
+		t.Fatalf("expected empty raw, got %q", results[0].raw)
+	}
+	if results[0].jobID != "job-empty-1" {
+		t.Fatalf("expected jobID 'job-empty-1', got %q", results[0].jobID)
+	}
+}
+
+func TestHandleConnectorResultDisconnectWithoutDoneReportsError(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+	activeJobsMu.Lock()
+	activeJobs = make(map[string]struct{})
+	activeJobsMu.Unlock()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+	proxy := connector.NewProxy()
+
+	releaseCalled := false
+	var mu sync.Mutex
+	entry := &bridgeEntry{
+		jobID:    "job-crash-1",
+		category: "subdomains",
+		release:  func() { mu.Lock(); releaseCalled = true; mu.Unlock() },
+	}
+	execID := "exec-crash-1"
+	bridgeMu.Lock()
+	bridge[execID] = entry
+	bridgeMu.Unlock()
+
+	resultCh := make(chan []byte, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil)
+		close(done)
+	}()
+
+	// Crash simulation: stream dies without Done → channel closes directly.
+	close(resultCh)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	mu.Lock()
+	called := releaseCalled
+	mu.Unlock()
+	if !called {
+		t.Fatal("expected release to be called")
+	}
+
+	// A disconnect without Done must be reported to Core as an error.
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected 1 error result, got %d", len(results))
+	}
+	if !results[0].isError {
+		t.Fatal("expected isError=true for disconnect without Done")
+	}
+	if !strings.Contains(results[0].raw, "disconnected") {
+		t.Fatalf("expected raw to contain 'disconnected', got %q", results[0].raw)
+	}
+	if results[0].jobID != "job-crash-1" {
+		t.Fatalf("expected jobID 'job-crash-1', got %q", results[0].jobID)
 	}
 }

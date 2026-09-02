@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -24,17 +25,32 @@ type DockerRuntime struct {
 	connectorToken string // shared secret for connector authentication
 }
 
+// resolveHost resolves the Docker engine endpoint with precedence:
+// explicit host arg > WORKER_DOCKER_HOST env > existing DOCKER_HOST env > platform default.
+func resolveHost(host, dockerHostEnv, workerDockerHostEnv, goos string) string {
+	if host != "" {
+		return host
+	}
+	if workerDockerHostEnv != "" {
+		return workerDockerHostEnv
+	}
+	if dockerHostEnv != "" {
+		return dockerHostEnv
+	}
+	if goos == "windows" {
+		return "npipe:////./pipe/docker_engine"
+	}
+	return "unix:///var/run/docker.sock"
+}
+
 // NewDockerRuntime creates a DockerRuntime dialing via docker.sock.
-// host defaults to unix:///var/run/docker.sock; WORKER_DOCKER_HOST env overrides.
+// host defaults to npipe on Windows / unix socket elsewhere; WORKER_DOCKER_HOST
+// and DOCKER_HOST env override an empty host (see resolveHost).
+// A pre-set DOCKER_HOST is never clobbered: the resolved host is passed to the
+// client explicitly instead of being written into the process environment.
 func NewDockerRuntime(host, connectorAddr, connectorToken string) (*DockerRuntime, error) {
-	if host == "" {
-		host = "unix:///var/run/docker.sock"
-	}
-	if v := os.Getenv("WORKER_DOCKER_HOST"); v != "" {
-		host = v
-	}
-	_ = os.Setenv("DOCKER_HOST", host)
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	host = resolveHost(host, os.Getenv("DOCKER_HOST"), os.Getenv("WORKER_DOCKER_HOST"), runtime.GOOS)
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithHost(host), client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,14 @@ import (
 	"oasm-worker/internal/runtime"
 )
 
+// Logger receives error notifications from Manager when background
+// container-engine operations fail. TuiLogger (worker package) satisfies it.
+// A nil logger disables reporting.
+type Logger interface {
+	Error(msg string, args ...any)
+	ErrorE(msg string, err error)
+}
+
 // Manager tracks concurrent executions with a state machine.
 // It replaces the legacy exec.Command sh -c path with isolated executions.
 type Manager struct {
@@ -17,11 +25,32 @@ type Manager struct {
 	maxConcurrency int
 	execs          map[string]*Execution
 	nextID         int
+	logger         Logger
 }
 
 // NewManager creates a Manager backed by rt with at most maxConcurrency concurrent executions.
 func NewManager(rt runtime.ExecutionRuntime, maxConcurrency int) *Manager {
 	return &Manager{rt: rt, maxConcurrency: maxConcurrency, execs: map[string]*Execution{}}
+}
+
+// SetLogger wires an error logger for background container-engine operations.
+// Nil disables logging (safe). Call once at startup, before Submit.
+func (m *Manager) SetLogger(l Logger) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.logger = l
+}
+
+// logError reports a container-engine operation failure via the injected
+// Logger. No-op when no logger is set. Never panics.
+func (m *Manager) logError(op string, err error) {
+	m.mu.Lock()
+	l := m.logger
+	m.mu.Unlock()
+	if l == nil {
+		return
+	}
+	l.ErrorE(op, err)
 }
 
 // Submit enforces maxConcurrency, calls rt.Create+Start, and tracks the execution.
@@ -59,10 +88,19 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	if secs := timeoutSeconds(spec.Limits); secs > 0 {
 		execID := id
 		time.AfterFunc(time.Duration(secs)*time.Second, func() {
-			_ = m.Cancel(context.Background(), execID)
+			m.cancelTimeout(execID)
 		})
 	}
 	return id, nil
+}
+
+// cancelTimeout best-effort cancels an execution when its timer fires. The
+// only failure is "not found" (already removed); per the terminal-logging
+// mandate it is still reported, never silently dropped.
+func (m *Manager) cancelTimeout(execID string) {
+	if err := m.Cancel(context.Background(), execID); err != nil {
+		m.logError("timeout cancel failed", err)
+	}
 }
 
 // SubmitWithTimeout submits and auto-cancels after timeout (0 disables).
@@ -76,7 +114,7 @@ func (m *Manager) SubmitWithTimeout(ctx context.Context, spec JobSpec, timeout t
 		}
 		execID := id
 		time.AfterFunc(timeout, func() {
-			_ = m.Cancel(context.Background(), execID)
+			m.cancelTimeout(execID)
 		})
 		return id, nil
 	}
@@ -84,7 +122,8 @@ func (m *Manager) SubmitWithTimeout(ctx context.Context, spec JobSpec, timeout t
 }
 
 // Cancel propagates to the runtime (rt.Cancel), marks cancelled, and removes from active tracking.
-// ponytail: best-effort runtime Cancel + Cleanup; no DB requeue here.
+// Container-engine failures during Cancel/Cleanup are logged (not returned) —
+// the caller-facing error contract is unchanged.
 func (m *Manager) Cancel(ctx context.Context, id string) error {
 	m.mu.Lock()
 	e, ok := m.execs[id]
@@ -96,13 +135,18 @@ func (m *Manager) Cancel(ctx context.Context, id string) error {
 	e.State = StateCancelled
 	delete(m.execs, id)
 	m.mu.Unlock()
-	_ = m.rt.Cancel(ctx, h)
-	_ = m.rt.Cleanup(ctx, h)
+	if err := m.rt.Cancel(ctx, h); err != nil {
+		m.logError("container cancel failed", err)
+	}
+	if err := m.rt.Cleanup(ctx, h); err != nil {
+		m.logError("container cleanup failed", err)
+	}
 	return nil
 }
 
 // OnConnectorDown marks the execution done and cleans up runtime resources.
 // Called by connector proxy when a connector disconnects/crashes.
+// A failed runtime Cleanup is logged, never silently dropped.
 func (m *Manager) OnConnectorDown(ctx context.Context, execID string) error {
 	m.mu.Lock()
 	e, ok := m.execs[execID]
@@ -114,7 +158,9 @@ func (m *Manager) OnConnectorDown(ctx context.Context, execID string) error {
 	e.State = StateDone
 	delete(m.execs, execID)
 	m.mu.Unlock()
-	_ = m.rt.Cleanup(ctx, h)
+	if err := m.rt.Cleanup(ctx, h); err != nil {
+		m.logError("container cleanup failed", err)
+	}
 	return nil
 }
 

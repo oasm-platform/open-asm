@@ -32,6 +32,13 @@ var (
 	bridge   = make(map[string]*bridgeEntry) // executionID → entry
 )
 
+// connectorConnectTimeout bounds how long a connector job may stay up before
+// its container connects back. If the connector never connects (bad image,
+// wrong WORKER_GRPC_ADDR/WORKER_TOKEN), the execution is cancelled and the
+// job is failed so Core can finalize it.
+// ponytail: make this configurable when tuning is needed.
+const connectorConnectTimeout = 5 * time.Minute
+
 func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
 	job, err := grpcClient.NextJob(ctx)
 	if err != nil {
@@ -300,6 +307,8 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 			ErrorMsg: fmt.Sprintf("Submit failed: %v", err),
 			Duration: time.Since(startTime),
 		})
+		// Report the failure to Core so the job is finalized instead of stuck IN_PROGRESS.
+		submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Submit failed: %v", err))
 		return true, false // hadJob=true (job was pulled), caller releases semaphore
 	}
 
@@ -324,15 +333,17 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	log.Info("[%s] Connector job submitted: execID=%s image=%s", job.Id, execID, job.GetImage())
 
 	// Start completion handler goroutine — fire-and-forget.
-	go handleConnectorResult(ctx, execID, grpcClient, events, proxy, resultCh, startTime)
+	go handleConnectorResult(ctx, execID, grpcClient, events, proxy, resultCh, startTime, connectorConnectTimeout, mgr)
 
 	return true, true // hadJob, usedAsync — completion handler releases semaphore
 }
 
 // handleConnectorResult drains results from the connector proxy channel,
 // submits them to the appropriate category endpoint, and performs cleanup
-// when the channel closes (Done message or connector disconnect).
-func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcclient.Client, events chan<- TuiEvent, proxy *connector.Proxy, resultCh <-chan []byte, startTime time.Time) {
+// when the channel closes (Done message or connector disconnect). If the
+// connector never connects within connectTimeout, the execution is cancelled
+// (best-effort) and the job is failed so Core can finalize it.
+func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcclient.Client, events chan<- TuiEvent, proxy *connector.Proxy, resultCh <-chan []byte, startTime time.Time, connectTimeout time.Duration, mgr *execution.Manager) {
 	bridgeMu.Lock()
 	entry, ok := bridge[execID]
 	bridgeMu.Unlock()
@@ -343,10 +354,35 @@ func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcc
 
 	log := NewTuiLogger(events, "Jobs")
 
-	// Drain results from connector until channel closes (Done or disconnect).
-	for data := range resultCh {
-		if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(data)); err != nil {
-			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector result", entry.jobID), err)
+	timer := time.NewTimer(connectTimeout)
+	defer timer.Stop()
+	submittedAny := false
+
+	// Drain results from connector until channel closes (Done or disconnect)
+	// or the connector fails to connect within connectTimeout.
+drain:
+	for {
+		select {
+		case data, ok := <-resultCh:
+			if !ok {
+				break drain
+			}
+			submittedAny = true
+			if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(data)); err != nil {
+				log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector result", entry.jobID), err)
+			}
+		case <-timer.C:
+			// Connector never connected: cancel the container (best-effort,
+			// still terminal on failure) and fail the job. OnConnectorDown
+			// closes the channel — safe because ForwardResult uses select-default.
+			if mgr != nil {
+				if err := mgr.Cancel(ctx, execID); err != nil {
+					log.ErrorE(fmt.Sprintf("[%s] Failed to cancel connector execution %s", entry.jobID, execID), err)
+				}
+			}
+			proxy.SetError(execID, fmt.Sprintf("connector did not connect within %s (check image, WORKER_GRPC_ADDR, WORKER_TOKEN)", connectTimeout))
+			proxy.OnConnectorDown(execID)
+			break drain
 		}
 	}
 
@@ -364,6 +400,7 @@ func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcc
 
 	// Check if connector reported an error via Done message.
 	errMsg, hasError := proxy.PopError(execID)
+	hadDone := proxy.PopDone(execID)
 
 	Emit(events, TuiEvent{
 		Type:     EventJobCompleted,
@@ -373,11 +410,17 @@ func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcc
 		Duration: time.Since(startTime),
 	})
 
-	if hasError && errMsg != "" {
+	switch {
+	case hasError && errMsg != "":
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, errMsg)
 		log.Warning("[%s] Connector job failed: execID=%s error=%s", entry.jobID, execID, errMsg)
-	} else {
+	case !hadDone:
+		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, "connector disconnected before Done")
+		log.Warning("[%s] Connector disconnected without Done: execID=%s", entry.jobID, execID)
+	case !submittedAny:
+		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, "")
+		log.Info("[%s] Connector job completed with no results: execID=%s", entry.jobID, execID)
+	default:
 		log.Info("[%s] Connector job completed: execID=%s", entry.jobID, execID)
 	}
-
 }

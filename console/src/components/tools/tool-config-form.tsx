@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { camelToTitle } from '@/utils/string';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -361,7 +362,7 @@ export function ToolConfigForm({
           </p>
         )}
         {formEntries.map(([key, prop]) => {
-          const label = prop.title ?? key;
+          const label = prop.title ?? camelToTitle(key);
           const required = requiredFields.includes(key);
           const textColor = prop['ui:text-color'];
 

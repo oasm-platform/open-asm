@@ -325,9 +325,10 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			// host.docker.internal:PORT. Add WORKER_CONNECTOR_EXTERNAL_ADDR when listen != external.
 			dockerRT, err := runtime.NewDockerRuntime("", cfg.ConnectorAddr, cfg.ConnectorToken)
 			if err != nil {
-				log.Error("docker runtime init failed (non-fatal): %v", err)
+				log.Error("container engine unavailable — image/connector jobs disabled: %v", err)
 			} else {
 				mgrInit = execution.NewManager(dockerRT, 0)
+				mgrInit.SetLogger(log)
 				log.Success("execution manager ready (Docker runtime, unlimited concurrency)")
 			}
 		}

@@ -137,6 +137,36 @@ func TestServerHappyPath_RegisterResultDone(t *testing.T) {
 	}
 }
 
+func TestServerDoneMarksProxyDone(t *testing.T) {
+	srv, proxy := startTestServer(t, "secret")
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegister(t, conn, "secret")
+	if !ack.GetAccepted() {
+		t.Fatalf("expected accepted=true, got accepted=%v reason=%q", ack.GetAccepted(), ack.GetReason())
+	}
+
+	// Send a clean Done — the server must record it via proxy.MarkDone
+	// before tearing down the stream.
+	if err := stream.Send(&pb.ConnectorMessage{
+		Message: &pb.ConnectorMessage_Done{
+			Done: &pb.Done{ExecutionId: "exec-mark-1"},
+		},
+	}); err != nil {
+		t.Fatalf("Send Done: %v", err)
+	}
+
+	// Server returns nil on Done → stream closes → client sees EOF.
+	_, err := stream.Recv()
+	if err != io.EOF {
+		t.Fatalf("expected EOF after Done, got %v", err)
+	}
+
+	if !proxy.PopDone("exec-mark-1") {
+		t.Fatal("expected PopDone=true after clean Done message")
+	}
+}
+
 func TestServerInvalidToken(t *testing.T) {
 	srv, _ := startTestServer(t, "secret")
 	conn := dialTestServer(t, srv)
