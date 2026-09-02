@@ -7,6 +7,7 @@ import type { Tool } from '@/modules/tools/entities/tools.entity';
 import type { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import type { Repository } from 'typeorm';
 import type { ToolConfigProfile } from './entities/tool-config-profiles.entity';
+import { encryptProfile } from './validators/tool-config-profiles.crypto';
 import { ToolConfigProfilesService } from './tool-config-profiles.service';
 
 // --- Mocks ---
@@ -155,19 +156,29 @@ describe('ToolConfigProfilesService', () => {
     ).rejects.toThrow(/unknown tool/i);
   });
 
-  it('create — no effective schema throws with inputs schema message', async () => {
+  it('create — no-schema connector: succeeds and stores config as-is', async () => {
+    // Known connector with NEITHER configSchema NOR inputsSchema
+    // (e.g. wpscan) needs no config — creation must not throw.
     (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
       name: 'wpscan',
       slug: 'wpscan',
       // neither configSchema nor inputsSchema present
     });
     toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
+    profilesRepo.findOne.mockResolvedValue(null);
+    profilesRepo.save.mockImplementation((p) => p);
+    profilesRepo.create.mockImplementation((p) => p);
 
-    await expect(
-      service.create(wsId, toolId, { name: 'x', config: {} }),
-    ).rejects.toThrow(
-      'Tool "wpscan" has no config schema or inputs schema -- cannot validate config',
-    );
+    const result = await service.create(wsId, toolId, {
+      name: 'qa-wpscan',
+      config: { url: 'https://example.com' },
+    });
+
+    expect(result).toBeDefined();
+    expect(profilesRepo.save).toHaveBeenCalledTimes(1);
+    // No schema → no validation → config persisted byte-for-byte (no encryption)
+    const savedConfig = (profilesRepo.save.mock.calls[0][0] as ToolConfigProfile).config;
+    expect(savedConfig).toEqual({ url: 'https://example.com' });
   });
 
   // ── Fallback: configSchema absent → inputsSchema used ────────────
@@ -297,6 +308,35 @@ describe('ToolConfigProfilesService', () => {
     expect(savedConfig.target).toBe('new.com');
   });
 
+  it('update — no-schema connector: new config succeeds, stored as-is', async () => {
+    const existing = mockProfile({
+      id: 'prof-wpscan',
+      name: 'qa-wpscan',
+      config: {},
+    });
+    // Known connector without a schema (wpscan)
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'wpscan',
+      slug: 'wpscan',
+    });
+    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
+    profilesRepo.findOne
+      .mockResolvedValueOnce(existing) // findOwned
+      .mockResolvedValueOnce(null);    // dup check (new name unique)
+    profilesRepo.save.mockImplementation((p) => p);
+
+    await service.update(wsId, 'prof-wpscan', {
+      name: 'qa-wpscan-v2',
+      config: { url: 'https://new.example.com' },
+    });
+
+    expect(profilesRepo.save).toHaveBeenCalledTimes(1);
+    const saved = profilesRepo.save.mock.calls[0][0] as ToolConfigProfile;
+    expect(saved.name).toBe('qa-wpscan-v2');
+    // No schema → no validation → config persisted unchanged
+    expect(saved.config).toEqual({ url: 'https://new.example.com' });
+  });
+
   // ── setDefault ───────────────────────────────────────────────────────
 
   it('setDefault switches old default off atomically', async () => {
@@ -359,6 +399,23 @@ describe('ToolConfigProfilesService', () => {
     await expect(service.remove(wsId, 'prof-missing')).rejects.toThrow();
   });
 
+  it('delete — findOwned loads workspace and tool relations before ownership check', async () => {
+    const profile = mockProfile({ id: 'prof-001', config: {} });
+    profilesRepo.findOne.mockResolvedValue(profile);
+    profilesRepo.remove.mockImplementation((p) => p);
+
+    await service.remove(wsId, 'prof-001');
+
+    // findOwned() reads (profile.workspace).id — the workspace relation must
+    // be eager-loaded too, or the real TypeORM entity (undefined relation)
+    // crashes with TypeError on getOne/update/setDefault/remove.
+    expect(profilesRepo.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        relations: expect.arrayContaining(['workspace', 'tool']),
+      }),
+    );
+  });
+
   // ── LIST ─────────────────────────────────────────────────────────────
 
   it('list returns masked profiles (secrets hidden)', async () => {
@@ -413,10 +470,81 @@ describe('ToolConfigProfilesService', () => {
 
     await service.getOne(wsId, 'prof-001');
 
-    // Verify findOne was called with relations: ['tool']
+    // Verify findOne (via findOwned) was called with workspace + tool relations
     expect(profilesRepo.findOne).toHaveBeenCalledWith(
-      expect.objectContaining({ relations: ['tool'] }),
+      expect.objectContaining({
+        relations: expect.arrayContaining(['workspace', 'tool']),
+      }),
     );
+  });
+
+  // ── LIST: relation loading (regression: unloaded tool → TypeError) ──
+
+  it('list — loads tool relation for masking', async () => {
+    profilesRepo.find.mockResolvedValue([]);
+
+    await service.list(wsId, toolId);
+
+    // Regression guard: maskConfig() dereferences (profile.tool).name, so the
+    // find must eager-load the tool relation or it crashes with TypeError.
+    expect(profilesRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        relations: expect.arrayContaining(['tool']),
+      }),
+    );
+  });
+
+  it('list — profile with unloaded tool relation does not throw and returns unchanged', async () => {
+    // Simulates the real TypeORM shape when relations are NOT loaded:
+    // profile.tool is undefined, not a Tool object.
+    const profile = mockProfile({
+      tool: undefined as unknown as Tool,
+      config: { apiKey: 'supersecretvalue', target: 'x.com' },
+    });
+    profilesRepo.find.mockResolvedValue([profile]);
+
+    const result = await service.list(wsId, toolId);
+
+    // Must NOT throw; entity passes through unmasked (no schema to consult)
+    expect(result).toEqual([profile]);
+    expect(connectorRegistry.getConnector).not.toHaveBeenCalled();
+  });
+
+  // ── DISPATCH ─────────────────────────────────────────────────────────
+
+  it('resolveConfigForDispatch — loads workspace+tool relations and returns decrypted config', async () => {
+    const encrypted = encryptProfile(
+      { apiKey: 'secret123', target: 'x.com' },
+      ['apiKey'],
+      Buffer.alloc(32),
+    );
+    const profile = mockProfile({
+      id: 'prof-001',
+      tool: { id: toolId, name: 'nuclei' } as Tool,
+      workspace: { id: wsId },
+      config: encrypted,
+      isDefault: true,
+    });
+    profilesRepo.findOne.mockResolvedValue(profile);
+    toolsRepo.findOne.mockResolvedValue(mockTool);
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'nuclei', slug: 'nuclei', configSchema: schemaWithPassword,
+    });
+
+    const result = await service.resolveConfigForDispatch(
+      wsId,
+      toolId,
+      'prof-001',
+    );
+
+    // Explicit-profile branch reads (profile.workspace).id and (profile.tool).id,
+    // so findOne must eager-load both relations.
+    expect(profilesRepo.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        relations: expect.arrayContaining(['workspace', 'tool']),
+      }),
+    );
+    expect(result).toEqual({ apiKey: 'secret123', target: 'x.com' });
   });
 
   // ── SECURITY INVARIANT ───────────────────────────────────────────────

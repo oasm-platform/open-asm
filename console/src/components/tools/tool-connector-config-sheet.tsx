@@ -165,10 +165,15 @@ export function ToolConnectorConfigSheet({
               submitLabel={isEdit ? 'Update' : 'Create'}
               isSubmitting={isPending}
             />
-          ) : (
+          ) : isSchemaLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {isSchemaLoading ? 'Loading schema...' : 'No schema available'}
+              Loading schema...
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed px-4 py-6 text-sm text-muted-foreground">
+              This tool doesn't require configuration. You can still create a
+              profile (empty config) to use as default.
             </div>
           )}
         </div>
@@ -183,6 +188,15 @@ export function ToolConnectorConfigSheet({
             >
               Cancel
             </Button>
+            {!isSchemaLoading && (
+              <Button
+                type="button"
+                onClick={() => handleSubmit(initialData?.config ?? {})}
+                disabled={isPending}
+              >
+                {isEdit ? 'Update' : 'Create'}
+              </Button>
+            )}
           </SheetFooter>
         )}
       </SheetContent>

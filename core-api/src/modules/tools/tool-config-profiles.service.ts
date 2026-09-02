@@ -50,12 +50,16 @@ export class ToolConfigProfilesService {
         `Unknown tool "${tool.name}" -- cannot validate config`,
       );
     }
-    // Fallback: configSchema ?? inputsSchema
-    const schema = entry.configSchema ?? entry.inputsSchema;
+    // Fallback: configSchema ?? inputsSchema. A known connector with neither
+    // schema needs no config — profile creation stays allowed and validation
+    // is skipped (config stored as-is, no sensitive fields to encrypt).
+    const schema = entry.configSchema ?? entry.inputsSchema ?? null;
     if (!schema) {
-      throw new BadRequestException(
-        `Tool "${tool.name}" has no config schema or inputs schema -- cannot validate config`,
-      );
+      return {
+        tool,
+        schema: null,
+        sensitiveFields: [],
+      };
     }
     return {
       tool,
@@ -88,6 +92,9 @@ export class ToolConfigProfilesService {
   private maskConfig(
     profile: ToolConfigProfile,
   ): ToolConfigProfile {
+    // Defensive: some callers do not eager-load the tool relation.
+    // Without it there is no schema to consult — return unmasked.
+    if (!profile.tool) return profile;
     const entry = this.connectorRegistry.getConnector(
       (profile.tool).name,
     );
@@ -108,15 +115,18 @@ export class ToolConfigProfilesService {
     toolId: string,
     dto: { name: string; config: Record<string, unknown>; isDefault?: boolean },
   ): Promise<ToolConfigProfile> {
-    const { tool, sensitiveFields } =
+    const { tool, schema, sensitiveFields } =
       await this.resolveConnectorSchema(toolId);
 
-    // Validate config against schema (I3)
-    validateProfileOrThrow(
-      this.connectorRegistry,
-      tool.name,
-      dto.config,
-    );
+    // Validate config against schema (I3) — skipped for connectors without a
+    // config schema (their config is stored as-is, no validation possible).
+    if (schema) {
+      validateProfileOrThrow(
+        this.connectorRegistry,
+        tool.name,
+        dto.config,
+      );
+    }
 
     // Pre-check unique name (I1)
     const existing = await this.profilesRepo.findOne({
@@ -157,7 +167,7 @@ export class ToolConfigProfilesService {
 
     // Resolve schema via tool's slug
     const toolId = (profile.tool as unknown as { id: string }).id;
-    const { tool, sensitiveFields } =
+    const { tool, schema, sensitiveFields } =
       await this.resolveConnectorSchema(toolId);
 
     // If name is changing, check uniqueness (I1)
@@ -177,9 +187,11 @@ export class ToolConfigProfilesService {
       profile.name = dto.name;
     }
 
-    // Validate updated config (I3)
+    // Validate updated config (I3) — skipped for no-schema connectors
     if (dto.config !== undefined) {
-      validateProfileOrThrow(this.connectorRegistry, tool.name, dto.config);
+      if (schema) {
+        validateProfileOrThrow(this.connectorRegistry, tool.name, dto.config);
+      }
       profile.config = dto.config;
     }
 
@@ -241,6 +253,7 @@ export class ToolConfigProfilesService {
         workspace: { id: workspaceId },
         tool: { id: toolId },
       },
+      relations: ['tool'],
       order: { createdAt: 'DESC' },
     });
 
@@ -291,6 +304,7 @@ export class ToolConfigProfilesService {
       // Explicit profile — must belong to same workspace AND tool
       profile = await this.profilesRepo.findOne({
         where: { id: profileId },
+        relations: ['workspace', 'tool'],
       });
       if (!profile) return undefined;
 
@@ -336,7 +350,7 @@ export class ToolConfigProfilesService {
   ): Promise<ToolConfigProfile> {
     const profile = await this.profilesRepo.findOne({
       where: { id: profileId },
-      relations: ['tool'],
+      relations: ['workspace', 'tool'],
     });
     if (!profile) {
       throw new NotFoundException(`Profile ${profileId} not found`);

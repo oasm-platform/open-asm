@@ -647,13 +647,17 @@ export class ToolsService implements OnModuleInit {
     workspaceId?: string,
   ): Promise<{ schema: Record<string, unknown> | null; source: 'configSchema' | 'inputsSchema' | null }> {
     const tool = await this.getToolById(toolId, workspaceId);
-    const result = this.connectorRegistry.getEffectiveSchema(tool.name);
-    if (result.source === null && tool.type !== WorkerType.BUILT_IN) {
+    // Only an UNKNOWN connector slug (no registry entry at all) is an error.
+    // A known connector that merely lacks a schema legitimately has no config.
+    if (
+      this.connectorRegistry.getConnector(tool.name) === null &&
+      tool.type !== WorkerType.BUILT_IN
+    ) {
       throw new BadRequestException(
         `Unknown connector slug "${tool.name}"`,
       );
     }
-    return result;
+    return this.connectorRegistry.getEffectiveSchema(tool.name);
   }
 
   /**
@@ -725,7 +729,18 @@ export class ToolsService implements OnModuleInit {
       throw new BadRequestException('Tool is not installed in this workspace.');
     }
 
-    await this.workspaceToolRepository.remove(existingEntry);
+    // Remove the workspace_tools row AND cascade its ToolConfigProfile rows
+    // atomically. There is no FK from profiles to workspace_tools, so the
+    // profile cleanup must be explicit; doing both inside one transaction
+    // keeps them atomic.
+    await this.workspaceToolRepository.manager.transaction(async (manager) => {
+      await manager.remove(existingEntry);
+      await manager.delete(ToolConfigProfile, {
+        workspace: { id: dto.workspaceId },
+        tool: { id: dto.toolId },
+      });
+    });
+
     return {
       message: 'Tool uninstalled successfully.',
     };
@@ -845,10 +860,13 @@ export class ToolsService implements OnModuleInit {
           return tool;
         }
         const hasConfigProfile = profileToolIds.has(tool.id!);
+        // Connector without a config schema needs no config → installed means ready.
+        const needsConfig =
+          this.connectorRegistry.getConnectorSchema(tool.name) !== null;
         return {
           ...tool,
           hasConfigProfile,
-          isReady: hasConfigProfile,
+          isReady: needsConfig ? hasConfigProfile : true,
         };
       });
 
@@ -915,7 +933,10 @@ export class ToolsService implements OnModuleInit {
       const hasConfigProfile = workspaceId
         ? profileToolIds.has(tool.id!)
         : false;
-      return { ...tool, hasConfigProfile, isReady: hasConfigProfile };
+      // Connector without a config schema needs no config → installed means ready.
+      const needsConfig =
+        this.connectorRegistry.getConnectorSchema(tool.name) !== null;
+      return { ...tool, hasConfigProfile, isReady: needsConfig ? hasConfigProfile : true };
     });
 
     return {
@@ -962,7 +983,10 @@ export class ToolsService implements OnModuleInit {
       // Add hasConfigProfile and isReady flags
       const hasConfigProfile = await this.hasProfile(workspaceId, tool.id!);
       tool.hasConfigProfile = hasConfigProfile;
-      tool.isReady = hasConfigProfile;
+      // Connector without a config schema needs no config → installed means ready.
+      const needsConfig =
+        this.connectorRegistry.getConnectorSchema(tool.name) !== null;
+      tool.isReady = needsConfig ? hasConfigProfile : tool.isInstalled;
     } else {
       // Without workspaceId, profile status is unknown
       tool.hasConfigProfile = null;

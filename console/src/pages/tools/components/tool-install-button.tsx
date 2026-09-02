@@ -1,11 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { ToolConnectorConfigSheet } from "@/components/tools/tool-connector-config-sheet";
 import {
   ToolsControllerGetManyToolsType,
@@ -62,10 +56,6 @@ const ToolInstallButton = ({
   // Backend-augmented flag: tool has at least one config profile
   const hasConfigProfile =
     isConnector && Boolean((tool as ToolWithConfig).hasConfigProfile);
-
-  // Disable install when no workers are online
-  const noWorkers =
-    !tool.availableWorkersCount || tool.availableWorkersCount === 0;
 
   // Fetch existing profiles only when we may need to edit one
   const { data: profilesRaw } = useToolConfigProfilesControllerList(tool.id, {
@@ -180,7 +170,7 @@ const ToolInstallButton = ({
 
   // --- Connector tool ---
   if (isConnector) {
-    // Installed but no config profile yet: show Configure
+    // Installed but no config profile yet: show Configure + Remove
     if (isInstalled && !hasConfigProfile) {
       return (
         <>
@@ -188,6 +178,26 @@ const ToolInstallButton = ({
             <Settings className="mr-2 h-4 w-4" />
             Configure
           </Button>
+          <ConfirmDialog
+            title="Remove Tool"
+            description={`Are you sure you want to remove "${tool.name}"?`}
+            onConfirm={handleUninstall}
+            trigger={
+              <Button
+                variant="outline"
+                disabled={uninstallToolMutation.isPending}
+              >
+                {uninstallToolMutation.isPending ? (
+                  "Removing..."
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Added
+                  </>
+                )}
+              </Button>
+            }
+          />
           <ToolConnectorConfigSheet
             open={isConfigOpen}
             onOpenChange={setIsConfigOpen}
@@ -235,33 +245,20 @@ const ToolInstallButton = ({
             />
           </>
         ) : (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button
-                    variant="default"
-                    onClick={handleConnectorAdd}
-                    disabled={installToolMutation.isPending || noWorkers}
-                  >
-                    {installToolMutation.isPending ? (
-                      "Adding..."
-                    ) : (
-                      <>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add
-                      </>
-                    )}
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {noWorkers && (
-                <TooltipContent>
-                  <p>{`"${tool.name}" requires at least one worker online.`}</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="default"
+            onClick={handleConnectorAdd}
+            disabled={installToolMutation.isPending}
+          >
+            {installToolMutation.isPending ? (
+              "Adding..."
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </>
+            )}
+          </Button>
         )}
         <ToolConnectorConfigSheet
           open={isConfigOpen}
@@ -307,17 +304,12 @@ const ToolInstallButton = ({
   return (
     <ConfirmDialog
       title="Add Tool"
-      description={
-        noWorkers
-          ? `"${tool.name}" requires at least one worker online.`
-          : `Are you sure you want to add "${tool.name}"?`
-      }
-      disabled={noWorkers}
+      description={`Are you sure you want to add "${tool.name}"?`}
       onConfirm={handleInstall}
       trigger={
         <Button
           variant="default"
-          disabled={installToolMutation.isPending || noWorkers}
+          disabled={installToolMutation.isPending}
         >
           {installToolMutation.isPending ? (
             "Adding..."
