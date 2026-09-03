@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 )
@@ -29,6 +31,11 @@ type DockerRuntime struct {
 	connectorAddr  string // resolved dial address containers use to reach the worker's connector gRPC server
 	connectorToken string // shared secret for connector authentication
 	logger         Logger
+
+	// poolEnabled switches container naming to the stable pool form
+	// (oasm-<tool>-<hash8(image)>) and makes Create reuse a live container of
+	// the same image instead of always spawning a fresh one.
+	poolEnabled bool
 }
 
 // Logger receives DockerRuntime lifecycle log lines (image pull, create, start,
@@ -42,6 +49,12 @@ type Logger interface {
 // SetLogger wires a lifecycle logger. Nil disables logging (safe).
 func (d *DockerRuntime) SetLogger(l Logger) {
 	d.logger = l
+}
+
+// SetPoolEnabled toggles pooled container naming/reuse. Must be called before
+// any Create. Pooling off keeps the legacy random-suffix 1:1 behavior.
+func (d *DockerRuntime) SetPoolEnabled(enabled bool) {
+	d.poolEnabled = enabled
 }
 
 func (d *DockerRuntime) logInfo(msg string, args ...any) {
@@ -269,6 +282,80 @@ func buildContainerName(tool, execID string) string {
 	return fmt.Sprintf("oasm-%s-%s-%s", sanitizeToolName(tool), short, randHex4())
 }
 
+// buildPoolContainerName builds the stable pooled name oasm-<tool>-<hash8(image)>.
+// Deterministic per image so consecutive jobs of the same image reuse one
+// container; the 8-hex hash (sha256 prefix) disambiguates images without
+// leaking the full registry ref into the name.
+func buildPoolContainerName(tool, image string) string {
+	sum := sha256.Sum256([]byte(image))
+	return fmt.Sprintf("oasm-%s-%s", sanitizeToolName(tool), hex.EncodeToString(sum[:4]))
+}
+
+// pooledHandleFromName inspects a container by its pooled name and returns a
+// usable Handle when it is a live oasm-managed container (reuse path — skips
+// pull/create/start). A same-named container that is NOT a live managed one is
+// force-removed first (stale leftover), so the caller can create fresh under
+// the same stable name.
+func (d *DockerRuntime) pooledHandleFromName(ctx context.Context, name string, opts RuntimeOpts, spec JobSpec) (Handle, bool) {
+	j, err := d.cli.ContainerInspect(ctx, name)
+	if err != nil {
+		return Handle{}, false // nothing holds the name — caller creates fresh
+	}
+	managed := j.Config != nil && j.Config.Labels != nil && j.Config.Labels["oasm-managed"] == "true"
+	if !managed && (j.Config == nil || j.Config.Labels == nil || len(j.Config.Labels) == 0) {
+		// Name unregistered (no oasm labels): genuinely fresh, skip removal.
+		return Handle{}, false
+	}
+	if !managed || !j.State.Running {
+		if err := d.cli.ContainerRemove(context.Background(), j.ID, container.RemoveOptions{Force: true}); err != nil {
+			d.logWarning("docker: remove stale pooled container %s: %v", j.ID, err)
+		}
+		return Handle{}, false
+	}
+	d.logInfo("docker: pool hit, reusing running container: %s name=%s image=%s", j.ID, name, spec.Image)
+	return Handle{
+		ID: j.ID,
+		Labels: map[string]string{
+			"trace_id": opts.TraceID,
+			"tool":     spec.Tool,
+			"exec_id":  j.Config.Labels["exec_id"],
+		},
+	}, true
+}
+
+// SweepOrphans removes oasm-managed containers not referenced by keep — stale
+// leftovers from crashed workers/connectors. Pooling disabled: no-op (legacy
+// naming manages no containers).
+func (d *DockerRuntime) SweepOrphans(ctx context.Context, keep []string) (int, error) {
+	if d.cli == nil || !d.poolEnabled {
+		return 0, nil
+	}
+	args := filters.NewArgs(filters.Arg("label", "oasm-managed=true"))
+	list, err := d.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: args})
+	if err != nil {
+		return 0, err
+	}
+	keepSet := make(map[string]struct{}, len(keep))
+	for _, id := range keep {
+		keepSet[id] = struct{}{}
+	}
+	removed := 0
+	for _, c := range list {
+		if _, ok := keepSet[c.ID]; ok {
+			continue
+		}
+		if err := d.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true}); err != nil {
+			if !errdefs.IsNotFound(err) {
+				d.logWarning("docker: orphan sweep remove %s: %v", c.ID, err)
+			}
+			continue
+		}
+		removed++
+		d.logInfo("docker: swept orphan container: %s", c.ID)
+	}
+	return removed, nil
+}
+
 func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOpts) (Handle, error) {
 	if spec.Image == "" {
 		return Handle{}, fmt.Errorf("image required")
@@ -324,6 +411,18 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		ExtraHosts:     []string{"host.docker.internal:host-gateway"},
 	}
 
+	name := buildContainerName(spec.Tool, execID)
+	if d.poolEnabled {
+		// Pooled mode: deterministic per-image name + reuse of a live
+		// oasm-managed container so N same-image jobs share one container.
+		// Reuse skips pull/create/start entirely.
+		pname := buildPoolContainerName(spec.Tool, spec.Image)
+		if h, ok := d.pooledHandleFromName(ctx, pname, opts, spec); ok {
+			return h, nil
+		}
+		name = pname
+	}
+
 	// Pull image if not present locally.
 	pullReader, err := d.cli.ImagePull(ctx, spec.Image, types.ImagePullOptions{})
 	if err != nil {
@@ -334,13 +433,23 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	pullReader.Close()
 	d.logInfo("docker: image pull done: %s", spec.Image)
 
-	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, buildContainerName(spec.Tool, execID))
+	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	if err != nil {
 		if errdefs.IsConflict(err) {
-			// Name collision (typically a stale container from a crashed run
-			// with the same tool+exec): retry once with a fresh random suffix.
-			d.logInfo("docker: container name conflict, retrying with fresh suffix: %v", err)
-			resp, err = d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, buildContainerName(spec.Tool, execID))
+			if d.poolEnabled {
+				// Name held by a stale/foreign container: reuse it when it is a
+				// live oasm-managed container (race with a sibling create),
+				// otherwise remove and retry under the same stable name.
+				if h, ok := d.pooledHandleFromName(ctx, name, opts, spec); ok {
+					return h, nil
+				}
+				d.logInfo("docker: pool name conflict, removing stale container and retrying: %v", err)
+			} else {
+				// Legacy: retry once with a fresh random suffix.
+				d.logInfo("docker: container name conflict, retrying with fresh suffix: %v", err)
+				name = buildContainerName(spec.Tool, execID)
+			}
+			resp, err = d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 		}
 		if err != nil {
 			return Handle{}, fmt.Errorf("container create: %w", err)

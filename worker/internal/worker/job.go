@@ -607,7 +607,10 @@ drain:
 	// depend on this succeeding.
 	if mgr != nil {
 		cleanupCtx, cancel := newDetachedCleanupContext()
-		if err := mgr.OnConnectorDown(cleanupCtx, execID); err != nil {
+		// Release (pool-aware) instead of a blind remove: in pool mode the
+		// container survives for sibling jobs (or is retired when exited);
+		// with pooling disabled it cleans up the 1:1 container as before.
+		if err := mgr.Release(cleanupCtx, execID); err != nil {
 			log.ErrorE(fmt.Sprintf("[%s] Failed to clean up connector execution %s", entry.jobID, execID), err)
 		}
 		cancel()

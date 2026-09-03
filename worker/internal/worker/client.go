@@ -337,10 +337,26 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			if err != nil {
 				log.Error("container engine unavailable — image/connector jobs disabled: %v", err)
 			} else {
-				mgrInit = execution.NewManager(dockerRT, 0)
+				// Per-tool container pool: same-image jobs share up to
+				// MaxJobsPerContainer per live container (poolKey=image).
+				// Disabled via pool_enabled=false → legacy 1:1.
+				mgrInit = execution.NewManager(dockerRT, 0, execution.WithPool(execution.PoolConfig{
+					Enabled:             cfg.PoolEnabled,
+					MaxJobsPerContainer: cfg.MaxJobsPerContainer,
+					IdleTimeout:         cfg.PoolIdleTimeout,
+				}))
 				mgrInit.SetLogger(log)
 				dockerRT.SetLogger(log)
-				log.Success("execution manager ready (Docker runtime, unlimited concurrency)")
+				dockerRT.SetPoolEnabled(cfg.PoolEnabled)
+				if cfg.PoolEnabled {
+					// Reclaim crashed-worker leftovers before serving jobs, then
+					// keep empty pooled containers evicted past the idle timeout.
+					if err := mgrInit.SweepOrphans(workerCtx); err != nil {
+						log.Warning("orphan container sweep failed: %v", err)
+					}
+					mgrInit.StartPoolMaintenance(workerCtx)
+				}
+				log.Success("execution manager ready (Docker runtime, unlimited concurrency, pool=%t maxJobsPerContainer=%d)", cfg.PoolEnabled, cfg.MaxJobsPerContainer)
 			}
 		}
 		mgr = mgrInit

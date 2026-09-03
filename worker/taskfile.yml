@@ -85,6 +85,11 @@ tasks:
     cmds:
       - go test ./...
 
+  # Run tests with the race detector (slow; use for concurrency changes)
+  test-race:
+    cmds:
+      - go test -race ./...
+
   # Check code without building binary
   # Verifies compilation of all packages
   check:

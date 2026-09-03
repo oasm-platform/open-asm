@@ -2,6 +2,7 @@ package config
 
 import (
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
@@ -30,6 +31,12 @@ type Config struct {
 	ConnectorAddr  string `mapstructure:"connector_addr"`  // override: external dial address for containers; empty = auto-detect at runtime
 	ConnectorToken string `mapstructure:"connector_token"` // shared secret for connector auth, empty = no auth
 	Mode           string `mapstructure:"mode"`            // worker run mode: "cli", "node", or "" (unknown)
+
+	// Container pool — one container is reused across up to
+	// MaxJobsPerContainer jobs sharing the same image (poolKey).
+	PoolEnabled         bool          `mapstructure:"pool_enabled"`           // false = legacy 1:1 (one container per job)
+	MaxJobsPerContainer int           `mapstructure:"max_jobs_per_container"` // jobs sharing one container (env WORKER_MAX_JOBS_PER_CONTAINER)
+	PoolIdleTimeout     time.Duration `mapstructure:"pool_idle_timeout"`      // empty pooled container evicted after this idle duration
 }
 
 func LoadConfig() (*Config, error) {
@@ -50,6 +57,9 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("connector_addr", "") // empty = worker auto-derives the container-reachable address
 	viper.SetDefault("connector_token", "")
 	viper.SetDefault("mode", "")
+	viper.SetDefault("pool_enabled", true)
+	viper.SetDefault("max_jobs_per_container", 5)
+	viper.SetDefault("pool_idle_timeout", "2m")
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {

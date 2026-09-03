@@ -635,12 +635,14 @@ type fakeDockerEngine struct {
 	removeErr      error
 	running        bool // container state as the engine sees it
 	createBody     string
-	createName     string   // name of the most recent create attempt
-	createNames    []string // every create attempt name, in order
-	createConflict bool     // fail the next create with HTTP 409, then clear
-	health         string   // State.Health.Status, "" = no healthcheck
-	exitCode       int      // State.ExitCode
-	logOutput      string   // payload for the container logs stream
+	createName     string            // name of the most recent create attempt
+	createNames    []string          // every create attempt name, in order
+	createConflict bool              // fail the next create with HTTP 409, then clear
+	health         string            // State.Health.Status, "" = no healthcheck
+	exitCode       int               // State.ExitCode
+	logOutput      string            // payload for the container logs stream
+	labels         map[string]string // Config.Labels of the created container (pooled-name reuse checks oasm-managed)
+	exists         bool              // a container currently exists in the engine (inspect/list 404 when false)
 }
 
 func newFakeDockerEngine() *fakeDockerEngine {
@@ -674,6 +676,12 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 			f.createNames = append(f.createNames, f.createName)
 			conflict := f.createConflict
 			f.createConflict = false
+			var createReq struct {
+				Labels map[string]string `json:"Labels"`
+			}
+			_ = json.Unmarshal(body, &createReq)
+			f.labels = createReq.Labels
+			f.exists = true
 			f.mu.Unlock()
 			if conflict {
 				w.Header().Set("Content-Type", "application/json")
@@ -696,19 +704,38 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 			f.running = false
 			f.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && path == "/containers/json":
+			// ContainerList view used by SweepOrphans (label-filtered). Must be
+			// matched before the /containers/<id>/json prefix case below.
+			f.mu.Lock()
+			labels := f.labels
+			exists := f.exists
+			id := f.containerID
+			f.mu.Unlock()
+			list := []types.Container{}
+			if exists && labels["oasm-managed"] == "true" {
+				list = append(list, types.Container{ID: id, Labels: labels})
+			}
+			_ = json.NewEncoder(w).Encode(list)
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/json"):
 			f.mu.Lock()
 			running := f.running
 			id := f.containerID
 			health := f.health
 			exitCode := f.exitCode
+			labels := f.labels
 			f.mu.Unlock()
 			healthJSON := ""
 			if health != "" {
 				healthJSON = fmt.Sprintf(`,"Health":{"Status":%q}`, health)
 			}
+			labelsJSON := "null"
+			if len(labels) > 0 {
+				b, _ := json.Marshal(labels)
+				labelsJSON = string(b)
+			}
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"Id":%q,"State":{"Running":%t,"ExitCode":%d%s}}`, id, running, exitCode, healthJSON)
+			fmt.Fprintf(w, `{"Id":%q,"State":{"Running":%t,"ExitCode":%d%s},"Config":{"Labels":%s}}`, id, running, exitCode, healthJSON, labelsJSON)
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/logs"):
 			// ContainerLogs with ShowStdout+ShowStderr returns a multiplexed
 			// stream: 8-byte header (stream byte + uint32 BE length) + payload.
@@ -1293,5 +1320,155 @@ func TestConnectorAddrEnvFallbackWhenArgEmpty(t *testing.T) {
 	}
 	if d.connectorAddr != "192.168.1.50:50051" {
 		t.Fatalf("connectorAddr = %q, want env override %q", d.connectorAddr, "192.168.1.50:50051")
+	}
+}
+
+// --- container pool (per-tool reuse) ---
+
+// The pooled container name must be deterministic per (tool, image) and carry
+// the 8-hex sha256 hash of the image as its disambiguating suffix.
+func TestBuildPoolContainerNameDeterministic(t *testing.T) {
+	n1 := buildPoolContainerName("nuclei", "ghcr.io/open-asm/nuclei:1.0")
+	n2 := buildPoolContainerName("nuclei", "ghcr.io/open-asm/nuclei:1.0")
+	if n1 != n2 {
+		t.Fatalf("same tool+image must produce the same name, got %q and %q", n1, n2)
+	}
+	if !regexp.MustCompile(`^oasm-nuclei-[0-9a-f]{8}$`).MatchString(n1) {
+		t.Fatalf("name %q must match oasm-<tool>-<hash8>", n1)
+	}
+	if other := buildPoolContainerName("nuclei", "ghcr.io/open-asm/nuclei:2.0"); other == n1 {
+		t.Fatal("different images must produce different pool names")
+	}
+}
+
+// Pooled Create: the second same-image create reuses the live running
+// container — no extra pull, no extra create, same handle ID.
+func TestCreatePoolReusesRunningContainer(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+	r.SetPoolEnabled(true)
+
+	spec := JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0", JobID: "job-1", TraceID: "tr-1"}
+	h1, err := r.Create(context.Background(), spec, RuntimeOpts{})
+	if err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+	h2, err := r.Create(context.Background(), spec, RuntimeOpts{})
+	if err != nil {
+		t.Fatalf("second Create: %v", err)
+	}
+	if h1.ID != h2.ID {
+		t.Fatalf("pooled reuse must return the same container, got %q and %q", h1.ID, h2.ID)
+	}
+	if engine.created != 1 {
+		t.Fatalf("expected 1 container create for 2 pooled submits, got %d", engine.created)
+	}
+	if engine.pulled != 1 {
+		t.Fatalf("reuse must skip the image pull, pulled=%d", engine.pulled)
+	}
+	if _, ok := log.find("pool hit, reusing running container"); !ok {
+		t.Fatalf("expected a pool-hit log line, got %v", log.all())
+	}
+}
+
+// A pooled container that exited is retired on the next same-image create:
+// removed, then created fresh under the same stable name.
+func TestCreatePoolRetiresExitedContainerBeforeRecreate(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+	r.SetPoolEnabled(true)
+
+	spec := JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0", JobID: "job-1"}
+	if _, err := r.Create(context.Background(), spec, RuntimeOpts{}); err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+	engine.mu.Lock()
+	engine.running = false // container exited after its job
+	engine.mu.Unlock()
+
+	if _, err := r.Create(context.Background(), spec, RuntimeOpts{}); err != nil {
+		t.Fatalf("second Create must fall back to a fresh container: %v", err)
+	}
+	if engine.created != 2 {
+		t.Fatalf("expected a fresh create after the pooled container exited, got %d", engine.created)
+	}
+	if engine.removed != 1 {
+		t.Fatalf("exited stale pooled container must be removed, removed=%d", engine.removed)
+	}
+	if len(engine.createNames) != 2 || engine.createNames[0] != engine.createNames[1] {
+		t.Fatalf("both creates must use the same stable pool name, got %v", engine.createNames)
+	}
+}
+
+// A 409 conflict under pooled naming resolves to reuse (sibling created the
+// container) or stale-removal+retry — never a random fresh name.
+func TestCreatePool409ConflictKeepsStableName(t *testing.T) {
+	engine := newFakeDockerEngine()
+	engine.createConflict = true // first create attempt fails with 409
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+	r.SetPoolEnabled(true)
+
+	if _, err := r.Create(context.Background(), JobSpec{
+		Tool:  "nuclei",
+		Image: "ghcr.io/open-asm/nuclei:1.0",
+		JobID: "job-1",
+	}, RuntimeOpts{}); err != nil {
+		t.Fatalf("Create with pool 409 must retry and succeed: %v", err)
+	}
+	if engine.created != 2 {
+		t.Fatalf("expected 2 create calls (409 + retry), got %d", engine.created)
+	}
+	if len(engine.createNames) != 2 || engine.createNames[0] != engine.createNames[1] {
+		t.Fatalf("pooled mode must retry under the SAME stable name, got %v", engine.createNames)
+	}
+}
+
+// SweepOrphans removes oasm-managed containers the pool does not reference and
+// leaves referenced ones alone; pooling disabled sweeps nothing.
+func TestSweepOrphansRemovesUnreferencedContainers(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+	r.SetPoolEnabled(true)
+
+	h, err := r.Create(context.Background(), JobSpec{
+		Tool:  "nuclei",
+		Image: "ghcr.io/open-asm/nuclei:1.0",
+		JobID: "job-1",
+	}, RuntimeOpts{})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	kept, err := r.SweepOrphans(context.Background(), []string{h.ID})
+	if err != nil {
+		t.Fatalf("SweepOrphans(keep): %v", err)
+	}
+	if kept != 0 {
+		t.Fatalf("referenced container must be kept, removed=%d", kept)
+	}
+	if engine.removed != 0 {
+		t.Fatalf("no removal expected for kept container, removed=%d", engine.removed)
+	}
+
+	removed, err := r.SweepOrphans(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("SweepOrphans(nil): %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("unreferenced managed container must be removed, removed=%d", removed)
+	}
+
+	// Pooling disabled: nothing is managed, sweep is a no-op.
+	r2 := newFakeDockerRuntime(t, newFakeDockerEngine(), &captureLogger{})
+	n, err := r2.SweepOrphans(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("SweepOrphans disabled: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("disabled pool must sweep nothing, removed=%d", n)
 	}
 }
