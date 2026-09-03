@@ -77,6 +77,14 @@ services:
       - WORKER_GRPC_PORT=16276
       - WORKER_MAX_CONCURRENCY=10
       - WORKER_TOOL_PATH=/app/oasm-tools
+      # WORKER_CONNECTOR_ADDR: optional override for the address connector
+      # containers dial back on (auto-derived when unset — host.docker.internal
+      # on any OS via a host-gateway ExtraHosts mapping the worker adds on
+      # Linux; IPv4 bridge gateway fallback on engines < Docker Engine 20.10).
+      # Pin it to a stable value when containers must dial via service name:
+      # - WORKER_CONNECTOR_ADDR=oasm-worker
+      # Firewall: the connector port (26276) must accept inbound from spawned
+      # containers (docker bridge, or the compose network when pinned above).
     logging:
       driver: json-file
       options:

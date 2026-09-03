@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-rod/rod"
+	connectorpb "oasm-worker/internal/gen/connector"
 	pb "oasm-worker/internal/gen/jobs_registry"
 
 	"oasm-worker/internal/connector"
@@ -25,6 +26,7 @@ type bridgeEntry struct {
 	jobID    string
 	category string
 	release  func() // semaphore release callback — called only by completion handler
+	image    string // image the execution ran (backoff bookkeeping)
 }
 
 var (
@@ -32,12 +34,83 @@ var (
 	bridge   = make(map[string]*bridgeEntry) // executionID → entry
 )
 
+// imageBackoff gates container starts per image. Failures (submit error,
+// early exit, connect timeout) push the next allowed start out exponentially
+// (min(30s*2^fails, 10m)); success resets the counter. In-memory only — a
+// worker restart resets all counters (documented trade-off).
+var imageBackoff = execution.NewImageBackoff()
+
 // connectorConnectTimeout bounds how long a connector job may stay up before
 // its container connects back. If the connector never connects (bad image,
 // wrong WORKER_GRPC_ADDR/WORKER_TOKEN), the execution is cancelled and the
 // job is failed so Core can finalize it.
 // ponytail: make this configurable when tuning is needed.
 const connectorConnectTimeout = 5 * time.Minute
+
+// connectorCleanupTimeout bounds best-effort post-execution container cleanup.
+// The cleanup context MUST be detached from the session context: a worker
+// reconnect cancelling the session would abort the docker Stop/Cleanup calls
+// immediately and orphan the container.
+const connectorCleanupTimeout = 30 * time.Second
+
+// newDetachedCleanupContext returns a context rooted at context.Background
+// with a bounded deadline for best-effort container cleanup. Never pass the
+// session ctx here — see connectorCleanupTimeout.
+func newDetachedCleanupContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), connectorCleanupTimeout)
+}
+
+// healthPollInterval is how often the connector-job drain polls container
+// health. A var (not const) so tests can shrink it.
+var healthPollInterval = 5 * time.Second
+
+// Container log tail budget attached to failure payloads sent to Core.
+const (
+	tailMaxLines = 100
+	tailMaxBytes = 32 * 1024
+)
+
+// tailBuffer is a bounded ring buffer of container log lines. append drops the
+// oldest lines once the budget (100 lines / 32KB) is exceeded.
+type tailBuffer struct {
+	lines []string
+	bytes int
+}
+
+func (t *tailBuffer) append(line string) {
+	if line == "" {
+		return
+	}
+	if len(line) > tailMaxBytes {
+		line = line[:tailMaxBytes]
+	}
+	t.lines = append(t.lines, line)
+	t.bytes += len(line)
+	for (t.bytes > tailMaxBytes || len(t.lines) > tailMaxLines) && len(t.lines) > 1 {
+		t.bytes -= len(t.lines[0])
+		t.lines = t.lines[1:]
+	}
+}
+
+func (t *tailBuffer) String() string {
+	if len(t.lines) == 0 {
+		return ""
+	}
+	return strings.Join(t.lines, "\n")
+}
+
+// splitLogChunk splits a log chunk into non-empty lines, trimming \r.
+func splitLogChunk(chunk []byte) []string {
+	var out []string
+	for _, line := range strings.Split(string(chunk), "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		if line == "" {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
+}
 
 func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
 	job, err := grpcClient.NextJob(ctx)
@@ -297,8 +370,25 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		JobID:  job.Id,
 	}
 
+	// Per-image backoff gate: while the image is backing off, fail fast
+	// WITHOUT creating a container (no exec-N waste, no pending ExecuteJob).
+	if ok, retryIn := imageBackoff.Allow(spec.Image); !ok {
+		failMsg := fmt.Sprintf("image backing off, retry in %s (image=%s)", retryIn.Round(time.Second), spec.Image)
+		log.Warning("[%s] %s", job.Id, failMsg)
+		Emit(events, TuiEvent{
+			Type:     EventJobCompleted,
+			JobID:    job.Id,
+			Success:  false,
+			ErrorMsg: failMsg,
+			Duration: time.Since(startTime),
+		})
+		submitCategoryError(ctx, grpcClient, events, job.Id, category, failMsg)
+		return true, false // hadJob=true (job was pulled), caller releases semaphore
+	}
+
 	execID, err := mgr.Submit(ctx, spec)
 	if err != nil {
+		imageBackoff.RecordFailure(spec.Image)
 		log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector job", job.Id), err)
 		Emit(events, TuiEvent{
 			Type:     EventJobCompleted,
@@ -323,6 +413,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		jobID:    job.Id,
 		category: category,
 		release:  releaseSem,
+		image:    spec.Image,
 	}
 	bridgeMu.Unlock()
 
@@ -330,10 +421,32 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	resultCh := make(chan []byte, 16)
 	proxy.Register(execID, resultCh)
 
+	// Queue the ExecuteJob for the connector container. If the connector has
+	// not registered its stream yet (container boot race), the proxy holds it
+	// as pending and flushes it on connect. Send errors are logged only — the
+	// pending/timeout machinery covers late or broken connects.
+	inputs := make(map[string]string, len(spec.Inputs))
+	for k, v := range spec.Inputs {
+		inputs[k] = fmt.Sprintf("%v", v)
+	}
+	if err := proxy.SendExecute(execID, &connectorpb.ExecuteJob{
+		ExecutionId: execID,
+		JobId:       spec.JobID,
+		Tool:        spec.Tool,
+		Image:       spec.Image,
+		TraceId:     spec.TraceID,
+		Inputs:      inputs,
+	}); err != nil {
+		log.ErrorE(fmt.Sprintf("[%s] Failed to send ExecuteJob for exec %s", job.Id, execID), err)
+	}
+
 	log.Info("[%s] Connector job submitted: execID=%s image=%s", job.Id, execID, job.GetImage())
 
-	// Start completion handler goroutine — fire-and-forget.
-	go handleConnectorResult(ctx, execID, grpcClient, events, proxy, resultCh, startTime, connectorConnectTimeout, mgr)
+	// Start completion handler goroutine — fire-and-forget. It owns the health
+	// monitor (Inspect poll), the log tailer (Logs stream), result draining,
+	// container cleanup and Core finalization.
+	tail := &tailBuffer{}
+	go handleConnectorResult(ctx, execID, grpcClient, events, proxy, resultCh, startTime, connectorConnectTimeout, mgr, tail)
 
 	return true, true // hadJob, usedAsync — completion handler releases semaphore
 }
@@ -343,7 +456,12 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 // when the channel closes (Done message or connector disconnect). If the
 // connector never connects within connectTimeout, the execution is cancelled
 // (best-effort) and the job is failed so Core can finalize it.
-func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcclient.Client, events chan<- TuiEvent, proxy *connector.Proxy, resultCh <-chan []byte, startTime time.Time, connectTimeout time.Duration, mgr *execution.Manager) {
+//
+// Health monitor + log tailer live INSIDE the drain loop (ticker and Logs
+// select cases, not separate goroutines): Done/timeout/crash all break the
+// same drain, so there is no monitor/tailer lifecycle to coordinate and no
+// orphan goroutine after the job ends.
+func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcclient.Client, events chan<- TuiEvent, proxy *connector.Proxy, resultCh <-chan []byte, startTime time.Time, connectTimeout time.Duration, mgr *execution.Manager, tail *tailBuffer) {
 	bridgeMu.Lock()
 	entry, ok := bridge[execID]
 	bridgeMu.Unlock()
@@ -353,6 +471,29 @@ func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcc
 	defer entry.release()
 
 	log := NewTuiLogger(events, "Jobs")
+
+	// Open the container log stream; the logsCtx is cancelled when the drain
+	// exits so the docker read goroutine stops promptly. A nil channel
+	// disables the logs select case.
+	var logsCh <-chan []byte
+	if mgr != nil {
+		logsCtx, logsCancel := context.WithCancel(ctx)
+		defer logsCancel()
+		ch, err := mgr.Logs(logsCtx, execID)
+		if err != nil {
+			log.ErrorE(fmt.Sprintf("[%s] Failed to open container logs for %s", entry.jobID, execID), err)
+		} else {
+			logsCh = ch
+		}
+	}
+
+	// Health poll: nil channel disables the case when no manager (unit tests).
+	var healthC <-chan time.Time
+	if mgr != nil {
+		h := time.NewTicker(healthPollInterval)
+		defer h.Stop()
+		healthC = h.C
+	}
 
 	timer := time.NewTimer(connectTimeout)
 	defer timer.Stop()
@@ -370,17 +511,77 @@ drain:
 			submittedAny = true
 			if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(data)); err != nil {
 				log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector result", entry.jobID), err)
+			} else {
+				log.Info("[%s] connector result submitted: exec=%s bytes=%d", entry.jobID, execID, len(data))
 			}
+		case chunk, ok := <-logsCh:
+			if !ok {
+				logsCh = nil
+				continue
+			}
+			if tail != nil {
+				// Log line budget: also keep the raw line in the per-exec tail.
+				for _, line := range splitLogChunk(chunk) {
+					tail.append(line)
+					log.Info("[%s] container: %s", entry.jobID, line)
+				}
+			}
+		case <-healthC:
+			// Health monitor: a container that crashed (exit != 0), turned
+			// unhealthy, or exited before the connector delivered Done is a
+			// startup failure — cancel the container on a detached context,
+			// fail the job with the log tail attached, and drop the pending
+			// ExecuteJob. Exit-0 after Done is not a failure (connector
+			// finished; the drain will break on channel close).
+			if mgr == nil {
+				continue
+			}
+			res, err := mgr.Inspect(ctx, execID)
+			if err != nil {
+				continue // transient inspect error — try next tick
+			}
+			var reason string
+			switch {
+			case res.Health == "unhealthy":
+				reason = fmt.Sprintf("container unhealthy (health=%s)", res.Health)
+			case !res.Running && res.ExitCode != 0:
+				reason = fmt.Sprintf("container exited early with code %d", res.ExitCode)
+			case !res.Running && res.ExitCode == 0 && !proxy.HasDone(execID):
+				reason = "container exited before connector completed"
+			default:
+				continue
+			}
+			if tail != nil && tail.String() != "" {
+				reason += "\n--- container logs (last " + fmt.Sprintf("%d lines) ---", tailMaxLines) + "\n" + tail.String()
+			}
+			log.Warning("[%s] connector startup failure: %s exec=%s", entry.jobID, reason, execID)
+			proxy.SetError(execID, reason)
+			cleanupCtx, cancel := newDetachedCleanupContext()
+			if err := mgr.Cancel(cleanupCtx, execID); err != nil {
+				log.ErrorE(fmt.Sprintf("[%s] Failed to cancel connector execution %s", entry.jobID, execID), err)
+			}
+			cancel()
+			proxy.OnConnectorDown(execID)
+			break drain
 		case <-timer.C:
 			// Connector never connected: cancel the container (best-effort,
 			// still terminal on failure) and fail the job. OnConnectorDown
 			// closes the channel — safe because ForwardResult uses select-default.
+			// Cleanup runs on a detached context: the session ctx may already
+			// be cancelled (worker reconnect) and would abort Stop/Cleanup,
+			// orphaning the container.
+			timeoutMsg := fmt.Sprintf("connector did not connect within %s (check image, WORKER_GRPC_ADDR, WORKER_TOKEN)", connectTimeout)
+			if tail != nil && tail.String() != "" {
+				timeoutMsg += "\n--- container logs (last " + fmt.Sprintf("%d lines) ---", tailMaxLines) + "\n" + tail.String()
+			}
 			if mgr != nil {
-				if err := mgr.Cancel(ctx, execID); err != nil {
+				cleanupCtx, cancel := newDetachedCleanupContext()
+				if err := mgr.Cancel(cleanupCtx, execID); err != nil {
 					log.ErrorE(fmt.Sprintf("[%s] Failed to cancel connector execution %s", entry.jobID, execID), err)
 				}
+				cancel()
 			}
-			proxy.SetError(execID, fmt.Sprintf("connector did not connect within %s (check image, WORKER_GRPC_ADDR, WORKER_TOKEN)", connectTimeout))
+			proxy.SetError(execID, timeoutMsg)
 			proxy.OnConnectorDown(execID)
 			break drain
 		}
@@ -398,9 +599,40 @@ drain:
 
 	proxy.Unregister(execID)
 
+	// Best-effort container cleanup on a detached context (see
+	// newDetachedCleanupContext): the connector already finished or dropped,
+	// so the container (exited, or force-removed if still up) must be removed
+	// even when the session ctx was cancelled by a reconnect. The bridge /
+	// activeJobs / proxy cleanup above and the finalization below must not
+	// depend on this succeeding.
+	if mgr != nil {
+		cleanupCtx, cancel := newDetachedCleanupContext()
+		if err := mgr.OnConnectorDown(cleanupCtx, execID); err != nil {
+			log.ErrorE(fmt.Sprintf("[%s] Failed to clean up connector execution %s", entry.jobID, execID), err)
+		}
+		cancel()
+	}
+	// Drop any ExecuteJob still queued for this execution (connector never
+	// registered before finishing/dropping). Idempotent when the server-side
+	// OnConnectorDown already ran.
+	proxy.OnConnectorDown(execID)
+
 	// Check if connector reported an error via Done message.
 	errMsg, hasError := proxy.PopError(execID)
 	hadDone := proxy.PopDone(execID)
+
+	// Terminal lifecycle line: execution identity + outcome + duration.
+	errDetail := errMsg
+	if errDetail == "" {
+		errDetail = "-"
+	}
+	finishedMsg := fmt.Sprintf("[%s] connector job finished: exec=%s success=%t error=%s duration=%s",
+		entry.jobID, execID, !hasError, errDetail, time.Since(startTime))
+	if hasError {
+		log.Warning("%s", finishedMsg)
+	} else {
+		log.Success("%s", finishedMsg)
+	}
 
 	Emit(events, TuiEvent{
 		Type:     EventJobCompleted,
@@ -422,5 +654,16 @@ drain:
 		log.Info("[%s] Connector job completed with no results: execID=%s", entry.jobID, execID)
 	default:
 		log.Info("[%s] Connector job completed: execID=%s", entry.jobID, execID)
+	}
+
+	// Per-image backoff bookkeeping: any failed outcome (crash, timeout,
+	// disconnect, connector error) backs the image off; a clean Done with
+	// success resets it. Fail-fast jobs never reach this point (no exec).
+	if entry.image != "" {
+		if hasError || !hadDone {
+			imageBackoff.RecordFailure(entry.image)
+		} else {
+			imageBackoff.RecordSuccess(entry.image)
+		}
 	}
 }

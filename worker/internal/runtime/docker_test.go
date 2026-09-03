@@ -2,10 +2,23 @@ package runtime
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
 )
 
 func TestDockerRuntimeCreateRequiresImage(t *testing.T) {
@@ -187,11 +200,72 @@ func TestBuildContainerEnvBaseVars(t *testing.T) {
 	}
 
 	assertEnvContains("WORKER_GRPC_ADDR", "host:50051")
+	assertEnvContains("WORKER_GRPC_HOST", "host")
+	assertEnvContains("WORKER_GRPC_PORT", "50051")
 	assertEnvContains("WORKER_TOKEN", "tok-789")
 	assertEnvContains("EXECUTION_ID", "exec-abc")
 	assertEnvContains("JOB_ID", "j-123")
 	assertEnvContains("TOOL", "nuclei")
 	assertEnvContains("TRACE_ID", "tr-456")
+}
+
+// buildContainerEnv must split the resolved dial address into
+// WORKER_GRPC_HOST/_PORT for SDKs that need the parts separately, while
+// WORKER_GRPC_ADDR stays byte-identical (bracketed IPv6 literals included).
+func TestBuildContainerEnvSplitsGrpcHostPort(t *testing.T) {
+	spec := JobSpec{JobID: "j-split", Tool: "nuclei", TraceID: "tr-split"}
+	cases := []struct {
+		name string
+		addr string
+		host string
+		port string
+	}{
+		{"bracketed IPv6 override", "[fdc4:f303:9324::254]:50051", "fdc4:f303:9324::254", "50051"},
+		{"plain hostname", "host.docker.internal:50051", "host.docker.internal", "50051"},
+		{"default port flow", "host.docker.internal:26276", "host.docker.internal", "26276"},
+		{"plain IPv4", "172.18.0.3:50051", "172.18.0.3", "50051"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			env := buildContainerEnv(spec, tc.addr, "tok", "exec-1")
+			got := map[string]string{}
+			for _, e := range env {
+				k, v, ok := strings.Cut(e, "=")
+				if ok {
+					got[k] = v
+				}
+			}
+			if got["WORKER_GRPC_ADDR"] != tc.addr {
+				t.Fatalf("WORKER_GRPC_ADDR = %q, want %q (must stay verbatim)", got["WORKER_GRPC_ADDR"], tc.addr)
+			}
+			if got["WORKER_GRPC_HOST"] != tc.host {
+				t.Fatalf("WORKER_GRPC_HOST = %q, want %q", got["WORKER_GRPC_HOST"], tc.host)
+			}
+			if got["WORKER_GRPC_PORT"] != tc.port {
+				t.Fatalf("WORKER_GRPC_PORT = %q, want %q", got["WORKER_GRPC_PORT"], tc.port)
+			}
+		})
+	}
+}
+
+// A dial address without a port (e.g. a bare service-name override such as
+// WORKER_CONNECTOR_ADDR=oasm-worker) emits WORKER_GRPC_HOST only — the port is
+// unknown, so no WORKER_GRPC_PORT var is invented.
+func TestBuildContainerEnvNoPortAddrEmitsHostOnly(t *testing.T) {
+	spec := JobSpec{JobID: "j-noport", Tool: "nuclei", TraceID: "tr-noport"}
+	env := buildContainerEnv(spec, "oasm-worker", "tok", "exec-1")
+	var hostFound bool
+	for _, e := range env {
+		if strings.HasPrefix(e, "WORKER_GRPC_PORT=") {
+			t.Fatalf("no-port addr must not emit WORKER_GRPC_PORT, got %q", e)
+		}
+		if e == "WORKER_GRPC_HOST=oasm-worker" {
+			hostFound = true
+		}
+	}
+	if !hostFound {
+		t.Fatal("WORKER_GRPC_HOST=oasm-worker not found in env")
+	}
 }
 
 func TestBuildContainerEnvOASMConfig(t *testing.T) {
@@ -318,5 +392,906 @@ func TestBuildContainerEnvInputs(t *testing.T) {
 		if strings.HasPrefix(e, "INPUT_SEVERITY=") && e != "INPUT_SEVERITY=high" {
 			t.Fatalf("INPUT_SEVERITY wrong: %q", e)
 		}
+	}
+}
+
+// --- Connector address resolution (auto-derive WORKER_GRPC_ADDR) ---
+
+// stubInspector implements dockerInspector with canned responses.
+// Unconfigured handlers report an error, so tests can assert a code path was
+// NOT taken by registering handlers that t.Fatal on invocation.
+type stubInspector struct {
+	containerInspect func(ctx context.Context, id string) (types.ContainerJSON, error)
+	networkInspect   func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error)
+	serverVersion    func(ctx context.Context) (types.Version, error)
+}
+
+func (s *stubInspector) ContainerInspect(ctx context.Context, id string) (types.ContainerJSON, error) {
+	if s.containerInspect == nil {
+		return types.ContainerJSON{}, errors.New("stub: ContainerInspect not configured")
+	}
+	return s.containerInspect(ctx, id)
+}
+
+func (s *stubInspector) NetworkInspect(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+	if s.networkInspect == nil {
+		return types.NetworkResource{}, errors.New("stub: NetworkInspect not configured")
+	}
+	return s.networkInspect(ctx, id, opts)
+}
+
+func (s *stubInspector) ServerVersion(ctx context.Context) (types.Version, error) {
+	if s.serverVersion == nil {
+		return types.Version{}, errors.New("stub: ServerVersion not configured")
+	}
+	return s.serverVersion(ctx)
+}
+
+func mustResolveConnectorAddr(t *testing.T, di dockerInspector, hostname, override string, port int, goos string) string {
+	t.Helper()
+	addr, err := resolveConnectorAddr(context.Background(), di, hostname, override, port, goos)
+	if err != nil {
+		t.Fatalf("resolveConnectorAddr: %v", err)
+	}
+	return addr
+}
+
+// Regression: cfg.ConnectorAddr "0.0.0.0:50051" used to leak verbatim into
+// containers, and 0.0.0.0 from inside a container resolves to its own loopback.
+func TestResolveConnectorAddrExplicitOverride(t *testing.T) {
+	di := &stubInspector{
+		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+			t.Fatal("override must win: ContainerInspect must not be called")
+			return types.ContainerJSON{}, nil
+		},
+		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+			t.Fatal("override must win: NetworkInspect must not be called")
+			return types.NetworkResource{}, nil
+		},
+	}
+	got := mustResolveConnectorAddr(t, di, "deadbeef", "10.0.0.9:9999", 50051, "linux")
+	if got != "10.0.0.9:9999" {
+		t.Fatalf("override = %q, want %q", got, "10.0.0.9:9999")
+	}
+}
+
+// Worker itself running inside docker (e.g. compose): its container is
+// inspectable by hostname and reachable from spawned containers (nil network =
+// default bridge) via its bridge IP.
+func TestResolveConnectorAddrSelfContainer(t *testing.T) {
+	di := &stubInspector{
+		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+			if id != "worker-container-id" {
+				t.Fatalf("ContainerInspect(%q), want hostname %q", id, "worker-container-id")
+			}
+			return types.ContainerJSON{
+				NetworkSettings: &types.NetworkSettings{
+					Networks: map[string]*network.EndpointSettings{
+						"bridge": {IPAddress: "172.18.0.3"},
+					},
+				},
+			}, nil
+		},
+		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+			t.Fatal("self IP found: NetworkInspect must not be called")
+			return types.NetworkResource{}, nil
+		},
+	}
+	got := mustResolveConnectorAddr(t, di, "worker-container-id", "", 50051, "linux")
+	if got != "172.18.0.3:50051" {
+		t.Fatalf("self-container addr = %q, want %q", got, "172.18.0.3:50051")
+	}
+}
+
+// Docker Desktop (windows/darwin) exposes the host via host.docker.internal —
+// built-in name, no host-gateway ExtraHosts needed, so ServerVersion is never
+// consulted on these OSes.
+func TestResolveConnectorAddrDockerDesktop(t *testing.T) {
+	for _, goos := range []string{"windows", "darwin"} {
+		di := &stubInspector{
+			containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+				return types.ContainerJSON{}, errors.New("hostname is not a container")
+			},
+			serverVersion: func(ctx context.Context) (types.Version, error) {
+				t.Fatal("desktop host.docker.internal is built-in: ServerVersion must not be called")
+				return types.Version{}, nil
+			},
+		}
+		got := mustResolveConnectorAddr(t, di, "my-laptop", "", 50051, goos)
+		if got != "host.docker.internal:50051" {
+			t.Fatalf("goos %s: addr = %q, want %q", goos, got, "host.docker.internal:50051")
+		}
+	}
+}
+
+// Linux native docker pre-dating host-gateway support (API < 1.41 / Engine <
+// 20.10): no host.docker.internal mapping can be added, so spawned containers
+// on the bridge network dial the bridge gateway, whose address is reachable
+// from them.
+func TestResolveConnectorAddrLinuxBridgeGateway(t *testing.T) {
+	di := &stubInspector{
+		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		},
+		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+			if id != "bridge" {
+				t.Fatalf("NetworkInspect(%q), want %q", id, "bridge")
+			}
+			return types.NetworkResource{
+				IPAM: network.IPAM{Config: []network.IPAMConfig{{Gateway: "172.18.0.1"}}},
+			}, nil
+		},
+		serverVersion: func(ctx context.Context) (types.Version, error) {
+			return types.Version{APIVersion: "1.40"}, nil
+		},
+	}
+	got := mustResolveConnectorAddr(t, di, "my-server", "", 50051, "linux")
+	if got != "172.18.0.1:50051" {
+		t.Fatalf("bridge gateway addr = %q, want %q", got, "172.18.0.1:50051")
+	}
+}
+
+// Linux, engine version unreadable and bridge network uninspectable → default
+// gateway fallback (host-gateway support cannot be assumed).
+func TestResolveConnectorAddrLinuxFallback(t *testing.T) {
+	di := &stubInspector{
+		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		},
+		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+			return types.NetworkResource{}, errors.New("bridge network not found")
+		},
+	}
+	got := mustResolveConnectorAddr(t, di, "my-server", "", 50051, "linux")
+	if got != "172.17.0.1:50051" {
+		t.Fatalf("fallback addr = %q, want %q", got, "172.17.0.1:50051")
+	}
+}
+
+// The address stored on the runtime (resolved at construction) is what lands in
+// WORKER_GRPC_ADDR — never the old raw 0.0.0.0 default.
+func TestBuildContainerEnvUsesResolvedAddr(t *testing.T) {
+	r := NewDockerRuntimeWithClient(nil, "172.18.0.3:50051", "tok")
+	env := buildContainerEnv(JobSpec{JobID: "j-1", Tool: "nuclei", TraceID: "t-1"}, r.connectorAddr, r.connectorToken, "e-1")
+
+	found := false
+	for _, e := range env {
+		if strings.HasPrefix(e, "WORKER_GRPC_ADDR=") {
+			found = true
+			if e != "WORKER_GRPC_ADDR=172.18.0.3:50051" {
+				t.Fatalf("WORKER_GRPC_ADDR = %q, want resolved addr %q", e, "WORKER_GRPC_ADDR=172.18.0.3:50051")
+			}
+		}
+		if strings.Contains(e, "0.0.0.0") {
+			t.Fatalf("container env must not contain 0.0.0.0 (unreachable from containers), got %q", e)
+		}
+	}
+	if !found {
+		t.Fatal("WORKER_GRPC_ADDR missing from container env")
+	}
+}
+
+// Source guard (established style in this file): the bad hardcoded default must
+// never sneak back in.
+func TestDockerRuntimeNoHardcodedZeroAddr(t *testing.T) {
+	data, err := os.ReadFile("docker.go")
+	if err != nil {
+		t.Fatalf("read docker.go: %v", err)
+	}
+	if strings.Contains(string(data), "0.0.0.0:50051") {
+		t.Fatal("docker.go must not hardcode 0.0.0.0:50051 — connector addr must be auto-derived")
+	}
+}
+
+// --- lifecycle logging ---
+
+// captureLogger records Info/Warning lines for asserting runtime logs.
+type captureLogger struct {
+	mu     sync.Mutex
+	levels []string
+	lines  []string
+}
+
+func (c *captureLogger) Info(msg string, args ...any) { c.add("info", msg, args...) }
+func (c *captureLogger) Warning(msg string, args ...any) {
+	c.add("warning", msg, args...)
+}
+
+func (c *captureLogger) add(level, msg string, args ...any) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.levels = append(c.levels, level)
+	c.lines = append(c.lines, fmt.Sprintf(msg, args...))
+}
+
+func (c *captureLogger) all() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cp := make([]string, len(c.lines))
+	copy(cp, c.lines)
+	return cp
+}
+
+func (c *captureLogger) find(substr string) (string, bool) {
+	for _, l := range c.all() {
+		if strings.Contains(l, substr) {
+			return l, true
+		}
+	}
+	return "", false
+}
+
+// fakeDockerEngine is a minimal Docker Engine API server covering the
+// endpoints DockerRuntime.Create/Stop/Cleanup touch. It uses a fixed API
+// version on the client side, so no version negotiation or /_ping is needed.
+type fakeDockerEngine struct {
+	mu             sync.Mutex
+	containerID    string
+	pulled         int
+	created        int
+	started        int
+	stopped        int
+	removed        int
+	removeErr      error
+	running        bool // container state as the engine sees it
+	createBody     string
+	createName     string   // name of the most recent create attempt
+	createNames    []string // every create attempt name, in order
+	createConflict bool     // fail the next create with HTTP 409, then clear
+	health         string   // State.Health.Status, "" = no healthcheck
+	exitCode       int      // State.ExitCode
+	logOutput      string   // payload for the container logs stream
+}
+
+func newFakeDockerEngine() *fakeDockerEngine {
+	return &fakeDockerEngine{
+		containerID: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+	}
+}
+
+func (f *fakeDockerEngine) handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// The docker client bakes the API version into the path (/v1.44/...).
+		const vPrefix = "/v1.44"
+		path := r.URL.Path
+		if strings.HasPrefix(path, vPrefix) {
+			path = strings.TrimPrefix(path, vPrefix)
+		}
+		switch {
+		case r.Method == http.MethodPost && strings.HasPrefix(path, "/images/create"):
+			f.mu.Lock()
+			f.pulled++
+			f.mu.Unlock()
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `{"status":"pull complete"}`)
+		case r.Method == http.MethodPost && path == "/containers/create":
+			body, _ := io.ReadAll(r.Body)
+			f.mu.Lock()
+			f.created++
+			id := f.containerID
+			f.createBody = string(body)
+			f.createName = r.URL.Query().Get("name")
+			f.createNames = append(f.createNames, f.createName)
+			conflict := f.createConflict
+			f.createConflict = false
+			f.mu.Unlock()
+			if conflict {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusConflict)
+				fmt.Fprint(w, `{"message":"Conflict. The container name is already in use"}`)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprintf(w, `{"Id":%q}`, id)
+		case r.Method == http.MethodPost && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/start"):
+			f.mu.Lock()
+			f.started++
+			f.running = true
+			f.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPost && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/stop"):
+			f.mu.Lock()
+			f.stopped++
+			f.running = false
+			f.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/json"):
+			f.mu.Lock()
+			running := f.running
+			id := f.containerID
+			health := f.health
+			exitCode := f.exitCode
+			f.mu.Unlock()
+			healthJSON := ""
+			if health != "" {
+				healthJSON = fmt.Sprintf(`,"Health":{"Status":%q}`, health)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"Id":%q,"State":{"Running":%t,"ExitCode":%d%s}}`, id, running, exitCode, healthJSON)
+		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/logs"):
+			// ContainerLogs with ShowStdout+ShowStderr returns a multiplexed
+			// stream: 8-byte header (stream byte + uint32 BE length) + payload.
+			f.mu.Lock()
+			out := f.logOutput
+			f.mu.Unlock()
+			hdr := make([]byte, 8)
+			hdr[0] = 1 // stdout
+			binary.BigEndian.PutUint32(hdr[4:], uint32(len(out)))
+			w.Header().Set("Content-Type", "application/vnd.docker.raw-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(hdr)
+			_, _ = w.Write([]byte(out))
+			if fl, ok := w.(http.Flusher); ok {
+				fl.Flush()
+			}
+			// Follow:true — hold the stream open until the client goes away.
+			<-r.Context().Done()
+		case r.Method == http.MethodDelete && strings.HasPrefix(path, "/containers/"):
+			f.mu.Lock()
+			f.removed++
+			removeErr := f.removeErr
+			f.mu.Unlock()
+			if removeErr != nil {
+				http.Error(w, removeErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}
+}
+
+// newFakeDockerRuntime spins up the fake engine and returns a runtime bound to
+// it with the given capture logger wired.
+func newFakeDockerRuntime(t *testing.T, engine *fakeDockerEngine, log *captureLogger) *DockerRuntime {
+	t.Helper()
+	ts := httptest.NewServer(engine.handler())
+	t.Cleanup(ts.Close)
+	cli, err := client.NewClientWithOpts(client.WithHost(ts.URL), client.WithVersion("1.44"))
+	if err != nil {
+		t.Fatalf("docker client: %v", err)
+	}
+	r := NewDockerRuntimeWithClient(cli, "172.18.0.3:50051", "tok")
+	r.SetLogger(log)
+	return r
+}
+
+func TestCreateLogsLifecycleSteps(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	h, err := r.Create(context.Background(), JobSpec{
+		Tool:    "nuclei",
+		Image:   "ghcr.io/open-asm/nuclei:1.0",
+		JobID:   "job-1",
+		TraceID: "tr-1",
+	}, RuntimeOpts{})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if h.ID == "" || h.ID != engine.containerID {
+		t.Fatalf("unexpected container ID %q, want %q", h.ID, engine.containerID)
+	}
+
+	lines := log.all()
+	if len(lines) != 3 {
+		t.Fatalf("expected exactly 3 lifecycle log lines, got %d: %v", len(lines), lines)
+	}
+
+	// 1: image pull done.
+	if !strings.Contains(lines[0], "docker: image pull done:") || !strings.Contains(lines[0], "ghcr.io/open-asm/nuclei:1.0") {
+		t.Fatalf("pull line = %q", lines[0])
+	}
+	// 2: container created — carries exec/job/tool/grpc identity.
+	for _, want := range []string{
+		"docker: container created:", "exec=", "job=job-1", "tool=nuclei", "grpc=172.18.0.3:50051",
+	} {
+		if !strings.Contains(lines[1], want) {
+			t.Fatalf("created line %q missing %q", lines[1], want)
+		}
+	}
+	// 3: container started — same exec identity as created.
+	if !strings.Contains(lines[2], "docker: container started:") || !strings.Contains(lines[2], "job=job-1") {
+		t.Fatalf("started line = %q", lines[2])
+	}
+	execOf := func(line string) string {
+		start := strings.Index(line, "exec=")
+		if start < 0 {
+			return ""
+		}
+		rest := line[start+len("exec="):]
+		if i := strings.Index(rest, " "); i >= 0 {
+			rest = rest[:i]
+		}
+		return rest
+	}
+	if execOf(lines[1]) == "" || execOf(lines[1]) != execOf(lines[2]) {
+		t.Fatalf("started line must reuse the created exec identity: %q vs %q", lines[1], lines[2])
+	}
+	execID := execOf(lines[2])
+	if len(execID) != 32 {
+		t.Fatalf("exec identity %q must be a 32-hex execution id", execID)
+	}
+
+	// Engine received exactly one of each call.
+	if engine.pulled != 1 || engine.created != 1 || engine.started != 1 {
+		t.Fatalf("engine calls: pulled=%d created=%d started=%d, want 1 each", engine.pulled, engine.created, engine.started)
+	}
+}
+
+func TestStopLogsStoppingContainer(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	if err := r.Cancel(context.Background(), Handle{ID: engine.containerID}); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+
+	line, ok := log.find("docker: stopping container")
+	if !ok {
+		t.Fatalf("expected 'docker: stopping container' log, got %v", log.all())
+	}
+	if !strings.Contains(line, engine.containerID) {
+		t.Fatalf("stopping line must carry the container ID: %q", line)
+	}
+	if engine.stopped != 1 {
+		t.Fatalf("expected 1 stop call, got %d", engine.stopped)
+	}
+}
+
+func TestCleanupLogsRemoveFailureAsWarning(t *testing.T) {
+	engine := newFakeDockerEngine()
+	engine.removeErr = errors.New("container already gone")
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	// Cleanup must keep its nil-error contract even when remove fails.
+	if err := r.Cleanup(context.Background(), Handle{ID: engine.containerID}); err != nil {
+		t.Fatalf("Cleanup must still return nil on remove error, got %v", err)
+	}
+
+	line, ok := log.find("docker: removed container")
+	if !ok {
+		t.Fatalf("expected 'docker: removed container' log, got %v", log.all())
+	}
+	if !strings.Contains(line, "container already gone") {
+		t.Fatalf("remove-failure warning must include the error: %q", line)
+	}
+	if len(log.levels) != 1 || log.levels[0] != "warning" {
+		t.Fatalf("remove failure must be logged as warning, got %v", log.levels)
+	}
+	if engine.removed != 1 {
+		t.Fatalf("expected 1 remove call, got %d", engine.removed)
+	}
+}
+
+func TestCleanupLogsSuccessfulRemove(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	if err := r.Cleanup(context.Background(), Handle{ID: engine.containerID}); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+
+	line, ok := log.find("docker: removed container")
+	if !ok {
+		t.Fatalf("expected 'docker: removed container' log, got %v", log.all())
+	}
+	if !strings.Contains(line, engine.containerID) {
+		t.Fatalf("removed line must carry the container ID: %q", line)
+	}
+}
+
+// Create must prefer the execID passed in the spec (Manager's exec-N) over a
+// freshly generated hex id, so EXECUTION_ID in the container env matches the
+// ID the proxy queues ExecuteJob under — otherwise the pending job never
+// flushes on connector registration.
+func TestCreateUsesPassedExecID(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	h, err := r.Create(context.Background(), JobSpec{
+		Tool:   "nuclei",
+		Image:  "ghcr.io/open-asm/nuclei:1.0",
+		JobID:  "job-1",
+		ExecID: "exec-7",
+	}, RuntimeOpts{})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	// Log lines must carry the passed-in execID, not a random hex.
+	for _, line := range log.all() {
+		if strings.Contains(line, "exec=") && !strings.Contains(line, "exec=exec-7") {
+			t.Fatalf("lifecycle log must carry exec=exec-7, got %q", line)
+		}
+	}
+
+	// EXECUTION_ID env must be the passed-in ID (env entries serialize as K=V).
+	if !strings.Contains(engine.createBody, `"EXECUTION_ID=exec-7"`) {
+		t.Fatalf("create body must set EXECUTION_ID=exec-7, got %s", engine.createBody)
+	}
+
+	// Handle carries the exec id label for debugging.
+	if h.Labels["exec_id"] != "exec-7" {
+		t.Fatalf("expected Handle label exec_id=exec-7, got %v", h.Labels)
+	}
+}
+
+// DockerRuntime.Start must be idempotent: Create already starts the container,
+// and Manager.Submit calls Start right after Create. A second ContainerStart on
+// a running container (double-start) must be skipped.
+func TestStartIdempotentWhenAlreadyRunning(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	// Create starts the container (engine.running becomes true).
+	h, err := r.Create(context.Background(), JobSpec{
+		Tool:  "nuclei",
+		Image: "ghcr.io/open-asm/nuclei:1.0",
+		JobID: "job-1",
+	}, RuntimeOpts{})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	// The Manager-level second Start must be a no-op.
+	if err := r.Start(context.Background(), h); err != nil {
+		t.Fatalf("Start on a running container must not error: %v", err)
+	}
+	if engine.started != 1 {
+		t.Fatalf("expected exactly 1 start call (from Create), got %d — double-start", engine.started)
+	}
+}
+
+// A container that is NOT running must still be started by Start (inspect
+// first, start when stopped).
+func TestStartStartsStoppedContainer(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	// Container exists but was never started.
+	if err := r.Start(context.Background(), Handle{ID: engine.containerID}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if engine.started != 1 {
+		t.Fatalf("expected 1 start call on a stopped container, got %d", engine.started)
+	}
+}
+
+// Inspect must surface the container's health state and exit code so the
+// worker health monitor can detect unhealthy / crashed containers.
+func TestInspectReadsHealthAndExitCode(t *testing.T) {
+	engine := newFakeDockerEngine()
+	engine.health = "unhealthy"
+	engine.exitCode = 42
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	res, err := r.Inspect(context.Background(), Handle{ID: engine.containerID})
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+	if res.Health != "unhealthy" {
+		t.Fatalf("expected Health=unhealthy, got %q", res.Health)
+	}
+	if res.ExitCode != 42 {
+		t.Fatalf("expected ExitCode=42, got %d", res.ExitCode)
+	}
+
+	// A container without a healthcheck must report empty Health (unknown).
+	engine.health = ""
+	res, err = r.Inspect(context.Background(), Handle{ID: engine.containerID})
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+	if res.Health != "" {
+		t.Fatalf("expected empty Health without healthcheck, got %q", res.Health)
+	}
+}
+
+// Logs must stream the container log (multiplexed stdout+stderr demuxed into
+// lines) until the context is cancelled.
+func TestLogsStreamsContainerLines(t *testing.T) {
+	engine := newFakeDockerEngine()
+	engine.logOutput = "nuclei: scan started\nnuclei: probe 443 open\n"
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch, err := r.Logs(ctx, Handle{ID: engine.containerID})
+	if err != nil {
+		t.Fatalf("Logs: %v", err)
+	}
+
+	got := []string{}
+	deadline := time.After(3 * time.Second)
+	for len(got) < 2 {
+		select {
+		case line, ok := <-ch:
+			if !ok {
+				t.Fatalf("logs channel closed before all lines arrived, got %v", got)
+			}
+			got = append(got, string(line))
+		case <-deadline:
+			t.Fatalf("timeout waiting for log lines, got %v", got)
+		}
+	}
+	if got[0] != "nuclei: scan started" || got[1] != "nuclei: probe 443 open" {
+		t.Fatalf("unexpected log lines: %v", got)
+	}
+
+	// Cancelling the context must close the stream (no goroutine leak).
+	cancel()
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("expected channel closed after ctx cancel")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("logs channel did not close after ctx cancel")
+	}
+}
+
+// Logs must terminate the stream when the context is cancelled even when the
+// container never produces output.
+func TestLogsStopsOnContextCancel(t *testing.T) {
+	engine := newFakeDockerEngine() // no logOutput: stream holds open (follow)
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch, err := r.Logs(ctx, Handle{ID: engine.containerID})
+	if err != nil {
+		t.Fatalf("Logs: %v", err)
+	}
+
+	cancel()
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("expected channel closed after ctx cancel")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("logs channel did not close after ctx cancel")
+	}
+}
+
+// dockerNameRe is Docker's container name charset: alphanumeric start, then
+// [a-zA-Z0-9_.-].
+var dockerNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+
+// Docker Engine 27+ assigns the default bridge an IPv6 ULA (fdc4:...) in
+// addition to the IPv4 gateway. Containers on the bridge have no IPv6 route, so
+// on engines without host-gateway support (API < 1.41) auto-derive must pick
+// the IPv4 gateway even when IPv6 entries sort first in IPAM.Config.
+func TestResolvePrefersIPv4Gateway(t *testing.T) {
+	di := &stubInspector{
+		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		},
+		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+			return types.NetworkResource{
+				IPAM: network.IPAM{Config: []network.IPAMConfig{
+					{Gateway: "fdc4:f303:9324::254"}, // IPv6 ULA — first, unreachable from containers
+					{Gateway: "172.18.0.1"},
+				}},
+			}, nil
+		},
+		serverVersion: func(ctx context.Context) (types.Version, error) {
+			return types.Version{APIVersion: "1.40"}, nil
+		},
+	}
+	got := mustResolveConnectorAddr(t, di, "my-server", "", 50051, "linux")
+	if got != "172.18.0.1:50051" {
+		t.Fatalf("bridge gateway addr = %q, want IPv4 %q (not IPv6 %q)", got, "172.18.0.1:50051", "[fdc4:f303:9324::254]:50051")
+	}
+}
+
+// An IPv6-only bridge gateway must never be auto-selected — the container
+// cannot route to it ("network is unreachable"). The only supported IPv6 dial
+// path is an explicit override, which is used as-is (precedence rule 1).
+// Exercised here on an engine without host-gateway support so the gateway
+// chain is what resolves.
+func TestResolveSkipsIPv6UnlessExplicitOverride(t *testing.T) {
+	di6 := &stubInspector{
+		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		},
+		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+			return types.NetworkResource{
+				IPAM: network.IPAM{Config: []network.IPAMConfig{{Gateway: "fdc4:f303:9324::254"}}},
+			}, nil
+		},
+		serverVersion: func(ctx context.Context) (types.Version, error) {
+			return types.Version{APIVersion: "1.40"}, nil
+		},
+	}
+	got := mustResolveConnectorAddr(t, di6, "my-server", "", 50051, "linux")
+	if got != "172.17.0.1:50051" {
+		t.Fatalf("IPv6-only gateway must not be auto-selected: got %q, want %q", got, "172.17.0.1:50051")
+	}
+
+	// Explicit override (as-is, no port re-writing) still wins.
+	got = mustResolveConnectorAddr(t, di6, "my-server", "[fdc4:f303:9324::254]:50051", 50051, "linux")
+	if got != "[fdc4:f303:9324::254]:50051" {
+		t.Fatalf("explicit IPv6 override must be used as-is, got %q", got)
+	}
+}
+
+// supportsHostGateway: only API >= 1.41 (Docker Engine 20.10+) resolves the
+// special host-gateway value in ExtraHosts. Anything unreadable is treated as
+// unsupported so the caller falls back to the bridge gateway.
+func TestSupportsHostGateway(t *testing.T) {
+	cases := []struct {
+		api  string
+		want bool
+	}{
+		{"1.40", false},   // Engine 19.03 — pre-host-gateway
+		{"1.41", true},    // Engine 20.10 — host-gateway introduced
+		{"1.44", true},    // modern
+		{"2.0", true},     // future API major
+		{"", false},       // unreadable
+		{"1.4", false},    // incomplete minor
+		{"1.41.0", false}, // non-canonical form, treated conservatively
+	}
+	for _, c := range cases {
+		if got := supportsHostGateway(c.api); got != c.want {
+			t.Fatalf("supportsHostGateway(%q) = %t, want %t", c.api, got, c.want)
+		}
+	}
+}
+
+// Host-terminal linux worker on a host-gateway-capable engine (API >= 1.41):
+// resolveConnectorAddr returns the stable host.docker.internal name — the
+// mapping is guaranteed by the host-gateway ExtraHosts entry Create adds, so
+// no bridge inspection is needed.
+func TestResolveConnectorAddrLinuxHostTerminalUsesHostGateway(t *testing.T) {
+	di := &stubInspector{
+		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		},
+		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+			t.Fatal("host.docker.internal wins: NetworkInspect must not be called")
+			return types.NetworkResource{}, nil
+		},
+		serverVersion: func(ctx context.Context) (types.Version, error) {
+			return types.Version{APIVersion: "1.41"}, nil
+		},
+	}
+	got := mustResolveConnectorAddr(t, di, "my-server", "", 50051, "linux")
+	if got != "host.docker.internal:50051" {
+		t.Fatalf("linux host-terminal addr = %q, want %q", got, "host.docker.internal:50051")
+	}
+}
+
+func TestCreateUsesOasmPrefixName(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	if _, err := r.Create(context.Background(), JobSpec{
+		Tool:   "Nuclei Scanner",
+		Image:  "ghcr.io/open-asm/nuclei:1.0",
+		JobID:  "job-1",
+		ExecID: "exec-7",
+	}, RuntimeOpts{}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	name := engine.createName
+	if !strings.HasPrefix(name, "oasm-") {
+		t.Fatalf("container name %q must start with oasm-", name)
+	}
+	if !dockerNameRe.MatchString(name) {
+		t.Fatalf("container name %q violates Docker name charset %s", name, dockerNameRe)
+	}
+	if !strings.Contains(name, "nuclei-scanner") {
+		t.Fatalf("container name %q must contain the sanitized tool name", name)
+	}
+	if !strings.Contains(name, "exec-7") {
+		t.Fatalf("container name %q must contain the short exec id", name)
+	}
+}
+
+// Every connector container must carry the host.docker.internal:host-gateway
+// ExtraHosts entry so the auto-derived dial address resolves on Linux hosts
+// (Engine 20.10+ maps host-gateway to the host). Docker Desktop already maps
+// the name; the extra entry is harmless there, so it is added unconditionally.
+func TestCreateAddsHostGatewayExtraHosts(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	if _, err := r.Create(context.Background(), JobSpec{
+		Tool:  "nuclei",
+		Image: "ghcr.io/open-asm/nuclei:1.0",
+		JobID: "job-1",
+	}, RuntimeOpts{}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if !strings.Contains(engine.createBody, "ExtraHosts") {
+		t.Fatalf("create body must include ExtraHosts, got: %s", engine.createBody)
+	}
+	if !strings.Contains(engine.createBody, "host.docker.internal:host-gateway") {
+		t.Fatalf("create body must map host.docker.internal to host-gateway, got: %s", engine.createBody)
+	}
+}
+
+// A 409 Conflict on create (stale container holding the tool/exec name) must
+// retry once with a fresh random suffix and succeed.
+func TestCreateRetriesOn409NameConflict(t *testing.T) {
+	engine := newFakeDockerEngine()
+	engine.createConflict = true // first create fails with 409
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	h, err := r.Create(context.Background(), JobSpec{
+		Tool:   "nuclei",
+		Image:  "ghcr.io/open-asm/nuclei:1.0",
+		JobID:  "job-1",
+		ExecID: "exec-7",
+	}, RuntimeOpts{})
+	if err != nil {
+		t.Fatalf("Create with name conflict must retry and succeed: %v", err)
+	}
+	if engine.created != 2 {
+		t.Fatalf("expected 2 create calls (1 conflict + 1 retry), got %d", engine.created)
+	}
+	if h.ID != engine.containerID {
+		t.Fatalf("unexpected container ID %q, want %q", h.ID, engine.containerID)
+	}
+	if len(engine.createNames) != 2 {
+		t.Fatalf("expected 2 recorded names, got %v", engine.createNames)
+	}
+	for _, n := range engine.createNames {
+		if !strings.HasPrefix(n, "oasm-") || !dockerNameRe.MatchString(n) {
+			t.Fatalf("bad retry name %q", n)
+		}
+	}
+	if engine.createNames[0] == engine.createNames[1] {
+		t.Fatalf("retry must use a fresh random suffix, both attempts named %q", engine.createNames[0])
+	}
+	if engine.started != 1 {
+		t.Fatalf("expected container to start once after successful create, got %d", engine.started)
+	}
+}
+
+// The explicit connectorAddr must flow from NewDockerRuntime into the dial
+// address containers use. client.go passes cfg.ConnectorAddr (populated from
+// WORKER_CONNECTOR_ADDR by viper); previously only the process env was read.
+// NewDockerRuntime builds a lazy client and resolves the override before any
+// daemon call, so this works without a Docker engine.
+func TestConnectorAddrOverridePlumbing(t *testing.T) {
+	t.Setenv("WORKER_CONNECTOR_ADDR", "") // isolate the explicit-arg path
+	d, err := NewDockerRuntime("", "10.0.0.9:9999", 50051, "tok")
+	if err != nil {
+		t.Fatalf("NewDockerRuntime: %v", err)
+	}
+	if d.connectorAddr != "10.0.0.9:9999" {
+		t.Fatalf("connectorAddr = %q, want explicit arg %q", d.connectorAddr, "10.0.0.9:9999")
+	}
+}
+
+// Precedence: an empty connectorAddr arg falls back to the WORKER_CONNECTOR_ADDR
+// env (standalone runtime users). Config arg > env > auto-derive.
+func TestConnectorAddrEnvFallbackWhenArgEmpty(t *testing.T) {
+	t.Setenv("WORKER_CONNECTOR_ADDR", "192.168.1.50:50051")
+	d, err := NewDockerRuntime("", "", 50051, "tok")
+	if err != nil {
+		t.Fatalf("NewDockerRuntime: %v", err)
+	}
+	if d.connectorAddr != "192.168.1.50:50051" {
+		t.Fatalf("connectorAddr = %q, want env override %q", d.connectorAddr, "192.168.1.50:50051")
 	}
 }

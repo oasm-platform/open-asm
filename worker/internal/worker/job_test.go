@@ -9,16 +9,54 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"oasm-worker/internal/connector"
 	"oasm-worker/internal/execution"
+	connectorpb "oasm-worker/internal/gen/connector"
 	pb "oasm-worker/internal/gen/jobs_registry"
 	workerspb "oasm-worker/internal/gen/workers"
 	"oasm-worker/internal/grpcclient"
 	"oasm-worker/internal/runtime"
 )
+
+// captureStream is an in-memory connector bidi stream used to capture the
+// ExecuteJob the worker sends to a connector after registration.
+type captureStream struct {
+	mu   sync.Mutex
+	sent []*connectorpb.WorkerMessage
+}
+
+var _ connectorpb.ConnectorService_ConnectServer = (*captureStream)(nil)
+
+func (c *captureStream) Send(m *connectorpb.WorkerMessage) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sent = append(c.sent, m)
+	return nil
+}
+
+func (c *captureStream) Recv() (*connectorpb.ConnectorMessage, error) { return nil, nil }
+func (c *captureStream) SetHeader(metadata.MD) error                  { return nil }
+func (c *captureStream) SendHeader(metadata.MD) error                 { return nil }
+func (c *captureStream) SetTrailer(metadata.MD)                       {}
+func (c *captureStream) Context() context.Context                     { return context.Background() }
+func (c *captureStream) SendMsg(any) error                            { return nil }
+func (c *captureStream) RecvMsg(any) error                            { return nil }
+
+func (c *captureStream) executes() []*connectorpb.ExecuteJob {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var jobs []*connectorpb.ExecuteJob
+	for _, m := range c.sent {
+		if ex := m.GetExecute(); ex != nil {
+			jobs = append(jobs, ex)
+		}
+	}
+	return jobs
+}
 
 // --- test logger ---
 
@@ -243,6 +281,80 @@ func TestProcessJobConnectorBranch(t *testing.T) {
 	// The connector path should not touch getBrowser or toolPath.
 }
 
+func TestProcessConnectorJobSendsExecuteJob(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	mgr := execution.NewManager(fakeRT, 0) // unlimited
+	proxy := connector.NewProxy()
+
+	// Connector registers its stream before the job is submitted (execID
+	// "exec-1" is the first FakeRuntime execution). SendExecute must deliver
+	// immediately.
+	stream := &captureStream{}
+	if err := proxy.RegisterConnector("exec-1", stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+
+	inputs, _ := structpb.NewStruct(map[string]any{
+		"target": "https://example.com",
+		"port":   float64(443),
+	})
+
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return &pb.Job{
+			Id:     "job-exec-1",
+			Tool:   "nuclei",
+			Image:  "ghcr.io/open-asm/nuclei:1.0",
+			Inputs: inputs,
+		}, nil
+	}
+
+	events := make(chan TuiEvent, 64)
+	releaseCh := make(chan struct{}, 1)
+	releaseSem := func() { releaseCh <- struct{}{} }
+
+	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, releaseSem)
+	if !hadJob || !usedAsync {
+		t.Fatalf("expected (true, true), got (%v, %v)", hadJob, usedAsync)
+	}
+
+	// The worker must send exactly one ExecuteJob for this execution.
+	executes := stream.executes()
+	if len(executes) != 1 {
+		t.Fatalf("expected 1 ExecuteJob sent to connector, got %d", len(executes))
+	}
+	ex := executes[0]
+	if ex.GetExecutionId() != "exec-1" {
+		t.Fatalf("ExecutionId: got %q, want %q", ex.GetExecutionId(), "exec-1")
+	}
+	if ex.GetJobId() != "job-exec-1" {
+		t.Fatalf("JobId: got %q, want %q", ex.GetJobId(), "job-exec-1")
+	}
+	if ex.GetTool() != "nuclei" {
+		t.Fatalf("Tool: got %q, want %q", ex.GetTool(), "nuclei")
+	}
+	if ex.GetImage() != "ghcr.io/open-asm/nuclei:1.0" {
+		t.Fatalf("Image: got %q, want %q", ex.GetImage(), "ghcr.io/open-asm/nuclei:1.0")
+	}
+	if ex.GetTraceId() != "" {
+		t.Fatalf("TraceId: got %q, want empty (worker does not set it)", ex.GetTraceId())
+	}
+	inputsGot := ex.GetInputs()
+	if len(inputsGot) != 2 {
+		t.Fatalf("Inputs: expected 2 entries, got %v", inputsGot)
+	}
+	if inputsGot["target"] != "https://example.com" {
+		t.Fatalf("Inputs[target]: got %q, want %q", inputsGot["target"], "https://example.com")
+	}
+	if inputsGot["port"] != "443" {
+		t.Fatalf("Inputs[port]: got %q, want %q", inputsGot["port"], "443")
+	}
+}
+
 func TestHandleConnectorResultReportsError(t *testing.T) {
 	// Clean global state from prior tests.
 	bridgeMu.Lock()
@@ -271,7 +383,7 @@ func TestHandleConnectorResultReportsError(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil)
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
 		close(done)
 	}()
 
@@ -391,9 +503,11 @@ func TestProcessJobConnectorSubmitError(t *testing.T) {
 
 	jobsSrv.nextFn = func() (*pb.Job, error) {
 		return &pb.Job{
-			Id:    "job-err-1",
-			Tool:  "nuclei",
-			Image: "ghcr.io/open-asm/nuclei:1.0",
+			Id:   "job-err-1",
+			Tool: "nuclei",
+			// Unique image: this test records a backoff failure on Submit error,
+			// which must not poison later tests using the shared nuclei image.
+			Image: "ghcr.io/open-asm/submit-error:1.0",
 		}, nil
 	}
 
@@ -538,7 +652,7 @@ func TestHandleConnectorResultCleanupOnClose(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil)
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
 		close(done)
 	}()
 
@@ -614,11 +728,13 @@ func TestHandleConnectorResultConnectTimeout(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), 100*time.Millisecond, mgr)
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), 50*time.Millisecond, mgr, nil)
 		close(done)
 	}()
 
 	// Send nothing — the connector never connects; the timeout must fire.
+	// The connect timeout is shrunk so the timer (not the 5s health poll) is
+	// the path under test.
 	select {
 	case <-done:
 	case <-time.After(3 * time.Second):
@@ -691,7 +807,7 @@ func TestHandleConnectorResultEmptyCleanDoneSubmitsEmptyResult(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil)
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
 		close(done)
 	}()
 
@@ -758,7 +874,7 @@ func TestHandleConnectorResultDisconnectWithoutDoneReportsError(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil)
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
 		close(done)
 	}()
 
@@ -791,5 +907,80 @@ func TestHandleConnectorResultDisconnectWithoutDoneReportsError(t *testing.T) {
 	}
 	if results[0].jobID != "job-crash-1" {
 		t.Fatalf("expected jobID 'job-crash-1', got %q", results[0].jobID)
+	}
+}
+
+// eventActivityMessages drains the events channel and returns every TuiLogger
+// source-"Jobs" activity message.
+func eventActivityMessages(events chan TuiEvent) []string {
+	var msgs []string
+	for ev := range events {
+		if ev.Type == EventActivity && ev.Source == "Jobs" {
+			msgs = append(msgs, ev.Message)
+		}
+	}
+	return msgs
+}
+
+func TestHandleConnectorResultLogsLifecycle(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+	activeJobsMu.Lock()
+	activeJobs = make(map[string]struct{})
+	activeJobsMu.Unlock()
+
+	client, _, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+	proxy := connector.NewProxy()
+
+	entry := &bridgeEntry{
+		jobID:    "job-log-1",
+		category: "subdomains",
+		release:  func() {},
+	}
+	execID := "exec-log-f"
+	bridgeMu.Lock()
+	bridge[execID] = entry
+	bridgeMu.Unlock()
+
+	resultCh := make(chan []byte, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	// One result chunk (7 bytes) then a clean Done.
+	proxy.ForwardResult(execID, []byte(`{"a":1}`))
+	proxy.MarkDone(execID)
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	close(events)
+	msgs := eventActivityMessages(events)
+
+	found := map[string]bool{}
+	for _, m := range msgs {
+		switch {
+		case strings.Contains(m, "connector result submitted: exec=exec-log-f bytes=7"):
+			found["result"] = true
+		case strings.Contains(m, "connector job finished: exec=exec-log-f success=true error=- duration="):
+			found["finished"] = true
+		}
+	}
+	if !found["result"] {
+		t.Fatalf("expected 'connector result submitted' log, got %v", msgs)
+	}
+	if !found["finished"] {
+		t.Fatalf("expected 'connector job finished' log, got %v", msgs)
 	}
 }

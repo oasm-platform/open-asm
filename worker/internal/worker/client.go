@@ -299,7 +299,13 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		// Start connector gRPC server for Docker connectors.
 		// Non-fatal: worker can still operate legacy path without connector server.
 		proxy = connector.NewProxy()
+		proxy.SetLogger(log)
 		connectorServer, err := connector.NewServer(
+			// Bind all interfaces ("host:port" with an empty host): connector
+			// containers reach this listener via host.docker.internal / bridge
+			// IPs derived by resolveConnectorAddr. Never bind localhost — it
+			// would place the listener on the worker's loopback, unreachable
+			// from spawned containers. Guarded by TestConnectorServerBindsAllInterfaces.
 			fmt.Sprintf(":%d", cfg.ConnectorPort),
 			proxy,
 			cfg.ConnectorToken,
@@ -307,6 +313,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		if err != nil {
 			log.Error("connector server init failed (non-fatal): %v", err)
 		} else {
+			connectorServer.SetLogger(log)
 			go func() {
 				log.Success("connector server listening on %s", connectorServer.Addr())
 				if err := connectorServer.Serve(workerCtx); err != nil {
@@ -321,14 +328,18 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		// concurrency gate for both legacy and connector paths.
 		var mgrInit *execution.Manager
 		if proxy != nil {
-			// ponytail: ConnectorAddr is the listen address; for Docker containers this should be
-			// host.docker.internal:PORT. Add WORKER_CONNECTOR_EXTERNAL_ADDR when listen != external.
-			dockerRT, err := runtime.NewDockerRuntime("", cfg.ConnectorAddr, cfg.ConnectorToken)
+			// ConnectorAddr is an explicit override for the address containers use to reach
+			// this worker. Precedence: cfg.ConnectorAddr (populated from the
+			// WORKER_CONNECTOR_ADDR env by viper) > process env fallback > auto-derived
+			// (container self IPv4 / host.docker.internal / bridge IPv4 gateway).
+			// Empty = auto-derive; an IPv6 dial requires an explicit bracketed override.
+			dockerRT, err := runtime.NewDockerRuntime("", cfg.ConnectorAddr, cfg.ConnectorPort, cfg.ConnectorToken)
 			if err != nil {
 				log.Error("container engine unavailable — image/connector jobs disabled: %v", err)
 			} else {
 				mgrInit = execution.NewManager(dockerRT, 0)
 				mgrInit.SetLogger(log)
+				dockerRT.SetLogger(log)
 				log.Success("execution manager ready (Docker runtime, unlimited concurrency)")
 			}
 		}

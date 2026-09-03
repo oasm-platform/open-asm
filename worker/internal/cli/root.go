@@ -121,7 +121,13 @@ The worker runs in one of two modes, reported to core-api when it joins:
   node  Headless worker node for Docker / production deployments. Launch with
         '--mode node' and configure via the flags below or WORKER_* environment
         variables (WORKER_API_KEY, WORKER_MAX_CONCURRENCY, WORKER_GRPC_HOST,
-        WORKER_GRPC_PORT, WORKER_TOOL_PATH, WORKER_NETWORK).`,
+        WORKER_GRPC_PORT, WORKER_TOOL_PATH, WORKER_NETWORK,
+        WORKER_CONNECTOR_ADDR). WORKER_CONNECTOR_ADDR overrides the address
+        connector containers dial back on (default port 26276); when unset the
+        worker auto-derives host.docker.internal and adds a host-gateway
+        mapping to each container. Note: the connector gRPC port (26276) must
+        be open to Docker containers in the host firewall (linux: allow from
+        the docker bridge; Windows/macOS: allow the Docker Desktop VM).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			mode, err := cmd.Flags().GetString("mode")
 			if err != nil {

@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,6 +54,13 @@ func dialTestServer(t *testing.T, srv *Server) *grpc.ClientConn {
 // connectAndRegister opens a bidi stream, sends Register, and returns the stream.
 func connectAndRegister(t *testing.T, conn *grpc.ClientConn, token string) (grpc.BidiStreamingClient[pb.ConnectorMessage, pb.WorkerMessage], *pb.RegisterAck) {
 	t.Helper()
+	return connectAndRegisterWithExecID(t, conn, token, "")
+}
+
+// connectAndRegisterWithExecID is connectAndRegister with an optional
+// execution_id advertised in the Register message.
+func connectAndRegisterWithExecID(t *testing.T, conn *grpc.ClientConn, token, execID string) (grpc.BidiStreamingClient[pb.ConnectorMessage, pb.WorkerMessage], *pb.RegisterAck) {
+	t.Helper()
 	client := pb.NewConnectorServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	t.Cleanup(cancel)
@@ -64,7 +72,7 @@ func connectAndRegister(t *testing.T, conn *grpc.ClientConn, token string) (grpc
 
 	if err := stream.Send(&pb.ConnectorMessage{
 		Message: &pb.ConnectorMessage_Register{
-			Register: &pb.Register{Token: token},
+			Register: &pb.Register{Token: token, ExecutionId: execID},
 		},
 	}); err != nil {
 		t.Fatalf("Send Register: %v", err)
@@ -379,4 +387,224 @@ func TestServerProxyInteraction(t *testing.T) {
 	if proxy.Has("exec-99") {
 		t.Fatal("proxy should not retain exec-99 after OnConnectorDown")
 	}
+}
+
+func TestServerRegisterWithExecutionIDMapsStream(t *testing.T) {
+	srv, proxy := startTestServer(t, "secret")
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegisterWithExecID(t, conn, "secret", "exec-map-1")
+	if !ack.GetAccepted() {
+		t.Fatalf("expected accepted=true, got accepted=%v reason=%q", ack.GetAccepted(), ack.GetReason())
+	}
+
+	// The stream must be registered in the proxy so ExecuteJob can be routed.
+	if !proxy.HasStream("exec-map-1") {
+		t.Fatal("expected proxy stream registration for execution_id")
+	}
+
+	// A pending ExecuteJob sent before/without a stream must flush on register.
+	job := &pb.ExecuteJob{ExecutionId: "exec-map-1", JobId: "job-map-1", Tool: "nuclei"}
+	if err := proxy.SendExecute("exec-map-1", job); err != nil {
+		t.Fatalf("SendExecute: %v", err)
+	}
+
+	// The connector side must receive the flushed ExecuteJob on its stream.
+	wm, err := stream.Recv()
+	if err != nil {
+		t.Fatalf("Recv ExecuteJob: %v", err)
+	}
+	ex := wm.GetExecute()
+	if ex == nil {
+		t.Fatal("expected ExecuteJob message on stream")
+	}
+	if ex.GetExecutionId() != "exec-map-1" || ex.GetJobId() != "job-map-1" || ex.GetTool() != "nuclei" {
+		t.Fatalf("unexpected ExecuteJob payload: %+v", ex)
+	}
+
+	// Clean Done → stream closes → stream mapping removed.
+	if err := stream.Send(&pb.ConnectorMessage{
+		Message: &pb.ConnectorMessage_Done{
+			Done: &pb.Done{ExecutionId: "exec-map-1"},
+		},
+	}); err != nil {
+		t.Fatalf("Send Done: %v", err)
+	}
+	_, err = stream.Recv()
+	if err != io.EOF {
+		t.Fatalf("expected EOF after Done, got %v", err)
+	}
+	if proxy.HasStream("exec-map-1") {
+		t.Fatal("expected stream unregistered after Done")
+	}
+}
+
+func TestServerRegisterWithoutExecIDNoStreamMapping(t *testing.T) {
+	// Legacy connectors send Register{token} only — they must NOT be mapped
+	// (they keep the old behavior: no ExecuteJob delivery).
+	srv, proxy := startTestServer(t, "secret")
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegister(t, conn, "secret")
+	if !ack.GetAccepted() {
+		t.Fatalf("expected accepted=true, got %v", ack.GetAccepted())
+	}
+	if proxy.HasStream("") {
+		t.Fatal("empty execution_id must not be mapped as a stream")
+	}
+
+	if err := stream.Send(&pb.ConnectorMessage{
+		Message: &pb.ConnectorMessage_Done{
+			Done: &pb.Done{ExecutionId: "noop"},
+		},
+	}); err != nil {
+		t.Fatalf("Send Done: %v", err)
+	}
+}
+
+func TestServerDisconnectUnregistersStream(t *testing.T) {
+	srv, proxy := startTestServer(t, "secret")
+	conn := dialTestServer(t, srv)
+
+	client := pb.NewConnectorServiceClient(conn)
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := client.Connect(ctx)
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	if err := stream.Send(&pb.ConnectorMessage{
+		Message: &pb.ConnectorMessage_Register{
+			Register: &pb.Register{Token: "secret", ExecutionId: "exec-dis-1"},
+		},
+	}); err != nil {
+		t.Fatalf("Send Register: %v", err)
+	}
+	if _, err := stream.Recv(); err != nil {
+		t.Fatalf("Recv RegisterAck: %v", err)
+	}
+	if !proxy.HasStream("exec-dis-1") {
+		t.Fatal("expected stream registered before disconnect")
+	}
+
+	// Kill the connection — server must unregister the stream on stream end.
+	cancel()
+	deadline := time.Now().Add(2 * time.Second)
+	for proxy.HasStream("exec-dis-1") {
+		if time.Now().After(deadline) {
+			t.Fatal("stream not unregistered after disconnect")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// waitForLog polls until a captureLogger line contains substr (server logs are
+// written on the gRPC handler goroutine — after the client sees the ack).
+func waitForLog(t *testing.T, log *captureLogger, substr string) string {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if line, ok := log.find(substr); ok {
+			return line
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("log line %q not observed; got %v", substr, log.all())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestServerLogsRegisterAckAndDone(t *testing.T) {
+	srv, proxy := startTestServer(t, "secret")
+	log := &captureLogger{}
+	srv.SetLogger(log)
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegisterWithExecID(t, conn, "secret", "exec-log-1")
+	if !ack.GetAccepted() {
+		t.Fatalf("expected accepted=true, got %v", ack.GetAccepted())
+	}
+
+	// Register received + accepted ack lines (execution identity present).
+	regLine := waitForLog(t, log, "connector register: exec=exec-log-1")
+	if !strings.Contains(regLine, "job=") || !strings.Contains(regLine, "tool=") {
+		t.Fatalf("register line must carry job/tool identity: %q", regLine)
+	}
+	ackLine := waitForLog(t, log, "connector registered: exec=exec-log-1 ack=true")
+	if !strings.Contains(ackLine, "reason=") {
+		t.Fatalf("ack line must carry reason: %q", ackLine)
+	}
+
+	// Clean Done → "done" + unregister log lines.
+	if err := stream.Send(&pb.ConnectorMessage{
+		Message: &pb.ConnectorMessage_Done{
+			Done: &pb.Done{ExecutionId: "exec-log-1"},
+		},
+	}); err != nil {
+		t.Fatalf("Send Done: %v", err)
+	}
+	if _, err := stream.Recv(); err != io.EOF {
+		t.Fatalf("expected EOF after Done, got %v", err)
+	}
+	doneLine := waitForLog(t, log, "connector done: exec=exec-log-1")
+	if !strings.Contains(doneLine, "error=-") {
+		t.Fatalf("clean done line must show dash error: %q", doneLine)
+	}
+	if proxy.HasStream("exec-log-1") {
+		t.Fatal("stream must be unregistered after Done")
+	}
+}
+
+func TestServerLogsRejectedRegisterAsWarning(t *testing.T) {
+	srv, _ := startTestServer(t, "secret")
+	log := &captureLogger{}
+	srv.SetLogger(log)
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegister(t, conn, "wrong")
+	if ack.GetAccepted() {
+		t.Fatal("expected accepted=false for wrong token")
+	}
+
+	// Legacy register (no execution_id) → "(legacy)" label.
+	waitForLog(t, log, "connector register: exec=(legacy)")
+	ackLine := waitForLog(t, log, "connector registered: exec=(legacy) ack=false")
+	if !strings.Contains(ackLine, "reason=invalid token") {
+		t.Fatalf("reject ack line must carry reason: %q", ackLine)
+	}
+	if len(log.levels) < 2 || log.levels[len(log.levels)-1] != "warning" {
+		t.Fatalf("rejected register must be logged as warning, got %v", log.levels)
+	}
+
+	// Stream closes after the reject ack.
+	if _, err := stream.Recv(); err != io.EOF {
+		t.Fatalf("expected EOF after rejected ack, got %v", err)
+	}
+}
+
+func TestServerLogsStreamClosedOnDisconnect(t *testing.T) {
+	srv, _ := startTestServer(t, "")
+	log := &captureLogger{}
+	srv.SetLogger(log)
+	conn := dialTestServer(t, srv)
+
+	client := pb.NewConnectorServiceClient(conn)
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := client.Connect(ctx)
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	if err := stream.Send(&pb.ConnectorMessage{
+		Message: &pb.ConnectorMessage_Register{
+			Register: &pb.Register{Token: "", ExecutionId: "exec-closed-1"},
+		},
+	}); err != nil {
+		t.Fatalf("Send Register: %v", err)
+	}
+	if _, err := stream.Recv(); err != nil {
+		t.Fatalf("Recv RegisterAck: %v", err)
+	}
+
+	// Kill the connection → server must log the closed stream (warning).
+	cancel()
+	waitForLog(t, log, "connector stream closed: exec=exec-closed-1")
 }

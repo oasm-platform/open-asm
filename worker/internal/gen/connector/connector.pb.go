@@ -22,8 +22,13 @@ const (
 )
 
 type Register struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Token string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	// Execution context advertised by the connector on connect. Old connectors
+	// omit these (empty) — they keep the legacy no-ExecuteJob behavior.
+	ExecutionId   string `protobuf:"bytes,2,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	JobId         string `protobuf:"bytes,3,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Tool          string `protobuf:"bytes,4,opt,name=tool,proto3" json:"tool,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -61,6 +66,27 @@ func (*Register) Descriptor() ([]byte, []int) {
 func (x *Register) GetToken() string {
 	if x != nil {
 		return x.Token
+	}
+	return ""
+}
+
+func (x *Register) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *Register) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *Register) GetTool() string {
+	if x != nil {
+		return x.Tool
 	}
 	return ""
 }
@@ -559,9 +585,12 @@ var File_connector_proto protoreflect.FileDescriptor
 
 const file_connector_proto_rawDesc = "" +
 	"\n" +
-	"\x0fconnector.proto\x12\tconnector\" \n" +
+	"\x0fconnector.proto\x12\tconnector\"n\n" +
 	"\bRegister\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"A\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12!\n" +
+	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12\x15\n" +
+	"\x06job_id\x18\x03 \x01(\tR\x05jobId\x12\x12\n" +
+	"\x04tool\x18\x04 \x01(\tR\x04tool\"A\n" +
 	"\vRegisterAck\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x81\x02\n" +

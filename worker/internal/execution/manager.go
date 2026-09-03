@@ -76,6 +76,9 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		TraceID: spec.TraceID,
 		Config:  spec.Config,
 		JobID:   spec.JobID,
+		// Single source of truth: the connector registers under this ID
+		// (EXECUTION_ID env), matching the proxy's pending/stream key.
+		ExecID: id,
 	}, runtime.RuntimeOpts{TraceID: spec.TraceID})
 	if err != nil {
 		return "", err
@@ -169,6 +172,30 @@ func (m *Manager) ActiveCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.execs)
+}
+
+// Inspect returns the runtime inspect result for an execution by ID
+// (health monitor). Errors when the execution is unknown or the runtime
+// inspect fails.
+func (m *Manager) Inspect(ctx context.Context, id string) (runtime.InspectResult, error) {
+	m.mu.Lock()
+	e, ok := m.execs[id]
+	m.mu.Unlock()
+	if !ok {
+		return runtime.InspectResult{}, fmt.Errorf("execution %s not found", id)
+	}
+	return m.rt.Inspect(ctx, e.Handle)
+}
+
+// Logs opens the runtime log stream for an execution by ID (log tailer).
+func (m *Manager) Logs(ctx context.Context, id string) (<-chan []byte, error) {
+	m.mu.Lock()
+	e, ok := m.execs[id]
+	m.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("execution %s not found", id)
+	}
+	return m.rt.Logs(ctx, e.Handle)
 }
 
 func timeoutSeconds(limits map[string]any) int {

@@ -1,6 +1,52 @@
 package connector
 
-import "testing"
+import (
+	"context"
+	"fmt"
+	"strings"
+	"sync"
+	"testing"
+
+	"google.golang.org/grpc/metadata"
+
+	pb "oasm-worker/internal/gen/connector"
+)
+
+// captureLogger records Info/Warning lines for asserting connector logs.
+type captureLogger struct {
+	mu     sync.Mutex
+	levels []string
+	lines  []string
+}
+
+func (c *captureLogger) Info(msg string, args ...any) { c.add("info", msg, args...) }
+func (c *captureLogger) Warning(msg string, args ...any) {
+	c.add("warning", msg, args...)
+}
+
+func (c *captureLogger) add(level, msg string, args ...any) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.levels = append(c.levels, level)
+	c.lines = append(c.lines, fmt.Sprintf(msg, args...))
+}
+
+func (c *captureLogger) all() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cp := make([]string, len(c.lines))
+	copy(cp, c.lines)
+	return cp
+}
+
+func (c *captureLogger) find(substr string) (string, bool) {
+	for _, l := range c.all() {
+		if strings.Contains(l, substr) {
+			return l, true
+		}
+	}
+	return "", false
+}
 
 func TestProxyForwardsResult(t *testing.T) {
 	p := NewProxy()
@@ -38,5 +84,307 @@ func TestSetErrorAndPopError(t *testing.T) {
 	// Second Pop returns false (consumed).
 	if _, ok := p.PopError("exec-1"); ok {
 		t.Fatal("PopError should return false after first Pop")
+	}
+}
+
+// fakeConnectStream is an in-memory pb.ConnectorService_ConnectServer that
+// captures every WorkerMessage the proxy sends down the stream.
+type fakeConnectStream struct {
+	mu   sync.Mutex
+	sent []*pb.WorkerMessage
+}
+
+var _ pb.ConnectorService_ConnectServer = (*fakeConnectStream)(nil)
+
+func (f *fakeConnectStream) Send(m *pb.WorkerMessage) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, m)
+	return nil
+}
+
+func (f *fakeConnectStream) Recv() (*pb.ConnectorMessage, error) {
+	return nil, nil
+}
+
+func (f *fakeConnectStream) SetHeader(metadata.MD) error  { return nil }
+func (f *fakeConnectStream) SendHeader(metadata.MD) error { return nil }
+func (f *fakeConnectStream) SetTrailer(metadata.MD)       {}
+func (f *fakeConnectStream) Context() context.Context     { return context.Background() }
+func (f *fakeConnectStream) SendMsg(any) error            { return nil }
+func (f *fakeConnectStream) RecvMsg(any) error            { return nil }
+
+// sentExecutes returns the ExecuteJob messages sent on the stream.
+func (f *fakeConnectStream) sentExecutes() []*pb.ExecuteJob {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var jobs []*pb.ExecuteJob
+	for _, m := range f.sent {
+		if ex := m.GetExecute(); ex != nil {
+			jobs = append(jobs, ex)
+		}
+	}
+	return jobs
+}
+
+func (f *fakeConnectStream) sentCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.sent)
+}
+
+func sampleExecuteJob() *pb.ExecuteJob {
+	return &pb.ExecuteJob{
+		ExecutionId: "exec-1",
+		JobId:       "job-1",
+		Tool:        "nuclei",
+		Image:       "ghcr.io/open-asm/nuclei:1.0",
+		TraceId:     "trace-1",
+		Inputs:      map[string]string{"target": "https://example.com"},
+	}
+}
+
+func TestSendExecuteBeforeRegisterQueuesPending(t *testing.T) {
+	p := NewProxy()
+	job := sampleExecuteJob()
+
+	// No stream yet (container still booting) — must not error and must hold pending.
+	if err := p.SendExecute("exec-1", job); err != nil {
+		t.Fatalf("SendExecute before register: %v", err)
+	}
+	if p.HasStream("exec-1") {
+		t.Fatal("no stream should be registered yet")
+	}
+
+	// Connector connects later — pending job must be flushed.
+	stream := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-1", stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+	jobs := stream.sentExecutes()
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 flushed ExecuteJob, got %d", len(jobs))
+	}
+	assertExecuteJob(t, jobs[0], job)
+}
+
+func TestRegisterConnectorFlushesPendingExactlyOnce(t *testing.T) {
+	p := NewProxy()
+	job := sampleExecuteJob()
+	if err := p.SendExecute("exec-1", job); err != nil {
+		t.Fatalf("SendExecute: %v", err)
+	}
+
+	streamA := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-1", streamA); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+	if len(streamA.sentExecutes()) != 1 {
+		t.Fatalf("expected streamA to receive the pending ExecuteJob")
+	}
+
+	// A second registration (reconnect) must not resend — pending was consumed.
+	streamB := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-1", streamB); err != nil {
+		t.Fatalf("second RegisterConnector: %v", err)
+	}
+	if streamB.sentCount() != 0 {
+		t.Fatalf("expected streamB to receive nothing, got %d messages", streamB.sentCount())
+	}
+}
+
+func TestSendExecuteAfterRegisterSendsImmediately(t *testing.T) {
+	p := NewProxy()
+	stream := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-1", stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+
+	job := sampleExecuteJob()
+	if err := p.SendExecute("exec-1", job); err != nil {
+		t.Fatalf("SendExecute: %v", err)
+	}
+	jobs := stream.sentExecutes()
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 immediate ExecuteJob, got %d", len(jobs))
+	}
+	assertExecuteJob(t, jobs[0], job)
+}
+
+func TestUnregisterConnectorRemovesStream(t *testing.T) {
+	p := NewProxy()
+	stream := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-1", stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+	if !p.HasStream("exec-1") {
+		t.Fatal("expected HasStream=true after register")
+	}
+
+	p.UnregisterConnector("exec-1")
+	if p.HasStream("exec-1") {
+		t.Fatal("expected HasStream=false after unregister")
+	}
+
+	// After unregister, SendExecute must queue pending again (no stale stream).
+	if err := p.SendExecute("exec-1", sampleExecuteJob()); err != nil {
+		t.Fatalf("SendExecute after unregister: %v", err)
+	}
+	if stream.sentCount() != 0 {
+		t.Fatalf("expected no send on unregistered stream, got %d", stream.sentCount())
+	}
+}
+
+func TestConnectorStreamRoutingIgnoresEmptyExecID(t *testing.T) {
+	p := NewProxy()
+	stream := &fakeConnectStream{}
+
+	// Register with empty execID: legacy connectors send Register{token} only.
+	if err := p.RegisterConnector("", stream); err != nil {
+		t.Fatalf("RegisterConnector(\"\"): %v", err)
+	}
+	if p.HasStream("") {
+		t.Fatal("empty execID must not be tracked as a stream")
+	}
+
+	if err := p.SendExecute("", sampleExecuteJob()); err != nil {
+		t.Fatalf("SendExecute(\"\"): %v", err)
+	}
+	stream2 := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-2", stream2); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+	if stream2.sentCount() != 0 {
+		t.Fatal("empty-execID SendExecute must not be queued under another execID")
+	}
+}
+
+func assertExecuteJob(t *testing.T, got, want *pb.ExecuteJob) {
+	t.Helper()
+	if got.GetExecutionId() != want.GetExecutionId() {
+		t.Errorf("ExecutionId: got %q, want %q", got.GetExecutionId(), want.GetExecutionId())
+	}
+	if got.GetJobId() != want.GetJobId() {
+		t.Errorf("JobId: got %q, want %q", got.GetJobId(), want.GetJobId())
+	}
+	if got.GetTool() != want.GetTool() {
+		t.Errorf("Tool: got %q, want %q", got.GetTool(), want.GetTool())
+	}
+	if got.GetImage() != want.GetImage() {
+		t.Errorf("Image: got %q, want %q", got.GetImage(), want.GetImage())
+	}
+	if got.GetTraceId() != want.GetTraceId() {
+		t.Errorf("TraceId: got %q, want %q", got.GetTraceId(), want.GetTraceId())
+	}
+	if len(got.GetInputs()) != len(want.GetInputs()) {
+		t.Fatalf("Inputs: got %v, want %v", got.GetInputs(), want.GetInputs())
+	}
+	for k, v := range want.GetInputs() {
+		if got.GetInputs()[k] != v {
+			t.Errorf("Inputs[%q]: got %q, want %q", k, got.GetInputs()[k], v)
+		}
+	}
+}
+
+func TestProxyLogsExecuteQueuedThenFlushed(t *testing.T) {
+	p := NewProxy()
+	log := &captureLogger{}
+	p.SetLogger(log)
+	job := sampleExecuteJob()
+
+	// No stream yet — SendExecute must queue and log "queued".
+	if err := p.SendExecute("exec-1", job); err != nil {
+		t.Fatalf("SendExecute: %v", err)
+	}
+	line, ok := log.find("connector execute queued: exec=exec-1")
+	if !ok {
+		t.Fatalf("expected 'queued' log line, got %v", log.all())
+	}
+
+	// Connector connects — pending flush must log "flushed".
+	stream := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-1", stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+	line, ok = log.find("connector execute flushed: exec=exec-1")
+	if !ok {
+		t.Fatalf("expected 'flushed' log line, got %v", log.all())
+	}
+	if !strings.Contains(line, "job=job-1") {
+		t.Fatalf("flushed line must carry job id: %q", line)
+	}
+}
+
+func TestProxyLogsExecuteSentImmediately(t *testing.T) {
+	p := NewProxy()
+	log := &captureLogger{}
+	p.SetLogger(log)
+
+	stream := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-1", stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+	if err := p.SendExecute("exec-1", sampleExecuteJob()); err != nil {
+		t.Fatalf("SendExecute: %v", err)
+	}
+
+	line, ok := log.find("connector execute sent: exec=exec-1")
+	if !ok {
+		t.Fatalf("expected 'sent' log line, got %v", log.all())
+	}
+	for _, want := range []string{"job=job-1", "tool=nuclei"} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("sent line %q missing %q", line, want)
+		}
+	}
+	if _, queued := log.find("queued"); queued {
+		t.Fatal("immediate send must not log 'queued'")
+	}
+}
+
+// A pending ExecuteJob (queued before the connector connected) must be dropped
+// when the connector goes down: the job can never be delivered, and a later
+// registration must not resurrect it. Otherwise pendings accumulate forever.
+func TestOnConnectorDownClearsPending(t *testing.T) {
+	p := NewProxy()
+	job := sampleExecuteJob()
+
+	// No stream yet — SendExecute holds the job as pending.
+	if err := p.SendExecute("exec-1", job); err != nil {
+		t.Fatalf("SendExecute: %v", err)
+	}
+
+	// Connector dies before ever registering.
+	p.OnConnectorDown("exec-1")
+
+	// A late registration must NOT flush the dropped pending job.
+	stream := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-1", stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+	if n := stream.sentCount(); n != 0 {
+		t.Fatalf("expected 0 flushed ExecuteJobs after connector down, got %d", n)
+	}
+}
+
+// Live-stream flush must survive OnConnectorDown: a stream that is registered
+// (no pending) must keep delivering jobs after an unrelated down event.
+func TestOnConnectorDownKeepsLiveStream(t *testing.T) {
+	p := NewProxy()
+	stream := &fakeConnectStream{}
+	if err := p.RegisterConnector("exec-2", stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+
+	// Down event for a different execution must not touch exec-2's stream.
+	p.OnConnectorDown("exec-1")
+	if !p.HasStream("exec-2") {
+		t.Fatal("live stream must survive unrelated connector-down")
+	}
+	if err := p.SendExecute("exec-2", sampleExecuteJob()); err != nil {
+		t.Fatalf("SendExecute: %v", err)
+	}
+	if n := len(stream.sentExecutes()); n != 1 {
+		t.Fatalf("expected 1 ExecuteJob on live stream, got %d", n)
 	}
 }

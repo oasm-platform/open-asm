@@ -12,6 +12,12 @@ type JobSpec struct {
 	TraceID string
 	Config  map[string]any // connector config profile passed through from proto
 	JobID   string         // proto Job ID, distinct from Tool name
+	// ExecID is the worker-side execution identity (Manager's exec-N). It is
+	// injected as the container's EXECUTION_ID env so the connector registers
+	// under the same ID the proxy queues ExecuteJob under. Empty (direct
+	// runtime users) keeps the legacy behavior: DockerRuntime generates a
+	// random hex ID.
+	ExecID string
 }
 
 type RuntimeOpts struct {
@@ -30,6 +36,11 @@ type InspectResult struct {
 	Running  bool
 	ExitCode int
 	Error    string
+	// Health is the container's healthcheck status: "", "starting",
+	// "healthy" or "unhealthy". Empty = no healthcheck configured (unknown);
+	// the worker health monitor keys startup failures off "unhealthy" and
+	// non-zero exit codes instead.
+	Health string
 }
 
 type ExecutionRuntime interface {

@@ -6,6 +6,11 @@ option go_package = "./connector";
 
 message Register {
   string token = 1;
+  // Execution context advertised by the connector on connect. Old connectors
+  // omit these (empty) — they keep the legacy no-ExecuteJob behavior.
+  string execution_id = 2;
+  string job_id = 3;
+  string tool = 4;
 }
 
 message RegisterAck {

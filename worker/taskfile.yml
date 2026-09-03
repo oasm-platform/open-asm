@@ -1,9 +1,9 @@
-version: "3"
+version: '3'
 
 vars:
-  replicas: "{{.replicas | default 1}}"
-  apiKey: "{{.apiKey | default .API_KEY}}"
-  maxJobs: "{{.maxJobs | default .MAX_JOBS}}"
+  replicas: '{{.replicas | default 1}}'
+  apiKey: '{{.apiKey | default .API_KEY}}'
+  maxJobs: '{{.maxJobs | default .MAX_JOBS}}'
   network: '{{.network | default ""}}'
 
 tasks:
@@ -14,7 +14,7 @@ tasks:
     cmds:
       - |
         if [ "{{.replicas}}" = "1" ]; then
-          exec go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}{{if .network}} --network {{.network}}{{end}}
+          exec go run ./cmd/cli --api-key {{.apiKey}} --mode node --max-concurrency {{.maxJobs}}{{if .network}} --network {{.network}}{{end}}
         else
           trap 'wait; exit 0' INT TERM
           for i in $(seq 1 {{.replicas}}); do
