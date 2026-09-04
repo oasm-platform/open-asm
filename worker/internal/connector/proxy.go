@@ -16,7 +16,20 @@ type Proxy struct {
 	// pendings holds ExecuteJobs queued before the connector's stream arrived
 	// (container boot race). Flushed on RegisterConnector.
 	pendings map[string]*pb.ExecuteJob
+	// regChans are registration signals: an open channel closes when the
+	// connector for execID registers, or an already-closed channel is stored
+	// for registrations that happened before WaitRegistered. The drain uses it
+	// to disable the connect timeout once the connector is connected.
+	regChans map[string]*regSignal
 	logger   Logger
+}
+
+// regSignal is one execID's registration signal. closed records whether the
+// channel was signaled so a reconnect (second RegisterConnector on the same
+// execID) never double-closes. All access is under the proxy mutex.
+type regSignal struct {
+	ch     chan struct{}
+	closed bool
 }
 
 // Logger receives connector protocol lifecycle log lines (execute sent/queued/
@@ -51,6 +64,7 @@ func NewProxy() *Proxy {
 		done:     map[string]bool{},
 		streams:  map[string]pb.ConnectorService_ConnectServer{},
 		pendings: map[string]*pb.ExecuteJob{},
+		regChans: map[string]*regSignal{},
 	}
 }
 
@@ -67,6 +81,21 @@ func (p *Proxy) RegisterConnector(execID string, stream pb.ConnectorService_Conn
 		delete(p.pendings, execID)
 	}
 	p.streams[execID] = stream
+	// Registration signal: close the open waiter channel, or store an
+	// already-closed one so a late WaitRegistered returns immediately. Never
+	// delete here — the drain may wait for registration after it happened.
+	// A reconnect (second RegisterConnector for the same execID) must not
+	// double-close, hence the closed flag.
+	if sig, ok := p.regChans[execID]; ok {
+		if !sig.closed {
+			close(sig.ch)
+			sig.closed = true
+		}
+	} else {
+		ch := make(chan struct{})
+		close(ch)
+		p.regChans[execID] = &regSignal{ch: ch, closed: true}
+	}
 	p.mu.Unlock()
 
 	if hasPending {
@@ -77,6 +106,21 @@ func (p *Proxy) RegisterConnector(execID string, stream pb.ConnectorService_Conn
 		p.logInfo("connector execute flushed: exec=%s job=%s", execID, pending.GetJobId())
 	}
 	return nil
+}
+
+// WaitRegistered returns a channel that closes once the connector for execID
+// registers its stream. If the connector already registered, the returned
+// channel is already closed. One registration signal per execID: repeated
+// calls return the same channel.
+func (p *Proxy) WaitRegistered(execID string) <-chan struct{} {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if sig, ok := p.regChans[execID]; ok {
+		return sig.ch
+	}
+	sig := &regSignal{ch: make(chan struct{})}
+	p.regChans[execID] = sig
+	return sig.ch
 }
 
 // UnregisterConnector removes the stream for execID. It does not touch the
@@ -136,10 +180,15 @@ func (p *Proxy) ForwardResult(execID string, data []byte) {
 	if !ok {
 		return
 	}
-	select {
-	case ch <- data:
-	default:
-	}
+	// Blocking send: the drain loop is the sole consumer and always drains
+	// until close, so a full buffer must never drop a result (the old
+	// select-default silently lost every finding beyond the 16-slot buffer).
+	// OnConnectorDown may close the channel while a send is blocked (health-
+	// fail path); sending into a closed channel panics, so the send is
+	// recover-guarded — a result dropped because the connector just died is
+	// acceptable, a worker crash is not.
+	defer func() { _ = recover() }()
+	ch <- data
 }
 
 func (p *Proxy) Unregister(execID string) {
@@ -219,6 +268,10 @@ func (p *Proxy) OnConnectorDown(execID string) {
 	if ok {
 		delete(p.chans, execID)
 	}
+	// Drop the registration signal WITHOUT closing it: the drain may already
+	// have consumed the close, and a double close would panic. After a
+	// down/timeout the drain no longer waits on registration.
+	delete(p.regChans, execID)
 	p.mu.Unlock()
 	if hadPending {
 		p.logWarning("connector execute pending dropped: exec=%s (connector down)", execID)

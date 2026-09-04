@@ -47,6 +47,42 @@ import {
 } from './dto/jobs-registry.dto';
 import { JobsRegistryService } from './jobs-registry.service';
 
+/**
+ * Packs a single JSON-ish value into a `google.protobuf.Value` wire object.
+ * protobufjs only reads the `fields` key of a Struct (and the oneof key of a
+ * Value), so plain records/values are silently dropped during gRPC encoding.
+ */
+function packStructValue(value: unknown): Record<string, unknown> {
+  if (value === null) return { nullValue: 0 };
+  switch (typeof value) {
+    case 'string':
+      return { stringValue: value };
+    case 'number':
+      return { numberValue: value };
+    case 'boolean':
+      return { boolValue: value };
+    case 'object':
+      if (Array.isArray(value)) {
+        return { listValue: { values: value.map(packStructValue) } };
+      }
+      return {
+        structValue: { fields: packStructFields(value as Record<string, unknown>) },
+      };
+    default:
+      // undefined / function / symbol — not JSON-representable; omit at field level
+      return { nullValue: 0 };
+  }
+}
+
+/** Packs a plain record into a `google.protobuf.Struct` `fields` map. */
+function packStructFields(record: Record<string, unknown>): Record<string, Record<string, unknown>> {
+  const fields: Record<string, Record<string, unknown>> = {};
+  for (const [key, val] of Object.entries(record)) {
+    if (val !== undefined) fields[key] = packStructValue(val);
+  }
+  return fields;
+}
+
 @Controller('jobs-registry')
 export class JobsRegistryController {
   private readonly logger = new Logger(JobsRegistryController.name);
@@ -348,11 +384,13 @@ export class JobsRegistryController {
         category: job.category,
         tool: connectorEntry.name,
         image: connectorEntry.image,
-        inputs: { target: job.asset.value },
+        inputs: {
+          fields: { target: { stringValue: job.asset.value } },
+        },
       };
 
       if (config && Object.keys(config).length > 0) {
-        response.config = config;
+        response.config = { fields: packStructFields(config) };
       }
 
       return response;

@@ -117,12 +117,63 @@ describe('JobsRegistryController', () => {
 
       expect(result).toHaveProperty('tool', 'my-connector');
       expect(result).toHaveProperty('image', 'my-connector:latest');
-      expect(result).toHaveProperty('inputs', { target: 'example.com' });
-      expect(result).toHaveProperty('config', { apiKey: 'decrypted-key' });
+      // protobufjs Struct shape: plain keys are dropped by Struct.fromObject,
+      // so inputs/config must be { fields: { key: { <kind>Value: value } } }
+      expect(result).toHaveProperty('inputs', {
+        fields: { target: { stringValue: 'example.com' } },
+      });
+      expect(result).toHaveProperty('config', {
+        fields: { apiKey: { stringValue: 'decrypted-key' } },
+      });
       expect(result).toHaveProperty('id', 'job-1');
       expect(result).toHaveProperty('category', 'VULNERABILITIES');
       // Must NOT include command in connector response
       expect(result).not.toHaveProperty('command');
+    });
+
+    it('should pack mixed-type config values into Struct fields by kind', async () => {
+      const mockJob = {
+        id: 'job-1b',
+        category: 'VULNERABILITIES',
+        asset: { id: 'a1', value: 'example.com' },
+        tool: { id: 'tool-1', name: 'my-connector' },
+        workspaceId: 'ws-1',
+        configProfileId: 'profile-1',
+      };
+      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'my-connector',
+        image: 'my-connector:latest',
+      });
+      mockToolConfigProfilesService.resolveConfigForDispatch.mockResolvedValue({
+        apiKey: 'decrypted-key',
+        timeout: 30,
+        verbose: true,
+        rateLimit: null,
+        tags: ['web', 'cve'],
+        proxy: { host: 'proxy:8080' },
+      });
+
+      const result = await controller.next({ id: 'worker-1' });
+
+      expect(result.config).toEqual({
+        fields: {
+          apiKey: { stringValue: 'decrypted-key' },
+          timeout: { numberValue: 30 },
+          verbose: { boolValue: true },
+          rateLimit: { nullValue: 0 },
+          tags: {
+            listValue: {
+              values: [{ stringValue: 'web' }, { stringValue: 'cve' }],
+            },
+          },
+          proxy: {
+            structValue: {
+              fields: { host: { stringValue: 'proxy:8080' } },
+            },
+          },
+        },
+      });
     });
 
     it('should use explicit configProfileId over default', async () => {

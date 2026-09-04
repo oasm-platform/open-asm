@@ -57,7 +57,13 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("connector_addr", "") // empty = worker auto-derives the container-reachable address
 	viper.SetDefault("connector_token", "")
 	viper.SetDefault("mode", "")
-	viper.SetDefault("pool_enabled", true)
+	// Connector protocol is one stream, one execution: connectors exit after
+	// the first Done and the server closes the stream after the first Done.
+	// Pooled reuse would misroute/starve jobs 2..N (their ExecuteJob is queued
+	// pending under job 1's execID and dropped) and carry a stale EXECUTION_ID
+	// env in the reused container. Re-enable only when a connector supports
+	// multiple executions per stream.
+	viper.SetDefault("pool_enabled", false)
 	viper.SetDefault("max_jobs_per_container", 5)
 	viper.SetDefault("pool_idle_timeout", "2m")
 

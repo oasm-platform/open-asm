@@ -495,8 +495,15 @@ func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcc
 		healthC = h.C
 	}
 
+	// Connect timeout: applies ONLY while the connector has not connected. The
+	// registration signal disables it — a long legitimate scan that connected
+	// fine must never be failed mid-run because it outlived the timeout.
+	regCh := proxy.WaitRegistered(execID)
 	timer := time.NewTimer(connectTimeout)
 	defer timer.Stop()
+	// timerC is nil once the connector registers; a nil channel disables the
+	// timeout case for the rest of the drain.
+	var timerC <-chan time.Time = timer.C
 	submittedAny := false
 
 	// Drain results from connector until channel closes (Done or disconnect)
@@ -563,13 +570,18 @@ drain:
 			cancel()
 			proxy.OnConnectorDown(execID)
 			break drain
-		case <-timer.C:
+		case <-regCh:
+			// Connector connected: the connect timeout no longer applies. The
+			// stopped timer's channel (nil) disables this case permanently.
+			timer.Stop()
+			timerC = nil
+		case <-timerC:
 			// Connector never connected: cancel the container (best-effort,
 			// still terminal on failure) and fail the job. OnConnectorDown
-			// closes the channel — safe because ForwardResult uses select-default.
-			// Cleanup runs on a detached context: the session ctx may already
-			// be cancelled (worker reconnect) and would abort Stop/Cleanup,
-			// orphaning the container.
+			// deletes the result channel before closing it, which breaks the
+			// drain. Cleanup runs on a detached context: the session ctx may
+			// already be cancelled (worker reconnect) and would abort
+			// Stop/Cleanup, orphaning the container.
 			timeoutMsg := fmt.Sprintf("connector did not connect within %s (check image, WORKER_GRPC_ADDR, WORKER_TOKEN)", connectTimeout)
 			if tail != nil && tail.String() != "" {
 				timeoutMsg += "\n--- container logs (last " + fmt.Sprintf("%d lines) ---", tailMaxLines) + "\n" + tail.String()

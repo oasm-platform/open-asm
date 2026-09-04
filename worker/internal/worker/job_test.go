@@ -777,6 +777,111 @@ func TestHandleConnectorResultConnectTimeout(t *testing.T) {
 	}
 }
 
+func TestHandleConnectorResultRegisteredIsNotTimedOut(t *testing.T) {
+	// Clean global state from prior tests.
+	bridgeMu.Lock()
+	bridge = make(map[string]*bridgeEntry)
+	bridgeMu.Unlock()
+	activeJobsMu.Lock()
+	activeJobs = make(map[string]struct{})
+	activeJobsMu.Unlock()
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+	proxy := connector.NewProxy()
+
+	// Real Manager so the handler reaches the timer path (mgr != nil enables
+	// the health ticker too, exactly as in the timeout test).
+	mgr := execution.NewManager(fakeRT, 0)
+	execID, err := mgr.Submit(context.Background(), execution.JobSpec{Tool: "nuclei"})
+	if err != nil {
+		t.Fatalf("mgr.Submit: %v", err)
+	}
+
+	releaseCalled := false
+	var mu sync.Mutex
+	entry := &bridgeEntry{
+		jobID:    "job-registered-1",
+		category: "subdomains",
+		release:  func() { mu.Lock(); releaseCalled = true; mu.Unlock() },
+	}
+	bridgeMu.Lock()
+	bridge[execID] = entry
+	bridgeMu.Unlock()
+
+	resultCh := make(chan []byte, 4)
+	proxy.Register(execID, resultCh)
+
+	// The connector registers its stream BEFORE the drain starts: the
+	// registration signal must already be closed, so the connect timeout must
+	// never fire for this (connected, legitimately long) scan.
+	stream := &captureStream{}
+	if err := proxy.RegisterConnector(execID, stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), 50*time.Millisecond, mgr, nil)
+		close(done)
+	}()
+
+	// Sleep well past the 50ms connect timeout: a registered connector must
+	// not be failed by it.
+	time.Sleep(100 * time.Millisecond)
+
+	// A result arriving after the timeout mark must still be drained and
+	// submitted, then the Done flow (MarkDone + OnConnectorDown) finishes.
+	proxy.ForwardResult(execID, []byte(`{"subdomains":["c.example.com"]}`))
+	proxy.MarkDone(execID)
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	// The scan must NOT be failed with the connect-timeout error.
+	results := jobsSrv.getResults()
+	for _, r := range results {
+		if r.isError && strings.Contains(r.raw, "did not connect") {
+			t.Fatalf("registered connector must not be failed by the connect timeout, got error result: %q", r.raw)
+		}
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result submission, got %d", len(results))
+	}
+	if results[0].isError {
+		t.Fatal("expected isError=false for the drained result")
+	}
+	if results[0].raw != `{"subdomains":["c.example.com"]}` {
+		t.Fatalf("expected forwarded payload, got %q", results[0].raw)
+	}
+	if results[0].jobID != "job-registered-1" {
+		t.Fatalf("expected jobID 'job-registered-1', got %q", results[0].jobID)
+	}
+
+	mu.Lock()
+	called := releaseCalled
+	mu.Unlock()
+	if !called {
+		t.Fatal("expected release to be called")
+	}
+	if fakeRT.CancelCallCount() != 0 {
+		t.Fatalf("expected 0 Cancel calls for a registered connector, got %d", fakeRT.CancelCallCount())
+	}
+	if proxy.Has(execID) {
+		t.Fatal("proxy should not have execID after completion")
+	}
+	bridgeMu.Lock()
+	_, stillInBridge := bridge[execID]
+	bridgeMu.Unlock()
+	if stillInBridge {
+		t.Fatal("bridge entry should be removed after completion")
+	}
+}
+
 func TestHandleConnectorResultEmptyCleanDoneSubmitsEmptyResult(t *testing.T) {
 	// Clean global state from prior tests.
 	bridgeMu.Lock()

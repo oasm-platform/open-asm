@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/metadata"
 
@@ -61,6 +62,50 @@ func TestProxyForwardsResult(t *testing.T) {
 func TestProxyDropsUnknownExecution(t *testing.T) {
 	p := NewProxy()
 	p.ForwardResult("unknown", []byte(`x`))
+}
+
+// ForwardResult must BLOCK (not drop) when the result channel is full: the
+// drain loop is the sole consumer and always drains until close, so a fast
+// scanner filling the 16-slot buffer must never lose results to a
+// select-default send.
+func TestForwardResultBlocksWhenChannelFull(t *testing.T) {
+	p := NewProxy()
+	ch := make(chan []byte, 2)
+	p.Register("exec-1", ch)
+
+	done := make(chan struct{})
+	go func() {
+		p.ForwardResult("exec-1", []byte("one"))
+		p.ForwardResult("exec-1", []byte("two"))
+		p.ForwardResult("exec-1", []byte("three"))
+		close(done)
+	}()
+
+	// The first two sends fill the buffer; the third must stay blocked until
+	// a reader drains. A select-default send would return immediately here.
+	select {
+	case <-done:
+		t.Fatal("third ForwardResult must block while the channel is full — the current select-default silently drops results")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// Unblock by draining one element; the third send must now complete.
+	if got := <-ch; string(got) != "one" {
+		t.Fatalf("first result mismatch: %q", got)
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("blocked ForwardResult must unblock once a reader drains the channel")
+	}
+
+	// All three payloads must arrive intact, in order.
+	if got := <-ch; string(got) != "two" {
+		t.Fatalf("second result mismatch: %q", got)
+	}
+	if got := <-ch; string(got) != "three" {
+		t.Fatalf("third result mismatch: %q", got)
+	}
 }
 
 func TestSetErrorAndPopError(t *testing.T) {
