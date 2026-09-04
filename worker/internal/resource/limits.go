@@ -100,9 +100,10 @@ func ParseCPU(s string) (int, error) {
 }
 
 // ValidateLimits checks CPU, Memory, TimeoutSeconds.
+// TimeoutSeconds == 0 means no job-level timeout (unlimited); only < 0 is rejected.
 func ValidateLimits(l Limits) error {
-	if l.TimeoutSeconds <= 0 {
-		return fmt.Errorf("invalid timeout: %d must be > 0", l.TimeoutSeconds)
+	if l.TimeoutSeconds < 0 {
+		return fmt.Errorf("invalid timeout: %d must be >= 0", l.TimeoutSeconds)
 	}
 	if l.CPU != "" {
 		if _, err := ParseCPU(l.CPU); err != nil {

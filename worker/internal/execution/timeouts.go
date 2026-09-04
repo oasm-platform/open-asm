@@ -32,6 +32,16 @@ const ConnectorCleanupTimeout = 30 * time.Second
 // MUST change with it (worker/internal/proto/sync_test.go guards the .proto).
 const ConnectorSDKSendTimeout = 30 * time.Second
 
+// ConnectorIdleTimeout is how long a pooled container may sit idle (stream
+// registered, no execution in flight) before the sweeper stops and removes
+// it. 60s default; config.ConnectorIdleTimeout (WORKER_CONNECTOR_IDLE_TIMEOUT)
+// exists only for tuning/tests and wins when set.
+const ConnectorIdleTimeout = 60 * time.Second
+
+// ConnectorSweepInterval is how often the Manager's sweeper goroutine scans
+// the pool for containers idle past ConnectorIdleTimeout.
+const ConnectorSweepInterval = 10 * time.Second
+
 // JobTimeoutSecondsKey is the manifest/Job-spec limit key carrying the per-job
 // timeout (seconds). The worker reads it from spec.Limits; Core may carry it
 // through the jobs proto in the future.

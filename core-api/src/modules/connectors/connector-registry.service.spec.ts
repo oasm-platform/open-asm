@@ -167,6 +167,106 @@ describe('ConnectorRegistryService', () => {
     });
   });
 
+  describe('getResourceDefaults', () => {
+    const MANIFEST_WITH_DEFAULTS = {
+      generatedAt: '2026-09-01T00:00:00.000Z',
+      connectors: [
+        {
+          name: 'Nuclei',
+          slug: 'nuclei',
+          version: '1',
+          image: 'img',
+          capabilities: [],
+          resourceDefaults: { cpu: '1000m', memory: '1Gi', timeoutSeconds: 1200 },
+        },
+        {
+          name: 'Bad',
+          slug: 'bad',
+          version: '1',
+          image: 'img',
+          capabilities: [],
+          resourceDefaults: { cpu: 'nope', memory: '9999Zz', timeoutSeconds: -5 },
+        },
+      ],
+    };
+
+    it('should return manifest resource defaults when present', async () => {
+      const manifestDir = path.join(TEMP_DIR, 'rd-present');
+      await fs.mkdir(manifestDir, { recursive: true });
+      await fs.writeFile(
+        path.join(manifestDir, 'manifest.json'),
+        JSON.stringify(MANIFEST_WITH_DEFAULTS),
+      );
+      setupResolveSpy(manifestDir);
+
+      const svc = await initService();
+      await svc.onModuleInit();
+
+      expect(svc.getResourceDefaults('nuclei')).toEqual({
+        cpu: '1000m',
+        memory: '1Gi',
+        timeoutSeconds: 1200,
+      });
+    });
+
+    it('should fall back to defaults when manifest omits resourceDefaults', async () => {
+      const manifestDir = path.join(TEMP_DIR, 'rd-absent');
+      await fs.mkdir(manifestDir, { recursive: true });
+      await fs.writeFile(
+        path.join(manifestDir, 'manifest.json'),
+        JSON.stringify(VALID_MANIFEST),
+      );
+      setupResolveSpy(manifestDir);
+
+      const svc = await initService();
+      await svc.onModuleInit();
+
+      expect(svc.getResourceDefaults('nuclei')).toEqual({
+        cpu: '500m',
+        memory: '512Mi',
+        timeoutSeconds: 600,
+      });
+    });
+
+    it('should fall back to defaults for an unknown slug', async () => {
+      const manifestDir = path.join(TEMP_DIR, 'rd-unknown');
+      await fs.mkdir(manifestDir, { recursive: true });
+      await fs.writeFile(
+        path.join(manifestDir, 'manifest.json'),
+        JSON.stringify(VALID_MANIFEST),
+      );
+      setupResolveSpy(manifestDir);
+
+      const svc = await initService();
+      await svc.onModuleInit();
+
+      expect(svc.getResourceDefaults('nonexistent')).toEqual({
+        cpu: '500m',
+        memory: '512Mi',
+        timeoutSeconds: 600,
+      });
+    });
+
+    it('should ignore invalid resourceDefaults values', async () => {
+      const manifestDir = path.join(TEMP_DIR, 'rd-invalid');
+      await fs.mkdir(manifestDir, { recursive: true });
+      await fs.writeFile(
+        path.join(manifestDir, 'manifest.json'),
+        JSON.stringify(MANIFEST_WITH_DEFAULTS),
+      );
+      setupResolveSpy(manifestDir);
+
+      const svc = await initService();
+      await svc.onModuleInit();
+
+      expect(svc.getResourceDefaults('bad')).toEqual({
+        cpu: '500m',
+        memory: '512Mi',
+        timeoutSeconds: 600,
+      });
+    });
+  });
+
   describe('onModuleInit — graceful degradation', () => {
     it('should warn and leave registry empty when manifest is missing', async () => {
       const emptyDir = path.join(TEMP_DIR, 'empty-connectors');

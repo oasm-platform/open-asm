@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"runtime"
@@ -414,6 +415,18 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		JobID:  job.Id,
 	}
 
+	// Attach manifest resource limits (scheduling context from core-api) when
+	// the job carries them. Legacy jobs / built-in tools omit the fields →
+	// nil Limits → Manager runs the container unlimited (CPU=0/Memory=0 in
+	// Docker terms), preserving backward compatibility.
+	if cpu := job.GetCpu(); cpu != "" || job.GetMemory() != "" {
+		spec.Limits = map[string]any{
+			execution.JobCPUKey:            cpu,
+			execution.JobMemoryKey:         job.GetMemory(),
+			execution.JobTimeoutSecondsKey: int(job.GetTimeoutSeconds()),
+		}
+	}
+
 	// Per-image backoff gate: while the image is backing off, fail fast
 	// WITHOUT creating a container (no exec-N waste, no pending ExecuteJob).
 	if ok, retryIn := imageBackoff.Allow(spec.Image); !ok {
@@ -430,58 +443,143 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		return true, false // hadJob=true (job was pulled), caller releases semaphore
 	}
 
-	execID, err := mgr.Submit(ctx, spec)
-	if err != nil {
-		imageBackoff.RecordFailure(spec.Image)
-		log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector job", job.Id), err)
-		Emit(events, TuiEvent{
-			Type:     EventJobCompleted,
-			JobID:    job.Id,
-			Success:  false,
-			ErrorMsg: fmt.Sprintf("Submit failed: %v", err),
-			Duration: time.Since(startTime),
-		})
-		// Report the failure to Core so the job is finalized instead of stuck IN_PROGRESS.
-		submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Submit failed: %v", err))
-		return true, false // hadJob=true (job was pulled), caller releases semaphore
-	}
+	// Phase 3 replica quota: when every pooled container of this image is
+	// busy at the replica cap, Manager refuses with ErrPoolExhausted instead
+	// of creating another replica. Back off and retry — the job is NOT
+	// failed to Core, the semaphore slot stays held, and imageBackoff is NOT
+	// penalized (quota pressure is not an image failure).
+	const poolRetryDelay = 2 * time.Second
 
-	// Add to activeJobs for metrics tracking.
-	activeJobsMu.Lock()
-	activeJobs[job.Id] = struct{}{}
-	activeJobsMu.Unlock()
-
-	// Register bridge entry: links executionID → job for result routing.
-	bridgeMu.Lock()
-	bridge[execID] = &bridgeEntry{
-		jobID:    job.Id,
-		category: category,
-		release:  releaseSem,
-		image:    spec.Image,
-	}
-	bridgeMu.Unlock()
-
-	// Register proxy channel for streaming results from connector.
-	resultCh := make(chan connector.ResultMsg, 16)
-	proxy.Register(execID, resultCh)
-
-	// Queue the ExecuteJob for the connector container. If the connector has
-	// not registered its stream yet (container boot race), the proxy holds it
-	// as pending and flushes it on connect. Send errors are logged only — the
-	// pending/timeout machinery covers late or broken connects.
+	// The ExecuteJob payload is identical across retries, so build it once.
 	inputs := make(map[string]string, len(spec.Inputs))
 	for k, v := range spec.Inputs {
 		inputs[k] = fmt.Sprintf("%v", v)
 	}
-	if err := proxy.SendExecute(execID, &connectorpb.ExecuteJob{
-		ExecutionId: execID,
-		JobId:       spec.JobID,
-		Tool:        spec.Tool,
-		Image:       spec.Image,
-		TraceId:     spec.TraceID,
-		Inputs:      inputs,
-	}); err != nil {
-		log.ErrorE(fmt.Sprintf("[%s] Failed to send ExecuteJob for exec %s", job.Id, execID), err)
+	// Connector config profile rides along the ExecuteJob as JSON under
+	// "oasm_config": a REUSED container keeps its first-run env (Phase 2), so
+	// per-job config must arrive in-band instead. The SDK overrides its
+	// OASM_CONFIG env with this payload.
+	configFields := map[string]string{}
+	if len(spec.Config) > 0 {
+		if b, err := json.Marshal(spec.Config); err == nil {
+			configFields["oasm_config"] = string(b)
+		}
+	}
+
+	// Warm-pool reuse acquires an existing container whose connector stream is
+	// already live (adopted in Manager.Submit). A send error here means the
+	// stream died between acquire and send — the container is unusable, so the
+	// whole acquire-bridge-send cycle retries ONCE on a fresh container
+	// instead of hanging the job (edge: container killed right after adopt).
+	var execID string
+	var err error
+	var sendErr error
+	var resultCh chan connector.ResultMsg
+	for attempt := 0; attempt < 2; attempt++ {
+		execID, err = mgr.Submit(ctx, spec)
+		for err != nil && errors.Is(err, execution.ErrPoolExhausted) {
+			log.Info("[%s] Pool at replica cap for image %s, waiting for an idle pooled container (retry in %s)", job.Id, spec.Image, poolRetryDelay)
+			select {
+			case <-ctx.Done():
+				// The wait outlived the job context — finalize as failed so Core
+				// can re-queue the job elsewhere.
+				msg := fmt.Sprintf("Submit failed: timed out waiting for a pooled container: %v", err)
+				imageBackoff.RecordFailure(spec.Image)
+				log.ErrorE(fmt.Sprintf("[%s] %s", job.Id, msg), err)
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: msg,
+					Duration: time.Since(startTime),
+				})
+				submitCategoryError(ctx, grpcClient, events, job.Id, category, msg)
+				return true, false // hadJob=true (job was pulled), caller releases semaphore
+			case <-time.After(poolRetryDelay):
+			}
+			execID, err = mgr.Submit(ctx, spec)
+		}
+		if err != nil {
+			imageBackoff.RecordFailure(spec.Image)
+			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector job", job.Id), err)
+			Emit(events, TuiEvent{
+				Type:     EventJobCompleted,
+				JobID:    job.Id,
+				Success:  false,
+				ErrorMsg: fmt.Sprintf("Submit failed: %v", err),
+				Duration: time.Since(startTime),
+			})
+			// Report the failure to Core so the job is finalized instead of stuck IN_PROGRESS.
+			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Submit failed: %v", err))
+			return true, false // hadJob=true (job was pulled), caller releases semaphore
+		}
+
+		// Add to activeJobs for metrics tracking.
+		activeJobsMu.Lock()
+		activeJobs[job.Id] = struct{}{}
+		activeJobsMu.Unlock()
+
+		// Register bridge entry: links executionID → job for result routing.
+		bridgeMu.Lock()
+		bridge[execID] = &bridgeEntry{
+			jobID:    job.Id,
+			category: category,
+			release:  releaseSem,
+			image:    spec.Image,
+		}
+		bridgeMu.Unlock()
+
+		// Register proxy channel for streaming results from connector.
+		resultCh = make(chan connector.ResultMsg, 16)
+		proxy.Register(execID, resultCh)
+
+		sendErr = proxy.SendExecute(execID, &connectorpb.ExecuteJob{
+			ExecutionId: execID,
+			JobId:       spec.JobID,
+			Tool:        spec.Tool,
+			Image:       spec.Image,
+			TraceId:     spec.TraceID,
+			Inputs:      inputs,
+			Config:      configFields,
+		})
+		if sendErr == nil {
+			break // delivered (immediately or queued) — hand off to the drain
+		}
+
+		// The connector's stream is broken (died on/after adopt). Tear this
+		// execution down — Cancel evicts the container from the pool and the
+		// proxy — and retry on a fresh container. Never fail the job to Core
+		// while a retry is still possible.
+		log.ErrorE(fmt.Sprintf("[%s] Failed to send ExecuteJob for exec %s (retrying on a fresh container)", job.Id, execID), sendErr)
+		cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+		if err := mgr.Cancel(cleanupCtx, execID); err != nil {
+			log.ErrorE(fmt.Sprintf("[%s] Failed to cancel broken execution %s", job.Id, execID), err)
+		}
+		cleanupCancel()
+		proxy.Unregister(execID)
+		proxy.OnConnectorDown(execID)
+		bridgeMu.Lock()
+		delete(bridge, execID)
+		bridgeMu.Unlock()
+		activeJobsMu.Lock()
+		delete(activeJobs, job.Id)
+		activeJobsMu.Unlock()
+	}
+	if sendErr != nil {
+		// Both attempts produced a container whose stream died before the
+		// send — out of options, fail the job.
+		msg := fmt.Sprintf("Failed to send ExecuteJob (stream died on reuse): %v", sendErr)
+		imageBackoff.RecordFailure(spec.Image)
+		log.ErrorE(fmt.Sprintf("[%s] %s", job.Id, msg), sendErr)
+		Emit(events, TuiEvent{
+			Type:     EventJobCompleted,
+			JobID:    job.Id,
+			Success:  false,
+			ErrorMsg: msg,
+			Duration: time.Since(startTime),
+		})
+		submitCategoryError(ctx, grpcClient, events, job.Id, category, msg)
+		return true, false // hadJob=true (job was pulled), caller releases semaphore
 	}
 
 	log.Info("[%s] Connector job submitted: execID=%s image=%s", job.Id, execID, job.GetImage())
@@ -601,6 +699,13 @@ drain:
 			if mgr == nil {
 				continue
 			}
+			// Phase 2: a REUSED container between executions is intentionally
+			// idle (its prior job finished, the next has not been sent yet) —
+			// the container is NOT doing anything, so skip health checks until
+			// an execution is in flight.
+			if mgr.IsIdle(execID) {
+				continue
+			}
 			res, err := mgr.Inspect(ctx, execID)
 			if err != nil {
 				continue // transient inspect error — try next tick
@@ -671,14 +776,14 @@ drain:
 
 	// Best-effort container cleanup on a detached context (see
 	// newDetachedCleanupContext): the connector already finished or dropped,
-	// so the container (exited, or force-removed if still up) must be removed
-	// even when the session ctx was cancelled by a reconnect. The bridge /
-	// activeJobs / proxy cleanup above and the finalization below must not
-	// depend on this succeeding.
+	// so the container must be removed even when the session ctx was
+	// cancelled by a reconnect. The bridge / activeJobs / proxy cleanup above
+	// and the finalization below must not depend on this succeeding.
+	// Phase 2: Release routes internally — pooled mode hands the container
+	// back to the pool idle (no Cleanup, stays alive for the next execution);
+	// legacy 1:1 mode runs the immediate Cleanup below.
 	if mgr != nil {
 		cleanupCtx, cancel := newDetachedCleanupContext()
-		// Release cleans up the 1:1 container (1 stream = 1 execution; the
-		// container is never shared, so a blind remove is safe here).
 		if err := mgr.Release(cleanupCtx, execID); err != nil {
 			log.ErrorE(fmt.Sprintf("[%s] Failed to clean up connector execution %s", entry.jobID, execID), err)
 		}

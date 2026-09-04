@@ -345,17 +345,51 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			if err != nil {
 				log.Error("container engine unavailable — image/connector jobs disabled: %v", err)
 			} else {
-				// 1 stream = 1 execution: every execution gets its own container
-				// (1:1 model, no pool). WORKER_POOL_ENABLED=true is rejected at
-				// config load.
 				mgrInit = execution.NewManager(dockerRT, 0)
 				mgrInit.SetLogger(log)
 				dockerRT.SetLogger(log)
 				// Per-execution single-use connector auth: the Manager mints a
 				// token per execution (before container creation) and the
 				// connector server validates Register against it.
-				connectorServer.SetTokenLookup(mgrInit)
-				log.Success("execution manager ready (Docker runtime, unlimited concurrency, 1 container = 1 execution)")
+				if connectorServer != nil {
+					connectorServer.SetTokenLookup(mgrInit)
+				} else {
+					log.Warning("connector server unavailable — pooled container registration/auth skipped")
+				}
+				// Phase 2 warm pool: idle containers of the same image survive
+				// their execution and are reused for the next job (finished =
+				// idle, next acquire hits). WORKER_POOL_ENABLED=false keeps
+				// the legacy 1:1 model (every execution gets its own
+				// container, removed on Done).
+				poolMode := "1 container = 1 execution"
+				if cfg.PoolEnabled {
+					pool := execution.NewPoolManager(
+						time.Duration(cfg.ConnectorIdleTimeout)*time.Second,
+						cfg.MaxReplicasPerImage,
+						cfg.MaxJobsPerContainer,
+					)
+					mgrInit.SetPool(pool)
+					// Proxy routing: BindExec/ReleaseExec map executions to
+					// pooled containers; RemoveContainer drops swept/dead ones.
+					mgrInit.SetStreamBinder(proxy)
+					mgrInit.SetEvictor(proxy)
+					// Server handoff: Done → ReleaseToIdle (keep container +
+					// stream alive), unexpected stream death → ContainerDown
+					// (stop, remove, evict).
+					if connectorServer != nil {
+						connectorServer.SetPoolNotifier(mgrInit)
+					}
+					go mgrInit.SweepLoop(workerCtx)
+					// Startup prune: remove pooled containers orphaned by a
+					// crashed previous worker (tagged oasm.pool_key). The
+					// SDK's stream is killed by the removal; the container
+					// must not accumulate across restarts.
+					pruneCtx, pruneCancel := context.WithTimeout(workerCtx, 30*time.Second)
+					dockerRT.PrunePoolContainers(pruneCtx)
+					pruneCancel()
+					poolMode = fmt.Sprintf("warm pool: idle_timeout=%ds max_replicas_per_image=%d", cfg.ConnectorIdleTimeout, cfg.MaxReplicasPerImage)
+				}
+				log.Success("execution manager ready (Docker runtime, unlimited concurrency, %s)", poolMode)
 			}
 		}
 		mgr = mgrInit

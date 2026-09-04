@@ -154,7 +154,7 @@ func TestServerHappyPath_RegisterResultDone(t *testing.T) {
 		t.Fatal("timeout waiting for forwarded result")
 	}
 
-	// Send Done — server closes the stream.
+	// Send Done — execution over.
 	if err := stream.Send(&pb.ConnectorMessage{
 		Message: &pb.ConnectorMessage_Done{
 			Done: &pb.Done{ExecutionId: "exec-1"},
@@ -163,19 +163,32 @@ func TestServerHappyPath_RegisterResultDone(t *testing.T) {
 		t.Fatalf("Send Done: %v", err)
 	}
 
-	// Server returns nil on Done → stream closes → client sees EOF.
-	_, err := stream.Recv()
-	if err != io.EOF {
-		t.Fatalf("expected EOF after Done, got %v", err)
+	// Verify proxy cleanup of the EXECUTION: channel closed, execution removed
+	// (OnConnectorDown still fires on Done). The channel close proves the
+	// server already processed the Done — checked BEFORE the Has assertion to
+	// avoid racing the handler goroutine.
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("channel should be closed after OnConnectorDown")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for channel close")
 	}
-
-	// Verify proxy cleanup: channel closed, execution removed.
 	if proxy.Has("exec-1") {
 		t.Fatal("proxy should not retain exec-1 after Done")
 	}
-	_, ok := <-ch
-	if ok {
-		t.Fatal("channel should be closed after OnConnectorDown")
+
+	// Phase 2 warm pool: the STREAM stays open for reuse — no EOF after Done.
+	recvCh := make(chan error, 1)
+	go func() {
+		_, err := stream.Recv()
+		recvCh <- err
+	}()
+	select {
+	case err := <-recvCh:
+		t.Fatalf("stream must stay open after Done, got %v", err)
+	case <-time.After(200 * time.Millisecond):
 	}
 }
 
@@ -188,8 +201,9 @@ func TestServerDoneMarksProxyDone(t *testing.T) {
 		t.Fatalf("expected accepted=true, got accepted=%v reason=%q", ack.GetAccepted(), ack.GetReason())
 	}
 
-	// Send a clean Done — the server must record it via proxy.MarkDone
-	// before tearing down the stream.
+	// Clean Done — the server records it via proxy.MarkDone. The stream does
+	// NOT close (Phase 2 pool reuse), so poll the flag instead of expecting
+	// EOF.
 	if err := stream.Send(&pb.ConnectorMessage{
 		Message: &pb.ConnectorMessage_Done{
 			Done: &pb.Done{ExecutionId: "exec-mark-1"},
@@ -198,14 +212,12 @@ func TestServerDoneMarksProxyDone(t *testing.T) {
 		t.Fatalf("Send Done: %v", err)
 	}
 
-	// Server returns nil on Done → stream closes → client sees EOF.
-	_, err := stream.Recv()
-	if err != io.EOF {
-		t.Fatalf("expected EOF after Done, got %v", err)
-	}
-
-	if !proxy.PopDone("exec-mark-1") {
-		t.Fatal("expected PopDone=true after clean Done message")
+	deadline := time.Now().Add(2 * time.Second)
+	for !proxy.PopDone("exec-mark-1") {
+		if time.Now().After(deadline) {
+			t.Fatal("PopDone must be true shortly after a clean Done message")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -463,7 +475,8 @@ func TestServerRegisterWithExecutionIDMapsStream(t *testing.T) {
 		t.Fatalf("unexpected ExecuteJob payload: %+v", ex)
 	}
 
-	// Clean Done → stream closes → stream mapping removed.
+	// Clean Done ends the execution; the stream stays registered (warm pool
+	// reuse) — the container survives for the next ExecuteJob.
 	if err := stream.Send(&pb.ConnectorMessage{
 		Message: &pb.ConnectorMessage_Done{
 			Done: &pb.Done{ExecutionId: "exec-map-1"},
@@ -471,12 +484,9 @@ func TestServerRegisterWithExecutionIDMapsStream(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Send Done: %v", err)
 	}
-	_, err = stream.Recv()
-	if err != io.EOF {
-		t.Fatalf("expected EOF after Done, got %v", err)
-	}
-	if proxy.HasStream("exec-map-1") {
-		t.Fatal("expected stream unregistered after Done")
+	// Phase 2: no EOF after Done — the read loop continues.
+	if !proxy.HasStream("exec-map-1") {
+		t.Fatal("expected stream still registered after Done (pool reuse)")
 	}
 }
 
@@ -565,15 +575,14 @@ func TestServerLogsRegisterAckAndDone(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Send Done: %v", err)
 	}
-	if _, err := stream.Recv(); err != io.EOF {
-		t.Fatalf("expected EOF after Done, got %v", err)
-	}
 	doneLine := waitForLog(t, log, "connector done: exec=exec-log-1")
 	if !strings.Contains(doneLine, "error=-") {
 		t.Fatalf("clean done line must show dash error: %q", doneLine)
 	}
-	if proxy.HasStream("exec-log-1") {
-		t.Fatal("stream must be unregistered after Done")
+	// Phase 2: the stream stays registered after Done (pool reuse) — the
+	// connector keeps its read loop open for the next ExecuteJob.
+	if !proxy.HasStream("exec-log-1") {
+		t.Fatal("stream must stay registered after Done (pool reuse)")
 	}
 }
 

@@ -145,13 +145,17 @@ func (x *RegisterAck) GetReason() string {
 }
 
 type ExecuteJob struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ExecutionId   string                 `protobuf:"bytes,1,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
-	JobId         string                 `protobuf:"bytes,2,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
-	Tool          string                 `protobuf:"bytes,3,opt,name=tool,proto3" json:"tool,omitempty"`
-	Image         string                 `protobuf:"bytes,4,opt,name=image,proto3" json:"image,omitempty"`
-	TraceId       string                 `protobuf:"bytes,5,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
-	Inputs        map[string]string      `protobuf:"bytes,6,rep,name=inputs,proto3" json:"inputs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ExecutionId string                 `protobuf:"bytes,1,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	JobId       string                 `protobuf:"bytes,2,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Tool        string                 `protobuf:"bytes,3,opt,name=tool,proto3" json:"tool,omitempty"`
+	Image       string                 `protobuf:"bytes,4,opt,name=image,proto3" json:"image,omitempty"`
+	TraceId     string                 `protobuf:"bytes,5,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	Inputs      map[string]string      `protobuf:"bytes,6,rep,name=inputs,proto3" json:"inputs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Per-job connector config override (Phase 2 warm pool): a reused container
+	// keeps its first-run env, so the job's config profile travels in-band.
+	// The SDK merges "oasm_config" (JSON blob) over its OASM_CONFIG env.
+	Config        map[string]string `protobuf:"bytes,7,rep,name=config,proto3" json:"config,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -224,6 +228,13 @@ func (x *ExecuteJob) GetTraceId() string {
 func (x *ExecuteJob) GetInputs() map[string]string {
 	if x != nil {
 		return x.Inputs
+	}
+	return nil
+}
+
+func (x *ExecuteJob) GetConfig() map[string]string {
+	if x != nil {
+		return x.Config
 	}
 	return nil
 }
@@ -753,7 +764,7 @@ const file_connector_proto_rawDesc = "" +
 	"\x04tool\x18\x04 \x01(\tR\x04tool\"A\n" +
 	"\vRegisterAck\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x81\x02\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xf7\x02\n" +
 	"\n" +
 	"ExecuteJob\x12!\n" +
 	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\x12\x15\n" +
@@ -761,8 +772,12 @@ const file_connector_proto_rawDesc = "" +
 	"\x04tool\x18\x03 \x01(\tR\x04tool\x12\x14\n" +
 	"\x05image\x18\x04 \x01(\tR\x05image\x12\x19\n" +
 	"\btrace_id\x18\x05 \x01(\tR\atraceId\x129\n" +
-	"\x06inputs\x18\x06 \x03(\v2!.connector.ExecuteJob.InputsEntryR\x06inputs\x1a9\n" +
+	"\x06inputs\x18\x06 \x03(\v2!.connector.ExecuteJob.InputsEntryR\x06inputs\x129\n" +
+	"\x06config\x18\a \x03(\v2!.connector.ExecuteJob.ConfigEntryR\x06config\x1a9\n" +
 	"\vInputsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a9\n" +
+	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"+\n" +
 	"\x06Cancel\x12!\n" +
@@ -821,7 +836,7 @@ func file_connector_proto_rawDescGZIP() []byte {
 	return file_connector_proto_rawDescData
 }
 
-var file_connector_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_connector_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_connector_proto_goTypes = []any{
 	(*Register)(nil),              // 0: connector.Register
 	(*RegisterAck)(nil),           // 1: connector.RegisterAck
@@ -833,25 +848,27 @@ var file_connector_proto_goTypes = []any{
 	(*ConnectorMessage)(nil),      // 7: connector.ConnectorMessage
 	(*WorkerMessage)(nil),         // 8: connector.WorkerMessage
 	nil,                           // 9: connector.ExecuteJob.InputsEntry
-	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
+	nil,                           // 10: connector.ExecuteJob.ConfigEntry
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
 }
 var file_connector_proto_depIdxs = []int32{
 	9,  // 0: connector.ExecuteJob.inputs:type_name -> connector.ExecuteJob.InputsEntry
-	5,  // 1: connector.Result.findings:type_name -> connector.Finding
-	10, // 2: connector.Finding.timestamp:type_name -> google.protobuf.Timestamp
-	0,  // 3: connector.ConnectorMessage.register:type_name -> connector.Register
-	4,  // 4: connector.ConnectorMessage.result:type_name -> connector.Result
-	6,  // 5: connector.ConnectorMessage.done:type_name -> connector.Done
-	1,  // 6: connector.WorkerMessage.register_ack:type_name -> connector.RegisterAck
-	2,  // 7: connector.WorkerMessage.execute:type_name -> connector.ExecuteJob
-	3,  // 8: connector.WorkerMessage.cancel:type_name -> connector.Cancel
-	7,  // 9: connector.ConnectorService.Connect:input_type -> connector.ConnectorMessage
-	8,  // 10: connector.ConnectorService.Connect:output_type -> connector.WorkerMessage
-	10, // [10:11] is the sub-list for method output_type
-	9,  // [9:10] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	10, // 1: connector.ExecuteJob.config:type_name -> connector.ExecuteJob.ConfigEntry
+	5,  // 2: connector.Result.findings:type_name -> connector.Finding
+	11, // 3: connector.Finding.timestamp:type_name -> google.protobuf.Timestamp
+	0,  // 4: connector.ConnectorMessage.register:type_name -> connector.Register
+	4,  // 5: connector.ConnectorMessage.result:type_name -> connector.Result
+	6,  // 6: connector.ConnectorMessage.done:type_name -> connector.Done
+	1,  // 7: connector.WorkerMessage.register_ack:type_name -> connector.RegisterAck
+	2,  // 8: connector.WorkerMessage.execute:type_name -> connector.ExecuteJob
+	3,  // 9: connector.WorkerMessage.cancel:type_name -> connector.Cancel
+	7,  // 10: connector.ConnectorService.Connect:input_type -> connector.ConnectorMessage
+	8,  // 11: connector.ConnectorService.Connect:output_type -> connector.WorkerMessage
+	11, // [11:12] is the sub-list for method output_type
+	10, // [10:11] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_connector_proto_init() }
@@ -875,7 +892,7 @@ func file_connector_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_connector_proto_rawDesc), len(file_connector_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -232,10 +232,12 @@ func TestRegisterConnectorFlushesPendingExactlyOnce(t *testing.T) {
 		t.Fatalf("expected streamA to receive the pending ExecuteJob")
 	}
 
-	// A second registration (reconnect) must not resend — pending was consumed.
+	// A second registration (reconnect) is REJECTED: Phase 2 keeps one live
+	// stream per pooled container — silently replacing it would strand
+	// in-flight Sends. streamB must receive nothing.
 	streamB := &fakeConnectStream{}
-	if err := p.RegisterConnector("exec-1", streamB); err != nil {
-		t.Fatalf("second RegisterConnector: %v", err)
+	if err := p.RegisterConnector("exec-1", streamB); err == nil {
+		t.Fatal("second RegisterConnector on a live stream must be rejected")
 	}
 	if streamB.sentCount() != 0 {
 		t.Fatalf("expected streamB to receive nothing, got %d messages", streamB.sentCount())

@@ -27,6 +27,10 @@ message ExecuteJob {
   string image = 4;
   string trace_id = 5;
   map<string, string> inputs = 6;
+  // Per-job connector config override (Phase 2 warm pool): a reused container
+  // keeps its first-run env, so the job's config profile travels in-band.
+  // The SDK merges "oasm_config" (JSON blob) over its OASM_CONFIG env.
+  map<string, string> config = 7;
 }
 
 message Cancel {

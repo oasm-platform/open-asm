@@ -32,7 +32,8 @@ type Server struct {
 	proxy      *Proxy
 	token      string // legacy shared secret for auth; empty = no auth (dev mode)
 	lookup     TokenLookup
-	tlsEnabled bool // mTLS activated via WORKER_CONNECTOR_TLS_* (all three set)
+	notifier   IdleNotifier // pool handoff on Done / stream death (nil = legacy teardown)
+	tlsEnabled bool         // mTLS activated via WORKER_CONNECTOR_TLS_* (all three set)
 	lis        net.Listener
 	grpcServer *grpc.Server
 	logger     Logger
@@ -46,6 +47,34 @@ func (s *Server) SetTokenLookup(l TokenLookup) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lookup = l
+}
+
+// SetPoolNotifier wires the warm-pool handoff: ReleaseToIdle is called after a
+// clean Done (execution over, container+stream stay alive for reuse);
+// ContainerDown is called when the stream dies unexpectedly (evict the
+// container). Nil disables both notifications (legacy teardown behavior).
+func (s *Server) SetPoolNotifier(n IdleNotifier) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.notifier = n
+}
+
+func (s *Server) notifyReleaseToIdle(execID string) {
+	s.mu.Lock()
+	n := s.notifier
+	s.mu.Unlock()
+	if n != nil {
+		n.ReleaseToIdle(execID)
+	}
+}
+
+func (s *Server) notifyContainerDown(execID string) {
+	s.mu.Lock()
+	n := s.notifier
+	s.mu.Unlock()
+	if n != nil {
+		n.ContainerDown(execID)
+	}
 }
 
 // SetLogger wires a protocol lifecycle logger. Nil disables logging (safe).
@@ -242,24 +271,34 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 	// Step 2: Read loop — receive results and done messages.
 	// Track execution IDs seen on this stream so we can clean up if the
 	// stream breaks (container crash, network error) without a Done message.
+	//
+	// Phase 2 warm pool: a Done ends the EXECUTION, not the stream. The
+	// connector stays connected and waits for the next ExecuteJob, so the
+	// container survives for reuse. The pool is notified (ReleaseToIdle) and
+	// the loop CONTINUES. The stream only tears down on unexpected death
+	// (EOF/error → ContainerDown → sweep), which keeps this handler from
+	// returning until the container is removed.
 	seenExecIDs := make(map[string]bool)
 	for {
 		msg, err := stream.Recv()
 		if err == io.EOF {
-			// Stream ended without Done — clean up tracked executions.
+			// Stream ended without a Done (or the container was swept): the
+			// container can never be reused — evict it from the pool.
 			for execID := range seenExecIDs {
 				s.proxy.OnConnectorDown(execID)
 			}
 			s.proxy.UnregisterConnector(reg.ExecutionId)
+			s.notifyContainerDown(reg.ExecutionId)
 			s.logWarning("connector stream closed: exec=%s err=EOF", reg.ExecutionId)
 			return nil
 		}
 		if err != nil {
-			// Stream error — clean up tracked executions.
+			// Stream error — evict the container.
 			for execID := range seenExecIDs {
 				s.proxy.OnConnectorDown(execID)
 			}
 			s.proxy.UnregisterConnector(reg.ExecutionId)
+			s.notifyContainerDown(reg.ExecutionId)
 			s.logWarning("connector stream closed: exec=%s err=%v", reg.ExecutionId, err)
 			return err
 		}
@@ -280,8 +319,10 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 			delete(seenExecIDs, m.Done.ExecutionId)
 			s.proxy.MarkDone(m.Done.ExecutionId)
 			s.proxy.OnConnectorDown(m.Done.ExecutionId)
-			s.proxy.UnregisterConnector(reg.ExecutionId)
-			return nil
+			// Keep the stream OPEN: the container goes back to the pool idle
+			// and must be ready for the next ExecuteJob. The connector SDK
+			// loops on Recv after its Done.
+			s.notifyReleaseToIdle(m.Done.ExecutionId)
 		}
 	}
 }

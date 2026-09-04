@@ -1224,11 +1224,15 @@ func TestCreateUsesOasmPrefixName(t *testing.T) {
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
 
+	// Phase 2 pooled naming: oasm-<tool>-<poolShort8>-<rand4>. The tool short
+	// comes from the POOL KEY (normalized image, sanitized, 8 chars), NOT the
+	// exec id — same-image containers share the prefix for docker ps grouping.
 	if _, err := r.Create(context.Background(), JobSpec{
-		Tool:   "Nuclei Scanner",
-		Image:  "ghcr.io/open-asm/nuclei:1.0",
-		JobID:  "job-1",
-		ExecID: "exec-7",
+		Tool:    "Nuclei Scanner",
+		Image:   "ghcr.io/open-asm/nuclei:1.0",
+		JobID:   "job-1",
+		ExecID:  "exec-7",
+		PoolKey: "ghcr.io/open-asm/nuclei:1.0",
 	}, RuntimeOpts{}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -1243,8 +1247,54 @@ func TestCreateUsesOasmPrefixName(t *testing.T) {
 	if !strings.Contains(name, "nuclei-scanner") {
 		t.Fatalf("container name %q must contain the sanitized tool name", name)
 	}
-	if !strings.Contains(name, "exec-7") {
-		t.Fatalf("container name %q must contain the short exec id", name)
+	if !strings.Contains(name, "ghcr-io") {
+		t.Fatalf("container name %q must contain the sanitized pool-short (first 8 chars of the pool key)", name)
+	}
+	if strings.Contains(name, "exec-7") {
+		t.Fatalf("container name %q must NOT carry the exec id (pooled naming by pool key)", name)
+	}
+}
+
+func TestCreateUsesPoolKeyShortInName(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	if _, err := r.Create(context.Background(), JobSpec{
+		Tool:    "nuclei",
+		Image:   "ghcr.io/open-asm/nuclei:1.0",
+		JobID:   "job-1",
+		ExecID:  "exec-1",
+		PoolKey: "library/nuclei",
+	}, RuntimeOpts{}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if !strings.Contains(engine.createName, "library-") {
+		t.Fatalf("name %q must carry the 8-char pool-short of the pool key (library/nuclei → library-)", engine.createName)
+	}
+}
+
+func TestCreateLabelsPoolKeyAndLastUsed(t *testing.T) {
+	engine := newFakeDockerEngine()
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	if _, err := r.Create(context.Background(), JobSpec{
+		Tool:    "nuclei",
+		Image:   "ghcr.io/open-asm/nuclei:1.0",
+		JobID:   "job-1",
+		ExecID:  "exec-1",
+		PoolKey: "library/nuclei",
+	}, RuntimeOpts{}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if engine.labels["oasm.pool_key"] != "library/nuclei" {
+		t.Fatalf("label oasm.pool_key = %q, want library/nuclei (prune filter)", engine.labels["oasm.pool_key"])
+	}
+	if _, ok := engine.labels["oasm.last_used"]; !ok {
+		t.Fatal("label oasm.last_used must be set (sweeper info)")
 	}
 }
 

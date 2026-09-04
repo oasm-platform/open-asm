@@ -378,12 +378,21 @@ export class JobsRegistryController {
         this.logger.warn('profile decrypt failed');
       }
 
+      // Manifest resource limits — scheduling context for the worker runtime.
+      // Field names match the proto (cpu/memory/timeout_seconds).
+      const defaults = this.connectorRegistry.getResourceDefaults(
+        job.tool!.name,
+      );
+
       const response: Record<string, unknown> = {
         id: job.id,
         asset: job.asset,
         category: job.category,
         tool: connectorEntry.name,
         image: connectorEntry.image,
+        cpu: defaults.cpu,
+        memory: defaults.memory,
+        timeout_seconds: defaults.timeoutSeconds,
         inputs: {
           fields: { target: { stringValue: job.asset.value } },
         },

@@ -1,10 +1,42 @@
 package connector
 
 import (
+	"fmt"
 	"sync"
 
 	pb "oasm-worker/internal/gen/connector"
 )
+
+// ---------------------------------------------------------------------------
+// Warm-pool routing contracts (Phase 2). All are structural: the connector
+// package declares them, the execution package satisfies them without imports.
+// ---------------------------------------------------------------------------
+
+// StreamBinder lets the Manager bind an execution to a pooled container before
+// the connector SDK registers, so the proxy can route to the container ID and
+// pre-close the registration signal (reuse skips the connect timer).
+type StreamBinder interface {
+	BindExec(execID, containerID string)
+	ReleaseExec(execID string)
+	// AdoptStream re-owns a pooled container's live stream for a new execution
+	// on warm-pool reuse. Errors when the container has no live stream (the
+	// caller falls back to a fresh container).
+	AdoptStream(containerID, newExecID string) error
+}
+
+// Evictor lets the Manager remove a pooled container from the proxy when the
+// sweeper collects it or the connector stream dies.
+type Evictor interface {
+	RemoveContainer(containerID string)
+}
+
+// IdleNotifier lets the connector server hand an execution back to the pool
+// on Done (keep the container + stream alive) and report unexpected stream
+// death (evict the container).
+type IdleNotifier interface {
+	ReleaseToIdle(execID string)
+	ContainerDown(execID string)
+}
 
 // ResultMsg is one streamed Result delivery: the raw payload plus any
 // structured findings the connector attached (findings is nil for connectors
@@ -14,6 +46,14 @@ import (
 type ResultMsg struct {
 	Data     []byte
 	Findings []*pb.Finding
+}
+
+// connStream is one pooled container's connector stream state. stream is nil
+// until the connector SDK registers; ownerExecID is the execution that
+// registered it (authoritative while busy).
+type connStream struct {
+	stream      pb.ConnectorService_ConnectServer
+	ownerExecID string
 }
 
 type Proxy struct {
@@ -28,8 +68,17 @@ type Proxy struct {
 	chans  map[string]chan ResultMsg
 	errors map[string]string
 	done   map[string]bool
-	// streams maps execID → live connector bidi stream for ExecuteJob delivery.
-	streams map[string]pb.ConnectorService_ConnectServer
+	// containers maps pooled container ID → its connector stream. A container
+	// outlives its execution (Phase 2 warm pool): the stream is kept alive
+	// across sequential executions and only dies on sweep/eviction. An
+	// unbound registration (no prior BindExec) gets an adhoc container entry
+	// "adhoc-<execID>" keeping the legacy direct-runtime single-exec path
+	// working unchanged.
+	containers map[string]*connStream
+	// execIndex maps execID → container ID for routing SendExecute/Register
+	// to the container stream. MaxJobsPerContainer=1 means at most one
+	// execution is bound per container at a time.
+	execIndex map[string]string
 	// pendings holds ExecuteJobs queued before the connector's stream arrived
 	// (container boot race). Flushed on RegisterConnector.
 	pendings map[string]*pb.ExecuteJob
@@ -76,35 +125,55 @@ func (p *Proxy) logWarning(msg string, args ...any) {
 
 func NewProxy() *Proxy {
 	return &Proxy{
-		chans:    map[string]chan ResultMsg{},
-		errors:   map[string]string{},
-		done:     map[string]bool{},
-		streams:  map[string]pb.ConnectorService_ConnectServer{},
-		pendings: map[string]*pb.ExecuteJob{},
-		regChans: map[string]*regSignal{},
+		chans:      map[string]chan ResultMsg{},
+		errors:     map[string]string{},
+		done:       map[string]bool{},
+		containers: map[string]*connStream{},
+		execIndex:  map[string]string{},
+		pendings:   map[string]*pb.ExecuteJob{},
+		regChans:   map[string]*regSignal{},
 	}
 }
 
-// RegisterConnector stores the live bidi stream for execID and flushes any
-// ExecuteJob that was queued before the connector connected. An empty execID
-// is never registered here: the server rejects empty execution_id in
+// RegisterConnector stores the live bidi stream for execID's container and
+// flushes any ExecuteJob queued before the connector connected. An empty
+// execID is never registered here: the server rejects empty execution_id in
 // Register before mapping (see server.go), so this guard only defends against
-// internal misuse — ignoring it (nil, no stream entry) is the safe behavior.
+// internal misuse. A second registration while the container's stream is
+// already live is REJECTED: Phase 2 keeps one stream per pool container, and
+// silently replacing it would strand in-flight Sends.
 func (p *Proxy) RegisterConnector(execID string, stream pb.ConnectorService_ConnectServer) error {
 	if execID == "" || stream == nil {
 		return nil
 	}
 	p.mu.Lock()
+	containerID, ok := p.execIndex[execID]
+	if !ok {
+		// No prior BindExec: direct runtime / legacy single-exec path. Track
+		// the stream under an adhoc container key so routing stays uniform.
+		containerID = "adhoc-" + execID
+		p.execIndex[execID] = containerID
+	}
+	cs, exists := p.containers[containerID]
+	if !exists {
+		cs = &connStream{}
+		p.containers[containerID] = cs
+	}
+	if cs.stream != nil {
+		p.mu.Unlock()
+		return fmt.Errorf("connector stream already registered for exec %s", execID)
+	}
+	cs.stream = stream
+	cs.ownerExecID = execID
+
 	pending, hasPending := p.pendings[execID]
 	if hasPending {
 		delete(p.pendings, execID)
 	}
-	p.streams[execID] = stream
 	// Registration signal: close the open waiter channel, or store an
 	// already-closed one so a late WaitRegistered returns immediately. Never
 	// delete here — the drain may wait for registration after it happened.
-	// A reconnect (second RegisterConnector for the same execID) must not
-	// double-close, hence the closed flag.
+	// A second RegisterConnector must not double-close, hence the closed flag.
 	if sig, ok := p.regChans[execID]; ok {
 		if !sig.closed {
 			close(sig.ch)
@@ -147,28 +216,165 @@ func (p *Proxy) WaitRegistered(execID string) <-chan struct{} {
 	return sig.ch
 }
 
-// UnregisterConnector removes the stream for execID. It does not touch the
-// result channel — OnConnectorDown owns that (avoids double close).
+// BindExec pre-binds an execution to a pooled container before the connector
+// SDK registers. The Manager calls it on container create and on pool acquire
+// (reuse). If the container's stream is already live (reuse), the registration
+// signal is pre-closed so the drain skips the connect timer. Calling BindExec
+// twice for the same execID is a no-op.
+func (p *Proxy) BindExec(execID, containerID string) {
+	if execID == "" || containerID == "" {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cs, ok := p.containers[containerID]
+	if !ok {
+		cs = &connStream{ownerExecID: execID}
+		p.containers[containerID] = cs
+	}
+	if _, bound := p.execIndex[execID]; bound {
+		return
+	}
+	p.execIndex[execID] = containerID
+	if cs.stream != nil {
+		// Stream already live: pre-close the signal (skip connect timer).
+		ch := make(chan struct{})
+		close(ch)
+		p.regChans[execID] = &regSignal{ch: ch, closed: true}
+	} else if _, exists := p.regChans[execID]; !exists {
+		p.regChans[execID] = &regSignal{ch: make(chan struct{})}
+	}
+}
+
+// AdoptStream re-owns a pooled container's live stream for newExecID on
+// warm-pool reuse. The OLD execution finished with a clean Done: the stream
+// stays open and the connector SDK keeps looping on Recv (it never
+// re-registers). Transferring the routing here — BEFORE SendExecute — is what
+// unblocks the next ExecuteJob; routing it under a brand-new execID would
+// queue it behind a Register that never arrives (the warm-pool deadlock).
+//
+// Keyed by containerID because the old execID is unknowable at the reuse call
+// site (the pool clears it on ReleaseToIdle); ownerExecID on the container
+// entry records the transfer. Re-binds execIndex[newExecID] even when the
+// manager skipped BindExec, pre-closes the registration signal (stream
+// already connected — drain skips the connect timer), and flushes any
+// ExecuteJob queued while the app raced the adopt. Double-adopt (container
+// already owned by newExecID) is a no-op. Errors only when the container has
+// no live stream (dead container / boot race) — the caller then falls back to
+// creating a fresh container.
+func (p *Proxy) AdoptStream(containerID, newExecID string) error {
+	if containerID == "" || newExecID == "" {
+		return fmt.Errorf("adopt stream: invalid container %q exec %q", containerID, newExecID)
+	}
+	p.mu.Lock()
+	cs, ok := p.containers[containerID]
+	if !ok || cs.stream == nil {
+		p.mu.Unlock()
+		return fmt.Errorf("adopt stream: container %s has no live stream", containerID)
+	}
+	if cs.ownerExecID == newExecID {
+		p.mu.Unlock()
+		return nil
+	}
+	if _, bound := p.execIndex[newExecID]; !bound {
+		p.execIndex[newExecID] = containerID
+	}
+	cs.ownerExecID = newExecID
+	// Stream already live: pre-close the signal (skip connect timer). Never
+	// delete here — the drain may wait for registration after the adopt.
+	if sig, ok := p.regChans[newExecID]; ok {
+		if !sig.closed {
+			close(sig.ch)
+			sig.closed = true
+		}
+	} else {
+		ch := make(chan struct{})
+		close(ch)
+		p.regChans[newExecID] = &regSignal{ch: ch, closed: true}
+	}
+	pending, hasPending := p.pendings[newExecID]
+	if hasPending {
+		delete(p.pendings, newExecID)
+	}
+	stream := cs.stream
+	p.mu.Unlock()
+
+	if hasPending {
+		// Flush outside the lock; sendMu serializes against SendExecute and
+		// the RegisterConnector flush (one Send at a time).
+		p.sendMu.Lock()
+		err := stream.Send(&pb.WorkerMessage{Message: &pb.WorkerMessage_Execute{Execute: pending}})
+		p.sendMu.Unlock()
+		if err != nil {
+			return err
+		}
+		p.logInfo("connector execute flushed: exec=%s job=%s", newExecID, pending.GetJobId())
+	}
+	p.logInfo("connector stream adopted: container=%s exec=%s", containerID, newExecID)
+	return nil
+}
+
+// ReleaseExec drops an execution's index entry (and registration signal). The
+// container entry itself survives — pool reuse. Called when an execution ends
+// (ReleaseToIdle) or is cancelled.
+func (p *Proxy) ReleaseExec(execID string) {
+	p.mu.Lock()
+	delete(p.execIndex, execID)
+	delete(p.regChans, execID)
+	p.mu.Unlock()
+}
+
+// RemoveContainer removes a container and every execution bound to it from the
+// routing tables. The sweeper calls it after Stop+Cleanup; the connector
+// death path calls it after unexpected stream EOF.
+func (p *Proxy) RemoveContainer(containerID string) {
+	p.mu.Lock()
+	delete(p.containers, containerID)
+	for execID, cid := range p.execIndex {
+		if cid == containerID {
+			delete(p.execIndex, execID)
+			delete(p.regChans, execID)
+		}
+	}
+	p.mu.Unlock()
+}
+
+// UnregisterConnector detaches the live stream from execID's container (EOF /
+// sweep). The container entry and execution index survive — Phase 2 pool
+// reuse. It does not touch the result channel — OnConnectorDown owns that
+// (avoids double close).
 func (p *Proxy) UnregisterConnector(execID string) {
 	if execID == "" {
 		return
 	}
 	p.mu.Lock()
-	delete(p.streams, execID)
-	p.mu.Unlock()
+	defer p.mu.Unlock()
+	cid, ok := p.execIndex[execID]
+	if !ok {
+		return
+	}
+	if cs := p.containers[cid]; cs != nil {
+		cs.stream = nil
+	}
 }
 
-// SendExecute delivers job to the connector stream for execID, or queues it as
-// pending until the connector registers. Safe to call before the connector
-// connects (container boot race). Returns an error only when an immediate send
-// to a live stream fails.
+// SendExecute delivers job to the connector stream for execID's container, or
+// queues it as pending until the container's connector registers. Safe to call
+// before the connector connects (container boot race). Returns an error only
+// when an immediate send to a live stream fails.
 func (p *Proxy) SendExecute(execID string, job *pb.ExecuteJob) error {
 	if execID == "" || job == nil {
 		return nil
 	}
 	p.mu.Lock()
-	stream, hasStream := p.streams[execID]
-	if !hasStream {
+	cid, ok := p.execIndex[execID]
+	var stream pb.ConnectorService_ConnectServer
+	if ok {
+		if cs := p.containers[cid]; cs != nil {
+			stream = cs.stream
+		}
+	}
+	if !ok || stream == nil {
 		p.pendings[execID] = job
 		p.mu.Unlock()
 		p.logInfo("connector execute queued: exec=%s (connector not connected)", execID)
@@ -188,12 +394,17 @@ func (p *Proxy) SendExecute(execID string, job *pb.ExecuteJob) error {
 	return nil
 }
 
-// HasStream reports whether a live connector stream is registered for execID.
+// HasStream reports whether a live connector stream is registered for execID's
+// container.
 func (p *Proxy) HasStream(execID string) bool {
 	p.mu.RLock()
-	_, ok := p.streams[execID]
-	p.mu.RUnlock()
-	return ok
+	defer p.mu.RUnlock()
+	cid, ok := p.execIndex[execID]
+	if !ok {
+		return false
+	}
+	cs, ok := p.containers[cid]
+	return ok && cs != nil && cs.stream != nil
 }
 
 func (p *Proxy) Register(execID string, ch chan ResultMsg) {

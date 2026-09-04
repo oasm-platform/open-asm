@@ -18,6 +18,11 @@ type JobSpec struct {
 	// runtime users) keeps the legacy behavior: DockerRuntime generates a
 	// random hex ID.
 	ExecID string
+	// PoolKey is the normalized (lowercase) container image the Manager
+	// resolves; the Docker runtime uses it for the pooled container name
+	// (oasm-<tool>-<poolShort>-<rand>) and the oasm.pool_key label. Empty for
+	// direct runtime users (legacy naming by execID).
+	PoolKey string
 	// ConnectorToken is the per-execution single-use connector auth token. It
 	// is injected as the container's WORKER_TOKEN env so the Register
 	// handshake authenticates against this execution only. Empty keeps the

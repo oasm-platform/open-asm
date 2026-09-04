@@ -63,6 +63,11 @@ describe('JobsRegistryController', () => {
       };
       mockConnectorRegistry = {
         getConnector: jest.fn(),
+        getResourceDefaults: jest.fn(() => ({
+          cpu: '500m',
+          memory: '512Mi',
+          timeoutSeconds: 600,
+        })),
       };
       mockToolConfigProfilesService = {
         resolveConfigForDispatch: jest.fn(),
@@ -129,6 +134,54 @@ describe('JobsRegistryController', () => {
       expect(result).toHaveProperty('category', 'VULNERABILITIES');
       // Must NOT include command in connector response
       expect(result).not.toHaveProperty('command');
+    });
+
+    it('should attach manifest resource defaults to connector response', async () => {
+      const mockJob = {
+        id: 'job-rd',
+        category: 'VULNERABILITIES',
+        asset: { id: 'a1', value: 'example.com' },
+        tool: { id: 'tool-1', name: 'my-connector' },
+        workspaceId: 'ws-1',
+        configProfileId: 'profile-1',
+      };
+      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'my-connector',
+        image: 'my-connector:latest',
+      });
+      mockConnectorRegistry.getResourceDefaults.mockReturnValue({
+        cpu: '500m',
+        memory: '512Mi',
+        timeoutSeconds: 600,
+      });
+      mockToolConfigProfilesService.resolveConfigForDispatch.mockResolvedValue(null);
+
+      const result = await controller.next({ id: 'worker-1' });
+
+      expect(result).toHaveProperty('cpu', '500m');
+      expect(result).toHaveProperty('memory', '512Mi');
+      expect(result).toHaveProperty('timeout_seconds', 600);
+      expect(mockConnectorRegistry.getResourceDefaults).toHaveBeenCalledWith(
+        'my-connector',
+      );
+    });
+
+    it('should not attach resource fields for built-in (non-connector) job', async () => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'job-legacy',
+        category: 'VULNERABILITIES',
+        command: 'nmap -sV target',
+        asset: { id: 'a1', value: 'example.com' },
+      });
+      mockConnectorRegistry.getConnector.mockReturnValue(null);
+
+      const result = await controller.next({ id: 'worker-1' });
+
+      expect(result).not.toHaveProperty('cpu');
+      expect(result).not.toHaveProperty('memory');
+      expect(result).not.toHaveProperty('timeout_seconds');
+      expect(mockConnectorRegistry.getResourceDefaults).not.toHaveBeenCalled();
     });
 
     it('should pack mixed-type config values into Struct fields by kind', async () => {

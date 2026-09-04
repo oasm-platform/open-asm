@@ -8,7 +8,16 @@ import (
 	"sync"
 	"time"
 
+	"oasm-worker/internal/resource"
 	"oasm-worker/internal/runtime"
+)
+
+// Resource limit keys inside JobSpec.Limits — the scheduling context
+// (core-api) speaks cpu/memory/timeoutSeconds per the connector manifest;
+// parsing rules live in internal/resource.
+const (
+	JobCPUKey    = "cpu"
+	JobMemoryKey = "memory"
 )
 
 // Logger receives error notifications from Manager when background
@@ -22,9 +31,9 @@ type Logger interface {
 
 // Manager tracks concurrent executions with a state machine.
 // It replaces the legacy exec.Command sh -c path with isolated executions.
-// The connector protocol is one stream = one execution: every execution gets
-// its own container (1:1 model). There is no container-reuse pool — pooled
-// reuse would misroute/starve jobs 2..N and carry a stale EXECUTION_ID env.
+// Phase 2 warm pool: when a PoolManager is wired (node mode, pool_enabled),
+// executions acquire+release idle containers of the same image instead of the
+// legacy 1-container-per-execution model. Pool nil = legacy 1:1 unchanged.
 type Manager struct {
 	mu             sync.Mutex
 	rt             runtime.ExecutionRuntime
@@ -33,6 +42,15 @@ type Manager struct {
 	nextID         int
 	logger         Logger
 
+	// pool is the warm-container pool; nil keeps the legacy 1:1 model.
+	pool *PoolManager
+	// binder releases the proxy's execID→container routing when an execution
+	// ends (structural connector.StreamBinder; nil = no proxy wiring).
+	binder streamBinder
+	// evictor removes a dead container from the proxy (structural
+	// connector.Evictor; nil = no proxy wiring).
+	evictor containerEvictor
+
 	// tokenMu guards tokens: per-execution single-use connector auth tokens
 	// (one token = one execution). They are minted before container creation
 	// and deleted on Release/Cancel (single-use lifecycle). Notably separate
@@ -40,6 +58,21 @@ type Manager struct {
 	// Register handshake goroutines.
 	tokenMu sync.RWMutex
 	tokens  map[string]string
+}
+
+// streamBinder / containerEvictor are the structural slices of
+// connector.StreamBinder / connector.Evictor the Manager consumes. Declared
+// locally so the execution package never imports connector.
+type streamBinder interface {
+	BindExec(execID, containerID string)
+	ReleaseExec(execID string)
+	// AdoptStream re-owns a pooled container's live stream for the new
+	// execution on reuse; errors when the container has no live stream.
+	AdoptStream(containerID, newExecID string) error
+}
+
+type containerEvictor interface {
+	RemoveContainer(containerID string)
 }
 
 // NewManager creates a Manager backed by rt with at most maxConcurrency
@@ -60,6 +93,31 @@ func (m *Manager) SetLogger(l Logger) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.logger = l
+}
+
+// SetPool wires the warm-container pool (node mode only). The legacy 1:1
+// model (pool nil) keeps every execution on its own container. Call once at
+// startup, before Submit.
+func (m *Manager) SetPool(p *PoolManager) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.pool = p
+}
+
+// SetStreamBinder wires the proxy execID→container routing (connector
+// package, structural). Nil = no proxy to bind.
+func (m *Manager) SetStreamBinder(b streamBinder) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.binder = b
+}
+
+// SetEvictor wires proxy container removal for the sweeper (connector
+// package, structural). Nil = no proxy to evict.
+func (m *Manager) SetEvictor(e containerEvictor) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.evictor = e
 }
 
 // logError reports a container-engine operation failure via the injected
@@ -134,40 +192,202 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	m.tokenMu.Unlock()
 	spec.ConnectorToken = token
 
-	h, err := m.rt.Create(ctx, runtime.JobSpec{
-		Tool:    spec.Tool,
-		Image:   spec.Image,
-		Version: spec.Version,
-		Inputs:  spec.Inputs,
-		Limits:  spec.Limits,
-		TraceID: spec.TraceID,
-		Config:  spec.Config,
-		JobID:   spec.JobID,
-		// Single source of truth: the connector registers under this ID
-		// (EXECUTION_ID env), matching the proxy's pending/stream key.
-		ExecID: id,
-		// Single-use auth: the connector's Register must present this token
-		// (WORKER_TOKEN env); the connector server validates it per-execution.
-		ConnectorToken: spec.ConnectorToken,
-	}, runtime.RuntimeOpts{TraceID: spec.TraceID})
-	if err != nil {
-		// No execution was created — drop the token so a stray connector can
-		// never authenticate against a ghost execution.
-		m.tokenMu.Lock()
-		delete(m.tokens, id)
-		m.tokenMu.Unlock()
-		m.mu.Unlock()
-		return "", err
+	// Manifest resource limits → runtime opts. Malformed values must never
+	// fail the job: warn and run unlimited (CPU=0/Memory=0 in Docker terms).
+	// Timeout-only limits keep the legacy unlimited opts — the timeout is
+	// enforced separately by the auto-cancel timer below.
+	opts := runtime.RuntimeOpts{TraceID: spec.TraceID}
+	var limitWarn error
+	if cpu, mem := limitsCPUandMemory(spec.Limits); cpu != "" && mem != "" {
+		ropts, err := resource.ToRuntimeOpts(resource.Limits{
+			CPU:            cpu,
+			Memory:         mem,
+			TimeoutSeconds: timeoutSeconds(spec.Limits),
+		}, spec.TraceID)
+		if err != nil {
+			limitWarn = err
+		} else {
+			opts = ropts
+		}
 	}
-	if err := m.rt.Start(ctx, h); err != nil {
-		m.mu.Unlock()
-		return "", err
+
+	// Pool key: normalized (lowercase) image — the acquire key for warm
+	// container reuse.
+	poolKey := normalizePoolKey(spec.Image)
+
+	// Acquire-or-create (Phase 2):
+	//  - pool hit: adopt the existing container. It is already running with
+	//    its original manifest limits applied; the reused stream is already
+	//    authenticated, so no Create/Start/token handshake is needed.
+	//  - pool miss (or pool disabled): create + start a fresh container, then
+	//    record it in the pool as busy.
+	// poolLogs carries the Phase 3 acquire/create outcome as SEPARATE lines
+	// (one event per line, never overwriting each other); logged after
+	// mu.Unlock (logInfo takes mu itself — calling it here would deadlock).
+	// adoptEvicted/adoptErr record an adopt failure so it can be logged as its
+	// own ERROR line and the container Stop+Cleanup'd outside the lock.
+	var poolLogs []string
+	var adoptEvicted string
+	var adoptErr error
+	var h runtime.Handle
+	if m.pool != nil {
+		if cid, ok := m.pool.Acquire(id, poolKey); ok {
+			h = runtime.Handle{ID: cid}
+			poolLogs = append(poolLogs, fmt.Sprintf("pool reuse: container %s pool_key=%s", cid, poolKey))
+			// Warm-pool reuse: the container's connector stream is already
+			// live under the PREVIOUS execution's ID (the SDK loops on Recv
+			// after Done and never re-registers). Route the stream to THIS
+			// execution now — BindExec alone cannot: it sees only the pool
+			// entry, which cleared the old execID on ReleaseToIdle. Without
+			// the adopt, the next SendExecute queues behind a Register that
+			// never arrives and the job deadlocks. A stream-less container
+			// (dead / boot race) is evicted and falls through to a fresh
+			// replica below — the evicted container is recorded so it is
+			// stopped+cleaned up after the critical section instead of
+			// leaking as an up-forever orphan.
+			if m.binder != nil {
+				if err := m.binder.AdoptStream(cid, id); err != nil {
+					poolLogs = append(poolLogs, fmt.Sprintf("pool evict: container %s removed (adopt failed)", cid))
+					adoptErr = err
+					adoptEvicted = cid
+					m.pool.Evict(id)
+					if m.evictor != nil {
+						m.evictor.RemoveContainer(cid)
+					}
+					h = runtime.Handle{}
+				} else {
+					poolLogs = append(poolLogs, fmt.Sprintf("pool adopt: container=%s exec=%s", cid, id))
+				}
+			}
+		} else if m.pool.AtCapacity(poolKey) {
+			// Phase 3 replica quota: no idle container AND the image's busy
+			// count is at the cap — refuse instead of creating a replica. The
+			// caller (job.go) backs off and retries; no container is created,
+			// no Core failure is recorded.
+			busy, max := m.pool.busyCount(poolKey), m.pool.maxReplicasPerImage
+			poolLogs = append(poolLogs, fmt.Sprintf("pool exhausted: pool_key=%s busy=%d max=%d", poolKey, busy, max))
+			// No execution was created — drop the token so a stray connector
+			// can never authenticate against a ghost execution.
+			m.tokenMu.Lock()
+			delete(m.tokens, id)
+			m.tokenMu.Unlock()
+			m.mu.Unlock()
+			for _, line := range poolLogs {
+				m.logInfo("%s", line)
+			}
+			return "", fmt.Errorf("%w: %s", ErrPoolExhausted, poolKey)
+		}
+	}
+	if h.ID == "" {
+		created, err := m.rt.Create(ctx, runtime.JobSpec{
+			Tool:    spec.Tool,
+			Image:   spec.Image,
+			Version: spec.Version,
+			Inputs:  spec.Inputs,
+			Limits:  spec.Limits,
+			TraceID: spec.TraceID,
+			Config:  spec.Config,
+			JobID:   spec.JobID,
+			// Single source of truth: the connector registers under this ID
+			// (EXECUTION_ID env), matching the proxy's pending/stream key.
+			ExecID: id,
+			// Pooled container identity for name + labels (docker runtime).
+			PoolKey: poolKey,
+			// Single-use auth: the connector's Register must present this
+			// token (WORKER_TOKEN env); the connector server validates it
+			// per-execution.
+			ConnectorToken: spec.ConnectorToken,
+		}, opts)
+		if err != nil {
+			// No execution was created — drop the token so a stray connector
+			// can never authenticate against a ghost execution.
+			m.tokenMu.Lock()
+			delete(m.tokens, id)
+			m.tokenMu.Unlock()
+			m.mu.Unlock()
+			return "", err
+		}
+		h = created
+		// Track the replica as busy FIRST: a connector that dials back while
+		// the container boots must find the pool entry consistent (Sweep never
+		// races a not-yet-tracked execution).
+		if m.pool != nil {
+			cpu, mem := limitsCPUandMemory(spec.Limits)
+			m.pool.Add(poolEntry{
+				ID:      h.ID,
+				Image:   spec.Image,
+				PoolKey: poolKey,
+				CPU:     cpu,
+				Memory:  mem,
+				State:   PoolStateBusy,
+				ExecID:  id,
+			})
+			poolLogs = append(poolLogs, fmt.Sprintf("pool miss: created replica container %s pool_key=%s busy=%d max=%d",
+				h.ID, poolKey, m.pool.busyCount(poolKey), m.pool.maxReplicasPerImage))
+		}
+		// Bind BEFORE Start: the connector can dial back as soon as the
+		// container boots. Routing the execution to its container first
+		// guarantees RegisterConnector never falls into the adhoc key — an
+		// unbound registration keys the stream under adhoc-<exec>, so the
+		// container is never mapped under its real ID and pool reuse later
+		// can never adopt it (silent Evict + orphan container: the
+		// "reuse-miss" bug).
+		if m.binder != nil {
+			m.binder.BindExec(id, h.ID)
+		}
+		if err := m.rt.Start(ctx, h); err != nil {
+			// Start failed: no execution exists. Undo the pool/proxy wiring
+			// staged above and drop the single-use token so no ghost execution
+			// can authenticate against a container that never ran.
+			if m.pool != nil {
+				if cid := m.pool.Evict(id); cid != "" && m.evictor != nil {
+					m.evictor.RemoveContainer(cid)
+				}
+			}
+			if m.binder != nil {
+				m.binder.ReleaseExec(id)
+			}
+			m.tokenMu.Lock()
+			delete(m.tokens, id)
+			m.tokenMu.Unlock()
+			m.mu.Unlock()
+			return "", err
+		}
 	}
 	m.execs[id] = &Execution{ID: id, Spec: spec, State: StateRunning, Handle: h}
+	// Route this execution to its container in the proxy. On a pool hit the
+	// stream may already be live — BindExec pre-closes the registration signal
+	// so the drain skips the connect timer.
+	if m.binder != nil {
+		m.binder.BindExec(id, h.ID)
+	}
 	m.mu.Unlock()
+
+	// An adopt failure is its own ERROR line (never overwritten by the
+	// fallback "pool miss" line below), followed by a best-effort Stop+Cleanup
+	// of the evicted container on a detached context: it is already out of
+	// byID (Evict), so leaving it running makes it an invisible up-forever
+	// orphan the sweeper can never see.
+	if adoptEvicted != "" {
+		m.logError(fmt.Sprintf("pool adopt failed: container=%s exec=%s", adoptEvicted, id), adoptErr)
+		dctx, dcancel := context.WithTimeout(context.Background(), ConnectorCleanupTimeout)
+		if err := m.rt.Cancel(dctx, runtime.Handle{ID: adoptEvicted}); err != nil {
+			m.logError("pool adopt-fail stop failed", err)
+		}
+		if err := m.rt.Cleanup(dctx, runtime.Handle{ID: adoptEvicted}); err != nil {
+			m.logError("pool adopt-fail cleanup failed", err)
+		}
+		dcancel()
+	}
 	// Never log the token value — only that it was set. Logged outside the
-	// critical section (logInfo takes mu).
+	// critical section (logInfo takes mu). Each phase-3 event is its own line.
+	for _, line := range poolLogs {
+		m.logInfo("%s", line)
+	}
 	m.logInfo("execution token set token_set=%t", true)
+	if limitWarn != nil {
+		m.logInfo("running unlimited: invalid resource limits (%v)", limitWarn)
+	}
 	m.armTimeout(id, spec)
 	return id, nil
 }
@@ -211,8 +431,9 @@ func (m *Manager) SubmitWithTimeout(ctx context.Context, spec JobSpec, timeout t
 	return m.Submit(ctx, spec)
 }
 
-// Cancel marks the execution cancelled and stops tracking it. The 1:1
-// container is stopped and removed immediately (rt.Cancel + rt.Cleanup).
+// Cancel marks the execution cancelled and stops tracking it. The container is
+// stopped and removed immediately (rt.Cancel + rt.Cleanup) regardless of pool
+// state — a cancelled execution never leaves a warm container behind.
 func (m *Manager) Cancel(ctx context.Context, id string) error {
 	m.mu.Lock()
 	e, ok := m.execs[id]
@@ -227,6 +448,15 @@ func (m *Manager) Cancel(ctx context.Context, id string) error {
 	m.tokenMu.Lock()
 	delete(m.tokens, id)
 	m.tokenMu.Unlock()
+	// Pooled container dies with its cancelled execution.
+	if m.pool != nil {
+		if cid := m.pool.Evict(id); cid != "" && m.evictor != nil {
+			m.evictor.RemoveContainer(cid)
+		}
+	}
+	if m.binder != nil {
+		m.binder.ReleaseExec(id)
+	}
 	m.mu.Unlock()
 	if err := m.rt.Cancel(ctx, h); err != nil {
 		m.logError("container cancel failed", err)
@@ -237,25 +467,38 @@ func (m *Manager) Cancel(ctx context.Context, id string) error {
 	return nil
 }
 
-// Release retires an execution's claim on its 1:1 container: cleanup runs
-// immediately. OnConnectorDown is the legacy name for this signal.
+// Release retires an execution's claim on its container. With a pool wired the
+// container is handed back IDLE for reuse (no Cleanup — it stays alive for the
+// next execution of the same image); without a pool the legacy 1:1 teardown
+// (immediate Cleanup) runs. OnConnectorDown is the legacy name for this
+// signal.
 func (m *Manager) Release(ctx context.Context, execID string) error {
+	if m.pool != nil {
+		m.pool.ReleaseToIdle(execID)
+	}
 	m.mu.Lock()
 	e, ok := m.execs[execID]
-	if !ok {
-		m.mu.Unlock()
-		return nil
+	var h runtime.Handle
+	if ok {
+		h = e.Handle
+		e.State = StateDone
+		delete(m.execs, execID)
 	}
-	h := e.Handle
-	e.State = StateDone
-	delete(m.execs, execID)
 	// Single-use: the token dies with its execution.
 	m.tokenMu.Lock()
 	delete(m.tokens, execID)
 	m.tokenMu.Unlock()
+	if m.binder != nil {
+		m.binder.ReleaseExec(execID)
+	}
 	m.mu.Unlock()
-	if err := m.rt.Cleanup(ctx, h); err != nil {
-		m.logError("container cleanup failed", err)
+	if !ok {
+		return nil
+	}
+	if m.pool == nil {
+		if err := m.rt.Cleanup(ctx, h); err != nil {
+			m.logError("container cleanup failed", err)
+		}
 	}
 	return nil
 }
@@ -264,6 +507,90 @@ func (m *Manager) Release(ctx context.Context, execID string) error {
 // releases this execution's claim on its container.
 func (m *Manager) OnConnectorDown(ctx context.Context, execID string) error {
 	return m.Release(ctx, execID)
+}
+
+// IsIdle reports whether the container backing execID is idle (no execution
+// in flight). The job drain uses it to skip container health checks while a
+// reused container sits between executions. False when the pool is disabled.
+func (m *Manager) IsIdle(execID string) bool {
+	if m.pool == nil {
+		return false
+	}
+	return m.pool.IsIdle(execID)
+}
+
+// ReleaseToIdle implements connector.IdleNotifier: the connector server calls
+// it after a clean Done so the pooled container goes back to the idle queue
+// for reuse. No-op when the pool is disabled.
+func (m *Manager) ReleaseToIdle(execID string) {
+	if m.pool == nil {
+		return
+	}
+	m.pool.ReleaseToIdle(execID)
+}
+
+// ContainerDown implements connector.IdleNotifier: the connector stream died
+// unexpectedly, so the container can never be reused. It is evicted from the
+// pool, stopped, removed and dropped from the proxy. No-op when the pool is
+// disabled or the container is already gone.
+func (m *Manager) ContainerDown(execID string) {
+	if m.pool == nil {
+		return
+	}
+	cid := m.pool.Evict(execID)
+	if cid == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), ConnectorCleanupTimeout)
+	defer cancel()
+	if err := m.rt.Cancel(ctx, runtime.Handle{ID: cid}); err != nil {
+		m.logError("pool evict cancel failed", err)
+	}
+	if err := m.rt.Cleanup(ctx, runtime.Handle{ID: cid}); err != nil {
+		m.logError("pool evict cleanup failed", err)
+	}
+	if m.evictor != nil {
+		m.evictor.RemoveContainer(cid)
+	}
+	m.logInfo("pool evict: container %s removed (connector stream down)", cid)
+}
+
+// SweepLoop runs the pool sweeper until ctx is cancelled: every
+// ConnectorSweepInterval, idle containers past the idle timeout are stopped,
+// removed and dropped from the proxy. Called only when the pool is enabled.
+func (m *Manager) SweepLoop(ctx context.Context) {
+	if m.pool == nil {
+		return
+	}
+	ticker := time.NewTicker(ConnectorSweepInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			for _, e := range m.pool.Sweep(time.Now()) {
+				m.sweepContainer(e)
+			}
+		}
+	}
+}
+
+// sweepContainer tears down one expired idle container (Stop+Cleanup) and
+// removes it from the proxy. Best-effort: failures are logged, never fatal.
+func (m *Manager) sweepContainer(e poolEntry) {
+	ctx, cancel := context.WithTimeout(context.Background(), ConnectorCleanupTimeout)
+	defer cancel()
+	if err := m.rt.Cancel(ctx, runtime.Handle{ID: e.ID}); err != nil {
+		m.logError("pool sweep stop failed", err)
+	}
+	if err := m.rt.Cleanup(ctx, runtime.Handle{ID: e.ID}); err != nil {
+		m.logError("pool sweep cleanup failed", err)
+	}
+	if m.evictor != nil {
+		m.evictor.RemoveContainer(e.ID)
+	}
+	m.logInfo("pool sweep: idle container %s removed (pool_key=%s)", e.ID, e.PoolKey)
 }
 
 // ActiveCount returns the number of active executions.
@@ -322,4 +649,15 @@ func timeoutSeconds(limits map[string]any) int {
 		return int(v)
 	}
 	return 0
+}
+
+// limitsCPUandMemory extracts the CPU/memory strings from a Limits map.
+// Missing or wrong-typed values yield empty strings (→ unlimited run).
+func limitsCPUandMemory(limits map[string]any) (string, string) {
+	if limits == nil {
+		return "", ""
+	}
+	cpu, _ := limits[JobCPUKey].(string)
+	mem, _ := limits[JobMemoryKey].(string)
+	return cpu, mem
 }

@@ -18,6 +18,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 )
@@ -283,12 +284,14 @@ func randHex4() string {
 	return hex.EncodeToString(b)
 }
 
-// buildContainerName builds the container name oasm-<tool>-<exec8>-<rand4>.
-// The random suffix keeps concurrent creates of the same tool collision-free;
-// a 409 Conflict (stale container holding the name) is retried once with a
-// fresh suffix in Create.
-func buildContainerName(tool, execID string) string {
-	short := execID
+// buildContainerName builds the pooled container name oasm-<tool>-<poolShort>-<rand4>.
+// The pool short is the sanitized pool key (normalized image) truncated to 8
+// chars: same-image containers in the pool share the prefix, so a container
+// listing groups a warm pool at a glance. The random suffix keeps concurrent
+// creates of the same tool collision-free; a 409 Conflict (stale container
+// holding the name) is retried once with a fresh suffix in Create.
+func buildContainerName(tool, poolRef string) string {
+	short := sanitizeToolName(poolRef)
 	if len(short) > 8 {
 		short = short[:8]
 	}
@@ -302,6 +305,22 @@ func buildContainerName(tool, execID string) string {
 // never silently skips a needed fetch.
 func imageIsCached(err error) bool {
 	return err == nil
+}
+
+// hostResources maps worker RuntimeOpts to Docker HostConfig.Resources.
+// Contract: opts.CPU is millicores (500m -> 500 -> 500000000 nanocpus) and
+// opts.Memory is BYTES (resource.ParseMemoryToBytes already converted, e.g.
+// 512Mi -> 536870912). Memory is passed through verbatim — it must NOT be
+// re-multiplied: the Phase 1 unit bug (×1024*1024 on already-byte values)
+// inflated 512Mi to ~512Gi. MemorySwap == Memory disables swap. Zero means
+// "unlimited", which is what the runtime expects for legacy specs without
+// resource defaults.
+func hostResources(opts RuntimeOpts) container.Resources {
+	return container.Resources{
+		NanoCPUs:   int64(opts.CPU) * 1e6,
+		Memory:     int64(opts.Memory),
+		MemorySwap: int64(opts.Memory),
+	}
 }
 
 func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOpts) (Handle, error) {
@@ -326,20 +345,36 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID)
 
 	// Container config: image, env, labels for lifecycle management.
+	// oasm.pool_key (normalized image) marks pooled containers so worker
+	// startup + sweeper can identify (and prune) them; oasm.last_used is
+	// informational only — the in-memory pool owns sweep timing.
+	labels := map[string]string{
+		"trace_id":     opts.TraceID,
+		"tool":         spec.Tool,
+		"exec_id":      execID,
+		"oasm-managed": "true",
+	}
+	poolRef := spec.PoolKey
+	if poolRef == "" {
+		poolRef = spec.Image
+	}
+	labels["oasm.pool_key"] = poolRef
+	labels["oasm.last_used"] = time.Now().UTC().Format(time.RFC3339)
+	// Labels assigned after the struct literal so gofmt keeps
+	// "Image: spec.Image" single-spaced (source-guard test).
 	config := &container.Config{
 		Image: spec.Image,
 		Env:   env,
-		Labels: map[string]string{
-			"trace_id":     opts.TraceID,
-			"tool":         spec.Tool,
-			"exec_id":      execID,
-			"oasm-managed": "true",
-		},
 	}
+	config.Labels = labels
 
 	// Host config: resource limits + security hardening.
 	// CPU: opts.CPU in millicores → NanoCPUs (1 millicore = 1e6 nanocpus).
-	// Memory: opts.Memory in MB → bytes. MemorySwap = Memory disables swap.
+	// Memory: opts.Memory in BYTES (resource.ParseMemoryToBytes + limits.go
+	// already converted 512Mi → 536870912) passed through unchanged — do NOT
+	// multiply by 1024*1024 here (the pre-Phase-2 unit bug inflated memory
+	// ~1024×). MemorySwap = Memory disables swap. Zero = unlimited (legacy
+	// specs without resource defaults).
 	// ExtraHosts maps host.docker.internal → host-gateway so connector
 	// containers can dial the worker's connector gRPC server from inside the
 	// container on any host: Engine 20.10+ resolves host-gateway to the host,
@@ -349,11 +384,7 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	// ponytail: if an engine predating host-gateway ever errors on this entry,
 	// gate it by OS (skip on windows/darwin) before retrying create.
 	hostConfig := &container.HostConfig{
-		Resources: container.Resources{
-			NanoCPUs:   int64(opts.CPU) * 1e6,
-			Memory:     int64(opts.Memory) * 1024 * 1024,
-			MemorySwap: int64(opts.Memory) * 1024 * 1024,
-		},
+		Resources:      hostResources(opts),
 		SecurityOpt:    []string{"no-new-privileges:true"},
 		ReadonlyRootfs: false, // connectors may need to write temp files
 		ExtraHosts:     []string{"host.docker.internal:host-gateway"},
@@ -373,9 +404,10 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		},
 	}
 
-	// 1 stream = 1 execution: every container is a fresh 1:1 execution with a
-	// random-suffix name — no pooled reuse (pool machinery removed).
-	name := buildContainerName(spec.Tool, execID)
+	// Pooled container name: oasm-<tool>-<poolShort8>-<rand4> — same-image
+	// containers group under one short prefix; an idle warm container is
+	// reused by the next execution of the same image (Phase 2).
+	name := buildContainerName(spec.Tool, poolRef)
 
 	// Pull policy: inspect first — an image already present locally skips the
 	// network pull entirely (the common case for repeated jobs of the same
@@ -400,7 +432,7 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 			// Name held by a stale/foreign container: retry once with a fresh
 			// random suffix.
 			d.logInfo("docker: container name conflict, retrying with fresh suffix: %v", err)
-			name = buildContainerName(spec.Tool, execID)
+			name = buildContainerName(spec.Tool, poolRef)
 			resp, err = d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 		}
 		if err != nil {
@@ -421,9 +453,10 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	return Handle{
 		ID: containerID,
 		Labels: map[string]string{
-			"trace_id": opts.TraceID,
-			"tool":     spec.Tool,
-			"exec_id":  execID,
+			"trace_id":      opts.TraceID,
+			"tool":          spec.Tool,
+			"exec_id":       execID,
+			"oasm.pool_key": poolRef,
 		},
 	}, nil
 }
@@ -690,7 +723,31 @@ func (d *DockerRuntime) Cleanup(ctx context.Context, h Handle) error {
 	return nil
 }
 
+// PrunePoolContainers removes every container tagged oasm.pool_key left over
+// from a previous worker process (crash/orphan guard). Called once at worker
+// startup when the pool is enabled; stale idle containers from a dead worker
+// must not accumulate forever. Best-effort — failures are logged, never fatal.
+func (d *DockerRuntime) PrunePoolContainers(ctx context.Context) {
+	if d.cli == nil {
+		return
+	}
+	f := filters.NewArgs()
+	f.Add("label", "oasm.pool_key")
+	report, err := d.cli.ContainersPrune(ctx, f)
+	if err != nil {
+		d.logWarning("docker: pool prune failed: %v", err)
+		return
+	}
+	if n := len(report.ContainersDeleted); n > 0 {
+		d.logInfo("docker: pruned %d stale pool container(s) from a previous worker", n)
+	}
+}
+
 // buildContainerEnv constructs the env var slice for a connector container.
+// IMPORTANT (Phase 2 warm pool): this env is FIRST-RUN ONLY. A reused idle
+// container keeps its original env; per-job inputs and the config profile
+// (OASM_CONFIG) travel in-band via the ExecuteJob message instead, and the
+// SDK merges them over the stale env (see sdk/runtime/runtime.go).
 // WORKER_GRPC_ADDR is the verbatim dial address (a bracketed IPv6 override
 // stays bracketed); WORKER_GRPC_HOST/_PORT are the same address split for
 // SDKs that need host and port separately (host is bare — brackets stripped).

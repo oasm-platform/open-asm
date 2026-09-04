@@ -130,12 +130,17 @@ type Job struct {
 	Command  *string `protobuf:"bytes,3,opt,name=command,proto3,oneof" json:"command,omitempty"`
 	Category string  `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`
 	// NEW — connector execution spec
-	Tool          string           `protobuf:"bytes,5,opt,name=tool,proto3" json:"tool,omitempty"`
-	Image         string           `protobuf:"bytes,6,opt,name=image,proto3" json:"image,omitempty"`   // core resolves from manifest registry
-	Inputs        *structpb.Struct `protobuf:"bytes,7,opt,name=inputs,proto3" json:"inputs,omitempty"` // {target: "..."} per-run
-	Config        *structpb.Struct `protobuf:"bytes,8,opt,name=config,proto3" json:"config,omitempty"` // decrypted profile JSON per-profile
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Tool   string           `protobuf:"bytes,5,opt,name=tool,proto3" json:"tool,omitempty"`
+	Image  string           `protobuf:"bytes,6,opt,name=image,proto3" json:"image,omitempty"`   // core resolves from manifest registry
+	Inputs *structpb.Struct `protobuf:"bytes,7,opt,name=inputs,proto3" json:"inputs,omitempty"` // {target: "..."} per-run
+	Config *structpb.Struct `protobuf:"bytes,8,opt,name=config,proto3" json:"config,omitempty"` // decrypted profile JSON per-profile
+	// Resource limits resolved from the connector manifest (scheduling context).
+	// Worker falls back to unlimited when absent.
+	Cpu            *string `protobuf:"bytes,9,opt,name=cpu,proto3,oneof" json:"cpu,omitempty"`                                               // e.g. "500m" (millicores) or "1" (cores)
+	Memory         *string `protobuf:"bytes,10,opt,name=memory,proto3,oneof" json:"memory,omitempty"`                                        // e.g. "512Mi", "1Gi"
+	TimeoutSeconds *int32  `protobuf:"varint,11,opt,name=timeout_seconds,json=timeoutSeconds,proto3,oneof" json:"timeout_seconds,omitempty"` // container timeout in seconds
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Job) Reset() {
@@ -223,6 +228,27 @@ func (x *Job) GetConfig() *structpb.Struct {
 		return x.Config
 	}
 	return nil
+}
+
+func (x *Job) GetCpu() string {
+	if x != nil && x.Cpu != nil {
+		return *x.Cpu
+	}
+	return ""
+}
+
+func (x *Job) GetMemory() string {
+	if x != nil && x.Memory != nil {
+		return *x.Memory
+	}
+	return ""
+}
+
+func (x *Job) GetTimeoutSeconds() int32 {
+	if x != nil && x.TimeoutSeconds != nil {
+		return *x.TimeoutSeconds
+	}
+	return 0
 }
 
 type JobResponse struct {
@@ -1729,7 +1755,7 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\n" +
 	"\x13jobs_registry.proto\x12\rjobs_registry\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\x18\n" +
 	"\x06Worker\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x98\x02\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xa1\x03\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x05asset\x18\x02 \x01(\v2\x14.jobs_registry.AssetR\x05asset\x12!\n" +
@@ -1738,9 +1764,16 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\x04tool\x18\x05 \x01(\tR\x04tool\x12\x14\n" +
 	"\x05image\x18\x06 \x01(\tR\x05image\x12/\n" +
 	"\x06inputs\x18\a \x01(\v2\x17.google.protobuf.StructR\x06inputs\x12/\n" +
-	"\x06config\x18\b \x01(\v2\x17.google.protobuf.StructR\x06configB\n" +
+	"\x06config\x18\b \x01(\v2\x17.google.protobuf.StructR\x06config\x12\x15\n" +
+	"\x03cpu\x18\t \x01(\tH\x01R\x03cpu\x88\x01\x01\x12\x1b\n" +
+	"\x06memory\x18\n" +
+	" \x01(\tH\x02R\x06memory\x88\x01\x01\x12,\n" +
+	"\x0ftimeout_seconds\x18\v \x01(\x05H\x03R\x0etimeoutSeconds\x88\x01\x01B\n" +
 	"\n" +
-	"\b_command\"'\n" +
+	"\b_commandB\x06\n" +
+	"\x04_cpuB\t\n" +
+	"\a_memoryB\x12\n" +
+	"\x10_timeout_seconds\"'\n" +
 	"\vJobResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"\xb3\x01\n" +
 	"\x16SubdomainResultRequest\x12\x1b\n" +

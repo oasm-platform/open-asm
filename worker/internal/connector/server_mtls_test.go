@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"io"
 	"math/big"
 	"net"
 	"os"
@@ -266,7 +265,8 @@ func TestServerMTLSHandshakeAccepted(t *testing.T) {
 		t.Fatal("expected stream mapped over mTLS connection")
 	}
 
-	// Clean Done → EOF, stream unmapped.
+	// Clean Done over mTLS — the stream stays OPEN (Phase 2 warm pool): the
+	// connector keeps its read loop for the next ExecuteJob.
 	if err := stream.Send(&pb.ConnectorMessage{
 		Message: &pb.ConnectorMessage_Done{
 			Done: &pb.Done{ExecutionId: "exec-mtls-1"},
@@ -274,11 +274,10 @@ func TestServerMTLSHandshakeAccepted(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Send Done: %v", err)
 	}
-	if _, err := stream.Recv(); err != io.EOF {
-		t.Fatalf("expected EOF after Done over mTLS, got %v", err)
-	}
-	if proxy.HasStream("exec-mtls-1") {
-		t.Fatal("stream must be unregistered after Done")
+	// No EOF after Done — the read loop continues; the client connection is
+	// torn down by the test cleanup.
+	if !proxy.HasStream("exec-mtls-1") {
+		t.Fatal("stream must stay registered after Done (pool reuse)")
 	}
 }
 

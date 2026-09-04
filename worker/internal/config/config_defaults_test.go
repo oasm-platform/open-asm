@@ -1,39 +1,56 @@
 package config
 
 import (
-	"os"
-	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
 )
 
-// The connector protocol is one stream per execution: a connector registers
-// under one execID and exits after the first Done, and the server closes the
-// stream after the first Done. Container pool reuse (multiple executions
-// sharing one container) is therefore unsupported: WORKER_POOL_ENABLED=true
-// must fail fast with a clear reason instead of silently degrading.
-func TestLoadConfigRejectsPoolEnabled(t *testing.T) {
-	viper.Reset() // fresh viper — no overrides from previous LoadConfig calls
-	t.Setenv("WORKER_POOL_ENABLED", "true")
-
-	_, err := LoadConfig()
-	if err == nil {
-		t.Fatal("expected error when WORKER_POOL_ENABLED=true (pool reuse is unsupported with single-exec connectors)")
+// Phase 2: warm-pool container reuse is now supported and ON by default.
+// pool_enabled defaults to true so a single node worker reuses idle containers
+// across jobs of the same image; WORKER_POOL_ENABLED=false is the kill-switch
+// that restores the legacy 1-stream-1-container behavior.
+func TestLoadConfigPoolEnabledDefaultTrue(t *testing.T) {
+	viper.Reset()
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
 	}
-	if !strings.Contains(err.Error(), "pool reuse") {
-		t.Fatalf("error must explain the pool-reuse ban, got %q", err.Error())
+	if !cfg.PoolEnabled {
+		t.Fatal("pool_enabled must default to true (warm-pool reuse)")
 	}
 }
 
-// Source guard: the Config struct must not resurrect the pool knobs. 1 stream =
-// 1 execution; pooled reuse would misroute/starve jobs 2..N.
-func TestNoContainerPoolKnobs(t *testing.T) {
-	src, err := os.ReadFile("config.go")
+func TestLoadConfigPoolKillSwitchDisables(t *testing.T) {
+	viper.Reset()
+	t.Setenv("WORKER_POOL_ENABLED", "false")
+	cfg, err := LoadConfig()
 	if err != nil {
-		t.Fatalf("read config.go: %v", err)
+		t.Fatalf("LoadConfig: %v", err)
 	}
-	if strings.Contains(string(src), `mapstructure:"pool_enabled"`) {
-		t.Fatal("config.go must not expose the pool_enabled field again (1 stream = 1 execution; pool reuse unsupported)")
+	if cfg.PoolEnabled {
+		t.Fatal("WORKER_POOL_ENABLED=false must disable the pool (legacy 1:1)")
+	}
+}
+
+func TestLoadConfigConnectorIdleTimeoutDefault60(t *testing.T) {
+	viper.Reset()
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.ConnectorIdleTimeout != 60 {
+		t.Fatalf("connector_idle_timeout must default to 60s, got %d", cfg.ConnectorIdleTimeout)
+	}
+}
+
+func TestLoadConfigMaxReplicasPerImageDefault1(t *testing.T) {
+	viper.Reset()
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.MaxReplicasPerImage != 1 {
+		t.Fatalf("max_replicas_per_image must default to 1 (queue-behind-one replica), got %d", cfg.MaxReplicasPerImage)
 	}
 }
