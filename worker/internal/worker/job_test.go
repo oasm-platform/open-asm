@@ -92,6 +92,7 @@ type capturedResult struct {
 	jobID   string
 	raw     string
 	isError bool
+	vulns   []*pb.Vulnerability
 }
 
 func (s *testJobsServer) Next(_ context.Context, _ *pb.Worker) (*pb.Job, error) {
@@ -154,7 +155,7 @@ func (s *testJobsServer) ResultVulnerabilities(_ context.Context, req *pb.Vulner
 	if req.Raw != nil {
 		raw = *req.Raw
 	}
-	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error})
+	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error, vulns: req.GetVulnerabilities().GetValues()})
 	return &pb.JobResponse{Success: true}, nil
 }
 
@@ -369,7 +370,7 @@ func TestHandleConnectorResultReportsError(t *testing.T) {
 	proxy := connector.NewProxy()
 
 	execID := "exec-err-1"
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	entry := &bridgeEntry{
@@ -388,7 +389,7 @@ func TestHandleConnectorResultReportsError(t *testing.T) {
 	}()
 
 	// Send a result chunk, then signal error via proxy + close.
-	proxy.ForwardResult(execID, []byte(`{"partial":"data"}`))
+	proxy.ForwardResult(execID, []byte(`{"partial":"data"}`), nil)
 	proxy.SetError(execID, "connector crashed")
 	proxy.MarkDone(execID)
 	proxy.OnConnectorDown(execID)
@@ -581,7 +582,7 @@ func TestProcessJobConnectorCompletionReleasesSemaphore(t *testing.T) {
 	}
 
 	// Simulate connector sending a result data chunk.
-	proxy.ForwardResult(execID, []byte(`{"subdomains":["a.example.com"]}`))
+	proxy.ForwardResult(execID, []byte(`{"subdomains":["a.example.com"]}`), nil)
 
 	// Simulate Done message — server marks Done, then OnConnectorDown closes the channel.
 	proxy.MarkDone(execID)
@@ -647,7 +648,7 @@ func TestHandleConnectorResultCleanupOnClose(t *testing.T) {
 	bridge[execID] = entry
 	bridgeMu.Unlock()
 
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	done := make(chan struct{})
@@ -657,8 +658,8 @@ func TestHandleConnectorResultCleanupOnClose(t *testing.T) {
 	}()
 
 	// Send results and close.
-	resultCh <- []byte("first-chunk")
-	resultCh <- []byte("second-chunk")
+	resultCh <- connector.ResultMsg{Data: []byte("first-chunk")}
+	resultCh <- connector.ResultMsg{Data: []byte("second-chunk")}
 	close(resultCh)
 
 	select {
@@ -719,7 +720,7 @@ func TestHandleConnectorResultConnectTimeout(t *testing.T) {
 	bridge[execID] = entry
 	bridgeMu.Unlock()
 
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	activeJobsMu.Lock()
@@ -809,7 +810,7 @@ func TestHandleConnectorResultRegisteredIsNotTimedOut(t *testing.T) {
 	bridge[execID] = entry
 	bridgeMu.Unlock()
 
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	// The connector registers its stream BEFORE the drain starts: the
@@ -832,7 +833,7 @@ func TestHandleConnectorResultRegisteredIsNotTimedOut(t *testing.T) {
 
 	// A result arriving after the timeout mark must still be drained and
 	// submitted, then the Done flow (MarkDone + OnConnectorDown) finishes.
-	proxy.ForwardResult(execID, []byte(`{"subdomains":["c.example.com"]}`))
+	proxy.ForwardResult(execID, []byte(`{"subdomains":["c.example.com"]}`), nil)
 	proxy.MarkDone(execID)
 	proxy.OnConnectorDown(execID)
 
@@ -907,7 +908,7 @@ func TestHandleConnectorResultEmptyCleanDoneSubmitsEmptyResult(t *testing.T) {
 	bridge[execID] = entry
 	bridgeMu.Unlock()
 
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	done := make(chan struct{})
@@ -974,7 +975,7 @@ func TestHandleConnectorResultDisconnectWithoutDoneReportsError(t *testing.T) {
 	bridge[execID] = entry
 	bridgeMu.Unlock()
 
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	done := make(chan struct{})
@@ -1050,7 +1051,7 @@ func TestHandleConnectorResultLogsLifecycle(t *testing.T) {
 	bridge[execID] = entry
 	bridgeMu.Unlock()
 
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	done := make(chan struct{})
@@ -1060,7 +1061,7 @@ func TestHandleConnectorResultLogsLifecycle(t *testing.T) {
 	}()
 
 	// One result chunk (7 bytes) then a clean Done.
-	proxy.ForwardResult(execID, []byte(`{"a":1}`))
+	proxy.ForwardResult(execID, []byte(`{"a":1}`), nil)
 	proxy.MarkDone(execID)
 	proxy.OnConnectorDown(execID)
 

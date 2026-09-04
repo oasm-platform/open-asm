@@ -2,6 +2,8 @@ package execution
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"sync"
 	"time"
@@ -13,58 +15,16 @@ import (
 // container-engine operations fail. TuiLogger (worker package) satisfies it.
 // A nil logger disables reporting.
 type Logger interface {
+	Info(msg string, args ...any)
 	Error(msg string, args ...any)
 	ErrorE(msg string, err error)
 }
 
-// InfoLogger is the optional extension for pool hit/miss reporting. Only
-// loggers that implement it (e.g. TuiLogger) receive lifecycle lines; the
-// minimal recorderLogger in tests implements Logger alone and stays valid.
-type InfoLogger interface {
-	Info(msg string, args ...any)
-}
-
-// PoolConfig controls the per-tool container pool: a live container is reused
-// for up to MaxJobsPerContainer concurrent jobs sharing the same image
-// (poolKey). IdleTimeout bounds how long an empty pooled container is retained
-// before eviction.
-type PoolConfig struct {
-	Enabled             bool
-	MaxJobsPerContainer int
-	IdleTimeout         time.Duration
-}
-
-// WithPool enables container pooling. Omit for the legacy 1:1 behavior (one
-// container per job, cleaned up on Cancel/connector-down).
-func WithPool(cfg PoolConfig) Option {
-	return func(m *Manager) {
-		m.poolCfg = cfg
-	}
-}
-
-// Option configures a Manager. Applied in NewManager.
-type Option func(*Manager)
-
-// poolState tracks a pooled container's lifecycle.
-type poolState string
-
-const (
-	poolStateActive   poolState = "active"   // accepts new job registrations
-	poolStateDraining poolState = "draining" // container dead/doomed; new jobs must not join
-)
-
-// PoolEntry is one pooled container behind a poolKey (image). Executions
-// referencing the same Handle share it via their exec IDs in jobs.
-type PoolEntry struct {
-	handle    Handle
-	jobs      map[string]bool
-	jobsCount int
-	lastUsed  time.Time
-	state     poolState
-}
-
 // Manager tracks concurrent executions with a state machine.
 // It replaces the legacy exec.Command sh -c path with isolated executions.
+// The connector protocol is one stream = one execution: every execution gets
+// its own container (1:1 model). There is no container-reuse pool — pooled
+// reuse would misroute/starve jobs 2..N and carry a stale EXECUTION_ID env.
 type Manager struct {
 	mu             sync.Mutex
 	rt             runtime.ExecutionRuntime
@@ -73,23 +33,25 @@ type Manager struct {
 	nextID         int
 	logger         Logger
 
-	poolCfg   PoolConfig
-	pool      map[string][]*PoolEntry // poolKey(image) -> entries; one entry per container
-	poolLocks sync.Map                // poolKey -> *sync.Mutex, serializes container creation per image
+	// tokenMu guards tokens: per-execution single-use connector auth tokens
+	// (one token = one execution). They are minted before container creation
+	// and deleted on Release/Cancel (single-use lifecycle). Notably separate
+	// from mu: ExecToken is read concurrently by the connector server's
+	// Register handshake goroutines.
+	tokenMu sync.RWMutex
+	tokens  map[string]string
 }
 
-// NewManager creates a Manager backed by rt with at most maxConcurrency concurrent executions.
-func NewManager(rt runtime.ExecutionRuntime, maxConcurrency int, opts ...Option) *Manager {
-	m := &Manager{
+// NewManager creates a Manager backed by rt with at most maxConcurrency
+// concurrent executions (<=0 means unlimited — the worker semaphore is then
+// the sole concurrency gate).
+func NewManager(rt runtime.ExecutionRuntime, maxConcurrency int) *Manager {
+	return &Manager{
 		rt:             rt,
 		maxConcurrency: maxConcurrency,
 		execs:          map[string]*Execution{},
-		pool:           map[string][]*PoolEntry{},
+		tokens:         map[string]string{},
 	}
-	for _, opt := range opts {
-		opt(m)
-	}
-	return m
 }
 
 // SetLogger wires an error logger for background container-engine operations.
@@ -112,80 +74,36 @@ func (m *Manager) logError(op string, err error) {
 	l.ErrorE(op, err)
 }
 
-// poolInfo reports a pool lifecycle event via the injected InfoLogger. No-op
-// when the logger does not implement Info. Never panics. The logger reference
-// is read lock-free (write-once at startup, same pattern as DockerRuntime) so
-// this can be called while m.mu is held.
-func (m *Manager) poolInfo(msg string, args ...any) {
-	if il, ok := m.logger.(InfoLogger); ok {
-		il.Info(msg, args...)
+// logInfo reports a lifecycle event via the injected Logger. No-op when no
+// logger is set. Never panics. Sensitive values (tokens, keys) are never
+// passed through this — callers log flags (token_set=%t), not values.
+func (m *Manager) logInfo(msg string, args ...any) {
+	m.mu.Lock()
+	l := m.logger
+	m.mu.Unlock()
+	if l == nil {
+		return
 	}
+	l.Info(msg, args...)
 }
 
-// pooling reports whether the container pool is active. IdleTimeout > 0 makes
-// eviction meaningful; MaxJobsPerContainer > 1 makes sharing worthwhile.
-func (m *Manager) pooling() bool {
-	return m.poolCfg.Enabled && m.poolCfg.MaxJobsPerContainer > 1 && m.poolCfg.IdleTimeout > 0
-}
-
-// poolLock returns (creating if needed) the per-image create mutex.
-func (m *Manager) poolLock(key string) *sync.Mutex {
-	if l, ok := m.poolLocks.Load(key); ok {
-		return l.(*sync.Mutex)
+// generateExecToken mints the per-execution single-use connector auth token:
+// 32 random bytes encoded as 64 hex chars. crypto/rand is used so container
+// dial-backs cannot guess or replay another execution's token.
+func generateExecToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// crypto/rand only fails when the OS entropy source is broken; falling
+		// back to a zero token would silently disable auth, so surface it.
+		panic(fmt.Sprintf("crypto/rand failed: %v", err))
 	}
-	l := &sync.Mutex{}
-	actual, _ := m.poolLocks.LoadOrStore(key, l)
-	return actual.(*sync.Mutex)
-}
-
-// poolEntry finds the pooled container whose handle matches h. The caller must
-// hold m.mu.
-func (m *Manager) poolEntry(h Handle) (string, *PoolEntry, bool) {
-	for key, ents := range m.pool {
-		for _, ent := range ents {
-			if ent.handle.ID == h.ID {
-				return key, ent, true
-			}
-		}
-	}
-	return "", nil, false
-}
-
-// removePoolEntry deletes ent from its key's entry list (and the key itself
-// when it held the only entry). The caller must hold m.mu.
-func (m *Manager) removePoolEntry(key string, ent *PoolEntry) {
-	ents := m.pool[key]
-	for i, e := range ents {
-		if e == ent {
-			rest := append(ents[:i], ents[i+1:]...)
-			if len(rest) == 0 {
-				delete(m.pool, key)
-			} else {
-				m.pool[key] = rest
-			}
-			return
-		}
-	}
-}
-
-// poolContains reports whether ent is still registered under key. The caller
-// must hold m.mu.
-func (m *Manager) poolContains(key string, ent *PoolEntry) bool {
-	for _, e := range m.pool[key] {
-		if e == ent {
-			return true
-		}
-	}
-	return false
+	return hex.EncodeToString(b)
 }
 
 // Submit enforces maxConcurrency, calls rt.Create+Start, and tracks the execution.
 // Image is required and passed through to the runtime (resolved by Core ConnectorRegistry 1.5).
-// If spec.Limits[timeoutSeconds] is set (>0), a timer auto-cancels the execution.
-// With pooling enabled and spec.Image non-empty, jobs sharing an image reuse a
-// live pooled container (poolKey=image) up to MaxJobsPerContainer; only a pool
-// miss creates a container. Container creation per image is serialized so
-// concurrent submits never double-create: total containers = ceil(jobs / max).
+// If spec.Limits[JobTimeoutSecondsKey] is set (>0), a timer auto-cancels the execution.
+// The 1:1 model: exactly one container per execution, never shared.
 func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	m.mu.Lock()
 	// maxConcurrency <= 0 means unlimited — worker semaphore is the sole concurrency gate.
@@ -193,84 +111,28 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		m.mu.Unlock()
 		return "", fmt.Errorf("max concurrency reached")
 	}
+	// Timeout contract: the connect deadline must stay below the manifest job
+	// timeout, otherwise the connect timer cancels the execution before the
+	// configured job timeout can ever apply. Fail fast — no container created.
+	if err := ValidateConnectorTimeouts(timeoutSeconds(spec.Limits), ConnectorConnectTimeout); err != nil {
+		m.mu.Unlock()
+		return "", err
+	}
 	// Monotonic counter (not len(execs)): Cancel deletes entries, so a size-derived
 	// ID collides with and overwrites a still-running execution.
 	m.nextID++
 	id := fmt.Sprintf("exec-%d", m.nextID)
 
-	if !m.pooling() || spec.Image == "" {
-		// Legacy 1:1 path — one container per job, unchanged.
-		h, err := m.rt.Create(ctx, runtime.JobSpec{
-			Tool:    spec.Tool,
-			Image:   spec.Image,
-			Version: spec.Version,
-			Inputs:  spec.Inputs,
-			Limits:  spec.Limits,
-			TraceID: spec.TraceID,
-			Config:  spec.Config,
-			JobID:   spec.JobID,
-			// Single source of truth: the connector registers under this ID
-			// (EXECUTION_ID env), matching the proxy's pending/stream key.
-			ExecID: id,
-		}, runtime.RuntimeOpts{TraceID: spec.TraceID})
-		if err != nil {
-			m.mu.Unlock()
-			return "", err
-		}
-		if err := m.rt.Start(ctx, h); err != nil {
-			m.mu.Unlock()
-			return "", err
-		}
-		m.execs[id] = &Execution{ID: id, Spec: spec, State: StateRunning, Handle: h}
-		m.mu.Unlock()
-		m.armTimeout(id, spec)
-		return id, nil
-	}
-
-	key := spec.Image
-
-	// Fast path: any live pooled container of this image with spare capacity
-	// accepts the job.
-	if ents := m.pool[key]; len(ents) > 0 {
-		m.mu.Unlock()
-		for _, ent := range ents {
-			if res, ierr := m.rt.Inspect(ctx, ent.handle); ierr == nil && res.Running {
-				if reused, _ := m.registerPooled(id, spec, key, ent); reused {
-					return id, nil
-				}
-			}
-		}
-	} else {
-		m.mu.Unlock()
-	}
-
-	// Miss path: create a fresh container. Serialized per poolKey with a
-	// double-check — a sibling may have created a reusable container while we
-	// waited on the key lock.
-	keyLock := m.poolLock(key)
-	keyLock.Lock()
-	defer keyLock.Unlock()
-
-	m.mu.Lock()
-	ents := m.pool[key]
-	var reusable *PoolEntry
-	for _, ent := range ents {
-		if ent.state == poolStateActive && ent.jobsCount < m.poolCfg.MaxJobsPerContainer {
-			reusable = ent
-			break
-		}
-	}
-	m.mu.Unlock()
-	if reusable != nil {
-		if res, ierr := m.rt.Inspect(ctx, reusable.handle); ierr == nil && res.Running {
-			if reused, _ := m.registerPooled(id, spec, key, reusable); reused {
-				return id, nil
-			}
-		}
-		m.mu.Lock()
-		m.removePoolEntry(key, reusable)
-		m.mu.Unlock()
-	}
+	// Per-execution single-use connector auth token: minted and registered
+	// BEFORE the container is created so a fast connector that dials back
+	// immediately finds its token on the Register handshake (no early-connect
+	// race). The token is injected into the container via spec.ConnectorToken
+	// (WORKER_TOKEN env) and deleted on Release/Cancel.
+	token := generateExecToken()
+	m.tokenMu.Lock()
+	m.tokens[id] = token
+	m.tokenMu.Unlock()
+	spec.ConnectorToken = token
 
 	h, err := m.rt.Create(ctx, runtime.JobSpec{
 		Tool:    spec.Tool,
@@ -281,52 +143,33 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		TraceID: spec.TraceID,
 		Config:  spec.Config,
 		JobID:   spec.JobID,
-		ExecID:  id,
+		// Single source of truth: the connector registers under this ID
+		// (EXECUTION_ID env), matching the proxy's pending/stream key.
+		ExecID: id,
+		// Single-use auth: the connector's Register must present this token
+		// (WORKER_TOKEN env); the connector server validates it per-execution.
+		ConnectorToken: spec.ConnectorToken,
 	}, runtime.RuntimeOpts{TraceID: spec.TraceID})
 	if err != nil {
+		// No execution was created — drop the token so a stray connector can
+		// never authenticate against a ghost execution.
+		m.tokenMu.Lock()
+		delete(m.tokens, id)
+		m.tokenMu.Unlock()
+		m.mu.Unlock()
 		return "", err
 	}
 	if err := m.rt.Start(ctx, h); err != nil {
-		_ = m.rt.Cleanup(ctx, h) // never leak a half-started container
+		m.mu.Unlock()
 		return "", err
 	}
-	m.mu.Lock()
-	ent := &PoolEntry{
-		handle:    h,
-		jobs:      map[string]bool{id: true},
-		jobsCount: 1,
-		lastUsed:  time.Now(),
-		state:     poolStateActive,
-	}
-	m.pool[key] = append(m.pool[key], ent)
 	m.execs[id] = &Execution{ID: id, Spec: spec, State: StateRunning, Handle: h}
-	containers := len(m.pool[key])
 	m.mu.Unlock()
-	m.poolInfo("pool: miss, created container: image=%s exec=%s handle=%s containers=%d", key, id, h.ID, containers)
+	// Never log the token value — only that it was set. Logged outside the
+	// critical section (logInfo takes mu).
+	m.logInfo("execution token set token_set=%t", true)
 	m.armTimeout(id, spec)
 	return id, nil
-}
-
-// registerPooled binds id to an existing pooled entry. Succeeds only when the
-// entry is still part of the pool (identity check), active, and below
-// capacity. Returns false when the job must instead go through the create path.
-func (m *Manager) registerPooled(id string, spec JobSpec, key string, ent *PoolEntry) (bool, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, cur := range m.pool[key] {
-		if cur == ent {
-			if cur.state != poolStateActive || cur.jobsCount >= m.poolCfg.MaxJobsPerContainer {
-				return false, nil
-			}
-			cur.jobs[id] = true
-			cur.jobsCount++
-			cur.lastUsed = time.Now()
-			m.execs[id] = &Execution{ID: id, Spec: spec, State: StateRunning, Handle: cur.handle}
-			m.poolInfo("pool: hit, reused container: image=%s exec=%s handle=%s jobs=%d", key, id, cur.handle.ID, cur.jobsCount)
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // armTimeout auto-cancels the execution when spec.Limits carries
@@ -368,12 +211,8 @@ func (m *Manager) SubmitWithTimeout(ctx context.Context, spec JobSpec, timeout t
 	return m.Submit(ctx, spec)
 }
 
-// Cancel marks the execution cancelled and stops tracking it. Inside the pool
-// this is bookkeeping only: the borrowed container is a shared resource, so it
-// is neither stopped nor removed — an exited/doomed container is retired by
-// Release (drain) or eviction instead, and siblings are never disturbed. With
-// pooling disabled the legacy contract applies: rt.Cancel + rt.Cleanup run
-// immediately.
+// Cancel marks the execution cancelled and stops tracking it. The 1:1
+// container is stopped and removed immediately (rt.Cancel + rt.Cleanup).
 func (m *Manager) Cancel(ctx context.Context, id string) error {
 	m.mu.Lock()
 	e, ok := m.execs[id]
@@ -384,17 +223,10 @@ func (m *Manager) Cancel(ctx context.Context, id string) error {
 	h := e.Handle
 	e.State = StateCancelled
 	delete(m.execs, id)
-	if m.pooling() {
-		if _, ent, found := m.poolEntry(h); found {
-			if ent.jobs[id] {
-				delete(ent.jobs, id)
-				ent.jobsCount--
-				ent.lastUsed = time.Now()
-			}
-		}
-		m.mu.Unlock()
-		return nil
-	}
+	// Single-use: the token dies with its execution.
+	m.tokenMu.Lock()
+	delete(m.tokens, id)
+	m.tokenMu.Unlock()
 	m.mu.Unlock()
 	if err := m.rt.Cancel(ctx, h); err != nil {
 		m.logError("container cancel failed", err)
@@ -405,12 +237,8 @@ func (m *Manager) Cancel(ctx context.Context, id string) error {
 	return nil
 }
 
-// Release retires an execution's claim on its pooled container (or a 1:1
-// container in legacy mode). In pool mode an empty, still-running container
-// stays pooled for the next same-image job; an exited/errored one is cleaned
-// up and removed so the next submit falls back to a fresh create. Siblings
-// left on a dead container are drained: the entry stops accepting new jobs and
-// each sibling fails fast via its own health monitor.
+// Release retires an execution's claim on its 1:1 container: cleanup runs
+// immediately. OnConnectorDown is the legacy name for this signal.
 func (m *Manager) Release(ctx context.Context, execID string) error {
 	m.mu.Lock()
 	e, ok := m.execs[execID]
@@ -421,58 +249,13 @@ func (m *Manager) Release(ctx context.Context, execID string) error {
 	h := e.Handle
 	e.State = StateDone
 	delete(m.execs, execID)
-	if !m.pooling() {
-		m.mu.Unlock()
-		if err := m.rt.Cleanup(ctx, h); err != nil {
-			m.logError("container cleanup failed", err)
-		}
-		return nil
-	}
-
-	key, ent, found := m.poolEntry(h)
-	if !found {
-		m.mu.Unlock()
-		// Entry already retired (evicted/replaced): retire the container too so
-		// a half-registered execution cannot leak it.
-		if err := m.rt.Cleanup(ctx, h); err != nil {
-			m.logError("container cleanup failed", err)
-		}
-		return nil
-	}
-	if ent.jobs[execID] {
-		delete(ent.jobs, execID)
-		ent.jobsCount--
-	}
-	ent.lastUsed = time.Now()
-	remain := ent.jobsCount
+	// Single-use: the token dies with its execution.
+	m.tokenMu.Lock()
+	delete(m.tokens, execID)
+	m.tokenMu.Unlock()
 	m.mu.Unlock()
-
-	if remain > 0 {
-		// Siblings still bound. If the container died they each fail via their
-		// health monitor; mark the entry draining so no new job joins a doomed
-		// container. Live container: nothing to do, siblings keep using it.
-		res, ierr := m.rt.Inspect(ctx, h)
-		m.mu.Lock()
-		if m.poolContains(key, ent) && (ierr != nil || !res.Running) {
-			ent.state = poolStateDraining
-			m.poolInfo("pool: container down, draining: image=%s handle=%s remaining=%d", key, h.ID, remain)
-		}
-		m.mu.Unlock()
-		return nil
-	}
-
-	// Entry is empty: keep a live container for the next same-image job.
-	res, ierr := m.rt.Inspect(ctx, h)
-	if ierr != nil || !res.Running {
-		_ = m.rt.Cleanup(ctx, h) // best-effort; retried by sweep if it fails
-		m.mu.Lock()
-		if m.poolContains(key, ent) && ent.jobsCount == 0 {
-			m.removePoolEntry(key, ent)
-		}
-		m.mu.Unlock()
-		m.poolInfo("pool: retired exited container: image=%s exec=%s handle=%s", key, execID, h.ID)
-	} else {
-		m.poolInfo("pool: kept idle container: image=%s handle=%s", key, h.ID)
+	if err := m.rt.Cleanup(ctx, h); err != nil {
+		m.logError("container cleanup failed", err)
 	}
 	return nil
 }
@@ -483,93 +266,23 @@ func (m *Manager) OnConnectorDown(ctx context.Context, execID string) error {
 	return m.Release(ctx, execID)
 }
 
-// evictIdle removes empty pooled containers idle past PoolConfig.IdleTimeout.
-// A live-but-idle scannable container is kept; dead or unresponsive ones are
-// force-removed. Exported via tests calling it directly; the maintenance
-// goroutine (StartPoolMaintenance) drives it in production.
-func (m *Manager) evictIdle(ctx context.Context) {
-	m.mu.Lock()
-	type candidate struct {
-		key string
-		ent *PoolEntry
-	}
-	var candidates []candidate
-	now := time.Now()
-	for k, ents := range m.pool {
-		for _, ent := range ents {
-			if ent.jobsCount == 0 && ent.state == poolStateActive && now.Sub(ent.lastUsed) >= m.poolCfg.IdleTimeout {
-				candidates = append(candidates, candidate{k, ent})
-			}
-		}
-	}
-	m.mu.Unlock()
-
-	for _, c := range candidates {
-		// Probe liveness first: an Inspect error means the container already
-		// vanished (best-effort engine state) — removal is still attempted.
-		_, _ = m.rt.Inspect(ctx, c.ent.handle)
-		if err := m.rt.Cleanup(ctx, c.ent.handle); err != nil {
-			m.logError("pool eviction cleanup failed", err)
-			continue
-		}
-		m.mu.Lock()
-		if m.poolContains(c.key, c.ent) && c.ent.jobsCount == 0 {
-			m.removePoolEntry(c.key, c.ent)
-		}
-		m.mu.Unlock()
-		m.poolInfo("pool: evicted idle container: image=%s handle=%s", c.key, c.ent.handle.ID)
-	}
-}
-
-// StartPoolMaintenance runs eviction of idle empty containers on a background
-// ticker until ctx is cancelled. No-op when pooling is disabled.
-// IdleTimeout/2 (min 10s) keeps an empty container alive at most ~1.5x the
-// configured timeout.
-func (m *Manager) StartPoolMaintenance(ctx context.Context) {
-	if !m.pooling() {
-		return
-	}
-	interval := m.poolCfg.IdleTimeout / 2
-	if interval < 10*time.Second {
-		interval = 10 * time.Second
-	}
-	go func() {
-		t := time.NewTicker(interval)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				m.evictIdle(ctx)
-			}
-		}
-	}()
-}
-
-// SweepOrphans removes oasm-managed containers that no tracked pool entry
-// references (crashed worker leftovers). Returns the count removed.
-func (m *Manager) SweepOrphans(ctx context.Context) error {
-	m.mu.Lock()
-	keep := make([]string, 0, len(m.pool))
-	for _, ents := range m.pool {
-		for _, ent := range ents {
-			keep = append(keep, ent.handle.ID)
-		}
-	}
-	m.mu.Unlock()
-	removed, err := m.rt.SweepOrphans(ctx, keep)
-	if err == nil && removed > 0 {
-		m.poolInfo("pool: swept %d orphan containers", removed)
-	}
-	return err
-}
-
 // ActiveCount returns the number of active executions.
 func (m *Manager) ActiveCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.execs)
+}
+
+// ExecToken returns the per-execution single-use connector auth token for an
+// execution, and whether one exists. It structurally implements the
+// connector.TokenLookup contract (the connector server calls it from its
+// Register handshake goroutines). Any concurrently deleted token (Release/
+// Cancel/Submit failure) reads as not-found.
+func (m *Manager) ExecToken(execID string) (string, bool) {
+	m.tokenMu.RLock()
+	defer m.tokenMu.RUnlock()
+	tok, ok := m.tokens[execID]
+	return tok, ok
 }
 
 // Inspect returns the runtime inspect result for an execution by ID
@@ -600,7 +313,7 @@ func timeoutSeconds(limits map[string]any) int {
 	if limits == nil {
 		return 0
 	}
-	switch v := limits["timeoutSeconds"].(type) {
+	switch v := limits[JobTimeoutSecondsKey].(type) {
 	case int:
 		return v
 	case int64:

@@ -314,6 +314,14 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			log.Error("connector server init failed (non-fatal): %v", err)
 		} else {
 			connectorServer.SetLogger(log)
+			// mTLS is env-gated (WORKER_CONNECTOR_TLS_CERT/KEY/CA, all three
+			// required); without it the listener stays plaintext for backward
+			// compatibility. Cert contents are never logged.
+			if connectorServer.TLSEnabled() {
+				log.Info("connector server: mutual TLS enabled (client certificates verified against WORKER_CONNECTOR_TLS_CA)")
+			} else {
+				log.Warning("connector server: running WITHOUT TLS (plaintext) — set WORKER_CONNECTOR_TLS_CERT, WORKER_CONNECTOR_TLS_KEY and WORKER_CONNECTOR_TLS_CA to require client certificates")
+			}
 			go func() {
 				log.Success("connector server listening on %s", connectorServer.Addr())
 				if err := connectorServer.Serve(workerCtx); err != nil {
@@ -337,26 +345,17 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			if err != nil {
 				log.Error("container engine unavailable — image/connector jobs disabled: %v", err)
 			} else {
-				// Per-tool container pool: same-image jobs share up to
-				// MaxJobsPerContainer per live container (poolKey=image).
-				// Disabled via pool_enabled=false → legacy 1:1.
-				mgrInit = execution.NewManager(dockerRT, 0, execution.WithPool(execution.PoolConfig{
-					Enabled:             cfg.PoolEnabled,
-					MaxJobsPerContainer: cfg.MaxJobsPerContainer,
-					IdleTimeout:         cfg.PoolIdleTimeout,
-				}))
+				// 1 stream = 1 execution: every execution gets its own container
+				// (1:1 model, no pool). WORKER_POOL_ENABLED=true is rejected at
+				// config load.
+				mgrInit = execution.NewManager(dockerRT, 0)
 				mgrInit.SetLogger(log)
 				dockerRT.SetLogger(log)
-				dockerRT.SetPoolEnabled(cfg.PoolEnabled)
-				if cfg.PoolEnabled {
-					// Reclaim crashed-worker leftovers before serving jobs, then
-					// keep empty pooled containers evicted past the idle timeout.
-					if err := mgrInit.SweepOrphans(workerCtx); err != nil {
-						log.Warning("orphan container sweep failed: %v", err)
-					}
-					mgrInit.StartPoolMaintenance(workerCtx)
-				}
-				log.Success("execution manager ready (Docker runtime, unlimited concurrency, pool=%t maxJobsPerContainer=%d)", cfg.PoolEnabled, cfg.MaxJobsPerContainer)
+				// Per-execution single-use connector auth: the Manager mints a
+				// token per execution (before container creation) and the
+				// connector server validates Register against it.
+				connectorServer.SetTokenLookup(mgrInit)
+				log.Success("execution manager ready (Docker runtime, unlimited concurrency, 1 container = 1 execution)")
 			}
 		}
 		mgr = mgrInit

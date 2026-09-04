@@ -14,12 +14,14 @@ tasks:
     cmds:
       - |
         if [ "{{.replicas}}" = "1" ]; then
-          exec go run ./cmd/cli --api-key {{.apiKey}} --mode node --max-concurrency {{.maxJobs}}{{if .network}} --network {{.network}}{{end}}
+          # Dev-only: keep the legacy connector auto-detect chain (no pinned
+          # WORKER_CONNECTOR_ADDR locally) instead of failing fast.
+          exec env WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 go run ./cmd/cli --api-key {{.apiKey}} --mode node --max-concurrency {{.maxJobs}}{{if .network}} --network {{.network}}{{end}}
         else
           trap 'wait; exit 0' INT TERM
           for i in $(seq 1 {{.replicas}}); do
             echo "Starting CLI worker instance $i"
-            CMD="go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}"
+            CMD="env WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}"
             {{- if .network}}
             CMD="$CMD --network {{.network}}"
             {{- end}}
@@ -33,13 +35,14 @@ tasks:
     cmds:
       - |
         if [ "{{.replicas}}" = "1" ]; then
-          ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}}{{if .network}} WORKER_NETWORK={{.network}}{{end}}"
+          # Dev-only: connector auto-detect opt-in (see dev task above).
+          ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}} WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1{{if .network}} WORKER_NETWORK={{.network}}{{end}}"
           exec env $ENV_VARS go run ./cmd/app
         else
           trap 'wait; exit 0' INT TERM
           for i in $(seq 1 {{.replicas}}); do
             echo "Starting App worker instance $i"
-            ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}}"
+            ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}} WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1"
             {{- if .network}}
             ENV_VARS="$ENV_VARS WORKER_NETWORK={{.network}}"
             {{- end}}

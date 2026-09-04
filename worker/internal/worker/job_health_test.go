@@ -81,7 +81,7 @@ func TestHandleConnectorResultEarlyExitFailsWithTailAndBackoff(t *testing.T) {
 	bridgeMu.Lock()
 	bridge[execID] = &bridgeEntry{jobID: "job-he-1", category: "subdomains", release: func() {}, image: image}
 	bridgeMu.Unlock()
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 	tail := &tailBuffer{}
 
@@ -152,7 +152,7 @@ func TestHandleConnectorResultTimeoutBacksOff(t *testing.T) {
 	bridgeMu.Lock()
 	bridge[execID] = &bridgeEntry{jobID: "job-tmo-1", category: "subdomains", release: func() {}, image: image}
 	bridgeMu.Unlock()
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 	tail := &tailBuffer{}
 
@@ -198,7 +198,7 @@ func TestHandleConnectorResultDoneResetsBackoff(t *testing.T) {
 	bridgeMu.Lock()
 	bridge[execID] = &bridgeEntry{jobID: "job-reset-1", category: "subdomains", release: func() {}, image: image}
 	bridgeMu.Unlock()
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	done := make(chan struct{})
@@ -207,7 +207,7 @@ func TestHandleConnectorResultDoneResetsBackoff(t *testing.T) {
 		close(done)
 	}()
 
-	proxy.ForwardResult(execID, []byte(`{"host":"example.com"}`))
+	proxy.ForwardResult(execID, []byte(`{"host":"example.com"}`), nil)
 	proxy.MarkDone(execID)
 	proxy.OnConnectorDown(execID)
 
@@ -248,7 +248,7 @@ func TestHandleConnectorResultForwardsLogsToTail(t *testing.T) {
 	bridgeMu.Lock()
 	bridge[execID] = &bridgeEntry{jobID: "job-logs-1", category: "subdomains", release: func() {}, image: "ghcr.io/open-asm/nuclei:1.0"}
 	bridgeMu.Unlock()
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 	tail := &tailBuffer{}
 
@@ -261,7 +261,7 @@ func TestHandleConnectorResultForwardsLogsToTail(t *testing.T) {
 	// Log lines must reach the tail buffer while the drain is still running.
 	waitFor(t, 3*time.Second, func() bool { return strings.Contains(tail.String(), "scan started") })
 
-	proxy.ForwardResult(execID, []byte(`{"host":"example.com"}`))
+	proxy.ForwardResult(execID, []byte(`{"host":"example.com"}`), nil)
 	proxy.MarkDone(execID)
 	proxy.OnConnectorDown(execID)
 

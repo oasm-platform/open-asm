@@ -6,9 +6,26 @@ import (
 	pb "oasm-worker/internal/gen/connector"
 )
 
+// ResultMsg is one streamed Result delivery: the raw payload plus any
+// structured findings the connector attached (findings is nil for connectors
+// that only stream raw data — the Result.findings field is omitted).
+// Exported (beyond the original internal name) so the worker drain can build
+// and read the channels it registers on the proxy.
+type ResultMsg struct {
+	Data     []byte
+	Findings []*pb.Finding
+}
+
 type Proxy struct {
 	mu     sync.RWMutex
-	chans  map[string]chan []byte
+	sendMu sync.Mutex
+	// sendMu serializes every stream.Send on the registered connector
+	// streams. grpc-go bidi streams are not safe for concurrent Send: two
+	// parallel Sends can panic inside the transport instead of returning an
+	// error. RegisterConnector's pending flush runs on the Connect handler
+	// goroutine while SendExecute runs on job goroutines, so all Sends
+	// funnel through this one mutex — one Send at a time.
+	chans  map[string]chan ResultMsg
 	errors map[string]string
 	done   map[string]bool
 	// streams maps execID → live connector bidi stream for ExecuteJob delivery.
@@ -59,7 +76,7 @@ func (p *Proxy) logWarning(msg string, args ...any) {
 
 func NewProxy() *Proxy {
 	return &Proxy{
-		chans:    map[string]chan []byte{},
+		chans:    map[string]chan ResultMsg{},
 		errors:   map[string]string{},
 		done:     map[string]bool{},
 		streams:  map[string]pb.ConnectorService_ConnectServer{},
@@ -69,8 +86,10 @@ func NewProxy() *Proxy {
 }
 
 // RegisterConnector stores the live bidi stream for execID and flushes any
-// ExecuteJob that was queued before the connector connected. Empty execID
-// (legacy connectors that only send Register{token}) is ignored.
+// ExecuteJob that was queued before the connector connected. An empty execID
+// is never registered here: the server rejects empty execution_id in
+// Register before mapping (see server.go), so this guard only defends against
+// internal misuse — ignoring it (nil, no stream entry) is the safe behavior.
 func (p *Proxy) RegisterConnector(execID string, stream pb.ConnectorService_ConnectServer) error {
 	if execID == "" || stream == nil {
 		return nil
@@ -99,8 +118,13 @@ func (p *Proxy) RegisterConnector(execID string, stream pb.ConnectorService_Conn
 	p.mu.Unlock()
 
 	if hasPending {
-		// Send outside the lock — a stalled connector must not block the proxy.
-		if err := stream.Send(&pb.WorkerMessage{Message: &pb.WorkerMessage_Execute{Execute: pending}}); err != nil {
+		// Send outside the lock — a stalled connector must not block the
+		// proxy. sendMu serializes this flush against concurrent SendExecute
+		// sends on the same stream (one Send at a time).
+		p.sendMu.Lock()
+		err := stream.Send(&pb.WorkerMessage{Message: &pb.WorkerMessage_Execute{Execute: pending}})
+		p.sendMu.Unlock()
+		if err != nil {
 			return err
 		}
 		p.logInfo("connector execute flushed: exec=%s job=%s", execID, pending.GetJobId())
@@ -152,7 +176,12 @@ func (p *Proxy) SendExecute(execID string, job *pb.ExecuteJob) error {
 	}
 	p.mu.Unlock()
 
-	if err := stream.Send(&pb.WorkerMessage{Message: &pb.WorkerMessage_Execute{Execute: job}}); err != nil {
+	// sendMu serializes against the RegisterConnector pending flush and other
+	// concurrent SendExecute calls: grpc-go streams allow one Send at a time.
+	p.sendMu.Lock()
+	err := stream.Send(&pb.WorkerMessage{Message: &pb.WorkerMessage_Execute{Execute: job}})
+	p.sendMu.Unlock()
+	if err != nil {
 		return err
 	}
 	p.logInfo("connector execute sent: exec=%s job=%s tool=%s", execID, job.GetJobId(), job.GetTool())
@@ -167,13 +196,13 @@ func (p *Proxy) HasStream(execID string) bool {
 	return ok
 }
 
-func (p *Proxy) Register(execID string, ch chan []byte) {
+func (p *Proxy) Register(execID string, ch chan ResultMsg) {
 	p.mu.Lock()
 	p.chans[execID] = ch
 	p.mu.Unlock()
 }
 
-func (p *Proxy) ForwardResult(execID string, data []byte) {
+func (p *Proxy) ForwardResult(execID string, data []byte, findings []*pb.Finding) {
 	p.mu.RLock()
 	ch, ok := p.chans[execID]
 	p.mu.RUnlock()
@@ -188,7 +217,7 @@ func (p *Proxy) ForwardResult(execID string, data []byte) {
 	// recover-guarded — a result dropped because the connector just died is
 	// acceptable, a worker crash is not.
 	defer func() { _ = recover() }()
-	ch <- data
+	ch <- ResultMsg{Data: data, Findings: findings}
 }
 
 func (p *Proxy) Unregister(execID string) {

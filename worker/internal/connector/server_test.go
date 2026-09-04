@@ -19,10 +19,20 @@ import (
 // registers cleanup to stop it when the test ends.
 func startTestServer(t *testing.T, token string) (*Server, *Proxy) {
 	t.Helper()
+	return startTestServerWithLookup(t, token, nil)
+}
+
+// startTestServerWithLookup is startTestServer with a TokenLookup wired via
+// SetTokenLookup (per-execution single-use token mode).
+func startTestServerWithLookup(t *testing.T, token string, lookup TokenLookup) (*Server, *Proxy) {
+	t.Helper()
 	proxy := NewProxy()
 	srv, err := NewServer("localhost:0", proxy, token)
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
+	}
+	if lookup != nil {
+		srv.SetTokenLookup(lookup)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	served := make(chan struct{})
@@ -85,6 +95,30 @@ func connectAndRegisterWithExecID(t *testing.T, conn *grpc.ClientConn, token, ex
 	return stream, ack.GetRegisterAck()
 }
 
+// Register without execution_id must be rejected: without it the server has no
+// way to route ExecuteJob/Result messages to the right execution (the execID
+// is worker-assigned), and an unmapped stream would silently misroute.
+func TestServerRegisterWithEmptyExecIDRejected(t *testing.T) {
+	srv, proxy := startTestServer(t, "secret")
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegister(t, conn, "secret") // empty execution_id
+	if ack.GetAccepted() {
+		t.Fatalf("expected accepted=false for empty execution_id, got accepted=%v reason=%q", ack.GetAccepted(), ack.GetReason())
+	}
+	if ack.GetReason() != "execution_id required" {
+		t.Fatalf("expected reason='execution_id required', got %q", ack.GetReason())
+	}
+	if proxy.HasStream("") {
+		t.Fatal("empty execution_id must not be mapped as a stream")
+	}
+
+	// Server closes the stream after the reject ack.
+	if _, err := stream.Recv(); err != io.EOF {
+		t.Fatalf("expected EOF after rejected ack, got %v", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Scenarios
 // ---------------------------------------------------------------------------
@@ -93,13 +127,13 @@ func TestServerHappyPath_RegisterResultDone(t *testing.T) {
 	srv, proxy := startTestServer(t, "secret")
 	conn := dialTestServer(t, srv)
 
-	stream, ack := connectAndRegister(t, conn, "secret")
+	stream, ack := connectAndRegisterWithExecID(t, conn, "secret", "exec-1")
 	if !ack.GetAccepted() {
 		t.Fatalf("expected accepted=true, got accepted=%v reason=%q", ack.GetAccepted(), ack.GetReason())
 	}
 
 	// Register a channel to capture forwarded results.
-	ch := make(chan []byte, 1)
+	ch := make(chan ResultMsg, 1)
 	proxy.Register("exec-1", ch)
 
 	// Send Result.
@@ -113,8 +147,8 @@ func TestServerHappyPath_RegisterResultDone(t *testing.T) {
 
 	select {
 	case got := <-ch:
-		if string(got) != "hello" {
-			t.Fatalf("expected 'hello', got %q", got)
+		if string(got.Data) != "hello" {
+			t.Fatalf("expected 'hello', got %q", got.Data)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for forwarded result")
@@ -149,7 +183,7 @@ func TestServerDoneMarksProxyDone(t *testing.T) {
 	srv, proxy := startTestServer(t, "secret")
 	conn := dialTestServer(t, srv)
 
-	stream, ack := connectAndRegister(t, conn, "secret")
+	stream, ack := connectAndRegisterWithExecID(t, conn, "secret", "exec-mark-1")
 	if !ack.GetAccepted() {
 		t.Fatalf("expected accepted=true, got accepted=%v reason=%q", ack.GetAccepted(), ack.GetReason())
 	}
@@ -179,7 +213,7 @@ func TestServerInvalidToken(t *testing.T) {
 	srv, _ := startTestServer(t, "secret")
 	conn := dialTestServer(t, srv)
 
-	stream, ack := connectAndRegister(t, conn, "wrong")
+	stream, ack := connectAndRegisterWithExecID(t, conn, "wrong", "exec-invalid-1")
 	if ack.GetAccepted() {
 		t.Fatal("expected accepted=false for wrong token")
 	}
@@ -198,7 +232,7 @@ func TestServerEmptyTokenWhenAuthRequired(t *testing.T) {
 	srv, _ := startTestServer(t, "required-token")
 	conn := dialTestServer(t, srv)
 
-	stream, ack := connectAndRegister(t, conn, "")
+	stream, ack := connectAndRegisterWithExecID(t, conn, "", "exec-empty-tok-1")
 	if ack.GetAccepted() {
 		t.Fatal("expected accepted=false for empty token when auth required")
 	}
@@ -214,8 +248,8 @@ func TestServerNoAuthRequired(t *testing.T) {
 	srv, _ := startTestServer(t, "") // empty token = no auth (dev mode)
 	conn := dialTestServer(t, srv)
 
-	// Any token should be accepted.
-	stream, ack := connectAndRegister(t, conn, "anything")
+	// Any token should be accepted for a registered execution.
+	stream, ack := connectAndRegisterWithExecID(t, conn, "anything", "exec-noauth-1")
 	if !ack.GetAccepted() {
 		t.Fatalf("expected accepted=true with no auth, got accepted=%v", ack.GetAccepted())
 	}
@@ -273,31 +307,32 @@ func TestServerMultipleResults(t *testing.T) {
 	srv, proxy := startTestServer(t, "secret")
 	conn := dialTestServer(t, srv)
 
-	stream, ack := connectAndRegister(t, conn, "secret")
+	stream, ack := connectAndRegisterWithExecID(t, conn, "secret", "exec-1")
 	if !ack.GetAccepted() {
 		t.Fatalf("expected accepted=true, got %v", ack.GetAccepted())
 	}
 
 	// Register capture channels for two executions.
-	ch1 := make(chan []byte, 1)
-	ch2 := make(chan []byte, 1)
+	ch1 := make(chan ResultMsg, 1)
+	ch2 := make(chan ResultMsg, 1)
 	proxy.Register("exec-1", ch1)
 	proxy.Register("exec-2", ch2)
 
 	type result struct {
 		execID string
 		data   string
-		ch     chan []byte
+		find   string
+		ch     chan ResultMsg
 	}
 	results := []result{
-		{"exec-1", "first", ch1},
-		{"exec-2", "second", ch2},
+		{"exec-1", "first", "", ch1},
+		{"exec-2", "second", "f2", ch2},
 	}
 
 	for _, r := range results {
 		if err := stream.Send(&pb.ConnectorMessage{
 			Message: &pb.ConnectorMessage_Result{
-				Result: &pb.Result{ExecutionId: r.execID, Data: []byte(r.data)},
+				Result: &pb.Result{ExecutionId: r.execID, Data: []byte(r.data), Findings: []*pb.Finding{{Name: r.find}}},
 			},
 		}); err != nil {
 			t.Fatalf("Send Result for %s: %v", r.execID, err)
@@ -308,8 +343,11 @@ func TestServerMultipleResults(t *testing.T) {
 	for _, r := range results {
 		select {
 		case got := <-r.ch:
-			if string(got) != r.data {
-				t.Fatalf("exec %s: expected %q, got %q", r.execID, r.data, got)
+			if string(got.Data) != r.data {
+				t.Fatalf("exec %s: expected %q, got %q", r.execID, r.data, got.Data)
+			}
+			if len(got.Findings) != 1 || got.Findings[0].GetName() != r.find {
+				t.Fatalf("exec %s: findings not forwarded: %v", r.execID, got.Findings)
 			}
 		case <-time.After(2 * time.Second):
 			t.Fatalf("timeout waiting for result on exec %s", r.execID)
@@ -344,18 +382,18 @@ func TestServerProxyInteraction(t *testing.T) {
 	})
 
 	conn := dialTestServer(t, srv)
-	stream, ack := connectAndRegister(t, conn, "tok")
+	stream, ack := connectAndRegisterWithExecID(t, conn, "tok", "exec-99")
 	if !ack.GetAccepted() {
 		t.Fatal("expected accepted")
 	}
 
-	captured := make(chan []byte, 1)
+	captured := make(chan ResultMsg, 1)
 	proxy.Register("exec-99", captured)
 
 	// Send Result → verify ForwardResult called with correct execution_id and data.
 	if err := stream.Send(&pb.ConnectorMessage{
 		Message: &pb.ConnectorMessage_Result{
-			Result: &pb.Result{ExecutionId: "exec-99", Data: []byte("proxy-data")},
+			Result: &pb.Result{ExecutionId: "exec-99", Data: []byte("proxy-data"), Findings: []*pb.Finding{{Name: "proxy-f"}}},
 		},
 	}); err != nil {
 		t.Fatalf("Send Result: %v", err)
@@ -363,8 +401,11 @@ func TestServerProxyInteraction(t *testing.T) {
 
 	select {
 	case got := <-captured:
-		if string(got) != "proxy-data" {
-			t.Fatalf("ForwardResult data mismatch: got %q", got)
+		if string(got.Data) != "proxy-data" {
+			t.Fatalf("ForwardResult data mismatch: got %q", got.Data)
+		}
+		if len(got.Findings) != 1 || got.Findings[0].GetName() != "proxy-f" {
+			t.Fatalf("ForwardResult findings mismatch: got %v", got.Findings)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout: ForwardResult not called")
@@ -439,28 +480,10 @@ func TestServerRegisterWithExecutionIDMapsStream(t *testing.T) {
 	}
 }
 
-func TestServerRegisterWithoutExecIDNoStreamMapping(t *testing.T) {
-	// Legacy connectors send Register{token} only — they must NOT be mapped
-	// (they keep the old behavior: no ExecuteJob delivery).
-	srv, proxy := startTestServer(t, "secret")
-	conn := dialTestServer(t, srv)
-
-	stream, ack := connectAndRegister(t, conn, "secret")
-	if !ack.GetAccepted() {
-		t.Fatalf("expected accepted=true, got %v", ack.GetAccepted())
-	}
-	if proxy.HasStream("") {
-		t.Fatal("empty execution_id must not be mapped as a stream")
-	}
-
-	if err := stream.Send(&pb.ConnectorMessage{
-		Message: &pb.ConnectorMessage_Done{
-			Done: &pb.Done{ExecutionId: "noop"},
-		},
-	}); err != nil {
-		t.Fatalf("Send Done: %v", err)
-	}
-}
+// (Legacy empty-execution_id acceptance is gone — TestServerRegisterWithEmptyExecIDRejected
+// above asserts the new rejection; the old RegisterWithoutExecIDNoStreamMapping
+// test was removed because accepting unmapped legacy streams is the misroute
+// this change eliminates.)
 
 func TestServerDisconnectUnregistersStream(t *testing.T) {
 	srv, proxy := startTestServer(t, "secret")
@@ -560,14 +583,14 @@ func TestServerLogsRejectedRegisterAsWarning(t *testing.T) {
 	srv.SetLogger(log)
 	conn := dialTestServer(t, srv)
 
-	stream, ack := connectAndRegister(t, conn, "wrong")
+	stream, ack := connectAndRegisterWithExecID(t, conn, "wrong", "exec-bad-tok")
 	if ack.GetAccepted() {
 		t.Fatal("expected accepted=false for wrong token")
 	}
 
-	// Legacy register (no execution_id) → "(legacy)" label.
-	waitForLog(t, log, "connector register: exec=(legacy)")
-	ackLine := waitForLog(t, log, "connector registered: exec=(legacy) ack=false")
+	// Registered execution identity in the register/reject log lines.
+	waitForLog(t, log, "connector register: exec=exec-bad-tok")
+	ackLine := waitForLog(t, log, "connector registered: exec=exec-bad-tok ack=false")
 	if !strings.Contains(ackLine, "reason=invalid token") {
 		t.Fatalf("reject ack line must carry reason: %q", ackLine)
 	}
@@ -607,4 +630,119 @@ func TestServerLogsStreamClosedOnDisconnect(t *testing.T) {
 	// Kill the connection → server must log the closed stream (warning).
 	cancel()
 	waitForLog(t, log, "connector stream closed: exec=exec-closed-1")
+}
+
+// ---------------------------------------------------------------------------
+// Per-execution single-use token mode (TokenLookup)
+// ---------------------------------------------------------------------------
+
+// fakeTokenLookup implements TokenLookup for tests: per-execution tokens keyed
+// by execution_id.
+type fakeTokenLookup struct {
+	tokens map[string]string
+}
+
+func (f *fakeTokenLookup) ExecToken(execID string) (string, bool) {
+	tok, ok := f.tokens[execID]
+	return tok, ok
+}
+
+func TestServerPerExecTokenAccepted(t *testing.T) {
+	srv, proxy := startTestServerWithLookup(t, "shared-secret", &fakeTokenLookup{
+		tokens: map[string]string{"exec-tok-1": "t1"},
+	})
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegisterWithExecID(t, conn, "t1", "exec-tok-1")
+	if !ack.GetAccepted() {
+		t.Fatalf("expected accepted=true with the matching per-execution token, got accepted=%v reason=%q", ack.GetAccepted(), ack.GetReason())
+	}
+	if !proxy.HasStream("exec-tok-1") {
+		t.Fatal("expected stream mapped after per-exec token accept")
+	}
+
+	// Clean up with Done so the read loop ends.
+	if err := stream.Send(&pb.ConnectorMessage{
+		Message: &pb.ConnectorMessage_Done{
+			Done: &pb.Done{ExecutionId: "exec-tok-1"},
+		},
+	}); err != nil {
+		t.Fatalf("Send Done: %v", err)
+	}
+}
+
+func TestServerPerExecTokenRejected(t *testing.T) {
+	srv, _ := startTestServerWithLookup(t, "shared-secret", &fakeTokenLookup{
+		tokens: map[string]string{"exec-tok-1": "t1"},
+	})
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegisterWithExecID(t, conn, "wrong-token", "exec-tok-1")
+	if ack.GetAccepted() {
+		t.Fatal("expected accepted=false for a wrong per-execution token")
+	}
+	if ack.GetReason() != "invalid token" {
+		t.Fatalf("expected reason='invalid token', got %q", ack.GetReason())
+	}
+	if _, err := stream.Recv(); err != io.EOF {
+		t.Fatalf("expected EOF after rejected ack, got %v", err)
+	}
+}
+
+func TestServerTokenFromAnotherExecRejected(t *testing.T) {
+	// exec-a's token must not authenticate exec-b: tokens are per-execution
+	// single-use, never interchangeable.
+	srv, _ := startTestServerWithLookup(t, "shared-secret", &fakeTokenLookup{
+		tokens: map[string]string{"exec-a": "t-a", "exec-b": "t-b"},
+	})
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegisterWithExecID(t, conn, "t-a", "exec-b")
+	if ack.GetAccepted() {
+		t.Fatal("expected accepted=false when presenting another execution's token")
+	}
+	if ack.GetReason() != "invalid token" {
+		t.Fatalf("expected reason='invalid token', got %q", ack.GetReason())
+	}
+	if _, err := stream.Recv(); err != io.EOF {
+		t.Fatalf("expected EOF after rejected ack, got %v", err)
+	}
+}
+
+func TestServerNoPerExecTokenFallsBackToShared(t *testing.T) {
+	// An execution without a registered per-execution token falls back to the
+	// legacy shared secret — and the shared secret is still enforced there.
+	srv, proxy := startTestServerWithLookup(t, "shared-secret", &fakeTokenLookup{
+		tokens: map[string]string{"exec-with-token": "t-x"},
+	})
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegisterWithExecID(t, conn, "shared-secret", "exec-fallback-1")
+	if !ack.GetAccepted() {
+		t.Fatalf("expected accepted=true via shared-secret fallback, got accepted=%v reason=%q", ack.GetAccepted(), ack.GetReason())
+	}
+	if !proxy.HasStream("exec-fallback-1") {
+		t.Fatal("expected stream mapped after fallback accept")
+	}
+
+	// The same unknown execution with a wrong shared token must be rejected.
+	if err := stream.Send(&pb.ConnectorMessage{
+		Message: &pb.ConnectorMessage_Done{
+			Done: &pb.Done{ExecutionId: "exec-fallback-1"},
+		},
+	}); err != nil {
+		t.Fatalf("Send Done: %v", err)
+	}
+
+	conn2 := dialTestServer(t, srv)
+	stream2, ack2 := connectAndRegisterWithExecID(t, conn2, "wrong-shared", "exec-fallback-2")
+	if ack2.GetAccepted() {
+		t.Fatal("expected accepted=false for wrong shared token on unknown execution")
+	}
+	if ack2.GetReason() != "invalid token" {
+		t.Fatalf("expected reason='invalid token', got %q", ack2.GetReason())
+	}
+	if _, err := stream2.Recv(); err != io.EOF {
+		t.Fatalf("expected EOF after rejected ack, got %v", err)
+	}
 }

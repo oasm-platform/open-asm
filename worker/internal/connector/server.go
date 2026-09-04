@@ -13,6 +13,16 @@ import (
 	pb "oasm-worker/internal/gen/connector"
 )
 
+// TokenLookup resolves the per-execution single-use connector auth token for
+// an execution (one token = one execution, minted by the execution Manager
+// before the container starts). Implemented by *execution.Manager via
+// structural typing; the connector package never imports execution.
+// When a lookup is wired, a registered execution must present EXACTLY its own
+// token; executions without a registered token fall back to the shared secret.
+type TokenLookup interface {
+	ExecToken(execID string) (string, bool)
+}
+
 // Server implements the ConnectorService gRPC server.
 // Connector containers connect via bidi stream to register,
 // receive execution commands, and stream results back.
@@ -20,12 +30,22 @@ type Server struct {
 	pb.UnimplementedConnectorServiceServer
 
 	proxy      *Proxy
-	token      string // shared secret for auth; empty = no auth (dev mode)
+	token      string // legacy shared secret for auth; empty = no auth (dev mode)
+	lookup     TokenLookup
+	tlsEnabled bool // mTLS activated via WORKER_CONNECTOR_TLS_* (all three set)
 	lis        net.Listener
 	grpcServer *grpc.Server
 	logger     Logger
 	mu         sync.Mutex
 	running    bool
+}
+
+// SetTokenLookup wires the per-execution single-use token resolver (called at
+// startup, before serving). Nil clears it. Safe to call once.
+func (s *Server) SetTokenLookup(l TokenLookup) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lookup = l
 }
 
 // SetLogger wires a protocol lifecycle logger. Nil disables logging (safe).
@@ -50,6 +70,11 @@ func (s *Server) logWarning(msg string, args ...any) {
 // addr: listen address (e.g. ":26276" or "0.0.0.0:26276").
 // proxy: result forwarding proxy (must not be nil).
 // token: shared secret for connector authentication (empty = no auth).
+//
+// Transport: mutual TLS is activated when all three WORKER_CONNECTOR_TLS_*
+// env vars are set (see buildServerCreds); otherwise the server serves
+// plaintext gRPC (backward compatible). Invalid TLS material with all three
+// vars set is an error — an explicit mTLS request never silently degrades.
 func NewServer(addr string, proxy *Proxy, token string) (*Server, error) {
 	if proxy == nil {
 		return nil, status.Error(codes.InvalidArgument, "proxy must not be nil")
@@ -58,14 +83,30 @@ func NewServer(addr string, proxy *Proxy, token string) (*Server, error) {
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to listen on %s: %v", addr, err)
 	}
-	s := &Server{
-		proxy: proxy,
-		token: token,
-		lis:   lis,
+	creds, err := buildServerCreds()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "connector server TLS: %v", err)
 	}
-	s.grpcServer = grpc.NewServer()
+	s := &Server{
+		proxy:      proxy,
+		token:      token,
+		tlsEnabled: creds != nil,
+		lis:        lis,
+	}
+	var opts []grpc.ServerOption
+	if creds != nil {
+		opts = append(opts, grpc.Creds(creds))
+	}
+	s.grpcServer = grpc.NewServer(opts...)
 	pb.RegisterConnectorServiceServer(s.grpcServer, s)
 	return s, nil
+}
+
+// TLSEnabled reports whether the server serves mutual TLS (all three
+// WORKER_CONNECTOR_TLS_* env vars were set and material loaded). Used for
+// startup logging only; certificate contents are never logged.
+func (s *Server) TLSEnabled() bool {
+	return s.tlsEnabled
 }
 
 // Addr returns the listener address (useful when using ":0" for random port).
@@ -108,8 +149,10 @@ func (s *Server) Serve(ctx context.Context) error {
 
 // Connect implements the bidirectional streaming ConnectorService.
 // Protocol:
-//  1. Connector sends Register{token} as first message.
-//  2. Server validates token and sends RegisterAck.
+//  1. Connector sends Register{token, execution_id} as first message.
+//  2. Server rejects empty execution_id, validates token (per-execution
+//     single-use token first; shared secret is the legacy fallback for
+//     executions without a registered token), sends RegisterAck.
 //  3. Connector streams Result/Done messages.
 //  4. On Done or stream end, server cleans up.
 func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
@@ -125,13 +168,49 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 	}
 
 	execLabel := reg.ExecutionId
-	if execLabel == "" {
-		execLabel = "(legacy)"
-	}
 	s.logInfo("connector register: exec=%s job=%s tool=%s", execLabel, reg.JobId, reg.Tool)
 
-	// Validate token
-	if s.token != "" && reg.Token != s.token {
+	// Reject registers without execution_id: the execID is worker-assigned,
+	// and an unmapped stream cannot be routed (ExecuteJob/Result go nowhere)
+	// — accepting legacy empty IDs silently misroutes connectors. Nothing
+	// legitimate omits it.
+	if reg.ExecutionId == "" {
+		execLabel = "(empty)"
+		s.logWarning("connector registered: exec=%s ack=false reason=execution_id required", execLabel)
+		return stream.Send(&pb.WorkerMessage{
+			Message: &pb.WorkerMessage_RegisterAck{
+				RegisterAck: &pb.RegisterAck{
+					Accepted: false,
+					Reason:   "execution_id required",
+				},
+			},
+		})
+	}
+
+	// Validate token. With a TokenLookup wired, a registered execution must
+	// present EXACTLY its own per-execution single-use token — a token minted
+	// for another execution fails here (tokens never interchange). Executions
+	// without a registered token fall back to the legacy shared secret.
+	s.mu.Lock()
+	lookup := s.lookup
+	s.mu.Unlock()
+	tokenOK := false
+	if lookup != nil {
+		if tok, ok := lookup.ExecToken(reg.ExecutionId); ok {
+			tokenOK = reg.Token == tok
+		} else if s.token != "" {
+			tokenOK = reg.Token == s.token
+		} else {
+			// No per-execution token and no shared secret configured — accept
+			// only in this dev-mode combination.
+			tokenOK = true
+		}
+	} else if s.token != "" {
+		tokenOK = reg.Token == s.token
+	} else {
+		tokenOK = true
+	}
+	if !tokenOK {
 		s.logWarning("connector registered: exec=%s ack=false reason=invalid token", execLabel)
 		return stream.Send(&pb.WorkerMessage{
 			Message: &pb.WorkerMessage_RegisterAck{
@@ -154,20 +233,10 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 	s.logInfo("connector registered: exec=%s ack=true reason=", execLabel)
 
 	// Map the stream to the execution advertised in Register so ExecuteJob
-	// messages can be routed to this connector. Legacy connectors send an
-	// empty execution_id — they are not mapped and keep the old behavior.
-	registeredExecID := ""
-	if reg.ExecutionId != "" {
-		registeredExecID = reg.ExecutionId
-		if err := s.proxy.RegisterConnector(reg.ExecutionId, stream); err != nil {
-			return err
-		}
-	}
-	registeredExecLabel := func() string {
-		if registeredExecID == "" {
-			return "(legacy)"
-		}
-		return registeredExecID
+	// messages can be routed to this connector. A non-empty execution_id is
+	// guaranteed here (rejected above), so the stream is always mapped.
+	if err := s.proxy.RegisterConnector(reg.ExecutionId, stream); err != nil {
+		return err
 	}
 
 	// Step 2: Read loop — receive results and done messages.
@@ -181,10 +250,8 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 			for execID := range seenExecIDs {
 				s.proxy.OnConnectorDown(execID)
 			}
-			if registeredExecID != "" {
-				s.proxy.UnregisterConnector(registeredExecID)
-			}
-			s.logWarning("connector stream closed: exec=%s err=EOF", registeredExecLabel())
+			s.proxy.UnregisterConnector(reg.ExecutionId)
+			s.logWarning("connector stream closed: exec=%s err=EOF", reg.ExecutionId)
 			return nil
 		}
 		if err != nil {
@@ -192,17 +259,15 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 			for execID := range seenExecIDs {
 				s.proxy.OnConnectorDown(execID)
 			}
-			if registeredExecID != "" {
-				s.proxy.UnregisterConnector(registeredExecID)
-			}
-			s.logWarning("connector stream closed: exec=%s err=%v", registeredExecLabel(), err)
+			s.proxy.UnregisterConnector(reg.ExecutionId)
+			s.logWarning("connector stream closed: exec=%s err=%v", reg.ExecutionId, err)
 			return err
 		}
 
 		switch m := msg.Message.(type) {
 		case *pb.ConnectorMessage_Result:
 			seenExecIDs[m.Result.ExecutionId] = true
-			s.proxy.ForwardResult(m.Result.ExecutionId, m.Result.Data)
+			s.proxy.ForwardResult(m.Result.ExecutionId, m.Result.Data, m.Result.Findings)
 		case *pb.ConnectorMessage_Done:
 			errDetail := m.Done.Error
 			if errDetail == "" {
@@ -215,9 +280,7 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 			delete(seenExecIDs, m.Done.ExecutionId)
 			s.proxy.MarkDone(m.Done.ExecutionId)
 			s.proxy.OnConnectorDown(m.Done.ExecutionId)
-			if registeredExecID != "" {
-				s.proxy.UnregisterConnector(registeredExecID)
-			}
+			s.proxy.UnregisterConnector(reg.ExecutionId)
 			return nil
 		}
 	}

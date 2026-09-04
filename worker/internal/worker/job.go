@@ -40,24 +40,23 @@ var (
 // worker restart resets all counters (documented trade-off).
 var imageBackoff = execution.NewImageBackoff()
 
-// connectorConnectTimeout bounds how long a connector job may stay up before
-// its container connects back. If the connector never connects (bad image,
-// wrong WORKER_GRPC_ADDR/WORKER_TOKEN), the execution is cancelled and the
-// job is failed so Core can finalize it.
+// Timeout constants live in internal/execution/timeouts.go (single source of
+// truth): ConnectorConnectTimeout bounds how long a connector job may stay up
+// before its container connects back. If the connector never connects (bad
+// image, wrong WORKER_GRPC_ADDR/WORKER_TOKEN), the execution is cancelled and
+// the job is failed so Core can finalize it.
 // ponytail: make this configurable when tuning is needed.
-const connectorConnectTimeout = 5 * time.Minute
-
-// connectorCleanupTimeout bounds best-effort post-execution container cleanup.
+//
+// ConnectorCleanupTimeout bounds best-effort post-execution container cleanup.
 // The cleanup context MUST be detached from the session context: a worker
 // reconnect cancelling the session would abort the docker Stop/Cleanup calls
 // immediately and orphan the container.
-const connectorCleanupTimeout = 30 * time.Second
 
 // newDetachedCleanupContext returns a context rooted at context.Background
 // with a bounded deadline for best-effort container cleanup. Never pass the
 // session ctx here — see connectorCleanupTimeout.
 func newDetachedCleanupContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), connectorCleanupTimeout)
+	return context.WithTimeout(context.Background(), execution.ConnectorCleanupTimeout)
 }
 
 // healthPollInterval is how often the connector-job drain polls container
@@ -346,6 +345,51 @@ func submitCategoryError(ctx context.Context, grpcClient *grpcclient.Client, eve
 	}
 }
 
+// findingToVulnerability maps one connector Finding onto the jobs_registry
+// Vulnerability model consumed by Core. Fields with no counterpart in
+// Vulnerability (matched_at, timestamp) are intentionally dropped. A nil
+// finding yields nil (skipped by the caller).
+func findingToVulnerability(f *connectorpb.Finding) *pb.Vulnerability {
+	if f == nil {
+		return nil
+	}
+	return &pb.Vulnerability{
+		Name:       f.GetName(),
+		Severity:   severityFromString(f.GetSeverity()),
+		Tags:       f.GetTags(),
+		References: f.GetReferences(),
+		CveId:      f.GetCveId(),
+		CweId:      f.GetCweId(),
+		CvssScore:  float32(f.GetCvssScore()),
+		CvssMetric: f.GetCvssMetrics(),
+		EpssScore:  float32(f.GetEpssScore()),
+		Solution:   f.GetSolution(),
+		Host:       f.GetHost(),
+		IpAddress:  f.GetIp(),
+	}
+}
+
+// severityFromString maps the connector's lowercase severity string onto the
+// jobs_registry.Severity enum. Unknown values keep the zero value (Core's
+// default) — the connector's closed set is info/low/medium/high/critical, and
+// the worker must never invent enum values for severities it does not know.
+func severityFromString(s string) pb.Severity {
+	switch strings.ToLower(s) {
+	case "info":
+		return pb.Severity_INFO
+	case "low":
+		return pb.Severity_LOW
+	case "medium":
+		return pb.Severity_MEDIUM
+	case "high":
+		return pb.Severity_HIGH
+	case "critical":
+		return pb.Severity_CRITICAL
+	default:
+		return pb.Severity_INFO
+	}
+}
+
 // processConnectorJob submits an image-based job to the Docker runtime via Manager.
 // Returns immediately after Submit (fire-and-forget); cleanup runs asynchronously
 // in handleConnectorResult when the container exits or connector signals Done.
@@ -418,7 +462,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	bridgeMu.Unlock()
 
 	// Register proxy channel for streaming results from connector.
-	resultCh := make(chan []byte, 16)
+	resultCh := make(chan connector.ResultMsg, 16)
 	proxy.Register(execID, resultCh)
 
 	// Queue the ExecuteJob for the connector container. If the connector has
@@ -446,7 +490,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	// monitor (Inspect poll), the log tailer (Logs stream), result draining,
 	// container cleanup and Core finalization.
 	tail := &tailBuffer{}
-	go handleConnectorResult(ctx, execID, grpcClient, events, proxy, resultCh, startTime, connectorConnectTimeout, mgr, tail)
+	go handleConnectorResult(ctx, execID, grpcClient, events, proxy, resultCh, startTime, execution.ConnectorConnectTimeout, mgr, tail)
 
 	return true, true // hadJob, usedAsync — completion handler releases semaphore
 }
@@ -461,7 +505,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 // select cases, not separate goroutines): Done/timeout/crash all break the
 // same drain, so there is no monitor/tailer lifecycle to coordinate and no
 // orphan goroutine after the job ends.
-func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcclient.Client, events chan<- TuiEvent, proxy *connector.Proxy, resultCh <-chan []byte, startTime time.Time, connectTimeout time.Duration, mgr *execution.Manager, tail *tailBuffer) {
+func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcclient.Client, events chan<- TuiEvent, proxy *connector.Proxy, resultCh <-chan connector.ResultMsg, startTime time.Time, connectTimeout time.Duration, mgr *execution.Manager, tail *tailBuffer) {
 	bridgeMu.Lock()
 	entry, ok := bridge[execID]
 	bridgeMu.Unlock()
@@ -506,20 +550,34 @@ func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcc
 	var timerC <-chan time.Time = timer.C
 	submittedAny := false
 
+	// Accumulated structured findings for the vulnerabilities category: chunks
+	// are aggregated and submitted ONCE at drain end (see finalization below).
+	// Other categories keep the per-chunk raw submission path.
+	var vulns []*pb.Vulnerability
+
 	// Drain results from connector until channel closes (Done or disconnect)
 	// or the connector fails to connect within connectTimeout.
 drain:
 	for {
 		select {
-		case data, ok := <-resultCh:
+		case msg, ok := <-resultCh:
 			if !ok {
 				break drain
 			}
 			submittedAny = true
-			if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(data)); err != nil {
+			if entry.category == "vulnerabilities" {
+				for _, f := range msg.Findings {
+					if v := findingToVulnerability(f); v != nil {
+						vulns = append(vulns, v)
+					}
+				}
+				// Per-chunk log kept (bytes + findings count) even though the
+				// submission itself is deferred to the single drain-end call.
+				log.Info("[%s] connector result chunk: exec=%s bytes=%d findings=%d", entry.jobID, execID, len(msg.Data), len(msg.Findings))
+			} else if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(msg.Data)); err != nil {
 				log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector result", entry.jobID), err)
 			} else {
-				log.Info("[%s] connector result submitted: exec=%s bytes=%d", entry.jobID, execID, len(data))
+				log.Info("[%s] connector result submitted: exec=%s bytes=%d", entry.jobID, execID, len(msg.Data))
 			}
 		case chunk, ok := <-logsCh:
 			if !ok {
@@ -619,9 +677,8 @@ drain:
 	// depend on this succeeding.
 	if mgr != nil {
 		cleanupCtx, cancel := newDetachedCleanupContext()
-		// Release (pool-aware) instead of a blind remove: in pool mode the
-		// container survives for sibling jobs (or is retired when exited);
-		// with pooling disabled it cleans up the 1:1 container as before.
+		// Release cleans up the 1:1 container (1 stream = 1 execution; the
+		// container is never shared, so a blind remove is safe here).
 		if err := mgr.Release(cleanupCtx, execID); err != nil {
 			log.ErrorE(fmt.Sprintf("[%s] Failed to clean up connector execution %s", entry.jobID, execID), err)
 		}
@@ -664,6 +721,14 @@ drain:
 	case !hadDone:
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, "connector disconnected before Done")
 		log.Warning("[%s] Connector disconnected without Done: execID=%s", entry.jobID, execID)
+	case entry.category == "vulnerabilities":
+		// Clean Done: submit the aggregated findings exactly once (raw is ""
+		// per contract — findings travel in the structured payload).
+		if err := grpcClient.SubmitVulnerabilitiesResult(ctx, entry.jobID, false, "", vulns); err != nil {
+			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector vulnerabilities", entry.jobID), err)
+		} else {
+			log.Info("[%s] connector vulnerabilities result submitted: exec=%s findings=%d", entry.jobID, execID, len(vulns))
+		}
 	case !submittedAny:
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, "")
 		log.Info("[%s] Connector job completed with no results: execID=%s", entry.jobID, execID)

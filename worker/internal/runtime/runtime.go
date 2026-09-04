@@ -18,6 +18,11 @@ type JobSpec struct {
 	// runtime users) keeps the legacy behavior: DockerRuntime generates a
 	// random hex ID.
 	ExecID string
+	// ConnectorToken is the per-execution single-use connector auth token. It
+	// is injected as the container's WORKER_TOKEN env so the Register
+	// handshake authenticates against this execution only. Empty keeps the
+	// legacy shared-secret behavior (backend compatibility).
+	ConnectorToken string
 }
 
 type RuntimeOpts struct {
@@ -51,8 +56,4 @@ type ExecutionRuntime interface {
 	Inspect(ctx context.Context, h Handle) (InspectResult, error)
 	Logs(ctx context.Context, h Handle) (<-chan []byte, error)
 	Cleanup(ctx context.Context, h Handle) error
-	// SweepOrphans removes runtime-managed containers (oasm-managed label) not
-	// referenced by keep, returning how many were removed. Used by the pool on
-	// worker start to clean up crashed-worker leftovers.
-	SweepOrphans(ctx context.Context, keep []string) (int, error)
 }

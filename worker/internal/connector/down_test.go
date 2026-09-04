@@ -4,7 +4,7 @@ import "testing"
 
 func TestConnectorDownTriggersCleanup(t *testing.T) {
 	p := NewProxy()
-	ch := make(chan []byte, 1)
+	ch := make(chan ResultMsg, 1)
 	p.Register("exec-1", ch)
 	p.OnConnectorDown("exec-1")
 	// channel should be closed; reading it yields ok==false
@@ -22,18 +22,18 @@ func TestConnectorDownTriggersCleanup(t *testing.T) {
 
 func TestProxyUnregistersOnDisconnect(t *testing.T) {
 	p := NewProxy()
-	ch := make(chan []byte, 1)
+	ch := make(chan ResultMsg, 1)
 	p.Register("exec-2", ch)
 	p.Unregister("exec-2")
 	if p.Has("exec-2") {
 		t.Fatal("expected unregistered")
 	}
-	p.ForwardResult("exec-2", []byte(`x`)) // should not panic or block
+	p.ForwardResult("exec-2", []byte(`x`), nil) // should not panic or block
 }
 
 func TestOnConnectorDownClosesExactlyOnce(t *testing.T) {
 	p := NewProxy()
-	ch := make(chan []byte, 1)
+	ch := make(chan ResultMsg, 1)
 	p.Register("exec-3", ch)
 	p.OnConnectorDown("exec-3")
 	p.OnConnectorDown("exec-3") // second call must not panic (double close guard)

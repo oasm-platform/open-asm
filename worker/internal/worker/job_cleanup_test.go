@@ -107,7 +107,7 @@ func TestHandleConnectorResultTimeoutUsesDetachedContext(t *testing.T) {
 	bridge[execID] = entry
 	bridgeMu.Unlock()
 
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 	activeJobsMu.Lock()
 	activeJobs[entry.jobID] = struct{}{}
@@ -164,7 +164,7 @@ func TestHandleConnectorResultDoneCleansUpContainer(t *testing.T) {
 	bridge[execID] = entry
 	bridgeMu.Unlock()
 
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	done := make(chan struct{})
@@ -174,7 +174,7 @@ func TestHandleConnectorResultDoneCleansUpContainer(t *testing.T) {
 	}()
 
 	// Normal flow: result chunk, then Done, then connector-down (channel close).
-	proxy.ForwardResult(execID, []byte(`{"a":1}`))
+	proxy.ForwardResult(execID, []byte(`{"a":1}`), nil)
 	proxy.MarkDone(execID)
 	proxy.OnConnectorDown(execID)
 
@@ -221,7 +221,7 @@ func TestHandleConnectorResultDoneClearsPendingExecute(t *testing.T) {
 	bridge[execID] = entry
 	bridgeMu.Unlock()
 
-	resultCh := make(chan []byte, 4)
+	resultCh := make(chan connector.ResultMsg, 4)
 	proxy.Register(execID, resultCh)
 
 	done := make(chan struct{})

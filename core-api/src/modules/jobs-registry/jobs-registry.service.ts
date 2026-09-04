@@ -32,18 +32,19 @@ import { randomUUID } from 'crypto';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
-import { WorkspacesService } from '../workspaces/workspaces.service';
-import { StorageService } from '../storage/storage.service';
-import { builtInTools } from '../tools/tools-provider/built-in-tools';
-import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
-import { ToolsService } from '../tools/tools.service';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { StorageService } from '../storage/storage.service';
+import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
+import { builtInTools } from '../tools/tools-provider/built-in-tools';
+import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
 import {
+  BaseResultDto,
   CreateJobs,
   GetManyJobsQueryParams,
   GetNextJobResult,
@@ -51,7 +52,6 @@ import {
   JobTimelineQueryResult,
   JobTimelineResponseDto,
   UpdateResultDto,
-  BaseResultDto,
 } from './dto/jobs-registry.dto';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
@@ -436,9 +436,7 @@ export class JobsRegistryService {
    * @param workerId the ID of the worker to retrieve a job for
    * @returns the next job associated with the worker, or `null` if none is found
    */
-  public async getNextJob(
-    workerId: string,
-  ): Promise<GetNextJobResult | null> {
+  public async getNextJob(workerId: string): Promise<GetNextJobResult | null> {
     // [OPT-2] Fetch worker OUTSIDE transaction to reduce lock hold time
     const worker = await this.dataSource.getRepository(WorkerInstance).findOne({
       where: { id: workerId },
@@ -483,7 +481,9 @@ export class JobsRegistryService {
           // while the manifest display name is capitalized ('Nuclei'). The
           // `tool.name IN (:...names)` filter must use slugs or connector
           // jobs never match and stay PENDING forever.
-          const connectorTools = this.connectorRegistry.getAllConnectors().map((c) => c.slug);
+          const connectorTools = this.connectorRegistry
+            .getAllConnectors()
+            .map((c) => c.slug);
           allowedToolNames.push(...connectorTools);
         }
         queryBuilder.andWhere('tool.name IN (:...names)', {
@@ -532,7 +532,9 @@ export class JobsRegistryService {
 
       if (isBuiltInTools && !job.command) {
         // Check if this is a connector tool (which has no command by design)
-        const isConnector = !!this.connectorRegistry.getConnector(job.tool?.name ?? '');
+        const isConnector = !!this.connectorRegistry.getConnector(
+          job.tool?.name ?? '',
+        );
         if (!isConnector) {
           await queryRunner.rollbackTransaction();
           return null;
@@ -562,7 +564,9 @@ export class JobsRegistryService {
       if (!isBuiltInTools && worker.tool) {
         base.tool = { id: worker.tool.id!, name: worker.tool.name };
         // Connector workers have no workspace — derive from job's target instead, fallback to worker workspace for backward compat
-        base.workspaceId = job.asset.target?.workspaceId ?? (worker.workspace as { id?: string })?.id;
+        base.workspaceId =
+          job.asset.target?.workspaceId ??
+          (worker.workspace as { id?: string })?.id;
         base.configProfileId = job.configProfileId;
       } else if (isBuiltInTools && job.tool) {
         // Connector job picked up by BUILT_IN worker
@@ -707,6 +711,7 @@ export class JobsRegistryService {
     dto: BaseResultDto,
     category: ToolCategory,
   ): Promise<{ jobId: string; queueId: string }> {
+    console.log(dto);
     const fileName = `${dto.jobId}-${Date.now()}.json`;
     const { path: resultRef } = await this.storageService.uploadFile(
       fileName,
@@ -874,7 +879,11 @@ export class JobsRegistryService {
     if (nextToolIndex >= jobs.length) return 0;
 
     const workspaceId = workflow.workspace?.id;
-    if (workspaceId && !(await this.workspaceService.getWorkspaceConfigValue(workspaceId)).isAssetsDiscovery) {
+    if (
+      workspaceId &&
+      !(await this.workspaceService.getWorkspaceConfigValue(workspaceId))
+        .isAssetsDiscovery
+    ) {
       // Batch-resolve remaining tools' categories to find first non-SUBDOMAINS
       const remainingJobNames = jobs.slice(nextToolIndex).map((j) => j.run);
       const tools = await this.toolsService.getToolByNames({
@@ -1124,9 +1133,7 @@ export class JobsRegistryService {
 
     // Build a lookup map: toolId → computed status
     const toolStatusMap = new Map<string, JobStatus>();
-    rawToolStatuses.forEach((row) =>
-      toolStatusMap.set(row.toolId, row.status),
-    );
+    rawToolStatuses.forEach((row) => toolStatusMap.set(row.toolId, row.status));
 
     // Map tools from workflow content with their computed status.
     // Only id/name/logoUrl/status are exposed — the UI renders nothing else
@@ -1139,12 +1146,12 @@ export class JobsRegistryService {
     const tools = (
       jobHistory.workflow?.content.jobs
         .map((job) => {
-          const tool = instaledTools.data.find(
-            (t) => t.name === job.run,
-          );
+          const tool = instaledTools.data.find((t) => t.name === job.run);
           return tool;
         })
-        .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined) ?? []
+        .filter(
+          (tool): tool is NonNullable<typeof tool> => tool !== undefined,
+        ) ?? []
     ).map((tool) => ({
       id: tool.id,
       name: tool.name,

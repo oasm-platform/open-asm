@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 )
@@ -32,11 +30,6 @@ type DockerRuntime struct {
 	connectorAddr  string // resolved dial address containers use to reach the worker's connector gRPC server
 	connectorToken string // shared secret for connector authentication
 	logger         Logger
-
-	// poolEnabled switches container naming to the stable pool form
-	// (oasm-<tool>-<hash8(image)>) and makes Create reuse a live container of
-	// the same image instead of always spawning a fresh one.
-	poolEnabled bool
 }
 
 // Logger receives DockerRuntime lifecycle log lines (image pull, create, start,
@@ -50,12 +43,6 @@ type Logger interface {
 // SetLogger wires a lifecycle logger. Nil disables logging (safe).
 func (d *DockerRuntime) SetLogger(l Logger) {
 	d.logger = l
-}
-
-// SetPoolEnabled toggles pooled container naming/reuse. Must be called before
-// any Create. Pooling off keeps the legacy random-suffix 1:1 behavior.
-func (d *DockerRuntime) SetPoolEnabled(enabled bool) {
-	d.poolEnabled = enabled
 }
 
 func (d *DockerRuntime) logInfo(msg string, args ...any) {
@@ -88,15 +75,31 @@ func resolveHost(host, dockerHostEnv, workerDockerHostEnv, goos string) string {
 	return "unix:///var/run/docker.sock"
 }
 
+// envTruthy reports whether an env var carries an opt-in value
+// (1/true/yes/on, case-insensitive). Used for explicit opt-ins like
+// WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT.
+func envTruthy(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
 // NewDockerRuntime creates a DockerRuntime dialing via docker.sock.
 // host defaults to npipe on Windows / unix socket elsewhere; WORKER_DOCKER_HOST
 // and DOCKER_HOST env override an empty host (see resolveHost).
 // A pre-set DOCKER_HOST is never clobbered: the resolved host is passed to the
 // client explicitly instead of being written into the process environment.
-// connectorAddr is an explicit override for the address containers dial the
-// connector server on (precedence: connectorAddr arg > WORKER_CONNECTOR_ADDR
-// env > auto-derive, see resolveConnectorAddr); pass "" to auto-derive.
-// connectorPort is the listen port of the worker's connector gRPC server.
+// connectorAddr is the explicit dial address containers use to reach the
+// worker's connector server (precedence: connectorAddr arg >
+// WORKER_CONNECTOR_ADDR env). Networking is explicit: when both are empty the
+// constructor FAILS FAST with guidance instead of guessing an address spawned
+// containers may not be able to dial. The legacy auto-derive chain
+// (resolveConnectorAddr) only runs under the explicit
+// WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 opt-in, which logs a warning so the
+// fallback is never silent. connectorPort is the listen port of the worker's
+// connector gRPC server.
 func NewDockerRuntime(host string, connectorAddr string, connectorPort int, connectorToken string) (*DockerRuntime, error) {
 	host = resolveHost(host, os.Getenv("DOCKER_HOST"), os.Getenv("WORKER_DOCKER_HOST"), runtime.GOOS)
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithHost(host), client.WithAPIVersionNegotiation())
@@ -110,10 +113,19 @@ func NewDockerRuntime(host string, connectorAddr string, connectorPort int, conn
 	if override == "" {
 		override = os.Getenv("WORKER_CONNECTOR_ADDR")
 	}
+	if override == "" && !envTruthy("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT") {
+		return nil, fmt.Errorf(
+			"WORKER_CONNECTOR_ADDR is required: set it to a host or IP connector containers can dial back to — the worker's LAN IP (e.g. 192.168.1.50:%d), a DNS name containers resolve, or host.docker.internal:%d when the worker runs on the Docker host. Do NOT use 0.0.0.0: the connector may bind there, but containers cannot dial it. To keep the legacy auto-detect chain (self-IP → host.docker.internal → bridge gateway → 172.17.0.1) set WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1",
+			connectorPort, connectorPort)
+	}
 	hostname, _ := os.Hostname()
-	addr, err := resolveConnectorAddr(context.Background(), cli, hostname, override, connectorPort, runtime.GOOS)
-	if err != nil {
-		return nil, err
+	addr := override
+	if addr == "" {
+		fmt.Fprintf(os.Stderr, "WARNING: WORKER_CONNECTOR_ADDR is empty; WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 opted into the legacy auto-detect chain (self-IP → host.docker.internal → bridge gateway → 172.17.0.1). Prefer an explicit address connector containers can dial back to.\n")
+		addr, err = resolveConnectorAddr(context.Background(), cli, hostname, "", connectorPort, runtime.GOOS)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &DockerRuntime{
 		cli:            cli,
@@ -283,80 +295,6 @@ func buildContainerName(tool, execID string) string {
 	return fmt.Sprintf("oasm-%s-%s-%s", sanitizeToolName(tool), short, randHex4())
 }
 
-// buildPoolContainerName builds the stable pooled name oasm-<tool>-<hash8(image)>.
-// Deterministic per image so consecutive jobs of the same image reuse one
-// container; the 8-hex hash (sha256 prefix) disambiguates images without
-// leaking the full registry ref into the name.
-func buildPoolContainerName(tool, image string) string {
-	sum := sha256.Sum256([]byte(image))
-	return fmt.Sprintf("oasm-%s-%s", sanitizeToolName(tool), hex.EncodeToString(sum[:4]))
-}
-
-// pooledHandleFromName inspects a container by its pooled name and returns a
-// usable Handle when it is a live oasm-managed container (reuse path — skips
-// pull/create/start). A same-named container that is NOT a live managed one is
-// force-removed first (stale leftover), so the caller can create fresh under
-// the same stable name.
-func (d *DockerRuntime) pooledHandleFromName(ctx context.Context, name string, opts RuntimeOpts, spec JobSpec) (Handle, bool) {
-	j, err := d.cli.ContainerInspect(ctx, name)
-	if err != nil {
-		return Handle{}, false // nothing holds the name — caller creates fresh
-	}
-	managed := j.Config != nil && j.Config.Labels != nil && j.Config.Labels["oasm-managed"] == "true"
-	if !managed && (j.Config == nil || j.Config.Labels == nil || len(j.Config.Labels) == 0) {
-		// Name unregistered (no oasm labels): genuinely fresh, skip removal.
-		return Handle{}, false
-	}
-	if !managed || !j.State.Running {
-		if err := d.cli.ContainerRemove(context.Background(), j.ID, container.RemoveOptions{Force: true}); err != nil {
-			d.logWarning("docker: remove stale pooled container %s: %v", j.ID, err)
-		}
-		return Handle{}, false
-	}
-	d.logInfo("docker: pool hit, reusing running container: %s name=%s image=%s", j.ID, name, spec.Image)
-	return Handle{
-		ID: j.ID,
-		Labels: map[string]string{
-			"trace_id": opts.TraceID,
-			"tool":     spec.Tool,
-			"exec_id":  j.Config.Labels["exec_id"],
-		},
-	}, true
-}
-
-// SweepOrphans removes oasm-managed containers not referenced by keep — stale
-// leftovers from crashed workers/connectors. Pooling disabled: no-op (legacy
-// naming manages no containers).
-func (d *DockerRuntime) SweepOrphans(ctx context.Context, keep []string) (int, error) {
-	if d.cli == nil || !d.poolEnabled {
-		return 0, nil
-	}
-	args := filters.NewArgs(filters.Arg("label", "oasm-managed=true"))
-	list, err := d.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: args})
-	if err != nil {
-		return 0, err
-	}
-	keepSet := make(map[string]struct{}, len(keep))
-	for _, id := range keep {
-		keepSet[id] = struct{}{}
-	}
-	removed := 0
-	for _, c := range list {
-		if _, ok := keepSet[c.ID]; ok {
-			continue
-		}
-		if err := d.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true}); err != nil {
-			if !errdefs.IsNotFound(err) {
-				d.logWarning("docker: orphan sweep remove %s: %v", c.ID, err)
-			}
-			continue
-		}
-		removed++
-		d.logInfo("docker: swept orphan container: %s", c.ID)
-	}
-	return removed, nil
-}
-
 // imageIsCached reports whether the engine already holds a local copy of the
 // image: a nil error from ImageInspect means present. Any error (404 for a
 // missing image, or a transient daemon error) means the caller falls back to a
@@ -428,24 +366,16 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		// ephemeral, so no cross-job state leaks.
 		// ponytail: single shared volume per tool image; if images ever differ
 		// in template layout, key the volume per image
-		// (oasm-nuclei-templates-<hash8(image)>) like the pool name does.
+		// (oasm-nuclei-templates-<hash8(image)>) like the per-image temp volume.
 		Binds: []string{"oasm-nuclei-templates:/opt/nuclei-templates"},
 		Tmpfs: map[string]string{
 			"/tmp": "rw,nosuid,nodev,size=256m",
 		},
 	}
 
+	// 1 stream = 1 execution: every container is a fresh 1:1 execution with a
+	// random-suffix name — no pooled reuse (pool machinery removed).
 	name := buildContainerName(spec.Tool, execID)
-	if d.poolEnabled {
-		// Pooled mode: deterministic per-image name + reuse of a live
-		// oasm-managed container so N same-image jobs share one container.
-		// Reuse skips pull/create/start entirely.
-		pname := buildPoolContainerName(spec.Tool, spec.Image)
-		if h, ok := d.pooledHandleFromName(ctx, pname, opts, spec); ok {
-			return h, nil
-		}
-		name = pname
-	}
 
 	// Pull policy: inspect first — an image already present locally skips the
 	// network pull entirely (the common case for repeated jobs of the same
@@ -467,19 +397,10 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	if err != nil {
 		if errdefs.IsConflict(err) {
-			if d.poolEnabled {
-				// Name held by a stale/foreign container: reuse it when it is a
-				// live oasm-managed container (race with a sibling create),
-				// otherwise remove and retry under the same stable name.
-				if h, ok := d.pooledHandleFromName(ctx, name, opts, spec); ok {
-					return h, nil
-				}
-				d.logInfo("docker: pool name conflict, removing stale container and retrying: %v", err)
-			} else {
-				// Legacy: retry once with a fresh random suffix.
-				d.logInfo("docker: container name conflict, retrying with fresh suffix: %v", err)
-				name = buildContainerName(spec.Tool, execID)
-			}
+			// Name held by a stale/foreign container: retry once with a fresh
+			// random suffix.
+			d.logInfo("docker: container name conflict, retrying with fresh suffix: %v", err)
+			name = buildContainerName(spec.Tool, execID)
 			resp, err = d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 		}
 		if err != nil {
@@ -560,6 +481,18 @@ func (d *DockerRuntime) Inspect(ctx context.Context, h Handle) (InspectResult, e
 // when ctx is cancelled (docker client aborts the request) or the stream
 // closes — sends are ctx-aware so a stopped consumer cannot leak them, and
 // the channel is always closed on exit.
+//
+// The demux validates every 8-byte header before trusting it: TTY containers
+// serve a raw stream with no headers, tools can emit binary output, and a
+// torn frame can leave garbage in the header bytes. A malformed header means
+// the claimed payload length is attacker/daemon-controlled garbage — the old
+// make([]byte, payloadLen) could panic (makeslice: len out of range / OOM) or
+// hang on a read that never completes, killing the worker. On any invalid
+// header the stream reverts to raw mode: the bytes are replayed as log data
+// and everything after them is streamed verbatim, so output keeps flowing.
+// On ctx cancel the response body is closed explicitly (a stalled Follow
+// read does not unblock on its own) and the demux goroutine is joined before
+// the channel closes, so no reader goroutine outlives it.
 func (d *DockerRuntime) Logs(ctx context.Context, h Handle) (<-chan []byte, error) {
 	if d.cli == nil {
 		return nil, fmt.Errorf("docker client not initialized")
@@ -573,6 +506,17 @@ func (d *DockerRuntime) Logs(ctx context.Context, h Handle) (<-chan []byte, erro
 		return nil, err
 	}
 	ch := make(chan []byte, 16)
+
+	// maxLogFrameBytes caps a single multiplexed frame payload. Legitimate
+	// frames stay far below this; anything claiming more is a corrupt
+	// header and triggers the raw-stream fallback instead of allocating a
+	// huge buffer (makeslice panic / OOM / hang on an unreadable frame).
+	const maxLogFrameBytes = 10 * 1024 * 1024
+
+	// demuxDone is closed when the frame reader exits, so the outer
+	// goroutine can join it before closing the channel — no reader
+	// goroutine may outlive the channel.
+	demuxDone := make(chan struct{})
 	go func() {
 		defer rc.Close()
 		defer close(ch)
@@ -585,19 +529,50 @@ func (d *DockerRuntime) Logs(ctx context.Context, h Handle) (<-chan []byte, erro
 		frames := make(chan []byte, 16)
 		go func() {
 			defer close(frames)
+			defer close(demuxDone)
+
+			// send delivers raw stream bytes to the outer line splitter,
+			// aborting when the context is cancelled.
+			send := func(p []byte) bool {
+				select {
+				case frames <- p:
+					return true
+				case <-ctx.Done():
+					return false
+				}
+			}
+
 			for {
 				hdr := make([]byte, 8)
 				if _, err := io.ReadFull(br, hdr); err != nil {
-					return
+					return // EOF, rc closed, or ctx cancelled
 				}
+				stream := hdr[0]
 				payloadLen := binary.BigEndian.Uint32(hdr[4:8])
+				if stream > 2 || hdr[1] != 0 || hdr[2] != 0 || hdr[3] != 0 || payloadLen == 0 || payloadLen > maxLogFrameBytes {
+					// Not a valid multiplex header: the stream is raw
+					// (TTY container), binary output, or a torn frame.
+					// Replay the header bytes as stream bytes and switch
+					// to raw mode so the log lines keep flowing.
+					if !send(hdr) {
+						return
+					}
+					buf := make([]byte, 32*1024)
+					for {
+						n, err := br.Read(buf)
+						if n > 0 && !send(buf[:n]) {
+							return
+						}
+						if err != nil {
+							return
+						}
+					}
+				}
 				payload := make([]byte, payloadLen)
 				if _, err := io.ReadFull(br, payload); err != nil {
-					return
+					return // torn frame: stop, outer flushes what arrived
 				}
-				select {
-				case frames <- payload:
-				case <-ctx.Done():
+				if !send(payload) {
 					return
 				}
 			}
@@ -621,6 +596,12 @@ func (d *DockerRuntime) Logs(ctx context.Context, h Handle) (<-chan []byte, erro
 					return // ctx cancelled mid-flush
 				}
 			case <-ctx.Done():
+				// Unblock the frame reader: closing rc makes its blocking
+				// ReadFull/Read return (a stalled Follow stream does not
+				// unblock on its own). Join it before returning so no
+				// reader goroutine outlives the channel.
+				_ = rc.Close()
+				<-demuxDone
 				return
 			}
 		}
@@ -714,11 +695,19 @@ func (d *DockerRuntime) Cleanup(ctx context.Context, h Handle) error {
 // stays bracketed); WORKER_GRPC_HOST/_PORT are the same address split for
 // SDKs that need host and port separately (host is bare — brackets stripped).
 // An address without a port (e.g. a bare service-name override) emits
-// WORKER_GRPC_HOST only.
+// WORKER_GRPC_HOST only. WORKER_TOKEN prefers the per-execution single-use
+// token (spec.ConnectorToken, set by the Manager) and falls back to the
+// legacy shared secret (connectorToken) for back-compat.
 func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID string) []string {
+	// Single-use per-execution token wins; the shared secret is the legacy
+	// fallback for direct runtime users that never went through the Manager.
+	workerToken := connectorToken
+	if spec.ConnectorToken != "" {
+		workerToken = spec.ConnectorToken
+	}
 	env := []string{
 		"WORKER_GRPC_ADDR=" + connectorAddr,
-		"WORKER_TOKEN=" + connectorToken,
+		"WORKER_TOKEN=" + workerToken,
 		"EXECUTION_ID=" + execID,
 		"JOB_ID=" + spec.JobID,
 		"TOOL=" + spec.Tool,

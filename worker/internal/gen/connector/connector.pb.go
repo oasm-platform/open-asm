@@ -9,6 +9,7 @@ package connector
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -276,6 +277,7 @@ type Result struct {
 	ExecutionId   string                 `protobuf:"bytes,1,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
 	Data          []byte                 `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 	IsError       bool                   `protobuf:"varint,3,opt,name=is_error,json=isError,proto3" json:"is_error,omitempty"`
+	Findings      []*Finding             `protobuf:"bytes,4,rep,name=findings,proto3" json:"findings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -331,6 +333,164 @@ func (x *Result) GetIsError() bool {
 	return false
 }
 
+func (x *Result) GetFindings() []*Finding {
+	if x != nil {
+		return x.Findings
+	}
+	return nil
+}
+
+// Finding is one structured vulnerability emitted by a connector. Field
+// numbers are the wire contract with the SDK (sdk/proto/connector.proto) —
+// never renumber.
+type Finding struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Severity      string                 `protobuf:"bytes,2,opt,name=severity,proto3" json:"severity,omitempty"`
+	Tags          []string               `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty"`
+	References    []string               `protobuf:"bytes,4,rep,name=references,proto3" json:"references,omitempty"`
+	CveId         []string               `protobuf:"bytes,5,rep,name=cve_id,json=cveId,proto3" json:"cve_id,omitempty"`
+	CweId         []string               `protobuf:"bytes,6,rep,name=cwe_id,json=cweId,proto3" json:"cwe_id,omitempty"`
+	CvssScore     float64                `protobuf:"fixed64,7,opt,name=cvss_score,json=cvssScore,proto3" json:"cvss_score,omitempty"`
+	CvssMetrics   string                 `protobuf:"bytes,8,opt,name=cvss_metrics,json=cvssMetrics,proto3" json:"cvss_metrics,omitempty"`
+	EpssScore     float64                `protobuf:"fixed64,9,opt,name=epss_score,json=epssScore,proto3" json:"epss_score,omitempty"`
+	Solution      string                 `protobuf:"bytes,10,opt,name=solution,proto3" json:"solution,omitempty"`
+	MatchedAt     string                 `protobuf:"bytes,11,opt,name=matched_at,json=matchedAt,proto3" json:"matched_at,omitempty"`
+	Host          string                 `protobuf:"bytes,12,opt,name=host,proto3" json:"host,omitempty"`
+	Ip            string                 `protobuf:"bytes,13,opt,name=ip,proto3" json:"ip,omitempty"`
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Finding) Reset() {
+	*x = Finding{}
+	mi := &file_connector_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Finding) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Finding) ProtoMessage() {}
+
+func (x *Finding) ProtoReflect() protoreflect.Message {
+	mi := &file_connector_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Finding.ProtoReflect.Descriptor instead.
+func (*Finding) Descriptor() ([]byte, []int) {
+	return file_connector_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Finding) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Finding) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *Finding) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *Finding) GetReferences() []string {
+	if x != nil {
+		return x.References
+	}
+	return nil
+}
+
+func (x *Finding) GetCveId() []string {
+	if x != nil {
+		return x.CveId
+	}
+	return nil
+}
+
+func (x *Finding) GetCweId() []string {
+	if x != nil {
+		return x.CweId
+	}
+	return nil
+}
+
+func (x *Finding) GetCvssScore() float64 {
+	if x != nil {
+		return x.CvssScore
+	}
+	return 0
+}
+
+func (x *Finding) GetCvssMetrics() string {
+	if x != nil {
+		return x.CvssMetrics
+	}
+	return ""
+}
+
+func (x *Finding) GetEpssScore() float64 {
+	if x != nil {
+		return x.EpssScore
+	}
+	return 0
+}
+
+func (x *Finding) GetSolution() string {
+	if x != nil {
+		return x.Solution
+	}
+	return ""
+}
+
+func (x *Finding) GetMatchedAt() string {
+	if x != nil {
+		return x.MatchedAt
+	}
+	return ""
+}
+
+func (x *Finding) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *Finding) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *Finding) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
 type Done struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ExecutionId   string                 `protobuf:"bytes,1,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
@@ -341,7 +501,7 @@ type Done struct {
 
 func (x *Done) Reset() {
 	*x = Done{}
-	mi := &file_connector_proto_msgTypes[5]
+	mi := &file_connector_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -353,7 +513,7 @@ func (x *Done) String() string {
 func (*Done) ProtoMessage() {}
 
 func (x *Done) ProtoReflect() protoreflect.Message {
-	mi := &file_connector_proto_msgTypes[5]
+	mi := &file_connector_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -366,7 +526,7 @@ func (x *Done) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Done.ProtoReflect.Descriptor instead.
 func (*Done) Descriptor() ([]byte, []int) {
-	return file_connector_proto_rawDescGZIP(), []int{5}
+	return file_connector_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Done) GetExecutionId() string {
@@ -398,7 +558,7 @@ type ConnectorMessage struct {
 
 func (x *ConnectorMessage) Reset() {
 	*x = ConnectorMessage{}
-	mi := &file_connector_proto_msgTypes[6]
+	mi := &file_connector_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -410,7 +570,7 @@ func (x *ConnectorMessage) String() string {
 func (*ConnectorMessage) ProtoMessage() {}
 
 func (x *ConnectorMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_connector_proto_msgTypes[6]
+	mi := &file_connector_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -423,7 +583,7 @@ func (x *ConnectorMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectorMessage.ProtoReflect.Descriptor instead.
 func (*ConnectorMessage) Descriptor() ([]byte, []int) {
-	return file_connector_proto_rawDescGZIP(), []int{6}
+	return file_connector_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ConnectorMessage) GetMessage() isConnectorMessage_Message {
@@ -497,7 +657,7 @@ type WorkerMessage struct {
 
 func (x *WorkerMessage) Reset() {
 	*x = WorkerMessage{}
-	mi := &file_connector_proto_msgTypes[7]
+	mi := &file_connector_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -509,7 +669,7 @@ func (x *WorkerMessage) String() string {
 func (*WorkerMessage) ProtoMessage() {}
 
 func (x *WorkerMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_connector_proto_msgTypes[7]
+	mi := &file_connector_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -522,7 +682,7 @@ func (x *WorkerMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerMessage.ProtoReflect.Descriptor instead.
 func (*WorkerMessage) Descriptor() ([]byte, []int) {
-	return file_connector_proto_rawDescGZIP(), []int{7}
+	return file_connector_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *WorkerMessage) GetMessage() isWorkerMessage_Message {
@@ -585,7 +745,7 @@ var File_connector_proto protoreflect.FileDescriptor
 
 const file_connector_proto_rawDesc = "" +
 	"\n" +
-	"\x0fconnector.proto\x12\tconnector\"n\n" +
+	"\x0fconnector.proto\x12\tconnector\x1a\x1fgoogle/protobuf/timestamp.proto\"n\n" +
 	"\bRegister\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12!\n" +
 	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12\x15\n" +
@@ -606,11 +766,33 @@ const file_connector_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"+\n" +
 	"\x06Cancel\x12!\n" +
-	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\"Z\n" +
+	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\"\x8a\x01\n" +
 	"\x06Result\x12!\n" +
 	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\x12\x19\n" +
-	"\bis_error\x18\x03 \x01(\bR\aisError\"?\n" +
+	"\bis_error\x18\x03 \x01(\bR\aisError\x12.\n" +
+	"\bfindings\x18\x04 \x03(\v2\x12.connector.FindingR\bfindings\"\x95\x03\n" +
+	"\aFinding\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
+	"\bseverity\x18\x02 \x01(\tR\bseverity\x12\x12\n" +
+	"\x04tags\x18\x03 \x03(\tR\x04tags\x12\x1e\n" +
+	"\n" +
+	"references\x18\x04 \x03(\tR\n" +
+	"references\x12\x15\n" +
+	"\x06cve_id\x18\x05 \x03(\tR\x05cveId\x12\x15\n" +
+	"\x06cwe_id\x18\x06 \x03(\tR\x05cweId\x12\x1d\n" +
+	"\n" +
+	"cvss_score\x18\a \x01(\x01R\tcvssScore\x12!\n" +
+	"\fcvss_metrics\x18\b \x01(\tR\vcvssMetrics\x12\x1d\n" +
+	"\n" +
+	"epss_score\x18\t \x01(\x01R\tepssScore\x12\x1a\n" +
+	"\bsolution\x18\n" +
+	" \x01(\tR\bsolution\x12\x1d\n" +
+	"\n" +
+	"matched_at\x18\v \x01(\tR\tmatchedAt\x12\x12\n" +
+	"\x04host\x18\f \x01(\tR\x04host\x12\x0e\n" +
+	"\x02ip\x18\r \x01(\tR\x02ip\x128\n" +
+	"\ttimestamp\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"?\n" +
 	"\x04Done\x12!\n" +
 	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\xa4\x01\n" +
@@ -639,33 +821,37 @@ func file_connector_proto_rawDescGZIP() []byte {
 	return file_connector_proto_rawDescData
 }
 
-var file_connector_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_connector_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_connector_proto_goTypes = []any{
-	(*Register)(nil),         // 0: connector.Register
-	(*RegisterAck)(nil),      // 1: connector.RegisterAck
-	(*ExecuteJob)(nil),       // 2: connector.ExecuteJob
-	(*Cancel)(nil),           // 3: connector.Cancel
-	(*Result)(nil),           // 4: connector.Result
-	(*Done)(nil),             // 5: connector.Done
-	(*ConnectorMessage)(nil), // 6: connector.ConnectorMessage
-	(*WorkerMessage)(nil),    // 7: connector.WorkerMessage
-	nil,                      // 8: connector.ExecuteJob.InputsEntry
+	(*Register)(nil),              // 0: connector.Register
+	(*RegisterAck)(nil),           // 1: connector.RegisterAck
+	(*ExecuteJob)(nil),            // 2: connector.ExecuteJob
+	(*Cancel)(nil),                // 3: connector.Cancel
+	(*Result)(nil),                // 4: connector.Result
+	(*Finding)(nil),               // 5: connector.Finding
+	(*Done)(nil),                  // 6: connector.Done
+	(*ConnectorMessage)(nil),      // 7: connector.ConnectorMessage
+	(*WorkerMessage)(nil),         // 8: connector.WorkerMessage
+	nil,                           // 9: connector.ExecuteJob.InputsEntry
+	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
 }
 var file_connector_proto_depIdxs = []int32{
-	8, // 0: connector.ExecuteJob.inputs:type_name -> connector.ExecuteJob.InputsEntry
-	0, // 1: connector.ConnectorMessage.register:type_name -> connector.Register
-	4, // 2: connector.ConnectorMessage.result:type_name -> connector.Result
-	5, // 3: connector.ConnectorMessage.done:type_name -> connector.Done
-	1, // 4: connector.WorkerMessage.register_ack:type_name -> connector.RegisterAck
-	2, // 5: connector.WorkerMessage.execute:type_name -> connector.ExecuteJob
-	3, // 6: connector.WorkerMessage.cancel:type_name -> connector.Cancel
-	6, // 7: connector.ConnectorService.Connect:input_type -> connector.ConnectorMessage
-	7, // 8: connector.ConnectorService.Connect:output_type -> connector.WorkerMessage
-	8, // [8:9] is the sub-list for method output_type
-	7, // [7:8] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	9,  // 0: connector.ExecuteJob.inputs:type_name -> connector.ExecuteJob.InputsEntry
+	5,  // 1: connector.Result.findings:type_name -> connector.Finding
+	10, // 2: connector.Finding.timestamp:type_name -> google.protobuf.Timestamp
+	0,  // 3: connector.ConnectorMessage.register:type_name -> connector.Register
+	4,  // 4: connector.ConnectorMessage.result:type_name -> connector.Result
+	6,  // 5: connector.ConnectorMessage.done:type_name -> connector.Done
+	1,  // 6: connector.WorkerMessage.register_ack:type_name -> connector.RegisterAck
+	2,  // 7: connector.WorkerMessage.execute:type_name -> connector.ExecuteJob
+	3,  // 8: connector.WorkerMessage.cancel:type_name -> connector.Cancel
+	7,  // 9: connector.ConnectorService.Connect:input_type -> connector.ConnectorMessage
+	8,  // 10: connector.ConnectorService.Connect:output_type -> connector.WorkerMessage
+	10, // [10:11] is the sub-list for method output_type
+	9,  // [9:10] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_connector_proto_init() }
@@ -673,12 +859,12 @@ func file_connector_proto_init() {
 	if File_connector_proto != nil {
 		return
 	}
-	file_connector_proto_msgTypes[6].OneofWrappers = []any{
+	file_connector_proto_msgTypes[7].OneofWrappers = []any{
 		(*ConnectorMessage_Register)(nil),
 		(*ConnectorMessage_Result)(nil),
 		(*ConnectorMessage_Done)(nil),
 	}
-	file_connector_proto_msgTypes[7].OneofWrappers = []any{
+	file_connector_proto_msgTypes[8].OneofWrappers = []any{
 		(*WorkerMessage_RegisterAck)(nil),
 		(*WorkerMessage_Execute)(nil),
 		(*WorkerMessage_Cancel)(nil),
@@ -689,7 +875,7 @@ func file_connector_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_connector_proto_rawDesc), len(file_connector_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

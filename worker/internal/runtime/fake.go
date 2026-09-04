@@ -102,11 +102,6 @@ func (f *FakeRuntime) Cleanup(_ context.Context, h Handle) error {
 	return nil
 }
 
-// SweepOrphans is a no-op bookkeeping stub (FakeRuntime tracks no containers).
-func (f *FakeRuntime) SweepOrphans(_ context.Context, _ []string) (int, error) {
-	return 0, nil
-}
-
 func (f *FakeRuntime) CancelCallCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()

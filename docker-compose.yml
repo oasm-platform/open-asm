@@ -81,8 +81,11 @@ services:
       # containers dial back on (auto-derived when unset — host.docker.internal
       # on any OS via a host-gateway ExtraHosts mapping the worker adds on
       # Linux; IPv4 bridge gateway fallback on engines < Docker Engine 20.10).
-      # Pin it to a stable value when containers must dial via service name:
-      # - WORKER_CONNECTOR_ADDR=oasm-worker
+      # Dev/compose: WORKER_CONNECTOR_ADDR is intentionally unset here, so the
+      # worker must opt back into the legacy auto-detect chain (host-gateway →
+      # bridge gateway) instead of failing fast. Pin WORKER_CONNECTOR_ADDR for
+      # stable service-name dialing: - WORKER_CONNECTOR_ADDR=oasm-worker
+      - WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1
       # Firewall: the connector port (26276) must accept inbound from spawned
       # containers (docker bridge, or the compose network when pinned above).
     logging:

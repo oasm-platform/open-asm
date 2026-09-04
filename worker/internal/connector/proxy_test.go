@@ -51,17 +51,21 @@ func (c *captureLogger) find(substr string) (string, bool) {
 
 func TestProxyForwardsResult(t *testing.T) {
 	p := NewProxy()
-	ch := make(chan []byte, 1)
+	ch := make(chan ResultMsg, 1)
 	p.Register("exec-1", ch)
-	p.ForwardResult("exec-1", []byte(`{"ok":true}`))
-	if got := <-ch; string(got) != `{"ok":true}` {
-		t.Fatalf("forward mismatch: %s", got)
+	p.ForwardResult("exec-1", []byte(`{"ok":true}`), []*pb.Finding{{Name: "f1"}})
+	got := <-ch
+	if string(got.Data) != `{"ok":true}` {
+		t.Fatalf("forward mismatch: %s", got.Data)
+	}
+	if len(got.Findings) != 1 || got.Findings[0].GetName() != "f1" {
+		t.Fatalf("findings not forwarded: %v", got.Findings)
 	}
 }
 
 func TestProxyDropsUnknownExecution(t *testing.T) {
 	p := NewProxy()
-	p.ForwardResult("unknown", []byte(`x`))
+	p.ForwardResult("unknown", []byte(`x`), nil)
 }
 
 // ForwardResult must BLOCK (not drop) when the result channel is full: the
@@ -70,14 +74,14 @@ func TestProxyDropsUnknownExecution(t *testing.T) {
 // select-default send.
 func TestForwardResultBlocksWhenChannelFull(t *testing.T) {
 	p := NewProxy()
-	ch := make(chan []byte, 2)
+	ch := make(chan ResultMsg, 2)
 	p.Register("exec-1", ch)
 
 	done := make(chan struct{})
 	go func() {
-		p.ForwardResult("exec-1", []byte("one"))
-		p.ForwardResult("exec-1", []byte("two"))
-		p.ForwardResult("exec-1", []byte("three"))
+		p.ForwardResult("exec-1", []byte("one"), nil)
+		p.ForwardResult("exec-1", []byte("two"), nil)
+		p.ForwardResult("exec-1", []byte("three"), nil)
 		close(done)
 	}()
 
@@ -90,8 +94,8 @@ func TestForwardResultBlocksWhenChannelFull(t *testing.T) {
 	}
 
 	// Unblock by draining one element; the third send must now complete.
-	if got := <-ch; string(got) != "one" {
-		t.Fatalf("first result mismatch: %q", got)
+	if got := <-ch; string(got.Data) != "one" {
+		t.Fatalf("first result mismatch: %q", got.Data)
 	}
 	select {
 	case <-done:
@@ -100,11 +104,11 @@ func TestForwardResultBlocksWhenChannelFull(t *testing.T) {
 	}
 
 	// All three payloads must arrive intact, in order.
-	if got := <-ch; string(got) != "two" {
-		t.Fatalf("second result mismatch: %q", got)
+	if got := <-ch; string(got.Data) != "two" {
+		t.Fatalf("second result mismatch: %q", got.Data)
 	}
-	if got := <-ch; string(got) != "three" {
-		t.Fatalf("third result mismatch: %q", got)
+	if got := <-ch; string(got.Data) != "three" {
+		t.Fatalf("third result mismatch: %q", got.Data)
 	}
 }
 
@@ -431,5 +435,142 @@ func TestOnConnectorDownKeepsLiveStream(t *testing.T) {
 	}
 	if n := len(stream.sentExecutes()); n != 1 {
 		t.Fatalf("expected 1 ExecuteJob on live stream, got %d", n)
+	}
+}
+
+// racyConnectStream is fakeConnectStream WITHOUT the internal mutex: Send
+// mutates the shared send state exactly like grpc-go's transport does when
+// two goroutines send on the same stream concurrently (unsynchronized, and in
+// real grpc-go an internal panic instead of a returned error). The race
+// detector flags concurrent Sends on it — the failure mode the proxy must
+// prevent.
+type racyConnectStream struct {
+	sent []*pb.WorkerMessage
+}
+
+var _ pb.ConnectorService_ConnectServer = (*racyConnectStream)(nil)
+
+func (f *racyConnectStream) Send(m *pb.WorkerMessage) error {
+	// Deliberately unsynchronized: -race must catch concurrent Send calls.
+	f.sent = append(f.sent, m)
+	return nil
+}
+
+func (f *racyConnectStream) Recv() (*pb.ConnectorMessage, error) {
+	return nil, nil
+}
+
+func (f *racyConnectStream) SetHeader(metadata.MD) error  { return nil }
+func (f *racyConnectStream) SendHeader(metadata.MD) error { return nil }
+func (f *racyConnectStream) SetTrailer(metadata.MD)       {}
+func (f *racyConnectStream) Context() context.Context     { return context.Background() }
+func (f *racyConnectStream) SendMsg(any) error            { return nil }
+func (f *racyConnectStream) RecvMsg(any) error            { return nil }
+
+// TestProxyConcurrentSendDoesNotRace: N goroutines must be able to call
+// SendExecute on the same live stream at once. grpc-go streams are not safe
+// for concurrent Send — two parallel Sends can panic inside the transport
+// instead of returning an error — so the proxy must serialize every
+// stream.Send through one mutex (one Send at a time). Run with -race.
+func TestProxyConcurrentSendDoesNotRace(t *testing.T) {
+	p := NewProxy()
+	stream := &racyConnectStream{}
+	if err := p.RegisterConnector("exec-1", stream); err != nil {
+		t.Fatalf("RegisterConnector: %v", err)
+	}
+
+	const n = 16
+	var wg sync.WaitGroup
+	errs := make(chan error, n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			errs <- p.SendExecute("exec-1", &pb.ExecuteJob{
+				ExecutionId: "exec-1",
+				JobId:       fmt.Sprintf("job-%d", i),
+				Tool:        "nuclei",
+			})
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("SendExecute: %v", err)
+		}
+	}
+
+	if got := len(stream.sent); got != n {
+		t.Fatalf("expected %d ExecuteJobs delivered, got %d", n, got)
+	}
+	delivered := make(map[string]bool, n)
+	for _, m := range stream.sent {
+		delivered[m.GetExecute().GetJobId()] = true
+	}
+	for i := 0; i < n; i++ {
+		if !delivered[fmt.Sprintf("job-%d", i)] {
+			t.Fatalf("job-%d was not delivered", i)
+		}
+	}
+}
+
+// TestProxyConcurrentFlushAndSendDoesNotRace: the exact H3 hazard —
+// RegisterConnector's pending flush (Connect handler goroutine) and
+// SendExecute (job goroutine) both call stream.Send on the same stream. Both
+// must be serialized: one Send at a time. Run with -race.
+func TestProxyConcurrentFlushAndSendDoesNotRace(t *testing.T) {
+	p := NewProxy()
+	// One pending job (queued before the connector connected) + N job sends.
+	if err := p.SendExecute("exec-1", sampleExecuteJob()); err != nil {
+		t.Fatalf("pending SendExecute: %v", err)
+	}
+
+	stream := &racyConnectStream{}
+	const n = 16
+	var wg sync.WaitGroup
+	errs := make(chan error, n+1)
+	start := make(chan struct{})
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			errs <- p.SendExecute("exec-1", &pb.ExecuteJob{
+				ExecutionId: "exec-1",
+				JobId:       fmt.Sprintf("job-%d", i),
+				Tool:        "nuclei",
+			})
+		}(i)
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		close(start) // release the senders exactly as the flush starts
+		errs <- p.RegisterConnector("exec-1", stream)
+	}()
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent flush/send: %v", err)
+		}
+	}
+
+	// 1 pending flush + N immediate sends = N+1 deliveries, none lost.
+	if got := len(stream.sent); got != n+1 {
+		t.Fatalf("expected %d deliveries (1 flush + %d sends), got %d", n+1, n, got)
+	}
+	delivered := make(map[string]bool, n+1)
+	for _, m := range stream.sent {
+		delivered[m.GetExecute().GetJobId()] = true
+	}
+	if !delivered["job-1"] {
+		t.Fatal("pending job (job-1) was not flushed")
+	}
+	for i := 0; i < n; i++ {
+		if !delivered[fmt.Sprintf("job-%d", i)] {
+			t.Fatalf("job-%d was not delivered", i)
+		}
 	}
 }

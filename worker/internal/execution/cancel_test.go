@@ -27,17 +27,20 @@ func TestManagerCancelPropagatesToRuntime(t *testing.T) {
 }
 
 func TestTimeoutCancelsExecution(t *testing.T) {
+	// Submit rejects Limits below the connect deadline (timeouts.go invariant),
+	// so the Limits-driven auto-cancel timer is exercised white-box: register an
+	// execution and arm its timer directly (SubmitWithTimeout covers the
+	// external path in TestSubmitWithTimeout).
 	rt := runtime.NewFakeRuntime()
 	m := NewManager(rt, 2)
-	id, err := m.Submit(context.Background(), JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0.0", Limits: map[string]any{"timeoutSeconds": 1}})
-	if err != nil {
-		t.Fatalf("Submit failed: %v", err)
-	}
+	id := "exec-arm-1"
+	spec := JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0.0", Limits: map[string]any{JobTimeoutSecondsKey: 1}}
+	m.execs[id] = &Execution{ID: id, Spec: spec, State: StateRunning, Handle: runtime.Handle{ID: "fake-1"}}
+	m.armTimeout(id, spec)
 	time.Sleep(1200 * time.Millisecond)
 	if m.ActiveCount() != 0 {
 		t.Fatalf("expected auto-cancel after timeout, got %d active", m.ActiveCount())
 	}
-	_ = id
 }
 
 func TestSubmitWithTimeout(t *testing.T) {

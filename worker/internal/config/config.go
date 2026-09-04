@@ -1,8 +1,8 @@
 package config
 
 import (
+	"errors"
 	"strings"
-	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
@@ -27,16 +27,11 @@ type Config struct {
 	TLS            TLSConfig `mapstructure:",squash"`
 
 	// Connector server — Docker containers connect back to the worker via this gRPC endpoint.
-	ConnectorPort  int    `mapstructure:"connector_port"`  // gRPC port for connectors, default 26276
-	ConnectorAddr  string `mapstructure:"connector_addr"`  // override: external dial address for containers; empty = auto-detect at runtime
-	ConnectorToken string `mapstructure:"connector_token"` // shared secret for connector auth, empty = no auth
-	Mode           string `mapstructure:"mode"`            // worker run mode: "cli", "node", or "" (unknown)
-
-	// Container pool — one container is reused across up to
-	// MaxJobsPerContainer jobs sharing the same image (poolKey).
-	PoolEnabled         bool          `mapstructure:"pool_enabled"`           // false = legacy 1:1 (one container per job)
-	MaxJobsPerContainer int           `mapstructure:"max_jobs_per_container"` // jobs sharing one container (env WORKER_MAX_JOBS_PER_CONTAINER)
-	PoolIdleTimeout     time.Duration `mapstructure:"pool_idle_timeout"`      // empty pooled container evicted after this idle duration
+	ConnectorPort                int    `mapstructure:"connector_port"`                  // gRPC port for connectors, default 26276
+	ConnectorAddr                string `mapstructure:"connector_addr"`                  // REQUIRED dial address (host:port) connector containers use to reach the connector server; empty fails fast at runtime init unless autodetect is opted in below
+	ConnectorAddrAllowAutodetect bool   `mapstructure:"connector_addr_allow_autodetect"` // WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT: restore the legacy auto-derive chain (self-IP → host.docker.internal → bridge gateway → 172.17.0.1) with a warning instead of failing fast
+	ConnectorToken               string `mapstructure:"connector_token"`                 // shared secret for connector auth, empty = no auth
+	Mode                         string `mapstructure:"mode"`                            // worker run mode: "cli", "node", or "" (unknown)
 }
 
 func LoadConfig() (*Config, error) {
@@ -54,22 +49,25 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("tool_path", "oasm-tools")
 	viper.SetDefault("workspace_root", "agent-sessions")
 	viper.SetDefault("connector_port", 26276)
-	viper.SetDefault("connector_addr", "") // empty = worker auto-derives the container-reachable address
+	viper.SetDefault("connector_addr", "") // REQUIRED dial address for connector containers; empty fails fast unless connector_addr_allow_autodetect is set
+	viper.SetDefault("connector_addr_allow_autodetect", false)
 	viper.SetDefault("connector_token", "")
 	viper.SetDefault("mode", "")
-	// Connector protocol is one stream, one execution: connectors exit after
-	// the first Done and the server closes the stream after the first Done.
-	// Pooled reuse would misroute/starve jobs 2..N (their ExecuteJob is queued
-	// pending under job 1's execID and dropped) and carry a stale EXECUTION_ID
-	// env in the reused container. Re-enable only when a connector supports
-	// multiple executions per stream.
-	viper.SetDefault("pool_enabled", false)
-	viper.SetDefault("max_jobs_per_container", 5)
-	viper.SetDefault("pool_idle_timeout", "2m")
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, err
+	}
+
+	// Connector protocol is one stream, one execution: a connector registers
+	// under one execID and exits after the first Done, and the server closes
+	// the stream after the first Done. Container pool reuse (multiple
+	// executions sharing one container) would misroute/starve jobs 2..N and
+	// carry a stale EXECUTION_ID env in the reused container. The knob is kept
+	// only as a hard fail-fast so a leftover WORKER_POOL_ENABLED=true cannot
+	// silently degrade; each execution gets its own container.
+	if viper.GetBool("pool_enabled") {
+		return nil, errors.New("pool reuse is not supported with the connector protocol (1 stream = 1 execution): WORKER_POOL_ENABLED=true rejected — every execution gets its own container; unset WORKER_POOL_ENABLED or set it to false")
 	}
 
 	return &cfg, nil

@@ -33,13 +33,24 @@ func (f *failRuntime) Cleanup(ctx context.Context, h runtime.Handle) error {
 	return f.FakeRuntime.Cleanup(ctx, h)
 }
 
-// recorderLogger captures error log calls (implements execution.Logger).
+// recorderLogger captures log calls (implements execution.Logger). Info goes
+// to msgs; Error/ErrorE also go to errMsgs so "no error logs" is assertable
+// independent of informational lifecycle logs (e.g. token_set flags).
 type recorderLogger struct {
-	mu   sync.Mutex
-	msgs []string
+	mu      sync.Mutex
+	msgs    []string
+	errMsgs []string
 }
 
 func (l *recorderLogger) Error(msg string, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	line := fmt.Sprintf(msg, args...)
+	l.msgs = append(l.msgs, line)
+	l.errMsgs = append(l.errMsgs, line)
+}
+
+func (l *recorderLogger) Info(msg string, args ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.msgs = append(l.msgs, fmt.Sprintf(msg, args...))
@@ -48,13 +59,21 @@ func (l *recorderLogger) Error(msg string, args ...any) {
 func (l *recorderLogger) ErrorE(msg string, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.msgs = append(l.msgs, msg+": "+err.Error())
+	line := msg + ": " + err.Error()
+	l.msgs = append(l.msgs, line)
+	l.errMsgs = append(l.errMsgs, line)
 }
 
 func (l *recorderLogger) count() int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return len(l.msgs)
+}
+
+func (l *recorderLogger) errorCount() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.errMsgs)
 }
 
 func (l *recorderLogger) joined() string {
@@ -80,6 +99,34 @@ func TestManagerSubmitAndCancel(t *testing.T) {
 	}
 	if m.ActiveCount() != 0 {
 		t.Fatalf("expected 0 after cancel, got %d", m.ActiveCount())
+	}
+}
+
+// The connect timeout (5m) must stay strictly below the per-job timeout from
+// the manifest. When the manifest demands a shorter lifetime than the connect
+// deadline, Submit must fail fast WITHOUT creating a container — a connector
+// that can never register would otherwise be cancelled by its own job timeout
+// on the first poll.
+func TestManagerSubmitRejectsConnectTimeoutNotBelowJobTimeout(t *testing.T) {
+	rt := runtime.NewFakeRuntime()
+	m := NewManager(rt, 0)
+
+	bad := JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0.0", Limits: map[string]any{JobTimeoutSecondsKey: 60}}
+	if _, err := m.Submit(context.Background(), bad); err == nil {
+		t.Fatalf("Submit with job timeout 60s (below connect timeout %v) must fail", ConnectorConnectTimeout)
+	} else if !strings.Contains(err.Error(), "must be < per-job timeout") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rt.CreateCount != 0 {
+		t.Fatalf("no container may be created for a rejected config, got %d creates", rt.CreateCount)
+	}
+
+	good := JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0.0", Limits: map[string]any{JobTimeoutSecondsKey: 600}}
+	if _, err := m.Submit(context.Background(), good); err != nil {
+		t.Fatalf("Submit with job timeout 600s must succeed: %v", err)
+	}
+	if rt.CreateCount != 1 {
+		t.Fatalf("expected 1 create for valid config, got %d", rt.CreateCount)
 	}
 }
 
@@ -306,7 +353,7 @@ func TestManagerHealthyRuntimeEmitsNoErrorLogs(t *testing.T) {
 		t.Fatalf("OnConnectorDown failed: %v", err)
 	}
 
-	if rec.count() != 0 {
-		t.Fatalf("healthy runtime must emit no error logs, got %d: %s", rec.count(), rec.joined())
+	if rec.errorCount() != 0 {
+		t.Fatalf("healthy runtime must emit no ERROR logs, got %d: %s", rec.errorCount(), rec.joined())
 	}
 }

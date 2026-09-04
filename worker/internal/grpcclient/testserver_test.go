@@ -3,6 +3,8 @@ package grpcclient
 import (
 	"context"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -37,9 +39,11 @@ type fakeWorkersService struct {
 }
 
 type joinCall struct {
-	apiKey   string
-	metadata *workers.WorkerMetadata
-	mode     workers.WorkerRunMode // extracted from metadata.Mode for convenience
+	apiKey    string
+	metadata  *workers.WorkerMetadata
+	mode      workers.WorkerRunMode // extracted from metadata.Mode for convenience
+	token     string                // req.Token (persisted token, if any)
+	signature string                // req.Signature
 }
 
 func (f *fakeWorkersService) Join(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
@@ -48,7 +52,11 @@ func (f *fakeWorkersService) Join(ctx context.Context, req *workers.JoinRequest)
 	if req.Metadata != nil && req.Metadata.Mode != nil {
 		mode = *req.Metadata.Mode
 	}
-	f.joinCalls = append(f.joinCalls, joinCall{apiKey: req.ApiKey, metadata: req.Metadata, mode: mode})
+	token := ""
+	if req.Token != nil {
+		token = *req.Token
+	}
+	f.joinCalls = append(f.joinCalls, joinCall{apiKey: req.ApiKey, metadata: req.Metadata, mode: mode, token: token, signature: req.Signature})
 	f.mu.Unlock()
 	if f.joinFn != nil {
 		return f.joinFn(ctx, req)
@@ -198,6 +206,14 @@ type testServer struct {
 }
 
 func newTestServer(t *testing.T) *testServer {
+	return newTestServerWithLogger(t, &noOpLogger{})
+}
+
+// newTestServerWithLogger builds a bufconn-backed test server. The client's
+// token file is isolated per test (temp dir) unless WORKER_TOKEN_FILE is set,
+// so persistence/rejoin tests can steer the path through the env just like
+// production startup does.
+func newTestServerWithLogger(t *testing.T, logger Logger) *testServer {
 	t.Helper()
 	lis := bufconn.Listen(64 * 1024)
 	grpcSrv := grpc.NewServer()
@@ -209,12 +225,18 @@ func newTestServer(t *testing.T) *testServer {
 
 	// Create Client with bufconn dialer. The passthrough:/// scheme makes
 	// grpc.NewClient invoke the custom dialer instead of resolving via DNS.
-	client, err := NewClient("test-api-key", "passthrough:///bufnet", "test-tools", &noOpLogger{},
+	client, err := NewClient("test-api-key", "passthrough:///bufnet", "test-tools", logger,
 		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
 			return lis.DialContext(ctx)
 		}))
 	if err != nil {
 		t.Fatalf("failed to create client: %v", err)
+	}
+	if env := os.Getenv("WORKER_TOKEN_FILE"); env != "" {
+		client.tokenFile = env
+	} else {
+		// Never touch a real token file (or the repo tree) during tests.
+		client.tokenFile = filepath.Join(t.TempDir(), ".worker-token")
 	}
 	t.Cleanup(func() {
 		_ = client.Close()

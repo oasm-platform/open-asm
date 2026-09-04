@@ -4,6 +4,8 @@ package connector;
 
 option go_package = "./connector";
 
+import "google/protobuf/timestamp.proto";
+
 message Register {
   string token = 1;
   // Execution context advertised by the connector on connect. Old connectors
@@ -35,6 +37,27 @@ message Result {
   string execution_id = 1;
   bytes data = 2;
   bool is_error = 3;
+  repeated Finding findings = 4;
+}
+
+// Finding is one structured vulnerability emitted by a connector. Field
+// numbers are the wire contract with the SDK (sdk/proto/connector.proto) —
+// never renumber.
+message Finding {
+  string name = 1;
+  string severity = 2;
+  repeated string tags = 3;
+  repeated string references = 4;
+  repeated string cve_id = 5;
+  repeated string cwe_id = 6;
+  double cvss_score = 7;
+  string cvss_metrics = 8;
+  double epss_score = 9;
+  string solution = 10;
+  string matched_at = 11;
+  string host = 12;
+  string ip = 13;
+  google.protobuf.Timestamp timestamp = 14;
 }
 
 message Done {

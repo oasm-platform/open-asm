@@ -2,6 +2,9 @@ package grpcclient
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,6 +13,11 @@ import (
 	jobRegistryPb "oasm-worker/internal/gen/jobs_registry"
 	workerPb "oasm-worker/internal/gen/workers"
 )
+
+// tokenFileName is the default location of the persisted worker token,
+// relative to the process working directory (the worker workspace root).
+// Override with the WORKER_TOKEN_FILE environment variable.
+const tokenFileName = ".worker-token"
 
 // Client wraps the gRPC connection to core-api and the generated service
 // stubs, attaching the worker token via PerRPCCredentials on every call.
@@ -20,6 +28,12 @@ type Client struct {
 	runMode  string // "cli", "node", or "" (unknown)
 	logger   Logger
 	auth     *tokenAuth
+
+	// tokenFile is where the worker token is persisted across restarts so a
+	// rejoin can recover the same worker identity (core matches on the token).
+	// signature is sent with Join when WORKER_SIGNATURE is configured.
+	tokenFile string
+	signature string
 
 	workers workerPb.WorkersServiceClient
 	jobs    jobRegistryPb.JobsRegistryServiceClient
@@ -34,7 +48,9 @@ type Client struct {
 }
 
 // NewClient validates the required configuration and creates a lazily-dialing
-// gRPC client for the core-api server.
+// gRPC client for the core-api server. A worker token persisted by a previous
+// run is loaded here (before Connect) so the first Join can rejoin with the
+// same identity; a missing file just means the server assigns a new one.
 func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grpc.DialOption) (*Client, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("api key must not be empty")
@@ -61,7 +77,7 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 		return nil, fmt.Errorf("dial grpc server %s: %w", grpcHost, err)
 	}
 
-	return &Client{
+	c := &Client{
 		conn:             conn,
 		apiKey:           apiKey,
 		toolPath:         toolPath,
@@ -72,7 +88,43 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 		connectBaseDelay: 2 * time.Second,
 		connectMaxDelay:  30 * time.Second,
 		reconnectDelay:   1 * time.Second,
-	}, nil
+	}
+
+	c.tokenFile = resolveTokenFilePath()
+	c.signature = os.Getenv("WORKER_SIGNATURE")
+	if tok := readTokenFile(c.tokenFile); tok != "" {
+		auth.setToken(tok)
+		logger.Verbose("resumed worker token from %s", c.tokenFile)
+	} else {
+		// First ever run (or a lost file). Core's autoCleanupWorkersAndJobs
+		// reaps any orphaned IN_PROGRESS jobs, so a fresh identity is safe.
+		logger.Warning("no worker token file at %s — will register as a NEW worker on join (core auto-cleanup reaps orphaned jobs)", c.tokenFile)
+	}
+
+	return c, nil
+}
+
+// resolveTokenFilePath returns WORKER_TOKEN_FILE when set, otherwise the
+// workspace-root default (<cwd>/.worker-token).
+func resolveTokenFilePath() string {
+	if p := os.Getenv("WORKER_TOKEN_FILE"); p != "" {
+		return p
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return tokenFileName
+	}
+	return filepath.Join(cwd, tokenFileName)
+}
+
+// readTokenFile returns the trimmed worker token from path, or "" when the
+// file is missing or empty (both states mean "no identity to resume").
+func readTokenFile(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
 }
 
 // Close closes the underlying gRPC connection.

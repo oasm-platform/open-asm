@@ -209,6 +209,27 @@ func TestBuildContainerEnvBaseVars(t *testing.T) {
 	assertEnvContains("TRACE_ID", "tr-456")
 }
 
+// Per-execution single-use tokens take precedence over the legacy shared
+// secret: buildContainerEnv must inject WORKER_TOKEN from spec.ConnectorToken
+// when it is set, falling back to the connectorToken parameter otherwise.
+func TestBuildContainerEnvPrefersSpecConnectorToken(t *testing.T) {
+	spec := JobSpec{JobID: "j-tok", Tool: "nuclei", ConnectorToken: "per-exec-9f2a"}
+	env := buildContainerEnv(spec, "host:50051", "legacy-shared", "exec-abc")
+
+	found := false
+	for _, e := range env {
+		if strings.HasPrefix(e, "WORKER_TOKEN=") {
+			if e != "WORKER_TOKEN=per-exec-9f2a" {
+				t.Fatalf("WORKER_TOKEN = %q, want the per-execution token, got %q", e, "WORKER_TOKEN=per-exec-9f2a")
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("WORKER_TOKEN not found in env")
+	}
+}
+
 // buildContainerEnv must split the resolved dial address into
 // WORKER_GRPC_HOST/_PORT for SDKs that need the parts separately, while
 // WORKER_GRPC_ADDR stays byte-identical (bracketed IPv6 literals included).
@@ -641,7 +662,8 @@ type fakeDockerEngine struct {
 	health         string            // State.Health.Status, "" = no healthcheck
 	exitCode       int               // State.ExitCode
 	logOutput      string            // payload for the container logs stream
-	labels         map[string]string // Config.Labels of the created container (pooled-name reuse checks oasm-managed)
+	logRaw         []byte            // verbatim bytes for the logs stream (raw/TTY); when set, served without a multiplex header
+	labels         map[string]string // Config.Labels of the created container
 	exists         bool              // a container currently exists in the engine (inspect/list 404 when false)
 }
 
@@ -704,19 +726,6 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 			f.running = false
 			f.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
-		case r.Method == http.MethodGet && path == "/containers/json":
-			// ContainerList view used by SweepOrphans (label-filtered). Must be
-			// matched before the /containers/<id>/json prefix case below.
-			f.mu.Lock()
-			labels := f.labels
-			exists := f.exists
-			id := f.containerID
-			f.mu.Unlock()
-			list := []types.Container{}
-			if exists && labels["oasm-managed"] == "true" {
-				list = append(list, types.Container{ID: id, Labels: labels})
-			}
-			_ = json.NewEncoder(w).Encode(list)
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/json"):
 			f.mu.Lock()
 			running := f.running
@@ -738,17 +747,26 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 			fmt.Fprintf(w, `{"Id":%q,"State":{"Running":%t,"ExitCode":%d%s},"Config":{"Labels":%s}}`, id, running, exitCode, healthJSON, labelsJSON)
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/logs"):
 			// ContainerLogs with ShowStdout+ShowStderr returns a multiplexed
-			// stream: 8-byte header (stream byte + uint32 BE length) + payload.
+			// stream (8-byte header: stream byte + uint32 BE length, then
+			// payload) — except for TTY containers, which get a raw stream
+			// with no headers. logRaw forces the raw form verbatim so tests
+			// can exercise corrupt/TTY streams; otherwise the multiplexed form
+			// is served.
 			f.mu.Lock()
 			out := f.logOutput
+			raw := f.logRaw
 			f.mu.Unlock()
-			hdr := make([]byte, 8)
-			hdr[0] = 1 // stdout
-			binary.BigEndian.PutUint32(hdr[4:], uint32(len(out)))
 			w.Header().Set("Content-Type", "application/vnd.docker.raw-stream")
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(hdr)
-			_, _ = w.Write([]byte(out))
+			if len(raw) > 0 {
+				_, _ = w.Write(raw)
+			} else {
+				hdr := make([]byte, 8)
+				hdr[0] = 1 // stdout
+				binary.BigEndian.PutUint32(hdr[4:], uint32(len(out)))
+				_, _ = w.Write(hdr)
+				_, _ = w.Write([]byte(out))
+			}
 			if fl, ok := w.(http.Flusher); ok {
 				fl.Flush()
 			}
@@ -1323,152 +1341,50 @@ func TestConnectorAddrEnvFallbackWhenArgEmpty(t *testing.T) {
 	}
 }
 
-// --- container pool (per-tool reuse) ---
-
-// The pooled container name must be deterministic per (tool, image) and carry
-// the 8-hex sha256 hash of the image as its disambiguating suffix.
-func TestBuildPoolContainerNameDeterministic(t *testing.T) {
-	n1 := buildPoolContainerName("nuclei", "ghcr.io/open-asm/nuclei:1.0")
-	n2 := buildPoolContainerName("nuclei", "ghcr.io/open-asm/nuclei:1.0")
-	if n1 != n2 {
-		t.Fatalf("same tool+image must produce the same name, got %q and %q", n1, n2)
+// Networking must be explicit: an empty WORKER_CONNECTOR_ADDR (no autodetect
+// opt-in) FAILS FAST with a message that names the variable and the opt-in —
+// never a silent engine-dependent guess that may be unreachable from spawned
+// containers (firewall, bridge, topology).
+func TestNewDockerRuntimeRequiresConnectorAddr(t *testing.T) {
+	t.Setenv("WORKER_CONNECTOR_ADDR", "")
+	t.Setenv("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT", "")
+	_, err := NewDockerRuntime("", "", 50051, "tok")
+	if err == nil {
+		t.Fatal("expected error when WORKER_CONNECTOR_ADDR is empty and autodetect is not opted in")
 	}
-	if !regexp.MustCompile(`^oasm-nuclei-[0-9a-f]{8}$`).MatchString(n1) {
-		t.Fatalf("name %q must match oasm-<tool>-<hash8>", n1)
+	if !strings.Contains(err.Error(), "WORKER_CONNECTOR_ADDR") {
+		t.Fatalf("error must name WORKER_CONNECTOR_ADDR, got: %v", err)
 	}
-	if other := buildPoolContainerName("nuclei", "ghcr.io/open-asm/nuclei:2.0"); other == n1 {
-		t.Fatal("different images must produce different pool names")
-	}
-}
-
-// Pooled Create: the second same-image create reuses the live running
-// container — no extra pull, no extra create, same handle ID.
-func TestCreatePoolReusesRunningContainer(t *testing.T) {
-	engine := newFakeDockerEngine()
-	log := &captureLogger{}
-	r := newFakeDockerRuntime(t, engine, log)
-	r.SetPoolEnabled(true)
-
-	spec := JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0", JobID: "job-1", TraceID: "tr-1"}
-	h1, err := r.Create(context.Background(), spec, RuntimeOpts{})
-	if err != nil {
-		t.Fatalf("first Create: %v", err)
-	}
-	h2, err := r.Create(context.Background(), spec, RuntimeOpts{})
-	if err != nil {
-		t.Fatalf("second Create: %v", err)
-	}
-	if h1.ID != h2.ID {
-		t.Fatalf("pooled reuse must return the same container, got %q and %q", h1.ID, h2.ID)
-	}
-	if engine.created != 1 {
-		t.Fatalf("expected 1 container create for 2 pooled submits, got %d", engine.created)
-	}
-	if engine.pulled != 1 {
-		t.Fatalf("reuse must skip the image pull, pulled=%d", engine.pulled)
-	}
-	if _, ok := log.find("pool hit, reusing running container"); !ok {
-		t.Fatalf("expected a pool-hit log line, got %v", log.all())
+	if !strings.Contains(err.Error(), "WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT") {
+		t.Fatalf("error must point at the WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT opt-in, got: %v", err)
 	}
 }
 
-// A pooled container that exited is retired on the next same-image create:
-// removed, then created fresh under the same stable name.
-func TestCreatePoolRetiresExitedContainerBeforeRecreate(t *testing.T) {
-	engine := newFakeDockerEngine()
-	log := &captureLogger{}
-	r := newFakeDockerRuntime(t, engine, log)
-	r.SetPoolEnabled(true)
-
-	spec := JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0", JobID: "job-1"}
-	if _, err := r.Create(context.Background(), spec, RuntimeOpts{}); err != nil {
-		t.Fatalf("first Create: %v", err)
+// An explicit override must win and never hit the fail-fast path — even when
+// the autodetect opt-in is set (the opt-in only restores the legacy fallback
+// for the empty case).
+func TestNewDockerRuntimeOverrideUsedWithoutGuessing(t *testing.T) {
+	t.Setenv("WORKER_CONNECTOR_ADDR", "")
+	t.Setenv("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT", "1")
+	d, err := NewDockerRuntime("", "10.0.0.9:9999", 50051, "tok")
+	if err != nil {
+		t.Fatalf("NewDockerRuntime with explicit override: %v", err)
 	}
-	engine.mu.Lock()
-	engine.running = false // container exited after its job
-	engine.mu.Unlock()
-
-	if _, err := r.Create(context.Background(), spec, RuntimeOpts{}); err != nil {
-		t.Fatalf("second Create must fall back to a fresh container: %v", err)
-	}
-	if engine.created != 2 {
-		t.Fatalf("expected a fresh create after the pooled container exited, got %d", engine.created)
-	}
-	if engine.removed != 1 {
-		t.Fatalf("exited stale pooled container must be removed, removed=%d", engine.removed)
-	}
-	if len(engine.createNames) != 2 || engine.createNames[0] != engine.createNames[1] {
-		t.Fatalf("both creates must use the same stable pool name, got %v", engine.createNames)
+	if d.connectorAddr != "10.0.0.9:9999" {
+		t.Fatalf("connectorAddr = %q, want explicit override %q", d.connectorAddr, "10.0.0.9:9999")
 	}
 }
 
-// A 409 conflict under pooled naming resolves to reuse (sibling created the
-// container) or stale-removal+retry — never a random fresh name.
-func TestCreatePool409ConflictKeepsStableName(t *testing.T) {
-	engine := newFakeDockerEngine()
-	engine.createConflict = true // first create attempt fails with 409
-	log := &captureLogger{}
-	r := newFakeDockerRuntime(t, engine, log)
-	r.SetPoolEnabled(true)
-
-	if _, err := r.Create(context.Background(), JobSpec{
-		Tool:  "nuclei",
-		Image: "ghcr.io/open-asm/nuclei:1.0",
-		JobID: "job-1",
-	}, RuntimeOpts{}); err != nil {
-		t.Fatalf("Create with pool 409 must retry and succeed: %v", err)
-	}
-	if engine.created != 2 {
-		t.Fatalf("expected 2 create calls (409 + retry), got %d", engine.created)
-	}
-	if len(engine.createNames) != 2 || engine.createNames[0] != engine.createNames[1] {
-		t.Fatalf("pooled mode must retry under the SAME stable name, got %v", engine.createNames)
-	}
-}
-
-// SweepOrphans removes oasm-managed containers the pool does not reference and
-// leaves referenced ones alone; pooling disabled sweeps nothing.
-func TestSweepOrphansRemovesUnreferencedContainers(t *testing.T) {
-	engine := newFakeDockerEngine()
-	log := &captureLogger{}
-	r := newFakeDockerRuntime(t, engine, log)
-	r.SetPoolEnabled(true)
-
-	h, err := r.Create(context.Background(), JobSpec{
-		Tool:  "nuclei",
-		Image: "ghcr.io/open-asm/nuclei:1.0",
-		JobID: "job-1",
-	}, RuntimeOpts{})
+// The legacy auto-derive chain still works, but only under the explicit
+// WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 opt-in (which logs a warning).
+func TestNewDockerRuntimeAutodetectOptInResolves(t *testing.T) {
+	t.Setenv("WORKER_CONNECTOR_ADDR", "")
+	t.Setenv("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT", "1")
+	d, err := NewDockerRuntime("", "", 50051, "tok")
 	if err != nil {
-		t.Fatalf("Create: %v", err)
+		t.Fatalf("NewDockerRuntime with autodetect opt-in: %v", err)
 	}
-
-	kept, err := r.SweepOrphans(context.Background(), []string{h.ID})
-	if err != nil {
-		t.Fatalf("SweepOrphans(keep): %v", err)
-	}
-	if kept != 0 {
-		t.Fatalf("referenced container must be kept, removed=%d", kept)
-	}
-	if engine.removed != 0 {
-		t.Fatalf("no removal expected for kept container, removed=%d", engine.removed)
-	}
-
-	removed, err := r.SweepOrphans(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("SweepOrphans(nil): %v", err)
-	}
-	if removed != 1 {
-		t.Fatalf("unreferenced managed container must be removed, removed=%d", removed)
-	}
-
-	// Pooling disabled: nothing is managed, sweep is a no-op.
-	r2 := newFakeDockerRuntime(t, newFakeDockerEngine(), &captureLogger{})
-	n, err := r2.SweepOrphans(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("SweepOrphans disabled: %v", err)
-	}
-	if n != 0 {
-		t.Fatalf("disabled pool must sweep nothing, removed=%d", n)
+	if d.connectorAddr == "" {
+		t.Fatal("autodetect opt-in must resolve a connector address")
 	}
 }
