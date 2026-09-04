@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -356,6 +357,15 @@ func (d *DockerRuntime) SweepOrphans(ctx context.Context, keep []string) (int, e
 	return removed, nil
 }
 
+// imageIsCached reports whether the engine already holds a local copy of the
+// image: a nil error from ImageInspect means present. Any error (404 for a
+// missing image, or a transient daemon error) means the caller falls back to a
+// pull — the pull itself then surfaces genuine failures, so an inspect error
+// never silently skips a needed fetch.
+func imageIsCached(err error) bool {
+	return err == nil
+}
+
 func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOpts) (Handle, error) {
 	if spec.Image == "" {
 		return Handle{}, fmt.Errorf("image required")
@@ -409,6 +419,20 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		SecurityOpt:    []string{"no-new-privileges:true"},
 		ReadonlyRootfs: false, // connectors may need to write temp files
 		ExtraHosts:     []string{"host.docker.internal:host-gateway"},
+		// Template/cache persistence: the nuclei template DB (NUCLEI_TEMPLATES_DIR)
+		// lives in a named volume so consecutive jobs reuse it instead of
+		// re-fetching per run — the same job as the image pull-skip keeps the
+		// image cached. The volume lives at /opt/nuclei-templates, deliberately
+		// OUTSIDE the Tmpfs on /tmp so it cannot be shadowed. Tmpfs backs
+		// HOME/XDG_CACHE_HOME (under /tmp): fast, container-local and
+		// ephemeral, so no cross-job state leaks.
+		// ponytail: single shared volume per tool image; if images ever differ
+		// in template layout, key the volume per image
+		// (oasm-nuclei-templates-<hash8(image)>) like the pool name does.
+		Binds: []string{"oasm-nuclei-templates:/opt/nuclei-templates"},
+		Tmpfs: map[string]string{
+			"/tmp": "rw,nosuid,nodev,size=256m",
+		},
 	}
 
 	name := buildContainerName(spec.Tool, execID)
@@ -423,15 +447,22 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		name = pname
 	}
 
-	// Pull image if not present locally.
-	pullReader, err := d.cli.ImagePull(ctx, spec.Image, types.ImagePullOptions{})
-	if err != nil {
-		return Handle{}, fmt.Errorf("image pull %s: %w", spec.Image, err)
+	// Pull policy: inspect first — an image already present locally skips the
+	// network pull entirely (the common case for repeated jobs of the same
+	// tool). A failed inspect (404 missing, or any engine error) falls back to
+	// a pull, which surfaces the real failure if the image cannot be fetched.
+	if _, _, inspectErr := d.cli.ImageInspectWithRaw(ctx, spec.Image); imageIsCached(inspectErr) {
+		d.logInfo("docker: image pull skipped (cached): %s", spec.Image)
+	} else {
+		pullReader, err := d.cli.ImagePull(ctx, spec.Image, types.ImagePullOptions{})
+		if err != nil {
+			return Handle{}, fmt.Errorf("image pull %s: %w", spec.Image, err)
+		}
+		// Drain the pull output (required to complete the pull).
+		_, _ = io.Copy(io.Discard, pullReader)
+		pullReader.Close()
+		d.logInfo("docker: image pull done: %s", spec.Image)
 	}
-	// Drain the pull output (required to complete the pull).
-	_, _ = io.Copy(io.Discard, pullReader)
-	pullReader.Close()
-	d.logInfo("docker: image pull done: %s", spec.Image)
 
 	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	if err != nil {
@@ -523,9 +554,12 @@ func (d *DockerRuntime) Inspect(ctx context.Context, h Handle) (InspectResult, e
 // the context is cancelled or the stream ends. Non-TTY containers return a
 // multiplexed stream (8-byte header + payload per frame) when both streams
 // are requested; the 8-byte header is stripped here so the caller sees plain
-// lines. The read goroutine exits when ctx is cancelled (docker client aborts
-// the request) or the stream closes — it never blocks on the send side
-// (ctx-aware select) and the channel is always closed on exit.
+// lines. Partial lines (no trailing \n yet) are flushed at least every 500ms
+// so slow or stalled output surfaces promptly instead of sitting in the
+// buffer until the next frame or the stream end. The reader goroutines exit
+// when ctx is cancelled (docker client aborts the request) or the stream
+// closes — sends are ctx-aware so a stopped consumer cannot leak them, and
+// the channel is always closed on exit.
 func (d *DockerRuntime) Logs(ctx context.Context, h Handle) (<-chan []byte, error) {
 	if d.cli == nil {
 		return nil, fmt.Errorf("docker client not initialized")
@@ -544,21 +578,49 @@ func (d *DockerRuntime) Logs(ctx context.Context, h Handle) (<-chan []byte, erro
 		defer close(ch)
 		br := bufio.NewReaderSize(rc, 32*1024)
 		w := &lineChunkWriter{ctx: ctx, ch: ch}
+
+		// Demux the socket in its own goroutine: the blocking frame reads
+		// must not starve the flush ticker while the stream is idle (no
+		// frames = a stalled partial line still gets delivered).
+		frames := make(chan []byte, 16)
+		go func() {
+			defer close(frames)
+			for {
+				hdr := make([]byte, 8)
+				if _, err := io.ReadFull(br, hdr); err != nil {
+					return
+				}
+				payloadLen := binary.BigEndian.Uint32(hdr[4:8])
+				payload := make([]byte, payloadLen)
+				if _, err := io.ReadFull(br, payload); err != nil {
+					return
+				}
+				select {
+				case frames <- payload:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		flushTicker := time.NewTicker(500 * time.Millisecond)
+		defer flushTicker.Stop()
 		for {
-			hdr := make([]byte, 8)
-			if _, err := io.ReadFull(br, hdr); err != nil {
-				// Stream ended or ctx cancelled.
-				w.flush()
-				return
-			}
-			payloadLen := binary.BigEndian.Uint32(hdr[4:8])
-			payload := make([]byte, payloadLen)
-			if _, err := io.ReadFull(br, payload); err != nil {
-				w.flush()
-				return
-			}
-			if w.write(payload) {
-				// ctx cancelled mid-stream.
+			select {
+			case payload, ok := <-frames:
+				if !ok {
+					// Stream ended or ctx cancelled: deliver what is left.
+					w.flush()
+					return
+				}
+				if w.write(payload) {
+					return // ctx cancelled mid-stream
+				}
+			case <-flushTicker.C:
+				if w.flush() {
+					return // ctx cancelled mid-flush
+				}
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -594,15 +656,18 @@ func (w *lineChunkWriter) write(p []byte) bool {
 	return false
 }
 
-func (w *lineChunkWriter) flush() {
+// flush delivers any buffered partial line. It reports true when the send
+// aborted due to ctx cancellation, matching write's contract.
+func (w *lineChunkWriter) flush() bool {
 	if len(w.buf) == 0 {
-		return
+		return false
 	}
 	line := trimCR(w.buf)
 	w.buf = nil
-	if len(line) > 0 {
-		w.send(line)
+	if len(line) == 0 {
+		return false
 	}
+	return w.send(line)
 }
 
 func (w *lineChunkWriter) send(line []byte) bool {
@@ -658,6 +723,17 @@ func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID strin
 		"JOB_ID=" + spec.JobID,
 		"TOOL=" + spec.Tool,
 		"TRACE_ID=" + spec.TraceID,
+		// Cache/template dirs: HOME/XDG_CACHE_HOME pinned under /tmp (writable
+		// with ReadonlyRootfs false or not, and ephemeral via the Tmpfs mount)
+		// so tools never scatter dotfiles into the image layer.
+		// NUCLEI_TEMPLATES_DIR is the nuclei template DB path — Create mounts
+		// the matching named volume at /opt/nuclei-templates (outside /tmp,
+		// so the Tmpfs cannot shadow it) and it survives across jobs
+		// (pull-skip keeps the image cached; this keeps the templates cached
+		// too).
+		"HOME=/tmp",
+		"XDG_CACHE_HOME=/tmp/.cache",
+		"NUCLEI_TEMPLATES_DIR=/opt/nuclei-templates",
 	}
 	if host, port, err := net.SplitHostPort(connectorAddr); err == nil {
 		env = append(env,
