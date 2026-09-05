@@ -1,11 +1,33 @@
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { camelToTitle } from '@/utils/string';
 import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Plus, X } from 'lucide-react';
+import { ChevronsUpDown, Loader2, Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -20,8 +42,10 @@ interface SchemaProperty {
   'ui:text-color'?: string;
   'ui:form:group'?: string;
   default?: unknown;
+  enum?: unknown[];
   items?: {
     type?: string;
+    enum?: unknown[];
     [key: string]: unknown;
   };
 }
@@ -124,6 +148,127 @@ function ArrayField({
   );
 }
 
+function EnumMultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+}: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (val: unknown) => void;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const getLabel = (value: string): string => {
+    const opt = options.find((o) => o.value === value);
+    return opt?.label ?? value;
+  };
+
+  const handleToggle = (value: string) => {
+    const next = selected.includes(value)
+      ? selected.filter((v) => v !== value)
+      : [...selected, value];
+    onChange(next);
+  };
+
+  const handleRemove = (value: string) => {
+    onChange(selected.filter((v) => v !== value));
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          aria-label={placeholder}
+          className="border-input placeholder:text-muted-foreground dark:bg-input/30 flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-1 text-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {selected.length === 0 ? (
+            <span className="text-muted-foreground truncate">{placeholder}</span>
+          ) : (
+            <div className="flex flex-1 flex-wrap gap-1">
+              {selected.map((value) => (
+                <Badge
+                  key={value}
+                  variant="secondary"
+                  className="gap-1 pr-1"
+                >
+                  <span className="truncate">{getLabel(value)}</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Remove ${getLabel(value)}`}
+                    className="rounded-full p-0.5 hover:bg-foreground/10"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemove(value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleRemove(value);
+                      }
+                    }}
+                  >
+                    <X className="size-3" />
+                  </span>
+                </Badge>
+              ))}
+            </div>
+          )}
+          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+        align="start"
+      >
+        <Command>
+          <CommandInput placeholder="Search..." />
+          <CommandList>
+            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.label}
+                  onSelect={() => handleToggle(option.value)}
+                  className="cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selected.includes(option.value)}
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+                  <span className="truncate">{option.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+          {selected.length > 0 && (
+            <div className="border-t p-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => onChange([])}
+              >
+                Clear all
+              </Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function renderField(
   key: string,
   prop: SchemaProperty,
@@ -200,6 +345,27 @@ function renderField(
     );
   }
 
+  // Array with enum items → inline multi-select (Popover + Command + Checkbox).
+  if (prop.type === 'array' && Array.isArray(prop.items?.enum)) {
+    const enumOptions = prop.items!.enum!
+      .filter((v): v is string => typeof v === 'string')
+      .map((v) => ({ value: v, label: camelToTitle(v) }));
+    const selected = Array.isArray(value)
+      ? (value as unknown[]).filter(
+          (v): v is string =>
+            typeof v === 'string' && enumOptions.some((o) => o.value === v),
+        )
+      : [];
+    return (
+      <EnumMultiSelect
+        options={enumOptions}
+        selected={selected}
+        onChange={onChange}
+        placeholder={placeholder}
+      />
+    );
+  }
+
   if (prop.type === 'array') {
     return (
       <ArrayField
@@ -209,6 +375,31 @@ function renderField(
         autoComplete={autoComplete}
         placeholder={placeholder}
       />
+    );
+  }
+
+  // Top-level enum → single-select using existing Select component.
+  if (Array.isArray(prop.enum)) {
+    const enumOptions = prop.enum
+      .filter((v): v is string => typeof v === 'string')
+      .map((v) => ({ value: v, label: camelToTitle(v) }));
+    const selected =
+      typeof value === 'string' && enumOptions.some((o) => o.value === value)
+        ? value
+        : '';
+    return (
+      <Select value={selected || undefined} onValueChange={(val) => onChange(val)}>
+        <SelectTrigger id={key} className="w-full">
+          <SelectValue placeholder={placeholder || 'Select...'} />
+        </SelectTrigger>
+        <SelectContent>
+          {enumOptions.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     );
   }
 
@@ -238,7 +429,7 @@ function defaultsFromSchema(
     } else if (prop.default !== undefined) {
       defaults[key] = prop.default;
     } else if (prop.type === 'array') {
-      defaults[key] = [''];
+      defaults[key] = Array.isArray(prop.items?.enum) ? [] : [''];
     }
   }
   return defaults;

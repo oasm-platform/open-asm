@@ -7,8 +7,8 @@ interface ToolsListProps {
   data?: Tool[];
   isLoading: boolean;
   icon: ReactNode;
-  title: string;
   emptyMessage?: string;
+  emptyDescription?: string;
   renderButton: (tool: Tool) => ReactNode;
 }
 
@@ -17,6 +17,7 @@ const ToolsList = ({
   isLoading,
   icon,
   emptyMessage = 'No tools found',
+  emptyDescription,
   renderButton,
 }: ToolsListProps) => {
   return (
@@ -24,21 +25,26 @@ const ToolsList = ({
       {isLoading ? (
         <ToolCardLoading />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {data?.map((tool, index) => (
             <ToolCard key={tool.id ?? index} tool={tool} button={renderButton(tool)} />
           ))}
         </div>
       )}
       {(!data || data.length === 0) && !isLoading && (
-        <div className="flex items-center justify-center gap-2 text-blue-500">
+        <div className="flex flex-col items-center justify-center gap-1 py-16 text-center">
           {icon &&
             React.cloneElement(icon as JSX.Element, {
               className: 'w-6 h-6 text-gray-500',
             })}
-          <span className="text-gray-500 text-xl font-bold">
+          <span className="text-lg font-semibold text-gray-500">
             {emptyMessage}
           </span>
+          {emptyDescription && (
+            <p className="max-w-sm text-sm text-muted-foreground">
+              {emptyDescription}
+            </p>
+          )}
         </div>
       )}
     </div>

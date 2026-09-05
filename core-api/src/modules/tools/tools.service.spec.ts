@@ -1,4 +1,4 @@
-import { WorkerType } from '@/common/enums/enum';
+import { ToolCategory, WorkerType } from '@/common/enums/enum';
 import { BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { Repository } from 'typeorm';
@@ -23,9 +23,13 @@ const mockRepo = () => ({
 const mockWorkersService = () => ({
   repo: {
     createQueryBuilder: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
       getCount: jest.fn().mockResolvedValue(0),
+      getRawMany: jest.fn().mockResolvedValue([]),
     }),
     manager: { query: jest.fn().mockResolvedValue(undefined) },
   },
@@ -117,9 +121,13 @@ describe('ToolsService — readiness flags', () => {
       workspaceToolRepo.find.mockResolvedValue([{ tool: connectorTool, isEnabled: true }]);
       profilesRepo.find.mockResolvedValue([{ id: 'prof-1', tool: { id: 'tool-1' } }]); // batched profile lookup
       workersService.repo.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
         getCount: jest.fn().mockResolvedValue(2),
+        getRawMany: jest.fn().mockResolvedValue([]),
       });
 
       const result = await service.getManyTools({
@@ -139,9 +147,13 @@ describe('ToolsService — readiness flags', () => {
       // Connector HAS a schema → config is required → not ready without profile
       (connectorRegistry.getConnectorSchema).mockReturnValue({ type: 'object' });
       workersService.repo.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
         getCount: jest.fn().mockResolvedValue(2),
+        getRawMany: jest.fn().mockResolvedValue([]),
       });
 
       const result = await service.getManyTools({
@@ -162,9 +174,13 @@ describe('ToolsService — readiness flags', () => {
       // → needs no config → installed implies ready
       (connectorRegistry.getConnectorSchema).mockReturnValue(null);
       workersService.repo.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
         getCount: jest.fn().mockResolvedValue(2),
+        getRawMany: jest.fn().mockResolvedValue([]),
       });
 
       const result = await service.getManyTools({
@@ -183,9 +199,13 @@ describe('ToolsService — readiness flags', () => {
       toolsRepo.findAndCount.mockResolvedValue([[builtInTool], 1]);
       workspaceToolRepo.find.mockResolvedValue([]);
       workersService.repo.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
         getCount: jest.fn().mockResolvedValue(2),
+        getRawMany: jest.fn().mockResolvedValue([]),
       });
 
       const result = await service.getManyTools({
@@ -197,6 +217,212 @@ describe('ToolsService — readiness flags', () => {
       expect(tool.isReady).toBe(true);
     });
   });
+
+  // ── Search tests ────────────────────────────────────────────────────
+  const mockWorkerCount = () => {
+    workersService.repo.createQueryBuilder.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      getCount: jest.fn().mockResolvedValue(0),
+      getRawMany: jest.fn().mockResolvedValue([]),
+    });
+  };
+
+  describe('getManyTools — search filter', () => {
+    it('should return all tools when search is empty string', async () => {
+      const tool = makeTool({ id: 't1', name: 'nuclei', description: 'vuln scanner' });
+      toolsRepo.findAndCount.mockResolvedValue([[tool], 1]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      const result = await service.getManyTools({
+        page: 1, limit: 10, search: '', workspaceId: 'ws-001',
+      } as any);
+
+      expect(result.data).toHaveLength(1);
+      // No ILike in where — plain findAndCount called
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      expect(callArg.where).toBeUndefined();
+    });
+
+    it('should filter tools by name match (case-insensitive)', async () => {
+      const nuclei = makeTool({ id: 't1', name: 'nuclei', description: 'scan vulns' });
+      toolsRepo.findAndCount.mockResolvedValue([[nuclei], 1]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      const result = await service.getManyTools({
+        page: 1, limit: 10, search: 'nucle', workspaceId: 'ws-001',
+      } as any);
+
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      // The where should contain ILike conditions
+      expect(callArg.where).toBeDefined();
+      // findAndCount returns the filtered subset
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].name).toBe('nuclei');
+    });
+
+    it('should filter tools by description match', async () => {
+      const tool = makeTool({
+        id: 't1', name: 'subfinder',
+        description: 'Find subdomains of websites',
+      });
+      toolsRepo.findAndCount.mockResolvedValue([[tool], 1]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      const result = await service.getManyTools({
+        page: 1, limit: 10, search: 'subdomain', workspaceId: 'ws-001',
+      } as any);
+
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      expect(callArg.where).toBeDefined();
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('should combine search with category filter', async () => {
+      const tool = makeTool({ id: 't1', name: 'nuclei', category: ToolCategory.VULNERABILITIES });
+      toolsRepo.findAndCount.mockResolvedValue([[tool], 1]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      const result = await service.getManyTools({
+        page: 1, limit: 10, search: 'nuclei', category: ToolCategory.VULNERABILITIES,
+        workspaceId: 'ws-001',
+      } as any);
+
+      expect(result.data).toHaveLength(1);
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      expect(callArg.where).toBeDefined();
+    });
+
+    it('should combine search with type filter', async () => {
+      const tool = makeTool({ id: 't1', name: 'nuclei', type: WorkerType.CONNECTOR });
+      toolsRepo.findAndCount.mockResolvedValue([[tool], 1]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      const result = await service.getManyTools({
+        page: 1, limit: 10, search: 'nuclei', type: WorkerType.CONNECTOR,
+        workspaceId: 'ws-001',
+      } as any);
+
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('should return empty when search matches nothing', async () => {
+      toolsRepo.findAndCount.mockResolvedValue([[], 0]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      const result = await service.getManyTools({
+        page: 1, limit: 10, search: 'nonexistent', workspaceId: 'ws-001',
+      } as any);
+
+      expect(result.data).toHaveLength(0);
+      expect(result.total).toBe(0);
+    });
+
+    it('should trim whitespace from search input', async () => {
+      toolsRepo.findAndCount.mockResolvedValue([[], 0]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      await service.getManyTools({
+        page: 1, limit: 10, search: '   nuclei   ', workspaceId: 'ws-001',
+      } as any);
+
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      expect(callArg.where).toBeDefined();
+    });
+
+    it('should treat whitespace-only search as empty', async () => {
+      const tool = makeTool({ id: 't1', name: 'nuclei' });
+      toolsRepo.findAndCount.mockResolvedValue([[tool], 1]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      await service.getManyTools({
+        page: 1, limit: 10, search: '   ', workspaceId: 'ws-001',
+      } as any);
+
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      // whitespace-only → no search where clause
+      expect(callArg.where).toBeUndefined();
+    });
+
+    it('should apply search in non-workspace path (no workspaceId)', async () => {
+      const tool = makeTool({ id: 't1', name: 'nuclei' });
+      toolsRepo.findAndCount.mockResolvedValue([[tool], 1]);
+
+      const result = await service.getManyTools({
+        page: 1, limit: 10, search: 'nuclei',
+      } as any);
+
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      expect(callArg.where).toBeDefined();
+      expect(result.data).toHaveLength(1);
+    });
+  });
+
+  describe('getManyTools — sortBy / sortOrder', () => {
+    it('should keep legacy default sort (name ASC) when sortBy is not overridden', async () => {
+      toolsRepo.findAndCount.mockResolvedValue([[], 0]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      await service.getManyTools({
+        page: 1, limit: 10, workspaceId: 'ws-001',
+      } as any);
+
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      expect(callArg.order).toEqual({ name: 'ASC' });
+    });
+
+    it('should respect custom sortBy and sortOrder', async () => {
+      toolsRepo.findAndCount.mockResolvedValue([[], 0]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      await service.getManyTools({
+        page: 1, limit: 10, sortBy: 'updatedAt', sortOrder: 'DESC', workspaceId: 'ws-001',
+      } as any);
+
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      expect(callArg.order).toEqual({ updatedAt: 'DESC' });
+    });
+
+    it('should fall back to legacy default for non-whitelisted sortBy', async () => {
+      toolsRepo.findAndCount.mockResolvedValue([[], 0]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      await service.getManyTools({
+        page: 1, limit: 10, sortBy: 'passwordHash; DROP TABLE tools', sortOrder: 'DESC',
+        workspaceId: 'ws-001',
+      } as any);
+
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      expect(callArg.order).toEqual({ name: 'ASC' });
+    });
+
+    it('should use default sort in non-workspace path', async () => {
+      toolsRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.getManyTools({
+        page: 1, limit: 10,
+      } as any);
+
+      const callArg = toolsRepo.findAndCount.mock.calls[0][0];
+      expect(callArg.order).toEqual({ name: 'ASC' });
+    });
+  });
+
+  // ── End search tests ────────────────────────────────────────────────
 
   describe('getInstalledTools — hasConfigProfile and isReady', () => {
     it('should include hasConfigProfile for installed connector tools', async () => {
@@ -444,9 +670,13 @@ describe('ToolsService — readiness flags', () => {
   describe('ToolsService — batched profile lookup (#4)', () => {
     const mockWorkerCount = () => {
       workersService.repo.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getCount: jest.fn().mockResolvedValue(0),
+        groupBy: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(2),
+        getRawMany: jest.fn().mockResolvedValue([]),
       });
     };
 

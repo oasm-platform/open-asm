@@ -1,5 +1,6 @@
 import type { WrapperType } from '@/common/types/app.types';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
@@ -15,7 +16,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { In, Repository } from 'typeorm';
+import type {
+  FindOptionsWhere,
+} from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
@@ -32,6 +36,21 @@ import { StorageService } from '../storage/storage.service';
 import { JobPriority } from '@/common/enums/enum';
 import { builtInTools } from './tools-provider/built-in-tools';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+
+// Search input is trimmed and capped to keep ILIKE patterns cheap and bounded.
+const MAX_SEARCH_LENGTH = 100;
+// DTO-level default sortBy — treated as "not passed" so the legacy tools-list
+// ordering (name ASC) is preserved when the client does not override it.
+const DEFAULT_SORT_FIELD = 'createdAt';
+// Whitelist of sortable columns; anything else falls back to the default order.
+const ALLOWED_SORT_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'name',
+  'category',
+  'type',
+] as const;
+
 @Injectable()
 export class ToolsService implements OnModuleInit {
   constructor(
@@ -61,44 +80,56 @@ export class ToolsService implements OnModuleInit {
   ) {}
 
   /**
-   * Count available workers for a specific tool.
-   * Includes both workspace-scoped and cloud-scoped workers.
-   * @param toolId The tool ID to count workers for.
+   * Count available BUILT_IN-type workers for a workspace.
+   * All built-in tools share the same worker pool, so the count is computed
+   * once per page instead of once per tool.
    * @param workspaceId The workspace ID to filter workspace-scoped workers.
-   * @param toolType The type of the tool (BUILT_IN or PROVIDER).
-   * @returns The number of available workers for this tool.
+   * @returns The number of available BUILT_IN workers.
    */
-  private async countAvailableWorkers(
-    toolId: string,
-    workspaceId: string,
-    toolType?: WorkerType,
-  ): Promise<number> {
-    const queryBuilder = this.workersService.repo
+  private async countBuiltInWorkers(workspaceId: string): Promise<number> {
+    return this.workersService.repo
       .createQueryBuilder('w')
-      .where('1=1');
-
-    // Add workspace filter: workers with matching workspaceId OR cloud scope
-    queryBuilder.andWhere(
-      '(w."workspaceId" = :workspaceId OR w."scope" = :cloudScope)',
-      {
+      .where('(w."workspaceId" = :workspaceId OR w."scope" = :cloudScope)', {
         workspaceId,
         cloudScope: WorkerScope.CLOUD,
-      },
-    );
+      })
+      .andWhere('w.type = :type', { type: WorkerType.BUILT_IN })
+      .getCount();
+  }
 
-    // If toolType is not provided or is BUILT_IN, count BUILT_IN workers
-    if (!toolType || toolType === WorkerType.BUILT_IN) {
-      // For BUILT_IN type, count all BUILT_IN workers that are enabled for this workspace
-      queryBuilder.andWhere('w.type = :type', { type: WorkerType.BUILT_IN });
-    } else {
-      // For PROVIDER type, count workers with matching toolId.
-      // PROVIDER workers are always CLOUD-scoped (see determineWorkerTypeAndScope),
-      // so they're available globally regardless of per-workspace installation status.
-      // The isInstalled flag on each tool handles the workspace-installation UI concern.
-      queryBuilder.andWhere('w."toolId" = :toolId', { toolId });
+  /**
+   * Count available workers per tool id in a single grouped query.
+   * Batch variant of the per-tool worker count (N+1): PROVIDER workers are
+   * always CLOUD-scoped (see determineWorkerTypeAndScope), so they're
+   * available globally regardless of per-workspace installation status.
+   * @param workspaceId The workspace ID to filter workspace-scoped workers.
+   * @param toolIds The tool ids to count workers for.
+   * @returns Map of toolId → available worker count.
+   */
+  private async countAvailableWorkersBatch(
+    workspaceId: string,
+    toolIds: string[],
+  ): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    if (toolIds.length === 0) return counts;
+
+    const rows: Array<{ toolId: string | null; count: string }> =
+      await this.workersService.repo
+        .createQueryBuilder('w')
+        .select('w."toolId"', 'toolId')
+        .addSelect('COUNT(*)', 'count')
+        .where('(w."workspaceId" = :workspaceId OR w."scope" = :cloudScope)', {
+          workspaceId,
+          cloudScope: WorkerScope.CLOUD,
+        })
+        .andWhere('w."toolId" IN (:...toolIds)', { toolIds })
+        .groupBy('w."toolId"')
+        .getRawMany();
+
+    for (const row of rows) {
+      if (row.toolId) counts.set(row.toolId, Number(row.count));
     }
-
-    return queryBuilder.getCount();
+    return counts;
   }
 
   async onModuleInit() {
@@ -766,6 +797,51 @@ export class ToolsService implements OnModuleInit {
   }
 
   /**
+   * Builds a TypeORM where clause for getManyTools.
+   * When search is provided, creates an OR branch matching name OR description
+   * (ILIKE, case-insensitive), combined (AND) with type/category/provider filters.
+   */
+  private buildToolsWhere(
+    query: ToolsQueryDto,
+  ): FindOptionsWhere<Tool>[] | FindOptionsWhere<Tool> | undefined {
+    const base: FindOptionsWhere<Tool> = {};
+    if (query.type) base.type = query.type;
+    if (query.category) base.category = query.category;
+    if (query.providerId) base.provider = { id: query.providerId };
+
+    const searchTerm = (query.search ?? '').trim().slice(0, MAX_SEARCH_LENGTH);
+    if (!searchTerm) {
+      return Object.keys(base).length ? base : undefined;
+    }
+    // Escape LIKE wildcards so user input is matched literally; ILike()
+    // keeps the value parameterized (no SQL injection).
+    const pattern = `%${searchTerm.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    return [
+      { ...base, name: ILike(pattern) },
+      { ...base, description: ILike(pattern) },
+    ];
+  }
+
+  /**
+   * Builds a TypeORM order clause for getManyTools.
+   * When sortBy/sortOrder are non-default and the field is whitelisted,
+   * the client-specified sort is used; otherwise the legacy default (name ASC).
+   */
+  private buildToolsOrder(query: ToolsQueryDto): Record<string, 'ASC' | 'DESC'> {
+    const isDefaultSort =
+      (!query.sortBy || query.sortBy === DEFAULT_SORT_FIELD) &&
+      (!query.sortOrder || query.sortOrder === SortOrder.ASC);
+    if (
+      !isDefaultSort &&
+      query.sortBy &&
+      (ALLOWED_SORT_FIELDS as readonly string[]).includes(query.sortBy)
+    ) {
+      return { [query.sortBy]: query.sortOrder ?? SortOrder.ASC };
+    }
+    return { name: 'ASC' };
+  }
+
+  /**
    * Retrieves a list of tools with pagination.
    * @param {ToolsQueryDto} query - The query parameters.
    * @returns {Promise<GetManyBaseResponseDto<Tool>>} The tools.
@@ -774,22 +850,18 @@ export class ToolsService implements OnModuleInit {
     const { page, limit } = query;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, string | number | object> = {};
-    if (query.type) where.type = query.type;
-    if (query.category) where.category = query.category;
-    if (query.providerId) where.provider = { id: query.providerId };
+    const where = this.buildToolsWhere(query);
+    const order = this.buildToolsOrder(query);
 
     // If workspaceId is provided, we need to check which tools are installed
     if (query.workspaceId) {
       const workspaceId = query.workspaceId;
 
       const [data, total] = await this.toolsRepository.findAndCount({
-        where: Object.keys(where).length ? where : undefined,
+        where,
         take: limit,
-        skip: skip,
-        order: {
-          name: 'ASC',
-        },
+        skip,
+        order,
       });
 
       // Get installed tools for this workspace
@@ -800,46 +872,53 @@ export class ToolsService implements OnModuleInit {
         relations: ['tool'],
       });
 
+      // Batch worker counts — one query for the shared built-in pool and one
+      // grouped query for all connector/provider tools (replaces N+1).
+      const builtInWorkersCount = data.some(
+        (t) => t.type === WorkerType.BUILT_IN,
+      )
+        ? await this.countBuiltInWorkers(workspaceId)
+        : 0;
+
+      const nonBuiltInIds = data
+        .filter((t) => t.type !== WorkerType.BUILT_IN && t.id)
+        .map((t) => t.id!);
+      const workersCounts = await this.countAvailableWorkersBatch(
+        workspaceId,
+        nonBuiltInIds,
+      );
+
       // Add isInstalled flag and availableWorkersCount to each tool
-      const toolsWithInstalledFlag = await Promise.all(
-        data.map(async (tool) => {
-          // Skip tools without ID or type
-          if (!tool.id || !tool.type) {
-            return {
-              ...tool,
-              isInstalled: false,
-              availableWorkersCount: 0,
-            };
-          }
-
-          // Count available workers for this tool
-          const availableWorkersCount = await this.countAvailableWorkers(
-            tool.id,
-            workspaceId,
-            tool.type,
-          );
-
-          // Built-in tools are always considered installed
-          if (tool.type === WorkerType.BUILT_IN) {
-            return {
-              ...tool,
-              isInstalled: true,
-              availableWorkersCount,
-              isReady: true,
-            };
-          }
-
-          const workspaceTool = installedTools.find(
-            (wt) => wt.tool.id === tool.id,
-          );
-          const isInstalled = !!workspaceTool?.isEnabled;
+      const toolsWithInstalledFlag = data.map((tool) => {
+        // Skip tools without ID or type
+        if (!tool.id || !tool.type) {
           return {
             ...tool,
-            isInstalled,
-            availableWorkersCount,
+            isInstalled: false,
+            availableWorkersCount: 0,
           };
-        }),
-      );
+        }
+
+        // Built-in tools are always considered installed
+        if (tool.type === WorkerType.BUILT_IN) {
+          return {
+            ...tool,
+            isInstalled: true,
+            availableWorkersCount: builtInWorkersCount,
+            isReady: true,
+          };
+        }
+
+        const workspaceTool = installedTools.find(
+          (wt) => wt.tool.id === tool.id,
+        );
+        const isInstalled = !!workspaceTool?.isEnabled;
+        return {
+          ...tool,
+          isInstalled,
+          availableWorkersCount: workersCounts.get(tool.id) ?? 0,
+        };
+      });
 
       // Batch config-profile lookup for installed connectors (single query
       // with In-operator instead of one findOne per tool, #4)
@@ -872,18 +951,16 @@ export class ToolsService implements OnModuleInit {
 
       return getManyResponse({ query, data: toolsWithProfiles, total });
     } else {
-      // Original behavior when no workspaceId is provided
+      // No workspaceId — simple paginated query
       const [data, total] = await this.toolsRepository.findAndCount({
-        where: Object.keys(where).length ? where : undefined,
+        where,
         take: limit,
-        skip: skip,
+        skip,
         relations: {
           workspaceTools: true,
           provider: true,
         },
-        order: {
-          name: 'ASC',
-        },
+        order,
       });
       return getManyResponse({ query, data, total });
     }
