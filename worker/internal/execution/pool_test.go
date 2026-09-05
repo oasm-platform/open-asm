@@ -146,3 +146,42 @@ func TestPoolBusyCountTracksPerKey(t *testing.T) {
 		t.Fatalf("busyCount(nuclei) = %d, want 1", got)
 	}
 }
+
+// The owner map must not grow without bound: when a released container is
+// re-acquired by a new execution, the previous owner's mapping is stale (the
+// container no longer backs exec-1) and must be deleted.
+func TestPoolAcquireReplacesStaleOwnerMapping(t *testing.T) {
+	now := time.Now()
+	p, _ := newPoolForTest(t, now)
+	// Created busy under exec-1 (owner[exec-1]=c1), then released to idle.
+	p.Add(poolEntry{ID: "c1", Image: "nuclei", PoolKey: "nuclei", State: PoolStateBusy, ExecID: "exec-1", LastUsedAt: now})
+	p.ReleaseToIdle("exec-1")
+
+	if _, ok := p.Acquire("exec-2", "nuclei"); !ok {
+		t.Fatal("Acquire must hit the released container")
+	}
+	if _, ok := p.owner["exec-1"]; ok {
+		t.Fatal("stale owner mapping exec-1 must be deleted when the container is re-acquired (owner map leak)")
+	}
+	if p.owner["exec-2"] != "c1" {
+		t.Fatalf("owner[exec-2] = %q, want c1", p.owner["exec-2"])
+	}
+}
+
+// Sweeping an expired idle container must also drop the owner mapping of the
+// execution that last used it — otherwise owner entries for drained
+// executions survive until process exit.
+func TestPoolSweepClearsOwnerMappingOfExpiredIdle(t *testing.T) {
+	now := time.Now()
+	p, _ := newPoolForTest(t, now)
+	p.Add(poolEntry{ID: "c1", Image: "nuclei", PoolKey: "nuclei", State: PoolStateBusy, ExecID: "exec-1", LastUsedAt: now})
+	p.ReleaseToIdle("exec-1")
+
+	expired := p.Sweep(now.Add(2 * ConnectorIdleTimeout))
+	if len(expired) != 1 || expired[0].ID != "c1" {
+		t.Fatalf("expired idle container must be swept, got %v", expired)
+	}
+	if len(p.owner) != 0 {
+		t.Fatalf("owner map must be empty after the container is swept, got %v", p.owner)
+	}
+}

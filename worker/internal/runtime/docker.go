@@ -21,6 +21,8 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
+
+	"oasm-worker/internal/security"
 )
 
 // DockerRuntime implements ExecutionRuntime via Docker Engine API over docker.sock.
@@ -323,6 +325,26 @@ func hostResources(opts RuntimeOpts) container.Resources {
 	}
 }
 
+// applyDefaultIsolation wires security.DefaultIsolation into the container's
+// HostConfig: read-only root filesystem, no-new-privileges, bridge network and
+// a PID cap. It only ADDS hardening — opts set by the caller before this call
+// (Resources CPU/memory, Tmpfs caches, nuclei templates Binds, ExtraHosts)
+// are untouched.
+func applyDefaultIsolation(hc *container.HostConfig) {
+	iso := security.DefaultIsolation()
+	hc.ReadonlyRootfs = iso.ReadOnlyRootFS
+	if iso.NetworkMode != "" {
+		hc.NetworkMode = container.NetworkMode(iso.NetworkMode)
+	}
+	if iso.NoNewPrivileges {
+		hc.SecurityOpt = append(hc.SecurityOpt, "no-new-privileges:true")
+	}
+	if iso.PidsLimit > 0 {
+		limit := iso.PidsLimit
+		hc.Resources.PidsLimit = &limit
+	}
+}
+
 func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOpts) (Handle, error) {
 	if spec.Image == "" {
 		return Handle{}, fmt.Errorf("image required")
@@ -384,10 +406,11 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	// ponytail: if an engine predating host-gateway ever errors on this entry,
 	// gate it by OS (skip on windows/darwin) before retrying create.
 	hostConfig := &container.HostConfig{
-		Resources:      hostResources(opts),
-		SecurityOpt:    []string{"no-new-privileges:true"},
-		ReadonlyRootfs: false, // connectors may need to write temp files
-		ExtraHosts:     []string{"host.docker.internal:host-gateway"},
+		Resources: hostResources(opts),
+		// SecurityOpt/ReadonlyRootfs/NetworkMode/PidsLimit come from
+		// security.DefaultIsolation via applyDefaultIsolation below — never
+		// hardcode them here (W4 dead-isolation regression).
+		ExtraHosts: []string{"host.docker.internal:host-gateway"},
 		// Template/cache persistence: the nuclei template DB (NUCLEI_TEMPLATES_DIR)
 		// lives in a named volume so consecutive jobs reuse it instead of
 		// re-fetching per run — the same job as the image pull-skip keeps the
@@ -403,6 +426,7 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 			"/tmp": "rw,nosuid,nodev,size=256m",
 		},
 	}
+	applyDefaultIsolation(hostConfig)
 
 	// Pooled container name: oasm-<tool>-<poolShort8>-<rand4> — same-image
 	// containers group under one short prefix; an idle warm container is

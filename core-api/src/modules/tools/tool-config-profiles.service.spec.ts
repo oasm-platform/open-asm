@@ -7,7 +7,10 @@ import type { Tool } from '@/modules/tools/entities/tools.entity';
 import type { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import type { Repository } from 'typeorm';
 import type { ToolConfigProfile } from './entities/tool-config-profiles.entity';
-import { encryptProfile } from './validators/tool-config-profiles.crypto';
+import {
+  decryptProfile,
+  encryptProfile,
+} from './validators/tool-config-profiles.crypto';
 import { ToolConfigProfilesService } from './tool-config-profiles.service';
 
 // --- Mocks ---
@@ -335,6 +338,43 @@ describe('ToolConfigProfilesService', () => {
     expect(saved.name).toBe('qa-wpscan-v2');
     // No schema → no validation → config persisted unchanged
     expect(saved.config).toEqual({ url: 'https://new.example.com' });
+  });
+
+  it('update — rename/isDefault only does NOT re-encrypt ciphertext (round-trips to original plaintext)', async () => {
+    const dek = Buffer.alloc(32);
+    const encrypted = encryptProfile(
+      { apiKey: 'secret123', target: 'x.com' },
+      ['apiKey'],
+      dek,
+    );
+    const existing = mockProfile({
+      id: 'prof-001',
+      name: 'default',
+      config: encrypted,
+    });
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'nessus',
+      slug: 'nessus',
+      configSchema: schemaWithPassword,
+    });
+    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'nessus' });
+    profilesRepo.findOne
+      .mockResolvedValueOnce(existing) // findOwned
+      .mockResolvedValueOnce(null);    // dup check (new name unique)
+    profilesRepo.save.mockImplementation((p) => p);
+
+    await service.update(wsId, 'prof-001', { name: 'renamed' });
+
+    expect(profilesRepo.save).toHaveBeenCalledTimes(1);
+    const saved = profilesRepo.save.mock.calls[0][0] as ToolConfigProfile;
+    expect(saved.name).toBe('renamed');
+    // Decrypting the persisted config must yield the ORIGINAL plaintext.
+    // A second encryption pass over ciphertext (double-encrypt) would leave
+    // one decrypt layer's output still encrypted, failing this assertion.
+    expect(decryptProfile(saved.config, ['apiKey'], dek)).toEqual({
+      apiKey: 'secret123',
+      target: 'x.com',
+    });
   });
 
   // ── setDefault ───────────────────────────────────────────────────────

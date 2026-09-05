@@ -107,6 +107,51 @@ func TestSubmitDoesNotLeakTokenOnCreateFailure(t *testing.T) {
 	}
 }
 
+// ContainerDown (connector stream died) is a terminal teardown: the single-use
+// token must die with the execution, in pool and non-pool mode alike.
+func TestContainerDownDeletesConnectorToken(t *testing.T) {
+	rt := runtime.NewFakeRuntime()
+	m := NewManager(rt, 2)
+	m.SetPool(NewPoolManager(ConnectorIdleTimeout, 3, 1))
+	id, err := m.Submit(context.Background(), JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0.0"})
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	if _, ok := m.ExecToken(id); !ok {
+		t.Fatal("expected token before ContainerDown")
+	}
+	m.ContainerDown(id)
+	if _, ok := m.ExecToken(id); ok {
+		t.Fatal("token must be deleted after ContainerDown (single-use)")
+	}
+	if rt.CancelCallCount() != 1 {
+		t.Fatalf("expected the evicted container to be stopped once, got %d cancels", rt.CancelCallCount())
+	}
+}
+
+func TestContainerDownDeletesTokenWithoutPool(t *testing.T) {
+	m := NewManager(runtime.NewFakeRuntime(), 2)
+	id, err := m.Submit(context.Background(), JobSpec{Tool: "nuclei", Image: "ghcr.io/open-asm/nuclei:1.0.0"})
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	m.ContainerDown(id)
+	if _, ok := m.ExecToken(id); ok {
+		t.Fatal("token must be deleted after ContainerDown even when the pool is disabled")
+	}
+}
+
+// Defensive sweep path: a swept entry that still names an execution must have
+// that execution's token dropped with it.
+func TestSweepContainerDropsTokenOfNamedExecution(t *testing.T) {
+	m := NewManager(runtime.NewFakeRuntime(), 2)
+	m.tokens["exec-x"] = "tok-x"
+	m.sweepContainer(poolEntry{ID: "fake-1", PoolKey: "nuclei", ExecID: "exec-x"})
+	if _, ok := m.ExecToken("exec-x"); ok {
+		t.Fatal("token must be deleted when its execution's container is swept")
+	}
+}
+
 // Submit must never log the token itself — only a token_set flag. The
 // recorderLogger content is the assertion surface.
 func TestSubmitLogsTokenSetOnly(t *testing.T) {

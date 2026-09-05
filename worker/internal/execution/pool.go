@@ -151,6 +151,14 @@ func (p *PoolManager) Acquire(execID, image string) (string, bool) {
 		e.State = PoolStateBusy
 		e.ExecID = execID
 		e.LastUsedAt = p.now()
+		// Re-acquire takes the container over from its previous execution.
+		// ReleaseToIdle deliberately KEEPS the previous owner mapping (for
+		// IsIdle) and clears the entry's ExecID, so the stale mapping is only
+		// discoverable through the owner map itself: purge every entry pointing
+		// at this container BEFORE re-owning it — otherwise the owner map grows
+		// one dead entry per reuse and a late Evict(oldExecID) would remove a
+		// container now running the NEW execution.
+		p.purgeOwnerByContainer(cid)
 		p.owner[execID] = cid
 		p.unindexIdle(cid, key)
 		return cid, true
@@ -194,11 +202,23 @@ func (p *PoolManager) Sweep(now time.Time) []poolEntry {
 		stale = append(stale, *e)
 		p.unindexIdle(cid, e.PoolKey)
 		delete(p.byID, cid)
-		if e.ExecID != "" {
-			delete(p.owner, e.ExecID)
-		}
+		// ReleaseToIdle keeps the last execution's owner mapping alive for
+		// IsIdle; once the container is collected that mapping is dead weight
+		// (the drained execution survives until process exit otherwise) — purge
+		// every owner entry pointing at the removed container.
+		p.purgeOwnerByContainer(cid)
 	}
 	return stale
+}
+
+// purgeOwnerByContainer removes every owner[execID] mapping pointing at cid
+// (must hold p.mu). Deleting map entries during range is safe in Go.
+func (p *PoolManager) purgeOwnerByContainer(cid string) {
+	for execID, ownerCid := range p.owner {
+		if ownerCid == cid {
+			delete(p.owner, execID)
+		}
+	}
 }
 
 // Evict force-removes the container owned by execID regardless of state
@@ -219,6 +239,10 @@ func (p *PoolManager) Evict(execID string) string {
 	}
 	delete(p.byID, cid)
 	delete(p.owner, execID)
+	// The container can also be mapped under a PREVIOUS execution's ID
+	// (re-acquire / adopt-fail path): purge every owner entry pointing at it
+	// so Evict never leaves a stale routing behind.
+	p.purgeOwnerByContainer(cid)
 	return cid
 }
 

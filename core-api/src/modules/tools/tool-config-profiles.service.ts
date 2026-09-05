@@ -199,6 +199,13 @@ export class ToolConfigProfilesService {
       profile.isDefault = dto.isDefault;
     }
 
+    // No config change (rename/isDefault only): persist as-is. Re-running
+    // encryptAndSave here would encrypt already-encrypted ciphertext
+    // (double-encrypt), which decryptProfile then cannot fully unwrap.
+    if (dto.config === undefined) {
+      return this.profilesRepo.save(profile);
+    }
+
     // Re-encrypt (I4) and save
     return this.encryptAndSave(profile, sensitiveFields, workspaceId);
   }

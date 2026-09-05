@@ -58,6 +58,13 @@ type Manager struct {
 	// Register handshake goroutines.
 	tokenMu sync.RWMutex
 	tokens  map[string]string
+
+	// pending counts Submits holding a reserved maxConcurrency slot whose
+	// execution is not yet in execs: with the lock narrowed (rt.Create/Start
+	// run WITHOUT mu), the slot must be reserved when the spec is built —
+	// len(execs) alone would let concurrent Submits overshoot the cap during
+	// a slow image pull. Guarded by mu.
+	pending int
 }
 
 // streamBinder / containerEvictor are the structural slices of
@@ -165,7 +172,11 @@ func generateExecToken() string {
 func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	m.mu.Lock()
 	// maxConcurrency <= 0 means unlimited — worker semaphore is the sole concurrency gate.
-	if m.maxConcurrency > 0 && len(m.execs) >= m.maxConcurrency {
+	// Admission counts Submits holding a reserved slot too (m.pending): with
+	// the lock narrowed, rt.Create runs after mu is released, so a slot must
+	// be reserved when the spec is built — len(execs) alone would let a
+	// concurrent Submit overshoot the cap during a slow image pull.
+	if m.maxConcurrency > 0 && len(m.execs)+m.pending >= m.maxConcurrency {
 		m.mu.Unlock()
 		return "", fmt.Errorf("max concurrency reached")
 	}
@@ -215,6 +226,17 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	// container reuse.
 	poolKey := normalizePoolKey(spec.Image)
 
+	// Connector wiring is configured once at startup (SetPool/SetStreamBinder/
+	// SetEvictor before the first Submit) — snapshot it under the lock and use
+	// the locals in the un-locked sections below.
+	p := m.pool
+	binder := m.binder
+	evictor := m.evictor
+
+	// Reserve the concurrency slot across the Create/Start window (see the
+	// admission check above): the execution is not in m.execs yet.
+	m.pending++
+
 	// Acquire-or-create (Phase 2):
 	//  - pool hit: adopt the existing container. It is already running with
 	//    its original manifest limits applied; the reused stream is already
@@ -230,8 +252,8 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	var adoptEvicted string
 	var adoptErr error
 	var h runtime.Handle
-	if m.pool != nil {
-		if cid, ok := m.pool.Acquire(id, poolKey); ok {
+	if p != nil {
+		if cid, ok := p.Acquire(id, poolKey); ok {
 			h = runtime.Handle{ID: cid}
 			poolLogs = append(poolLogs, fmt.Sprintf("pool reuse: container %s pool_key=%s", cid, poolKey))
 			// Warm-pool reuse: the container's connector stream is already
@@ -245,29 +267,31 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			// replica below — the evicted container is recorded so it is
 			// stopped+cleaned up after the critical section instead of
 			// leaking as an up-forever orphan.
-			if m.binder != nil {
-				if err := m.binder.AdoptStream(cid, id); err != nil {
+			if binder != nil {
+				if err := binder.AdoptStream(cid, id); err != nil {
 					poolLogs = append(poolLogs, fmt.Sprintf("pool evict: container %s removed (adopt failed)", cid))
 					adoptErr = err
 					adoptEvicted = cid
-					m.pool.Evict(id)
-					if m.evictor != nil {
-						m.evictor.RemoveContainer(cid)
+					p.Evict(id)
+					if evictor != nil {
+						evictor.RemoveContainer(cid)
 					}
 					h = runtime.Handle{}
 				} else {
 					poolLogs = append(poolLogs, fmt.Sprintf("pool adopt: container=%s exec=%s", cid, id))
 				}
 			}
-		} else if m.pool.AtCapacity(poolKey) {
+		} else if p.AtCapacity(poolKey) {
 			// Phase 3 replica quota: no idle container AND the image's busy
 			// count is at the cap — refuse instead of creating a replica. The
 			// caller (job.go) backs off and retries; no container is created,
 			// no Core failure is recorded.
-			busy, max := m.pool.busyCount(poolKey), m.pool.maxReplicasPerImage
+			busy, max := p.busyCount(poolKey), p.maxReplicasPerImage
 			poolLogs = append(poolLogs, fmt.Sprintf("pool exhausted: pool_key=%s busy=%d max=%d", poolKey, busy, max))
 			// No execution was created — drop the token so a stray connector
-			// can never authenticate against a ghost execution.
+			// can never authenticate against a ghost execution, and release
+			// the reserved slot.
+			m.pending--
 			m.tokenMu.Lock()
 			delete(m.tokens, id)
 			m.tokenMu.Unlock()
@@ -278,8 +302,15 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			return "", fmt.Errorf("%w: %s", ErrPoolExhausted, poolKey)
 		}
 	}
+	// The runtime spec is built under the lock; the Docker calls (Create
+	// including the image pull, Start) run WITHOUT mu (W1): an image pull
+	// inside rt.Create can take minutes and must not block Cancel/Release/
+	// Inspect/ActiveCount. Token-mint atomicity and exec-registration
+	// ordering (pool busy entry + proxy bind BEFORE Start) are preserved
+	// by the short critical sections after each Docker call.
+	var createdSpec *runtime.JobSpec
 	if h.ID == "" {
-		created, err := m.rt.Create(ctx, runtime.JobSpec{
+		createdSpec = &runtime.JobSpec{
 			Tool:    spec.Tool,
 			Image:   spec.Image,
 			Version: spec.Version,
@@ -297,23 +328,33 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			// token (WORKER_TOKEN env); the connector server validates it
 			// per-execution.
 			ConnectorToken: spec.ConnectorToken,
-		}, opts)
+		}
+	}
+	m.mu.Unlock()
+
+	if createdSpec != nil {
+		created, err := m.rt.Create(ctx, *createdSpec, opts)
 		if err != nil {
 			// No execution was created — drop the token so a stray connector
-			// can never authenticate against a ghost execution.
+			// can never authenticate against a ghost execution, and release
+			// the reserved concurrency slot.
+			m.mu.Lock()
+			m.pending--
+			m.mu.Unlock()
 			m.tokenMu.Lock()
 			delete(m.tokens, id)
 			m.tokenMu.Unlock()
-			m.mu.Unlock()
 			return "", err
 		}
 		h = created
 		// Track the replica as busy FIRST: a connector that dials back while
 		// the container boots must find the pool entry consistent (Sweep never
-		// races a not-yet-tracked execution).
-		if m.pool != nil {
+		// races a not-yet-tracked execution). Short critical section — no
+		// runtime call inside.
+		m.mu.Lock()
+		if p != nil {
 			cpu, mem := limitsCPUandMemory(spec.Limits)
-			m.pool.Add(poolEntry{
+			p.Add(poolEntry{
 				ID:      h.ID,
 				Image:   spec.Image,
 				PoolKey: poolKey,
@@ -323,7 +364,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 				ExecID:  id,
 			})
 			poolLogs = append(poolLogs, fmt.Sprintf("pool miss: created replica container %s pool_key=%s busy=%d max=%d",
-				h.ID, poolKey, m.pool.busyCount(poolKey), m.pool.maxReplicasPerImage))
+				h.ID, poolKey, p.busyCount(poolKey), p.maxReplicasPerImage))
 		}
 		// Bind BEFORE Start: the connector can dial back as soon as the
 		// container boots. Routing the execution to its container first
@@ -332,35 +373,43 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		// container is never mapped under its real ID and pool reuse later
 		// can never adopt it (silent Evict + orphan container: the
 		// "reuse-miss" bug).
-		if m.binder != nil {
-			m.binder.BindExec(id, h.ID)
+		if binder != nil {
+			binder.BindExec(id, h.ID)
 		}
+		m.mu.Unlock()
 		if err := m.rt.Start(ctx, h); err != nil {
 			// Start failed: no execution exists. Undo the pool/proxy wiring
-			// staged above and drop the single-use token so no ghost execution
+			// staged above (pool/binder/evictor carry their own locks — safe
+			// without mu) and drop the single-use token so no ghost execution
 			// can authenticate against a container that never ran.
-			if m.pool != nil {
-				if cid := m.pool.Evict(id); cid != "" && m.evictor != nil {
-					m.evictor.RemoveContainer(cid)
+			if p != nil {
+				if cid := p.Evict(id); cid != "" && evictor != nil {
+					evictor.RemoveContainer(cid)
 				}
 			}
-			if m.binder != nil {
-				m.binder.ReleaseExec(id)
+			if binder != nil {
+				binder.ReleaseExec(id)
 			}
 			m.tokenMu.Lock()
 			delete(m.tokens, id)
 			m.tokenMu.Unlock()
+			m.mu.Lock()
+			m.pending--
 			m.mu.Unlock()
 			return "", err
 		}
 	}
+	m.mu.Lock()
 	m.execs[id] = &Execution{ID: id, Spec: spec, State: StateRunning, Handle: h}
 	// Route this execution to its container in the proxy. On a pool hit the
 	// stream may already be live — BindExec pre-closes the registration signal
 	// so the drain skips the connect timer.
-	if m.binder != nil {
-		m.binder.BindExec(id, h.ID)
+	if binder != nil {
+		binder.BindExec(id, h.ID)
 	}
+	// Registration completes the Submit: the reserved slot becomes a real
+	// execution (pending → execs, same admission count total).
+	m.pending--
 	m.mu.Unlock()
 
 	// An adopt failure is its own ERROR line (never overwritten by the
@@ -534,6 +583,12 @@ func (m *Manager) ReleaseToIdle(execID string) {
 // pool, stopped, removed and dropped from the proxy. No-op when the pool is
 // disabled or the container is already gone.
 func (m *Manager) ContainerDown(execID string) {
+	// Single-use token: the token dies with its execution. Stream death is
+	// terminal for this execution whether or not the pool is enabled, so the
+	// token is deleted BEFORE the pool-nil early return.
+	m.tokenMu.Lock()
+	delete(m.tokens, execID)
+	m.tokenMu.Unlock()
 	if m.pool == nil {
 		return
 	}
@@ -576,9 +631,37 @@ func (m *Manager) SweepLoop(ctx context.Context) {
 	}
 }
 
+// DrainPool force-collects every IDLE pooled container regardless of idle age
+// and tears it down (Stop+Cleanup+proxy removal) via sweepContainer. Shutdown
+// drain: workerCancel() only stops the SweepLoop — without an explicit drain
+// every idle pooled container would outlive the worker as an up-forever
+// orphan. Busy containers (live executions) are never touched: job draining
+// (wait group) happens upstream before this runs. No-op when the pool is
+// disabled (legacy 1:1 model has nothing pooled).
+func (m *Manager) DrainPool() {
+	if m.pool == nil {
+		return
+	}
+	// A far-future "now": Sweep collects only entries idle past the timeout,
+	// and at shutdown EVERY idle entry is due — advance now past the idle
+	// timeout so age is irrelevant.
+	future := time.Now().Add(m.pool.idleTimeout + time.Minute)
+	for _, e := range m.pool.Sweep(future) {
+		m.sweepContainer(e)
+	}
+}
+
 // sweepContainer tears down one expired idle container (Stop+Cleanup) and
 // removes it from the proxy. Best-effort: failures are logged, never fatal.
 func (m *Manager) sweepContainer(e poolEntry) {
+	// A swept entry that still names an execution (defensive: released entries
+	// are cleared by ReleaseToIdle) drops that execution's single-use token
+	// with it — no token survives the container that carried it.
+	if e.ExecID != "" {
+		m.tokenMu.Lock()
+		delete(m.tokens, e.ExecID)
+		m.tokenMu.Unlock()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), ConnectorCleanupTimeout)
 	defer cancel()
 	if err := m.rt.Cancel(ctx, runtime.Handle{ID: e.ID}); err != nil {

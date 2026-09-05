@@ -447,6 +447,14 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		lazyLauncher.Kill()
 		lazyLauncher.Cleanup()
 	}
+	// Shutdown drain: workerCancel() below only stops the pool SweepLoop —
+	// without an explicit drain every idle pooled container would outlive the
+	// worker (up-forever orphans). All jobs are done (wg.Wait above), so drain
+	// stops+removes the idle containers first; busy containers carrying live
+	// executions are untouched.
+	if mgr != nil {
+		mgr.DrainPool()
+	}
 	log.Success("Shutdown complete")
 
 	workerCancel()

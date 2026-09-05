@@ -5,7 +5,32 @@ import {
 } from '@/common/utils/workspace-encryption.util';
 
 /**
- * Scans a JSON Schema for properties marked with `"ui:widget": "password"`.
+ * Fallback heuristic: property names conventionally used for secrets, matched
+ * case-insensitively. Covers connector manifests that omit the ui:widget
+ * marker (e.g. nessus accessKey/password/secretKey in
+ * resources/connectors/manifest.json) while skipping ordinary identifiers
+ * like username, policyId, url, host, clientId.
+ *
+ * Regex choice: /(password|passwd|secret|token|api_?key|access_?key)/i.
+ * Deliberate trade-off: `token`/`secret` match as substrings, so a field such
+ * as `tokenExpirySeconds` is also treated as sensitive. Decrypt/mask are
+ * transparent to consumers, so a false positive costs one extra encrypt+mask
+ * round trip; a false negative would leak a secret in plaintext.
+ */
+const SENSITIVE_NAME_RE =
+  /(password|passwd|secret|token|api_?key|access_?key)/i;
+
+function isSensitiveField(key: string, value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if ((value as Record<string, unknown>)['ui:widget'] === 'password') {
+    return true;
+  }
+  return SENSITIVE_NAME_RE.test(key);
+}
+
+/**
+ * Scans a JSON Schema for sensitive properties: those marked with
+ * `"ui:widget": "password"` or matching the name heuristic above.
  * Returns the list of property names that are sensitive (encrypted at rest,
  * masked in API responses).
  *
@@ -18,20 +43,14 @@ export function getSensitiveFields(
   if (!schema) return [];
   const fields = new Set<string>();
 
-  const properties = schema.properties as
-    | Record<string, unknown>
-    | undefined;
-  if (!properties) return [];
-
-  for (const [key, value] of Object.entries(properties)) {
-    if (
-      value &&
-      typeof value === 'object' &&
-      (value as Record<string, unknown>)['ui:widget'] === 'password'
-    ) {
-      fields.add(key);
+  const addSensitive = (props: Record<string, unknown> | undefined) => {
+    if (!props) return;
+    for (const [key, value] of Object.entries(props)) {
+      if (isSensitiveField(key, value)) fields.add(key);
     }
-  }
+  };
+
+  addSensitive(schema.properties as Record<string, unknown> | undefined);
 
   // Also scan oneOf/anyOf sub-schemas (integrations-style)
   for (const keyword of ['oneOf', 'anyOf'] as const) {
@@ -40,17 +59,7 @@ export function getSensitiveFields(
       | undefined;
     if (!Array.isArray(branches)) continue;
     for (const sub of branches) {
-      const props = sub.properties as Record<string, unknown> | undefined;
-      if (!props) continue;
-      for (const [key, value] of Object.entries(props)) {
-        if (
-          value &&
-          typeof value === 'object' &&
-          (value as Record<string, unknown>)['ui:widget'] === 'password'
-        ) {
-          fields.add(key);
-        }
-      }
+      addSensitive(sub.properties as Record<string, unknown> | undefined);
     }
   }
 
