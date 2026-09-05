@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"net"
 	"os"
@@ -309,6 +310,80 @@ func imageIsCached(err error) bool {
 	return err == nil
 }
 
+// volumeNameForImage returns a deterministic Docker volume name derived from
+// the full image reference. Same image → same name (containers share one
+// volume); different image → different name.
+func volumeNameForImage(image string) string {
+	s := sanitizeVolumeName(image)
+	h := fnv.New32a()
+	h.Write([]byte(image))
+	return "oasm-" + s + "-" + fmt.Sprintf("%08x", h.Sum32())
+}
+
+// sanitizeVolumeName lowercases, replaces non-alphanumeric runs with single
+// dashes, trims leading/trailing dashes, and truncates to keep the full
+// Docker volume name ≤ 63 characters ("oasm-" + sanitized + "-" + 8hex).
+func sanitizeVolumeName(s string) string {
+	s = strings.ToLower(s)
+	var b strings.Builder
+	prevDash := false
+	for _, c := range s {
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+			b.WriteRune(c)
+			prevDash = false
+		} else if !prevDash {
+			b.WriteRune('-')
+			prevDash = true
+		}
+	}
+	result := strings.Trim(b.String(), "-")
+	// "oasm-" + sanitized + "-" + 8hex = 14 + len(sanitized) ≤ 63 → ≤49.
+	if len(result) > 49 {
+		result = result[:49]
+		result = strings.TrimRight(result, "-")
+	}
+	return result
+}
+
+// shouldPull returns true when the registry reports a different digest than
+// what is cached locally. An empty registryDigest (registry unreachable) means
+// we cannot compare — caller should keep the cached copy.
+func shouldPull(localDigest, registryDigest string) bool {
+	if registryDigest == "" {
+		return false
+	}
+	return localDigest != registryDigest
+}
+
+// imageRepoDigest extracts the content-addressable digest from an image's
+// RepoDigests list (format: "repo@sha256:…"). Returns "" when unavailable.
+func imageRepoDigest(inspect types.ImageInspect) string {
+	for _, d := range inspect.RepoDigests {
+		if i := strings.Index(d, "@"); i >= 0 {
+			return d[i+1:]
+		}
+	}
+	return ""
+}
+
+// persistPathsFromLabels extracts container paths that should be backed by a
+// per-image named volume. The oasm.persist label is a comma-separated list
+// of absolute paths; relative or blank entries are ignored.
+func persistPathsFromLabels(labels map[string]string) []string {
+	raw, ok := labels["oasm.persist"]
+	if !ok || strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var paths []string
+	for _, p := range strings.Split(raw, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" && strings.HasPrefix(p, "/") {
+			paths = append(paths, p)
+		}
+	}
+	return paths
+}
+
 // hostResources maps worker RuntimeOpts to Docker HostConfig.Resources.
 // Contract: opts.CPU is millicores (500m -> 500 -> 500000000 nanocpus) and
 // opts.Memory is BYTES (resource.ParseMemoryToBytes already converted, e.g.
@@ -328,7 +403,7 @@ func hostResources(opts RuntimeOpts) container.Resources {
 // applyDefaultIsolation wires security.DefaultIsolation into the container's
 // HostConfig: read-only root filesystem, no-new-privileges, bridge network and
 // a PID cap. It only ADDS hardening — opts set by the caller before this call
-// (Resources CPU/memory, Tmpfs caches, nuclei templates Binds, ExtraHosts)
+// (Resources CPU/memory, Tmpfs caches, per-image Binds, ExtraHosts)
 // are untouched.
 func applyDefaultIsolation(hc *container.HostConfig) {
 	iso := security.DefaultIsolation()
@@ -390,38 +465,72 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	config.Labels = labels
 
+	// Pull policy: inspect first — an image already present locally skips the
+	// network pull (the common case). When cached, compare the registry digest
+	// to detect rebuilds (same tag, new content). Registry unreachable → keep
+	// cached; digest changed → pull. Failed inspect → always pull.
+	pull := false
+	digestChanged := false
+	inspect, _, inspectErr := d.cli.ImageInspectWithRaw(ctx, spec.Image)
+	if !imageIsCached(inspectErr) {
+		pull = true // image absent — always pull
+	} else {
+		// Image is cached locally. Check the registry for a newer digest.
+		localDigest := imageRepoDigest(inspect)
+		dist, distErr := d.cli.DistributionInspect(ctx, spec.Image, "")
+		if distErr == nil && shouldPull(localDigest, dist.Descriptor.Digest.String()) {
+			d.logInfo("docker: image digest changed, pulling: %s", spec.Image)
+			pull = true
+			digestChanged = true
+		} else {
+			d.logInfo("docker: image pull skipped (cached): %s", spec.Image)
+		}
+	}
+	if pull {
+		pullReader, err := d.cli.ImagePull(ctx, spec.Image, types.ImagePullOptions{})
+		if err != nil {
+			return Handle{}, fmt.Errorf("image pull %s: %w", spec.Image, err)
+		}
+		// Drain the pull output (required to complete the pull).
+		_, _ = io.Copy(io.Discard, pullReader)
+		pullReader.Close()
+		d.logInfo("docker: image pull done: %s", spec.Image)
+		// Re-inspect after pull to get fresh image labels.
+		inspect, _, _ = d.cli.ImageInspectWithRaw(ctx, spec.Image)
+	}
+
+	// Per-image persistence: read oasm.persist label (comma-separated
+	// absolute container paths) from the image. Each path gets a named
+	// volume derived from the image reference so same-image containers
+	// share one volume while different images get separate ones.
+	var persistBinds []string
+	volName := volumeNameForImage(spec.Image)
+	if inspect.Config != nil {
+		if paths := persistPathsFromLabels(inspect.Config.Labels); len(paths) > 0 {
+			persistBinds = make([]string, 0, len(paths))
+			for _, p := range paths {
+				persistBinds = append(persistBinds, volName+":"+p)
+			}
+		}
+	}
+
+	// When digest changed, remove the existing volume so Docker copies up
+	// fresh content from the rebuilt image into the shared volume.
+	if digestChanged {
+		if err := d.cli.VolumeRemove(ctx, volName, false); err != nil {
+			d.logInfo("docker: volume remove skip (best-effort): %s err=%v", volName, err)
+		}
+	}
+
 	// Host config: resource limits + security hardening.
 	// CPU: opts.CPU in millicores → NanoCPUs (1 millicore = 1e6 nanocpus).
-	// Memory: opts.Memory in BYTES (resource.ParseMemoryToBytes + limits.go
-	// already converted 512Mi → 536870912) passed through unchanged — do NOT
-	// multiply by 1024*1024 here (the pre-Phase-2 unit bug inflated memory
-	// ~1024×). MemorySwap = Memory disables swap. Zero = unlimited (legacy
-	// specs without resource defaults).
-	// ExtraHosts maps host.docker.internal → host-gateway so connector
-	// containers can dial the worker's connector gRPC server from inside the
-	// container on any host: Engine 20.10+ resolves host-gateway to the host,
-	// and Docker Desktop ignores the duplicate of its built-in name (harmless).
-	// Added unconditionally — on linux there is no built-in mapping; on
-	// windows/darwin the entry is a no-op.
-	// ponytail: if an engine predating host-gateway ever errors on this entry,
-	// gate it by OS (skip on windows/darwin) before retrying create.
+	// Memory: opts.Memory in BYTES — passed through unchanged.
+	// Tmpfs backs HOME/XDG_CACHE_HOME under /tmp: fast, container-local and
+	// ephemeral, so no cross-job state leaks.
 	hostConfig := &container.HostConfig{
-		Resources: hostResources(opts),
-		// SecurityOpt/ReadonlyRootfs/NetworkMode/PidsLimit come from
-		// security.DefaultIsolation via applyDefaultIsolation below — never
-		// hardcode them here (W4 dead-isolation regression).
+		Resources:  hostResources(opts),
 		ExtraHosts: []string{"host.docker.internal:host-gateway"},
-		// Template/cache persistence: the nuclei template DB (NUCLEI_TEMPLATES_DIR)
-		// lives in a named volume so consecutive jobs reuse it instead of
-		// re-fetching per run — the same job as the image pull-skip keeps the
-		// image cached. The volume lives at /opt/nuclei-templates, deliberately
-		// OUTSIDE the Tmpfs on /tmp so it cannot be shadowed. Tmpfs backs
-		// HOME/XDG_CACHE_HOME (under /tmp): fast, container-local and
-		// ephemeral, so no cross-job state leaks.
-		// ponytail: single shared volume per tool image; if images ever differ
-		// in template layout, key the volume per image
-		// (oasm-nuclei-templates-<hash8(image)>) like the per-image temp volume.
-		Binds: []string{"oasm-nuclei-templates:/opt/nuclei-templates"},
+		Binds:      persistBinds,
 		Tmpfs: map[string]string{
 			"/tmp": "rw,nosuid,nodev,size=256m",
 		},
@@ -432,23 +541,6 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	// containers group under one short prefix; an idle warm container is
 	// reused by the next execution of the same image (Phase 2).
 	name := buildContainerName(spec.Tool, poolRef)
-
-	// Pull policy: inspect first — an image already present locally skips the
-	// network pull entirely (the common case for repeated jobs of the same
-	// tool). A failed inspect (404 missing, or any engine error) falls back to
-	// a pull, which surfaces the real failure if the image cannot be fetched.
-	if _, _, inspectErr := d.cli.ImageInspectWithRaw(ctx, spec.Image); imageIsCached(inspectErr) {
-		d.logInfo("docker: image pull skipped (cached): %s", spec.Image)
-	} else {
-		pullReader, err := d.cli.ImagePull(ctx, spec.Image, types.ImagePullOptions{})
-		if err != nil {
-			return Handle{}, fmt.Errorf("image pull %s: %w", spec.Image, err)
-		}
-		// Drain the pull output (required to complete the pull).
-		_, _ = io.Copy(io.Discard, pullReader)
-		pullReader.Close()
-		d.logInfo("docker: image pull done: %s", spec.Image)
-	}
 
 	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	if err != nil {
@@ -793,17 +885,11 @@ func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID strin
 		"JOB_ID=" + spec.JobID,
 		"TOOL=" + spec.Tool,
 		"TRACE_ID=" + spec.TraceID,
-		// Cache/template dirs: HOME/XDG_CACHE_HOME pinned under /tmp (writable
-		// with ReadonlyRootfs false or not, and ephemeral via the Tmpfs mount)
-		// so tools never scatter dotfiles into the image layer.
-		// NUCLEI_TEMPLATES_DIR is the nuclei template DB path — Create mounts
-		// the matching named volume at /opt/nuclei-templates (outside /tmp,
-		// so the Tmpfs cannot shadow it) and it survives across jobs
-		// (pull-skip keeps the image cached; this keeps the templates cached
-		// too).
+		// Cache dirs: HOME/XDG_CACHE_HOME pinned under /tmp (writable with
+		// ReadonlyRootfs false or not, and ephemeral via the Tmpfs mount) so
+		// tools never scatter dotfiles into the image layer.
 		"HOME=/tmp",
 		"XDG_CACHE_HOME=/tmp/.cache",
-		"NUCLEI_TEMPLATES_DIR=/opt/nuclei-templates",
 	}
 	if host, port, err := net.SplitHostPort(connectorAddr); err == nil {
 		env = append(env,

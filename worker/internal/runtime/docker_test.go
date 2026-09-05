@@ -665,6 +665,7 @@ type fakeDockerEngine struct {
 	logRaw         []byte            // verbatim bytes for the logs stream (raw/TTY); when set, served without a multiplex header
 	labels         map[string]string // Config.Labels of the created container
 	exists         bool              // a container currently exists in the engine (inspect/list 404 when false)
+	imageLabels    map[string]string // Config.Labels returned by ImageInspectWithRaw; nil = 404 (image absent)
 }
 
 func newFakeDockerEngine() *fakeDockerEngine {
@@ -781,6 +782,26 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 				http.Error(w, removeErr.Error(), http.StatusInternalServerError)
 				return
 			}
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && strings.HasPrefix(path, "/images/") && strings.HasSuffix(path, "/json"):
+			// ImageInspectWithRaw — only returns labels when imageLabels is set;
+			// nil means image absent (404), keeping existing test behaviour.
+			f.mu.Lock()
+			labels := f.imageLabels
+			f.mu.Unlock()
+			if labels == nil {
+				http.NotFound(w, r)
+				return
+			}
+			labelsJSON := "null"
+			if len(labels) > 0 {
+				b, _ := json.Marshal(labels)
+				labelsJSON = string(b)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"Id":"sha256:abc123","Config":{"Labels":%s}}`, labelsJSON)
+		case r.Method == http.MethodDelete && strings.HasPrefix(path, "/volumes/"):
+			// VolumeRemove — best-effort in production, always 204 in tests.
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			http.NotFound(w, r)

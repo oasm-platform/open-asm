@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -100,7 +101,6 @@ func TestBuildContainerEnvCacheDirs(t *testing.T) {
 	for _, want := range []string{
 		"HOME=/tmp",
 		"XDG_CACHE_HOME=/tmp/.cache",
-		"NUCLEI_TEMPLATES_DIR=/opt/nuclei-templates",
 	} {
 		found := false
 		for _, e := range env {
@@ -115,24 +115,108 @@ func TestBuildContainerEnvCacheDirs(t *testing.T) {
 	}
 }
 
-func TestCreateMountsNucleiTemplateVolume(t *testing.T) {
+// --- pull-policy digest comparison ---
+
+func TestPullPolicy_PullsWhenDigestChanged(t *testing.T) {
+	// Same digest → no pull needed.
+	if shouldPull("sha256:aaa", "sha256:aaa") {
+		t.Fatal("shouldPull returned true for matching digests")
+	}
+	// Different digest → pull needed.
+	if !shouldPull("sha256:aaa", "sha256:bbb") {
+		t.Fatal("shouldPull returned false for different digests")
+	}
+	// Empty registry digest (unreachable) → keep cached, no pull.
+	if shouldPull("sha256:aaa", "") {
+		t.Fatal("shouldPull returned true for empty registry digest")
+	}
+}
+
+// --- per-image persistence ---
+
+func TestVolumeNameForImage(t *testing.T) {
+	a := volumeNameForImage("ghcr.io/test/scanner:1.0")
+	b := volumeNameForImage("ghcr.io/test/scanner:1.0")
+	if a != b {
+		t.Fatalf("same image must produce same volume name: %q != %q", a, b)
+	}
+	if !strings.HasPrefix(a, "oasm-") {
+		t.Fatalf("volume name must start with oasm-, got %q", a)
+	}
+	c := volumeNameForImage("ghcr.io/test/other:2.0")
+	if a == c {
+		t.Fatalf("different images must produce different volume names")
+	}
+}
+
+func TestPersistPathsFromLabels(t *testing.T) {
+	// Missing label → nil.
+	if paths := persistPathsFromLabels(nil); paths != nil {
+		t.Fatalf("nil labels → nil, got %v", paths)
+	}
+	// Empty label → nil.
+	if paths := persistPathsFromLabels(map[string]string{"oasm.persist": " "}); paths != nil {
+		t.Fatalf("blank label → nil, got %v", paths)
+	}
+	// Parse comma-separated absolute paths.
+	paths := persistPathsFromLabels(map[string]string{"oasm.persist": "/data, /cache"})
+	if len(paths) != 2 || paths[0] != "/data" || paths[1] != "/cache" {
+		t.Fatalf("unexpected paths: %v", paths)
+	}
+	// Relative paths and blanks are ignored.
+	paths = persistPathsFromLabels(map[string]string{"oasm.persist": "/ok, bad, , /also-ok"})
+	if len(paths) != 2 || paths[0] != "/ok" || paths[1] != "/also-ok" {
+		t.Fatalf("unexpected filtered paths: %v", paths)
+	}
+}
+
+func TestCreateMountsLabelDrivenVolume(t *testing.T) {
 	engine := newFakeDockerEngine()
+	engine.imageLabels = map[string]string{"oasm.persist": "/data"}
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
 
 	if _, err := r.Create(context.Background(), JobSpec{
-		Tool:  "nuclei",
-		Image: "ghcr.io/open-asm/nuclei:1.0",
+		Tool:  "scanner",
+		Image: "ghcr.io/test/connector-foo:1.0",
 		JobID: "job-1",
 	}, RuntimeOpts{}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 
-	if !strings.Contains(engine.createBody, "oasm-nuclei-templates:/opt/nuclei-templates") {
-		t.Fatalf("create body must mount the named template volume, got: %s", engine.createBody)
+	wantVol := volumeNameForImage("ghcr.io/test/connector-foo:1.0") + ":/data"
+	if !strings.Contains(engine.createBody, wantVol) {
+		t.Fatalf("create body must mount label-driven volume, got: %s", engine.createBody)
 	}
 	if !strings.Contains(engine.createBody, `"/tmp"`) {
-		t.Fatalf("create body must include the /tmp Tmpfs fallback, got: %s", engine.createBody)
+		t.Fatalf("create body must include /tmp Tmpfs, got: %s", engine.createBody)
+	}
+}
+
+func TestCreateNoBindsWithoutPersistLabel(t *testing.T) {
+	engine := newFakeDockerEngine() // no imageLabels → no oasm.persist
+	log := &captureLogger{}
+	r := newFakeDockerRuntime(t, engine, log)
+
+	if _, err := r.Create(context.Background(), JobSpec{
+		Tool:  "scanner",
+		Image: "ghcr.io/test/plain:1.0",
+		JobID: "job-1",
+	}, RuntimeOpts{}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	// No oasm.persist label → Binds must be empty.
+	var req struct {
+		HostConfig struct {
+			Binds []string `json:"Binds"`
+		} `json:"HostConfig"`
+	}
+	if err := json.Unmarshal([]byte(engine.createBody), &req); err != nil {
+		t.Fatalf("parse create body: %v", err)
+	}
+	if len(req.HostConfig.Binds) > 0 {
+		t.Fatalf("expected no binds without persist label, got %v", req.HostConfig.Binds)
 	}
 }
 

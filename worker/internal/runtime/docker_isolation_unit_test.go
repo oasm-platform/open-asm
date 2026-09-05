@@ -30,15 +30,16 @@ func TestApplyDefaultIsolationHardensHostConfig(t *testing.T) {
 	}
 }
 
-// Pre-existing host-config opts (tmpfs caches, nuclei templates volume) must
-// survive the isolation pass untouched — the pass only ADDS hardening.
+// Pre-existing host-config opts (tmpfs caches, per-image persistence volume)
+// must survive the isolation pass untouched — the pass only ADDS hardening.
 func TestApplyDefaultIsolationKeepsExistingOpts(t *testing.T) {
+	wantBind := volumeNameForImage("ghcr.io/test/image:1.0") + ":/data"
 	hc := &container.HostConfig{
-		Binds: []string{"oasm-nuclei-templates:/opt/nuclei-templates"},
+		Binds: []string{wantBind},
 		Tmpfs: map[string]string{"/tmp": "rw,nosuid,nodev,size=256m"},
 	}
 	applyDefaultIsolation(hc)
-	if len(hc.Binds) != 1 || hc.Binds[0] != "oasm-nuclei-templates:/opt/nuclei-templates" {
+	if len(hc.Binds) != 1 || hc.Binds[0] != wantBind {
 		t.Fatalf("Binds must survive isolation, got %v", hc.Binds)
 	}
 	if hc.Tmpfs["/tmp"] != "rw,nosuid,nodev,size=256m" {
