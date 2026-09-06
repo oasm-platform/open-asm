@@ -4,9 +4,8 @@ import {
   type ToolsControllerGetManyToolsType,
 } from '@/services/apis/gen/queries';
 import { LayoutGrid } from 'lucide-react';
-import ToolsList from '../tools-list';
-import ToolInstallButton from './tool-install-button';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import ToolsList from '../tools-list';
 
 interface MarketplaceProps {
   toolType?: ToolsControllerGetManyToolsType;
@@ -39,13 +38,6 @@ const Marketplace = ({ toolType, search, category }: MarketplaceProps) => {
             ? 'Try a different search term or category.'
             : undefined
         }
-        renderButton={(tool) => (
-          <ToolInstallButton
-            tool={tool}
-            workspaceId={selectedWorkspaceId}
-            showConfig={false}
-          />
-        )}
       />
     </div>
   );

@@ -142,7 +142,12 @@ export function ToolConnectorConfigSheet({
               tool has no logoUrl. */}
           <div className="flex items-center gap-2">
             <div className="light:bg-black dark:bg-white rounded-lg p-[3px] shrink-0">
-              <Image url={tool.logoUrl} width={24} height={24} />
+              <Image
+                className="rounded"
+                url={tool.logoUrl}
+                width={24}
+                height={24}
+              />
             </div>
             <SheetTitle>
               {isEdit

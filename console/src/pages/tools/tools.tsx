@@ -47,7 +47,10 @@ const Tools = () => {
   const toolType = TAB_TO_TYPE[activeTab];
 
   return (
-    <Page title="Tools">
+    <Page
+      title="Tools"
+      description="Browse the marketplace and add tools to your workspace"
+    >
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="all">All</TabsTrigger>
@@ -56,8 +59,8 @@ const Tools = () => {
         </TabsList>
         {/* Content is always Marketplace but filtered via query param */}
       </Tabs>
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="relative flex-1 sm:max-w-xs">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search tools..."
@@ -76,7 +79,7 @@ const Tools = () => {
             )
           }
         >
-          <SelectTrigger className="w-full border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0 sm:w-[150px]">
+          <SelectTrigger className="w-[150px] border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>

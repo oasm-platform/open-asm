@@ -9,7 +9,6 @@ interface ToolsListProps {
   icon: ReactNode;
   emptyMessage?: string;
   emptyDescription?: string;
-  renderButton: (tool: Tool) => ReactNode;
 }
 
 const ToolsList = ({
@@ -18,16 +17,15 @@ const ToolsList = ({
   icon,
   emptyMessage = 'No tools found',
   emptyDescription,
-  renderButton,
 }: ToolsListProps) => {
   return (
     <div className="flex flex-col gap-4">
       {isLoading ? (
         <ToolCardLoading />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {data?.map((tool, index) => (
-            <ToolCard key={tool.id ?? index} tool={tool} button={renderButton(tool)} />
+            <ToolCard key={tool.id ?? index} tool={tool} />
           ))}
         </div>
       )}

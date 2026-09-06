@@ -186,7 +186,7 @@ export default function Integrations() {
           ))}
         </TabsList>
 
-        <TabsContent value="applications" className="py-4">
+        <TabsContent value="applications" className="pt-2">
           <AppsTabContent
             appSchemas={appSchemas}
             filteredSchemas={filteredSchemas}
@@ -200,7 +200,7 @@ export default function Integrations() {
           />
         </TabsContent>
 
-        <TabsContent value="connected" className="py-4">
+        <TabsContent value="connected" className="pt-2">
           <ConnectedTabContent
             connectedIntegrations={connectedIntegrations}
             connectedTotal={connectedTotal}
