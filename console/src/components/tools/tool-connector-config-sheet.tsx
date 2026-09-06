@@ -1,25 +1,28 @@
+import {
+  ToolConfigForm,
+  type ToolConfigFormHandle,
+} from '@/components/tools/tool-config-form';
 import { Button } from '@/components/ui/button';
+import Image from '@/components/ui/image';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { ToolConfigForm } from '@/components/tools/tool-config-form';
 import { useToolSchema } from '@/hooks/use-tool-schema';
+import type { Tool } from '@/services/apis/gen/queries';
 import {
+  getToolConfigProfilesControllerListQueryKey,
   useToolConfigProfilesControllerCreate,
   useToolConfigProfilesControllerUpdate,
-  getToolConfigProfilesControllerListQueryKey,
 } from '@/services/apis/gen/queries';
-import type { Tool } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface ToolConnectorConfigSheetProps {
@@ -45,6 +48,7 @@ export function ToolConnectorConfigSheet({
   const queryClient = useQueryClient();
   const isEdit = !!initialData;
 
+  const formRef = useRef<ToolConfigFormHandle>(null);
   const [profileName, setProfileName] = useState('');
 
   // Fetch schema internally — no need for parent to pass it
@@ -133,17 +137,34 @@ export function ToolConnectorConfigSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>
-            {isEdit ? 'Edit Configuration Profile' : 'Create Configuration Profile'}
-          </SheetTitle>
-          <SheetDescription>
-            {isEdit
-              ? `Update the profile for ${tool.name}`
-              : `Configure ${tool.name} before use`}
-          </SheetDescription>
+          {/* Logo chip mirrors the integration sheets' header: white/black tile
+              behind the 24px icon; Image falls back to a generic icon when the
+              tool has no logoUrl. */}
+          <div className="flex items-center gap-2">
+            <div className="light:bg-black dark:bg-white rounded-lg p-[3px] shrink-0">
+              <Image url={tool.logoUrl} width={24} height={24} />
+            </div>
+            <SheetTitle>
+              {isEdit
+                ? 'Edit Configuration Profile'
+                : 'Create Configuration Profile'}
+            </SheetTitle>
+          </div>
         </SheetHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
+          {!isEdit && schema && (
+            <div className="flex justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => formRef.current?.applyAllPresets()}
+              >
+                Use default presets
+              </Button>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="profile-name">
               Profile name <span className="text-destructive">*</span>
@@ -158,7 +179,10 @@ export function ToolConnectorConfigSheet({
 
           {schema ? (
             <ToolConfigForm
-              schema={schema as import('@/components/tools/tool-config-form').JSONSchema}
+              ref={formRef}
+              schema={
+                schema as import('@/components/tools/tool-config-form').JSONSchema
+              }
               initialValues={initialData?.config}
               onSubmit={handleSubmit}
               onCancel={() => onOpenChange(false)}

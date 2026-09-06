@@ -26,6 +26,7 @@ import {
   useToolConfigProfilesControllerRemove,
   useToolConfigProfilesControllerSetDefault,
   getToolConfigProfilesControllerListQueryKey,
+  type Tool,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Group, Plus, Settings, Trash2, Verified } from 'lucide-react';
@@ -235,15 +236,16 @@ export default function ToolDetail() {
 
       {/* Configuration Profiles section — visible only for connector tools */}
       {isConnector && isInstalled && (
-        <ConfigProfilesSection toolId={tool.id} />
+        <ConfigProfilesSection tool={tool} />
       )}
     </Page>
   );
 }
 
 /** Table of configuration profiles for a connector tool. */
-function ConfigProfilesSection({ toolId }: { toolId: string }) {
+function ConfigProfilesSection({ tool }: { tool: Tool }) {
   const queryClient = useQueryClient();
+  const toolId = tool.id;
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<{
     id: string;
@@ -309,8 +311,7 @@ function ConfigProfilesSection({ toolId }: { toolId: string }) {
     setSheetOpen(true);
   };
 
-  // The sheet needs a Tool object; construct minimal one from toolId
-  const toolStub = { id: toolId } as import('@/services/apis/gen/queries').Tool;
+  // The sheet needs the real Tool object for its header (name, logoUrl)
 
   return (
     <Card className="mb-6">
@@ -406,7 +407,7 @@ function ConfigProfilesSection({ toolId }: { toolId: string }) {
             setSheetOpen(open);
             if (!open) setEditingProfile(null);
           }}
-          tool={toolStub}
+          tool={tool}
           initialData={editingProfile ?? undefined}
           onSuccess={() => {
             queryClient.invalidateQueries({

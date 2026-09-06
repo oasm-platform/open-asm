@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-04T09:40:09.6656353Z",
+  "generatedAt": "2026-09-06T10:29:45.540102Z",
   "connectors": [
     {
       "name": "Nessus",
@@ -17,8 +17,14 @@
         "additionalProperties": false,
         "properties": {
           "target": {
+            "description": "Target URL or hostname to scan.",
+            "examples": [
+              "https://example.com"
+            ],
             "format": "uri",
-            "type": "string"
+            "title": "Scan target",
+            "type": "string",
+            "ui:placeholder": "https://example.com"
           }
         },
         "required": [
@@ -30,26 +36,60 @@
         "additionalProperties": false,
         "properties": {
           "accessKey": {
-            "type": "string"
+            "description": "Nessus API access key (alternative to username/password).",
+            "title": "API access key",
+            "type": "string",
+            "ui:placeholder": "Enter API access key"
+          },
+          "folderId": {
+            "description": "ID of the Nessus folder that will contain the scan.",
+            "title": "Folder ID",
+            "type": "string",
+            "ui:placeholder": "e.g. 1"
           },
           "password": {
-            "type": "string"
+            "description": "Nessus password for session authentication.",
+            "title": "Password",
+            "type": "string",
+            "ui:placeholder": "••••••••",
+            "ui:widget": "password"
           },
           "policyId": {
-            "type": "string"
+            "description": "ID of an existing Nessus scan policy.",
+            "title": "Policy ID",
+            "type": "string",
+            "ui:placeholder": "e.g. 123"
           },
           "secretKey": {
-            "type": "string"
+            "description": "Nessus API secret key, paired with accessKey.",
+            "title": "API secret key",
+            "type": "string",
+            "ui:placeholder": "Enter API secret key"
           },
           "templateUuid": {
-            "type": "string"
+            "description": "UUID of the Nessus scan template to use.",
+            "title": "Scan template UUID",
+            "type": "string",
+            "ui:placeholder": "ad629e16-03b6-461c-94cf-736f3f1a1c2f"
           },
           "url": {
+            "description": "Base URL of the Nessus instance.",
+            "examples": [
+              "https://nessus.local:8834"
+            ],
             "format": "uri",
-            "type": "string"
+            "title": "Nessus URL",
+            "type": "string",
+            "ui:placeholder": "https://nessus.local:8834"
           },
           "username": {
-            "type": "string"
+            "description": "Nessus username for session authentication.",
+            "examples": [
+              "administrator"
+            ],
+            "title": "Username",
+            "type": "string",
+            "ui:placeholder": "administrator"
           }
         },
         "required": [
@@ -83,22 +123,42 @@
         "properties": {
           "concurrency": {
             "default": 25,
+            "description": "Maximum templates executed in parallel.",
+            "title": "Concurrency",
             "type": "integer"
           },
           "excludeTags": {
+            "description": "Skip templates that match these tags.",
+            "examples": [
+              [
+                "dos",
+                "fuzz"
+              ]
+            ],
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "title": "Excluded tags",
+            "type": "array",
+            "ui:placeholder": "e.g. dos, fuzz"
           },
           "followRedirects": {
+            "description": "Follow HTTP redirects during the scan.",
+            "title": "Follow redirects",
             "type": "boolean"
           },
           "rateLimit": {
             "default": 150,
+            "description": "Maximum HTTP requests per second.",
+            "title": "Rate limit",
             "type": "integer"
           },
           "severity": {
+            "default": [
+              "high",
+              "critical"
+            ],
+            "description": "Only report findings at the selected severity levels.",
             "items": {
               "enum": [
                 "info",
@@ -109,19 +169,38 @@
               ],
               "type": "string"
             },
+            "title": "Severity levels",
             "type": "array"
           },
           "tags": {
+            "description": "Only run templates matching these tags.",
+            "examples": [
+              [
+                "cve",
+                "rce"
+              ]
+            ],
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "title": "Template tags",
+            "type": "array",
+            "ui:placeholder": "e.g. cve, rce"
           },
           "templateIds": {
+            "description": "Only run these specific template IDs.",
+            "examples": [
+              [
+                "CVE-2024-12345",
+                "wordpress-rce"
+              ]
+            ],
             "items": {
               "type": "string"
             },
-            "type": "array"
+            "title": "Template IDs",
+            "type": "array",
+            "ui:placeholder": "e.g. CVE-2024-12345"
           }
         },
         "type": "object"

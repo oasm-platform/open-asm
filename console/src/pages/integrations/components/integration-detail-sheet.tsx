@@ -1,3 +1,9 @@
+import {
+  SchemaForm,
+  type SchemaProperty,
+  defaultsFromSchema,
+  groupProperties,
+} from '@/components/schema-form';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
@@ -11,7 +17,6 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import {
   getIntegrationsControllerGetManyIntegrationsQueryKey,
   useIntegrationsControllerSyncIntegration,
@@ -27,7 +32,7 @@ import {
   formatNextRun,
   getLocalTimezone,
 } from '@/lib/cron-schedule';
-import { Loader2, Pencil, Play, RefreshCw, X } from 'lucide-react';
+import { Loader2, Pencil, Play, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { SchemaOneOfItem } from '../index';
@@ -44,207 +49,11 @@ const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 const getDefaultSchedule = (): string =>
   buildCronExpression(DEFAULT_CRON_STATE, getLocalTimezone());
 
-interface SchemaProperty {
-  type?: string;
-  format?: string;
-  description?: string;
-  title?: string;
-  'ui:widget'?: string;
-  'ui:placeholder'?: string;
-  'ui:text-color'?: string;
-  'ui:form:group'?: string;
-  default?: unknown;
-  const?: string;
-  items?: {
-    type?: string;
-    [key: string]: unknown;
-  };
-}
-
 interface IntegrationDetailSheetProps {
   integration: GetIntegrationDto;
   schema: SchemaOneOfItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-/** Multi-value string input for array-typed fields. */
-function ArrayField({
-  fieldKey,
-  value,
-  onChange,
-  autoComplete,
-  placeholder,
-}: {
-  fieldKey: string;
-  value: unknown;
-  onChange: (val: unknown) => void;
-  autoComplete: string;
-  placeholder: string;
-}) {
-  const items: string[] =
-    Array.isArray(value) && value.length > 0
-      ? (value as string[])
-      : [''];
-
-  const handleItemChange = (index: number, newValue: string) => {
-    const next = [...items];
-    next[index] = newValue;
-    onChange(next);
-  };
-
-  const addItem = () => {
-    onChange([...items, '']);
-  };
-
-  const removeItem = (index: number) => {
-    if (items.length <= 1) return;
-    const next = items.filter((_, i) => i !== index);
-    onChange(next);
-  };
-
-  return (
-    <div className="space-y-2">
-      {items.map((item, index) => (
-        <div key={index} className="relative">
-          <Input
-            type="text"
-            name={`${fieldKey}[${index}]`}
-            id={`${fieldKey}[${index}]`}
-            autoComplete={autoComplete}
-            placeholder={placeholder}
-            value={item}
-            onChange={(e) => handleItemChange(index, e.target.value)}
-            className="w-full pr-9"
-          />
-          {items.length > 1 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => removeItem(index)}
-              aria-label={`Remove ${fieldKey} item ${index + 1}`}
-              className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
-            >
-              <X className="size-4" />
-            </Button>
-          )}
-        </div>
-      ))}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={addItem}
-        className="w-full"
-      >
-        + Add
-      </Button>
-    </div>
-  );
-}
-
-function renderField(
-  key: string,
-  prop: SchemaProperty,
-  value: unknown,
-  onChange: (val: unknown) => void,
-) {
-  const placeholder = prop['ui:placeholder'] ?? '';
-  const autoComplete = 'off';
-
-  if (prop.type === 'boolean') {
-    return (
-      <Switch
-        name={key}
-        id={key}
-        checked={value === true}
-        onCheckedChange={(checked) => onChange(checked)}
-      />
-    );
-  }
-
-  if (prop.format === 'password' || prop['ui:widget'] === 'password') {
-    return (
-      <Input
-        type="password"
-        name={key}
-        id={key}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        value={typeof value === 'string' ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-
-  if (prop.format === 'uri' || prop.format === 'url') {
-    return (
-      <Input
-        type="url"
-        name={key}
-        id={key}
-        autoComplete={autoComplete}
-        placeholder={placeholder || 'https://'}
-        value={typeof value === 'string' ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-
-  if (prop['ui:widget'] === 'textarea') {
-    return (
-      <Textarea
-        name={key}
-        id={key}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        value={typeof value === 'string' ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-        rows={3}
-      />
-    );
-  }
-
-  if (prop.type === 'number' || prop.type === 'integer') {
-    return (
-      <Input
-        type="number"
-        name={key}
-        id={key}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        value={typeof value === 'string' ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-
-  // Array: multi-value string input
-  if (prop.type === 'array') {
-    return (
-      <ArrayField
-        fieldKey={key}
-        value={value}
-        onChange={onChange}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-      />
-    );
-  }
-
-  // Default: text input
-  return (
-    <Input
-      type="text"
-      name={key}
-      id={key}
-      autoComplete={autoComplete}
-      placeholder={placeholder}
-      value={typeof value === 'string' ? value : ''}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
 }
 
 export function IntegrationDetailSheet({
@@ -276,22 +85,18 @@ export function IntegrationDetailSheet({
       setEditSchedule(
         scheduleOn && integration.syncSchedule ? integration.syncSchedule : '',
       );
-      const values: Record<string, unknown> = {};
-      for (const [key, prop] of Object.entries(schema.properties ?? {})) {
-        if (key === 'app_type' || key === 'category') continue;
-        const configVal = (integration.config as Record<string, unknown>)[key];
-        if (configVal !== undefined && configVal !== null) {
-          values[key] = configVal;
-        } else {
-          const typedProp = prop as SchemaProperty;
-          if (typedProp.default !== undefined) {
-            values[key] = typedProp.default;
-          } else if (typedProp.type === 'array') {
-            values[key] = [''];
-          }
-        }
-      }
-      setFormValues(values);
+      const filteredProps = Object.fromEntries(
+        Object.entries(schema.properties ?? {}).filter(
+          ([key]) => key !== 'app_type' && key !== 'category',
+        ),
+      );
+      // Stored config wins; defaults apply only where config is absent.
+      const existingConfig = Object.fromEntries(
+        Object.entries(
+          (integration.config as Record<string, unknown>) ?? {},
+        ).filter(([, value]) => value !== undefined && value !== null),
+      );
+      setFormValues(defaultsFromSchema(filteredProps, existingConfig));
     }
   }, [isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -371,26 +176,8 @@ export function IntegrationDetailSheet({
     : '—';
 
   // Group properties by ui:form:group
-  const grouped = formProperties.reduce<
-    [
-      ungrouped: [string, SchemaProperty][],
-      groups: Record<string, [string, SchemaProperty][]>,
-    ]
-  >(
-    ([ungrouped, groups], entry) => {
-      const group = entry[1]['ui:form:group'];
-      if (group) {
-        groups[group] ??= [];
-        groups[group].push(entry);
-      } else {
-        ungrouped.push(entry);
-      }
-      return [ungrouped, groups];
-    },
-    [[], {}],
-  );
-
-  const [ungroupedProperties, propertyGroups] = grouped;
+  const [ungroupedProperties, propertyGroups] =
+    groupProperties(formProperties);
 
   const handleValueChange = (key: string, value: unknown) => {
     setFormValues((prev) => ({ ...prev, [key]: value }));
@@ -467,39 +254,20 @@ export function IntegrationDetailSheet({
             </div>
           )}
 
-          {/* Ungrouped properties */}
-          {isEditing
-            ? ungroupedProperties.map(([key, prop]) => {
-                const label = prop.title ?? key;
-                const required = schema.required?.includes(key);
-                const textColor = prop['ui:text-color'];
-
-                return (
-                  <div key={key} className="space-y-2">
-                    <Label
-                      htmlFor={key}
-                      {...(textColor ? { style: { color: textColor } } : {})}
-                    >
-                      {label}
-                      {required && (
-                        <span className="ml-1 text-destructive">*</span>
-                      )}
-                    </Label>
-                    {renderField(
-                      key,
-                      prop,
-                      formValues[key] ?? '',
-                      (val) => handleValueChange(key, val),
-                    )}
-                    {prop.description && (
-                      <p className="text-xs text-muted-foreground">
-                        {prop.description}
-                      </p>
-                    )}
-                  </div>
-                );
-              })
-            : ungroupedProperties.map(([key, prop]) => {
+          {/* Ungrouped properties: edit mode renders via shared SchemaForm */}
+          {isEditing ? (
+            <SchemaForm
+              schema={{
+                properties: Object.fromEntries(formProperties),
+                required: schema.required ?? [],
+              }}
+              values={formValues}
+              onChange={handleValueChange}
+              enableGroups
+              emptyMessage=""
+            />
+          ) :
+            ungroupedProperties.map(([key, prop]) => {
                 const label = prop.title ?? key;
                 const value = configValue(key);
 
@@ -540,69 +308,46 @@ export function IntegrationDetailSheet({
                 );
               })}
 
-          {/* Grouped properties */}
-          {Object.entries(propertyGroups).map(([groupKey, fields]) => {
-            const groupLabel =
-              groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
+          {/* Grouped properties: view mode only (edit mode renders them via SchemaForm) */}
+          {!isEditing &&
+            Object.entries(propertyGroups).map(([groupKey, fields]) => {
+              const groupLabel =
+                groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
 
-            return (
-              <div key={groupKey} className="space-y-3">
-                <Label className="text-sm font-semibold">
-                  {groupLabel}
-                </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  {fields.map(([key, prop]) => {
-                    const textColor = prop['ui:text-color'];
+              return (
+                <div key={groupKey} className="space-y-3">
+                  <Label className="text-sm font-semibold">
+                    {groupLabel}
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {fields.map(([key, prop]) => {
+                      const textColor = prop['ui:text-color'];
+                      const value = configValue(key);
 
-                    if (isEditing) {
                       return (
                         <div key={key} className="flex items-center gap-2">
                           <Switch
                             name={key}
                             id={key}
-                            checked={formValues[key] === true}
-                            onCheckedChange={(checked) =>
-                              handleValueChange(key, checked)
-                            }
+                            checked={value === true || value === 'true'}
+                            disabled
                           />
                           <Label
                             htmlFor={key}
                             {...(textColor
                               ? { style: { color: textColor } }
                               : {})}
-                            className="cursor-pointer text-sm font-normal"
+                            className="text-sm font-normal"
                           >
                             {prop.title ?? key}
                           </Label>
                         </div>
                       );
-                    }
-
-                    const value = configValue(key);
-                    return (
-                      <div key={key} className="flex items-center gap-2">
-                        <Switch
-                          name={key}
-                          id={key}
-                          checked={value === true || value === 'true'}
-                          disabled
-                        />
-                        <Label
-                          htmlFor={key}
-                          {...(textColor
-                            ? { style: { color: textColor } }
-                            : {})}
-                          className="text-sm font-normal"
-                        >
-                          {prop.title ?? key}
-                        </Label>
-                      </div>
-                    );
-                  })}
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
           {/* Telegram pairing section — only for telegram integrations */}
           {integration.appType === 'telegram' && !isEditing && (
