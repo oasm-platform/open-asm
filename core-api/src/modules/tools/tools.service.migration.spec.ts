@@ -71,6 +71,18 @@ const manifestNucleiOnly = JSON.stringify({
   ],
 });
 
+const manifestWithOfficialAuthor = JSON.stringify({
+  connectors: [
+    { slug: 'nessus', name: 'Nessus', version: '10.8.0', description: 'Tenable Nessus', author: 'oasm', capabilities: ['vulnerabilities'], logo: '' },
+  ],
+});
+
+const manifestWithThirdPartyAuthor = JSON.stringify({
+  connectors: [
+    { slug: 'custom-scan', name: 'custom-scan', version: '1.0.0', description: 'Third-party scanner', author: 'acme-corp', capabilities: ['vulnerabilities'], logo: '' },
+  ],
+});
+
 describe('ToolsService — legacy PROVIDER → CONNECTOR migration', () => {
   let service: ToolsService;
   let toolsRepo: ReturnType<typeof mockRepo>;
@@ -365,6 +377,125 @@ describe('ToolsService — legacy PROVIDER → CONNECTOR migration', () => {
       expect(toolsRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ type: WorkerType.BUILT_IN }) }),
       );
+    });
+  });
+
+  // ── Scenario 5: author field drives isOfficialSupport ─────────────
+  describe('author field → isOfficialSupport', () => {
+    it('sets isOfficialSupport=true when manifest author is "oasm" (insert path)', async () => {
+      readFileSpy.mockResolvedValue(manifestWithOfficialAuthor);
+
+      // No existing tools → insert path
+      findResults.existingByName = [];
+      findResults.connector = [];
+
+      const qb = fakeQB();
+      toolsRepo.createQueryBuilder.mockReturnValue(qb as any);
+
+      await service.onModuleInit();
+
+      // Connector upsert values (calls[1]) — nessus should have isOfficialSupport=true
+      const connectorValues = qb.values.mock.calls[1]?.[0] as any[] | undefined;
+      expect(connectorValues).toBeDefined();
+      const nessusEntry = connectorValues!.find((v: Record<string, unknown>) => v.name === 'nessus');
+      expect(nessusEntry).toBeDefined();
+      expect(nessusEntry.isOfficialSupport).toBe(true);
+    });
+
+    it('sets isOfficialSupport=false when manifest author is third-party (insert path)', async () => {
+      readFileSpy.mockResolvedValue(manifestWithThirdPartyAuthor);
+
+      findResults.existingByName = [];
+      findResults.connector = [];
+
+      const qb = fakeQB();
+      toolsRepo.createQueryBuilder.mockReturnValue(qb as any);
+
+      await service.onModuleInit();
+
+      const connectorValues = qb.values.mock.calls[1]?.[0] as any[] | undefined;
+      expect(connectorValues).toBeDefined();
+      const customEntry = connectorValues!.find((v: Record<string, unknown>) => v.name === 'custom-scan');
+      expect(customEntry).toBeDefined();
+      expect(customEntry.isOfficialSupport).toBe(false);
+    });
+
+    it('sets isOfficialSupport=true on override when manifest author is "oasm"', async () => {
+      readFileSpy.mockResolvedValue(manifestWithOfficialAuthor);
+
+      const existingNessus = makeTool({
+        name: 'nessus',
+        type: WorkerType.CONNECTOR,
+        isOfficialSupport: false,
+        description: 'Old description',
+        version: '9.0.0',
+        logoUrl: '/connectors/nessus.png',
+      });
+
+      findResults.existingByName = [existingNessus];
+
+      const qb = fakeQB();
+      toolsRepo.createQueryBuilder.mockReturnValue(qb as any);
+
+      await service.onModuleInit();
+
+      // Override path saves the existing tool
+      const saveCall = toolsRepo.save.mock.calls.find(
+        (c: any[]) => c[0]?.name === 'nessus',
+      );
+      expect(saveCall).toBeDefined();
+      const saved = saveCall[0] as Tool;
+      expect(saved.isOfficialSupport).toBe(true);
+    });
+  });
+
+  // ── Scenario 6: distributed lock guards connector sync (single-writer) ──
+  describe('connector sync distributed lock (single-writer)', () => {
+    it('skips the sync entirely when another replica holds the connector-sync lock', async () => {
+      // Second caller: lock not acquired (withLock → null) → sync body must NOT run
+      redisLockService.withLock.mockImplementation(
+        (key: string, _ttl: number, fn: () => Promise<unknown>) => {
+          if (key === 'connector-sync') return null;
+          return fn();
+        },
+      );
+
+      const qb = fakeQB();
+      toolsRepo.createQueryBuilder.mockReturnValue(qb as any);
+      findResults.existingByName = [];
+      findResults.connector = [];
+
+      await service.onModuleInit();
+
+      // Lock was requested with the single-writer key + a generous TTL
+      const connectorSyncCall = redisLockService.withLock.mock.calls.find(
+        (c: any[]) => c[0] === 'connector-sync',
+      );
+      expect(connectorSyncCall).toBeDefined();
+      expect(connectorSyncCall![1]).toBeGreaterThanOrEqual(60_000);
+      // No connector upsert happened — only the built-in upsert (calls[0])
+      expect(qb.values.mock.calls.length).toBe(1);
+    });
+
+    it('runs the full sync when the connector-sync lock is acquired', async () => {
+      readFileSpy.mockResolvedValue(manifestWithOfficialAuthor);
+      findResults.existingByName = [];
+      findResults.connector = [];
+
+      const qb = fakeQB();
+      toolsRepo.createQueryBuilder.mockReturnValue(qb as any);
+
+      await service.onModuleInit();
+
+      const connectorSyncCall = redisLockService.withLock.mock.calls.find(
+        (c: any[]) => c[0] === 'connector-sync',
+      );
+      expect(connectorSyncCall).toBeDefined();
+      // Sync body executed under the lock: connector upsert present (calls[1])
+      const connectorValues = qb.values.mock.calls[1]?.[0] as any[] | undefined;
+      expect(connectorValues).toBeDefined();
+      const names: string[] = connectorValues!.map((v: Record<string, string>) => v.name);
+      expect(names).toContain('nessus');
     });
   });
 });

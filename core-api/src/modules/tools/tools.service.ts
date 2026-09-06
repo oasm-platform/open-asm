@@ -246,6 +246,29 @@ export class ToolsService implements OnModuleInit {
    * - Uploads base64 logos to StorageService (bucket: system) ensuring files exist when used
    */
   private async syncConnectorTools(): Promise<Tool[]> {
+    // Single-writer invariant: manifest read → dedup → override → upsert →
+    // orphan cleanup runs under one distributed lock so concurrent replicas of
+    // the API cannot interleave reads and writes of the tools table.
+    // withLock releases the lock as soon as the action completes, so the TTL
+    // (120s) only matters if a replica dies mid-sync — generous headroom for
+    // manifest fetch, logo uploads and the inner locks.
+    const synced = await this.redisLockService.withLock(
+      'connector-sync',
+      120_000,
+      () => this.syncConnectorToolsLocked(),
+    );
+    if (synced === null) {
+      Logger.warn('Connector tools sync: another instance holds the "connector-sync" lock, skipping');
+      return [];
+    }
+    return synced;
+  }
+
+  /**
+   * Locked body of syncConnectorTools — must only run under the 'connector-sync'
+   * distributed lock acquired by the wrapper above.
+   */
+  private async syncConnectorToolsLocked(): Promise<Tool[]> {
     const manifestPath = path.resolve(
       process.cwd(),
       'resources',
@@ -303,6 +326,8 @@ export class ToolsService implements OnModuleInit {
       const logoBase64 = rawEntry['logo'] as string | undefined;
       const capabilities = rawEntry['capabilities'] as string[] | undefined;
       const category = ToolsService.mapConnectorCapabilityToCategory(capabilities);
+      const author = String((rawEntry['author'] as string) ?? '').trim().toLowerCase();
+      const isOfficialSupport = author === 'oasm';
 
       const logoUrl = `/connectors/${name}.png`;
 
@@ -314,7 +339,7 @@ export class ToolsService implements OnModuleInit {
         version,
         logoUrl,
         isBuiltIn: false,
-        isOfficialSupport: false,
+        isOfficialSupport,
         type: WorkerType.CONNECTOR,
         priority: JobPriority.MEDIUM,
       };
@@ -398,7 +423,7 @@ export class ToolsService implements OnModuleInit {
         const needsUpdate =
           existing.type !== WorkerType.CONNECTOR ||
           existing.isBuiltIn !== false ||
-          existing.isOfficialSupport !== false ||
+          existing.isOfficialSupport !== entry.insert.isOfficialSupport ||
           existing.description !== entry.insert.description ||
           existing.category !== entry.insert.category ||
           existing.version !== entry.insert.version ||
@@ -412,7 +437,7 @@ export class ToolsService implements OnModuleInit {
         }
         existing.type = WorkerType.CONNECTOR;
         existing.isBuiltIn = false;
-        existing.isOfficialSupport = false;
+        existing.isOfficialSupport = entry.insert.isOfficialSupport;
         existing.description = entry.insert.description;
         existing.category = entry.insert.category;
         existing.version = entry.insert.version;
