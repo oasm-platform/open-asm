@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-06T10:29:45.540102Z",
+  "generatedAt": "2026-09-07T05:41:21.5096378Z",
   "connectors": [
     {
       "name": "Nessus",
@@ -7,7 +7,12 @@
       "version": "0.1.0",
       "image": "ghcr.io/oasm-platform/connector-nessus:0.1.0",
       "author": "oasm",
-      "license": "free",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://www.tenable.com",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Tenable Nessus vulnerability scanner",
       "description": "Connects to a Tenable Nessus instance, creates and runs a scan against a target, and streams the discovered vulnerabilities back to the Worker as JSONL findings.",
       "capabilities": [
@@ -112,7 +117,12 @@
       "version": "3.4.1",
       "image": "ghcr.io/oasm-platform/connector-nuclei:3.4.1",
       "author": "oasm",
-      "license": "free",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://projectdiscovery.io",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Fast template-based vulnerability scanner",
       "description": "Runs ProjectDiscovery Nuclei template-based scans against a target URL to detect known vulnerabilities, misconfigurations, and exposed secrets.",
       "capabilities": [
@@ -218,7 +228,12 @@
       "version": "3.8.25",
       "image": "ghcr.io/oasm-platform/connector-wpscan:3.8.25",
       "author": "oasm",
-      "license": "free",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://wpscan.com",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "WordPress vulnerability scanner",
       "description": "Scans WordPress sites using WPScan to enumerate vulnerable plugins and themes, detect known CVEs, misconfigurations, and weak credentials.",
       "capabilities": [

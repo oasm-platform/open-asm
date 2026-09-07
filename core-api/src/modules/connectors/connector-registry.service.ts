@@ -7,6 +7,13 @@ export interface ConnectorManifestEntry {
   slug: string;
   version: string;
   image: string;
+  author?: string;
+  pricingTier?: string[];
+  shortDescription?: string;
+  description?: string;
+  homepage?: string;
+  repositoryUrl?: string;
+  supportUrl?: string;
   capabilities: string[];
   inputsSchema?: Record<string, unknown>;
   configSchema?: Record<string, unknown>;

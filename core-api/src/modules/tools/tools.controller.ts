@@ -7,6 +7,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -14,7 +15,10 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { ConnectorDto } from './dto/connector.dto';
 import { CreateToolDto } from './dto/create-tool.dto';
+import { GetConnectorBySlugDto } from './dto/get-connector-by-slug.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { GetToolByIdDto } from './dto/get-tool-by-id.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
@@ -27,7 +31,10 @@ import { ToolsService } from './tools.service';
 @ApiTags('Tools')
 @Controller('tools')
 export class ToolsController {
-  constructor(private readonly toolsService: ToolsService) {}
+  constructor(
+    private readonly toolsService: ToolsService,
+    private readonly connectorRegistryService: ConnectorRegistryService,
+  ) {}
 
   @Doc({
     summary: 'Create a new tool',
@@ -160,6 +167,40 @@ export class ToolsController {
     @WorkspaceId() workspaceId?: string,
   ) {
     return this.toolsService.getInstalledTools(dto, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get connector metadata by slug',
+    description:
+      'Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links) from the connector manifest.',
+    response: {
+      serialization: ConnectorDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('workspace.read')
+  @Get('connectors/:slug')
+  getConnectorBySlug(@Param() { slug }: GetConnectorBySlugDto) {
+    const connector = this.connectorRegistryService.getConnector(slug);
+    if (!connector) {
+      throw new NotFoundException(`Connector with slug "${slug}" not found.`);
+    }
+    return {
+      name: connector.name,
+      slug: connector.slug,
+      version: connector.version,
+      image: connector.image,
+      author: connector.author,
+      pricingTier: connector.pricingTier,
+      shortDescription: connector.shortDescription,
+      description: connector.description,
+      homepage: connector.homepage,
+      repositoryUrl: connector.repositoryUrl,
+      supportUrl: connector.supportUrl,
+      capabilities: connector.capabilities,
+    };
   }
 
   @Doc({
