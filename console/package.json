@@ -123,7 +123,7 @@
     "@types/node": "^22.0.0",
     "@types/qs": "^6.14.0",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
+    "@types/react-dom": "^19.2.7",
     "@types/react-leaflet": "^3.0.0",
     "@vitejs/plugin-react": "^4.4.1",
     "@vitest/coverage-v8": "^4.1.7",
