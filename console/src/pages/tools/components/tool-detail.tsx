@@ -2,7 +2,12 @@ import Page from '@/components/common/page';
 import { ToolConnectorConfigSheet } from '@/components/tools/tool-connector-config-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardTitle,
+} from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import Image from '@/components/ui/image';
 import {
@@ -27,25 +32,16 @@ import {
   type Tool,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { useParams } from '@tanstack/react-router';
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import dayjs from 'dayjs';
-import {
-  BadgeCheck,
-  Box,
-  Plus,
-  Settings,
-  SlidersHorizontal,
-  Tag,
-  Trash2,
-} from 'lucide-react';
+import { BadgeCheck, Box, Plus, Settings, Tag, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  ConfigProfilesSkeleton,
+  ToolDetailSkeleton,
+} from './tool-detail-skeleton';
 import ToolInstallButton from './tool-install-button';
-
-/** Backend-augmented fields not yet in orval-generated Tool type. */
-interface ToolWithConfig {
-  hasConfigProfile?: boolean;
-}
 
 /** Extended profile shape returned by the API (orval type is incomplete). */
 interface ProfileWithMeta {
@@ -108,23 +104,31 @@ export default function ToolDetail() {
       query: { enabled: Boolean(toolSlug), retry: false },
     });
 
-  // Active tab for the default Tabs control (Overview, Configuration)
-  const [activeTab, setActiveTab] = useState('configuration');
+  // Tabs are URL-driven (?tab=overview|configuration) via Tabs tabParam.
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as { tab?: string };
 
   // Default to Overview once its metadata resolves — first flip only, so a
-  // tab the user already picked is never overridden.
+  // tab the user already picked (or linked) is never overridden.
   const overviewDefaultApplied = useRef(false);
   useEffect(() => {
     if (
       toolSlug &&
       connectorMeta &&
       !connectorMetaLoading &&
-      !overviewDefaultApplied.current
+      !overviewDefaultApplied.current &&
+      !search.tab
     ) {
       overviewDefaultApplied.current = true;
-      setActiveTab('overview');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      navigate({
+        search: { ...search, tab: 'overview' } as any,
+        replace: true,
+      });
     }
-  }, [toolSlug, connectorMeta, connectorMetaLoading]);
+    // `search` intentionally omitted — avoids a navigate loop on back/forward.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toolSlug, connectorMeta, connectorMetaLoading, navigate]);
 
   // Update local state when tool data changes
   useEffect(() => {
@@ -140,11 +144,7 @@ export default function ToolDetail() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-lg">Loading tool details...</div>
-      </div>
-    );
+    return <ToolDetailSkeleton />;
   }
 
   if (error || !toolResponse) {
@@ -157,9 +157,6 @@ export default function ToolDetail() {
 
   const tool = toolResponse;
   const isConnector = tool.type === ToolsControllerGetManyToolsType.connector;
-  const hasConfigProfile =
-    isConnector &&
-    Boolean((tool as unknown as ToolWithConfig).hasConfigProfile);
 
   // Data-driven tab list: a tab appears only when its content can be shown.
   const overviewVisible =
@@ -202,63 +199,52 @@ export default function ToolDetail() {
   };
 
   return (
-    <Page>
+    <Page isShowButtonGoBack>
       <div className="mb-4 space-y-4">
         {/* Hero: logo, name, badges, meta + install CTA */}
-        <Card className="py-2 gap-2">
-          <CardContent className="px-2 md:px-4 py-2">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-              <Image
-                url={tool?.logoUrl}
-                width={80}
-                height={80}
-                className="rounded-2xl shrink-0"
-              />
-              <div className="min-w-0 flex-1 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+        <Card>
+          <CardContent>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+              <div className="flex min-w-0 flex-1 items-center gap-4">
+                <Image
+                  url={tool?.logoUrl}
+                  width={80}
+                  height={80}
+                  className="size-20 shrink-0 rounded-2xl"
+                />
+                <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-semibold tracking-tight">
                       {tool.name}
                     </h1>
                     {tool.isOfficialSupport && (
-                      <BadgeCheck
-                        title="Official"
-                        className="size-4 shrink-0 text-blue-500"
-                      />
+                      <span title="Official" className="inline-flex shrink-0">
+                        <BadgeCheck className="size-4 text-blue-500" />
+                      </span>
                     )}
-                    {isConnector && !hasConfigProfile && (
-                      <Badge
-                        variant="secondary"
-                        className="gap-1 text-yellow-700 bg-yellow-50 border-yellow-200"
-                      >
-                        Needs config
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {tool.category && (
+                      <Badge variant="secondary" className="gap-1">
+                        <Tag />
+                        {formatCategory(tool.category)}
+                      </Badge>
+                    )}
+                    {tool.type && (
+                      <Badge variant="secondary" className="gap-1">
+                        <Box />
+                        {formatType(tool.type)}
                       </Badge>
                     )}
                   </div>
-                  <div className="shrink-0">
-                    <ToolInstallButton
-                      tool={tool}
-                      workspaceId={selectedWorkspaceId || ''}
-                      onInstallChange={handleInstallChange}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {tool.category && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Tag />
-                      {formatCategory(tool.category)}
-                    </Badge>
-                  )}
-                  {tool.type && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Box />
-                      {formatType(tool.type)}
-                    </Badge>
-                  )}
                 </div>
               </div>
+              <ToolInstallButton
+                tool={tool}
+                workspaceId={selectedWorkspaceId || ''}
+                onInstallChange={handleInstallChange}
+              />
             </div>
           </CardContent>
         </Card>
@@ -266,8 +252,9 @@ export default function ToolDetail() {
         {/* Default Tabs control — same pattern as the other detail pages */}
         {tabs.length > 0 && (
           <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
+            tabParam="tab"
+            defaultValue="configuration"
+            validValues={['overview', 'configuration']}
             className="w-full"
           >
             <TabsList>
@@ -323,9 +310,7 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
         : []
   )
     .filter(Boolean)
-    .map(
-      (tier) => tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase(),
-    );
+    .map((tier) => tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase());
   const metaRows: { label: string; value: string; href?: string }[] = [
     { label: 'Version', value: meta.version },
     { label: 'Author', value: meta.author ?? '' },
@@ -367,8 +352,8 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
   ].filter((row) => row.value !== '');
 
   return (
-    <Card className="py-2 gap-2">
-      <CardContent className="px-2 md:px-4 py-2">
+    <Card>
+      <CardContent>
         {meta.shortDescription && (
           <p className="text-sm font-medium">{meta.shortDescription}</p>
         )}
@@ -412,16 +397,6 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
             </div>
           </div>
         )}
-
-        {meta.capabilities.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {meta.capabilities.map((capability) => (
-              <Badge key={capability} variant="secondary">
-                {capability}
-              </Badge>
-            ))}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -438,6 +413,11 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
     config: Record<string, unknown>;
     isDefault?: boolean;
   } | null>(null);
+
+  const handleCreate = () => {
+    setEditingProfile(null);
+    setSheetOpen(true);
+  };
 
   const { data: profilesRaw, isLoading } =
     useToolConfigProfilesControllerList(toolId);
@@ -491,38 +471,31 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
     setSheetOpen(true);
   };
 
-  const handleCreate = () => {
-    setEditingProfile(null);
-    setSheetOpen(true);
-  };
-
   // The sheet needs the real Tool object for its header (name, logoUrl)
 
   return (
-    <Card className="">
-      <CardHeader className="flex flex-row items-center justify-between gap-4 px-2 md:px-4 py-2">
-        <Button size="sm" onClick={handleCreate}>
-          <Plus className="mr-1 h-4 w-4" />
-          Create Profile
-        </Button>
-      </CardHeader>
-      <CardContent className="px-2 md:px-4 py-2">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading profiles...</p>
-        ) : profiles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-12 text-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-              <SlidersHorizontal className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <p className="font-medium">No configuration profiles yet</p>
-            <p className="text-sm text-muted-foreground">
-              Create a profile to make this tool ready for asset groups.
-            </p>
-            <Button size="sm" onClick={handleCreate} className="mt-2">
-              <Plus className="mr-1 h-4 w-4" />
-              Create Profile
-            </Button>
+    <Card>
+      <CardContent>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <CardTitle>Configuration Profiles</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">
+              Manage configuration profiles for this tool. Each profile defines
+              a set of parameters that can be applied when running scans.
+            </CardDescription>
           </div>
+          <Button variant="outline" onClick={handleCreate}>
+            <Plus className="mr-1 h-4 w-4" />
+            Config
+          </Button>
+        </div>
+
+        {isLoading ? (
+          <ConfigProfilesSkeleton />
+        ) : profiles.length === 0 ? (
+          <p className="text-sm text-center text-muted-foreground py-4">
+            No configuration profiles yet.
+          </p>
         ) : (
           <Table>
             <TableHeader>

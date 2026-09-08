@@ -7,15 +7,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
 import {
   ToolsControllerGetManyToolsCategory,
   type ToolsControllerGetManyToolsType,
 } from '@/services/apis/gen/queries';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Search } from 'lucide-react';
-import { useState } from 'react';
+import useDebounce from '@/hooks/use-debounce';
 import Marketplace from './components/marketplace';
-import { useToolsFilters } from './hooks/use-tools-filters';
 
 const TAB_TO_TYPE: Record<string, ToolsControllerGetManyToolsType | undefined> =
   {
@@ -35,29 +35,48 @@ const CATEGORY_OPTIONS = [
 ];
 
 const Tools = () => {
-  const [activeTab, setActiveTab] = useState<string>('all');
-  const {
-    searchInput,
-    setSearchInput,
-    category,
-    setCategory,
-    debouncedSearch,
-  } = useToolsFilters();
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as Record<string, string>;
+  const [activeTab, setActiveTab] = useQueryTab({
+    tabParam: 'tab',
+    defaultValue: 'all',
+    validValues: ['all', 'builtin', 'connector'],
+  });
+  const searchInput = search.search ?? '';
+  const categoryParam = search.category;
+  const debouncedSearch = useDebounce(searchInput.trim(), 300);
 
   const toolType = TAB_TO_TYPE[activeTab];
+
+  const handleSearchChange = (value: string) => {
+    navigate({
+      search: { ...search, search: value || undefined } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      replace: true,
+    });
+  };
+
+  const handleCategoryChange = (value: string | undefined) => {
+    navigate({
+      search: { ...search, category: value } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      replace: true,
+    });
+  };
 
   return (
     <Page
       title="Tools"
       description="Browse the marketplace and add tools to your workspace"
     >
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="w-full"
+      >
         <TabsList className="mb-4">
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="builtin">Built-in</TabsTrigger>
           <TabsTrigger value="connector">Connector</TabsTrigger>
         </TabsList>
-        {/* Content is always Marketplace but filtered via query param */}
       </Tabs>
       <div className="flex items-center gap-2 mb-4">
         <div className="relative flex-1 max-w-xs">
@@ -65,17 +84,17 @@ const Tools = () => {
           <Input
             placeholder="Search tools..."
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="h-9 pl-8 text-xs"
           />
         </div>
         <Select
-          value={category ?? 'ALL'}
+          value={categoryParam ?? 'ALL'}
           onValueChange={(val) =>
-            setCategory(
+            handleCategoryChange(
               val === 'ALL'
                 ? undefined
-                : (val as ToolsControllerGetManyToolsCategory),
+                : val,
             )
           }
         >
@@ -94,7 +113,7 @@ const Tools = () => {
       <Marketplace
         toolType={toolType}
         search={debouncedSearch}
-        category={category}
+        category={categoryParam as ToolsControllerGetManyToolsCategory | undefined}
       />
     </Page>
   );

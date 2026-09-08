@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   useWorkspaceSelector,
@@ -46,8 +46,6 @@ import CreateWorkspace from '../workspaces/create-workspace';
 
 dayjs.extend(relativeTime);
 
-type TabValue = 'all' | 'SUMMARY' | 'VULNERABILITY' | 'templates';
-
 const SEVERITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical', color: 'text-red-500' },
   { value: 'HIGH', label: 'High', color: 'text-orange-500' },
@@ -63,7 +61,11 @@ export default function Reports() {
   const [reportType, setReportType] = useState<ReportType>('SUMMARY');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [minSeverity, setMinSeverity] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<TabValue>('all');
+  const [activeTab, setTab] = useQueryTab({
+    tabParam: 'tab',
+    defaultValue: 'all',
+    validValues: ['all', 'SUMMARY', 'VULNERABILITY', 'templates'],
+  });
 
   const { workspaces, isLoading: wsLoading } = useWorkspaceSelector();
   const {
@@ -342,7 +344,7 @@ export default function Reports() {
         <Tabs
           value={activeTab}
           onValueChange={(v) => {
-            setActiveTab(v as TabValue);
+            setTab(v);
             setPage(1);
           }}
         >

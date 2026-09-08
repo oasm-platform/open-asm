@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsObject, IsString, MaxLength } from 'class-validator';
 
 export class CreateProfileDto {
   @ApiProperty({ description: 'Profile name (unique per tool)', example: 'production' })
@@ -11,8 +11,4 @@ export class CreateProfileDto {
   @ApiProperty({ description: 'Tool-specific configuration object', example: { severity: ['high'] } })
   @IsObject()
   config: Record<string, unknown>;
-
-  @ApiProperty({ description: 'Set as default profile', required: false, default: false })
-  @IsOptional()
-  isDefault?: boolean;
 }

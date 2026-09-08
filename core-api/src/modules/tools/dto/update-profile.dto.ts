@@ -13,8 +13,4 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsObject()
   config?: Record<string, unknown>;
-
-  @ApiPropertyOptional({ description: 'Set as default profile' })
-  @IsOptional()
-  isDefault?: boolean;
 }

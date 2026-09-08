@@ -5,12 +5,11 @@ import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
 import Image from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
 import type { WorkersControllerGetWorkersParams } from '@/services/apis/gen/queries';
-import { useNavigate, useSearch } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Loader2Icon, Server } from 'lucide-react';
@@ -28,23 +27,17 @@ const QueryOptions = {
 } as const;
 
 const VALID_TABS = ['global', 'workspace'] as const;
-type TabValue = (typeof VALID_TABS)[number];
 
 const ListWorkers = () => {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const navigateWithParams = useNavigateWithParams();
-  const search = useSearch({ strict: false }) as Record<string, string | undefined>;
-  const activeTab: TabValue = VALID_TABS.includes(search.tab as TabValue)
-    ? (search.tab as TabValue)
-    : 'global';
-
-  const navigate = useNavigate();
-  const setActiveTab = (tab: TabValue) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    navigate({ search: { ...search, tab } as any, replace: true });
-  };
+  const [activeTab, setActiveTab] = useQueryTab({
+    tabParam: 'tab',
+    defaultValue: 'global',
+    validValues: [...VALID_TABS],
+  });
 
   const { data: globalData, isLoading: isGlobalLoading } =
     useWorkersControllerGetWorkers(
@@ -265,7 +258,7 @@ const ListWorkers = () => {
                         className="h-8 w-8 p-0 rounded-full"
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigateWithParams(`/tools/${tool.id}`);
+                        navigate({ to: '/tools/$id', params: { id: tool.id } });
                         }}
                       >
                         <Avatar className="h-8 w-8 border-2 border-background">
@@ -358,7 +351,7 @@ const ListWorkers = () => {
 
   return (
     <Page title="Workers" permission="worker.read">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'global' | 'workspace')}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between">
           <TabsList>
             <TabsTrigger value="global">Global</TabsTrigger>

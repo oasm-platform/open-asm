@@ -113,7 +113,7 @@ export class ToolConfigProfilesService {
   async create(
     workspaceId: string,
     toolId: string,
-    dto: { name: string; config: Record<string, unknown>; isDefault?: boolean },
+    dto: { name: string; config: Record<string, unknown> },
   ): Promise<ToolConfigProfile> {
     const { tool, schema, sensitiveFields } =
       await this.resolveConnectorSchema(toolId);
@@ -142,12 +142,22 @@ export class ToolConfigProfilesService {
       );
     }
 
+    // First profile for this workspace+tool → auto-set as default.
+    // Subsequent profiles are never default by creation; use setDefault API.
+    const count = await this.profilesRepo.count({
+      where: {
+        workspace: { id: workspaceId },
+        tool: { id: toolId },
+      },
+    });
+    const isFirstProfile = count === 0;
+
     const profile = this.profilesRepo.create({
       workspace: { id: workspaceId },
       tool: { id: toolId },
       name: dto.name,
       config: dto.config,
-      isDefault: dto.isDefault ?? false,
+      isDefault: isFirstProfile,
     });
 
     // Encrypt secrets (I4), then persist
@@ -160,7 +170,6 @@ export class ToolConfigProfilesService {
     dto: {
       name?: string;
       config?: Record<string, unknown>;
-      isDefault?: boolean;
     },
   ): Promise<ToolConfigProfile> {
     const profile = await this.findOwned(workspaceId, profileId);
@@ -195,11 +204,7 @@ export class ToolConfigProfilesService {
       profile.config = dto.config;
     }
 
-    if (dto.isDefault !== undefined) {
-      profile.isDefault = dto.isDefault;
-    }
-
-    // No config change (rename/isDefault only): persist as-is. Re-running
+    // No config change (rename only): persist as-is. Re-running
     // encryptAndSave here would encrypt already-encrypted ciphertext
     // (double-encrypt), which decryptProfile then cannot fully unwrap.
     if (dto.config === undefined) {
@@ -248,7 +253,26 @@ export class ToolConfigProfilesService {
     profileId: string,
   ): Promise<void> {
     const profile = await this.findOwned(workspaceId, profileId);
+    const toolId = (profile.tool as unknown as { id: string }).id;
+    const wasDefault = profile.isDefault;
+
     await this.profilesRepo.remove(profile);
+
+    // If the deleted profile was the default, auto-assign the next remaining
+    // profile as the new default so there is always a default when profiles exist.
+    if (wasDefault) {
+      const next = await this.profilesRepo.findOne({
+        where: {
+          workspace: { id: workspaceId },
+          tool: { id: toolId },
+        },
+        order: { createdAt: 'ASC' },
+      });
+      if (next) {
+        next.isDefault = true;
+        await this.profilesRepo.save(next);
+      }
+    }
   }
 
   async list(

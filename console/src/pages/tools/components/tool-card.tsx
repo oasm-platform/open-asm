@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import Image from '@/components/ui/image';
-import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { type Tool } from '@/services/apis/gen/queries';
+import { useNavigate } from '@tanstack/react-router';
 import { BadgeCheck } from 'lucide-react';
 
 interface ToolCardProps {
@@ -16,12 +16,12 @@ function formatCategory(category: string): string {
 }
 
 const ToolCard = ({ tool }: ToolCardProps) => {
-  const navigateWithParams = useNavigateWithParams();
+  const navigate = useNavigate();
 
   return (
     <button
       type="button"
-      onClick={() => navigateWithParams(`/tools/${tool.id}`)}
+      onClick={() => navigate({ to: '/tools/$id', params: { id: tool.id } })}
       className="flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:border-primary hover:bg-accent/50 cursor-pointer"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -35,10 +35,9 @@ const ToolCard = ({ tool }: ToolCardProps) => {
         </div>
         <h3 className="text-base font-semibold">{tool.name}</h3>
         {tool.isOfficialSupport && (
-          <BadgeCheck
-            title="Official"
-            className="size-4 shrink-0 text-blue-500"
-          />
+          <span title="Official" className="inline-flex shrink-0">
+            <BadgeCheck className="size-4 text-blue-500" />
+          </span>
         )}
         <Badge variant="secondary">{formatCategory(tool.category)}</Badge>
       </div>
