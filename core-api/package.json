@@ -68,7 +68,7 @@
     "ioredis": "^5.8.2",
     "js-yaml": "^4.2.0",
     "mongodb": "^6.21.0",
-    "multer": "^2.2.0",
+    "multer": "^2.3.0",
     "mustache": "^4.2.0",
     "nanoid": "^3.3.18",
     "nestjs-i18n": "^10.6.0",
