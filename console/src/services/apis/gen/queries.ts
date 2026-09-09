@@ -602,9 +602,13 @@ export type On = {
   schedule: string;
 };
 
+export type WorkflowJobConfig = { [key: string]: unknown };
+
 export type WorkflowJob = {
   name: string;
   run: string;
+  config?: WorkflowJobConfig;
+  configProfileId?: string;
 };
 
 export type WorkflowContent = {
@@ -1715,9 +1719,12 @@ export type ConnectorDto = {
   version: string;
   image: string;
   author?: string;
-  license?: string;
+  pricingTier?: string[];
   shortDescription?: string;
   description?: string;
+  homepage?: string;
+  repositoryUrl?: string;
+  supportUrl?: string;
   capabilities: string[];
 };
 
@@ -1737,8 +1744,6 @@ export type CreateProfileDto = {
   name: string;
   /** Tool-specific configuration object */
   config: CreateProfileDtoConfig;
-  /** Set as default profile */
-  isDefault?: boolean;
 };
 
 /**
@@ -1751,8 +1756,6 @@ export type UpdateProfileDto = {
   name?: string;
   /** Tool-specific configuration object */
   config?: UpdateProfileDtoConfig;
-  /** Set as default profile */
-  isDefault?: boolean;
 };
 
 export type SearchData = {
@@ -2796,6 +2799,20 @@ export type UpdateAssetGroupDto = {
   hexColor?: string;
 };
 
+/**
+ * Inline config override for this tool
+ */
+export type AssetGroupToolInputConfig = { [key: string]: unknown };
+
+export type AssetGroupToolInput = {
+  /** Tool ID */
+  toolId: string;
+  /** Inline config override for this tool */
+  config?: AssetGroupToolInputConfig;
+  /** Reference to a saved config profile */
+  configProfileId?: string;
+};
+
 export type CreateAssetGroupDto = {
   /** Name of the asset group */
   name: string;
@@ -2807,6 +2824,8 @@ export type CreateAssetGroupDto = {
   schedule?: string;
   /** Tool IDs used to build the group workflow. When provided, a workflow is created and assigned to the group. */
   toolIds?: string[];
+  /** Per-tool config inputs for the group workflow. When provided, overrides toolIds — each entry specifies a tool ID plus optional inline config or a config profile reference. */
+  tools?: AssetGroupToolInput[];
 };
 
 export type AddManyWorkflowsToAssetGroupDto = {
@@ -19643,7 +19662,7 @@ export function useToolsControllerGetInstalledTools<
 }
 
 /**
- * Fetches connector metadata (name, version, image, author, license, descriptions, capabilities) from the connector manifest.
+ * Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links) from the connector manifest.
  * @summary Get connector metadata by slug
  */
 export const toolsControllerGetConnectorBySlug = (

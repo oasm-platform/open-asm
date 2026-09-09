@@ -368,10 +368,10 @@ export class JobsRegistryController {
       let config: Record<string, unknown> | undefined;
       try {
         config =
-          await this.toolConfigProfilesService.resolveConfigForDispatch(
+          await this.toolConfigProfilesService.resolveConfigForJob(
             job.workspaceId!,
             job.tool!.id,
-            job.configProfileId,
+            { config: job.config ?? undefined, configProfileId: job.configProfileId },
           );
       } catch {
         // Never log decrypted payload — generic message only

@@ -1,9 +1,10 @@
 'use client';
 
 import Page from '@/components/common/page';
-import { ToolSelector } from '@/components/common/tool-selector';
-import type { ToolSelectorItem } from '@/components/common/tool-selector';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  ToolPipelineBuilder,
+  type PipelineToolEntry,
+} from '@/pages/asset-group/components/tool-pipeline-builder';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -32,7 +33,6 @@ import {
   useAssetGroupControllerCreate,
   useAssetsControllerGetHostAssets,
   useToolsControllerGetInstalledTools,
-  ToolsControllerGetManyToolsType,
   type AssetGroup,
   type CreateAssetGroupDto,
 } from '@/services/apis/gen/queries';
@@ -44,7 +44,6 @@ import {
   FileTextIcon,
   LoaderCircleIcon,
   ServerIcon,
-  AlertTriangle,
   WrenchIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -80,7 +79,8 @@ export function CreateAssetGroup() {
   const [name, setName] = useState('');
   const [hexColor, setHexColor] = useState<string | undefined>(undefined);
   const [hostIds, setHostIds] = useState<Set<string>>(new Set());
-  const [toolIds, setToolIds] = useState<Set<string>>(new Set());
+  // Ordered pipeline — array order is the execution order.
+  const [pipeline, setPipeline] = useState<PipelineToolEntry[]>([]);
   const [schedule, setSchedule] = useState<string | undefined>(undefined);
 
   const {
@@ -109,7 +109,7 @@ export function CreateAssetGroup() {
     step === 0
       ? name.trim().length > 0
       : step === 2
-        ? toolIds.size > 0
+        ? pipeline.length > 0
         : step === 3
           ? Boolean(schedule)
           : true;
@@ -119,12 +119,14 @@ export function CreateAssetGroup() {
       setStep((prev) => prev + 1);
       return;
     }
-    const dto: CreateAssetGroupDto = {
+    const dto = {
       name: name.trim(),
       hexColor: hexColor || undefined,
       hostIds: Array.from(hostIds),
-      toolIds: Array.from(toolIds),
+      tools: pipeline,
       schedule,
+    } as CreateAssetGroupDto & {
+      tools: { toolId: string; config?: Record<string, unknown>; configProfileId?: string }[];
     };
     createAssetGroup(
       { data: dto },
@@ -188,30 +190,8 @@ export function CreateAssetGroup() {
     { accessorKey: 'assetCount', header: 'Services' },
   ];
 
-  /** Per-tool state: connector without config → disabled. */
-  const getToolState = (tool: ToolSelectorItem) => {
-    const fullTool = toolsQuery.data?.data?.find((t) => t.id === tool.id);
-    if (
-      fullTool?.type === ToolsControllerGetManyToolsType.connector &&
-      (fullTool as Record<string, unknown>).hasConfigProfile === false
-    ) {
-      return {
-        disabled: true,
-        tooltip: 'Configure this tool before adding it to a group.',
-      };
-    }
-    return { disabled: false };
-  };
-
-  const hasUnconfiguredConnectors =
-    toolsQuery.data?.data?.some(
-      (t) =>
-        t.type === ToolsControllerGetManyToolsType.connector &&
-        (t as Record<string, unknown>).hasConfigProfile === false,
-    ) ?? false;
-
   return (
-    <Page permission="group.write">
+      <Page permission="group.write">
       <div className="h-full overflow-y-auto">
         <Card className="mx-auto w-full max-w-4xl max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent">
           <CardHeader className="max-sm:px-0">
@@ -328,27 +308,12 @@ export function CreateAssetGroup() {
           )}
 
           {step === 2 && (
-            <div className="flex flex-col gap-3">
-              {hasUnconfiguredConnectors && (
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    Some tools require configuration — visit the Tools detail page to configure them.
-                  </AlertDescription>
-                </Alert>
-              )}
-              <ToolSelector
-                tools={(toolsQuery.data?.data || []).map((tool) => ({
-                  id: tool.id,
-                  name: tool.name,
-                  logoUrl: tool.logoUrl,
-                }))}
-                selectedIds={toolIds}
-                onToggle={(id) => setToolIds((prev) => toggleId(prev, id))}
-                emptyMessage="No tools found"
-                getToolState={getToolState}
-              />
-            </div>
+            <ToolPipelineBuilder
+              tools={toolsQuery.data?.data ?? []}
+              value={pipeline}
+              onChange={setPipeline}
+              emptyMessage="No tools found"
+            />
           )}
 
           {step === 3 && (

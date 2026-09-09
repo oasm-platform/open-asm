@@ -4,6 +4,7 @@ import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Job } from 'bullmq';
 import { Asset } from '../assets/entities/assets.entity';
+import { ConnectorsModule } from '../connectors/connectors.module';
 import { JobHistory } from '../jobs-registry/entities/job-history.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
@@ -29,6 +30,7 @@ import { AssetGroup } from './entities/asset-groups.entity';
       Workspace,
       JobHistory,
     ]),
+    ConnectorsModule,
   ],
   controllers: [AssetGroupController],
   providers: [AssetGroupService],

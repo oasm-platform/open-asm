@@ -69,6 +69,8 @@ export class TriggerWorkflowService implements OnModuleInit {
 
           await this.jobRegistryService.createNewJob({
             tool,
+            config: startJob?.config,
+            configProfileId: startJob?.configProfileId,
             targetIds: [payload.id],
             workflow,
             priority: tool.priority,

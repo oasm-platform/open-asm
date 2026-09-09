@@ -125,3 +125,56 @@ export function maskProfile(
   }
   return masked;
 }
+
+// ── Inline config helpers ──────────────────────────────────────────
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Deep-merges base into override. Keys in override win.
+ * Arrays replace (not concat). undefined values in override are skipped.
+ */
+export function deepMerge(
+  base: Record<string, unknown>,
+  override: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...base };
+  for (const [k, v] of Object.entries(override)) {
+    if (v === undefined) continue;
+    if (isPlainObject(v) && isPlainObject(out[k])) {
+      out[k] = deepMerge(
+        out[k],
+        v,
+      );
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+/**
+ * Encrypts sensitive fields in an inline config object.
+ * Uses workspace DEK when available, falls back to KEK.
+ */
+export function encryptInlineConfig(
+  config: Record<string, unknown> | undefined,
+  sensitiveFields: string[],
+  dek: Buffer | null,
+): Record<string, unknown> | undefined {
+  if (!config || Object.keys(config).length === 0) return config;
+  return encryptProfile(config, sensitiveFields, dek);
+}
+
+/**
+ * Decrypts sensitive fields in an inline config object.
+ */
+export function decryptInlineConfig(
+  config: Record<string, unknown>,
+  sensitiveFields: string[],
+  dek: Buffer | null,
+): Record<string, unknown> {
+  return decryptProfile(config, sensitiveFields, dek);
+}

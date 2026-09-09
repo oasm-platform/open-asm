@@ -46,6 +46,7 @@ export interface GetNextJobResult extends GetNextJobResponseDto {
   tool?: { id: string; name: string };
   workspaceId?: string;
   configProfileId?: string;
+  config?: Record<string, unknown> | null;
 }
 
 export class WorkerIdParams {
@@ -205,6 +206,7 @@ export class CreateJobs extends PickType(Job, [
   jobName?: string;
   jobRunType?: JobRunType;
   configProfileId?: string;
+  config?: Record<string, unknown>;
 }
 
 // --- Category-Specific Result DTOs ---

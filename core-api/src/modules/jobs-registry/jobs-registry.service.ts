@@ -104,6 +104,7 @@ export class JobsRegistryService {
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
   ) {}
+  private readonly logger = new Logger(JobsRegistryService.name);
   public async getManyJobs(
     workspaceId: string,
     query: GetManyJobsRequestDto,
@@ -180,6 +181,7 @@ export class JobsRegistryService {
     isPublishEvent,
     jobRunType,
     configProfileId,
+    config,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
@@ -200,6 +202,20 @@ export class JobsRegistryService {
         configProfileId,
         tool.id!,
       );
+    }
+
+    // Resolve merged final config for connector jobs
+    let mergedConfig: Record<string, unknown> | undefined;
+    if (isConnector) {
+      try {
+        mergedConfig = await this.toolConfigProfilesService.resolveConfigForJob(
+          workspaceId,
+          tool.id!,
+          { config, configProfileId },
+        );
+      } catch {
+        this.logger.warn('Failed to resolve config for job');
+      }
     }
 
     if (
@@ -277,6 +293,7 @@ export class JobsRegistryService {
                 port: assetService.port.toString(),
               }),
           configProfileId: isConnector ? configProfileId : undefined,
+          config: isConnector ? mergedConfig ?? config ?? null : null,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
@@ -317,6 +334,7 @@ export class JobsRegistryService {
                 value: asset.value,
               }),
           configProfileId: isConnector ? configProfileId : undefined,
+          config: isConnector ? mergedConfig ?? config ?? null : null,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
@@ -568,11 +586,13 @@ export class JobsRegistryService {
           job.asset.target?.workspaceId ??
           (worker.workspace as { id?: string })?.id;
         base.configProfileId = job.configProfileId;
+        base.config = job.config;
       } else if (isBuiltInTools && job.tool) {
         // Connector job picked up by BUILT_IN worker
         base.tool = { id: job.tool.id!, name: job.tool.name };
         base.workspaceId = job.asset.target?.workspaceId;
         base.configProfileId = job.configProfileId;
+        base.config = job.config;
       }
 
       return base;
@@ -711,7 +731,6 @@ export class JobsRegistryService {
     dto: BaseResultDto,
     category: ToolCategory,
   ): Promise<{ jobId: string; queueId: string }> {
-    console.log(dto);
     const fileName = `${dto.jobId}-${Date.now()}.json`;
     const { path: resultRef } = await this.storageService.uploadFile(
       fileName,
@@ -905,9 +924,13 @@ export class JobsRegistryService {
       names: [nextTool],
     });
 
+    const nextJobMeta = jobs[nextToolIndex];
+
     const createPromises = tools.map((tool) =>
       this.createNewJob({
         tool,
+        config: nextJobMeta?.config,
+        configProfileId: nextJobMeta?.configProfileId,
         targetIds: [job.asset.target.id],
         assetIds: [job.asset.id],
         workflow: job.jobHistory.workflow,

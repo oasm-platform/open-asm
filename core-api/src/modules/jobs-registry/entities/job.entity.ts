@@ -127,6 +127,13 @@ export class Job extends BaseEntity {
   configProfileId?: string;
 
   /**
+   * Inline config snapshot from workflow job (merged final).
+   * Worker reads this directly — no runtime merge needed.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  config?: Record<string, unknown> | null;
+
+  /**
    * The asset service this job belongs to.
    */
   @ApiProperty()

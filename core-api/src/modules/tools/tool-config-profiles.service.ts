@@ -14,11 +14,15 @@ import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
 import { Tool } from './entities/tools.entity';
 import {
   decryptProfile,
+  deepMerge,
   encryptProfile,
   getSensitiveFields,
   maskProfile,
 } from './validators/tool-config-profiles.crypto';
 import { validateProfileOrThrow } from './validators/tool-config-profiles.validator';
+
+interface JobRef { id: string; }
+interface WfRef { name: string; wf_id: string; }
 
 @Injectable()
 export class ToolConfigProfilesService {
@@ -256,6 +260,36 @@ export class ToolConfigProfilesService {
     const toolId = (profile.tool as unknown as { id: string }).id;
     const wasDefault = profile.isDefault;
 
+    // ── Fail-fast: check for active references BEFORE delete ───────────
+
+    // Check jobs table for direct configProfileId usage
+    const jobRefs = (await this.dataSource.query(
+      `SELECT id FROM "jobs" WHERE "configProfileId" = $1 AND "workspaceId" IN (
+        SELECT "workspaceId" FROM "jobs" j2 JOIN "assets" a ON a.id = j2."assetId"
+        JOIN "targets" t ON t.id = a."targetId" WHERE t."workspaceId" = $2
+      ) LIMIT 1`,
+      [profileId, workspaceId],
+    )) as unknown as JobRef[];
+    if (jobRefs && jobRefs.length > 0) {
+      throw new ConflictException(
+        `Cannot delete profile ${profileId}: referenced by Job #${jobRefs[0].id}`,
+      );
+    }
+
+    // Check workflows content JSONB for configProfileId in jobs[]
+    const wfRefs = (await this.dataSource.query(
+      `SELECT w.name, w.id AS wf_id FROM workflows w
+       WHERE w."workspaceId" = $1
+       AND w.content->'jobs' IS NOT NULL
+       AND jsonb_path_exists(w.content->'jobs', '$[*] ? (@.configProfileId == $0)')`,
+      [workspaceId, profileId],
+    )) as unknown as WfRef[];
+    if (wfRefs && wfRefs.length > 0) {
+      throw new ConflictException(
+        `Cannot delete profile ${profileId}: referenced by Workflow ${wfRefs[0].name} (#${wfRefs[0].wf_id})`,
+      );
+    }
+
     await this.profilesRepo.remove(profile);
 
     // If the deleted profile was the default, auto-assign the next remaining
@@ -337,12 +371,14 @@ export class ToolConfigProfilesService {
         where: { id: profileId },
         relations: ['workspace', 'tool'],
       });
-      if (!profile) return undefined;
+      if (!profile) {
+        throw new NotFoundException(`ToolConfigProfile ${profileId} not found`);
+      }
 
       const profileWsId = (profile.workspace as unknown as { id: string }).id;
       const profileToolId = (profile.tool as unknown as { id: string }).id;
       if (profileWsId !== workspaceId || profileToolId !== toolId) {
-        return undefined;
+        throw new NotFoundException(`ToolConfigProfile ${profileId} not found`);
       }
     } else {
       // Default profile for this workspace + tool
@@ -371,6 +407,44 @@ export class ToolConfigProfilesService {
 
     const dek = await this.encryptionService.getDEK(workspaceId);
     return decryptProfile(profile.config, sensitiveFields, dek);
+  }
+
+  /**
+   * Resolves merged config for a workflow job.
+   * Loads base profile (by configProfileId or default), then deep-merges
+   * with decrypted inline config if present.
+   */
+  async resolveConfigForJob(
+    workspaceId: string,
+    toolId: string,
+    ref: { config?: Record<string, unknown>; configProfileId?: string },
+  ): Promise<Record<string, unknown> | undefined> {
+    const base =
+      (await this.resolveConfigForDispatch(
+        workspaceId,
+        toolId,
+        ref.configProfileId,
+      )) ?? {};
+
+    if (!ref.config || Object.keys(ref.config).length === 0) {
+      return Object.keys(base).length > 0 ? base : undefined;
+    }
+
+    // Decrypt inline config sensitive fields
+    const tool = await this.toolsRepo.findOne({ where: { id: toolId } });
+    if (!tool) return ref.config;
+
+    const entry = this.connectorRegistry.getConnector(tool.name);
+    const schema = entry?.configSchema ?? entry?.inputsSchema;
+    const sensitiveFields = getSensitiveFields(schema);
+
+    let inlineConfig = ref.config;
+    if (sensitiveFields.length > 0) {
+      const dek = await this.encryptionService.getDEK(workspaceId);
+      inlineConfig = decryptProfile(ref.config, sensitiveFields, dek);
+    }
+
+    return deepMerge(base, inlineConfig);
   }
 
   // ── Internals ────────────────────────────────────────────────────────

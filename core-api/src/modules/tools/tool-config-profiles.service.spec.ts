@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { _resetValidatorCache } from '@/modules/tools/validators/tool-config-profiles.validator';
@@ -22,6 +26,7 @@ const mockRepo = () => ({
   create: jest.fn(),
   createQueryBuilder: jest.fn(),
   manager: { transaction: jest.fn() },
+  count: jest.fn().mockResolvedValue(0),
 });
 
 const nucleiSchema: Record<string, unknown> = {
@@ -53,7 +58,7 @@ describe('ToolConfigProfilesService', () => {
   let toolsRepo: ReturnType<typeof mockRepo>;
   let connectorRegistry: ConnectorRegistryService;
   let encryptionService: WorkspaceEncryptionService;
-  let dataSource: { transaction: jest.Mock };
+  let dataSource: { transaction: jest.Mock; query: jest.Mock };
 
   beforeEach(() => {
     _resetValidatorCache();
@@ -68,7 +73,7 @@ describe('ToolConfigProfilesService', () => {
       getDEK: jest.fn().mockResolvedValue(Buffer.alloc(32)),
     } as unknown as WorkspaceEncryptionService;
 
-    dataSource = { transaction: jest.fn() };
+    dataSource = { transaction: jest.fn(), query: jest.fn() };
 
     service = new ToolConfigProfilesService(
       profilesRepo as unknown as Repository<ToolConfigProfile>,
@@ -261,6 +266,7 @@ describe('ToolConfigProfilesService', () => {
     });
     toolsRepo.findOne.mockResolvedValue(mockTool);
     profilesRepo.findOne.mockResolvedValue(null);
+    profilesRepo.count.mockResolvedValue(1); // existing profile exists → new one is NOT default
     profilesRepo.save.mockImplementation((p) => p);
     profilesRepo.create.mockImplementation((p) => p);
 
@@ -456,6 +462,65 @@ describe('ToolConfigProfilesService', () => {
     );
   });
 
+  // ── REMOVE: orphan configProfileId guard (RED+GREEN) ─────────────────
+
+  it('remove — referenced by job (jobs.configProfileId) throws 409', async () => {
+    const profile = mockProfile({ id: 'prof-linked', config: {} });
+    profilesRepo.findOne.mockResolvedValue(profile);
+    profilesRepo.remove.mockImplementation((p) => p);
+
+    dataSource.query.mockResolvedValue([{ id: 'job-ref' }]);
+
+    await expect(
+      service.remove(wsId, 'prof-linked'),
+    ).rejects.toThrow(new ConflictException('Cannot delete profile prof-linked: referenced by Job #job-ref'));
+  });
+
+  it('remove — referenced by workflow (content jsonb jobs[]) throws 409', async () => {
+    const profile = mockProfile({ id: 'prof-wf', config: {} });
+    profilesRepo.findOne.mockResolvedValue(profile);
+    profilesRepo.remove.mockImplementation((p) => p);
+
+    // First query (jobs) returns nothing; second query (workflows) matches
+    dataSource.query.mockResolvedValueOnce([])
+                                  .mockResolvedValueOnce([{ name: 'my-workflow', wf_id: 'wf-1' }]);
+
+    await expect(
+      service.remove(wsId, 'prof-wf'),
+    ).rejects.toThrow(new ConflictException('Cannot delete profile prof-wf: referenced by Workflow my-workflow (#wf-1)'));
+  });
+
+  it('remove — no one uses it deletes successfully', async () => {
+    const profile = mockProfile({ id: 'prof-standalone', isDefault: false });
+    profilesRepo.findOne.mockResolvedValueOnce(profile); // findOwned
+    profilesRepo.remove.mockImplementation((p) => p);
+    dataSource.query.mockResolvedValue([]);
+
+    // No next profile exists (only deleted one)
+    profilesRepo.findOne.mockResolvedValue(null); // next lookup
+
+    await service.remove(wsId, 'prof-standalone');
+
+    expect(profilesRepo.remove).toHaveBeenCalledWith(profile);
+  });
+
+  it('remove — deleting default reassigns next profile as default', async () => {
+    const profile = mockProfile({ id: 'prof-old-default', isDefault: true });
+    profilesRepo.findOne.mockResolvedValueOnce(profile); // findOwned
+    profilesRepo.remove.mockImplementation((p) => p);
+    dataSource.query.mockResolvedValue([]);
+
+    const nextProfile = mockProfile({ id: 'prof-next', isDefault: false });
+    profilesRepo.findOne.mockResolvedValue(nextProfile); // next lookup
+    profilesRepo.save.mockImplementation((p) => p);
+
+    await service.remove(wsId, 'prof-old-default');
+
+    expect(profilesRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'prof-next', isDefault: true }),
+    );
+  });
+
   // ── LIST ─────────────────────────────────────────────────────────────
 
   it('list returns masked profiles (secrets hidden)', async () => {
@@ -518,8 +583,6 @@ describe('ToolConfigProfilesService', () => {
     );
   });
 
-  // ── LIST: relation loading (regression: unloaded tool → TypeError) ──
-
   it('list — loads tool relation for masking', async () => {
     profilesRepo.find.mockResolvedValue([]);
 
@@ -552,6 +615,73 @@ describe('ToolConfigProfilesService', () => {
 
   // ── DISPATCH ─────────────────────────────────────────────────────────
 
+  it('resolveConfigForDispatch — explicit orphan profileId throws 404', async () => {
+    profilesRepo.findOne.mockResolvedValue(null); // profileId not found
+
+    await expect(
+      service.resolveConfigForDispatch(wsId, toolId, 'orphan-profile-id'),
+    ).rejects.toThrow(new NotFoundException('ToolConfigProfile orphan-profile-id not found'));
+  });
+
+  it('resolveConfigForDispatch — cross-tool profileId throws 404', async () => {
+    profilesRepo.findOne.mockResolvedValue({
+      id: 'prof-other-tool',
+      name: 'other',
+      config: {},
+      tool: { id: 'tool-999', name: 'scanner' },
+      workspace: { id: wsId },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await expect(
+      service.resolveConfigForDispatch(wsId, toolId, 'prof-other-tool'),
+    ).rejects.toThrow(new NotFoundException('ToolConfigProfile prof-other-tool not found'));
+  });
+
+  it('resolveConfigForDispatch — cross-workspace profileId throws 404', async () => {
+    profilesRepo.findOne.mockResolvedValue({
+      id: 'prof-other-ws',
+      name: 'other',
+      config: {},
+      tool: { id: toolId, name: 'nuclei' },
+      workspace: { id: 'ws-other' },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await expect(
+      service.resolveConfigForDispatch(wsId, toolId, 'prof-other-ws'),
+    ).rejects.toThrow(new NotFoundException('ToolConfigProfile prof-other-ws not found'));
+  });
+
+  it('resolveConfigForDispatch — default profile branch (no explicit profileId) returns decrypted config', async () => {
+    const encrypted = encryptProfile(
+      { apiKey: 'secret123', target: 'x.com' },
+      ['apiKey'],
+      Buffer.alloc(32),
+    );
+    const profile = mockProfile({
+      id: 'prof-001',
+      tool: { id: toolId, name: 'nuclei' } as Tool,
+      workspace: { id: wsId } as any,
+      config: encrypted,
+      isDefault: true,
+    });
+    profilesRepo.findOne.mockResolvedValue(profile);
+    toolsRepo.findOne.mockResolvedValue(mockTool);
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'nuclei', slug: 'nuclei', configSchema: schemaWithPassword,
+    });
+
+    const result = await service.resolveConfigForDispatch(
+      wsId,
+      toolId,
+    );
+
+    expect(result).toEqual({ apiKey: 'secret123', target: 'x.com' });
+  });
+
   it('resolveConfigForDispatch — loads workspace+tool relations and returns decrypted config', async () => {
     const encrypted = encryptProfile(
       { apiKey: 'secret123', target: 'x.com' },
@@ -561,7 +691,7 @@ describe('ToolConfigProfilesService', () => {
     const profile = mockProfile({
       id: 'prof-001',
       tool: { id: toolId, name: 'nuclei' } as Tool,
-      workspace: { id: wsId },
+      workspace: { id: wsId } as any,
       config: encrypted,
       isDefault: true,
     });
