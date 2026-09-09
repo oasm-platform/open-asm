@@ -36,6 +36,21 @@ interface ToolConnectorConfigSheetProps {
     isDefault?: boolean;
   };
   onSuccess?: () => void;
+  /** When true, skip API calls and fire onSubmit with the form data instead. */
+  inline?: boolean;
+  /** Called in inline mode with the config and profile ID. */
+  onSubmit?: (data: {
+    config: Record<string, unknown>;
+    configProfileId?: string;
+  }) => void;
+  /** Pre-fill config values in inline mode. */
+  defaultConfig?: Record<string, unknown>;
+  /** Pre-selected profile ID in inline mode. */
+  defaultProfileId?: string;
+  /** Display/behavior mode: 'profile' (default) manages API profiles; 'inline' returns config via callback. */
+  mode?: 'profile' | 'inline';
+  /** Called in inline mode with the raw form config. */
+  onInlineSubmit?: (config: Record<string, unknown>) => void;
 }
 
 export function ToolConnectorConfigSheet({
@@ -44,6 +59,12 @@ export function ToolConnectorConfigSheet({
   tool,
   initialData,
   onSuccess,
+  inline = false,
+  onSubmit,
+  defaultConfig,
+  defaultProfileId,
+  mode = 'profile',
+  onInlineSubmit,
 }: ToolConnectorConfigSheetProps) {
   const queryClient = useQueryClient();
   const isEdit = !!initialData;
@@ -106,6 +127,20 @@ export function ToolConnectorConfigSheet({
   const isPending = isCreating || isUpdating;
 
   const handleSubmit = (config: Record<string, unknown>) => {
+    // Inline mode (new): fire callback and close — no mutations
+    if (mode === 'inline') {
+      onInlineSubmit?.(config);
+      onOpenChange(false);
+      return;
+    }
+
+    // Legacy inline prop (backward compat)
+    if (inline && onSubmit) {
+      onSubmit({ config, configProfileId: defaultProfileId });
+      onOpenChange(false);
+      return;
+    }
+
     if (!profileName.trim()) {
       toast.error('Profile name is required');
       return;
@@ -118,7 +153,6 @@ export function ToolConnectorConfigSheet({
         data: {
           name: profileName.trim(),
           config,
-          isDefault: initialData.isDefault,
         },
       });
     } else {
@@ -127,7 +161,6 @@ export function ToolConnectorConfigSheet({
         data: {
           name: profileName.trim(),
           config,
-          isDefault: true,
         },
       });
     }
@@ -150,9 +183,11 @@ export function ToolConnectorConfigSheet({
               />
             </div>
             <SheetTitle>
-              {isEdit
-                ? 'Edit Configuration Profile'
-                : 'Create Configuration Profile'}
+              {mode === 'inline'
+                ? 'Configure Tool'
+                : isEdit
+                  ? 'Edit Configuration Profile'
+                  : 'Create Configuration Profile'}
             </SheetTitle>
           </div>
         </SheetHeader>
@@ -170,17 +205,19 @@ export function ToolConnectorConfigSheet({
               </Button>
             </div>
           )}
-          <div className="space-y-2">
-            <Label htmlFor="profile-name">
-              Profile name <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="profile-name"
-              placeholder="default"
-              value={profileName}
-              onChange={(e) => setProfileName(e.target.value)}
-            />
-          </div>
+          {!inline && mode !== 'inline' && (
+            <div className="space-y-2">
+              <Label htmlFor="profile-name">
+                Profile name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="profile-name"
+                placeholder="default"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+              />
+            </div>
+          )}
 
           {schema ? (
             <ToolConfigForm
@@ -188,10 +225,10 @@ export function ToolConnectorConfigSheet({
               schema={
                 schema as import('@/components/tools/tool-config-form').JSONSchema
               }
-              initialValues={initialData?.config}
+              initialValues={inline || mode === 'inline' ? defaultConfig : initialData?.config}
               onSubmit={handleSubmit}
               onCancel={() => onOpenChange(false)}
-              submitLabel={isEdit ? 'Update' : 'Create'}
+              submitLabel={mode === 'inline' ? 'Apply' : isEdit ? 'Update' : 'Create'}
               isSubmitting={isPending}
             />
           ) : isSchemaLoading ? (
@@ -220,10 +257,16 @@ export function ToolConnectorConfigSheet({
             {!isSchemaLoading && (
               <Button
                 type="button"
-                onClick={() => handleSubmit(initialData?.config ?? {})}
+                onClick={() =>
+                  handleSubmit(
+                    inline || mode === 'inline'
+                      ? (defaultConfig ?? {})
+                      : (initialData?.config ?? {}),
+                  )
+                }
                 disabled={isPending}
               >
-                {isEdit ? 'Update' : 'Create'}
+                {mode === 'inline' ? 'Apply' : isEdit ? 'Update' : 'Create'}
               </Button>
             )}
           </SheetFooter>

@@ -50,6 +50,7 @@ function useQueryTab({
           return next;
         },
         replace: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
     };
     // Only on unmount — navigate and tabParam are stable refs.

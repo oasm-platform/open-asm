@@ -120,8 +120,8 @@ export default function ToolDetail() {
       !search.tab
     ) {
       overviewDefaultApplied.current = true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       navigate({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         search: { ...search, tab: 'overview' } as any,
         replace: true,
       });
