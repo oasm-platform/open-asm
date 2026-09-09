@@ -20,6 +20,7 @@ import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -195,26 +196,56 @@ export class JobsRegistryService {
     const connectorEntry = this.connectorRegistry.getConnector(tool.name);
     const isConnector = !!connectorEntry?.image;
 
-    // Validate configProfileId belongs to same workspace AND tool
-    if (isConnector && configProfileId) {
-      await this.toolConfigProfilesService.assertProfileOwnership(
-        workspaceId,
-        configProfileId,
-        tool.id!,
-      );
-    }
-
-    // Resolve merged final config for connector jobs
+    // Resolve merged final config for connector jobs.
+    // Catches both assertProfileOwnership (orphan profile) and
+    // resolveConfigForJob errors, persisting FAILED job + error log
+    // so the job-log UI surfaces the failure, then rethrows.
     let mergedConfig: Record<string, unknown> | undefined;
     if (isConnector) {
       try {
+        // Validate configProfileId belongs to same workspace AND tool
+        if (configProfileId) {
+          await this.toolConfigProfilesService.assertProfileOwnership(
+            workspaceId,
+            configProfileId,
+            tool.id!,
+          );
+        }
+
         mergedConfig = await this.toolConfigProfilesService.resolveConfigForJob(
           workspaceId,
           tool.id!,
           { config, configProfileId },
         );
-      } catch {
-        this.logger.warn('Failed to resolve config for job');
+
+        // If no config resolved but tool requires config (has schema), fail fast.
+        if (!mergedConfig && (!config || Object.keys(config).length === 0)) {
+          const entry = this.connectorRegistry.getConnector(tool.name);
+          const schema = entry?.configSchema ?? entry?.inputsSchema;
+          if (schema) {
+            throw new BadRequestException(
+              `missing/default profile for connector "${tool.name}": tool requires configuration but no profile was provided or found`,
+            );
+          }
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `[config-profile] ${tool.name}: ${message} (profileId=${configProfileId ?? 'none'}, workspace=${workspaceId})`,
+        );
+        await this.persistFailedConfigJob({
+          tool,
+          workflow,
+          jobHistory: existingJobHistory,
+          jobRunType,
+          jobName,
+          configProfileId,
+          config,
+          workspaceId,
+          message,
+        });
+        throw error;
       }
     }
 
@@ -349,6 +380,73 @@ export class JobsRegistryService {
     }
 
     return jobsToInsert;
+  }
+
+  /**
+   * Persists a FAILED job row + JobErrorLog when connector config resolution
+   * fails (e.g. orphan configProfileId). The job references no asset — it
+   * exists so the job-log UI surfaces the dispatch failure. Linked to a
+   * JobHistory (created if absent) for workflow grouping.
+   */
+  private async persistFailedConfigJob(args: {
+    tool: CreateJobs['tool'];
+    workflow: CreateJobs['workflow'];
+    jobHistory?: CreateJobs['jobHistory'];
+    jobRunType: CreateJobs['jobRunType'];
+    jobName: CreateJobs['jobName'];
+    configProfileId: CreateJobs['configProfileId'];
+    config: CreateJobs['config'];
+    workspaceId?: string;
+    message: string;
+  }): Promise<Job> {
+    const {
+      tool,
+      workflow,
+      jobHistory: existingJobHistory,
+      jobRunType,
+      jobName,
+      configProfileId,
+      config,
+      workspaceId,
+      message,
+    } = args;
+
+    let jobHistory = existingJobHistory;
+    if (!jobHistory) {
+      jobHistory = this.jobHistoryRepo.create({
+        workflow,
+        jobRunType,
+        jobHistoryName: jobName,
+      });
+      await this.jobHistoryRepo.save(jobHistory);
+    }
+
+    const jobRepo = this.dataSource.getRepository(Job);
+    const failedJob = jobRepo.create({
+      id: randomUUID(),
+      status: JobStatus.FAILED,
+      category: tool.category,
+      tool,
+      priority: tool.priority ?? JobPriority.BACKGROUND,
+      jobHistory,
+      configProfileId,
+      config: config ?? null,
+      completedAt: new Date(),
+    } as DeepPartial<Job>);
+    await jobRepo.save(failedJob);
+
+    await this.jobErrorLogRepo.save({
+      job: failedJob,
+      logMessage: `[config-profile] ${tool.name}: ${message} (profileId=${configProfileId ?? 'none'}, workspace=${workspaceId ?? 'unknown'})`,
+      payload: JSON.stringify({
+        tool: tool.name,
+        configProfileId: configProfileId ?? null,
+        workspaceId: workspaceId ?? null,
+        reason: message,
+      }),
+    });
+
+    return failedJob;
   }
 
   /**

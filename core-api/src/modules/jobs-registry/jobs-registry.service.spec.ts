@@ -56,10 +56,14 @@ describe('JobsRegistryService', () => {
     createQueryBuilder: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
   };
 
   const mockJobErrorLogRepository = {
     createQueryBuilder: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
   };
 
   const mockDataSource = {
@@ -100,9 +104,10 @@ describe('JobsRegistryService', () => {
     getAllConnectors: jest.fn().mockReturnValue([]),
   };
 
-  const mockToolConfigProfilesService = {
+    const mockToolConfigProfilesService = {
     assertProfileOwnership: jest.fn(),
     resolveConfigForDispatch: jest.fn(),
+    resolveConfigForJob: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -1379,6 +1384,153 @@ describe('JobsRegistryService', () => {
       expect(created.command).toBeDefined();
       expect(typeof created.command).toBe('string');
       expect(created.configProfileId).toBeUndefined();
+    });
+
+    // ── Orphan configProfileId: fail-fast, persist FAILED job + error log ──
+
+    it('RED: orphan profileId → createNewJob throws AND persists FAILED job with error log', async () => {
+      mockConnectorRegistryService.getConnector.mockReturnValue({
+        name: 'my-connector',
+        image: 'my-connector:latest',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockRejectedValue(
+        new NotFoundException('ToolConfigProfile orphan-profile not found'),
+      );
+      // assertProfileOwnership passes (profile row may still exist at check
+      // time), resolve fails → orphan between check and dispatch.
+      mockToolConfigProfilesService.assertProfileOwnership.mockResolvedValue(
+        undefined,
+      );
+
+      await expect(
+        service.createNewJob({
+          tool: mockConnectorTool,
+          targetIds: ['target-1'],
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+          configProfileId: 'orphan-profile',
+        }),
+      ).rejects.toThrow('ToolConfigProfile orphan-profile not found');
+
+      // A FAILED job row must exist so the job-log UI surfaces the failure.
+      const failedJob = mockJobRepo.create.mock.calls.find(
+        (call) => (call[0] as Record<string, unknown>).status === 'failed',
+      );
+      expect(failedJob).toBeDefined();
+      expect(
+        (failedJob?.[0] as Record<string, unknown>).configProfileId,
+      ).toBe('orphan-profile');
+      // Error detail must be persisted (JobErrorLog), not just logged.
+      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          logMessage: expect.stringContaining('orphan-profile'),
+        }),
+      );
+    });
+
+    // ── assertProfileOwnership rejection (orphan between check & dispatch) ──
+
+    it('should create FAILED job + error log when assertProfileOwnership rejects NotFound (orphan profile)', async () => {
+      mockConnectorRegistryService.getConnector.mockReturnValue({
+        name: 'my-connector',
+        image: 'my-connector:latest',
+      });
+      mockToolConfigProfilesService.assertProfileOwnership.mockRejectedValue(
+        new NotFoundException('ToolConfigProfile orphan-profile not found'),
+      );
+
+      await expect(
+        service.createNewJob({
+          tool: mockConnectorTool,
+          targetIds: ['target-1'],
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+          configProfileId: 'orphan-profile',
+        }),
+      ).rejects.toThrow('ToolConfigProfile orphan-profile not found');
+
+      // FAILED job persisted
+      const failedJob = mockJobRepo.create.mock.calls.find(
+        (call) => (call[0] as Record<string, unknown>).status === 'failed',
+      );
+      expect(failedJob).toBeDefined();
+      expect(
+        (failedJob?.[0] as Record<string, unknown>).configProfileId,
+      ).toBe('orphan-profile');
+      // Error log contains profileId + tool
+      expect(mockJobErrorLogRepository.save).toHaveBeenCalledTimes(1);
+      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          logMessage: expect.stringContaining('orphan-profile'),
+        }),
+      );
+      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          logMessage: expect.stringContaining('my-connector'),
+        }),
+      );
+    });
+
+    // ── No profile + tool has schema → FAILED ──
+
+    it('should create FAILED job + error log when no profile found and tool requires config', async () => {
+      mockConnectorRegistryService.getConnector.mockReturnValue({
+        name: 'my-connector',
+        image: 'my-connector:latest',
+        configSchema: { type: 'object', properties: { url: { type: 'string' } } },
+      });
+      // resolveConfigForJob returns undefined (no profile + no default)
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue(undefined);
+
+      await expect(
+        service.createNewJob({
+          tool: mockConnectorTool,
+          targetIds: ['target-1'],
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+          // No configProfileId, no config
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      const failedJob = mockJobRepo.create.mock.calls.find(
+        (call) => (call[0] as Record<string, unknown>).status === 'failed',
+      );
+      expect(failedJob).toBeDefined();
+      expect(mockJobErrorLogRepository.save).toHaveBeenCalledTimes(1);
+      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          logMessage: expect.stringContaining('missing/default profile'),
+        }),
+      );
+      // Payload includes tool name + workspace
+      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.stringContaining('my-connector'),
+        }),
+      );
+    });
+
+    // ── No profile + no schema → PENDING, no error log ──
+
+    it('should create PENDING job without error log when connector has no schema and no profile', async () => {
+      mockConnectorRegistryService.getConnector.mockReturnValue({
+        name: 'my-connector',
+        image: 'my-connector:latest',
+        // No configSchema, no inputsSchema
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue(undefined);
+
+      const result = await service.createNewJob({
+        tool: mockConnectorTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(result).toHaveLength(1);
+      const created = mockJobRepo.create.mock.calls[0][0];
+      expect(created.status).toBe('pending');
+      expect(mockJobErrorLogRepository.save).not.toHaveBeenCalled();
     });
   });
 

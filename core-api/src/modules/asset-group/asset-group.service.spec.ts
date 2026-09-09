@@ -4,12 +4,14 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobHistory } from '../jobs-registry/entities/job-history.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { ToolsService } from '../tools/tools.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import type { Workspace } from '../workspaces/entities/workspace.entity';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { AssetGroupService } from './asset-group.service';
 import type { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
@@ -156,6 +158,14 @@ describe('AssetGroupService', () => {
 
   const mockJobsRegistryService = {};
 
+  const mockConnectorRegistryService = {
+    getConnector: jest.fn(),
+  };
+
+  const mockEncryptionService = {
+    getDEK: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
@@ -181,6 +191,8 @@ describe('AssetGroupService', () => {
         },
         { provide: ToolsService, useValue: mockToolsService },
         { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+        { provide: ConnectorRegistryService, useValue: mockConnectorRegistryService },
+        { provide: WorkspaceEncryptionService, useValue: mockEncryptionService },
         AssetGroupService,
       ],
     }).compile();
