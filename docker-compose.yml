@@ -73,6 +73,7 @@ services:
       - ./worker/.env
     environment:
       - WORKER_API_KEY=change_me
+      - WORKER_MODE=node
       - WORKER_GRPC_HOST=core-api
       - WORKER_GRPC_PORT=16276
       - WORKER_MAX_CONCURRENCY=10
@@ -81,11 +82,7 @@ services:
       # containers dial back on (auto-derived when unset — host.docker.internal
       # on any OS via a host-gateway ExtraHosts mapping the worker adds on
       # Linux; IPv4 bridge gateway fallback on engines < Docker Engine 20.10).
-      # Dev/compose: WORKER_CONNECTOR_ADDR is intentionally unset here, so the
-      # worker must opt back into the legacy auto-detect chain (host-gateway →
-      # bridge gateway) instead of failing fast. Pin WORKER_CONNECTOR_ADDR for
-      # stable service-name dialing: - WORKER_CONNECTOR_ADDR=oasm-worker
-      - WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1
+      - WORKER_CONNECTOR_ADDR=host.docker.internal:26276
       # Firewall: the connector port (26276) must accept inbound from spawned
       # containers (docker bridge, or the compose network when pinned above).
     logging:
@@ -95,6 +92,24 @@ services:
         max-file: '3'
     volumes:
       - worker-tools-cache:/app/oasm-tools:rw
+      # The worker spawns connector containers via the Docker Engine API
+      # (internal/runtime/docker.go), so it MUST reach a daemon. Mount the host
+      # socket (docker-outside-of-docker). SECURITY: docker.sock is
+      # root-equivalent on the host — only run trusted images with this worker.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # The image runs as non-root uid/gid 1000, but the mounted socket is owned
+    # by root:root (gid 0) — without this the daemon returns "permission denied"
+    # (and API version negotiation then falls back to 1.24). Add the socket's
+    # group. On Docker Desktop the gid is 0; on Linux hosts with a dedicated
+    # docker group use that gid instead (e.g. group_add: ['999']).
+    group_add:
+      - '0'
+    ports:
+      # Connector gRPC listen port. Spawned connector containers run on the host
+      # daemon (default bridge), so they must dial back through the host via
+      # WORKER_CONNECTOR_ADDR=host.docker.internal:26276 — which requires this
+      # port published on the host.
+      - '26276:26276'
     networks:
       - oasm
     restart: 'always'

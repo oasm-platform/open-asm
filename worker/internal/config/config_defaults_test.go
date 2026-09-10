@@ -44,6 +44,31 @@ func TestLoadConfigConnectorIdleTimeoutDefault60(t *testing.T) {
 	}
 }
 
+// WORKER_MODE is exposed like every other WORKER_* variable: LoadConfig must
+// surface it so the entrypoints can honour it (docker sets WORKER_MODE=node).
+func TestLoadConfigModeFromEnv(t *testing.T) {
+	viper.Reset()
+	t.Setenv("WORKER_MODE", "node")
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Mode != "node" {
+		t.Fatalf("WORKER_MODE=node must surface as mode %q, got %q", "node", cfg.Mode)
+	}
+}
+
+func TestLoadConfigModeDefaultsEmpty(t *testing.T) {
+	viper.Reset()
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Mode != "" {
+		t.Fatalf("mode must default to empty (entrypoint applies its own), got %q", cfg.Mode)
+	}
+}
+
 func TestLoadConfigMaxReplicasPerImageDefault1(t *testing.T) {
 	viper.Reset()
 	cfg, err := LoadConfig()

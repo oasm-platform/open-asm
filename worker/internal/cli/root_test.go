@@ -3,10 +3,29 @@ package cli
 import (
 	"strings"
 	"testing"
+
+	"oasm-worker/internal/config"
 )
 
 // The worker runs in one of two modes: "cli" (interactive TUI, default)
-// or "node" (headless worker node). Mode is selected with --mode.
+// or "node" (headless worker node). Mode is selected with --mode, or the
+// WORKER_MODE environment variable surfaced via config.LoadConfig.
+
+// resolveMode: an explicit WORKER_MODE (cfg.Mode) wins over the entrypoint
+// default, so docker can pin node without a CLI flag.
+func TestResolveModeEnvWins(t *testing.T) {
+	cfg := &config.Config{Mode: "cli"}
+	if got := resolveMode(cfg, "node"); got != "cli" {
+		t.Fatalf("WORKER_MODE=cli must win over the node default, got %q", got)
+	}
+}
+
+func TestResolveModeFallsBackToDefault(t *testing.T) {
+	cfg := &config.Config{Mode: ""}
+	if got := resolveMode(cfg, "node"); got != "node" {
+		t.Fatalf("empty WORKER_MODE must fall back to the default, got %q", got)
+	}
+}
 
 func TestRootCommandModeFlagDefaultIsCLI(t *testing.T) {
 	cmd := rootCommand("cli")

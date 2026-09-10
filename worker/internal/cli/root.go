@@ -16,12 +16,23 @@ import (
 	"github.com/spf13/viper"
 )
 
+// resolveMode returns the mode explicitly supplied via the environment
+// (WORKER_MODE), falling back to the entrypoint's default. The Docker image
+// runs the headless entrypoint and sets WORKER_MODE=node, so the reported mode
+// and the connector machinery stay node without a --mode CLI flag.
+func resolveMode(cfg *config.Config, defaultMode string) string {
+	if cfg.Mode != "" {
+		return cfg.Mode
+	}
+	return defaultMode
+}
+
 func App() error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("fail to load config: %v", err)
 	}
-	cfg.Mode = "cli"
+	cfg.Mode = resolveMode(cfg, "cli")
 
 	if cfg.ApiKey == "" {
 		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
@@ -74,7 +85,7 @@ func AppHeadless() error {
 	if err != nil {
 		return fmt.Errorf("fail to load config: %v", err)
 	}
-	cfg.Mode = "node"
+	cfg.Mode = resolveMode(cfg, "node")
 
 	if cfg.ApiKey == "" {
 		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
@@ -144,7 +155,7 @@ The worker runs in one of two modes, reported to core-api when it joins:
 		},
 	}
 
-	rootCmd.Flags().String("mode", defaultMode, "Worker run mode: \"cli\" (interactive TUI) or \"node\" (headless worker node)")
+	rootCmd.Flags().String("mode", defaultMode, "Worker run mode: \"cli\" (interactive TUI) or \"node\" (headless worker node); overridable with WORKER_MODE")
 
 	rootCmd.Flags().String("api-key", "", "API key for authentication")
 	viper.BindPFlag("api_key", rootCmd.Flags().Lookup("api-key"))
