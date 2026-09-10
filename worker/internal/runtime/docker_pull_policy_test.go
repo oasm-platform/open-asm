@@ -115,23 +115,6 @@ func TestBuildContainerEnvCacheDirs(t *testing.T) {
 	}
 }
 
-// --- pull-policy digest comparison ---
-
-func TestPullPolicy_PullsWhenDigestChanged(t *testing.T) {
-	// Same digest → no pull needed.
-	if shouldPull("sha256:aaa", "sha256:aaa") {
-		t.Fatal("shouldPull returned true for matching digests")
-	}
-	// Different digest → pull needed.
-	if !shouldPull("sha256:aaa", "sha256:bbb") {
-		t.Fatal("shouldPull returned false for different digests")
-	}
-	// Empty registry digest (unreachable) → keep cached, no pull.
-	if shouldPull("sha256:aaa", "") {
-		t.Fatal("shouldPull returned true for empty registry digest")
-	}
-}
-
 // --- per-image persistence ---
 
 func TestVolumeNameForImage(t *testing.T) {

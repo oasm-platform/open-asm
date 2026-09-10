@@ -345,26 +345,9 @@ func sanitizeVolumeName(s string) string {
 	return result
 }
 
-// shouldPull returns true when the registry reports a different digest than
-// what is cached locally. An empty registryDigest (registry unreachable) means
-// we cannot compare — caller should keep the cached copy.
-func shouldPull(localDigest, registryDigest string) bool {
-	if registryDigest == "" {
-		return false
-	}
-	return localDigest != registryDigest
-}
-
-// imageRepoDigest extracts the content-addressable digest from an image's
-// RepoDigests list (format: "repo@sha256:…"). Returns "" when unavailable.
-func imageRepoDigest(inspect types.ImageInspect) string {
-	for _, d := range inspect.RepoDigests {
-		if i := strings.Index(d, "@"); i >= 0 {
-			return d[i+1:]
-		}
-	}
-	return ""
-}
+// ponytail: IfNotPresent only — no registry digest check. Rebuilds under the
+// same tag need `docker rmi` / manual pull. Add WORKER_IMAGE_PULL_POLICY
+// opt-in if auto-update ever needed.
 
 // persistPathsFromLabels extracts container paths that should be backed by a
 // per-image named volume. The oasm.persist label is a comma-separated list
@@ -465,38 +448,18 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	config.Labels = labels
 
-	// Pull policy: inspect first — an image already present locally skips the
-	// network pull (the common case). When cached, compare the registry digest
-	// to detect rebuilds (same tag, new content). Registry unreachable → keep
-	// cached; digest changed → pull. Failed inspect → always pull.
-	pull := false
-	digestChanged := false
 	inspect, _, inspectErr := d.cli.ImageInspectWithRaw(ctx, spec.Image)
 	if !imageIsCached(inspectErr) {
-		pull = true // image absent — always pull
-	} else {
-		// Image is cached locally. Check the registry for a newer digest.
-		localDigest := imageRepoDigest(inspect)
-		dist, distErr := d.cli.DistributionInspect(ctx, spec.Image, "")
-		if distErr == nil && shouldPull(localDigest, dist.Descriptor.Digest.String()) {
-			d.logInfo("docker: image digest changed, pulling: %s", spec.Image)
-			pull = true
-			digestChanged = true
-		} else {
-			d.logInfo("docker: image pull skipped (cached): %s", spec.Image)
-		}
-	}
-	if pull {
 		pullReader, err := d.cli.ImagePull(ctx, spec.Image, types.ImagePullOptions{})
 		if err != nil {
 			return Handle{}, fmt.Errorf("image pull %s: %w", spec.Image, err)
 		}
-		// Drain the pull output (required to complete the pull).
 		_, _ = io.Copy(io.Discard, pullReader)
 		pullReader.Close()
 		d.logInfo("docker: image pull done: %s", spec.Image)
-		// Re-inspect after pull to get fresh image labels.
 		inspect, _, _ = d.cli.ImageInspectWithRaw(ctx, spec.Image)
+	} else {
+		d.logInfo("docker: image pull skipped (cached): %s", spec.Image)
 	}
 
 	// Per-image persistence: read oasm.persist label (comma-separated
@@ -511,14 +474,6 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 			for _, p := range paths {
 				persistBinds = append(persistBinds, volName+":"+p)
 			}
-		}
-	}
-
-	// When digest changed, remove the existing volume so Docker copies up
-	// fresh content from the rebuilt image into the shared volume.
-	if digestChanged {
-		if err := d.cli.VolumeRemove(ctx, volName, false); err != nil {
-			d.logInfo("docker: volume remove skip (best-effort): %s err=%v", volName, err)
 		}
 	}
 
