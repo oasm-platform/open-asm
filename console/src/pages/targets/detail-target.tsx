@@ -8,17 +8,17 @@ import {
   useTargetsControllerGetTargetById,
   useVulnerabilitiesControllerScan,
 } from '@/services/apis/gen/queries';
+import { getRouteApi, useNavigate, useParams } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import { Bug, Loader2 } from 'lucide-react';
-import { getRouteApi, useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import AssetProvider from '../assets/context/asset-context';
 import { ListAssets } from '../assets/list-assets';
 import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
 import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
 import AssetsDiscovering from './assets-discovering';
-import SettingTarget from './setting-target';
 import { TargetSwitcher } from './components/target-switcher';
+import SettingTarget from './setting-target';
 
 // Define tabs configuration
 const TABS = [
@@ -76,7 +76,12 @@ export function DetailTarget() {
   return (
     <Page
       permission="target.read"
-      title={<TargetSwitcher currentTargetId={target.id} currentTargetValue={target.value} />}
+      title={
+        <TargetSwitcher
+          currentTargetId={target.id}
+          currentTargetValue={target.value}
+        />
+      }
       isShowButtonGoBack
       header={
         <div className="flex items-center gap-3 justify-between">
@@ -138,9 +143,6 @@ export function DetailTarget() {
                         to: '/targets/$id/$tab',
                         params: { id: id!, tab: 'vulnerabilities' },
                       });
-                    },
-                    onError: () => {
-                      toast.error('Failed to start scan');
                     },
                   },
                 )

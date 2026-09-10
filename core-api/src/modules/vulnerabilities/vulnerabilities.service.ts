@@ -75,12 +75,15 @@ export class VulnerabilitiesService {
       );
     }
 
+    const job = workflow.content.jobs?.[0];
     await this.jobRegistryService.createNewJob({
       tool: tools[0],
       workflow,
       targetIds: [targetId],
       priority: tools[0].priority,
       workspaceId,
+      config: job?.config,
+      configProfileId: job?.configProfileId,
     });
     return { message: `Scanning target ${targetId}...` };
   }

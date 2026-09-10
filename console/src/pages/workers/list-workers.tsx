@@ -4,15 +4,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
 import Image from '@/components/ui/image';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
-import type { WorkersControllerGetWorkersParams } from '@/services/apis/gen/queries';
+import type {
+  WorkerInstance,
+  WorkersControllerGetWorkersParams,
+} from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Loader2Icon, Server } from 'lucide-react';
+import { Loader2Icon, Search, SearchX, Server } from 'lucide-react';
+import { useMemo, useState } from 'react';
 dayjs.extend(relativeTime);
 
 const COMMON_PARAMS = {
@@ -26,7 +38,28 @@ const QueryOptions = {
   query: { refetchInterval: 1000 },
 } as const;
 
-const VALID_TABS = ['global', 'workspace'] as const;
+const VALID_TABS = ['workspace', 'global'] as const;
+
+type WorkerSurface = 'ALL' | 'INTERNAL' | 'EXTERNAL';
+
+const isWorkerOnline = (worker: WorkerInstance) =>
+  worker.isOnline ??
+  new Date().getTime() - new Date(worker.lastSeenAt).getTime() < 30000;
+
+const WorkerStatus = ({ worker }: { worker: WorkerInstance }) =>
+  isWorkerOnline(worker) ? (
+    <>
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+      </span>
+      <span className="text-sm text-green-600">Online</span>
+    </>
+  ) : (
+    <span className="text-sm text-muted-foreground">
+      {dayjs(worker.lastSeenAt).fromNow()}
+    </span>
+  );
 
 const ListWorkers = () => {
   const {
@@ -35,9 +68,11 @@ const ListWorkers = () => {
   const navigateWithParams = useNavigateWithParams();
   const [activeTab, setActiveTab] = useQueryTab({
     tabParam: 'tab',
-    defaultValue: 'global',
+    defaultValue: 'workspace',
     validValues: [...VALID_TABS],
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [surface, setSurface] = useState<WorkerSurface>('ALL');
 
   const { data: globalData, isLoading: isGlobalLoading } =
     useWorkersControllerGetWorkers(
@@ -65,6 +100,23 @@ const ListWorkers = () => {
 
   const data = activeTab === 'global' ? globalData : workspaceData;
   const isLoading = activeTab === 'global' ? isGlobalLoading : isWorkspaceLoading;
+
+  const filteredWorkers = useMemo(() => {
+    const workers = data?.data ?? [];
+    const query = searchQuery.trim().toLowerCase();
+    return workers.filter((worker) => {
+      const matchesQuery =
+        !query ||
+        worker.name?.toLowerCase().includes(query) ||
+        worker.os?.toLowerCase().includes(query);
+      const matchesSurface =
+        surface === 'ALL' ||
+        (surface === 'INTERNAL'
+          ? !!worker.internalNetworkId
+          : !worker.internalNetworkId);
+      return matchesQuery && matchesSurface;
+    });
+  }, [data, searchQuery, surface]);
 
   const renderSkeleton = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -116,251 +168,156 @@ const ListWorkers = () => {
     );
   };
 
-  const renderWorkerGrid = (workers: NonNullable<typeof globalData>['data']) => {
-    const isWorkerOnline = (w: NonNullable<typeof globalData>['data'][number]) =>
-      w.isOnline ??
-      new Date().getTime() - new Date(w.lastSeenAt).getTime() < 30000;
+  const renderNoMatch = () => (
+    <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <SearchX className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <h3 className="m-4 text-lg font-medium text-muted-foreground">
+        No matching workers
+      </h3>
+      <p className="text-sm text-muted-foreground">
+        Try a different search or filter.
+      </p>
+    </div>
+  );
 
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-        {workers.map((worker) => (
-          <Card key={worker.id} className={`p-1 transition-opacity ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}>
-            <CardContent className="p-3 space-y-4">
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1 bg-muted rounded-lg">
-                    {worker.os ? (
-                      <img
-                        className="dark:brightness-0 dark:invert"
-                        width={30}
-                        height={30}
-                        src={`/${worker.os}.svg`}
-                        alt={worker.os}
-                      />
-                    ) : (
-                      <Server />
-                    )}
-                  </div>
-                  <div>
-                    <span className="text-sm">{worker.name}</span>
-                    <div className="flex items-center space-x-2">
-                      {worker.isOnline !== undefined ? (
-                        worker.isOnline ? (
-                          <>
-                            <span className="relative flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                            </span>
-                            <span className="text-sm text-green-600">
-                              Online
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            {dayjs(worker.lastSeenAt).fromNow()}
-                          </span>
-                        )
-                      ) : new Date().getTime() -
-                          new Date(worker.lastSeenAt).getTime() <
-                        30000 ? (
-                        <>
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                          </span>
-                          <span className="text-sm text-green-600">Online</span>
-                        </>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">
-                          {dayjs(worker.lastSeenAt).fromNow()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <Badge
-                  variant="secondary"
-                  className={`${worker.internalNetworkId ? 'cursor-pointer hover:bg-secondary/80' : ''}`}
-                  onClick={() => {
-                    if (worker.internalNetworkId) {
-                      navigateWithParams(
-                        `/internal-networks/${worker.internalNetworkId}`,
-                      );
-                    }
-                  }}
-                >
-                  {worker.internalNetworkId ? 'Internal network' : 'External'}
-                </Badge>
-              </CardTitle>
-              <div className="flex justify-between items-center">
-                <div className="flex -space-x-2">
-                  {worker.tools.map((tool) => (
-                    <Button
-                      key={tool.id}
-                      variant="ghost"
-                      className="h-8 w-8 p-0 rounded-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigateWithParams(`/tools/${tool.id}`);
-                      }}
-                    >
-                      <Image
-                        className="rounded-full"
-                        height={30}
-                        width={30}
-                        url={tool.logoUrl}
-                      />
-                    </Button>
-                  ))}
-                </div>
-                <div className="flex justify-between">
-                  {worker.currentJobsCount > 0 ? (
-                    <span className="text-green-600">
-                      {worker.currentJobsCount} active job
-                      {worker.currentJobsCount > 1 ? 's' : ''}
-                    </span>
+  const renderWorkerGrid = (workers: WorkerInstance[]) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+      {workers.map((worker) => (
+        <Card
+          key={worker.id}
+          className={`p-1 transition-opacity ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
+        >
+          <CardContent className="p-3 space-y-4">
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1 bg-muted rounded-lg">
+                  {worker.os ? (
+                    <img
+                      className="dark:brightness-0 dark:invert"
+                      width={30}
+                      height={30}
+                      src={`/${worker.os}.svg`}
+                      alt={worker.os}
+                    />
                   ) : (
-                    <span className="text-muted-foreground">
-                      No active jobs
-                    </span>
+                    <Server />
                   )}
                 </div>
-              </div>
-              <div className="text-sm text-muted-foreground text-right">
-                Created {dayjs(worker.createdAt).fromNow()}
-              </div>
-            </CardContent>
-            {/* <CardContent className="p-3 space-y-3">
-              <div className="flex justify-between items-start">
-                <Badge variant="outline">Scope</Badge>
-                <div className="flex">
-                  <Badge variant="outline" className={`ml-2`}>
-                    {worker.scope === 'cloud' ? 'Global' : 'This workspace'}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex justify-between items-start">
-                <Badge variant="outline">Surface</Badge>
-                <div className="flex">
-                  <Badge variant="outline" className={`ml-2`}>
-                    {worker.internalNetworkId ? 'Internal network' : 'External'}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex justify-between items-start">
-                <Badge variant="outline">Tools</Badge>
-                {worker.tools && worker.tools.length > 0 ? (
-                  <div className="flex -space-x-2">
-                    {worker.tools.map((tool) => (
-                      <Button
-                        key={tool.id}
-                        variant="ghost"
-                        className="h-8 w-8 p-0 rounded-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        navigate({ to: '/tools/$id', params: { id: tool.id } });
-                        }}
-                      >
-                        <Avatar className="h-8 w-8 border-2 border-background">
-                          <AvatarImage
-                            src={`/api/${tool.logoUrl}`}
-                            alt={tool.name ?? ''}
-                          />
-                          <AvatarFallback className="text-xs">
-                            {tool.name?.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Button>
-                    ))}
+                <div>
+                  <span className="text-sm">{worker.name}</span>
+                  <div className="flex items-center space-x-2">
+                    <WorkerStatus worker={worker} />
                   </div>
+                </div>
+              </div>
+              <Badge
+                variant="secondary"
+                className={`${worker.internalNetworkId ? 'cursor-pointer hover:bg-secondary/80' : ''}`}
+                onClick={() => {
+                  if (worker.internalNetworkId) {
+                    navigateWithParams(
+                      `/internal-networks/${worker.internalNetworkId}`,
+                    );
+                  }
+                }}
+              >
+                {worker.internalNetworkId ? 'Internal network' : 'External'}
+              </Badge>
+            </CardTitle>
+            <div className="flex justify-between items-center">
+              <div className="flex -space-x-2">
+                {worker.tools.map((tool) => (
+                  <Button
+                    key={tool.id}
+                    variant="ghost"
+                    className="h-8 w-8 p-0 rounded-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigateWithParams(`/tools/${tool.id}`);
+                    }}
+                  >
+                    <Image
+                      className="rounded-full"
+                      height={30}
+                      width={30}
+                      url={tool.logoUrl}
+                    />
+                  </Button>
+                ))}
+              </div>
+              <div className="flex justify-between">
+                {worker.currentJobsCount > 0 ? (
+                  <span className="text-green-600">
+                    {worker.currentJobsCount} active job
+                    {worker.currentJobsCount > 1 ? 's' : ''}
+                  </span>
                 ) : (
-                  <Badge variant="outline">Built-in</Badge>
+                  <span className="text-muted-foreground">No active jobs</span>
                 )}
               </div>
-              <div className="flex justify-between items-start">
-                <Badge variant="outline">{worker.id.slice(0, 8)}</Badge>
-                <Badge
-                  variant={
-                    worker.currentJobsCount > 0 ? 'default' : 'secondary'
-                  }
-                  className={`${worker.currentJobsCount > 0 ? 'bg-green-500 hover:bg-green-700 text-white' : ''} ml-2`}
-                >
-                  {worker.currentJobsCount > 0 ? (
-                    <Loader2Icon className="animate-spin mr-1 h-4 w-4" />
-                  ) : (
-                    ''
-                  )}{' '}
-                  {worker.currentJobsCount > 0 ? 'Running' : 'Idle'}
-                </Badge>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Badge variant="outline">Status</Badge>
-                <div className="flex items-center space-x-2">
-                  {worker.isOnline !== undefined ? (
-                    worker.isOnline ? (
-                      <>
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                        </span>
-                        <span className="text-sm text-green-600">Online</span>
-                      </>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        {dayjs(worker.lastSeenAt).fromNow()}
-                      </span>
-                    )
-                  ) : new Date().getTime() -
-                      new Date(worker.lastSeenAt).getTime() <
-                    30000 ? (
-                    <>
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                      </span>
-                      <span className="text-sm text-green-600">Online</span>
-                    </>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">
-                      {dayjs(worker.lastSeenAt).fromNow()}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <Badge variant="outline">Created at</Badge>
-                <span className="text-sm text-muted-foreground">
-                  {dayjs(worker.createdAt).fromNow()}
-                </span>
-              </div>
-            </CardContent> */}
-          </Card>
-        ))}
-      </div>
-    );
-  };
+            </div>
+            <div className="text-sm text-muted-foreground text-right">
+              Created {dayjs(worker.createdAt).fromNow()}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 
   const renderTabContent = () => {
     if (isLoading) return renderSkeleton();
     if (!data?.data?.length) return renderEmpty();
-    return renderWorkerGrid(data.data);
+    if (!filteredWorkers.length) return renderNoMatch();
+    return renderWorkerGrid(filteredWorkers);
   };
 
   const hasWorkspaceWorkers = (workspaceData?.data?.length ?? 0) > 0;
 
   return (
-    <Page title="Workers" permission="worker.read">
+    <Page
+      title="Workers"
+      permission="worker.read"
+      description="Workers connect your infrastructure to run scans."
+    >
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <TabsList>
-            <TabsTrigger value="global">Global</TabsTrigger>
             <TabsTrigger value="workspace">Workspace</TabsTrigger>
+            <TabsTrigger value="global">Global</TabsTrigger>
           </TabsList>
-          {activeTab === 'workspace' && hasWorkspaceWorkers && <ConnectWorkerTrigger />}
+          {activeTab === 'workspace' && hasWorkspaceWorkers && (
+            <ConnectWorkerTrigger />
+          )}
         </div>
-        <TabsContent value="global">{renderTabContent()}</TabsContent>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="relative w-56 max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search workers..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 pl-8 text-xs"
+            />
+          </div>
+          <Select
+            value={surface}
+            onValueChange={(value) => setSurface(value as WorkerSurface)}
+          >
+            <SelectTrigger className="w-[130px] border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All types</SelectItem>
+              <SelectItem value="EXTERNAL">External</SelectItem>
+              <SelectItem value="INTERNAL">Internal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <TabsContent value="workspace">{renderTabContent()}</TabsContent>
+        <TabsContent value="global">{renderTabContent()}</TabsContent>
       </Tabs>
     </Page>
   );

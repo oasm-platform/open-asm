@@ -3,7 +3,7 @@ import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { CronSchedule } from '@/common/enums/enum';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import type { Repository } from 'typeorm';
 import type { User } from '../auth/entities/user.entity';
 import type { CreateWorkflowDto } from './dto/create-workflow.dto';
 import type { GetManyWorkflowsQueryDto } from './dto/get-many-workflows.dto';

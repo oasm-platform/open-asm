@@ -83,7 +83,7 @@ describe('ToolsService — readiness flags', () => {
       workersService as any,
       redisLockService as any,
       storageService as any,
-      profilesRepo as unknown as Repository<ToolConfigProfile>,
+      profilesRepo,
       connectorRegistry as any,
     );
   });
@@ -660,7 +660,7 @@ describe('ToolsService — readiness flags', () => {
         workersService as any,
         redisLockService as any,
         storageService as any,
-        profilesRepo as unknown as Repository<ToolConfigProfile>,
+        profilesRepo,
         connectorRegistry as any,
       );
       expect(instance).toBeDefined();
@@ -813,7 +813,7 @@ describe('uninstallTool — cascades config profile deletion', () => {
         withLock: jest.fn((_key: string, _ttl: number, fn: () => Promise<unknown>) => fn()),
       } as any,
       { uploadFile: jest.fn() } as any,
-      profilesRepo as unknown as Repository<ToolConfigProfile>,
+      profilesRepo,
       {} as any, // connectorRegistry
     );
   });
