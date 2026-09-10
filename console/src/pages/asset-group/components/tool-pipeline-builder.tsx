@@ -39,7 +39,14 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 
 /** A single tool entry in the pipeline. Order in the array = execution order. */
@@ -244,22 +251,32 @@ const ToolProfileSelect = memo(function ToolProfileSelect({
   );
 });
 
-/** Raw circular logo button — the PopoverAnchor / Tooltip target. */
-const PipelineToolLogo = memo(function PipelineToolLogo({
-  tool,
-  added,
-  disabled,
-  onClick,
-}: {
-  tool: Tool;
-  added: boolean;
-  disabled?: boolean;
-  onClick: (tool: Tool) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={cn(
+/**
+ * Raw circular logo button — the PopoverAnchor / Tooltip target.
+ *
+ * Must forward its ref: Radix `asChild` (PopoverAnchor / TooltipTrigger)
+ * clones this child and relies on the ref being attached to a DOM node.
+ * Without it the anchored popover never opens (added + pending tools alike).
+ */
+const PipelineToolLogo = memo(
+  forwardRef<
+    HTMLButtonElement,
+    {
+      tool: Tool;
+      added: boolean;
+      disabled?: boolean;
+      onClick: (tool: Tool) => void;
+    }
+  >(function PipelineToolLogo(
+    { tool, added, disabled, onClick, ...rest },
+    ref,
+  ) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        {...rest}
+        className={cn(
         'group flex cursor-pointer flex-col items-center gap-2',
         disabled && 'cursor-not-allowed opacity-50',
       )}
@@ -299,9 +316,10 @@ const PipelineToolLogo = memo(function PipelineToolLogo({
       <span className="text-center text-xs font-medium capitalize">
         {tool.name}
       </span>
-    </button>
-  );
-});
+      </button>
+    );
+  }),
+);
 
 /** Action panel for a selected tool: order, badges, profile, inline config, move, remove. */
 const SelectedToolPanel = memo(function SelectedToolPanel({
