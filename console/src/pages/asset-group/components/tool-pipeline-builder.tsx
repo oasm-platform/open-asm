@@ -410,7 +410,7 @@ export function ToolPipelineBuilder({
           )}
           {custom && <Badge variant="secondary">Custom</Badge>}
           {usesDefault && <Badge variant="soft">Using default</Badge>}
-          {!ready && <Badge variant="warning">Needs config</Badge>}
+
         </div>
         <ToolProfileSelect
           toolId={tool.id}

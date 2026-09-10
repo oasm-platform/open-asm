@@ -15,7 +15,7 @@ import { WorkspaceEncryptionService } from '@/services/workspace-encryption/work
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { WorkflowsService } from '../workflows/workflows.service';
+import { WorkflowTemplateService } from '../workflows/workflow-template.service';
 import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMemberPermission } from './entities/workspace-member-permission.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
@@ -32,7 +32,7 @@ describe('WorkspacesService', () => {
   let mockInvitationRepository: Partial<Repository<WorkspaceInvitation>>;
   let mockApiKeysService: Partial<ApiKeysService>;
   let mockNotificationsService: Partial<NotificationsService>;
-  let mockWorkflowsService: Partial<WorkflowsService>;
+  let mockWorkflowTemplateService: Partial<WorkflowTemplateService>;
   let mockAuditService: {
     recordInTx: jest.Mock;
     pseudonymizeActor: jest.Mock;
@@ -217,7 +217,7 @@ describe('WorkspacesService', () => {
       deleteByRef: jest.fn(),
     };
 
-    mockWorkflowsService = {
+    mockWorkflowTemplateService = {
       createDefaultWorkflows: jest.fn(),
     };
 
@@ -267,8 +267,8 @@ describe('WorkspacesService', () => {
           useValue: mockNotificationsService,
         },
         {
-          provide: WorkflowsService,
-          useValue: mockWorkflowsService,
+          provide: WorkflowTemplateService,
+          useValue: mockWorkflowTemplateService,
         },
         {
           provide: AuditService,
@@ -2000,7 +2000,7 @@ describe('WorkspacesService', () => {
       // The transaction was started — a partial workspace + missing Admin
       // group can no longer be left behind.
       expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(mockWorkflowsService.createDefaultWorkflows).not.toHaveBeenCalled();
+      expect(mockWorkflowTemplateService.createDefaultWorkflows).not.toHaveBeenCalled();
     });
 
     it('should enforce the workspace creation limit', async () => {

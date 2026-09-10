@@ -2,6 +2,7 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { JobPriority, JobStatus, ToolCategory } from '@/common/enums/enum';
 import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { Asset } from '@/modules/assets/entities/assets.entity';
+import { ToolConfigProfile } from '@/modules/tools/entities/tool-config-profiles.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, Relation } from 'typeorm';
@@ -125,6 +126,13 @@ export class Job extends BaseEntity {
    */
   @Column({ type: 'uuid', nullable: true })
   configProfileId?: string;
+
+  /**
+   * The tool config profile relation for this job.
+   */
+  @ManyToOne(() => ToolConfigProfile, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'configProfileId' })
+  configProfile?: Relation<ToolConfigProfile>;
 
   /**
    * Inline config snapshot from workflow job (merged final).

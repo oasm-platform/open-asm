@@ -9,6 +9,7 @@ import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
 import { ToolConfigProfilesController } from './tool-config-profiles.controller';
 import { ToolConfigProfilesService } from './tool-config-profiles.service';
+import { ToolSyncService } from './tool-sync.service';
 import { ToolsController } from './tools.controller';
 import { ToolsService } from './tools.service';
 
@@ -20,7 +21,7 @@ import { ToolsService } from './tools.service';
     ConnectorsModule,
   ],
   controllers: [ToolsController, ToolConfigProfilesController],
-  providers: [ToolsService, ToolConfigProfilesService],
+  providers: [ToolsService, ToolConfigProfilesService, ToolSyncService],
   exports: [ToolsService, ToolConfigProfilesService],
 })
 export class ToolsModule {}

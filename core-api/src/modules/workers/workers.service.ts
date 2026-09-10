@@ -32,6 +32,7 @@ import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
+import { ToolSyncService } from '../tools/tool-sync.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import {
@@ -297,7 +298,7 @@ export class WorkersService {
     const connectorTools: Tool[] = connectorList.map((c) => ({
       id: c.slug,
       name: c.name,
-      category: ToolsService.mapConnectorCapabilityToCategory(c.capabilities),
+      category: ToolSyncService.mapConnectorCapabilityToCategory(c.capabilities),
       type: WorkerType.CONNECTOR,
       logoUrl: c.logo ? `/connectors/${c.slug}.png` : undefined,
     })) as Tool[];
