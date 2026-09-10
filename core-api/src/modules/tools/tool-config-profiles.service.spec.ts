@@ -476,6 +476,24 @@ describe('ToolConfigProfilesService', () => {
     ).rejects.toThrow(new ConflictException('Cannot delete profile prof-linked: referenced by Job #job-ref'));
   });
 
+  it('remove — job-ref query reaches workspace via asset→target join (no jobs.workspaceId)', async () => {
+    const profile = mockProfile({ id: 'prof-linked', config: {} });
+    profilesRepo.findOne.mockResolvedValue(profile);
+    profilesRepo.remove.mockImplementation((p) => p);
+    dataSource.query.mockResolvedValue([]);
+
+    await service.remove(wsId, 'prof-linked');
+
+    // Regression: the "jobs" table has no workspaceId column. Workspace must
+    // be derived through jobs.assetId → assets.targetId → targets.workspaceId.
+    const [sql, params] = dataSource.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toMatch(/"workspaceId"\s+IN/i);
+    expect(sql).not.toMatch(/j2?\."workspaceId"/i);
+    expect(sql).toMatch(/JOIN\s+"assets"[\s\S]*JOIN\s+"targets"/i);
+    expect(sql).toMatch(/t\."workspaceId"\s*=\s*\$2/);
+    expect(params).toEqual(['prof-linked', wsId]);
+  });
+
   it('remove — referenced by workflow (content jsonb jobs[]) throws 409', async () => {
     const profile = mockProfile({ id: 'prof-wf', config: {} });
     profilesRepo.findOne.mockResolvedValue(profile);
@@ -488,6 +506,12 @@ describe('ToolConfigProfilesService', () => {
     await expect(
       service.remove(wsId, 'prof-wf'),
     ).rejects.toThrow(new ConflictException('Cannot delete profile prof-wf: referenced by Workflow my-workflow (#wf-1)'));
+
+    // Regression: the workflow query must bind BOTH params ($1 workspaceId,
+    // $2 jsonb array of jobs) — previously it passed 2 params but only had $1.
+    const [sql, params] = dataSource.query.mock.calls[1] as [string, unknown[]];
+    expect(sql).toMatch(/@>\s*\$2::jsonb/);
+    expect(params).toEqual([wsId, JSON.stringify([{ configProfileId: 'prof-wf' }])]);
   });
 
   it('remove — no one uses it deletes successfully', async () => {

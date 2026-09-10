@@ -264,10 +264,11 @@ export class ToolConfigProfilesService {
 
     // Check jobs table for direct configProfileId usage
     const jobRefs = (await this.dataSource.query(
-      `SELECT id FROM "jobs" WHERE "configProfileId" = $1 AND "workspaceId" IN (
-        SELECT "workspaceId" FROM "jobs" j2 JOIN "assets" a ON a.id = j2."assetId"
-        JOIN "targets" t ON t.id = a."targetId" WHERE t."workspaceId" = $2
-      ) LIMIT 1`,
+      `SELECT j.id FROM "jobs" j
+       JOIN "assets" a ON a.id = j."assetId"
+       JOIN "targets" t ON t.id = a."targetId"
+       WHERE j."configProfileId" = $1 AND t."workspaceId" = $2
+       LIMIT 1`,
       [profileId, workspaceId],
     )) as unknown as JobRef[];
     if (jobRefs && jobRefs.length > 0) {
@@ -281,8 +282,8 @@ export class ToolConfigProfilesService {
       `SELECT w.name, w.id AS wf_id FROM workflows w
        WHERE w."workspaceId" = $1
        AND w.content->'jobs' IS NOT NULL
-       AND jsonb_path_exists(w.content->'jobs', '$[*] ? (@.configProfileId == $0)')`,
-      [workspaceId, profileId],
+       AND w.content->'jobs' @> $2::jsonb`,
+      [workspaceId, JSON.stringify([{ configProfileId: profileId }])],
     )) as unknown as WfRef[];
     if (wfRefs && wfRefs.length > 0) {
       throw new ConflictException(
