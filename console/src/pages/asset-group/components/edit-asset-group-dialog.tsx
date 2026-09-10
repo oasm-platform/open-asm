@@ -29,7 +29,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Edit } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -38,6 +38,15 @@ const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   hexColor: z.string().optional(),
 });
+
+const COLORS = [
+  '#78716C', // current/default
+  '#3b82f6', // blue
+  '#22c55e', // green
+  '#f59e0b', // yellow
+  '#7e22ce', // purple
+  '#ec4899', // pink
+] as const;
 
 interface EditAssetGroupDialogProps {
   assetGroup: AssetGroup;
@@ -60,25 +69,28 @@ export function EditAssetGroupDialog({
 
   const queryClient = useQueryClient();
 
-  function handleSubmit(data: z.infer<typeof formSchema>) {
-    mutate(
-      {
-        id: assetGroup.id,
-        data,
-      },
-      {
-        onSuccess: () => {
-          setOpen(false);
-          toast.success('Automation group updated successfully');
-          queryClient.invalidateQueries({ queryKey: ['asset-group'] });
-          onSuccess?.();
+  const handleSubmit = useCallback(
+    (data: z.infer<typeof formSchema>) => {
+      mutate(
+        {
+          id: assetGroup.id,
+          data,
         },
-        onError: () => {
-          toast.error('Failed to update automation group');
+        {
+          onSuccess: () => {
+            setOpen(false);
+            toast.success('Automation group updated successfully');
+            queryClient.invalidateQueries({ queryKey: ['asset-group'] });
+            onSuccess?.();
+          },
+          onError: () => {
+            toast.error('Failed to update automation group');
+          },
         },
-      },
-    );
-  }
+      );
+    },
+    [mutate, assetGroup.id, queryClient, onSuccess],
+  );
 
   const [open, setOpen] = useState(false);
 
@@ -143,14 +155,7 @@ export function EditAssetGroupDialog({
                           {...field}
                         />
                         <div className="flex space-x-2">
-                          {[
-                            '#78716C', // current/default
-                            '#3b82f6', // blue
-                            '#22c55e', // green
-                            '#f59e0b', // yellow
-                            '#7e22ce', // purple
-                            '#ec4899', // pink
-                          ].map((color) => (
+                          {COLORS.map((color) => (
                             <button
                               key={color}
                               type="button"

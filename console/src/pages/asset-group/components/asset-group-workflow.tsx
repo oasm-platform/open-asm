@@ -48,7 +48,7 @@ import {
   Settings,
 } from 'lucide-react';
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
@@ -99,33 +99,39 @@ export default function AssetGroupWorkflow({
     [toolProviders],
   );
 
-  // Get the current workflow in the group (assuming there's only one workflow per group)
-  const getCurrentWorkflow = () => {
-    return workflows[0];
-  };
+  // Only one workflow per group is expected.
+  const currentWorkflow = workflows[0];
+  const workflowId = currentWorkflow?.id;
 
   const timezone = getLocalTimezone();
-  const currentSchedule = getCurrentWorkflow()?.schedule;
-  const lastRun = getCurrentWorkflow()?.lastRun;
-  const lastRunText = lastRun
-    ? dayjs(lastRun.createdAt).format('DD/MM/YYYY HH:mm')
-    : 'Never';
-  const nextRun =
-    currentSchedule && currentSchedule !== 'disabled'
-      ? getNextRun(currentSchedule, timezone)
-      : null;
-  const nextRunText = nextRun
-    ? dayjs(nextRun).format('DD/MM/YYYY HH:mm')
-    : 'Disabled';
+  const currentSchedule = currentWorkflow?.schedule;
+  const lastRun = currentWorkflow?.lastRun;
+  const lastRunText = useMemo(
+    () =>
+      lastRun ? dayjs(lastRun.createdAt).format('DD/MM/YYYY HH:mm') : 'Never',
+    [lastRun],
+  );
+  const nextRun = useMemo(
+    () =>
+      currentSchedule && currentSchedule !== 'disabled'
+        ? getNextRun(currentSchedule, timezone)
+        : null,
+    [currentSchedule, timezone],
+  );
+  const nextRunText = useMemo(
+    () => (nextRun ? dayjs(nextRun).format('DD/MM/YYYY HH:mm') : 'Disabled'),
+    [nextRun],
+  );
 
   // ---- Pipeline value derived from workflow jobs[] order ----
   // jobs[] order IS the execution order (scheduler runs jobs[0], chain uses
   // index). The builder's value array preserves that order 1:1, and every
   // mutation below writes the array back with the same ordering.
-  const currentWorkflow = workflows[0];
-  const jobsJson = JSON.stringify(
-    currentWorkflow?.workflow.content?.jobs ?? [],
+  const jobs = useMemo(
+    () => currentWorkflow?.workflow.content?.jobs ?? [],
+    [currentWorkflow],
   );
+  const jobsJson = useMemo(() => JSON.stringify(jobs), [jobs]);
   const pipeline: PipelineToolEntry[] = useMemo(() => {
     const jobs = currentWorkflow?.workflow.content?.jobs ?? [];
     return jobs.map((job) => {
@@ -142,14 +148,15 @@ export default function AssetGroupWorkflow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobsJson, toolByName]);
 
-  const toolNameOf = (entry: PipelineToolEntry): string =>
-    toolById.get(entry.toolId)?.name ??
-    pipeline.find((p) => p.toolId === entry.toolId)?.toolId ??
-    entry.toolId;
+  const toolNameOf = useCallback(
+    (entry: PipelineToolEntry): string =>
+      toolById.get(entry.toolId)?.name ?? entry.toolId,
+    [toolById],
+  );
 
   /** Persist the full ordered pipeline as jobs[] (append/update, order preserved). */
-  const persistPipeline = async (next: PipelineToolEntry[]) => {
-    const existingWorkflow = getCurrentWorkflow()?.workflow ?? null;
+  const persistPipeline = useCallback(async (next: PipelineToolEntry[]) => {
+    const existingWorkflow = currentWorkflow?.workflow ?? null;
     try {
       setIsProcessing(true);
       const jobs = next.map((entry) => {
@@ -207,11 +214,35 @@ export default function AssetGroupWorkflow({
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [
+    currentWorkflow,
+    toolNameOf,
+    removeWorkflowsMutation,
+    deleteWorkflowMutation,
+    updateWorkflowMutation,
+    createWorkflowMutation,
+    addWorkflowsMutation,
+    assetGroupId,
+    onRefetch,
+  ]);
+
+  const handleOpenSchedule = useCallback(() => {
+    setIsSetScheduleOpen(true);
+  }, []);
+
+  const handleScheduleOpenChange = useCallback((open: boolean) => {
+    setIsSetScheduleOpen(open);
+  }, []);
+
+  const handlePipelineChange = useCallback(
+    (next: PipelineToolEntry[]) => {
+      if (!isProcessing) void persistPipeline(next);
+    },
+    [persistPipeline, isProcessing],
+  );
 
   // Disable the workflow schedule by submitting the "disabled" value
-  const handleDisableSchedule = () => {
-    const workflowId = workflows[0]?.id;
+  const handleDisableSchedule = useCallback(() => {
     if (!workflowId) return;
 
     updateAssetGroupWorkflow(
@@ -227,11 +258,10 @@ export default function AssetGroupWorkflow({
         },
       },
     );
-  };
+  }, [workflowId, updateAssetGroupWorkflow, onRefetch]);
 
   // Save a custom cron schedule from the dialog, same API as the dropdown
-  const handleSaveCustomSchedule = () => {
-    const workflowId = workflows[0]?.id;
+  const handleSaveCustomSchedule = useCallback(() => {
     if (!workflowId || !draftSchedule?.cron) return;
 
     updateAssetGroupWorkflow(
@@ -247,7 +277,7 @@ export default function AssetGroupWorkflow({
         },
       },
     );
-  };
+  }, [workflowId, draftSchedule, updateAssetGroupWorkflow, onRefetch]);
 
   return (
     <div className="space-y-4 mb-4">
@@ -276,8 +306,8 @@ export default function AssetGroupWorkflow({
               variant="outline"
               size="icon"
               aria-label="Configure schedule"
-              disabled={isPendingUpdateSchedule || !workflows[0]?.id}
-              onClick={() => setIsSetScheduleOpen(true)}
+              disabled={isPendingUpdateSchedule || !workflowId}
+              onClick={handleOpenSchedule}
             >
               <Settings className="size-4" />
             </Button>
@@ -312,7 +342,7 @@ export default function AssetGroupWorkflow({
               </div>
             </div>
           </div>
-          <Sheet open={isSetScheduleOpen} onOpenChange={setIsSetScheduleOpen}>
+          <Sheet open={isSetScheduleOpen} onOpenChange={handleScheduleOpenChange}>
             <SheetContent
               side="right"
               className="w-full sm:max-w-lg gap-3"
@@ -340,7 +370,7 @@ export default function AssetGroupWorkflow({
                   confirmText="Disable"
                   disabled={
                     isPendingUpdateSchedule ||
-                    !workflows[0]?.id ||
+                    !workflowId ||
                     currentSchedule === 'disabled'
                   }
                   onConfirm={handleDisableSchedule}
@@ -352,7 +382,7 @@ export default function AssetGroupWorkflow({
                   className="ml-auto"
                   disabled={
                     isPendingUpdateSchedule ||
-                    !workflows[0]?.id ||
+                    !workflowId ||
                     !draftSchedule?.cron
                   }
                   onClick={handleSaveCustomSchedule}
@@ -374,7 +404,7 @@ export default function AssetGroupWorkflow({
             </CardDescription>
           </div>
           <RunWorkflowButton
-            id={getCurrentWorkflow()?.id}
+            id={workflowId}
             disabled={
               lastRun?.status ===
                 AssetGroupLastRunDtoStatus.pending ||
@@ -401,9 +431,7 @@ export default function AssetGroupWorkflow({
             <ToolPipelineBuilder
               tools={toolProviders as Tool[]}
               value={pipeline}
-              onChange={(next) => {
-                if (!isProcessing) void persistPipeline(next);
-              }}
+              onChange={handlePipelineChange}
               disabled={isProcessing}
             />
           )}

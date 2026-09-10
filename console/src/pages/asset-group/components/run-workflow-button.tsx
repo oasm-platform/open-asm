@@ -3,6 +3,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAssetGroupControllerRunGroupWorkflowScheduler } from '@/services/apis/gen/queries';
 import type { AxiosError } from 'axios';
 import { Play } from 'lucide-react';
+import { memo, useCallback } from 'react';
 import { toast } from 'sonner';
 
 interface RunAssetGroupWorkflowButtonProps {
@@ -16,7 +17,7 @@ const RunWorkflowButton = ({
   onSuccess,
 }: RunAssetGroupWorkflowButtonProps) => {
   const { mutate } = useAssetGroupControllerRunGroupWorkflowScheduler();
-  const handleRun = () => {
+  const handleRun = useCallback(() => {
     if (id) {
       mutate(
         {
@@ -29,12 +30,14 @@ const RunWorkflowButton = ({
           },
           onError: (e) => {
             const err = e as AxiosError<{ message: string }>;
-            toast.error(err.response?.data.message);
+            toast.error(
+              err.response?.data.message ?? 'Failed to run workflow',
+            );
           },
         },
       );
     }
-  };
+  }, [id, mutate, onSuccess]);
 
   return (
     <ConfirmDialog
@@ -55,4 +58,4 @@ const RunWorkflowButton = ({
   );
 };
 
-export default RunWorkflowButton;
+export default memo(RunWorkflowButton);

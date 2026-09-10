@@ -7,6 +7,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Trash } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import AssetGroupWorkflow from './components/asset-group-workflow';
@@ -20,7 +21,7 @@ export default function AssetGroupDetail() {
   const { mutate, isPending } = useAssetGroupControllerDelete();
   const queryClient = useQueryClient();
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     mutate(
       { id: id! },
       {
@@ -37,7 +38,12 @@ export default function AssetGroupDetail() {
         },
       },
     );
-  };
+  }, [mutate, queryClient, navigate, id]);
+
+  const workflows = useMemo(
+    () => data?.assetGroupWorkflows ?? [],
+    [data?.assetGroupWorkflows],
+  );
 
   if (!data) return <div></div>;
 
@@ -74,7 +80,7 @@ export default function AssetGroupDetail() {
     >
       <AssetGroupWorkflow
         assetGroupId={id!}
-        workflows={data.assetGroupWorkflows ?? []}
+        workflows={workflows}
         onRefetch={refetch}
       />
       <AssetSection assetGroupId={id!} />
