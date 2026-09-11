@@ -73,6 +73,17 @@ function blank(value: unknown): boolean {
   return typeof value !== 'string' || value.trim().length === 0;
 }
 
+function required<T>(value: T | undefined | null, message: string): T {
+  if (
+    value === undefined ||
+    value === null ||
+    (typeof value === 'string' && value.trim().length === 0)
+  ) {
+    throw new Error(message);
+  }
+  return value;
+}
+
 /**
  * IAM Identity Center (AWS SSO) device-authorization flow and credential
  * resolution.
@@ -111,29 +122,37 @@ export class AwsSsoService implements SsoCredentialResolver {
       }),
     );
 
-    if (blank(registered.clientId) || blank(registered.clientSecret)) {
-      throw new Error('AWS SSO RegisterClient did not return a client id/secret');
-    }
+    const clientId = required(
+      registered.clientId,
+      'AWS SSO RegisterClient did not return a client id/secret',
+    );
+    const clientSecret = required(
+      registered.clientSecret,
+      'AWS SSO RegisterClient did not return a client id/secret',
+    );
 
     const device = await client.send(
       new StartDeviceAuthorizationCommand({
-        clientId: registered.clientId,
-        clientSecret: registered.clientSecret,
+        clientId,
+        clientSecret,
         startUrl: args.startUrl,
       }),
     );
 
-    if (blank(device.deviceCode) || blank(device.userCode)) {
-      throw new Error(
-        'AWS SSO StartDeviceAuthorization did not return a device code',
-      );
-    }
+    const deviceCode = required(
+      device.deviceCode,
+      'AWS SSO StartDeviceAuthorization did not return a device code',
+    );
+    const userCode = required(
+      device.userCode,
+      'AWS SSO StartDeviceAuthorization did not return a device code',
+    );
 
     return {
-      clientId: registered.clientId,
-      clientSecret: registered.clientSecret,
-      deviceCode: device.deviceCode,
-      userCode: device.userCode,
+      clientId,
+      clientSecret,
+      deviceCode,
+      userCode,
       verificationUri: device.verificationUri ?? '',
       verificationUriComplete: device.verificationUriComplete,
       interval: device.interval ?? 5,
@@ -164,13 +183,14 @@ export class AwsSsoService implements SsoCredentialResolver {
         }),
       );
 
-      if (blank(token.accessToken)) {
-        throw new Error('AWS SSO CreateToken did not return an access token');
-      }
+      const accessToken = required(
+        token.accessToken,
+        'AWS SSO CreateToken did not return an access token',
+      );
 
       return {
         status: 'authorized',
-        accessToken: token.accessToken,
+        accessToken,
         refreshToken: token.refreshToken,
         expiresIn: token.expiresIn,
       };
@@ -282,31 +302,37 @@ export class AwsSsoService implements SsoCredentialResolver {
       }),
     );
 
-    if (blank(token.accessToken)) {
-      throw new Error('AWS SSO refresh_token exchange did not return an access token');
-    }
+    const accessToken = required(
+      token.accessToken,
+      'AWS SSO refresh_token exchange did not return an access token',
+    );
 
     const sso = new SSOClient({ region: args.region });
     const result = await sso.send(
       new GetRoleCredentialsCommand({
         accountId: args.accountId,
         roleName: args.roleName,
-        accessToken: token.accessToken,
+        accessToken,
       }),
     );
 
     const roleCredentials = result.roleCredentials;
-    if (blank(roleCredentials?.accessKeyId) || blank(roleCredentials?.secretAccessKey)) {
-      throw new Error('AWS SSO GetRoleCredentials returned no credentials');
-    }
+    const accessKeyId = required(
+      roleCredentials?.accessKeyId,
+      'AWS SSO GetRoleCredentials returned no credentials',
+    );
+    const secretAccessKey = required(
+      roleCredentials?.secretAccessKey,
+      'AWS SSO GetRoleCredentials returned no credentials',
+    );
 
     return {
       credentials: {
-        accessKeyId: roleCredentials.accessKeyId,
-        secretAccessKey: roleCredentials.secretAccessKey,
-        sessionToken: roleCredentials.sessionToken,
+        accessKeyId,
+        secretAccessKey,
+        sessionToken: roleCredentials?.sessionToken,
         expiration:
-          typeof roleCredentials.expiration === 'number'
+          typeof roleCredentials?.expiration === 'number'
             ? new Date(roleCredentials.expiration)
             : undefined,
       },
