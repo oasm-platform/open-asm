@@ -2,13 +2,13 @@ import { Logger, BadRequestException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { IntegrationType } from '@/common/enums/enum';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
-import type { DataAdapterService } from '../../data-adapter/data-adapter.service';
 import type { TargetType } from '../../targets/entities/target.entity';
 import { TargetSource } from '../../targets/entities/target.entity';
-import type { TargetsService } from '../../targets/targets.service';
 import {
   CloudProviderConnector,
+  type CloudProviderSyncConfig,
   type ConnectorConfig,
+  type ConnectorSyncResult,
 } from './connector.abstract';
 
 /**
@@ -44,7 +44,7 @@ export type DnsRecords = Record<DnsRecordType, string[]>;
 /**
  * Result of one Cloudflare asset sync.
  */
-export interface SyncResult {
+export interface SyncResult extends ConnectorSyncResult {
   /** Zones fetched from the API (pre-status-filter count — includes any
    * non-active zones that slipped through; the ingest loop skips them). */
   zones: number;
@@ -53,8 +53,6 @@ export interface SyncResult {
   records: number;
   /** Count of wildcard (`*.`) records that were counted but not materialized. */
   wildcardZones: number;
-  targetsCreated: number;
-  assetsUpserted: number;
   /** Set in test mode (__dryRun) only — 'active' when the credential probe succeeds. */
   tokenStatus?: string;
 }
@@ -99,27 +97,11 @@ interface CloudflareDnsRecord {
 
 /**
  * Runtime config assembled by IntegrationSyncService (P4) and injected into
- * the connector. Services are dependency-injected at runtime — the connector
- * only knows their surface via `import type`, so there is no runtime import
- * of the service modules.
+ * the connector. Shared shape lives on {@link CloudProviderSyncConfig}; the
+ * Cloudflare-specific credential is added here.
  */
-export interface CloudflareSyncConfig extends ConnectorConfig {
+export interface CloudflareSyncConfig extends CloudProviderSyncConfig {
   apiToken: string;
-  workspaceId: string;
-  integrationId: string;
-  /** Test mode — fetch only, never write to the DB. */
-  __dryRun?: boolean;
-  /**
-   * Stashed by syncAssets before returning so the caller (IntegrationSyncService)
-   * can read the counts back without re-parsing the connector result message.
-   */
-  __syncResult?: SyncResult;
-  targetsService: Pick<
-    TargetsService,
-    'findByWorkspaceAndValues' | 'createMultipleTargets'
-  >;
-  dataAdapterService: Pick<DataAdapterService, 'upsertAssetsByTargetId'>;
-  actingUserContext: UserContextPayload;
 }
 
 /**
