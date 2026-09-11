@@ -462,15 +462,18 @@ describe('ConnectIntegrationSheet', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows only the sso fields when sso is selected', async () => {
+  it('renders the aws sso device-code wizard instead of raw sso fields', async () => {
     const { user } = renderWithProviders(
       <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
     );
     await selectConnectionMethod(user, 'Sso');
 
-    expect(screen.getByLabelText(/start url/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/account id/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/role name/i)).toBeInTheDocument();
+    // The SSO wizard owns the region/startUrl/accountId/roleName fields.
+    expect(
+      await screen.findByRole('button', { name: /start authorization/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/account id/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/role name/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/access key id/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/role arn/i)).not.toBeInTheDocument();
   });

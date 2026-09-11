@@ -19,10 +19,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { AwsSsoConnect } from './aws-sso-connect';
 import { IntegrationLogo } from './integration-logo';
 import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
 
 const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
+
+/** Schema fields the AWS SSO wizard collects itself (not the raw form). */
+const AWS_SSO_WIZARD_FIELDS = ['region', 'startUrl', 'accountId', 'roleName'];
 
 interface ConnectIntegrationSheetProps {
   schema: {
@@ -75,9 +79,17 @@ export function ConnectIntegrationSheet({
   const appType = (schema.properties?.app_type as SchemaProperty | undefined)?.const ?? schema.$id ?? '';
   const category = (schema.properties?.category as SchemaProperty | undefined)?.const ?? '';
 
+  // AWS SSO uses the device-authorization wizard (todo 16) instead of raw
+  // schema fields: the OIDC client credentials + refresh token come from the
+  // poll response, not the form. Generated hooks don't exist until todo 18.
+  const isAwsSso = appType === 'aws' && formValues.connectionMethod === 'sso';
+
   // All properties except the hidden discriminator fields
   const formProperties = Object.entries(schema.properties ?? {}).filter(
-    ([key]) => key !== 'app_type' && key !== 'category',
+    ([key]) =>
+      key !== 'app_type' &&
+      key !== 'category' &&
+      !(isAwsSso && AWS_SSO_WIZARD_FIELDS.includes(key)),
   ) as [string, SchemaProperty][];
 
   // Group properties by ui:form:group for grid layout sections
@@ -126,6 +138,9 @@ export function ConnectIntegrationSheet({
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
+    // AWS SSO is completed by the wizard's own Connect button; the sheet form
+    // must never create the integration from raw schema values.
+    if (isAwsSso) return;
     if (!appType || !category) {
       toast.error('Invalid integration schema');
       return;
@@ -236,13 +251,25 @@ export function ConnectIntegrationSheet({
             </div>
           )}
 
-          {formProperties.length === 0 && (
+          {isAwsSso && (
+            <AwsSsoConnect
+              name={integrationName}
+              syncSchedule={syncSchedule}
+              onConnected={() => {
+                setFormValues({});
+                onOpenChange(false);
+              }}
+            />
+          )}
+
+          {!isAwsSso && formProperties.length === 0 && (
             <p className="text-sm text-muted-foreground">
               No configuration required.
             </p>
           )}
 
-          {ungroupedProperties.map(([key, prop]) => {
+          {!isAwsSso &&
+            ungroupedProperties.map(([key, prop]) => {
             const label = prop.title ?? key;
             const required = schema.required?.includes(key);
             const textColor = prop['ui:text-color'];
@@ -275,7 +302,8 @@ export function ConnectIntegrationSheet({
             );
           })}
 
-          {Object.entries(propertyGroups).map(([groupKey, fields]) => {
+          {!isAwsSso &&
+            Object.entries(propertyGroups).map(([groupKey, fields]) => {
             const groupLabel =
               groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
 
@@ -324,10 +352,12 @@ export function ConnectIntegrationSheet({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Connect
-          </Button>
+          {!isAwsSso && (
+            <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Connect
+            </Button>
+          )}
         </SheetFooter>
         </form>
       </SheetContent>
