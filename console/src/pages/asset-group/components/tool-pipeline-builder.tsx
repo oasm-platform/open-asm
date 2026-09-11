@@ -509,7 +509,10 @@ const PendingToolPanel = memo(function PendingToolPanel({
           const cfg = pending;
           const hasProfileId = !!cfg?.configProfileId;
           const hasInline = hasInlineConfig(cfg);
-          if (!hasProfileId && !hasInline) {
+          // Only tools that are not ready (connector without a backend
+          // profile / inline config) need an explicit configuration choice.
+          // Built-in, provider, and already-ready connectors add directly.
+          if (!isPipelineToolReady(tool, cfg as PipelineToolEntry | undefined) && !hasProfileId && !hasInline) {
             toast.info('Set a config profile or inline config first.');
             return;
           }
