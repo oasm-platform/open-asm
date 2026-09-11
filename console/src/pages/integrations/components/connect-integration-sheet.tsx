@@ -89,7 +89,10 @@ export function ConnectIntegrationSheet({
     ([key]) =>
       key !== 'app_type' &&
       key !== 'category' &&
-      !(isAwsSso && AWS_SSO_WIZARD_FIELDS.includes(key)),
+      !(
+        isAwsSso &&
+        (AWS_SSO_WIZARD_FIELDS.includes(key) || key === 'regions')
+      ),
   ) as [string, SchemaProperty][];
 
   // Group properties by ui:form:group for grid layout sections
@@ -251,25 +254,14 @@ export function ConnectIntegrationSheet({
             </div>
           )}
 
-          {isAwsSso && (
-            <AwsSsoConnect
-              name={integrationName}
-              syncSchedule={syncSchedule}
-              onConnected={() => {
-                setFormValues({});
-                onOpenChange(false);
-              }}
-            />
-          )}
-
           {!isAwsSso && formProperties.length === 0 && (
             <p className="text-sm text-muted-foreground">
               No configuration required.
             </p>
           )}
 
-          {!isAwsSso &&
-            ungroupedProperties.map(([key, prop]) => {
+          {ungroupedProperties.map(([key, prop]) => {
+            if (!isPropertyVisible(prop, formValues)) return null;
             const label = prop.title ?? key;
             const required = schema.required?.includes(key);
             const textColor = prop['ui:text-color'];
@@ -302,8 +294,7 @@ export function ConnectIntegrationSheet({
             );
           })}
 
-          {!isAwsSso &&
-            Object.entries(propertyGroups).map(([groupKey, fields]) => {
+          {Object.entries(propertyGroups).map(([groupKey, fields]) => {
             const groupLabel =
               groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
 
@@ -314,6 +305,7 @@ export function ConnectIntegrationSheet({
                 </Label>
                 <div className="grid grid-cols-2 gap-3">
                   {fields.map(([key, prop]) => {
+                    if (!isPropertyVisible(prop, formValues)) return null;
                     const textColor = prop['ui:text-color'];
                     return (
                       <div key={key} className="space-y-2">
@@ -341,6 +333,17 @@ export function ConnectIntegrationSheet({
               </div>
             );
           })}
+
+          {isAwsSso && (
+            <AwsSsoConnect
+              name={integrationName}
+              syncSchedule={syncSchedule}
+              onConnected={() => {
+                setFormValues({});
+                onOpenChange(false);
+              }}
+            />
+          )}
         </div>
 
         <SheetFooter>

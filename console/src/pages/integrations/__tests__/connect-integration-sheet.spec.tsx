@@ -411,6 +411,22 @@ describe('ConnectIntegrationSheet', () => {
     expect(screen.queryByLabelText(/start url/i)).not.toBeInTheDocument();
   });
 
+  it('does not leave dangling labels for fields hidden by the selected method', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await screen.findByRole('combobox', { name: 'Connection method' });
+
+    // accessKey default: assumeRole/sso labels must not linger in the DOM.
+    expect(screen.queryByText('Role ARN')).not.toBeInTheDocument();
+    expect(screen.queryByText('External ID')).not.toBeInTheDocument();
+    expect(screen.queryByText('Start URL')).not.toBeInTheDocument();
+
+    await selectConnectionMethod(user, 'Assume Role');
+    expect(screen.queryByText('Web identity token')).not.toBeInTheDocument();
+    expect(screen.queryByText('Start URL')).not.toBeInTheDocument();
+  });
+
   it('reveals roleArn + base credentials and externalId when assumeRole is selected', async () => {
     const { user } = renderWithProviders(
       <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
@@ -459,6 +475,26 @@ describe('ConnectIntegrationSheet', () => {
     // Grouped fields must NOT collapse to a boolean Switch.
     expect(
       screen.queryByRole('switch', { name: /role arn/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the connection method selector after picking sso so the user can switch back', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await selectConnectionMethod(user, 'Sso');
+
+    expect(
+      screen.getByRole('combobox', { name: 'Connection method' }),
+    ).toHaveTextContent('Sso');
+    expect(
+      await screen.findByRole('button', { name: /start authorization/i }),
+    ).toBeInTheDocument();
+
+    await selectConnectionMethod(user, 'Access Key');
+    expect(screen.getByLabelText(/access key id/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /start authorization/i }),
     ).not.toBeInTheDocument();
   });
 

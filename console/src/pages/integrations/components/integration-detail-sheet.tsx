@@ -279,6 +279,7 @@ export function IntegrationDetailSheet({
           {/* Ungrouped properties */}
           {isEditing
             ? ungroupedProperties.map(([key, prop]) => {
+                if (!isPropertyVisible(prop, conditionValues)) return null;
                 const label = prop.title ?? key;
                 const required = schema.required?.includes(key);
                 const textColor = prop['ui:text-color'];
@@ -312,6 +313,7 @@ export function IntegrationDetailSheet({
                 );
               })
             : ungroupedProperties.map(([key, prop]) => {
+                if (!isPropertyVisible(prop, conditionValues)) return null;
                 const label = prop.title ?? key;
 
                 return (
@@ -348,6 +350,7 @@ export function IntegrationDetailSheet({
                 </Label>
                 <div className="grid grid-cols-2 gap-3">
                   {fields.map(([key, prop]) => {
+                    if (!isPropertyVisible(prop, conditionValues)) return null;
                     const textColor = prop['ui:text-color'];
 
                     return (
