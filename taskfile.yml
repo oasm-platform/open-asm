@@ -127,3 +127,8 @@ tasks:
   migration:revert:
     cmds:
       - task: api:migration:revert
+
+  # Sync latest connectors manifest
+  sync-connectors:
+    cmds:
+      - node scripts/sync-tool-manifest.mjs

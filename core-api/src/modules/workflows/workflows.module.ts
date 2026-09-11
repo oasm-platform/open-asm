@@ -5,6 +5,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { Workflow } from './entities/workflow.entity';
 import { WorkflowsController } from './workflows.controller';
 import { WorkflowsService } from './workflows.service';
+import { WorkflowTemplateService } from './workflow-template.service';
 
 @Global()
 @Module({
@@ -13,7 +14,7 @@ import { WorkflowsService } from './workflows.service';
     forwardRef(() => WorkspacesModule),
   ],
   controllers: [WorkflowsController],
-  providers: [WorkflowsService],
-  exports: [WorkflowsService],
+  providers: [WorkflowsService, WorkflowTemplateService],
+  exports: [WorkflowsService, WorkflowTemplateService],
 })
 export class WorkflowsModule {}

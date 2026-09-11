@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package connector;
+
+option go_package = "./connector";
+
+import "google/protobuf/timestamp.proto";
+
+message Register {
+  string token = 1;
+  // Execution context advertised by the connector on connect. Old connectors
+  // omit these (empty) — they keep the legacy no-ExecuteJob behavior.
+  string execution_id = 2;
+  string job_id = 3;
+  string tool = 4;
+}
+
+message RegisterAck {
+  bool accepted = 1;
+  string reason = 2;
+}
+
+message ExecuteJob {
+  string execution_id = 1;
+  string job_id = 2;
+  string tool = 3;
+  string image = 4;
+  string trace_id = 5;
+  map<string, string> inputs = 6;
+  // Per-job connector config override (Phase 2 warm pool): a reused container
+  // keeps its first-run env, so the job's config profile travels in-band.
+  // The SDK merges "oasm_config" (JSON blob) over its OASM_CONFIG env.
+  map<string, string> config = 7;
+}
+
+message Cancel {
+  string execution_id = 1;
+}
+
+message Result {
+  string execution_id = 1;
+  bytes data = 2;
+  bool is_error = 3;
+  repeated Finding findings = 4;
+}
+
+// Finding is one structured vulnerability emitted by a connector. Field
+// numbers are the wire contract with the SDK (sdk/proto/connector.proto) —
+// never renumber.
+message Finding {
+  string name = 1;
+  string severity = 2;
+  repeated string tags = 3;
+  repeated string references = 4;
+  repeated string cve_id = 5;
+  repeated string cwe_id = 6;
+  double cvss_score = 7;
+  string cvss_metrics = 8;
+  double epss_score = 9;
+  string solution = 10;
+  string matched_at = 11;
+  string host = 12;
+  string ip = 13;
+  google.protobuf.Timestamp timestamp = 14;
+}
+
+message Done {
+  string execution_id = 1;
+  string error = 2;
+}
+
+// Connector → Worker messages (client stream)
+message ConnectorMessage {
+  oneof message {
+    Register register = 1;
+    Result result = 2;
+    Done done = 3;
+  }
+}
+
+// Worker → Connector messages (server stream)
+message WorkerMessage {
+  oneof message {
+    RegisterAck register_ack = 1;
+    ExecuteJob execute = 2;
+    Cancel cancel = 3;
+  }
+}
+
+service ConnectorService {
+  // Bidirectional streaming: connector connects and exchanges messages
+  rpc Connect(stream ConnectorMessage) returns (stream WorkerMessage);
+}

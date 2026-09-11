@@ -602,9 +602,13 @@ export type On = {
   schedule: string;
 };
 
+export type WorkflowJobConfig = { [key: string]: unknown };
+
 export type WorkflowJob = {
   name: string;
   run: string;
+  config?: WorkflowJobConfig;
+  configProfileId?: string;
 };
 
 export type WorkflowContent = {
@@ -1031,7 +1035,10 @@ export type ToolType = (typeof ToolType)[keyof typeof ToolType];
 export const ToolType = {
   built_in: 'built_in',
   provider: 'provider',
+  connector: 'connector',
 } as const;
+
+export type ToolHasConfigProfile = { [key: string]: unknown };
 
 export type Tool = {
   id: string;
@@ -1050,6 +1057,8 @@ export type Tool = {
   type: ToolType;
   providerId: string;
   availableWorkersCount?: number;
+  hasConfigProfile?: ToolHasConfigProfile;
+  isReady?: boolean;
 };
 
 export type User = {
@@ -1574,6 +1583,7 @@ export type WorkerInstanceType =
 export const WorkerInstanceType = {
   built_in: 'built_in',
   provider: 'provider',
+  connector: 'connector',
 } as const;
 
 export type WorkerInstanceScope =
@@ -1582,6 +1592,17 @@ export type WorkerInstanceScope =
 export const WorkerInstanceScope = {
   cloud: 'cloud',
   workspace: 'workspace',
+} as const;
+
+/**
+ * @nullable
+ */
+export type WorkerInstanceRunMode =
+  (typeof WorkerInstanceRunMode)[keyof typeof WorkerInstanceRunMode] | null;
+
+export const WorkerInstanceRunMode = {
+  cli: 'cli',
+  node: 'node',
 } as const;
 
 export type WorkerInstance = {
@@ -1600,12 +1621,28 @@ export type WorkerInstance = {
   internalNetworkId: string;
   tools: Tool[];
   enabledAgentMode?: boolean;
+  /** @nullable */
+  runMode?: WorkerInstanceRunMode;
   isOnline?: boolean;
 };
+
+/**
+ * Worker run mode enum over gRPC: 0=UNKNOWN, 1=CLI, 2=NODE. Accepts numeric or string.
+ */
+export type WorkerMetadataDtoMode =
+  (typeof WorkerMetadataDtoMode)[keyof typeof WorkerMetadataDtoMode];
+
+export const WorkerMetadataDtoMode = {
+  NUMBER_0: 0,
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
 
 export type WorkerMetadataDto = {
   name?: string;
   os?: string;
+  /** Worker run mode enum over gRPC: 0=UNKNOWN, 1=CLI, 2=NODE. Accepts numeric or string. */
+  mode?: WorkerMetadataDtoMode;
 };
 
 export type WorkerJoinDto = {
@@ -1674,6 +1711,51 @@ export type GetManyToolDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type ConnectorDto = {
+  name: string;
+  slug: string;
+  version: string;
+  image: string;
+  author?: string;
+  pricingTier?: string[];
+  shortDescription?: string;
+  description?: string;
+  homepage?: string;
+  repositoryUrl?: string;
+  supportUrl?: string;
+  capabilities: string[];
+};
+
+export type ToolConfigProfile = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Tool-specific configuration object
+ */
+export type CreateProfileDtoConfig = { [key: string]: unknown };
+
+export type CreateProfileDto = {
+  /** Profile name (unique per tool) */
+  name: string;
+  /** Tool-specific configuration object */
+  config: CreateProfileDtoConfig;
+};
+
+/**
+ * Tool-specific configuration object
+ */
+export type UpdateProfileDtoConfig = { [key: string]: unknown };
+
+export type UpdateProfileDto = {
+  /** Profile name (unique per tool) */
+  name?: string;
+  /** Tool-specific configuration object */
+  config?: UpdateProfileDtoConfig;
 };
 
 export type SearchData = {
@@ -2717,6 +2799,20 @@ export type UpdateAssetGroupDto = {
   hexColor?: string;
 };
 
+/**
+ * Inline config override for this tool
+ */
+export type AssetGroupToolInputConfig = { [key: string]: unknown };
+
+export type AssetGroupToolInput = {
+  /** Tool ID */
+  toolId: string;
+  /** Inline config override for this tool */
+  config?: AssetGroupToolInputConfig;
+  /** Reference to a saved config profile */
+  configProfileId?: string;
+};
+
 export type CreateAssetGroupDto = {
   /** Name of the asset group */
   name: string;
@@ -2728,6 +2824,8 @@ export type CreateAssetGroupDto = {
   schedule?: string;
   /** Tool IDs used to build the group workflow. When provided, a workflow is created and assigned to the group. */
   toolIds?: string[];
+  /** Per-tool config inputs for the group workflow. When provided, overrides toolIds — each entry specifies a tool ID plus optional inline config or a config profile reference. */
+  tools?: AssetGroupToolInput[];
 };
 
 export type AddManyWorkflowsToAssetGroupDto = {
@@ -3223,6 +3321,7 @@ export type WorkersControllerGetWorkersParams = {
   sortOrder?: string;
   workspaceId?: string;
   scope?: WorkersControllerGetWorkersScope;
+  runMode?: WorkersControllerGetWorkersRunMode;
   enabledAgentMode?: boolean;
 };
 
@@ -3232,6 +3331,14 @@ export type WorkersControllerGetWorkersScope =
 export const WorkersControllerGetWorkersScope = {
   cloud: 'cloud',
   workspace: 'workspace',
+} as const;
+
+export type WorkersControllerGetWorkersRunMode =
+  (typeof WorkersControllerGetWorkersRunMode)[keyof typeof WorkersControllerGetWorkersRunMode];
+
+export const WorkersControllerGetWorkersRunMode = {
+  cli: 'cli',
+  node: 'node',
 } as const;
 
 export type ToolsControllerGetManyToolsParams = {
@@ -3252,6 +3359,7 @@ export type ToolsControllerGetManyToolsType =
 export const ToolsControllerGetManyToolsType = {
   built_in: 'built_in',
   provider: 'provider',
+  connector: 'connector',
 } as const;
 
 export type ToolsControllerGetManyToolsCategory =
@@ -14317,6 +14425,179 @@ export const useJobsRegistryControllerDeleteJob = <
 };
 
 /**
+ * @summary Get connector logo by file name
+ */
+export const connectorLogoControllerGetConnectorLogo = (
+  file: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>(
+    { url: `/api/connectors/${file}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getConnectorLogoControllerGetConnectorLogoQueryKey = (
+  file: string,
+) => {
+  return [`/api/connectors/${file}`] as const;
+};
+
+export const getConnectorLogoControllerGetConnectorLogoQueryOptions = <
+  TData = Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+  TError = unknown,
+>(
+  file: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getConnectorLogoControllerGetConnectorLogoQueryKey(file);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>
+  > = ({ signal }) =>
+    connectorLogoControllerGetConnectorLogo(file, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: file !== null && file !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ConnectorLogoControllerGetConnectorLogoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>
+>;
+export type ConnectorLogoControllerGetConnectorLogoQueryError = unknown;
+
+export function useConnectorLogoControllerGetConnectorLogo<
+  TData = Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+  TError = unknown,
+>(
+  file: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+          TError,
+          Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useConnectorLogoControllerGetConnectorLogo<
+  TData = Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+  TError = unknown,
+>(
+  file: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+          TError,
+          Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useConnectorLogoControllerGetConnectorLogo<
+  TData = Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+  TError = unknown,
+>(
+  file: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get connector logo by file name
+ */
+
+export function useConnectorLogoControllerGetConnectorLogo<
+  TData = Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+  TError = unknown,
+>(
+  file: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof connectorLogoControllerGetConnectorLogo>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getConnectorLogoControllerGetConnectorLogoQueryOptions(
+    file,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Retrieves a list of assets associated with the given target.
  * @summary Get assets in target
  */
@@ -19381,6 +19662,178 @@ export function useToolsControllerGetInstalledTools<
 }
 
 /**
+ * Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links) from the connector manifest.
+ * @summary Get connector metadata by slug
+ */
+export const toolsControllerGetConnectorBySlug = (
+  slug: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ConnectorDto>(
+    { url: `/api/tools/connectors/${slug}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getToolsControllerGetConnectorBySlugQueryKey = (slug: string) => {
+  return [`/api/tools/connectors/${slug}`] as const;
+};
+
+export const getToolsControllerGetConnectorBySlugQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+  TError = unknown,
+>(
+  slug: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getToolsControllerGetConnectorBySlugQueryKey(slug);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>
+  > = ({ signal }) =>
+    toolsControllerGetConnectorBySlug(slug, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: slug !== null && slug !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetConnectorBySlugQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>
+>;
+export type ToolsControllerGetConnectorBySlugQueryError = unknown;
+
+export function useToolsControllerGetConnectorBySlug<
+  TData = Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+  TError = unknown,
+>(
+  slug: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetConnectorBySlug<
+  TData = Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+  TError = unknown,
+>(
+  slug: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetConnectorBySlug<
+  TData = Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+  TError = unknown,
+>(
+  slug: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get connector metadata by slug
+ */
+
+export function useToolsControllerGetConnectorBySlug<
+  TData = Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+  TError = unknown,
+>(
+  slug: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetConnectorBySlug>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetConnectorBySlugQueryOptions(
+    slug,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Fetches detailed information about a specific security tool using its unique identifier.
  * @summary Get tool by ID
  */
@@ -19548,33 +20001,33 @@ export function useToolsControllerGetToolById<
 }
 
 /**
- * Retrieves the authentication API key for accessing the specified security tool.
- * @summary Get tool API key
+ * Returns the effective JSON Schema for a tool's configuration. Uses configSchema when present, falls back to inputsSchema.
+ * @summary Get tool config schema
  */
-export const toolsControllerGetToolApiKey = (
+export const toolsControllerGetToolSchema = (
   id: string,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetApiKeyResponseDto>(
-    { url: `/api/tools/${id}/api-key`, method: 'GET', signal },
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/tools/${id}/schema`, method: 'GET', signal },
     options,
   );
 };
 
-export const getToolsControllerGetToolApiKeyQueryKey = (id: string) => {
-  return [`/api/tools/${id}/api-key`] as const;
+export const getToolsControllerGetToolSchemaQueryKey = (id: string) => {
+  return [`/api/tools/${id}/schema`] as const;
 };
 
-export const getToolsControllerGetToolApiKeyQueryOptions = <
-  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+export const getToolsControllerGetToolSchemaQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
         TError,
         TData
       >
@@ -19585,11 +20038,11 @@ export const getToolsControllerGetToolApiKeyQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getToolsControllerGetToolApiKeyQueryKey(id);
+    queryOptions?.queryKey ?? getToolsControllerGetToolSchemaQueryKey(id);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
-  > = ({ signal }) => toolsControllerGetToolApiKey(id, requestOptions, signal);
+    Awaited<ReturnType<typeof toolsControllerGetToolSchema>>
+  > = ({ signal }) => toolsControllerGetToolSchema(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -19597,35 +20050,35 @@ export const getToolsControllerGetToolApiKeyQueryOptions = <
     enabled: id !== null && id !== undefined,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+    Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type ToolsControllerGetToolApiKeyQueryResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+export type ToolsControllerGetToolSchemaQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetToolSchema>>
 >;
-export type ToolsControllerGetToolApiKeyQueryError = unknown;
+export type ToolsControllerGetToolSchemaQueryError = unknown;
 
-export function useToolsControllerGetToolApiKey<
-  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+export function useToolsControllerGetToolSchema<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
   TError = unknown,
 >(
   id: string,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
           TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+          Awaited<ReturnType<typeof toolsControllerGetToolSchema>>
         >,
         'initialData'
       >;
@@ -19635,24 +20088,24 @@ export function useToolsControllerGetToolApiKey<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useToolsControllerGetToolApiKey<
-  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+export function useToolsControllerGetToolSchema<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
           TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+          Awaited<ReturnType<typeof toolsControllerGetToolSchema>>
         >,
         'initialData'
       >;
@@ -19662,15 +20115,15 @@ export function useToolsControllerGetToolApiKey<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useToolsControllerGetToolApiKey<
-  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+export function useToolsControllerGetToolSchema<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
         TError,
         TData
       >
@@ -19682,18 +20135,18 @@ export function useToolsControllerGetToolApiKey<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get tool API key
+ * @summary Get tool config schema
  */
 
-export function useToolsControllerGetToolApiKey<
-  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+export function useToolsControllerGetToolSchema<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        Awaited<ReturnType<typeof toolsControllerGetToolSchema>>,
         TError,
         TData
       >
@@ -19704,7 +20157,7 @@ export function useToolsControllerGetToolApiKey<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getToolsControllerGetToolApiKeyQueryOptions(id, options);
+  const queryOptions = getToolsControllerGetToolSchemaQueryOptions(id, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -19715,38 +20168,45 @@ export function useToolsControllerGetToolApiKey<
 }
 
 /**
- * Regenerates a new API key for the specified security tool, invalidating the previous key.
- * @summary Rotate tool API key
+ * Creates a new configuration profile for a tool in the workspace. Config is validated against the tool schema, secrets are encrypted at rest.
+ * @summary Create a config profile
  */
-export const toolsControllerRotateToolApiKey = (
-  id: string,
+export const toolConfigProfilesControllerCreate = (
+  toolId: string,
+  createProfileDto: CreateProfileDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetApiKeyResponseDto>(
-    { url: `/api/tools/${id}/api-key/rotate`, method: 'POST', signal },
+  return orvalClient<ToolConfigProfile>(
+    {
+      url: `/api/tools/${toolId}/config-profiles`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createProfileDto,
+      signal,
+    },
     options,
   );
 };
 
-export const getToolsControllerRotateToolApiKeyMutationOptions = <
+export const getToolConfigProfilesControllerCreateMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+    Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
     TError,
-    { id: string },
+    { toolId: string; data: CreateProfileDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+  Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
   TError,
-  { id: string },
+  { toolId: string; data: CreateProfileDto },
   TContext
 > => {
-  const mutationKey = ['toolsControllerRotateToolApiKey'];
+  const mutationKey = ['toolConfigProfilesControllerCreate'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -19756,48 +20216,692 @@ export const getToolsControllerRotateToolApiKeyMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
-    { id: string }
+    Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
+    { toolId: string; data: CreateProfileDto }
   > = (props) => {
-    const { id } = props ?? {};
+    const { toolId, data } = props ?? {};
 
-    return toolsControllerRotateToolApiKey(id, requestOptions);
+    return toolConfigProfilesControllerCreate(toolId, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type ToolsControllerRotateToolApiKeyMutationResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>
+export type ToolConfigProfilesControllerCreateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>
 >;
-
-export type ToolsControllerRotateToolApiKeyMutationError = unknown;
+export type ToolConfigProfilesControllerCreateMutationBody = CreateProfileDto;
+export type ToolConfigProfilesControllerCreateMutationError = unknown;
 
 /**
- * @summary Rotate tool API key
+ * @summary Create a config profile
  */
-export const useToolsControllerRotateToolApiKey = <
+export const useToolConfigProfilesControllerCreate = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+      Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
       TError,
-      { id: string },
+      { toolId: string; data: CreateProfileDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+  Awaited<ReturnType<typeof toolConfigProfilesControllerCreate>>,
   TError,
-  { id: string },
+  { toolId: string; data: CreateProfileDto },
   TContext
 > => {
   return useMutation(
-    getToolsControllerRotateToolApiKeyMutationOptions(options),
+    getToolConfigProfilesControllerCreateMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Lists all configuration profiles for a tool in the workspace. Sensitive values are masked.
+ * @summary List config profiles
+ */
+export const toolConfigProfilesControllerList = (
+  toolId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolConfigProfile[]>(
+    { url: `/api/tools/${toolId}/config-profiles`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerListQueryKey = (toolId: string) => {
+  return [`/api/tools/${toolId}/config-profiles`] as const;
+};
+
+export const getToolConfigProfilesControllerListQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getToolConfigProfilesControllerListQueryKey(toolId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerList>>
+  > = ({ signal }) =>
+    toolConfigProfilesControllerList(toolId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: toolId !== null && toolId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolConfigProfilesControllerListQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerList>>
+>;
+export type ToolConfigProfilesControllerListQueryError = unknown;
+
+export function useToolConfigProfilesControllerList<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+          TError,
+          Awaited<ReturnType<typeof toolConfigProfilesControllerList>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolConfigProfilesControllerList<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+          TError,
+          Awaited<ReturnType<typeof toolConfigProfilesControllerList>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolConfigProfilesControllerList<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List config profiles
+ */
+
+export function useToolConfigProfilesControllerList<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+  TError = unknown,
+>(
+  toolId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerList>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolConfigProfilesControllerListQueryOptions(
+    toolId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves a single configuration profile by ID. Sensitive values are masked.
+ * @summary Get a config profile
+ */
+export const toolConfigProfilesControllerGetOne = (
+  toolId: string,
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolConfigProfile>(
+    {
+      url: `/api/tools/${toolId}/config-profiles/${id}`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerGetOneQueryKey = (
+  toolId: string,
+  id: string,
+) => {
+  return [`/api/tools/${toolId}/config-profiles/${id}`] as const;
+};
+
+export const getToolConfigProfilesControllerGetOneQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getToolConfigProfilesControllerGetOneQueryKey(toolId, id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>
+  > = ({ signal }) =>
+    toolConfigProfilesControllerGetOne(toolId, id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      toolId !== null &&
+      toolId !== undefined &&
+      id !== null &&
+      id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolConfigProfilesControllerGetOneQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>
+>;
+export type ToolConfigProfilesControllerGetOneQueryError = unknown;
+
+export function useToolConfigProfilesControllerGetOne<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+          TError,
+          Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolConfigProfilesControllerGetOne<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+          TError,
+          Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolConfigProfilesControllerGetOne<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a config profile
+ */
+
+export function useToolConfigProfilesControllerGetOne<
+  TData = Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+  TError = unknown,
+>(
+  toolId: string,
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolConfigProfilesControllerGetOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolConfigProfilesControllerGetOneQueryOptions(
+    toolId,
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Updates an existing configuration profile. Config is re-validated against the tool schema, secrets are re-encrypted.
+ * @summary Update a config profile
+ */
+export const toolConfigProfilesControllerUpdate = (
+  toolId: string,
+  id: string,
+  updateProfileDto: UpdateProfileDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolConfigProfile>(
+    {
+      url: `/api/tools/${toolId}/config-profiles/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateProfileDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerUpdateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+    TError,
+    { toolId: string; id: string; data: UpdateProfileDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+  TError,
+  { toolId: string; id: string; data: UpdateProfileDto },
+  TContext
+> => {
+  const mutationKey = ['toolConfigProfilesControllerUpdate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+    { toolId: string; id: string; data: UpdateProfileDto }
+  > = (props) => {
+    const { toolId, id, data } = props ?? {};
+
+    return toolConfigProfilesControllerUpdate(toolId, id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolConfigProfilesControllerUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>
+>;
+export type ToolConfigProfilesControllerUpdateMutationBody = UpdateProfileDto;
+export type ToolConfigProfilesControllerUpdateMutationError = unknown;
+
+/**
+ * @summary Update a config profile
+ */
+export const useToolConfigProfilesControllerUpdate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+      TError,
+      { toolId: string; id: string; data: UpdateProfileDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerUpdate>>,
+  TError,
+  { toolId: string; id: string; data: UpdateProfileDto },
+  TContext
+> => {
+  return useMutation(
+    getToolConfigProfilesControllerUpdateMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes a configuration profile. Allowed unconditionally (job pull falls back to default later).
+ * @summary Delete a config profile
+ */
+export const toolConfigProfilesControllerRemove = (
+  toolId: string,
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/tools/${toolId}/config-profiles/${id}`,
+      method: 'DELETE',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerRemoveMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+    TError,
+    { toolId: string; id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+  TError,
+  { toolId: string; id: string },
+  TContext
+> => {
+  const mutationKey = ['toolConfigProfilesControllerRemove'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+    { toolId: string; id: string }
+  > = (props) => {
+    const { toolId, id } = props ?? {};
+
+    return toolConfigProfilesControllerRemove(toolId, id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolConfigProfilesControllerRemoveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>
+>;
+
+export type ToolConfigProfilesControllerRemoveMutationError = unknown;
+
+/**
+ * @summary Delete a config profile
+ */
+export const useToolConfigProfilesControllerRemove = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+      TError,
+      { toolId: string; id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerRemove>>,
+  TError,
+  { toolId: string; id: string },
+  TContext
+> => {
+  return useMutation(
+    getToolConfigProfilesControllerRemoveMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Sets a profile as the default for its tool. Transactionally unsets the previous default.
+ * @summary Set default profile
+ */
+export const toolConfigProfilesControllerSetDefault = (
+  toolId: string,
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolConfigProfile>(
+    {
+      url: `/api/tools/${toolId}/config-profiles/${id}/set-default`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolConfigProfilesControllerSetDefaultMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+    TError,
+    { toolId: string; id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+  TError,
+  { toolId: string; id: string },
+  TContext
+> => {
+  const mutationKey = ['toolConfigProfilesControllerSetDefault'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+    { toolId: string; id: string }
+  > = (props) => {
+    const { toolId, id } = props ?? {};
+
+    return toolConfigProfilesControllerSetDefault(toolId, id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolConfigProfilesControllerSetDefaultMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>
+>;
+
+export type ToolConfigProfilesControllerSetDefaultMutationError = unknown;
+
+/**
+ * @summary Set default profile
+ */
+export const useToolConfigProfilesControllerSetDefault = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+      TError,
+      { toolId: string; id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolConfigProfilesControllerSetDefault>>,
+  TError,
+  { toolId: string; id: string },
+  TContext
+> => {
+  return useMutation(
+    getToolConfigProfilesControllerSetDefaultMutationOptions(options),
     queryClient,
   );
 };

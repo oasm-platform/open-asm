@@ -90,6 +90,10 @@ export class WorkerInstance extends BaseEntity {
   @Column({ nullable: true, default: false })
   enabledAgentMode: boolean;
 
+  @ApiProperty({ required: false, enum: ['cli', 'node'], nullable: true })
+  @Column({ type: 'varchar', nullable: true })
+  runMode: string | null;
+
   @ApiProperty({ required: false })
   isOnline?: boolean;
 }

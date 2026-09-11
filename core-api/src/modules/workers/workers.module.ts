@@ -2,6 +2,7 @@ import { forwardRef, Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ApiKeysModule } from '../apikeys/apikeys.module';
 import { Asset } from '../assets/entities/assets.entity';
+import { ConnectorsModule } from '../connectors/connectors.module';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
@@ -29,6 +30,7 @@ import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
     ]),
     ApiKeysModule,
     forwardRef(() => ToolsModule),
+    ConnectorsModule,
   ],
   controllers: [WorkersController],
   providers: [

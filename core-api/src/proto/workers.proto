@@ -11,9 +11,16 @@ message JoinRequest {
   optional WorkerMetadata metadata = 4;
 }
 
+enum WorkerRunMode {
+  WORKER_RUN_MODE_UNKNOWN = 0;
+  WORKER_RUN_MODE_CLI = 1;
+  WORKER_RUN_MODE_NODE = 2;
+}
+
 message WorkerMetadata {
   optional string name = 1;
   optional string os = 2;
+  optional WorkerRunMode mode = 3;
 }
 
 message JoinResponse {

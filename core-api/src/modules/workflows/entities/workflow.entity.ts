@@ -4,7 +4,15 @@ import { User } from '@/modules/auth/entities/user.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   Column,
   Entity,
@@ -27,17 +35,35 @@ export class On {
 
 export class WorkflowJob {
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
   name: string;
 
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
   run: string;
+
+  @ApiProperty({ required: false, type: Object })
+  @IsOptional()
+  @IsObject()
+  config?: Record<string, unknown>;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  configProfileId?: string;
 }
 
 export class WorkflowContent {
   @ApiProperty({ type: On })
+  @ValidateNested()
+  @Type(() => On)
   on: On;
 
   @ApiProperty({ type: [WorkflowJob] })
+  @ValidateNested({ each: true })
+  @Type(() => WorkflowJob)
   jobs: WorkflowJob[];
 
   @ApiProperty()

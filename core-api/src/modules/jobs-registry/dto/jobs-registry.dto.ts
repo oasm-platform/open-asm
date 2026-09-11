@@ -41,6 +41,14 @@ export class GetNextJobResponseDto extends PickType(Job, [
   'asset',
 ]) {}
 
+/** Extended result returned by getNextJob for connector-capable workers. */
+export interface GetNextJobResult extends GetNextJobResponseDto {
+  tool?: { id: string; name: string };
+  workspaceId?: string;
+  configProfileId?: string;
+  config?: Record<string, unknown> | null;
+}
+
 export class WorkerIdParams {
   @ApiProperty()
   @IsUUID()
@@ -197,6 +205,8 @@ export class CreateJobs extends PickType(Job, [
   jobHistory?: JobHistory;
   jobName?: string;
   jobRunType?: JobRunType;
+  configProfileId?: string;
+  config?: Record<string, unknown>;
 }
 
 // --- Category-Specific Result DTOs ---

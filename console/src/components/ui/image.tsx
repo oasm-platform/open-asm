@@ -17,7 +17,8 @@ export const Image: React.FC<ImageProps> = ({
   if (!url) return <ImageIcon width={width} height={height} className={className} />;
 
   const isHttpUrl = url.startsWith('http://') || url.startsWith('https://');
-  const imageUrl = isHttpUrl ? url : `/api${url}`;
+  const isDataUrl = url.startsWith('data:');
+  const imageUrl = isHttpUrl || isDataUrl ? url : `/api${url}`;
 
   return (
     <img

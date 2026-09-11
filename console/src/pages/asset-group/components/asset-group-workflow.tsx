@@ -1,6 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { ToolSelector } from '@/components/common/tool-selector';
+import {
+  ToolPipelineBuilder,
+  type PipelineToolEntry,
+} from '@/pages/asset-group/components/tool-pipeline-builder';
 import {
   Card,
   CardContent,
@@ -36,6 +39,7 @@ import {
   useWorkflowsControllerCreateWorkflow,
   useWorkflowsControllerDeleteWorkflow,
   useWorkflowsControllerUpdateWorkflow,
+  type Tool,
 } from '@/services/apis/gen/queries';
 import {
   CalendarClockIcon,
@@ -44,7 +48,7 @@ import {
   Settings,
 } from 'lucide-react';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
@@ -76,216 +80,169 @@ export default function AssetGroupWorkflow({
   const removeWorkflowsMutation = useAssetGroupControllerRemoveManyWorkflows();
 
   // Filter tools with category "vulnerabilities"
-  const toolProviders =
-    workspaceToolsInstalled?.data?.filter(
-      (tool) =>
-        tool.type === ToolsControllerGetManyToolsType.provider ||
-        tool.category === ToolCategory.vulnerabilities,
-    ) || [];
-
-  // Check if a tool is already added to this group
-  const isToolInGroup = (toolName: string) => {
-    // Get all jobs from all workflows in the group
-    const allJobs =
-      workflows.flatMap(
-        (groupWorkflow) => groupWorkflow.workflow.content?.jobs || [],
-      ) || [];
-
-    // Extract all run values from jobs
-    const toolsName = allJobs.map((job) => job.run) || [];
-
-    // Check if the tool name exists in any workflow
-    return toolsName.includes(toolName);
-  };
-
-  const toolById = Object.fromEntries(
-    toolProviders.map((tool) => [tool.id, tool]),
+  const toolProviders = useMemo(
+    () =>
+      workspaceToolsInstalled?.data?.filter(
+        (tool) =>
+          tool.type === ToolsControllerGetManyToolsType.provider ||
+          tool.category === ToolCategory.vulnerabilities,
+      ) || [],
+    [workspaceToolsInstalled?.data],
   );
 
-  // Tools that are already part of the workflow
-  const selectedToolIds = new Set(
-    toolProviders
-      .filter((tool) => isToolInGroup(tool.name))
-      .map((tool) => tool.id),
+  const toolByName = useMemo(
+    () => new Map(toolProviders.map((tool) => [tool.name, tool])),
+    [toolProviders],
+  );
+  const toolById = useMemo(
+    () => new Map(toolProviders.map((tool) => [tool.id, tool])),
+    [toolProviders],
   );
 
-  // Get the workflow that contains a specific tool
-  const getWorkflowContainingTool = (toolName: string) => {
-    return workflows.find((groupWorkflow) => {
-      const jobs = groupWorkflow.workflow.content?.jobs || [];
-      const toolsName = jobs.map((job) => job.run) || [];
-      return toolsName.includes(toolName);
-    });
-  };
-
-  // Get the current workflow in the group (assuming there's only one workflow per group)
-  const getCurrentWorkflow = () => {
-    return workflows[0];
-  };
+  // Only one workflow per group is expected.
+  const currentWorkflow = workflows[0];
+  const workflowId = currentWorkflow?.id;
 
   const timezone = getLocalTimezone();
-  const currentSchedule = getCurrentWorkflow()?.schedule;
-  const lastRun = getCurrentWorkflow()?.lastRun;
-  const lastRunText = lastRun
-    ? dayjs(lastRun.createdAt).format('DD/MM/YYYY HH:mm')
-    : 'Never';
-  const nextRun =
-    currentSchedule && currentSchedule !== 'disabled'
-      ? getNextRun(currentSchedule, timezone)
-      : null;
-  const nextRunText = nextRun
-    ? dayjs(nextRun).format('DD/MM/YYYY HH:mm')
-    : 'Disabled';
+  const currentSchedule = currentWorkflow?.schedule;
+  const lastRun = currentWorkflow?.lastRun;
+  const lastRunText = useMemo(
+    () =>
+      lastRun ? dayjs(lastRun.createdAt).format('DD/MM/YYYY HH:mm') : 'Never',
+    [lastRun],
+  );
+  const nextRun = useMemo(
+    () =>
+      currentSchedule && currentSchedule !== 'disabled'
+        ? getNextRun(currentSchedule, timezone)
+        : null,
+    [currentSchedule, timezone],
+  );
+  const nextRunText = useMemo(
+    () => (nextRun ? dayjs(nextRun).format('DD/MM/YYYY HH:mm') : 'Disabled'),
+    [nextRun],
+  );
 
-  // Handle tool click - add if not exists, remove if exists
-  const handleToolClick = async (tool: { name: string; id: string }) => {
-    const isInGroup = isToolInGroup(tool.name);
+  // ---- Pipeline value derived from workflow jobs[] order ----
+  // jobs[] order IS the execution order (scheduler runs jobs[0], chain uses
+  // index). The builder's value array preserves that order 1:1, and every
+  // mutation below writes the array back with the same ordering.
+  const jobs = useMemo(
+    () => currentWorkflow?.workflow.content?.jobs ?? [],
+    [currentWorkflow],
+  );
+  const jobsJson = useMemo(() => JSON.stringify(jobs), [jobs]);
+  const pipeline: PipelineToolEntry[] = useMemo(() => {
+    const jobs = currentWorkflow?.workflow.content?.jobs ?? [];
+    return jobs.map((job) => {
+      const tool = toolByName.get(job.run);
+      return {
+        toolId: tool?.id ?? job.run,
+        ...(job.config ? { config: job.config as Record<string, unknown> } : {}),
+        ...(job.configProfileId
+          ? { configProfileId: job.configProfileId }
+          : {}),
+      };
+    });
+    // jobsJson captures order + per-job config changes; toolByName covers id mapping.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobsJson, toolByName]);
 
-    if (isInGroup) {
-      // If tool is in group, find the workflow containing it and remove the tool
-      const groupWorkflow = getWorkflowContainingTool(tool.name)?.workflow;
+  const toolNameOf = useCallback(
+    (entry: PipelineToolEntry): string =>
+      toolById.get(entry.toolId)?.name ?? entry.toolId,
+    [toolById],
+  );
 
-      if (!groupWorkflow) {
-        toast.error('Workflow not found');
-        return;
-      }
-
-      try {
-        setIsProcessing(true);
-
-        // Filter out the tool from the workflow's jobs
-        const updatedJobs =
-          groupWorkflow.content?.jobs?.filter((job) => job.run !== tool.name) ||
-          [];
-
-        if (updatedJobs.length === 0) {
-          // If no jobs left, remove workflow from asset group and delete it
+  /** Persist the full ordered pipeline as jobs[] (append/update, order preserved). */
+  const persistPipeline = useCallback(async (next: PipelineToolEntry[]) => {
+    const existingWorkflow = currentWorkflow?.workflow ?? null;
+    try {
+      setIsProcessing(true);
+      const jobs = next.map((entry) => {
+        const name = toolNameOf(entry);
+        return {
+          name,
+          run: name,
+          ...(entry.config ? { config: entry.config } : {}),
+          ...(entry.configProfileId
+            ? { configProfileId: entry.configProfileId }
+            : {}),
+        };
+      });
+      if (existingWorkflow) {
+        if (jobs.length === 0) {
           await removeWorkflowsMutation.mutateAsync({
             groupId: assetGroupId,
-            data: {
-              workflowIds: [groupWorkflow.id],
-            },
+            data: { workflowIds: [existingWorkflow.id] },
           });
-
           await deleteWorkflowMutation.mutateAsync({
-            id: groupWorkflow.id,
+            id: existingWorkflow.id,
           });
-
-          toast.success(
-            `Workflow with tool ${tool.name} removed successfully!`,
-          );
+          toast.success('Workflow removed — no tools left in the pipeline.');
         } else {
-          // Update the workflow with the remaining jobs
-          const updatedWorkflowContent = {
-            ...groupWorkflow.content,
-            jobs: updatedJobs,
-          };
-
-          await updateWorkflowMutation.mutateAsync({
-            id: groupWorkflow.id,
-            data: {
-              content: updatedWorkflowContent,
-            },
-          });
-
-          toast.success(
-            `Tool ${tool.name} removed from workflow successfully!`,
-          );
-        }
-
-        // Refetch workflows to update the UI
-        await onRefetch();
-      } catch (error) {
-        console.error('Error removing tool from workflow:', error);
-        toast.error('Failed to remove tool. Please try again.');
-      } finally {
-        setIsProcessing(false);
-      }
-    } else {
-      // If tool is not in group, check if group already has a workflow
-      const existingWorkflow = getCurrentWorkflow()?.workflow ?? null;
-
-      try {
-        setIsProcessing(true);
-
-        if (existingWorkflow) {
-          // If group already has a workflow, update it by adding the tool
-          const updatedJobs = [
-            ...(existingWorkflow.content?.jobs || []),
-            {
-              name: tool.name,
-              run: tool.name,
-            },
-          ];
-
-          const updatedWorkflowContent = {
-            ...existingWorkflow.content,
-            jobs: updatedJobs,
-          };
-
           await updateWorkflowMutation.mutateAsync({
             id: existingWorkflow.id,
             data: {
-              content: updatedWorkflowContent,
+              content: { ...existingWorkflow.content, jobs },
             },
           });
-
-          toast.success(
-            `Tool ${tool.name} added to existing workflow successfully!`,
-          );
-        } else {
-          // If group has no workflow, create a new workflow with this tool
-          const workflowPayload = {
-            data: {
-              name: `Group Workflow - ${assetGroupId}`,
-              content: {
-                on: {
-                  schedule: '0 0 * * *',
-                  target: [], // Empty target array
-                },
-                jobs: [
-                  {
-                    name: tool.name,
-                    run: tool.name,
-                  },
-                ],
-                name: `Group Workflow - ${assetGroupId}`,
-              },
-              filePath: '', // Empty filePath
-            },
-          };
-
-          // Create the workflow
-          const createdWorkflow =
-            await createWorkflowMutation.mutateAsync(workflowPayload);
-
-          // Add the workflow to the asset group
-          await addWorkflowsMutation.mutateAsync({
-            groupId: assetGroupId,
-            data: {
-              workflowIds: [createdWorkflow.id],
-            },
-          });
-
-          toast.success(
-            `Workflow created and tool ${tool.name} added successfully!`,
-          );
+          toast.success('Pipeline saved successfully!');
         }
-
-        // Refetch workflows to update the UI
-        await onRefetch();
-      } catch (error) {
-        console.error('Error adding tool:', error);
-        toast.error('Failed to add tool. Please try again.');
-      } finally {
-        setIsProcessing(false);
+      } else if (jobs.length > 0) {
+        const createdWorkflow = await createWorkflowMutation.mutateAsync({
+          data: {
+            name: `Group Workflow - ${assetGroupId}`,
+            content: {
+              on: { schedule: '0 0 * * *', target: [] },
+              jobs,
+              name: `Group Workflow - ${assetGroupId}`,
+            },
+            filePath: '',
+          },
+        });
+        await addWorkflowsMutation.mutateAsync({
+          groupId: assetGroupId,
+          data: { workflowIds: [createdWorkflow.id] },
+        });
+        toast.success('Workflow created with the selected pipeline!');
       }
+      await onRefetch();
+    } catch (error) {
+      console.error('Error saving tool pipeline:', error);
+      toast.error('Failed to save pipeline. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
-  };
+  }, [
+    currentWorkflow,
+    toolNameOf,
+    removeWorkflowsMutation,
+    deleteWorkflowMutation,
+    updateWorkflowMutation,
+    createWorkflowMutation,
+    addWorkflowsMutation,
+    assetGroupId,
+    onRefetch,
+  ]);
+
+  const handleOpenSchedule = useCallback(() => {
+    setIsSetScheduleOpen(true);
+  }, []);
+
+  const handleScheduleOpenChange = useCallback((open: boolean) => {
+    setIsSetScheduleOpen(open);
+  }, []);
+
+  const handlePipelineChange = useCallback(
+    (next: PipelineToolEntry[]) => {
+      if (!isProcessing) void persistPipeline(next);
+    },
+    [persistPipeline, isProcessing],
+  );
 
   // Disable the workflow schedule by submitting the "disabled" value
-  const handleDisableSchedule = () => {
-    const workflowId = workflows[0]?.id;
+  const handleDisableSchedule = useCallback(() => {
     if (!workflowId) return;
 
     updateAssetGroupWorkflow(
@@ -301,11 +258,10 @@ export default function AssetGroupWorkflow({
         },
       },
     );
-  };
+  }, [workflowId, updateAssetGroupWorkflow, onRefetch]);
 
   // Save a custom cron schedule from the dialog, same API as the dropdown
-  const handleSaveCustomSchedule = () => {
-    const workflowId = workflows[0]?.id;
+  const handleSaveCustomSchedule = useCallback(() => {
     if (!workflowId || !draftSchedule?.cron) return;
 
     updateAssetGroupWorkflow(
@@ -321,7 +277,7 @@ export default function AssetGroupWorkflow({
         },
       },
     );
-  };
+  }, [workflowId, draftSchedule, updateAssetGroupWorkflow, onRefetch]);
 
   return (
     <div className="space-y-4 mb-4">
@@ -350,8 +306,8 @@ export default function AssetGroupWorkflow({
               variant="outline"
               size="icon"
               aria-label="Configure schedule"
-              disabled={isPendingUpdateSchedule || !workflows[0]?.id}
-              onClick={() => setIsSetScheduleOpen(true)}
+              disabled={isPendingUpdateSchedule || !workflowId}
+              onClick={handleOpenSchedule}
             >
               <Settings className="size-4" />
             </Button>
@@ -386,7 +342,7 @@ export default function AssetGroupWorkflow({
               </div>
             </div>
           </div>
-          <Sheet open={isSetScheduleOpen} onOpenChange={setIsSetScheduleOpen}>
+          <Sheet open={isSetScheduleOpen} onOpenChange={handleScheduleOpenChange}>
             <SheetContent
               side="right"
               className="w-full sm:max-w-lg gap-3"
@@ -414,7 +370,7 @@ export default function AssetGroupWorkflow({
                   confirmText="Disable"
                   disabled={
                     isPendingUpdateSchedule ||
-                    !workflows[0]?.id ||
+                    !workflowId ||
                     currentSchedule === 'disabled'
                   }
                   onConfirm={handleDisableSchedule}
@@ -426,7 +382,7 @@ export default function AssetGroupWorkflow({
                   className="ml-auto"
                   disabled={
                     isPendingUpdateSchedule ||
-                    !workflows[0]?.id ||
+                    !workflowId ||
                     !draftSchedule?.cron
                   }
                   onClick={handleSaveCustomSchedule}
@@ -448,7 +404,7 @@ export default function AssetGroupWorkflow({
             </CardDescription>
           </div>
           <RunWorkflowButton
-            id={getCurrentWorkflow()?.id}
+            id={workflowId}
             disabled={
               lastRun?.status ===
                 AssetGroupLastRunDtoStatus.pending ||
@@ -472,18 +428,11 @@ export default function AssetGroupWorkflow({
               </Link>
             </div>
           ) : (
-            <ToolSelector
-              tools={toolProviders.map((tool) => ({
-                id: tool.id,
-                name: tool.name,
-                logoUrl: tool.logoUrl,
-              }))}
-              selectedIds={selectedToolIds}
+            <ToolPipelineBuilder
+              tools={toolProviders as Tool[]}
+              value={pipeline}
+              onChange={handlePipelineChange}
               disabled={isProcessing}
-              onToggle={(id) => {
-                const tool = toolById[id];
-                if (tool && !isProcessing) handleToolClick(tool);
-              }}
             />
           )}
         </CardContent>

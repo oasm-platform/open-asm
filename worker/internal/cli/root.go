@@ -16,11 +16,23 @@ import (
 	"github.com/spf13/viper"
 )
 
+// resolveMode returns the mode explicitly supplied via the environment
+// (WORKER_MODE), falling back to the entrypoint's default. The Docker image
+// runs the headless entrypoint and sets WORKER_MODE=node, so the reported mode
+// and the connector machinery stay node without a --mode CLI flag.
+func resolveMode(cfg *config.Config, defaultMode string) string {
+	if cfg.Mode != "" {
+		return cfg.Mode
+	}
+	return defaultMode
+}
+
 func App() error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("fail to load config: %v", err)
 	}
+	cfg.Mode = resolveMode(cfg, "cli")
 
 	if cfg.ApiKey == "" {
 		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
@@ -73,6 +85,7 @@ func AppHeadless() error {
 	if err != nil {
 		return fmt.Errorf("fail to load config: %v", err)
 	}
+	cfg.Mode = resolveMode(cfg, "node")
 
 	if cfg.ApiKey == "" {
 		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
@@ -80,6 +93,13 @@ func AppHeadless() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// ponytail: graceful shutdown — signal.NotifyContext cancels ctx on SIGINT/SIGTERM;
+	// transport.Close() + runtime.CleanupAll() wired in Phase 3 (execution/manager).
+	go func() {
+		<-ctx.Done()
+		// ponytail: transport.Close() + runtime.CleanupAll() wired in Phase 3
+	}()
 
 	// Headless mode: no TUI. Pass nil events channel.
 	// TuiLogger falls back to writing formatted logs to stderr.
@@ -89,14 +109,53 @@ func AppHeadless() error {
 }
 
 func Execute() {
+	if err := rootCommand("cli").Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+// rootCommand builds the worker CLI command. The default mode ("cli" or
+// "node") selects between the interactive TUI and the headless worker node
+// when no --mode flag is given.
+func rootCommand(defaultMode string) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "oasm-worker",
 		Short: "OASM Worker is an attack surface management agent",
-		Long:  `OASM Worker is a high-performance agent used for attack surface management tasks.`,
+		Long: `OASM Worker is a high-performance agent used for attack surface management tasks.
+
+The worker runs in one of two modes, reported to core-api when it joins:
+
+  cli   (default) Interactive TUI worker. Launch with '--mode cli' (or simply
+        without a --mode flag) and configure via the flags below or their
+        WORKER_* environment variable equivalents.
+
+  node  Headless worker node for Docker / production deployments. Launch with
+        '--mode node' and configure via the flags below or WORKER_* environment
+        variables (WORKER_API_KEY, WORKER_MAX_CONCURRENCY, WORKER_GRPC_HOST,
+        WORKER_GRPC_PORT, WORKER_TOOL_PATH, WORKER_NETWORK,
+        WORKER_CONNECTOR_ADDR). WORKER_CONNECTOR_ADDR overrides the address
+        connector containers dial back on (default port 26276); when unset the
+        worker auto-derives host.docker.internal and adds a host-gateway
+        mapping to each container. Note: the connector gRPC port (26276) must
+        be open to Docker containers in the host firewall (linux: allow from
+        the docker bridge; Windows/macOS: allow the Docker Desktop VM).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return App()
+			mode, err := cmd.Flags().GetString("mode")
+			if err != nil {
+				return err
+			}
+			switch mode {
+			case "cli":
+				return App()
+			case "node":
+				return AppHeadless()
+			default:
+				return fmt.Errorf("invalid --mode %q: must be %q or %q", mode, "cli", "node")
+			}
 		},
 	}
+
+	rootCmd.Flags().String("mode", defaultMode, "Worker run mode: \"cli\" (interactive TUI) or \"node\" (headless worker node); overridable with WORKER_MODE")
 
 	rootCmd.Flags().String("api-key", "", "API key for authentication")
 	viper.BindPFlag("api_key", rootCmd.Flags().Lookup("api-key"))
@@ -116,7 +175,5 @@ func Execute() {
 	rootCmd.Flags().String("network", "", "Network ID for internal network connection")
 	viper.BindPFlag("network", rootCmd.Flags().Lookup("network"))
 
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
-	}
+	return rootCmd
 }

@@ -33,8 +33,18 @@ message Worker {
 message Job {
   string id = 1;
   Asset asset = 2;
-  optional string command = 3;
+  optional string command = 3 [deprecated = true];
   string category = 4;
+  // NEW — connector execution spec
+  string tool = 5;
+  string image = 6;                      // core resolves from manifest registry
+  google.protobuf.Struct inputs = 7;     // {target: "..."} per-run
+  google.protobuf.Struct config = 8;     // decrypted profile JSON per-profile
+  // Resource limits resolved from the connector manifest (scheduling context).
+  // Worker falls back to unlimited when absent.
+  optional string cpu = 9;               // e.g. "500m" (millicores) or "1" (cores)
+  optional string memory = 10;           // e.g. "512Mi", "1Gi"
+  optional int32 timeout_seconds = 11;   // container timeout in seconds
 }
 
 message JobResponse {

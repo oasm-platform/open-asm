@@ -3,6 +3,7 @@ import { ApiKeysModule } from './apikeys/apikeys.module';
 import { AssetGroupModule } from './asset-group/asset-group.module';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
+import { ConnectorsModule } from './connectors/connectors.module';
 import { DataAdapterModule } from './data-adapter/data-adapter.module';
 import { InternalNetworksModule } from './internal-networks/internal-networks.module';
 import { IssuesModule } from './issues/issues.module';
@@ -56,6 +57,7 @@ import { ReportsModule } from './reports/reports.module';
     RemoteExecuteModule,
     ReportsModule,
     IntegrationsModule,
+    ConnectorsModule,
   ],
 })
 export class CombineModule {}

@@ -20,6 +20,7 @@ import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -32,25 +33,26 @@ import { randomUUID } from 'crypto';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
-import { WorkspacesService } from '../workspaces/workspaces.service';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { StorageService } from '../storage/storage.service';
-import { Tool } from '../tools/entities/tools.entity';
+import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
 import {
+  BaseResultDto,
   CreateJobs,
   GetManyJobsQueryParams,
-  GetNextJobResponseDto,
+  GetNextJobResult,
   JobTimelineItem,
   JobTimelineQueryResult,
   JobTimelineResponseDto,
   UpdateResultDto,
-  BaseResultDto,
 } from './dto/jobs-registry.dto';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
@@ -100,7 +102,10 @@ export class JobsRegistryService {
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
     private eventEmitter: EventEmitter2,
     private workspaceService: WorkspacesService,
+    private readonly connectorRegistry: ConnectorRegistryService,
+    private readonly toolConfigProfilesService: ToolConfigProfilesService,
   ) {}
+  private readonly logger = new Logger(JobsRegistryService.name);
   public async getManyJobs(
     workspaceId: string,
     query: GetManyJobsRequestDto,
@@ -176,6 +181,8 @@ export class JobsRegistryService {
     jobName,
     isPublishEvent,
     jobRunType,
+    configProfileId,
+    config,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
@@ -183,6 +190,63 @@ export class JobsRegistryService {
 
     if (!tool.category) {
       throw new Error('Tool category is required for creating a job');
+    }
+
+    // Detect connector jobs: Tool.name IS the connector slug
+    const connectorEntry = this.connectorRegistry.getConnector(tool.name);
+    const isConnector = !!connectorEntry?.image;
+
+    // Resolve merged final config for connector jobs.
+    // Catches both assertProfileOwnership (orphan profile) and
+    // resolveConfigForJob errors, persisting FAILED job + error log
+    // so the job-log UI surfaces the failure, then rethrows.
+    let mergedConfig: Record<string, unknown> | undefined;
+    if (isConnector) {
+      try {
+        // Validate configProfileId belongs to same workspace AND tool
+        if (configProfileId) {
+          await this.toolConfigProfilesService.assertProfileOwnership(
+            workspaceId,
+            configProfileId,
+            tool.id!,
+          );
+        }
+
+        mergedConfig = await this.toolConfigProfilesService.resolveConfigForJob(
+          workspaceId,
+          tool.id!,
+          { config, configProfileId },
+        );
+
+        // If no config resolved but tool requires config (has schema), fail fast.
+        if (!mergedConfig && (!config || Object.keys(config).length === 0)) {
+          const entry = this.connectorRegistry.getConnector(tool.name);
+          const schema = entry?.configSchema ?? entry?.inputsSchema;
+          if (schema) {
+            throw new BadRequestException(
+              `missing/default profile for connector "${tool.name}": tool requires configuration but no profile was provided or found`,
+            );
+          }
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `[config-profile] ${tool.name}: ${message} (profileId=${configProfileId ?? 'none'}, workspace=${workspaceId})`,
+        );
+        await this.persistFailedConfigJob({
+          tool,
+          workflow,
+          jobHistory: existingJobHistory,
+          jobRunType,
+          jobName,
+          configProfileId,
+          config,
+          workspaceId,
+          message,
+        });
+        throw error;
+      }
     }
 
     if (
@@ -252,11 +316,15 @@ export class JobsRegistryService {
           tool,
           priority: priority ?? 4,
           jobHistory,
-          command: bindingCommand(defaultCommand ?? '', {
-            // Use the default command template for HTTP_PROBE
-            value: assetService.value,
-            port: assetService.port.toString(),
-          }),
+          command: isConnector
+            ? undefined
+            : bindingCommand(defaultCommand ?? '', {
+                // Use the default command template for HTTP_PROBE
+                value: assetService.value,
+                port: assetService.port.toString(),
+              }),
+          configProfileId: isConnector ? configProfileId : undefined,
+          config: isConnector ? mergedConfig ?? config ?? null : null,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
@@ -291,9 +359,13 @@ export class JobsRegistryService {
           tool,
           priority: priority ?? 4,
           jobHistory,
-          command: bindingCommand(defaultCommand ?? '', {
-            value: asset.value,
-          }),
+          command: isConnector
+            ? undefined
+            : bindingCommand(defaultCommand ?? '', {
+                value: asset.value,
+              }),
+          configProfileId: isConnector ? configProfileId : undefined,
+          config: isConnector ? mergedConfig ?? config ?? null : null,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
@@ -308,6 +380,73 @@ export class JobsRegistryService {
     }
 
     return jobsToInsert;
+  }
+
+  /**
+   * Persists a FAILED job row + JobErrorLog when connector config resolution
+   * fails (e.g. orphan configProfileId). The job references no asset — it
+   * exists so the job-log UI surfaces the dispatch failure. Linked to a
+   * JobHistory (created if absent) for workflow grouping.
+   */
+  private async persistFailedConfigJob(args: {
+    tool: CreateJobs['tool'];
+    workflow: CreateJobs['workflow'];
+    jobHistory?: CreateJobs['jobHistory'];
+    jobRunType: CreateJobs['jobRunType'];
+    jobName: CreateJobs['jobName'];
+    configProfileId: CreateJobs['configProfileId'];
+    config: CreateJobs['config'];
+    workspaceId?: string;
+    message: string;
+  }): Promise<Job> {
+    const {
+      tool,
+      workflow,
+      jobHistory: existingJobHistory,
+      jobRunType,
+      jobName,
+      configProfileId,
+      config,
+      workspaceId,
+      message,
+    } = args;
+
+    let jobHistory = existingJobHistory;
+    if (!jobHistory) {
+      jobHistory = this.jobHistoryRepo.create({
+        workflow,
+        jobRunType,
+        jobHistoryName: jobName,
+      });
+      await this.jobHistoryRepo.save(jobHistory);
+    }
+
+    const jobRepo = this.dataSource.getRepository(Job);
+    const failedJob = jobRepo.create({
+      id: randomUUID(),
+      status: JobStatus.FAILED,
+      category: tool.category,
+      tool,
+      priority: tool.priority ?? JobPriority.BACKGROUND,
+      jobHistory,
+      configProfileId,
+      config: config ?? null,
+      completedAt: new Date(),
+    } as DeepPartial<Job>);
+    await jobRepo.save(failedJob);
+
+    await this.jobErrorLogRepo.save({
+      job: failedJob,
+      logMessage: `[config-profile] ${tool.name}: ${message} (profileId=${configProfileId ?? 'none'}, workspace=${workspaceId ?? 'unknown'})`,
+      payload: JSON.stringify({
+        tool: tool.name,
+        configProfileId: configProfileId ?? null,
+        workspaceId: workspaceId ?? null,
+        reason: message,
+      }),
+    });
+
+    return failedJob;
   }
 
   /**
@@ -413,9 +552,7 @@ export class JobsRegistryService {
    * @param workerId the ID of the worker to retrieve a job for
    * @returns the next job associated with the worker, or `null` if none is found
    */
-  public async getNextJob(
-    workerId: string,
-  ): Promise<GetNextJobResponseDto | null> {
+  public async getNextJob(workerId: string): Promise<GetNextJobResult | null> {
     // [OPT-2] Fetch worker OUTSIDE transaction to reduce lock hold time
     const worker = await this.dataSource.getRepository(WorkerInstance).findOne({
       where: { id: workerId },
@@ -438,8 +575,8 @@ export class JobsRegistryService {
       const queryBuilder = queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
-        .innerJoin('asset.target', 'target')
-        .leftJoin('jobs.tool', 'tool')
+        .innerJoinAndSelect('asset.target', 'target')
+        .leftJoinAndSelect('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
         // [OPT-1] Use addOrderBy for compound sort (priority first, then createdAt)
         .orderBy('jobs.priority', 'DESC')
@@ -451,9 +588,22 @@ export class JobsRegistryService {
       }
 
       if (isBuiltInTools) {
-        const builtInToolsName = builtInTools.map((tool) => tool.name);
+        // Node-mode workers run Docker connectors (image-based jobs).
+        // CLI/legacy workers may lack Docker, so connector (image) tools are
+        // only eligible for node-mode workers.
+        const allowedToolNames = builtInTools.map((tool) => tool.name);
+        if (worker.runMode === 'node') {
+          // DB tool rows store the connector SLUG as `name` (e.g. 'nuclei'),
+          // while the manifest display name is capitalized ('Nuclei'). The
+          // `tool.name IN (:...names)` filter must use slugs or connector
+          // jobs never match and stay PENDING forever.
+          const connectorTools = this.connectorRegistry
+            .getAllConnectors()
+            .map((c) => c.slug);
+          allowedToolNames.push(...connectorTools);
+        }
         queryBuilder.andWhere('tool.name IN (:...names)', {
-          names: builtInToolsName,
+          names: allowedToolNames,
         });
 
         if (worker.scope !== WorkerScope.CLOUD) {
@@ -497,8 +647,14 @@ export class JobsRegistryService {
       }
 
       if (isBuiltInTools && !job.command) {
-        await queryRunner.rollbackTransaction();
-        return null;
+        // Check if this is a connector tool (which has no command by design)
+        const isConnector = !!this.connectorRegistry.getConnector(
+          job.tool?.name ?? '',
+        );
+        if (!isConnector) {
+          await queryRunner.rollbackTransaction();
+          return null;
+        }
       }
 
       // [OPT-5] Use update() instead of save() — direct SQL, no extra SELECT
@@ -510,7 +666,7 @@ export class JobsRegistryService {
 
       await queryRunner.commitTransaction();
 
-      return {
+      const base: GetNextJobResult = {
         id: job.id,
         category: job.category,
         createdAt: job.createdAt,
@@ -519,6 +675,25 @@ export class JobsRegistryService {
         command: job.command,
         asset: job.asset,
       };
+
+      // Connector support: include tool metadata for non-built-in workers
+      if (!isBuiltInTools && worker.tool) {
+        base.tool = { id: worker.tool.id!, name: worker.tool.name };
+        // Connector workers have no workspace — derive from job's target instead, fallback to worker workspace for backward compat
+        base.workspaceId =
+          job.asset.target?.workspaceId ??
+          (worker.workspace as { id?: string })?.id;
+        base.configProfileId = job.configProfileId;
+        base.config = job.config;
+      } else if (isBuiltInTools && job.tool) {
+        // Connector job picked up by BUILT_IN worker
+        base.tool = { id: job.tool.id!, name: job.tool.name };
+        base.workspaceId = job.asset.target?.workspaceId;
+        base.configProfileId = job.configProfileId;
+        base.config = job.config;
+      }
+
+      return base;
     } catch (error) {
       Logger.error(
         'Error in getNextJob',
@@ -821,7 +996,11 @@ export class JobsRegistryService {
     if (nextToolIndex >= jobs.length) return 0;
 
     const workspaceId = workflow.workspace?.id;
-    if (workspaceId && !(await this.workspaceService.getWorkspaceConfigValue(workspaceId)).isAssetsDiscovery) {
+    if (
+      workspaceId &&
+      !(await this.workspaceService.getWorkspaceConfigValue(workspaceId))
+        .isAssetsDiscovery
+    ) {
       // Batch-resolve remaining tools' categories to find first non-SUBDOMAINS
       const remainingJobNames = jobs.slice(nextToolIndex).map((j) => j.run);
       const tools = await this.toolsService.getToolByNames({
@@ -843,9 +1022,13 @@ export class JobsRegistryService {
       names: [nextTool],
     });
 
+    const nextJobMeta = jobs[nextToolIndex];
+
     const createPromises = tools.map((tool) =>
       this.createNewJob({
         tool,
+        config: nextJobMeta?.config,
+        configProfileId: nextJobMeta?.configProfileId,
         targetIds: [job.asset.target.id],
         assetIds: [job.asset.id],
         workflow: job.jobHistory.workflow,
@@ -1071,9 +1254,7 @@ export class JobsRegistryService {
 
     // Build a lookup map: toolId → computed status
     const toolStatusMap = new Map<string, JobStatus>();
-    rawToolStatuses.forEach((row) =>
-      toolStatusMap.set(row.toolId, row.status),
-    );
+    rawToolStatuses.forEach((row) => toolStatusMap.set(row.toolId, row.status));
 
     // Map tools from workflow content with their computed status.
     // Only id/name/logoUrl/status are exposed — the UI renders nothing else
@@ -1086,12 +1267,12 @@ export class JobsRegistryService {
     const tools = (
       jobHistory.workflow?.content.jobs
         .map((job) => {
-          const tool = instaledTools.data.find(
-            (t) => t.name === job.run,
-          );
+          const tool = instaledTools.data.find((t) => t.name === job.run);
           return tool;
         })
-        .filter((tool): tool is Tool => tool !== undefined) ?? []
+        .filter(
+          (tool): tool is NonNullable<typeof tool> => tool !== undefined,
+        ) ?? []
     ).map((tool) => ({
       id: tool.id,
       name: tool.name,

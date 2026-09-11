@@ -146,6 +146,12 @@ export const menu: NavGroup[] = [
         url: '/tools',
       },
       {
+        title: 'Integrations',
+        icon: <Puzzle />,
+        url: '/integrations',
+        permission: 'integration.read',
+      },
+      {
         title: 'Workers',
         icon: <Server />,
         url: '/workers',
@@ -156,12 +162,6 @@ export const menu: NavGroup[] = [
         icon: <CirclePlay />,
         url: '/jobs',
         permission: 'job.read',
-      },
-      {
-        title: 'Integrations',
-        icon: <Puzzle />,
-        url: '/integrations',
-        permission: 'integration.read',
       },
     ],
   },
