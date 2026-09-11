@@ -222,6 +222,52 @@ func TestHandleConnectorResultDoneResetsBackoff(t *testing.T) {
 	}
 }
 
+// TestHandleConnectorResultConnectorErrorDoesNotBackOffImage: a connector that
+// starts, runs and sends Done with an error (e.g. wpscan "scan aborted — target
+// not WordPress") proves the IMAGE is healthy. The failure belongs to the scan
+// target, not the image, so the image must NOT be backed off; only a missing
+// Done (crash/timeout/disconnect) indicts the image.
+func TestHandleConnectorResultConnectorErrorDoesNotBackOffImage(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, _, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+	proxy := connector.NewProxy()
+
+	image := "ghcr.io/oasm-platform/connector-wpscan:3.8.25"
+	backoff := execution.NewImageBackoff()
+	oldBackoff := swapImageBackoff(backoff)
+	defer func() { imageBackoff = oldBackoff }()
+
+	execID := "exec-cerr-1"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-cerr-1", category: "vulnerabilities", release: func() {}, image: image}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	// Connector completed and reported a scan-level error via Done.
+	proxy.SetError(execID, "wpscan: scan aborted: The url supplied seems to be down")
+	proxy.MarkDone(execID)
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	if ok, retryIn := backoff.Allow(image); !ok {
+		t.Fatalf("connector-level error must not back off the image, retryIn=%s", retryIn)
+	}
+}
+
 // TestHandleConnectorResultForwardsLogsToTail tests container logs are streamed
 // into the tail buffer and surfaced on the worker log while the job runs.
 func TestHandleConnectorResultForwardsLogsToTail(t *testing.T) {

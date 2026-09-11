@@ -841,11 +841,14 @@ drain:
 		log.Info("[%s] Connector job completed: execID=%s", entry.jobID, execID)
 	}
 
-	// Per-image backoff bookkeeping: any failed outcome (crash, timeout,
-	// disconnect, connector error) backs the image off; a clean Done with
-	// success resets it. Fail-fast jobs never reach this point (no exec).
+	// Per-image backoff bookkeeping: the image is indicted only when the
+	// connector never reached Done (crash, timeout, disconnect, stream death) —
+	// that is an image/pool problem. A Done carrying an error means the
+	// connector ran fine and the failure belongs to the job target (e.g. wpscan
+	// "scan aborted: not WordPress"), so the image must not be penalised.
+	// Fail-fast jobs never reach this point (no exec).
 	if entry.image != "" {
-		if hasError || !hadDone {
+		if !hadDone {
 			imageBackoff.RecordFailure(entry.image)
 		} else {
 			imageBackoff.RecordSuccess(entry.image)
