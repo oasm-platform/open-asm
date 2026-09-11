@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { renderWithProviders } from '@/test/utils';
 import { ConnectIntegrationSheet } from '../components/connect-integration-sheet';
@@ -69,10 +70,113 @@ const slackSchema = {
   isAvailable: true,
 };
 
+// Mirrors core-api aws.schema.ts (todo 9): connectionMethod enum + method-scoped
+// fields guarded by ui:visibleWhen (scalar AND array equals) + a grouped
+// non-boolean field (roleArn) to pin the grouped typed-renderer fix (todo 11).
+const awsSchema = {
+  $id: 'aws',
+  title: 'AWS',
+  description: 'Discover public AWS resources',
+  properties: {
+    app_type: { const: 'aws', title: 'App type' },
+    category: { const: 'CLOUD_PROVIDER', title: 'Category' },
+    connectionMethod: {
+      type: 'string',
+      enum: ['accessKey', 'assumeRole', 'crossAccountRole', 'workloadIdentity', 'sso'],
+      default: 'accessKey',
+      title: 'Connection method',
+    },
+    region: { type: 'string', default: 'us-east-1', title: 'AWS region' },
+    accessKeyId: {
+      type: 'string',
+      title: 'Access key ID',
+      'ui:visibleWhen': {
+        field: 'connectionMethod',
+        equals: ['accessKey', 'assumeRole', 'crossAccountRole'],
+      },
+    },
+    secretAccessKey: {
+      type: 'string',
+      format: 'password',
+      title: 'Secret access key',
+      'ui:visibleWhen': {
+        field: 'connectionMethod',
+        equals: ['accessKey', 'assumeRole', 'crossAccountRole'],
+      },
+    },
+    roleArn: {
+      type: 'string',
+      title: 'Role ARN',
+      'ui:form:group': 'role',
+      'ui:visibleWhen': {
+        field: 'connectionMethod',
+        equals: ['assumeRole', 'crossAccountRole', 'workloadIdentity'],
+      },
+    },
+    externalId: {
+      type: 'string',
+      format: 'password',
+      title: 'External ID',
+      'ui:visibleWhen': {
+        field: 'connectionMethod',
+        equals: ['assumeRole', 'crossAccountRole'],
+      },
+    },
+    webIdentityToken: {
+      type: 'string',
+      format: 'password',
+      title: 'Web identity token',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: 'workloadIdentity' },
+    },
+    startUrl: {
+      type: 'string',
+      title: 'Start URL',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: 'sso' },
+    },
+    accountId: {
+      type: 'string',
+      title: 'Account ID',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: 'sso' },
+    },
+    roleName: {
+      type: 'string',
+      title: 'Role name',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: 'sso' },
+    },
+  },
+  // Every method-scoped field is required at the top level; the sheet must skip
+  // the ones hidden by connectionMethod (todo 12), so hidden fields never block.
+  required: [
+    'app_type',
+    'category',
+    'connectionMethod',
+    'region',
+    'accessKeyId',
+    'secretAccessKey',
+    'roleArn',
+    'externalId',
+    'webIdentityToken',
+    'startUrl',
+    'accountId',
+    'roleName',
+  ],
+  isAvailable: true,
+};
+
 const fillRequired = async (labelRegex: RegExp, value = 'secret-value') => {
   fireEvent.change(screen.getByLabelText(labelRegex), {
     target: { value },
   });
+};
+
+const selectConnectionMethod = async (
+  user: ReturnType<typeof userEvent.setup>,
+  optionLabel: string,
+) => {
+  await user.click(
+    await screen.findByRole('combobox', { name: 'Connection method' }),
+  );
+  await user.click(await screen.findByRole('option', { name: optionLabel }));
 };
 
 describe('ConnectIntegrationSheet', () => {
@@ -273,5 +377,151 @@ describe('ConnectIntegrationSheet', () => {
     await waitFor(() => {
       expect(mocks.createMutate).toHaveBeenCalled();
     });
+  });
+
+  it('renders the connectionMethod enum as a combobox defaulting to Access Key (U11)', async () => {
+    renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+
+    const combo = await screen.findByRole('combobox', {
+      name: 'Connection method',
+    });
+    expect(combo).toHaveTextContent('Access Key');
+    // The default method is accessKey, so its two fields are shown…
+    expect(screen.getByLabelText(/access key id/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/secret access key/i)).toBeInTheDocument();
+    // …and the assumeRole-only fields are hidden.
+    expect(screen.queryByLabelText(/role arn/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/external id/i)).not.toBeInTheDocument();
+  });
+
+  it('shows base credentials for accessKey but hides roleArn/webIdentityToken/sso fields', async () => {
+    renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await screen.findByRole('combobox', { name: 'Connection method' });
+
+    expect(screen.getByLabelText(/access key id/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/secret access key/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/role arn/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/web identity token/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/start url/i)).not.toBeInTheDocument();
+  });
+
+  it('reveals roleArn + base credentials and externalId when assumeRole is selected', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await selectConnectionMethod(user, 'Assume Role');
+
+    expect(screen.getByLabelText(/access key id/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/secret access key/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/role arn/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/external id/i)).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/web identity token/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/start url/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps roleArn visible under multiple methods via the array equals condition', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await screen.findByRole('combobox', { name: 'Connection method' });
+
+    // roleArn's visibleWhen.equals is an ARRAY: assumeRole, crossAccountRole, workloadIdentity.
+    await selectConnectionMethod(user, 'Assume Role');
+    expect(screen.getByLabelText(/role arn/i)).toBeInTheDocument();
+
+    await selectConnectionMethod(user, 'Workload Identity');
+    expect(screen.getByLabelText(/role arn/i)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/web identity token/i),
+    ).toBeInTheDocument();
+    // base creds + externalId are not in workloadIdentity's visible set.
+    expect(screen.queryByLabelText(/access key id/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/external id/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the grouped roleArn as a typed text input, not a Switch (U11)', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await selectConnectionMethod(user, 'Assume Role');
+
+    const roleArn = screen.getByLabelText(/role arn/i);
+    expect(roleArn.tagName).toBe('INPUT');
+    expect(roleArn).toHaveAttribute('type', 'text');
+    // Grouped fields must NOT collapse to a boolean Switch.
+    expect(
+      screen.queryByRole('switch', { name: /role arn/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows only the sso fields when sso is selected', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await selectConnectionMethod(user, 'Sso');
+
+    expect(screen.getByLabelText(/start url/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/account id/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/role name/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/access key id/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/role arn/i)).not.toBeInTheDocument();
+  });
+
+  it('submits only the visible config values and skips hidden required fields (U12)', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await screen.findByRole('button', { name: /connect/i });
+    await user.clear(screen.getByLabelText(/integration name/i));
+    await user.type(screen.getByLabelText(/integration name/i), 'My AWS');
+
+    // Only accessKeyId is filled; every other required key is hidden or ignored.
+    await user.type(screen.getByLabelText(/access key id/i), 'AKIA123');
+    await user.type(screen.getByLabelText(/secret access key/i), 'shh');
+    await user.click(screen.getByRole('button', { name: /connect/i }));
+
+    await waitFor(() => {
+      expect(mocks.createMutate).toHaveBeenCalled();
+    });
+    expect(mocks.createMutate).toHaveBeenCalledWith({
+      data: {
+        name: 'My AWS',
+        appType: 'aws',
+        category: 'CLOUD_PROVIDER',
+        syncSchedule: 'disabled',
+        config: {
+          connectionMethod: 'accessKey',
+          region: 'us-east-1',
+          accessKeyId: 'AKIA123',
+          secretAccessKey: 'shh',
+        },
+      },
+    });
+  });
+
+  it('does not block submit on hidden required fields (no missing-fields toast)', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await screen.findByRole('button', { name: /connect/i });
+
+    await user.type(screen.getByLabelText(/access key id/i), 'AKIA123');
+    await user.type(screen.getByLabelText(/secret access key/i), 'shh');
+    await user.click(screen.getByRole('button', { name: /connect/i }));
+
+    await waitFor(() => {
+      expect(mocks.createMutate).toHaveBeenCalled();
+    });
+    expect(toast.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('required fields'),
+    );
   });
 });
