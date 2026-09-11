@@ -7,6 +7,10 @@ import type { IntegrationsService } from './integrations.service';
 import type { TargetsService } from '@/modules/targets/targets.service';
 import type { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import type { WorkspacesService } from '@/modules/workspaces/workspaces.service';
+import type { AwsSsoService } from './connectors/aws/aws-sso.service';
+import type { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
+import type { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { decryptSensitiveConfigFields } from './validators/integration.validator';
 import { IntegrationType } from '@/common/enums/enum';
 
 // runConnector is a module import inside IntegrationSyncService — mock it so
@@ -33,6 +37,11 @@ describe('IntegrationSyncService', () => {
   let targetsServiceMock: TargetsService;
   let dataAdapterServiceMock: DataAdapterService;
   let workspacesServiceMock: { getWorkspacesByIds: jest.Mock };
+  let awsSsoServiceMock: AwsSsoService;
+  let workspaceEncryptionMock: { getDEK: jest.Mock };
+  let redisLockServiceMock: {
+    withLock: jest.Mock;
+  };
   let service: IntegrationSyncService;
 
   /** Standard integration row. syncJobId defaults to null (fresh row). */
@@ -67,6 +76,18 @@ describe('IntegrationSyncService', () => {
     targetsServiceMock = {} as unknown as TargetsService;
     dataAdapterServiceMock = {} as unknown as DataAdapterService;
     workspacesServiceMock = { getWorkspacesByIds: jest.fn() };
+    awsSsoServiceMock = {} as unknown as AwsSsoService;
+    workspaceEncryptionMock = {
+      getDEK: jest.fn().mockResolvedValue(Buffer.alloc(32, 1)),
+    };
+    redisLockServiceMock = {
+      withLock: jest
+        .fn()
+        .mockImplementation(
+          (_key: string, _ttl: number, action: () => Promise<unknown>) =>
+            action(),
+        ),
+    };
 
     service = new IntegrationSyncService(
       queueMock as unknown as Queue,
@@ -75,6 +96,9 @@ describe('IntegrationSyncService', () => {
       targetsServiceMock,
       dataAdapterServiceMock,
       workspacesServiceMock as unknown as WorkspacesService,
+      awsSsoServiceMock,
+      workspaceEncryptionMock as unknown as WorkspaceEncryptionService,
+      redisLockServiceMock as unknown as RedisLockService,
     );
   });
 
@@ -416,12 +440,88 @@ describe('IntegrationSyncService', () => {
       });
 
       expect(result).toEqual({
-        zones: 0,
-        records: 0,
-        wildcardZones: 0,
         targetsCreated: 0,
         assetsUpserted: 0,
       });
+    });
+
+    it('passes the SSO service, max sync duration and a persistConfigPatch to the connector config', async () => {
+      await service.runSync('integration-1', 'ws-1', { dryRun: true });
+
+      expect(runConnectorMock).toHaveBeenCalledWith(
+        'cloudflare',
+        IntegrationType.CLOUD_PROVIDER,
+        expect.objectContaining({
+          ssoService: awsSsoServiceMock,
+          maxSyncDurationMs: 30 * 60_000,
+          persistConfigPatch: expect.any(Function),
+        }),
+      );
+    });
+
+    it('persistConfigPatch re-encrypts a rotated credential with the workspace DEK and saves the integration', async () => {
+      let capturedPatch:
+        | ((patch: Record<string, unknown>) => Promise<void>)
+        | undefined;
+      runConnectorMock.mockImplementation(
+        (_appType: string, _category: string, config: Record<string, unknown>) => {
+          capturedPatch = config.persistConfigPatch as (
+            patch: Record<string, unknown>,
+          ) => Promise<void>;
+          return {
+            success: true,
+            message: 'ok',
+            timestamp: new Date().toISOString(),
+          };
+        },
+      );
+      repoMock.save.mockClear();
+
+      await service.runSync('integration-1', 'ws-1');
+      expect(capturedPatch).toBeDefined();
+      await capturedPatch?.({ apiToken: 'rotated-token' });
+
+      expect(workspaceEncryptionMock.getDEK).toHaveBeenCalledWith('ws-1');
+      const saved = repoMock.save.mock.calls.at(-1)?.[0] as Integration;
+      const stored = saved.config;
+      expect(stored.apiToken).not.toBe('rotated-token');
+      expect(
+        decryptSensitiveConfigFields(stored, Buffer.alloc(32, 1)).apiToken,
+      ).toBe('rotated-token');
+    });
+
+    it('lock held (non-dry-run): returns zero without dispatching the connector', async () => {
+      redisLockServiceMock.withLock.mockResolvedValue(null);
+
+      const result = await service.runSync('integration-1', 'ws-1');
+
+      expect(runConnectorMock).not.toHaveBeenCalled();
+      expect(result).toEqual({ targetsCreated: 0, assetsUpserted: 0 });
+      expect(repoMock.save).not.toHaveBeenCalled();
+    });
+
+    it('lock held (dry-run): throws BadRequestException so testIntegration cannot report false success', async () => {
+      redisLockServiceMock.withLock.mockResolvedValue(null);
+
+      await expect(
+        service.runSync('integration-1', 'ws-1', { dryRun: true }),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.runSync('integration-1', 'ws-1', { dryRun: true }),
+      ).rejects.toThrow('already in progress');
+      expect(runConnectorMock).not.toHaveBeenCalled();
+    });
+
+    it('uses a lock key scoped to the integration and a TTL >= the sync ceiling', async () => {
+      await service.runSync('integration-1', 'ws-1');
+
+      expect(redisLockServiceMock.withLock).toHaveBeenCalledWith(
+        'integration-sync:integration-1',
+        expect.any(Number),
+        expect.any(Function),
+      );
+      const ttl = redisLockServiceMock.withLock.mock.calls[0][1] as number;
+      expect(ttl).toBeGreaterThanOrEqual(30 * 60_000);
     });
   });
 
@@ -487,6 +587,9 @@ describe('IntegrationSyncService', () => {
       expect(names[3]).toBe('TargetsService');
       expect(names[4]).toBe('DataAdapterService');
       expect(names[5]).toBe('WorkspacesService');
+      expect(names[6]).toBe('AwsSsoService');
+      expect(names[7]).toBe('WorkspaceEncryptionService');
+      expect(names[8]).toBe('RedisLockService');
     });
 
     it('injects IntegrationsService via a forwardRef token (circular pair)', () => {
