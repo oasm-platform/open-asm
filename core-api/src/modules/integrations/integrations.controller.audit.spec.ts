@@ -9,7 +9,7 @@ type WiredConfig = { action: string } & AuditLogConfig;
 
 const reflector = new Reflector();
 
-const wired = (method: unknown): WiredConfig => {
+const wired = (method: (...args: unknown[]) => unknown): WiredConfig => {
   const config = reflector.get<WiredConfig>(AUDIT_LOG_KEY, method);
   if (!config) {
     throw new Error('no AUDIT_LOG_KEY metadata');

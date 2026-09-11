@@ -1,6 +1,7 @@
 import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { IntegrationType } from '@/common/enums/enum';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -19,6 +20,11 @@ import { Public } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { AuditLog } from '../audit/audit-log.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import {
+  AwsSsoCompleteDto,
+  AwsSsoDeviceDto,
+  AwsSsoPollDto,
+} from './dto/aws-sso.dto';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { GetIntegrationDto } from './dto/get-integration.dto';
 import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
@@ -29,6 +35,7 @@ import { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { IntegrationsService } from './integrations.service';
 import { TelegramConnectService } from './telegram-connect.service';
 import { TelegramWebhookService } from './telegram-webhook.service';
+import { AwsSsoService } from './connectors/aws/aws-sso.service';
 
 @ApiTags('Integrations')
 @Controller('integrations')
@@ -37,6 +44,7 @@ export class IntegrationsController {
     private readonly integrationsService: IntegrationsService,
     private readonly telegramConnectService: TelegramConnectService,
     private readonly telegramWebhookService: TelegramWebhookService,
+    private readonly awsSsoService: AwsSsoService,
   ) {}
 
   @Doc({
@@ -231,6 +239,119 @@ export class IntegrationsController {
       workspaceId,
     );
     return { success: true, message: 'Sync queued', jobId };
+  }
+
+  // ─── AWS SSO device-authorization flow ─────────────────────────
+
+  @Doc({
+    summary: 'Start an AWS SSO device authorization',
+    description:
+      'Registers a public OIDC client and starts the IAM Identity Center device-authorization flow. Returns the client credentials, device/user codes and verification URIs the console displays. No integration is created until `complete`.',
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('integration.write')
+  @AuditLog('integration.connected')
+  @Post('aws/sso/device')
+  @HttpCode(200)
+  startAwsSsoDevice(@Body() dto: AwsSsoDeviceDto) {
+    return this.awsSsoService.startDeviceAuth({
+      region: dto.region,
+      startUrl: dto.startUrl,
+    });
+  }
+
+  @Doc({
+    summary: 'Poll an AWS SSO device authorization',
+    description:
+      'Polls the device-code grant. While pending/slow_down only the status is returned; once authorized the SSO accounts (and their roles) accessible to the signed-in user are returned.',
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('integration.write')
+  @AuditLog('integration.connected')
+  @Post('aws/sso/poll')
+  @HttpCode(200)
+  async pollAwsSsoDevice(@Body() dto: AwsSsoPollDto) {
+    const result = await this.awsSsoService.pollDeviceAuth({
+      region: dto.region,
+      clientId: dto.clientId,
+      clientSecret: dto.clientSecret,
+      deviceCode: dto.deviceCode,
+    });
+
+    if (result.status !== 'authorized') {
+      return { status: result.status };
+    }
+
+    const ssoAccounts = await this.awsSsoService.listSsoAccounts({
+      region: dto.region,
+      accessToken: result.accessToken,
+    });
+    const accounts = await Promise.all(
+      ssoAccounts.map(async (account) => {
+        const roles = await this.awsSsoService.listSsoRoles({
+          region: dto.region,
+          accessToken: result.accessToken,
+          accountId: account.accountId,
+        });
+        return {
+          accountId: account.accountId,
+          accountName: account.accountName,
+          roles: roles.map((role) => role.roleName),
+        };
+      }),
+    );
+
+    return {
+      status: 'authorized' as const,
+      refreshToken: result.refreshToken,
+      accounts,
+    };
+  }
+
+  @Doc({
+    summary: 'Complete an AWS SSO connection',
+    description:
+      'Creates the AWS integration from the selected account/role and the refresh token acquired by the device flow. Config secrets are encrypted at rest and masked in the response.',
+    response: {
+      serialization: GetIntegrationDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('integration.write')
+  @AuditLog('integration.connected', {
+    resourceId: (result) => (result as GetIntegrationDto | undefined)?.id,
+  })
+  @Post('aws/sso/complete')
+  completeAwsSso(
+    @Body() dto: AwsSsoCompleteDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ) {
+    return this.integrationsService.createIntegration({
+      name: dto.name,
+      description: undefined,
+      appType: 'aws',
+      category: IntegrationType.CLOUD_PROVIDER,
+      config: {
+        connectionMethod: 'sso',
+        region: dto.region,
+        startUrl: dto.startUrl,
+        accountId: dto.accountId,
+        roleName: dto.roleName,
+        clientId: dto.clientId,
+        clientSecret: dto.clientSecret,
+        refreshToken: dto.refreshToken,
+      },
+      workspaceId,
+      userId,
+      syncSchedule: dto.syncSchedule,
+    });
   }
 
   // ─── Telegram-specific endpoints ───────────────────────────────
