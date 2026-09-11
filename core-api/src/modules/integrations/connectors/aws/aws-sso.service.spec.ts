@@ -169,6 +169,14 @@ describe('AwsSsoService', () => {
       );
     });
 
+    it('treats the ExpiredTokenException class name as terminal too', async () => {
+      mockSend.mockRejectedValueOnce(
+        Object.assign(new Error('expired'), { name: 'ExpiredTokenException' }),
+      );
+
+      await expect(service.pollDeviceAuth(args)).rejects.toThrow(/expired/i);
+    });
+
     it('rethrows an unexpected SDK failure', async () => {
       mockSend.mockRejectedValueOnce(new Error('boom'));
 
@@ -277,6 +285,40 @@ describe('AwsSsoService', () => {
         expiration: new Date(1_900_000_000_000),
       });
       expect(result.rotatedRefreshToken).toBe('refresh-2');
+    });
+
+    it('sends the exact accountId/roleName and the persisted client, with no RegisterClient', async () => {
+      mockSend
+        .mockResolvedValueOnce({ accessToken: 'access-2' })
+        .mockResolvedValueOnce({
+          roleCredentials: {
+            accessKeyId: 'AKIA',
+            secretAccessKey: 'secret',
+          },
+        });
+
+      await service.resolveCredentials({
+        region: 'us-east-1',
+        clientId: 'client-9',
+        clientSecret: 'secret-9',
+        refreshToken: 'refresh-9',
+        accountId: '999999999999',
+        roleName: 'SecurityAudit',
+      });
+
+      expect(lastInput(0)).toEqual({
+        clientId: 'client-9',
+        clientSecret: 'secret-9',
+        grantType: 'refresh_token',
+        refreshToken: 'refresh-9',
+      });
+      expect(lastInput(1)).toEqual({
+        accountId: '999999999999',
+        roleName: 'SecurityAudit',
+        accessToken: 'access-2',
+      });
+      const kinds = mockSend.mock.calls.map((c) => (c[0] as SendInput).kind);
+      expect(kinds).toEqual(['CreateToken', 'GetRoleCredentials']);
     });
 
     it('throws when GetRoleCredentials returns nothing', async () => {

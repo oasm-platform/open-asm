@@ -185,6 +185,42 @@ describe('AwsSsoConnect', () => {
     });
   });
 
+  it(
+    'keeps polling through slow_down until authorized',
+    async () => {
+      let polls = 0;
+      mocks.post.mockImplementation((url: string) => {
+        if (url.endsWith('/aws/sso/device')) return Promise.resolve(DEVICE_RESPONSE);
+        if (url.endsWith('/aws/sso/poll')) {
+          polls += 1;
+          if (polls === 1) return Promise.resolve({ status: 'pending' });
+          if (polls === 2) return Promise.resolve({ status: 'slow_down' });
+          return Promise.resolve(AUTHORIZED_RESPONSE);
+        }
+        return Promise.reject(new Error(`unexpected url ${url}`));
+      });
+
+      const { user } = renderWithProviders(
+        <AwsSsoConnect name="My AWS" syncSchedule="disabled" />,
+      );
+
+      await user.type(
+        await screen.findByLabelText(/start url/i),
+        'https://my-sso.awsapps.com/start',
+      );
+      await user.click(
+        screen.getByRole('button', { name: /start authorization/i }),
+      );
+
+      expect(
+        await screen.findByText('Authorization complete', {}, { timeout: 8000 }),
+      ).toBeInTheDocument();
+      expect(polls).toBeGreaterThanOrEqual(3);
+      expect(toast.error).not.toHaveBeenCalled();
+    },
+    15000,
+  );
+
   it('shows an error toast and a restart affordance when the code expires', async () => {
     mocks.post.mockImplementation((url: string) => {
       if (url.endsWith('/aws/sso/device')) return Promise.resolve(DEVICE_RESPONSE);
@@ -229,6 +265,65 @@ describe('AwsSsoConnect', () => {
         },
       );
     });
+  });
+
+  it('never writes clientSecret/refreshToken to storage or the URL', async () => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    const initialHref = window.location.href;
+
+    let polls = 0;
+    mocks.post.mockImplementation((url: string) => {
+      if (url.endsWith('/aws/sso/device')) return Promise.resolve(DEVICE_RESPONSE);
+      if (url.endsWith('/aws/sso/poll')) {
+        polls += 1;
+        return Promise.resolve(
+          polls === 1 ? { status: 'pending' } : AUTHORIZED_RESPONSE,
+        );
+      }
+      if (url.endsWith('/aws/sso/complete')) return Promise.resolve({ id: 'int-1' });
+      return Promise.reject(new Error(`unexpected url ${url}`));
+    });
+
+    const { user } = renderWithProviders(
+      <AwsSsoConnect name="My AWS" syncSchedule="disabled" />,
+    );
+
+    await user.type(
+      await screen.findByLabelText(/start url/i),
+      'https://my-sso.awsapps.com/start',
+    );
+    await user.click(
+      screen.getByRole('button', { name: /start authorization/i }),
+    );
+    await screen.findByText('Authorization complete');
+
+    await pickOption(user, 'Account ID', /Production/);
+    await pickOption(user, 'Role name', 'Admin');
+    await user.click(screen.getByRole('button', { name: /^connect$/i }));
+
+    await waitFor(() => {
+      expect(mocks.post).toHaveBeenCalledWith(
+        '/api/integrations/aws/sso/complete',
+        expect.objectContaining({
+          clientSecret: 'secret-1',
+          refreshToken: 'refresh-1',
+        }),
+      );
+    });
+
+    const secrets = ['secret-1', 'refresh-1'];
+    const dump = (storage: Storage) =>
+      Object.keys(storage)
+        .map((k) => `${k}=${storage.getItem(k) ?? ''}`)
+        .join('&');
+    for (const secret of secrets) {
+      expect(dump(window.localStorage)).not.toContain(secret);
+      expect(dump(window.sessionStorage)).not.toContain(secret);
+      expect(window.location.href).not.toContain(secret);
+      expect(window.location.search).not.toContain(secret);
+    }
+    expect(window.location.href).toBe(initialHref);
   });
 
   it('renders the device-code wizard for aws + sso in the connect sheet', async () => {
