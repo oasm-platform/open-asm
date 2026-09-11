@@ -7,6 +7,7 @@ import { Integration } from './entities/integration.entity';
 import { TelegramConnect } from './entities/telegram-connect.entity';
 import { IntegrationSyncProcessor } from './integration-sync.processor';
 import { IntegrationsController } from './integrations.controller';
+import { AwsSsoService } from './connectors/aws/aws-sso.service';
 import { IntegrationSyncService } from './integrations-sync.service';
 import { IntegrationsService } from './integrations.service';
 import { TelegramConnectService } from './telegram-connect.service';
@@ -35,6 +36,7 @@ import { TelegramBotService } from './telegram-bot.service';
     TelegramWebhookService,
     TelegramPollingService,
     TelegramBotService,
+    AwsSsoService,
   ],
   exports: [IntegrationsService, TelegramConnectService],
 })
