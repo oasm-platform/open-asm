@@ -864,10 +864,5 @@ func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID strin
 		}
 	}
 
-	// Inject connector inputs as INPUT_<KEY>=<VALUE> env vars.
-	for k, v := range spec.Inputs {
-		env = append(env, "INPUT_"+strings.ToUpper(k)+"="+fmt.Sprintf("%v", v))
-	}
-
 	return env
 }

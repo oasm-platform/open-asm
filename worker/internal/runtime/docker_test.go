@@ -386,7 +386,9 @@ func TestDockerRuntimeNeverClobbersDockerHostEnv(t *testing.T) {
 	}
 }
 
-func TestBuildContainerEnvInputs(t *testing.T) {
+// Per-job inputs must not be baked into env: a reused warm container keeps its
+// first-run env, leaking a stale INPUT_<KEY> into the next job.
+func TestBuildContainerEnvNoInputs(t *testing.T) {
 	spec := JobSpec{
 		JobID:   "j-in",
 		Tool:    "nuclei",
@@ -395,23 +397,9 @@ func TestBuildContainerEnvInputs(t *testing.T) {
 	}
 	env := buildContainerEnv(spec, "", "", "")
 
-	var inputEnvs []string
 	for _, e := range env {
 		if strings.HasPrefix(e, "INPUT_") {
-			inputEnvs = append(inputEnvs, e)
-		}
-	}
-	if len(inputEnvs) != 2 {
-		t.Fatalf("expected 2 INPUT_ env vars, got %d: %v", len(inputEnvs), inputEnvs)
-	}
-
-	// Check TARGET is uppercased.
-	for _, e := range inputEnvs {
-		if strings.HasPrefix(e, "INPUT_TARGET=") && e != "INPUT_TARGET=example.com" {
-			t.Fatalf("INPUT_TARGET wrong: %q", e)
-		}
-		if strings.HasPrefix(e, "INPUT_SEVERITY=") && e != "INPUT_SEVERITY=high" {
-			t.Fatalf("INPUT_SEVERITY wrong: %q", e)
+			t.Fatalf("container env must not carry per-job INPUT_* vars (warm-pool leak): %q", e)
 		}
 	}
 }
