@@ -11,7 +11,6 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import {
   getIntegrationsControllerGetManyIntegrationsQueryKey,
   useIntegrationsControllerSyncIntegration,
@@ -27,11 +26,12 @@ import {
   formatNextRun,
   getLocalTimezone,
 } from '@/lib/cron-schedule';
-import { Loader2, Pencil, Play, RefreshCw, X } from 'lucide-react';
+import { Loader2, Pencil, Play, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { SchemaOneOfItem } from '../index';
 import { IntegrationLogo } from './integration-logo';
+import { SchemaField, type SchemaProperty } from './schema-field';
 import { TelegramConnect } from './telegram-connect';
 
 const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
@@ -44,207 +44,11 @@ const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 const getDefaultSchedule = (): string =>
   buildCronExpression(DEFAULT_CRON_STATE, getLocalTimezone());
 
-interface SchemaProperty {
-  type?: string;
-  format?: string;
-  description?: string;
-  title?: string;
-  'ui:widget'?: string;
-  'ui:placeholder'?: string;
-  'ui:text-color'?: string;
-  'ui:form:group'?: string;
-  default?: unknown;
-  const?: string;
-  items?: {
-    type?: string;
-    [key: string]: unknown;
-  };
-}
-
 interface IntegrationDetailSheetProps {
   integration: GetIntegrationDto;
   schema: SchemaOneOfItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-/** Multi-value string input for array-typed fields. */
-function ArrayField({
-  fieldKey,
-  value,
-  onChange,
-  autoComplete,
-  placeholder,
-}: {
-  fieldKey: string;
-  value: unknown;
-  onChange: (val: unknown) => void;
-  autoComplete: string;
-  placeholder: string;
-}) {
-  const items: string[] =
-    Array.isArray(value) && value.length > 0
-      ? (value as string[])
-      : [''];
-
-  const handleItemChange = (index: number, newValue: string) => {
-    const next = [...items];
-    next[index] = newValue;
-    onChange(next);
-  };
-
-  const addItem = () => {
-    onChange([...items, '']);
-  };
-
-  const removeItem = (index: number) => {
-    if (items.length <= 1) return;
-    const next = items.filter((_, i) => i !== index);
-    onChange(next);
-  };
-
-  return (
-    <div className="space-y-2">
-      {items.map((item, index) => (
-        <div key={index} className="relative">
-          <Input
-            type="text"
-            name={`${fieldKey}[${index}]`}
-            id={`${fieldKey}[${index}]`}
-            autoComplete={autoComplete}
-            placeholder={placeholder}
-            value={item}
-            onChange={(e) => handleItemChange(index, e.target.value)}
-            className="w-full pr-9"
-          />
-          {items.length > 1 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => removeItem(index)}
-              aria-label={`Remove ${fieldKey} item ${index + 1}`}
-              className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
-            >
-              <X className="size-4" />
-            </Button>
-          )}
-        </div>
-      ))}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={addItem}
-        className="w-full"
-      >
-        + Add
-      </Button>
-    </div>
-  );
-}
-
-function renderField(
-  key: string,
-  prop: SchemaProperty,
-  value: unknown,
-  onChange: (val: unknown) => void,
-) {
-  const placeholder = prop['ui:placeholder'] ?? '';
-  const autoComplete = 'off';
-
-  if (prop.type === 'boolean') {
-    return (
-      <Switch
-        name={key}
-        id={key}
-        checked={value === true}
-        onCheckedChange={(checked) => onChange(checked)}
-      />
-    );
-  }
-
-  if (prop.format === 'password' || prop['ui:widget'] === 'password') {
-    return (
-      <Input
-        type="password"
-        name={key}
-        id={key}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        value={typeof value === 'string' ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-
-  if (prop.format === 'uri' || prop.format === 'url') {
-    return (
-      <Input
-        type="url"
-        name={key}
-        id={key}
-        autoComplete={autoComplete}
-        placeholder={placeholder || 'https://'}
-        value={typeof value === 'string' ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-
-  if (prop['ui:widget'] === 'textarea') {
-    return (
-      <Textarea
-        name={key}
-        id={key}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        value={typeof value === 'string' ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-        rows={3}
-      />
-    );
-  }
-
-  if (prop.type === 'number' || prop.type === 'integer') {
-    return (
-      <Input
-        type="number"
-        name={key}
-        id={key}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        value={typeof value === 'string' ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-
-  // Array: multi-value string input
-  if (prop.type === 'array') {
-    return (
-      <ArrayField
-        fieldKey={key}
-        value={value}
-        onChange={onChange}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-      />
-    );
-  }
-
-  // Default: text input
-  return (
-    <Input
-      type="text"
-      name={key}
-      id={key}
-      autoComplete={autoComplete}
-      placeholder={placeholder}
-      value={typeof value === 'string' ? value : ''}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
 }
 
 export function IntegrationDetailSheet({
@@ -485,12 +289,14 @@ export function IntegrationDetailSheet({
                         <span className="ml-1 text-destructive">*</span>
                       )}
                     </Label>
-                    {renderField(
-                      key,
-                      prop,
-                      formValues[key] ?? '',
-                      (val) => handleValueChange(key, val),
-                    )}
+                    <SchemaField
+                      fieldKey={key}
+                      prop={prop}
+                      value={formValues[key] ?? ''}
+                      onChange={(val) => handleValueChange(key, val)}
+                      mode="edit"
+                      autoComplete="off"
+                    />
                     {prop.description && (
                       <p className="text-xs text-muted-foreground">
                         {prop.description}
@@ -501,36 +307,19 @@ export function IntegrationDetailSheet({
               })
             : ungroupedProperties.map(([key, prop]) => {
                 const label = prop.title ?? key;
-                const value = configValue(key);
 
                 return (
                   <div key={key} className="space-y-1.5">
                     <Label className="text-sm font-medium text-foreground">
                       {label}
                     </Label>
-                    {prop.type === 'boolean' ? (
-                      <div className="flex h-9 items-center rounded-md border bg-muted/30 px-3 py-2">
-                        <Switch
-                          checked={value === true || value === 'true'}
-                          disabled
-                        />
-                      </div>
-                    ) : prop.format === 'password' ||
-                      prop['ui:widget'] === 'password' ? (
-                      // Never reveal the raw secret in view mode (U6): mask
-                      // it client-side even if the backend already masks.
-                      <div className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                        <span className="text-foreground break-words">
-                          {'****' + String(value).slice(-4)}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                        <span className="text-foreground break-words">
-                          {String(value)}
-                        </span>
-                      </div>
-                    )}
+                    <SchemaField
+                      fieldKey={key}
+                      prop={prop}
+                      value={configValue(key)}
+                      onChange={() => undefined}
+                      mode="view"
+                    />
                     {prop.description && (
                       <p className="text-xs text-muted-foreground">
                         {prop.description}
@@ -554,39 +343,8 @@ export function IntegrationDetailSheet({
                   {fields.map(([key, prop]) => {
                     const textColor = prop['ui:text-color'];
 
-                    if (isEditing) {
-                      return (
-                        <div key={key} className="flex items-center gap-2">
-                          <Switch
-                            name={key}
-                            id={key}
-                            checked={formValues[key] === true}
-                            onCheckedChange={(checked) =>
-                              handleValueChange(key, checked)
-                            }
-                          />
-                          <Label
-                            htmlFor={key}
-                            {...(textColor
-                              ? { style: { color: textColor } }
-                              : {})}
-                            className="cursor-pointer text-sm font-normal"
-                          >
-                            {prop.title ?? key}
-                          </Label>
-                        </div>
-                      );
-                    }
-
-                    const value = configValue(key);
                     return (
-                      <div key={key} className="flex items-center gap-2">
-                        <Switch
-                          name={key}
-                          id={key}
-                          checked={value === true || value === 'true'}
-                          disabled
-                        />
+                      <div key={key} className="space-y-2">
                         <Label
                           htmlFor={key}
                           {...(textColor
@@ -596,6 +354,18 @@ export function IntegrationDetailSheet({
                         >
                           {prop.title ?? key}
                         </Label>
+                        <SchemaField
+                          fieldKey={key}
+                          prop={prop}
+                          value={
+                            isEditing
+                              ? (formValues[key] ?? '')
+                              : configValue(key)
+                          }
+                          onChange={(val) => handleValueChange(key, val)}
+                          mode={isEditing ? 'edit' : 'view'}
+                          autoComplete="off"
+                        />
                       </div>
                     );
                   })}
