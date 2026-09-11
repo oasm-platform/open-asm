@@ -31,7 +31,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { SchemaOneOfItem } from '../index';
 import { IntegrationLogo } from './integration-logo';
-import { SchemaField, type SchemaProperty } from './schema-field';
+import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
 import { TelegramConnect } from './telegram-connect';
 
 const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
@@ -196,6 +196,11 @@ export function IntegrationDetailSheet({
 
   const [ungroupedProperties, propertyGroups] = grouped;
 
+  // VIEW mode has no form state; resolve conditions against the stored config.
+  const conditionValues = isEditing
+    ? formValues
+    : (integration.config as Record<string, unknown>);
+
   const handleValueChange = (key: string, value: unknown) => {
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
@@ -296,6 +301,7 @@ export function IntegrationDetailSheet({
                       onChange={(val) => handleValueChange(key, val)}
                       mode="edit"
                       autoComplete="off"
+                      visible={isPropertyVisible(prop, conditionValues)}
                     />
                     {prop.description && (
                       <p className="text-xs text-muted-foreground">
@@ -319,6 +325,7 @@ export function IntegrationDetailSheet({
                       value={configValue(key)}
                       onChange={() => undefined}
                       mode="view"
+                      visible={isPropertyVisible(prop, conditionValues)}
                     />
                     {prop.description && (
                       <p className="text-xs text-muted-foreground">
@@ -365,6 +372,7 @@ export function IntegrationDetailSheet({
                           onChange={(val) => handleValueChange(key, val)}
                           mode={isEditing ? 'edit' : 'view'}
                           autoComplete="off"
+                          visible={isPropertyVisible(prop, conditionValues)}
                         />
                       </div>
                     );

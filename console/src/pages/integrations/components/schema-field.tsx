@@ -251,6 +251,18 @@ function renderView(fieldKey: string, prop: SchemaProperty, value: unknown) {
   return <ViewValue>{String(value ?? '')}</ViewValue>;
 }
 
+export function isPropertyVisible(
+  prop: SchemaProperty,
+  values: Record<string, unknown>,
+): boolean {
+  const condition = prop['ui:visibleWhen'];
+  if (!condition) return true;
+  const current = values[condition.field];
+  return Array.isArray(condition.equals)
+    ? condition.equals.includes(current)
+    : current === condition.equals;
+}
+
 /**
  * Single source of truth for rendering an integration schema property.
  *

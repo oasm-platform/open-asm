@@ -20,7 +20,7 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { IntegrationLogo } from './integration-logo';
-import { SchemaField, type SchemaProperty } from './schema-field';
+import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
 
 const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 
@@ -141,6 +141,8 @@ export function ConnectIntegrationSheet({
       (key) => key !== 'app_type' && key !== 'category',
     );
     const missing = requiredFields.filter((key) => {
+      const prop = schema.properties?.[key] as SchemaProperty | undefined;
+      if (prop && !isPropertyVisible(prop, formValues)) return false;
       const value = formValues[key];
       if (typeof value === 'string') return value.trim() === '';
       return value === undefined || value === null;
@@ -262,6 +264,7 @@ export function ConnectIntegrationSheet({
                   value={formValues[key] ?? ''}
                   onChange={(val) => handleValueChange(key, val)}
                   mode="edit"
+                  visible={isPropertyVisible(prop, formValues)}
                 />
                 {prop.description && (
                   <p className="text-xs text-muted-foreground">
@@ -301,6 +304,7 @@ export function ConnectIntegrationSheet({
                           value={formValues[key] ?? ''}
                           onChange={(val) => handleValueChange(key, val)}
                           mode="edit"
+                          visible={isPropertyVisible(prop, formValues)}
                         />
                       </div>
                     );
