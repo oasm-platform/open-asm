@@ -90,8 +90,8 @@ describe('IntegrationsController', () => {
     integrationsServiceMock.testIntegration.mockResolvedValue({
       success: false,
       category: IntegrationType.CLOUD_PROVIDER,
-      appType: 'aws',
-      message: 'No connector registered for appType "aws"',
+      appType: 'unregistered-app',
+      message: 'No connector registered for appType "unregistered-app"',
       timestamp: new Date().toISOString(),
     });
 

@@ -96,6 +96,23 @@ export class IntegrationsService {
     return universalIntegrationSchema;
   }
 
+  private assertAwsWorkloadIdentityScheduleAllowed(args: {
+    appType: string;
+    connectionMethod: unknown;
+    syncSchedule?: string;
+  }): void {
+    if (
+      args.appType === 'aws' &&
+      args.connectionMethod === 'workloadIdentity' &&
+      args.syncSchedule !== undefined &&
+      args.syncSchedule !== 'disabled'
+    ) {
+      throw new BadRequestException(
+        'AWS workloadIdentity integrations do not support scheduled syncs; the OIDC token is short-lived. Set syncSchedule to "disabled" and run manual syncs.',
+      );
+    }
+  }
+
   /**
    * Creates a new integration in the specified workspace.
    * Validates config against JSON Schema, encrypts sensitive fields, then persists.
@@ -124,6 +141,15 @@ export class IntegrationsService {
         'syncSchedule is only supported for CLOUD_PROVIDER integrations',
       );
     }
+
+    // AWS workloadIdentity relies on a short-lived OIDC token; a recurring
+    // sync would fail once the token expires, so only manual/disabled sync
+    // is allowed.
+    this.assertAwsWorkloadIdentityScheduleAllowed({
+      appType: args.appType,
+      connectionMethod: args.config.connectionMethod,
+      syncSchedule: args.syncSchedule,
+    });
 
     const dek = await this.workspaceEncryption.getDEK(args.workspaceId);
     const encryptedConfig = encryptSensitiveConfigFields(args.config, dek);
@@ -437,6 +463,16 @@ export class IntegrationsService {
           'syncSchedule is only supported for CLOUD_PROVIDER integrations',
         );
       }
+
+      const effectiveConnectionMethod =
+        dto.config?.connectionMethod ??
+        decryptSensitiveConfigFields(integration.config, dek).connectionMethod;
+
+      this.assertAwsWorkloadIdentityScheduleAllowed({
+        appType: integration.appType,
+        connectionMethod: effectiveConnectionMethod,
+        syncSchedule: dto.syncSchedule,
+      });
       await this.integrationSyncService.applySchedule(
         integration,
         dto.syncSchedule,

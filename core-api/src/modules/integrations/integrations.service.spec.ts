@@ -257,6 +257,118 @@ describe('IntegrationsService', () => {
     });
   });
 
+  describe('AWS workloadIdentity rejects scheduled syncs', () => {
+    const workloadIdentityConfig = {
+      connectionMethod: 'workloadIdentity',
+      region: 'us-east-1',
+      roleArn: 'arn:aws:iam::123456789012:role/oasm',
+      webIdentityToken: 'oidc-token',
+    };
+    const awsCreateArgs = {
+      name: 'AWS',
+      appType: 'aws',
+      category: IntegrationType.CLOUD_PROVIDER,
+      config: workloadIdentityConfig,
+      workspaceId: 'ws-1',
+      userId: 'user-1',
+    };
+
+    it('rejects a cron syncSchedule on create', async () => {
+      repoMock.save.mockResolvedValue(integrationEntity({ appType: 'aws' }));
+
+      await expect(
+        service.createIntegration({
+          ...awsCreateArgs,
+          syncSchedule: '0 0 * * *',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
+    });
+
+    it('accepts "disabled" syncSchedule on create', async () => {
+      repoMock.save.mockResolvedValue(
+        integrationEntity({ appType: 'aws', syncSchedule: 'disabled' }),
+      );
+
+      const result = await service.createIntegration({
+        ...awsCreateArgs,
+        syncSchedule: 'disabled',
+      });
+
+      expect(result.syncSchedule).toBe('disabled');
+      expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
+    });
+
+    it('allows a cron syncSchedule on create for a non-workloadIdentity AWS method', async () => {
+      repoMock.save.mockResolvedValue(integrationEntity({ appType: 'aws' }));
+
+      const result = await service.createIntegration({
+        ...awsCreateArgs,
+        config: {
+          connectionMethod: 'accessKey',
+          region: 'us-east-1',
+          accessKeyId: 'AKIA',
+          secretAccessKey: 'secret',
+        },
+        syncSchedule: '0 0 * * *',
+      });
+
+      expect(result.syncSchedule).toBe('0 0 * * *');
+      expect(integrationSyncServiceMock.applySchedule).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'integration-1' }),
+        '0 0 * * *',
+      );
+    });
+
+    it('rejects a cron syncSchedule on update using the stored config when dto.config is absent', async () => {
+      repoMock.findOne.mockResolvedValue(
+        integrationEntity({
+          appType: 'aws',
+          config: { connectionMethod: 'workloadIdentity' },
+        }),
+      );
+
+      await expect(
+        service.updateIntegration('integration-1', 'ws-1', {
+          syncSchedule: '0 2 * * *',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
+    });
+
+    it('rejects a cron syncSchedule on update when dto.config sets workloadIdentity', async () => {
+      repoMock.findOne.mockResolvedValue(
+        integrationEntity({ appType: 'aws', config: {} }),
+      );
+
+      await expect(
+        service.updateIntegration('integration-1', 'ws-1', {
+          config: workloadIdentityConfig,
+          syncSchedule: '0 2 * * *',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
+    });
+
+    it('allows "disabled" syncSchedule on update for workloadIdentity', async () => {
+      repoMock.findOne.mockResolvedValue(
+        integrationEntity({
+          appType: 'aws',
+          config: { connectionMethod: 'workloadIdentity' },
+        }),
+      );
+
+      await service.updateIntegration('integration-1', 'ws-1', {
+        syncSchedule: 'disabled',
+      });
+
+      expect(integrationSyncServiceMock.applySchedule).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'integration-1' }),
+        'disabled',
+      );
+    });
+  });
+
   describe('SC-SCHED-5: deleteIntegration removes the scheduler first', () => {
     it('calls removeJobScheduler before deleting the row', async () => {
       repoMock.findOne.mockResolvedValue(integrationEntity());
