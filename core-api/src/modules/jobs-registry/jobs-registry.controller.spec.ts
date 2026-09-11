@@ -70,7 +70,7 @@ describe('JobsRegistryController', () => {
         })),
       };
       mockToolConfigProfilesService = {
-        resolveConfigForDispatch: jest.fn(),
+        resolveConfigForJob: jest.fn(),
       };
 
       const module: TestingModule = await Test.createTestingModule({
@@ -114,7 +114,7 @@ describe('JobsRegistryController', () => {
         name: 'my-connector',
         image: 'my-connector:latest',
       });
-      mockToolConfigProfilesService.resolveConfigForDispatch.mockResolvedValue({
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
         apiKey: 'decrypted-key',
       });
 
@@ -155,7 +155,7 @@ describe('JobsRegistryController', () => {
         memory: '512Mi',
         timeoutSeconds: 600,
       });
-      mockToolConfigProfilesService.resolveConfigForDispatch.mockResolvedValue(null);
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue(null);
 
       const result = await controller.next({ id: 'worker-1' });
 
@@ -198,7 +198,7 @@ describe('JobsRegistryController', () => {
         name: 'my-connector',
         image: 'my-connector:latest',
       });
-      mockToolConfigProfilesService.resolveConfigForDispatch.mockResolvedValue({
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
         apiKey: 'decrypted-key',
         timeout: 30,
         verbose: true,
@@ -243,16 +243,16 @@ describe('JobsRegistryController', () => {
         name: 'my-connector',
         image: 'my-connector:latest',
       });
-      mockToolConfigProfilesService.resolveConfigForDispatch.mockResolvedValue({
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
         apiKey: 'explicit-key',
       });
 
       await controller.next({ id: 'worker-1' });
 
-      expect(mockToolConfigProfilesService.resolveConfigForDispatch).toHaveBeenCalledWith(
+      expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledWith(
         'ws-1',
         'tool-1',
-        'explicit-profile',
+        { config: undefined, configProfileId: 'explicit-profile' },
       );
     });
 
@@ -270,17 +270,17 @@ describe('JobsRegistryController', () => {
         name: 'my-connector',
         image: 'my-connector:latest',
       });
-      mockToolConfigProfilesService.resolveConfigForDispatch.mockResolvedValue({
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
         apiKey: 'default-key',
       });
 
       await controller.next({ id: 'worker-1' });
 
-      // profileId is undefined → resolveConfigForDispatch called with undefined
-      expect(mockToolConfigProfilesService.resolveConfigForDispatch).toHaveBeenCalledWith(
+      // profileId is undefined → resolveConfigForJob called with undefined profileId
+      expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledWith(
         'ws-1',
         'tool-1',
-        undefined,
+        { config: undefined, configProfileId: undefined },
       );
     });
 
@@ -298,7 +298,7 @@ describe('JobsRegistryController', () => {
         name: 'my-connector',
         image: 'my-connector:latest',
       });
-      mockToolConfigProfilesService.resolveConfigForDispatch.mockResolvedValue(undefined);
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue(undefined);
 
       const result = await controller.next({ id: 'worker-1' });
 
@@ -319,7 +319,7 @@ describe('JobsRegistryController', () => {
         name: 'my-connector',
         image: 'my-connector:latest',
       });
-      mockToolConfigProfilesService.resolveConfigForDispatch.mockRejectedValue(
+      mockToolConfigProfilesService.resolveConfigForJob.mockRejectedValue(
         new Error('decrypt failed'),
       );
 
@@ -347,7 +347,7 @@ describe('JobsRegistryController', () => {
         name: 'my-connector',
         image: 'my-connector:latest',
       });
-      mockToolConfigProfilesService.resolveConfigForDispatch.mockRejectedValue(
+      mockToolConfigProfilesService.resolveConfigForJob.mockRejectedValue(
         new Error('bad-dek'),
       );
 

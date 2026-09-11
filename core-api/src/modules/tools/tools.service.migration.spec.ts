@@ -4,7 +4,7 @@ import { JobPriority, ToolCategory, WorkerType } from '@/common/enums/enum';
 import type { Repository } from 'typeorm';
 import type { Tool } from './entities/tools.entity';
 import type { WorkspaceTool } from './entities/workspace_tools.entity';
-import { ToolsService } from './tools.service';
+import { ToolSyncService } from './tool-sync.service';
 
 // ── Mock factories ──────────────────────────────────────────────────────
 const mockRepo = () => ({
@@ -15,17 +15,6 @@ const mockRepo = () => ({
   create: jest.fn(),
   createQueryBuilder: jest.fn(),
   manager: { query: jest.fn().mockResolvedValue(undefined) },
-});
-
-const mockWorkersService = () => ({
-  repo: {
-    createQueryBuilder: jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      getCount: jest.fn().mockResolvedValue(0),
-    }),
-    manager: { query: jest.fn().mockResolvedValue(undefined) },
-  },
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -83,13 +72,13 @@ const manifestWithThirdPartyAuthor = JSON.stringify({
   ],
 });
 
-describe('ToolsService — legacy PROVIDER → CONNECTOR migration', () => {
-  let service: ToolsService;
+describe('ToolSyncService — legacy PROVIDER → CONNECTOR migration', () => {
+  let service: ToolSyncService;
   let toolsRepo: ReturnType<typeof mockRepo>;
   let workspaceToolRepo: ReturnType<typeof mockRepo>;
   let redisLockService: { withLock: jest.Mock };
   let storageService: { uploadFile: jest.Mock };
-  let workersService: ReturnType<typeof mockWorkersService>;
+  let dataSource: { query: jest.Mock };
   let readFileSpy: jest.SpyInstance;
 
   // Shared mock state — updated per test
@@ -108,7 +97,7 @@ describe('ToolsService — legacy PROVIDER → CONNECTOR migration', () => {
       withLock: jest.fn((_key: string, _ttl: number, fn: () => Promise<unknown>) => fn()),
     };
     storageService = { uploadFile: jest.fn().mockResolvedValue(undefined) };
-    workersService = mockWorkersService();
+    dataSource = { query: jest.fn().mockResolvedValue(undefined) };
 
     findResults = {
       builtIn: [],          // tools found with type=BUILT_IN
@@ -156,16 +145,12 @@ describe('ToolsService — legacy PROVIDER → CONNECTOR migration', () => {
 
     readFileSpy = jest.spyOn(fs, 'readFile').mockResolvedValue(manifestNucleiAndNessus);
 
-    service = new ToolsService(
+    service = new ToolSyncService(
       toolsRepo as unknown as Repository<Tool>,
       workspaceToolRepo as unknown as Repository<WorkspaceTool>,
-      {} as any,
-      {} as any,
-      workersService as any,
       redisLockService as any,
       storageService as any,
-      {} as any, // profilesRepo — not used by sync paths under test
-      {} as any, // connectorRegistry — not used by sync paths under test
+      dataSource as any,
     );
   });
 
@@ -264,8 +249,7 @@ describe('ToolsService — legacy PROVIDER → CONNECTOR migration', () => {
       // Reset manager.query mocks for FK migration
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       (workspaceToolRepo.manager.query as jest.Mock).mockClear();
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-      (workersService.repo.manager.query as jest.Mock).mockClear();
+      (dataSource.query).mockClear();
 
       await service.onModuleInit();
 
@@ -274,7 +258,7 @@ describe('ToolsService — legacy PROVIDER → CONNECTOR migration', () => {
         expect.stringContaining('workspace_tools'),
         expect.arrayContaining(['connector-nessus-id', 'legacy-nessus-id']),
       );
-      expect(workersService.repo.manager.query).toHaveBeenCalledWith(
+      expect(dataSource.query).toHaveBeenCalledWith(
         expect.stringContaining('workers'),
         expect.arrayContaining(['connector-nessus-id', 'legacy-nessus-id']),
       );

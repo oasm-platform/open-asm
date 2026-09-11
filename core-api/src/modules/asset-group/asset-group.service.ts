@@ -322,9 +322,15 @@ export class AssetGroupService {
         await this.assetGroupRepo.remove(savedAssetGroup);
       }
     } catch (rollbackError) {
+      const message =
+        rollbackError instanceof Error
+          ? rollbackError.message
+          : String(rollbackError);
+      const stack =
+        rollbackError instanceof Error ? rollbackError.stack : undefined;
       this.logger.error(
-        `Failed to rollback asset group creation: ${rollbackError.message}`,
-        rollbackError.stack,
+        `Failed to rollback asset group creation: ${message}`,
+        stack,
       );
     }
   }

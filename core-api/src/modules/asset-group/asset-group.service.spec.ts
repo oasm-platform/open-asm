@@ -174,6 +174,9 @@ describe('AssetGroupService', () => {
       mockAssetGroupWorkflowRepo.save.mockImplementation((entities) =>
         Promise.resolve(entities),
       );
+      // Rollback reads the group's join rows; default to an empty list so a
+      // failing create() can roll back cleanly instead of crashing on undefined.
+      mockAssetGroupWorkflowRepo.find.mockResolvedValue([]);
     });
 
     it('should create a group with name only (existing behavior)', async () => {
@@ -262,6 +265,7 @@ describe('AssetGroupService', () => {
         groupId,
         ['workflow-1'],
         '0 0 * * *',
+        workspaceId,
       );
     });
 
@@ -287,6 +291,7 @@ describe('AssetGroupService', () => {
         groupId,
         ['workflow-1'],
         CronSchedule.EVERY_3_DAYS,
+        workspaceId,
       );
     });
 

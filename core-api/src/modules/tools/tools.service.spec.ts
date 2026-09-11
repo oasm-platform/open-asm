@@ -54,8 +54,6 @@ describe('ToolsService — readiness flags', () => {
   let toolsRepo: ReturnType<typeof mockRepo>;
   let workspaceToolRepo: ReturnType<typeof mockRepo>;
   let profilesRepo: ReturnType<typeof mockRepo>;
-  let redisLockService: { withLock: jest.Mock };
-  let storageService: { uploadFile: jest.Mock };
   let workersService: ReturnType<typeof mockWorkersService>;
   let connectorRegistry: Record<string, jest.Mock>;
 
@@ -63,10 +61,6 @@ describe('ToolsService — readiness flags', () => {
     toolsRepo = mockRepo();
     workspaceToolRepo = mockRepo();
     profilesRepo = mockRepo();
-    redisLockService = {
-      withLock: jest.fn((_key: string, _ttl: number, fn: () => Promise<unknown>) => fn()),
-    };
-    storageService = { uploadFile: jest.fn().mockResolvedValue(undefined) };
     workersService = mockWorkersService();
     connectorRegistry = {
       getConnector: jest.fn(),
@@ -81,8 +75,6 @@ describe('ToolsService — readiness flags', () => {
       {} as any, // assetRepo
       {} as any, // vulnerabilityRepo
       workersService as any,
-      redisLockService as any,
-      storageService as any,
       profilesRepo,
       connectorRegistry as any,
     );
@@ -658,8 +650,6 @@ describe('ToolsService — readiness flags', () => {
         {} as any,
         {} as any,
         workersService as any,
-        redisLockService as any,
-        storageService as any,
         profilesRepo,
         connectorRegistry as any,
       );
@@ -809,10 +799,6 @@ describe('uninstallTool — cascades config profile deletion', () => {
       {} as any, // assetRepo
       {} as any, // vulnerabilityRepo
       mockWorkersService() as any,
-      {
-        withLock: jest.fn((_key: string, _ttl: number, fn: () => Promise<unknown>) => fn()),
-      } as any,
-      { uploadFile: jest.fn() } as any,
       profilesRepo,
       {} as any, // connectorRegistry
     );
