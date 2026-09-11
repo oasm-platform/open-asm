@@ -1,3 +1,4 @@
+import { awsSchema } from './aws.schema';
 import { cloudflareSchema } from './cloudflare.schema';
 import { jiraSchema } from './jira.schema';
 import { slackSchema } from './slack.schema';
@@ -20,6 +21,7 @@ export const universalIntegrationSchema = {
   description:
     'Discriminated union of all supported integration configurations.',
   oneOf: [
+    awsSchema,
     cloudflareSchema,
     // githubSchema,
     jiraSchema,
@@ -27,8 +29,7 @@ export const universalIntegrationSchema = {
     telegramSchema,
     webhookSchema,
     // linearSchema,
-    // Add more integration schemas here as they are implemented:
-    // awsSchema, etc.
+    // Add more integration schemas here as they are implemented.
   ],
 } as const;
 
