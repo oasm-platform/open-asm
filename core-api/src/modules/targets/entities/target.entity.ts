@@ -36,6 +36,7 @@ export enum TargetType {
 export enum TargetSource {
   MANUAL = 'MANUAL',
   CLOUDFLARE = 'cloudflare',
+  AWS = 'aws',
   INTERNAL_NETWORK = 'INTERNAL_NETWORK',
 }
 
