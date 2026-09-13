@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-07T05:41:21.5096378Z",
+  "generatedAt": "2026-09-13T14:47:23.3419122Z",
   "connectors": [
     {
       "name": "Nessus",
@@ -128,6 +128,25 @@
       "capabilities": [
         "vulnerabilities"
       ],
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "description": "Target URL or hostname to scan.",
+            "examples": [
+              "https://example.com"
+            ],
+            "format": "uri",
+            "title": "Scan target",
+            "type": "string",
+            "ui:placeholder": "https://example.com"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -225,8 +244,8 @@
     {
       "name": "WPScan - WordPress Security Scanner",
       "slug": "wpscan",
-      "version": "3.8.25",
-      "image": "ghcr.io/oasm-platform/connector-wpscan:3.8.25",
+      "version": "3.8.27",
+      "image": "ghcr.io/oasm-platform/connector-wpscan:3.8.27",
       "author": "oasm",
       "pricingTier": [
         "free"
@@ -239,6 +258,244 @@
       "capabilities": [
         "vulnerabilities"
       ],
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "description": "Target URL or hostname to scan.",
+            "examples": [
+              "https://example.com"
+            ],
+            "format": "uri",
+            "title": "Scan target",
+            "type": "string",
+            "ui:placeholder": "https://example.com"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "apiToken": {
+            "description": "API token from wpscan.com used to display vulnerability data. If omitted, the WPSCAN_API_TOKEN environment variable is used.",
+            "title": "WPScan API token",
+            "type": "string",
+            "ui:placeholder": "Enter WPScan API token",
+            "ui:widget": "password"
+          },
+          "connectTimeout": {
+            "default": 30,
+            "description": "Connection timeout in seconds.",
+            "minimum": 1,
+            "title": "Connect timeout",
+            "type": "integer"
+          },
+          "cookieString": {
+            "description": "Cookie string to send with requests, e.g. \"cookie1=value1; cookie2=value2\".",
+            "title": "Cookie string",
+            "type": "string",
+            "ui:widget": "password"
+          },
+          "detectionMode": {
+            "default": "mixed",
+            "description": "Global detection mode used by all detections.",
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
+            "title": "Detection mode",
+            "type": "string"
+          },
+          "disableTlsChecks": {
+            "description": "Disable SSL/TLS certificate verification.",
+            "title": "Disable TLS checks",
+            "type": "boolean"
+          },
+          "enumerate": {
+            "description": "Enumeration codes: vp/ap/p plugins, vt/at/t themes, tt timthumbs, cb config backups, dbe db exports, u users, m media.",
+            "items": {
+              "enum": [
+                "vp",
+                "ap",
+                "p",
+                "vt",
+                "at",
+                "t",
+                "tt",
+                "cb",
+                "dbe",
+                "u",
+                "m"
+              ],
+              "type": "string"
+            },
+            "title": "Enumeration",
+            "type": "array"
+          },
+          "excludeContentBased": {
+            "description": "Exclude responses matching this regexp/string during enumeration.",
+            "title": "Exclude content based",
+            "type": "string",
+            "ui:placeholder": "e.g. 404 not found"
+          },
+          "excludeUsernames": {
+            "description": "Exclude usernames matching this regexp/string.",
+            "title": "Exclude usernames",
+            "type": "string",
+            "ui:placeholder": "e.g. test.*"
+          },
+          "force": {
+            "description": "Do not check whether the target is running WordPress or returns 403.",
+            "title": "Force scan",
+            "type": "boolean"
+          },
+          "headers": {
+            "description": "Additional headers added to requests, separated by \"; \".",
+            "title": "Extra headers",
+            "type": "string",
+            "ui:placeholder": "X-Forwarded-For: 127.0.0.1"
+          },
+          "httpAuth": {
+            "description": "HTTP Basic authentication credentials in login:password form.",
+            "title": "HTTP basic auth",
+            "type": "string",
+            "ui:placeholder": "login:password"
+          },
+          "ignoreMainRedirect": {
+            "description": "Ignore the main redirect (if any) and scan the target URL.",
+            "title": "Ignore main redirect",
+            "type": "boolean"
+          },
+          "maxThreads": {
+            "default": 5,
+            "description": "Maximum number of threads to use.",
+            "minimum": 1,
+            "title": "Max threads",
+            "type": "integer"
+          },
+          "pluginsDetection": {
+            "default": "passive",
+            "description": "Detection mode used to enumerate plugins.",
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
+            "title": "Plugins detection",
+            "type": "string"
+          },
+          "pluginsVersionDetection": {
+            "default": "mixed",
+            "description": "Detection mode used to check plugins versions.",
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
+            "title": "Plugins version detection",
+            "type": "string"
+          },
+          "proxy": {
+            "description": "Proxy URL, e.g. http://127.0.0.1:8080 or socks5://127.0.0.1:9050.",
+            "title": "Proxy",
+            "type": "string",
+            "ui:placeholder": "http://127.0.0.1:8080"
+          },
+          "randomUserAgent": {
+            "description": "Use a random User-Agent for each scan.",
+            "title": "Random user agent",
+            "type": "boolean"
+          },
+          "requestTimeout": {
+            "default": 60,
+            "description": "Request timeout in seconds.",
+            "minimum": 1,
+            "title": "Request timeout",
+            "type": "integer"
+          },
+          "scope": {
+            "description": "Additional (sub-)domains to include in scope.",
+            "examples": [
+              [
+                "blog.example.com"
+              ]
+            ],
+            "items": {
+              "type": "string"
+            },
+            "title": "Scope",
+            "type": "array",
+            "ui:placeholder": "e.g. blog.example.com"
+          },
+          "server": {
+            "description": "Force the supplied server module instead of auto-detecting.",
+            "enum": [
+              "apache",
+              "iis",
+              "nginx"
+            ],
+            "title": "Web server",
+            "type": "string"
+          },
+          "stealthy": {
+            "description": "Alias for --random-user-agent plus passive detection modes.",
+            "title": "Stealthy",
+            "type": "boolean"
+          },
+          "themesDetection": {
+            "description": "Detection mode used to enumerate themes.",
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
+            "title": "Themes detection",
+            "type": "string"
+          },
+          "themesVersionDetection": {
+            "description": "Detection mode used to check themes versions.",
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
+            "title": "Themes version detection",
+            "type": "string"
+          },
+          "throttle": {
+            "description": "Milliseconds to wait before each request. When set, max threads is forced to 1.",
+            "minimum": 0,
+            "title": "Throttle",
+            "type": "integer"
+          },
+          "update": {
+            "description": "Force (true) or skip (false) the WPScan database update before scanning. Omit to use the WPScan default.",
+            "title": "Update database",
+            "type": "boolean"
+          },
+          "userAgent": {
+            "description": "Custom User-Agent header for requests.",
+            "title": "User agent",
+            "type": "string",
+            "ui:placeholder": "e.g. Mozilla/5.0"
+          },
+          "vhost": {
+            "description": "Host header to use in requests.",
+            "title": "Virtual host",
+            "type": "string",
+            "ui:placeholder": "e.g. internal.corp"
+          }
+        },
+        "required": [
+          "apiToken"
+        ],
+        "type": "object"
+      },
       "resourceDefaults": {
         "cpu": "500m",
         "memory": "512Mi",

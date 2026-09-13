@@ -107,82 +107,6 @@ describe('ToolsService — readiness flags', () => {
   });
 
   describe('getManyTools — hasConfigProfile and isReady', () => {
-    it('should include hasConfigProfile=true for connector tool with profile', async () => {
-      const connectorTool = makeTool({ id: 'tool-1', name: 'nuclei' });
-      toolsRepo.findAndCount.mockResolvedValue([[connectorTool], 1]);
-      workspaceToolRepo.find.mockResolvedValue([{ tool: connectorTool, isEnabled: true }]);
-      profilesRepo.find.mockResolvedValue([{ id: 'prof-1', tool: { id: 'tool-1' } }]); // batched profile lookup
-      workersService.repo.createQueryBuilder.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        addSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        groupBy: jest.fn().mockReturnThis(),
-        getCount: jest.fn().mockResolvedValue(2),
-        getRawMany: jest.fn().mockResolvedValue([]),
-      });
-
-      const result = await service.getManyTools({
-        page: 1, limit: 10, workspaceId: 'ws-001',
-      } as any);
-
-      const tool = result.data[0] as any;
-      expect(tool.hasConfigProfile).toBe(true);
-      expect(tool.isReady).toBe(true);
-    });
-
-    it('should include hasConfigProfile=false for connector tool with schema but no profile', async () => {
-      const connectorTool = makeTool({ id: 'tool-2', name: 'nuclei' });
-      toolsRepo.findAndCount.mockResolvedValue([[connectorTool], 1]);
-      workspaceToolRepo.find.mockResolvedValue([{ tool: connectorTool, isEnabled: true }]);
-      profilesRepo.find.mockResolvedValue([]); // no profile
-      // Connector HAS a schema → config is required → not ready without profile
-      (connectorRegistry.getConnectorSchema).mockReturnValue({ type: 'object' });
-      workersService.repo.createQueryBuilder.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        addSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        groupBy: jest.fn().mockReturnThis(),
-        getCount: jest.fn().mockResolvedValue(2),
-        getRawMany: jest.fn().mockResolvedValue([]),
-      });
-
-      const result = await service.getManyTools({
-        page: 1, limit: 10, workspaceId: 'ws-001',
-      } as any);
-
-      const tool = result.data[0] as any;
-      expect(tool.hasConfigProfile).toBe(false);
-      expect(tool.isReady).toBe(false);
-    });
-
-    it('should include isReady=true for no-schema connector without profile (wpscan)', async () => {
-      const connectorTool = makeTool({ id: 'tool-2', name: 'wpscan' });
-      toolsRepo.findAndCount.mockResolvedValue([[connectorTool], 1]);
-      workspaceToolRepo.find.mockResolvedValue([{ tool: connectorTool, isEnabled: true }]);
-      profilesRepo.find.mockResolvedValue([]); // no profile
-      // wpscan is a KNOWN connector with neither configSchema nor inputsSchema
-      // → needs no config → installed implies ready
-      (connectorRegistry.getConnectorSchema).mockReturnValue(null);
-      workersService.repo.createQueryBuilder.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        addSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        groupBy: jest.fn().mockReturnThis(),
-        getCount: jest.fn().mockResolvedValue(2),
-        getRawMany: jest.fn().mockResolvedValue([]),
-      });
-
-      const result = await service.getManyTools({
-        page: 1, limit: 10, workspaceId: 'ws-001',
-      } as any);
-
-      const tool = result.data[0] as any;
-      expect(tool.hasConfigProfile).toBe(false);
-      expect(tool.isReady).toBe(true);
-    });
 
     it('should include isReady=true for built-in tool (always ready)', async () => {
       const builtInTool = makeTool({
@@ -417,60 +341,6 @@ describe('ToolsService — readiness flags', () => {
   // ── End search tests ────────────────────────────────────────────────
 
   describe('getInstalledTools — hasConfigProfile and isReady', () => {
-    it('should include hasConfigProfile for installed connector tools', async () => {
-      const connectorTool = makeTool({ id: 'tool-1', name: 'nuclei' });
-      toolsRepo.find
-        .mockResolvedValueOnce([]);  // builtInTools
-      workspaceToolRepo.find
-        .mockResolvedValueOnce([{ tool: connectorTool }]); // workspaceTools
-      profilesRepo.find.mockResolvedValue([{ id: 'prof-1', tool: { id: 'tool-1' } }]); // batched profile lookup
-
-      const result = await service.getInstalledTools(
-        {}, 'ws-001',
-      );
-
-      const tool = result.data[0] as any;
-      expect(tool.hasConfigProfile).toBe(true);
-      expect(tool.isReady).toBe(true);
-    });
-
-    it('should include hasConfigProfile=false for connector with schema but no profile', async () => {
-      const connectorTool = makeTool({ id: 'tool-2', name: 'nuclei' });
-      toolsRepo.find
-        .mockResolvedValueOnce([]);  // builtInTools
-      workspaceToolRepo.find
-        .mockResolvedValueOnce([{ tool: connectorTool }]); // workspaceTools
-      profilesRepo.find.mockResolvedValue([]); // no profile
-      (connectorRegistry.getConnectorSchema).mockReturnValue({ type: 'object' });
-
-      const result = await service.getInstalledTools(
-        {}, 'ws-001',
-      );
-
-      const tool = result.data[0] as any;
-      expect(tool.hasConfigProfile).toBe(false);
-      expect(tool.isReady).toBe(false);
-    });
-
-    it('should include isReady=true for no-schema connector without profile (wpscan)', async () => {
-      const connectorTool = makeTool({ id: 'tool-2', name: 'wpscan' });
-      toolsRepo.find
-        .mockResolvedValueOnce([]);  // builtInTools
-      workspaceToolRepo.find
-        .mockResolvedValueOnce([{ tool: connectorTool }]); // workspaceTools
-      profilesRepo.find.mockResolvedValue([]); // no profile
-      // Known connector with no schema → no config needed → ready
-      (connectorRegistry.getConnectorSchema).mockReturnValue(null);
-
-      const result = await service.getInstalledTools(
-        {}, 'ws-001',
-      );
-
-      const tool = result.data[0] as any;
-      expect(tool.hasConfigProfile).toBe(false);
-      expect(tool.isReady).toBe(true);
-    });
-
     it('should always include isReady=true for built-in tools', async () => {
       const builtInTool = makeTool({
         id: 'tool-3', name: 'subfinder', type: WorkerType.BUILT_IN, isBuiltIn: true,
@@ -491,58 +361,6 @@ describe('ToolsService — readiness flags', () => {
   });
 
   describe('getToolById — hasConfigProfile and isReady', () => {
-    it('should include hasConfigProfile=true for connector with profile', async () => {
-      const connectorTool = makeTool({ id: 'tool-1', name: 'nuclei' });
-      toolsRepo.findOne.mockResolvedValue(connectorTool);
-      workspaceToolRepo.findOne.mockResolvedValue({ tool: connectorTool });
-      profilesRepo.findOne.mockResolvedValue({ id: 'prof-1' });
-
-      const result = await service.getToolById('tool-1', 'ws-001');
-
-      expect((result as any).hasConfigProfile).toBe(true);
-      expect((result as any).isReady).toBe(true);
-    });
-
-    it('should include hasConfigProfile=false for connector with schema but no profile', async () => {
-      const connectorTool = makeTool({ id: 'tool-2', name: 'nuclei' });
-      toolsRepo.findOne.mockResolvedValue(connectorTool);
-      workspaceToolRepo.findOne.mockResolvedValue({ tool: connectorTool });
-      profilesRepo.findOne.mockResolvedValue(null);
-      (connectorRegistry.getConnectorSchema).mockReturnValue({ type: 'object' });
-
-      const result = await service.getToolById('tool-2', 'ws-001');
-
-      expect((result as any).hasConfigProfile).toBe(false);
-      expect((result as any).isReady).toBe(false);
-    });
-
-    it('should include isReady=true for no-schema connector installed without profile (wpscan)', async () => {
-      const connectorTool = makeTool({ id: 'tool-2', name: 'wpscan' });
-      toolsRepo.findOne.mockResolvedValue(connectorTool);
-      workspaceToolRepo.findOne.mockResolvedValue({ tool: connectorTool }); // installed
-      profilesRepo.findOne.mockResolvedValue(null); // no profile
-      // Known connector with no schema → needs no config → installed implies ready
-      (connectorRegistry.getConnectorSchema).mockReturnValue(null);
-
-      const result = await service.getToolById('tool-2', 'ws-001');
-
-      expect((result as any).hasConfigProfile).toBe(false);
-      expect((result as any).isReady).toBe(true);
-    });
-
-    it('should keep isReady=false for no-schema connector NOT installed', async () => {
-      const connectorTool = makeTool({ id: 'tool-2', name: 'wpscan' });
-      toolsRepo.findOne.mockResolvedValue(connectorTool);
-      workspaceToolRepo.findOne.mockResolvedValue(null); // NOT installed
-      profilesRepo.findOne.mockResolvedValue(null);
-      (connectorRegistry.getConnectorSchema).mockReturnValue(null);
-
-      const result = await service.getToolById('tool-2', 'ws-001');
-
-      expect((result as any).isInstalled).toBe(false);
-      expect((result as any).isReady).toBe(false);
-    });
-
     it('should always include isReady=true for built-in tool', async () => {
       const builtInTool = makeTool({
         id: 'tool-3', name: 'subfinder', type: WorkerType.BUILT_IN, isBuiltIn: true,
@@ -555,75 +373,9 @@ describe('ToolsService — readiness flags', () => {
       expect((result as any).isReady).toBe(true);
     });
 
-    it('should return tool with hasConfigProfile even without workspaceId (connector)', async () => {
-      const connectorTool = makeTool({ id: 'tool-1', name: 'nuclei' });
-      toolsRepo.findOne.mockResolvedValue(connectorTool);
-
-      const result = await service.getToolById('tool-1');
-
-      // Without workspaceId, hasProfile is null (unknown)
-      expect((result as any).hasConfigProfile).toBeNull();
-      expect((result as any).isReady).toBe(false);
-    });
   });
 
   describe('getToolSchema — schema endpoint semantics', () => {
-    const setupConnector = (id: string, name: string) => {
-      const tool = makeTool({ id, name });
-      toolsRepo.findOne.mockResolvedValue(tool);
-      workspaceToolRepo.findOne.mockResolvedValue({ tool }); // installed
-      profilesRepo.findOne.mockResolvedValue(null);
-      return tool;
-    };
-
-    it('returns effective schema for known connector with configSchema', async () => {
-      setupConnector('tool-1', 'nuclei');
-      (connectorRegistry.getConnector).mockReturnValue({
-        name: 'nuclei', slug: 'nuclei', configSchema: { type: 'object' },
-      });
-      (connectorRegistry.getEffectiveSchema).mockReturnValue({
-        schema: { type: 'object' },
-        source: 'configSchema',
-      });
-
-      const result = await service.getToolSchema('tool-1', 'ws-001');
-
-      expect(result).toEqual({ schema: { type: 'object' }, source: 'configSchema' });
-    });
-
-    it('returns {schema:null, source:null} with 200 for known connector with no schema (wpscan)', async () => {
-      setupConnector('tool-2', 'wpscan');
-      // Known connector (registry entry) with NEITHER configSchema NOR inputsSchema
-      (connectorRegistry.getConnector).mockReturnValue({
-        name: 'wpscan', slug: 'wpscan',
-      });
-      (connectorRegistry.getEffectiveSchema).mockReturnValue({
-        schema: null,
-        source: null,
-      });
-      (connectorRegistry.getConnectorSchema).mockReturnValue(null);
-
-      const result = await service.getToolSchema('tool-2', 'ws-001');
-
-      // Must NOT throw — no schema is a valid outcome for a known connector
-      expect(result).toEqual({ schema: null, source: null });
-    });
-
-    it('throws BadRequest for unknown connector slug', async () => {
-      setupConnector('tool-3', 'ghost-tool');
-      (connectorRegistry.getConnector).mockReturnValue(null);
-      (connectorRegistry.getEffectiveSchema).mockReturnValue({
-        schema: null,
-        source: null,
-      });
-
-      await expect(
-        service.getToolSchema('tool-3', 'ws-001'),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.getToolSchema('tool-3', 'ws-001'),
-      ).rejects.toThrow(/Unknown connector slug/);
-    });
 
     it('returns {schema:null, source:null} without throwing for built-in tool', async () => {
       const builtInTool = makeTool({

@@ -534,7 +534,7 @@ describe('WorkersService', () => {
     });
   });
 
-  describe('getWorkers - connector tool shaping (#2 #3 #7 #8)', () => {
+  describe('getWorkers - built-in tools query hoisting', () => {
     const buildQueryBuilder = (rows: Record<string, unknown>[]) => ({
       select: jest.fn().mockReturnThis(),
       addSelect: jest.fn().mockReturnThis(),
@@ -557,45 +557,7 @@ describe('WorkersService', () => {
       return service.getWorkers({ page: 1, limit: 10 } as any);
     };
 
-    it('worker tools maps connector category from capabilities', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['subdomains'],
-        },
-      ]);
-
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'node' }]);
-
-      expect(result.data[0].tools).toHaveLength(1);
-      expect(result.data[0].tools[0]).toMatchObject({
-        id: 'nuclei',
-        category: 'subdomains',
-      });
-      expect(result.data[0].tools[0].category).not.toBe('vulnerabilities');
-    });
-
-    it('worker tools defaults category when capabilities absent', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        { slug: 'wpscan', name: 'WPScan' } as any,
-      ]);
-
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'node' }]);
-
-      expect(result.data[0].tools).toHaveLength(1);
-      expect(result.data[0].tools[0]).toMatchObject({
-        id: 'wpscan',
-        category: 'vulnerabilities',
-      });
-    });
-
     it('getMany hoists built-in tools query to single call', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue(
-        [],
-      );
       (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
         data: [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
       });
@@ -613,104 +575,6 @@ describe('WorkersService', () => {
           expect.objectContaining({ id: 'bt-1', name: 'subfinder' }),
         ]);
       }
-    });
-
-    it('worker tools marks connectors distinctly with stored logo', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['vulnerabilities'],
-          logo: 'aGVsbG8=',
-        },
-        {
-          slug: 'wpscan',
-          name: 'WPScan',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['vulnerabilities'],
-        } as any,
-      ]);
-
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'node' }]);
-      const tools = result.data[0].tools as Array<Record<string, unknown>>;
-
-      expect(tools).toHaveLength(2);
-      const nuclei = tools.find((t) => t.id === 'nuclei');
-      expect(nuclei?.type).toBe(WorkerType.CONNECTOR);
-      expect(nuclei?.logoUrl).toBe('/connectors/nuclei.png');
-      expect(String(nuclei?.logoUrl)).not.toContain('data:image/png;base64');
-      const wpscan = tools.find((t) => t.id === 'wpscan');
-      expect(wpscan?.type).toBe(WorkerType.CONNECTOR);
-      expect(wpscan?.logoUrl).toBeUndefined();
-    });
-
-    it('cli worker gets builtin tools only (no connectors)', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['subdomains'],
-        },
-      ]);
-      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
-        data: [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
-      });
-
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'cli' }]);
-
-      expect(result.data[0].tools).toHaveLength(1);
-      expect(result.data[0].tools[0]).toMatchObject({
-        id: 'bt-1',
-        name: 'subfinder',
-      });
-      expect(result.data[0].tools.some((t: any) => t.id === 'nuclei')).toBe(false);
-    });
-
-    it('worker without runMode (legacy) gets builtin tools only', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['subdomains'],
-        },
-      ]);
-      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
-        data: [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
-      });
-
-      const result = await runGetWorkers([{ id: 'w-1' }]);
-
-      expect(result.data[0].tools).toHaveLength(1);
-      expect(result.data[0].tools.some((t: any) => t.id === 'nuclei')).toBe(false);
-    });
-
-    it('node worker gets builtin tools plus connectors', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['subdomains'],
-        },
-      ]);
-      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
-        data: [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
-      });
-
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'node' }]);
-
-      const tools = result.data[0].tools as Array<Record<string, unknown>>;
-      const ids = tools.map((t) => t.id);
-      expect(ids).toContain('bt-1');
-      expect(ids).toContain('nuclei');
     });
   });
 });

@@ -17,6 +17,7 @@ import {
   deepMerge,
   encryptProfile,
   getSensitiveFields,
+  isMaskedValue,
   maskProfile,
 } from './validators/tool-config-profiles.crypto';
 import { validateProfileOrThrow } from './validators/tool-config-profiles.validator';
@@ -168,6 +169,23 @@ export class ToolConfigProfilesService {
     return this.encryptAndSave(profile, sensitiveFields, workspaceId);
   }
 
+  /**
+   * Updates a profile's name and/or config.
+   *
+   * Config handling (when `dto.config` is provided):
+   * 1. Validate against the connector schema first. A masked placeholder is a
+   *    non-empty string, so JSON-Schema `required` still passes.
+   * 2. For each sensitive field whose incoming value is a masked placeholder
+   *    (see isMaskedValue), delete it from the incoming config and carry over
+   *    the EXISTING stored ciphertext unchanged. This is what protects a real
+   *    secret from being overwritten when the console echoes back the masked
+   *    value the API returned.
+   * 3. Encrypt only the genuinely-new incoming fields, then merge the carried
+   *    ciphertext back on top: `{ ...encryptedIncoming, ...preservedFields }`.
+   *    Carried ciphertext is never re-encrypted (double-encrypt is a known bug).
+   *
+   * Rename-only (no `dto.config`) persists as-is without touching ciphertext.
+   */
   async update(
     workspaceId: string,
     profileId: string,
@@ -205,7 +223,6 @@ export class ToolConfigProfilesService {
       if (schema) {
         validateProfileOrThrow(this.connectorRegistry, tool.name, dto.config);
       }
-      profile.config = dto.config;
     }
 
     // No config change (rename only): persist as-is. Re-running
@@ -215,8 +232,25 @@ export class ToolConfigProfilesService {
       return this.profilesRepo.save(profile);
     }
 
-    // Re-encrypt (I4) and save
-    return this.encryptAndSave(profile, sensitiveFields, workspaceId);
+    // Preserve masked secrets: carry over existing ciphertext for any sensitive
+    // field whose incoming value is a mask placeholder (e.g. "****1234").
+    const incoming: Record<string, unknown> = { ...dto.config };
+    const preserved: Record<string, unknown> = {};
+    for (const field of sensitiveFields) {
+      if (field in incoming && isMaskedValue(incoming[field])) {
+        if (field in profile.config) {
+          preserved[field] = profile.config[field];
+        }
+        delete incoming[field];
+      }
+    }
+
+    // Encrypt only the genuinely-new incoming fields (I4)
+    const dek = await this.encryptionService.getDEK(workspaceId);
+    const encryptedIncoming = encryptProfile(incoming, sensitiveFields, dek);
+    profile.config = { ...encryptedIncoming, ...preserved };
+
+    return this.profilesRepo.save(profile);
   }
 
   /**

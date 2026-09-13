@@ -292,11 +292,14 @@ export class JobsRegistryService {
       tool.category === ToolCategory.HTTP_PROBE ||
       tool.category === ToolCategory.SCREENSHOT
     ) {
-      // For HTTP_PROBE, use asset services
+      // HTTP_PROBE must probe every enabled asset_service port; SCREENSHOT must
+      // only target services httpx actually confirmed live.
+      const liveOnly = tool.category === ToolCategory.SCREENSHOT;
       const assetServices = await this.findAssetServicesForJob(
         targetIds,
         assetIds,
         workspaceId,
+        liveOnly,
       );
 
       // Step 3: iterate tools and create jobs
@@ -488,22 +491,41 @@ export class JobsRegistryService {
   }
 
   /**
-   * Finds asset services for HTTP_PROBE job creation based on targetIds, assetIds, and workspaceId
+   * Finds asset services for HTTP_PROBE / SCREENSHOT job creation based on
+   * targetIds, assetIds, and workspaceId.
    * @param targetIds list of target IDs to filter asset services
    * @param assetIds list of asset IDs to filter asset services
    * @param workspaceId workspace ID to filter asset services
+   * @param liveOnly when true, restrict to services with an http_responses
+   *   row where failed = false (i.e. httpx confirmed live). Used by
+   *   SCREENSHOT so jobs are not created for every open port naabu found.
+   *   NOTE: isErrorPage = false is NOT sufficient — a service with ZERO
+   *   http_responses rows also has isErrorPage = false (default), so the
+   *   EXISTS predicate on http_responses with failed = false is the
+   *   authoritative "httpx confirmed live" predicate.
    * @returns Promise<Array<AssetService>> list of filtered asset services
    */
   private async findAssetServicesForJob(
     targetIds?: string[],
     assetIds?: string[],
     workspaceId?: string,
+    liveOnly?: boolean,
   ): Promise<AssetService[]> {
     const assetServicesQueryBuilder = this.dataSource
       .getRepository(AssetService)
       .createQueryBuilder('assetServices')
       .innerJoinAndSelect('assetServices.asset', 'asset')
       .where('asset.isEnabled = true');
+
+    if (liveOnly) {
+      // EXISTS semi-join: keeps the row set unmultiplied, so no DISTINCT is
+      // needed. DISTINCT over the asset join previously failed on
+      // asset.dnsRecords (PG `json` has no equality operator). The outer alias
+      // must stay double-quoted — unquoted assetServices folds to lowercase.
+      assetServicesQueryBuilder.andWhere(
+        'EXISTS (SELECT 1 FROM http_responses hr WHERE hr."assetServiceId" = "assetServices"."id" AND hr.failed = false)',
+      );
+    }
 
     if (targetIds && targetIds.length > 0) {
       assetServicesQueryBuilder.andWhere('asset.targetId IN (:...targetIds)', {
