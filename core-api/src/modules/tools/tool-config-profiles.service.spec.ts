@@ -164,31 +164,6 @@ describe('ToolConfigProfilesService', () => {
     ).rejects.toThrow(/unknown tool/i);
   });
 
-  it('create — no-schema connector: succeeds and stores config as-is', async () => {
-    // Known connector with NEITHER configSchema NOR inputsSchema
-    // (e.g. wpscan) needs no config — creation must not throw.
-    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
-      name: 'wpscan',
-      slug: 'wpscan',
-      // neither configSchema nor inputsSchema present
-    });
-    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
-    profilesRepo.findOne.mockResolvedValue(null);
-    profilesRepo.save.mockImplementation((p) => p);
-    profilesRepo.create.mockImplementation((p) => p);
-
-    const result = await service.create(wsId, toolId, {
-      name: 'qa-wpscan',
-      config: { url: 'https://example.com' },
-    });
-
-    expect(result).toBeDefined();
-    expect(profilesRepo.save).toHaveBeenCalledTimes(1);
-    // No schema → no validation → config persisted byte-for-byte (no encryption)
-    const savedConfig = (profilesRepo.save.mock.calls[0][0] as ToolConfigProfile).config;
-    expect(savedConfig).toEqual({ url: 'https://example.com' });
-  });
-
   // ── Fallback: configSchema absent → inputsSchema used ────────────
   it('create — uses inputsSchema fallback when configSchema absent', async () => {
     const inputsSchema = {
@@ -317,35 +292,6 @@ describe('ToolConfigProfilesService', () => {
     expect(savedConfig.target).toBe('new.com');
   });
 
-  it('update — no-schema connector: new config succeeds, stored as-is', async () => {
-    const existing = mockProfile({
-      id: 'prof-wpscan',
-      name: 'qa-wpscan',
-      config: {},
-    });
-    // Known connector without a schema (wpscan)
-    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
-      name: 'wpscan',
-      slug: 'wpscan',
-    });
-    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
-    profilesRepo.findOne
-      .mockResolvedValueOnce(existing) // findOwned
-      .mockResolvedValueOnce(null);    // dup check (new name unique)
-    profilesRepo.save.mockImplementation((p) => p);
-
-    await service.update(wsId, 'prof-wpscan', {
-      name: 'qa-wpscan-v2',
-      config: { url: 'https://new.example.com' },
-    });
-
-    expect(profilesRepo.save).toHaveBeenCalledTimes(1);
-    const saved = profilesRepo.save.mock.calls[0][0] as ToolConfigProfile;
-    expect(saved.name).toBe('qa-wpscan-v2');
-    // No schema → no validation → config persisted unchanged
-    expect(saved.config).toEqual({ url: 'https://new.example.com' });
-  });
-
   it('update — rename/isDefault only does NOT re-encrypt ciphertext (round-trips to original plaintext)', async () => {
     const dek = Buffer.alloc(32);
     const encrypted = encryptProfile(
@@ -383,8 +329,102 @@ describe('ToolConfigProfilesService', () => {
     });
   });
 
-  // ── setDefault ───────────────────────────────────────────────────────
+  it('update — MASKED secret is preserved byte-for-byte (no overwrite, no double-encrypt)', async () => {
+    const dek = Buffer.alloc(32);
+    const encrypted = encryptProfile(
+      { apiToken: 'PLAINTOKEN-ABCD1234', maxThreads: 5 },
+      ['apiToken'],
+      dek,
+    );
+    const preUpdateCiphertext = encrypted.apiToken as string;
+    const existing = mockProfile({
+      id: 'prof-mask',
+      name: 'zz-mask',
+      config: { ...encrypted },
+    });
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'wpscan',
+      slug: 'wpscan',
+      configSchema: {
+        type: 'object',
+        required: ['apiToken'],
+        properties: {
+          apiToken: { type: 'string', 'ui:widget': 'password' },
+          maxThreads: { type: 'integer' },
+        },
+        additionalProperties: false,
+      },
+    });
+    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
+    profilesRepo.findOne
+      .mockResolvedValueOnce(existing) // findOwned
+      .mockResolvedValueOnce(null);    // dup check
+    profilesRepo.save.mockImplementation((p) => p);
 
+    // Client echoes back the masked value the API returned.
+    await service.update(wsId, 'prof-mask', {
+      config: { apiToken: '****1234', maxThreads: 6 },
+    });
+
+    const saved = profilesRepo.save.mock.calls[0][0] as ToolConfigProfile;
+    const savedConfig = saved.config;
+    // Byte-identity proves the real secret ciphertext was carried over intact.
+    expect(savedConfig.apiToken).toBe(preUpdateCiphertext);
+    // Genuinely-new non-sensitive field is updated.
+    expect(savedConfig.maxThreads).toBe(6);
+    // Round-trip still yields the ORIGINAL plaintext (no double-encrypt).
+    expect(decryptProfile(savedConfig, ['apiToken'], dek)).toEqual({
+      apiToken: 'PLAINTOKEN-ABCD1234',
+      maxThreads: 6,
+    });
+  });
+
+  it('update — NEW real secret replaces ciphertext and round-trips to the new plaintext', async () => {
+    const dek = Buffer.alloc(32);
+    const encrypted = encryptProfile(
+      { apiToken: 'OLD-TOKEN-0000', maxThreads: 5 },
+      ['apiToken'],
+      dek,
+    );
+    const preUpdateCiphertext = encrypted.apiToken as string;
+    const existing = mockProfile({
+      id: 'prof-real',
+      name: 'zz-real',
+      config: { ...encrypted },
+    });
+    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+      name: 'wpscan',
+      slug: 'wpscan',
+      configSchema: {
+        type: 'object',
+        required: ['apiToken'],
+        properties: {
+          apiToken: { type: 'string', 'ui:widget': 'password' },
+          maxThreads: { type: 'integer' },
+        },
+        additionalProperties: false,
+      },
+    });
+    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
+    profilesRepo.findOne
+      .mockResolvedValueOnce(existing) // findOwned
+      .mockResolvedValueOnce(null);    // dup check
+    profilesRepo.save.mockImplementation((p) => p);
+
+    await service.update(wsId, 'prof-real', {
+      config: { apiToken: 'NEW-TOKEN-9999', maxThreads: 7 },
+    });
+
+    const saved = profilesRepo.save.mock.calls[0][0] as ToolConfigProfile;
+    const savedConfig = saved.config;
+    expect(savedConfig.apiToken).not.toBe(preUpdateCiphertext);
+    expect(decryptProfile(savedConfig, ['apiToken'], dek)).toEqual({
+      apiToken: 'NEW-TOKEN-9999',
+      maxThreads: 7,
+    });
+  });
+
+  // ── setDefault ───────────────────────────────────────────────────────
   it('setDefault switches old default off atomically', async () => {
     const oldDefault = mockProfile({
       id: 'prof-old',

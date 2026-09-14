@@ -1,4 +1,8 @@
-import { getSensitiveFields } from './tool-config-profiles.crypto';
+import {
+  getSensitiveFields,
+  isMaskedValue,
+  maskProfile,
+} from './tool-config-profiles.crypto';
 
 describe('getSensitiveFields', () => {
   it('detects fields explicitly marked with "ui:widget": "password"', () => {
@@ -93,5 +97,31 @@ describe('getSensitiveFields', () => {
       ],
     };
     expect(getSensitiveFields(schema).sort()).toEqual(['accessKey']);
+  });
+});
+
+describe('isMaskedValue', () => {
+  it('matches a bare **** placeholder', () => {
+    expect(isMaskedValue('****')).toBe(true);
+  });
+
+  it('matches **** + last4 as produced by maskProfile', () => {
+    expect(isMaskedValue('****1234')).toBe(true);
+  });
+
+  it('round-trips against maskProfile output', () => {
+    expect(isMaskedValue(maskProfile({ apiToken: 'secret1234' }, ['apiToken']).apiToken)).toBe(true);
+  });
+
+  it('rejects real plaintext secrets', () => {
+    expect(isMaskedValue('PLAINTOKEN-ABCD1234')).toBe(false);
+    expect(isMaskedValue('sk-live-abc')).toBe(false);
+  });
+
+  it('rejects non-strings', () => {
+    expect(isMaskedValue(undefined)).toBe(false);
+    expect(isMaskedValue(null)).toBe(false);
+    expect(isMaskedValue(1234)).toBe(false);
+    expect(isMaskedValue({})).toBe(false);
   });
 });
