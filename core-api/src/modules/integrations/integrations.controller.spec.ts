@@ -1,8 +1,11 @@
 import { NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { IntegrationType } from '@/common/enums/enum';
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
 import { IntegrationsController } from './integrations.controller';
+import { AwsSsoCompleteDto } from './dto/aws-sso.dto';
 import type { IntegrationsService } from './integrations.service';
 import type { TelegramConnectService } from './telegram-connect.service';
 import type { TelegramWebhookService } from './telegram-webhook.service';
@@ -246,6 +249,49 @@ describe('IntegrationsController', () => {
       expect(integrationsServiceMock.createIntegration).not.toHaveBeenCalled();
     });
 
+    it('poll authorized with many accounts bounds listSsoRoles concurrency and preserves order', async () => {
+      awsSsoServiceMock.pollDeviceAuth.mockResolvedValue({
+        status: 'authorized',
+        accessToken: 'at-1',
+        refreshToken: 'rt-1',
+      });
+      const ssoAccounts = Array.from({ length: 12 }, (_v, i) => ({
+        accountId: String(i),
+        accountName: `Acct-${i}`,
+      }));
+      awsSsoServiceMock.listSsoAccounts.mockResolvedValue(ssoAccounts);
+
+      let inFlight = 0;
+      let maxInFlight = 0;
+      awsSsoServiceMock.listSsoRoles.mockImplementation(
+        async (args: { accountId: string }) => {
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          inFlight--;
+          return [{ roleName: `Role-${args.accountId}` }];
+        },
+      );
+
+      const response = await controller.pollAwsSsoDevice({
+        region: 'us-east-1',
+        clientId: 'c1',
+        clientSecret: 's1',
+        deviceCode: 'd1',
+      });
+
+      expect(maxInFlight).toBeLessThanOrEqual(5);
+      expect(awsSsoServiceMock.listSsoRoles).toHaveBeenCalledTimes(12);
+      expect(response.accounts.map((a) => a.accountId)).toEqual(
+        ssoAccounts.map((a) => a.accountId),
+      );
+      expect(response.accounts[7]).toEqual({
+        accountId: '7',
+        accountName: 'Acct-7',
+        roles: ['Role-7'],
+      });
+    });
+
     it('complete maps the DTO to createIntegration as aws/CLOUD_PROVIDER and returns the masked config', async () => {
       integrationsServiceMock.createIntegration.mockResolvedValue({
         id: 'integration-9',
@@ -295,6 +341,36 @@ describe('IntegrationsController', () => {
       expect(response.config.clientSecret).toBe('****cret');
       expect(response.config.refreshToken).toBe('****oken');
     });
+  });
+});
+
+describe('AwsSsoCompleteDto.name length bound', () => {
+  const base = {
+    region: 'us-east-1',
+    startUrl: 'https://acme.awsapps.com/start',
+    accountId: '111',
+    roleName: 'Admin',
+    clientId: 'c1',
+    clientSecret: 's1',
+    refreshToken: 'rt-1',
+  };
+
+  it('accepts a 255-char name', async () => {
+    const dto = plainToInstance(AwsSsoCompleteDto, {
+      ...base,
+      name: 'a'.repeat(255),
+    });
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
+
+  it('rejects a 256-char name with an error on name', async () => {
+    const dto = plainToInstance(AwsSsoCompleteDto, {
+      ...base,
+      name: 'a'.repeat(256),
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].property).toBe('name');
   });
 });
 

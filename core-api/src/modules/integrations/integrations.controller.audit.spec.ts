@@ -95,4 +95,33 @@ describe('IntegrationsController audit wiring', () => {
       expect(resourceId).toBe('i-2');
     });
   });
+
+  describe('AWS SSO endpoints', () => {
+    it('startAwsSsoDevice carries no audit metadata (it connects nothing)', () => {
+      const config = reflector.get(
+        AUDIT_LOG_KEY,
+        IntegrationsController.prototype.startAwsSsoDevice,
+      );
+      expect(config).toBeUndefined();
+    });
+
+    it('pollAwsSsoDevice carries no audit metadata (poll repeats, connects nothing)', () => {
+      const config = reflector.get(
+        AUDIT_LOG_KEY,
+        IntegrationsController.prototype.pollAwsSsoDevice,
+      );
+      expect(config).toBeUndefined();
+    });
+
+    it('completeAwsSso is the only SSO step wired with integration.connected', () => {
+      expect(
+        wired(IntegrationsController.prototype.completeAwsSso).action,
+      ).toBe('integration.connected');
+      expect(
+        wired(IntegrationsController.prototype.completeAwsSso).resourceId?.({
+          id: 'i-3',
+        }),
+      ).toBe('i-3');
+    });
+  });
 });

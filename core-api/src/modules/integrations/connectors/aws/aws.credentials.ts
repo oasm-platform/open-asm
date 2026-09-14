@@ -10,6 +10,8 @@ import {
 } from '@aws-sdk/client-organizations';
 import type { AwsSessionCredentials } from '../connector.abstract';
 import type { SsoCredentialResolver } from '../connector.abstract';
+import { MAX_PAGES_PER_LIST } from './aws.discovery';
+import type { DiscoveryBudget } from './aws.discovery';
 
 /**
  * The five credential strategies an AWS integration can use.
@@ -81,6 +83,12 @@ export interface OrganizationAccount {
   accountId: string;
   name?: string;
   email?: string;
+}
+
+/** Paginated `ListAccounts` result; `truncated` when budget/page cap stopped it. */
+export interface ListOrganizationAccountsResult {
+  accounts: OrganizationAccount[];
+  truncated: boolean;
 }
 
 const DEFAULT_ROLE_SESSION_NAME = 'oasm-inventory';
@@ -230,12 +238,27 @@ export async function resolveAwsCredentials(
 export async function listOrganizationAccounts(
   credentials: AwsResolvedCredentials,
   region: string = DEFAULT_ORGANIZATIONS_REGION,
-): Promise<OrganizationAccount[]> {
+  budget?: DiscoveryBudget,
+): Promise<ListOrganizationAccountsResult> {
   const client = new OrganizationsClient({ region, credentials });
   const accounts: OrganizationAccount[] = [];
   let nextToken: string | undefined;
+  let pages = 0;
+  let truncated = false;
 
   do {
+    if (budget) {
+      if (budget.remaining <= 0) {
+        truncated = true;
+        break;
+      }
+      budget.remaining -= 1;
+    }
+    pages += 1;
+    if (pages > MAX_PAGES_PER_LIST) {
+      truncated = true;
+      break;
+    }
     const page = await client.send(
       new ListAccountsCommand({ NextToken: nextToken }),
     );
@@ -250,7 +273,7 @@ export async function listOrganizationAccounts(
     nextToken = page.NextToken;
   } while (nextToken);
 
-  return accounts;
+  return { accounts, truncated };
 }
 
 /** Calls STS `GetCallerIdentity` with the supplied credentials. */

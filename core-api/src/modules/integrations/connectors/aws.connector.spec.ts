@@ -17,6 +17,7 @@ import {
   discoverRoute53,
   discoverS3,
   listEnabledRegions,
+  MAX_REGIONS_PER_SYNC,
   type Candidate,
 } from './aws/aws.discovery';
 
@@ -36,6 +37,7 @@ jest.mock('./aws/aws.discovery', () => {
   const actual = jest.requireActual<{
     MAX_API_CALLS_PER_SYNC: number;
     MAX_REGION_CONCURRENCY: number;
+    MAX_REGIONS_PER_SYNC: number;
     isValidDomain: (value: string) => boolean;
     isValidPublicIp: (value: string) => boolean;
     isValidCidr: (value: string) => boolean;
@@ -43,6 +45,7 @@ jest.mock('./aws/aws.discovery', () => {
   return {
     MAX_API_CALLS_PER_SYNC: actual.MAX_API_CALLS_PER_SYNC,
     MAX_REGION_CONCURRENCY: actual.MAX_REGION_CONCURRENCY,
+    MAX_REGIONS_PER_SYNC: actual.MAX_REGIONS_PER_SYNC,
     isValidDomain: actual.isValidDomain,
     isValidPublicIp: actual.isValidPublicIp,
     isValidCidr: actual.isValidCidr,
@@ -136,7 +139,7 @@ describe('AwsConnector', () => {
     });
     jest
       .mocked(listOrganizationAccounts)
-      .mockResolvedValue([{ accountId: '111', name: 'acct' }]);
+      .mockResolvedValue({ accounts: [{ accountId: '111', name: 'acct' }], truncated: false });
     jest.mocked(getCallerIdentity).mockResolvedValue({ $metadata: {} });
     jest
       .mocked(listEnabledRegions)
@@ -291,7 +294,10 @@ describe('AwsConnector', () => {
     it('CONN-2: assumeRole dry run probes the base identity AND assumes the first account role, writing nothing', async () => {
       jest
         .mocked(listOrganizationAccounts)
-        .mockResolvedValue([{ accountId: '111' }, { accountId: '222' }]);
+        .mockResolvedValue({
+          accounts: [{ accountId: '111' }, { accountId: '222' }],
+          truncated: false,
+        });
       jest.mocked(resolveAwsCredentials).mockResolvedValue({
         credentials: CREDENTIALS,
         region: 'us-east-1',
@@ -313,6 +319,7 @@ describe('AwsConnector', () => {
       expect(listOrganizationAccounts).toHaveBeenCalledWith(
         { accessKeyId: 'AKIA', secretAccessKey: 'secret' },
         'us-east-1',
+        expect.objectContaining({ remaining: expect.any(Number) }),
       );
       // Only the FIRST account's role is assumed (lazy provider forced).
       expect(resolveAwsCredentials).toHaveBeenCalledTimes(1);
@@ -363,7 +370,10 @@ describe('AwsConnector', () => {
     it('CONN-4: a per-account AccessDenied is skipped; the other account still syncs', async () => {
       jest
         .mocked(listOrganizationAccounts)
-        .mockResolvedValue([{ accountId: '111' }, { accountId: '222' }]);
+        .mockResolvedValue({
+          accounts: [{ accountId: '111' }, { accountId: '222' }],
+          truncated: false,
+        });
       jest
         .mocked(getCallerIdentity)
         .mockRejectedValueOnce(
@@ -399,6 +409,23 @@ describe('AwsConnector', () => {
 
       expect(result.truncated).toBe(true);
       expect(result.targetsCreated).toBe(1);
+    });
+
+    it('CONN-5b: a truncated organization account list sets truncated:true', async () => {
+      jest.mocked(listOrganizationAccounts).mockResolvedValue({
+        accounts: [{ accountId: '111' }],
+        truncated: true,
+      });
+
+      const result = await new AwsConnector().syncAssets(
+        makeConfig({
+          connectionMethod: 'assumeRole',
+          roleArn: 'arn:aws:iam::{accountId}:role/oasm',
+          externalId: 'ext',
+        }),
+      );
+
+      expect(result.truncated).toBe(true);
     });
 
     it('CONN-6: a rotated SSO refresh token is persisted via persistConfigPatch', async () => {
@@ -442,6 +469,24 @@ describe('AwsConnector', () => {
         expect.objectContaining({ region: 'eu-west-1' }),
       );
       expect(result.regions).toBe(1);
+    });
+
+    it('CONN-7a: an allow-list above MAX_REGIONS_PER_SYNC is capped and flags truncated', async () => {
+      const regions = Array.from(
+        { length: MAX_REGIONS_PER_SYNC + 10 },
+        (_, index) => `region-${index}.example.com`,
+      );
+
+      const result = await new AwsConnector().syncAssets(
+        makeConfig({ regions }),
+      );
+
+      expect(result.truncated).toBe(true);
+      expect(result.regions).toBe(MAX_REGIONS_PER_SYNC);
+      const scannedRegions = new Set(
+        jest.mocked(discoverEc2).mock.calls.map((call) => call[0].region),
+      );
+      expect(scannedRegions.size).toBeLessThanOrEqual(MAX_REGIONS_PER_SYNC);
     });
 
     it('CONN-8: exceeding maxSyncDurationMs truncates without throwing or discovering', async () => {

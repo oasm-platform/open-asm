@@ -34,6 +34,7 @@ import {
   listEnabledRegions,
   MAX_API_CALLS_PER_SYNC,
   MAX_REGION_CONCURRENCY,
+  MAX_REGIONS_PER_SYNC,
   type Candidate,
   type CandidateType,
   type DiscoveryBudget,
@@ -237,7 +238,7 @@ export class AwsConnector extends CloudProviderConnector {
     };
 
     if (cfg.__dryRun) {
-      await this.probeDryRun(cfg, ctx.result);
+      await this.probeDryRun(cfg, ctx.result, ctx.budget);
     } else if (cfg.connectionMethod === 'assumeRole') {
       await this.syncAssumeRole(ctx);
     } else {
@@ -265,7 +266,12 @@ export class AwsConnector extends CloudProviderConnector {
     const region = this.resolveRegion(cfg);
     const baseCredentials = this.baseCredentials(cfg);
 
-    const accounts = await listOrganizationAccounts(baseCredentials, region);
+    const { accounts, truncated } = await listOrganizationAccounts(
+      baseCredentials,
+      region,
+      ctx.budget,
+    );
+    if (truncated) ctx.result.truncated = true;
     for (const account of accounts) {
       if (this.isExhausted(ctx)) {
         ctx.result.truncated = true;
@@ -333,12 +339,14 @@ export class AwsConnector extends CloudProviderConnector {
   private async probeDryRun(
     cfg: AwsSyncConfig,
     result: AwsSyncResult,
+    budget: DiscoveryBudget,
   ): Promise<void> {
     const region = this.resolveRegion(cfg);
     if (cfg.connectionMethod === 'assumeRole') {
-      const accounts = await listOrganizationAccounts(
+      const { accounts } = await listOrganizationAccounts(
         this.baseCredentials(cfg),
         region,
+        budget,
       );
       const first = accounts[0];
       if (first) {
@@ -461,7 +469,13 @@ export class AwsConnector extends CloudProviderConnector {
     const allowList = (ctx.cfg.regions ?? [])
       .map((value) => value.trim())
       .filter((value) => value.length > 0);
-    if (allowList.length > 0) return allowList;
+    if (allowList.length > 0) {
+      if (allowList.length > MAX_REGIONS_PER_SYNC) {
+        ctx.result.truncated = true;
+        return allowList.slice(0, MAX_REGIONS_PER_SYNC);
+      }
+      return allowList;
+    }
 
     const { regions, truncated } = await listEnabledRegions(
       credentials,
@@ -506,6 +520,10 @@ export class AwsConnector extends CloudProviderConnector {
     // 1) Pre-lookup every value in bounded chunks; collect the missing.
     const missing: NormalizedCandidate[] = [];
     for (const chunk of chunkArray(normalized, TARGET_LOOKUP_BATCH)) {
+      if (this.isExhausted(ctx)) {
+        ctx.result.truncated = true;
+        break;
+      }
       const existing = await targetsService.findByWorkspaceAndValues(
         workspaceId,
         chunk.map((candidate) => candidate.value),
@@ -526,11 +544,19 @@ export class AwsConnector extends CloudProviderConnector {
 
     // 2) Create the missing values in bounded chunks with race recovery.
     for (const chunk of chunkArray(missing, TARGET_CREATE_BATCH)) {
+      if (this.isExhausted(ctx)) {
+        ctx.result.truncated = true;
+        break;
+      }
       await this.createChunkWithRecovery(chunk, byValue, resolved, ctx);
     }
 
     // 3) Upsert assets for every resolved target (existing + created).
     for (const [value, entry] of resolved) {
+      if (this.isExhausted(ctx)) {
+        ctx.result.truncated = true;
+        break;
+      }
       const inserted = await dataAdapterService.upsertAssetsByTargetId(
         entry.targetId,
         [{ value, dnsRecords: entry.dnsRecords }],
@@ -570,6 +596,10 @@ export class AwsConnector extends CloudProviderConnector {
 
     // Per-value fallback: a bad value is logged and skipped, never aborts.
     for (const candidate of remaining) {
+      if (this.isExhausted(ctx)) {
+        ctx.result.truncated = true;
+        break;
+      }
       await this.ensureTarget(candidate, resolved, ctx);
     }
   }

@@ -7,6 +7,7 @@ import type {
   AwsCredentialConfig,
   AwsResolvedCredentials,
 } from './aws.credentials';
+import { MAX_PAGES_PER_LIST } from './aws.discovery';
 
 /**
  * Credential-strategy tests. The AWS SDK credential-provider factories and the
@@ -362,6 +363,7 @@ describe('resolveAwsCredentials', () => {
 describe('listOrganizationAccounts', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockOrgSend.mockReset();
     mockListAccountsInputs.length = 0;
   });
 
@@ -383,12 +385,68 @@ describe('listOrganizationAccounts', () => {
 
     const accounts = await listOrganizationAccounts(PROVIDER);
 
-    expect(accounts).toEqual([
-      { accountId: '111', name: 'prod', email: 'prod@x.com' },
-      { accountId: '333', name: 'dev', email: undefined },
-    ]);
+    expect(accounts).toEqual({
+      accounts: [
+        { accountId: '111', name: 'prod', email: 'prod@x.com' },
+        { accountId: '333', name: 'dev', email: undefined },
+      ],
+      truncated: false,
+    });
     expect(mockListAccountsInputs[0]).toEqual({ NextToken: undefined });
     expect(mockListAccountsInputs[1]).toEqual({ NextToken: 'page-2' });
+  });
+
+  it('decrements the budget once per page and stops when exhausted', async () => {
+    mockOrgSend
+      .mockResolvedValueOnce({
+        Accounts: [{ Id: '111', State: 'ACTIVE' }],
+        NextToken: 'page-2',
+      })
+      .mockResolvedValueOnce({
+        Accounts: [{ Id: '333', State: 'ACTIVE' }],
+        NextToken: 'page-3',
+      })
+      .mockResolvedValueOnce({
+        Accounts: [{ Id: '555', State: 'ACTIVE' }],
+      });
+
+    const budget = { remaining: 2 };
+    const result = await listOrganizationAccounts(PROVIDER, 'us-east-1', budget);
+
+    expect(budget.remaining).toBe(0);
+    expect(mockOrgSend).toHaveBeenCalledTimes(2);
+    expect(mockListAccountsInputs).toHaveLength(2);
+    expect(result).toEqual({
+      accounts: [
+        { accountId: '111', name: undefined, email: undefined },
+        { accountId: '333', name: undefined, email: undefined },
+      ],
+      truncated: true,
+    });
+  });
+
+  it('reports truncation when the budget starts at zero', async () => {
+    mockOrgSend.mockResolvedValue({
+      Accounts: [{ Id: '111', State: 'ACTIVE' }],
+    });
+
+    const budget = { remaining: 0 };
+    const result = await listOrganizationAccounts(PROVIDER, 'us-east-1', budget);
+
+    expect(result).toEqual({ accounts: [], truncated: true });
+    expect(mockOrgSend).not.toHaveBeenCalled();
+  });
+
+  it('caps pagination at MAX_PAGES_PER_LIST and flags truncation', async () => {
+    mockOrgSend.mockResolvedValue({
+      Accounts: [{ Id: '111', State: 'ACTIVE' }],
+      NextToken: 'always-more',
+    });
+
+    const result = await listOrganizationAccounts(PROVIDER);
+
+    expect(result.truncated).toBe(true);
+    expect(mockOrgSend).toHaveBeenCalledTimes(MAX_PAGES_PER_LIST);
   });
 });
 

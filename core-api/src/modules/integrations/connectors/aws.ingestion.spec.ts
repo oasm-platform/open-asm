@@ -144,7 +144,7 @@ describe('AwsConnector ingestion', () => {
     });
     jest
       .mocked(listOrganizationAccounts)
-      .mockResolvedValue([{ accountId: '111' }]);
+      .mockResolvedValue({ accounts: [{ accountId: '111' }], truncated: false });
     jest.mocked(getCallerIdentity).mockResolvedValue({ $metadata: {} });
     jest
       .mocked(listEnabledRegions)
@@ -382,6 +382,36 @@ describe('AwsConnector ingestion', () => {
       { value: 'example.com', type: 'DOMAIN' },
     ]);
     expect(result.targetsCreated).toBe(1);
+  });
+
+  it('ING-7: ingestion stops once maxSyncDurationMs is exhausted and flags truncated', async () => {
+    const candidates: Candidate[] = [];
+    for (let i = 0; i < 600; i++) {
+      candidates.push(candidate(`d${i}.example.com`));
+    }
+    jest
+      .mocked(discoverEc2)
+      .mockResolvedValue({ candidates, truncated: false });
+
+    const config = makeConfig({ maxSyncDurationMs: 1000 });
+    let now = 1_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    config.targetsService.findByWorkspaceAndValues.mockImplementation(() => {
+      now += 2000;
+      return Promise.resolve([]);
+    });
+
+    const result = await new AwsConnector().syncAssets(config);
+
+    expect(result.truncated).toBe(true);
+    expect(
+      config.targetsService.findByWorkspaceAndValues,
+    ).toHaveBeenCalledTimes(1);
+    expect(config.targetsService.createMultipleTargets).not.toHaveBeenCalled();
+    expect(
+      config.dataAdapterService.upsertAssetsByTargetId,
+    ).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
   });
 
   it('ING-6: candidate count above MAX_TARGETS_PER_SYNC truncates to 5000 and flags truncated', async () => {

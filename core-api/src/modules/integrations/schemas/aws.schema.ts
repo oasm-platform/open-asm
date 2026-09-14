@@ -69,6 +69,15 @@ export const awsSchema = {
         equals: ['accessKey', 'assumeRole', 'crossAccountRole'],
       },
     },
+    sessionToken: {
+      type: 'string',
+      title: 'Session Token',
+      'ui:widget': 'password',
+      'ui:visibleWhen': {
+        field: 'connectionMethod',
+        equals: ['accessKey', 'assumeRole', 'crossAccountRole'],
+      },
+    },
     roleArn: {
       type: 'string',
       title: 'Role ARN',

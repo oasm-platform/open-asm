@@ -37,6 +37,8 @@ import { TelegramConnectService } from './telegram-connect.service';
 import { TelegramWebhookService } from './telegram-webhook.service';
 import { AwsSsoService } from './connectors/aws/aws-sso.service';
 
+const SSO_ROLE_FETCH_CONCURRENCY = 5;
+
 @ApiTags('Integrations')
 @Controller('integrations')
 export class IntegrationsController {
@@ -252,7 +254,6 @@ export class IntegrationsController {
     },
   })
   @WorkspaceAccess('integration.write')
-  @AuditLog('integration.connected')
   @Post('aws/sso/device')
   @HttpCode(200)
   startAwsSsoDevice(@Body() dto: AwsSsoDeviceDto) {
@@ -271,7 +272,6 @@ export class IntegrationsController {
     },
   })
   @WorkspaceAccess('integration.write')
-  @AuditLog('integration.connected')
   @Post('aws/sso/poll')
   @HttpCode(200)
   async pollAwsSsoDevice(@Body() dto: AwsSsoPollDto) {
@@ -290,20 +290,33 @@ export class IntegrationsController {
       region: dto.region,
       accessToken: result.accessToken,
     });
-    const accounts = await Promise.all(
-      ssoAccounts.map(async (account) => {
-        const roles = await this.awsSsoService.listSsoRoles({
-          region: dto.region,
-          accessToken: result.accessToken,
-          accountId: account.accountId,
-        });
-        return {
-          accountId: account.accountId,
-          accountName: account.accountName,
-          roles: roles.map((role) => role.roleName),
-        };
-      }),
-    );
+
+    // One listSsoRoles call per account throttles large orgs (IAM Identity
+    // Center rate limits), so process accounts in bounded batches while
+    // preserving the account order.
+    const accounts: {
+      accountId: string;
+      accountName: string;
+      roles: string[];
+    }[] = [];
+    for (let i = 0; i < ssoAccounts.length; i += SSO_ROLE_FETCH_CONCURRENCY) {
+      const batch = ssoAccounts.slice(i, i + SSO_ROLE_FETCH_CONCURRENCY);
+      const resolved = await Promise.all(
+        batch.map(async (account) => {
+          const roles = await this.awsSsoService.listSsoRoles({
+            region: dto.region,
+            accessToken: result.accessToken,
+            accountId: account.accountId,
+          });
+          return {
+            accountId: account.accountId,
+            accountName: account.accountName,
+            roles: roles.map((role) => role.roleName),
+          };
+        }),
+      );
+      accounts.push(...resolved);
+    }
 
     return {
       status: 'authorized' as const,

@@ -145,6 +145,31 @@ describe('awsSchema', () => {
     expect(result).toEqual({ valid: true, errors: [] });
   });
 
+  it('declares a sessionToken secret property with password widget and credential-method visibility', () => {
+    const sessionToken = awsSchema.properties.sessionToken as {
+      type?: string;
+      'ui:widget'?: string;
+      'ui:visibleWhen'?: { field?: string; equals?: string[] };
+    };
+    expect(sessionToken.type).toBe('string');
+    expect(sessionToken['ui:widget']).toBe('password');
+    expect(sessionToken['ui:visibleWhen']).toEqual({
+      field: 'connectionMethod',
+      equals: ['accessKey', 'assumeRole', 'crossAccountRole'],
+    });
+  });
+
+  it('accepts a sessionToken (temporary STS credentials) on an accessKey config', () => {
+    const result = validate({
+      connectionMethod: 'accessKey',
+      region: 'us-east-1',
+      accessKeyId: 'ASIAEXAMPLE',
+      secretAccessKey: 'secret-value-1234',
+      sessionToken: 'session-token-value',
+    });
+    expect(result).toEqual({ valid: true, errors: [] });
+  });
+
   it('masks the SSO secret fields and leaves clientId public', () => {
     const masked = maskSensitiveConfigFields({
       app_type: 'aws',
@@ -153,6 +178,7 @@ describe('awsSchema', () => {
       region: 'us-east-1',
       accessKeyId: 'AKIAEXAMPLE',
       secretAccessKey: 'secret-value-1234',
+      sessionToken: 'session-token-1234',
       externalId: 'external-id-1234',
       webIdentityToken: 'web-identity-token',
       clientId: 'sso-client-id',
@@ -161,6 +187,7 @@ describe('awsSchema', () => {
     });
 
     expect(masked.secretAccessKey).toBe('****1234');
+    expect(masked.sessionToken).toBe('****1234');
     expect(masked.externalId).toBe('****1234');
     expect(masked.clientSecret).toBe('****1234');
     expect(masked.refreshToken).toBe('****9876');

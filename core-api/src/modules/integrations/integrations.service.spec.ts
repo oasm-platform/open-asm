@@ -367,6 +367,40 @@ describe('IntegrationsService', () => {
         'disabled',
       );
     });
+
+    it('rejects a config-only update that switches a scheduled integration to workloadIdentity (syncSchedule omitted)', async () => {
+      repoMock.findOne.mockResolvedValue(
+        integrationEntity({
+          appType: 'aws',
+          syncSchedule: '0 0 * * *',
+          config: { connectionMethod: 'accessKey' },
+        }),
+      );
+
+      await expect(
+        service.updateIntegration('integration-1', 'ws-1', {
+          config: workloadIdentityConfig,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
+      expect(repoMock.save).not.toHaveBeenCalled();
+    });
+
+    it('allows a config-only workloadIdentity update when the integration has no active schedule', async () => {
+      repoMock.findOne.mockResolvedValue(
+        integrationEntity({
+          appType: 'aws',
+          syncSchedule: 'disabled',
+          config: { connectionMethod: 'accessKey' },
+        }),
+      );
+
+      await expect(
+        service.updateIntegration('integration-1', 'ws-1', {
+          config: workloadIdentityConfig,
+        }),
+      ).resolves.toBeDefined();
+    });
   });
 
   describe('SC-SCHED-5: deleteIntegration removes the scheduler first', () => {

@@ -1,6 +1,6 @@
 import { IsCronSchedule } from '@/modules/asset-group/dto/cron-schedule.validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /** Step 1 of the AWS SSO device-authorization flow: register + start. */
 export class AwsSsoDeviceDto {
@@ -46,8 +46,9 @@ export class AwsSsoPollDto {
 
 /** Step 3: persist the selected account/role as an integration. */
 export class AwsSsoCompleteDto {
-  @ApiProperty({ example: 'AWS SSO' })
+  @ApiProperty({ example: 'AWS SSO', maxLength: 255 })
   @IsString()
+  @MaxLength(255)
   @IsNotEmpty()
   name: string;
 

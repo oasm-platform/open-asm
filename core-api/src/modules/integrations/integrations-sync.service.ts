@@ -27,7 +27,10 @@ import { AwsSsoService } from './connectors/aws/aws-sso.service';
 import { runConnector } from './connectors/connector.factory';
 import { Integration } from './entities/integration.entity';
 import { IntegrationsService } from './integrations.service';
-import { encryptSensitiveConfigFields } from './validators/integration.validator';
+import {
+  decryptSensitiveConfigFields,
+  encryptSensitiveConfigFields,
+} from './validators/integration.validator';
 
 /**
  * Hard ceiling on a single sync run. The distributed lock TTL must be at least
@@ -218,6 +221,23 @@ export class IntegrationSyncService implements OnModuleInit {
       );
     }
 
+    // Defense-in-depth: a legacy row (scheduled before the create/update
+    // workloadIdentity guard existed) must not execute while its cron is
+    // still active — its OIDC token is short-lived and the run would fail
+    // every tick. A dry-run test and a manual run on a row with no active
+    // schedule stay allowed.
+    if (
+      integration.appType === 'aws' &&
+      decryptedConfig.connectionMethod === 'workloadIdentity' &&
+      typeof integration.syncSchedule === 'string' &&
+      integration.syncSchedule !== 'disabled' &&
+      !opts?.dryRun
+    ) {
+      throw new BadRequestException(
+        'AWS workloadIdentity integrations do not support scheduled syncs; the OIDC token is short-lived. Set syncSchedule to "disabled" and run manual syncs.',
+      );
+    }
+
     const config = {
       ...decryptedConfig,
       integrationId,
@@ -229,13 +249,25 @@ export class IntegrationSyncService implements OnModuleInit {
       actingUserContext: await this.resolveActingUser(workspaceId, integration),
       ssoService: this.awsSsoService,
       // Persists a rotated SSO refresh token (and any other sensitive patch)
-      // re-encrypted with the workspace DEK, without touching lastRunAt.
-      persistConfigPatch: async (patch) => {
-        integration.config = encryptSensitiveConfigFields(
-          { ...decryptedConfig, ...patch },
-          await this.workspaceEncryption.getDEK(workspaceId),
+      // re-encrypted with the workspace DEK, without touching lastRunAt. The
+      // row is re-read so a concurrent user edit is not clobbered by the
+      // stale snapshot; only the config column is written.
+      persistConfigPatch: async (
+        patch: Record<string, unknown>,
+      ): Promise<void> => {
+        const current = await this.integrationRepository.findOneBy({
+          id: integrationId,
+        });
+        if (!current) return;
+        const dek = await this.workspaceEncryption.getDEK(workspaceId);
+        const merged = {
+          ...decryptSensitiveConfigFields(current.config, dek),
+          ...patch,
+        };
+        await this.integrationRepository.update(
+          { id: integrationId },
+          { config: encryptSensitiveConfigFields(merged, dek) },
         );
-        await this.integrationRepository.save(integration);
       },
     } as unknown as CloudProviderSyncConfig;
 

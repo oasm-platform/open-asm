@@ -12,6 +12,7 @@ import {
   isValidCidr,
   MAX_API_CALLS_PER_SYNC,
   MAX_PAGES_PER_LIST,
+  MAX_REGIONS_PER_SYNC,
   type DiscoveryBudget,
 } from './aws.discovery';
 import { AwsSyncError } from './aws.errors';
@@ -551,10 +552,33 @@ describe('aws.discovery — API Gateway', () => {
     const result = await discoverApiGateway(input());
     expect(result.candidates).toEqual([]);
   });
+
+  it('omits a private v1 REST API without a GetStages call', async () => {
+    respond({
+      'apigateway:GetRestApis': {
+        items: [
+          { id: 'private1', endpointConfiguration: { types: ['PRIVATE'] } },
+          { id: 'edge1', endpointConfiguration: { types: ['EDGE'] } },
+        ],
+        position: undefined,
+      },
+      'apigateway:GetStages': { item: [{ stageName: 'prod' }] },
+      'apigatewayv2:GetApis': { Items: [], NextToken: undefined },
+    });
+
+    const result = await discoverApiGateway(input());
+    expect(result.candidates.map((c) => c.value)).toEqual([
+      'edge1.execute-api.us-east-1.amazonaws.com',
+    ]);
+    const stageIds = mockSend.mock.calls
+      .filter(([cmd]) => (cmd as MockedCommand).type === 'apigateway:GetStages')
+      .map(([cmd]) => (cmd as MockedCommand).input.restApiId);
+    expect(stageIds).toEqual(['edge1']);
+  });
 });
 
 describe('aws.discovery — S3', () => {
-  it('calls ListBuckets exactly once and keeps only public buckets', async () => {
+  it('keeps only public buckets and resolves a non-default region', async () => {
     mockS3Send.mockImplementation((cmd: MockedCommand) => {
       switch (cmd.type) {
         case 's3:ListBuckets':
@@ -562,10 +586,8 @@ describe('aws.discovery — S3', () => {
             Buckets: [
               { Name: 'public-bucket' },
               { Name: 'private-bucket' },
-              { Name: 'blocked-bucket' },
+              { Name: 'restricted-bucket' },
             ],
-            // A ContinuationToken is deliberately present — must be ignored.
-            ContinuationToken: 'should-not-be-followed',
           });
         case 's3:GetBucketLocation':
           return Promise.resolve({ LocationConstraint: 'eu-west-1' });
@@ -578,7 +600,7 @@ describe('aws.discovery — S3', () => {
         case 's3:GetPublicAccessBlock':
           return Promise.resolve({
             PublicAccessBlockConfiguration: {
-              BlockPublicPolicy: cmd.input.Bucket === 'blocked-bucket',
+              RestrictPublicBuckets: cmd.input.Bucket === 'restricted-bucket',
             },
           });
         default:
@@ -597,6 +619,122 @@ describe('aws.discovery — S3', () => {
     expect(values).toEqual(['public-bucket.s3.amazonaws.com']);
     // Non-default bucket region is resolved before the regional client is built.
     expect(constructorRegions(S3Client)).toContain('eu-west-1');
+  });
+
+  it('treats BlockPublicPolicy:true as STILL public (only RestrictPublicBuckets blocks)', async () => {
+    mockS3Send.mockImplementation((cmd: MockedCommand) => {
+      switch (cmd.type) {
+        case 's3:ListBuckets':
+          return Promise.resolve({ Buckets: [{ Name: 'block-policy' }] });
+        case 's3:GetBucketLocation':
+          return Promise.resolve({ LocationConstraint: undefined });
+        case 's3:GetBucketPolicyStatus':
+          return Promise.resolve({ PolicyStatus: { IsPublic: true } });
+        case 's3:GetPublicAccessBlock':
+          return Promise.resolve({
+            PublicAccessBlockConfiguration: {
+              BlockPublicPolicy: true,
+              RestrictPublicBuckets: false,
+            },
+          });
+        default:
+          throw new Error(`unexpected ${cmd.type}`);
+      }
+    });
+
+    const result = await discoverS3(input());
+    expect(result.candidates.map((c) => c.value)).toEqual([
+      'block-policy.s3.amazonaws.com',
+    ]);
+  });
+
+  it('treats RestrictPublicBuckets:true as NOT public', async () => {
+    mockS3Send.mockImplementation((cmd: MockedCommand) => {
+      switch (cmd.type) {
+        case 's3:ListBuckets':
+          return Promise.resolve({ Buckets: [{ Name: 'restricted' }] });
+        case 's3:GetBucketLocation':
+          return Promise.resolve({ LocationConstraint: undefined });
+        case 's3:GetBucketPolicyStatus':
+          return Promise.resolve({ PolicyStatus: { IsPublic: true } });
+        case 's3:GetPublicAccessBlock':
+          return Promise.resolve({
+            PublicAccessBlockConfiguration: { RestrictPublicBuckets: true },
+          });
+        default:
+          throw new Error(`unexpected ${cmd.type}`);
+      }
+    });
+
+    const result = await discoverS3(input());
+    expect(result.candidates).toEqual([]);
+  });
+
+  it('follows ListBuckets pagination via ContinuationToken', async () => {
+    let listCalls = 0;
+    mockS3Send.mockImplementation((cmd: MockedCommand) => {
+      switch (cmd.type) {
+        case 's3:ListBuckets':
+          listCalls += 1;
+          return Promise.resolve(
+            listCalls === 1
+              ? {
+                  Buckets: [{ Name: 'first-bucket' }],
+                  ContinuationToken: 'page-2-token',
+                }
+              : {
+                  Buckets: [{ Name: 'second-bucket' }],
+                  ContinuationToken: undefined,
+                },
+          );
+        case 's3:GetBucketLocation':
+          return Promise.resolve({ LocationConstraint: undefined });
+        case 's3:GetBucketPolicyStatus':
+          return Promise.resolve({ PolicyStatus: { IsPublic: true } });
+        case 's3:GetPublicAccessBlock':
+          return Promise.resolve({
+            PublicAccessBlockConfiguration: { RestrictPublicBuckets: false },
+          });
+        default:
+          throw new Error(`unexpected ${cmd.type}`);
+      }
+    });
+
+    const result = await discoverS3(input());
+    expect(listCalls).toBe(2);
+    expect(result.truncated).toBe(false);
+    expect(result.candidates.map((c) => c.value).sort()).toEqual([
+      'first-bucket.s3.amazonaws.com',
+      'second-bucket.s3.amazonaws.com',
+    ]);
+  });
+
+  it('returns truncated:true when ListBuckets hits the page cap', async () => {
+    mockS3Send.mockImplementation((cmd: MockedCommand) => {
+      switch (cmd.type) {
+        case 's3:ListBuckets':
+          return Promise.resolve({
+            Buckets: [{ Name: 'bucket' }],
+            ContinuationToken: 'always-more',
+          });
+        case 's3:GetBucketLocation':
+          return Promise.resolve({ LocationConstraint: undefined });
+        case 's3:GetBucketPolicyStatus':
+          return Promise.resolve({ PolicyStatus: { IsPublic: true } });
+        case 's3:GetPublicAccessBlock':
+          return Promise.resolve({
+            PublicAccessBlockConfiguration: { RestrictPublicBuckets: false },
+          });
+        default:
+          throw new Error(`unexpected command ${cmd.type}`);
+      }
+    });
+
+    const result = await discoverS3(input({ budget: budget(1_000_000) }));
+    expect(result.truncated).toBe(true);
+    expect(result.candidates.map((c) => c.value)).toEqual([
+      'bucket.s3.amazonaws.com',
+    ]);
   });
 
   it('treats a missing bucket policy as not public', async () => {
@@ -663,6 +801,28 @@ describe('aws.discovery — region enumeration', () => {
     const result = await listEnabledRegions(CREDENTIALS, budget());
     expect(result.truncated).toBe(false);
     expect(result.regions).toEqual(['us-east-1', 'eu-west-1']);
+  });
+
+  it('caps at MAX_REGIONS_PER_SYNC and reports truncated when more are enabled', async () => {
+    const enabled = Array.from(
+      { length: MAX_REGIONS_PER_SYNC + 1 },
+      (_value, index) => ({
+        RegionName: `region-${String(index).padStart(3, '0')}`,
+        OptInStatus: 'opt-in-not-required',
+      }),
+    );
+    enabled.push({
+      RegionName: 'not-opted-in',
+      OptInStatus: 'not-opted-in',
+    });
+
+    respond({ 'ec2:DescribeRegions': { Regions: enabled } });
+
+    const result = await listEnabledRegions(CREDENTIALS, budget());
+    expect(result.truncated).toBe(true);
+    expect(result.regions).toHaveLength(MAX_REGIONS_PER_SYNC);
+    expect(result.regions[0]).toBe('region-000');
+    expect(result.regions).not.toContain('not-opted-in');
   });
 });
 

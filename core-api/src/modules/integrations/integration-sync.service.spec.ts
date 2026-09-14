@@ -10,7 +10,10 @@ import type { WorkspacesService } from '@/modules/workspaces/workspaces.service'
 import type { AwsSsoService } from './connectors/aws/aws-sso.service';
 import type { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import type { RedisLockService } from '@/services/redis/distributed-lock.service';
-import { decryptSensitiveConfigFields } from './validators/integration.validator';
+import {
+  decryptSensitiveConfigFields,
+  encryptSensitiveConfigFields,
+} from './validators/integration.validator';
 import { IntegrationType } from '@/common/enums/enum';
 
 // runConnector is a module import inside IntegrationSyncService — mock it so
@@ -32,6 +35,7 @@ describe('IntegrationSyncService', () => {
     findOneBy: jest.Mock;
     find: jest.Mock;
     save: jest.Mock;
+    update: jest.Mock;
   };
   let integrationsServiceMock: { getIntegrationWithDecryptedConfig: jest.Mock };
   let targetsServiceMock: TargetsService;
@@ -69,6 +73,7 @@ describe('IntegrationSyncService', () => {
       findOneBy: jest.fn().mockResolvedValue(null),
       find: jest.fn().mockResolvedValue([]),
       save: jest.fn().mockImplementation((entity: Integration) => entity),
+      update: jest.fn().mockResolvedValue(undefined),
     };
     integrationsServiceMock = {
       getIntegrationWithDecryptedConfig: jest.fn(),
@@ -459,7 +464,7 @@ describe('IntegrationSyncService', () => {
       );
     });
 
-    it('persistConfigPatch re-encrypts a rotated credential with the workspace DEK and saves the integration', async () => {
+    it('persistConfigPatch re-reads the current row and updates only the config column with the merged patch', async () => {
       let capturedPatch:
         | ((patch: Record<string, unknown>) => Promise<void>)
         | undefined;
@@ -475,19 +480,135 @@ describe('IntegrationSyncService', () => {
           };
         },
       );
+      // Freshly re-read row carries a user edit (apiToken) plus the rotated
+      // field the patch does not touch — the patch must preserve both.
+      const currentConfig = encryptSensitiveConfigFields(
+        { apiToken: 'user-edited-token', region: 'us-east-1' },
+        Buffer.alloc(32, 1),
+      );
+      repoMock.findOneBy.mockResolvedValue(
+        integration({ config: currentConfig }),
+      );
       repoMock.save.mockClear();
+      repoMock.update.mockClear();
 
       await service.runSync('integration-1', 'ws-1');
       expect(capturedPatch).toBeDefined();
-      await capturedPatch?.({ apiToken: 'rotated-token' });
+      await capturedPatch?.({ refreshToken: 'rotated-token' });
 
-      expect(workspaceEncryptionMock.getDEK).toHaveBeenCalledWith('ws-1');
-      const saved = repoMock.save.mock.calls.at(-1)?.[0] as Integration;
-      const stored = saved.config;
-      expect(stored.apiToken).not.toBe('rotated-token');
-      expect(
-        decryptSensitiveConfigFields(stored, Buffer.alloc(32, 1)).apiToken,
-      ).toBe('rotated-token');
+      expect(repoMock.findOneBy).toHaveBeenCalledWith({
+        id: 'integration-1',
+      });
+      // Only the config column is written — never the stale full entity.
+      const [criteria, patch] = repoMock.update.mock.calls.at(-1) as [
+        { id: string },
+        { config: Record<string, unknown> },
+      ];
+      expect(criteria).toEqual({ id: 'integration-1' });
+      const stored = patch.config;
+      const decrypted = decryptSensitiveConfigFields(
+        stored,
+        Buffer.alloc(32, 1),
+      );
+      expect(decrypted.refreshToken).toBe('rotated-token');
+      expect(decrypted.apiToken).toBe('user-edited-token');
+      expect(decrypted.region).toBe('us-east-1');
+      expect(stored.apiToken).not.toBe('user-edited-token');
+      expect(stored.refreshToken).not.toBe('rotated-token');
+    });
+
+    it('persistConfigPatch is a no-op when the integration row was deleted mid-sync', async () => {
+      let capturedPatch:
+        | ((patch: Record<string, unknown>) => Promise<void>)
+        | undefined;
+      runConnectorMock.mockImplementation(
+        (_appType: string, _category: string, config: Record<string, unknown>) => {
+          capturedPatch = config.persistConfigPatch as (
+            patch: Record<string, unknown>,
+          ) => Promise<void>;
+          return {
+            success: true,
+            message: 'ok',
+            timestamp: new Date().toISOString(),
+          };
+        },
+      );
+      repoMock.findOneBy.mockResolvedValue(null);
+      repoMock.update.mockClear();
+
+      await service.runSync('integration-1', 'ws-1');
+      await capturedPatch?.({ refreshToken: 'rotated-token' });
+
+      expect(repoMock.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a scheduled AWS workloadIdentity sync before dispatching the connector', async () => {
+      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+        {
+          integration: integration({
+            appType: 'aws',
+            syncSchedule: '0 0 * * *',
+          }),
+          decryptedConfig: {
+            connectionMethod: 'workloadIdentity',
+            region: 'us-east-1',
+            roleArn: 'arn:aws:iam::123456789012:role/oasm',
+            webIdentityToken: 'oidc-token',
+          },
+        },
+      );
+
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
+        'workloadIdentity',
+      );
+      expect(runConnectorMock).not.toHaveBeenCalled();
+    });
+
+    it('allows a manual/dry-run AWS workloadIdentity sync (schedule disabled)', async () => {
+      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+        {
+          integration: integration({
+            appType: 'aws',
+            syncSchedule: 'disabled',
+          }),
+          decryptedConfig: {
+            connectionMethod: 'workloadIdentity',
+            region: 'us-east-1',
+            roleArn: 'arn:aws:iam::123456789012:role/oasm',
+            webIdentityToken: 'oidc-token',
+          },
+        },
+      );
+
+      await expect(
+        service.runSync('integration-1', 'ws-1', { dryRun: true }),
+      ).resolves.toBeDefined();
+      expect(runConnectorMock).toHaveBeenCalled();
+    });
+
+    it('allows a non-dry-run manual AWS workloadIdentity sync when the schedule is disabled', async () => {
+      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+        {
+          integration: integration({
+            appType: 'aws',
+            syncSchedule: 'disabled',
+          }),
+          decryptedConfig: {
+            connectionMethod: 'workloadIdentity',
+            region: 'us-east-1',
+            roleArn: 'arn:aws:iam::123456789012:role/oasm',
+            webIdentityToken: 'oidc-token',
+          },
+        },
+      );
+
+      await expect(
+        service.runSync('integration-1', 'ws-1'),
+      ).resolves.toEqual(syncResult);
+      expect(runConnectorMock).toHaveBeenCalled();
     });
 
     it('lock held (non-dry-run): returns zero without dispatching the connector', async () => {

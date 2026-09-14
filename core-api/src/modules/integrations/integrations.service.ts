@@ -104,7 +104,7 @@ export class IntegrationsService {
     if (
       args.appType === 'aws' &&
       args.connectionMethod === 'workloadIdentity' &&
-      args.syncSchedule !== undefined &&
+      typeof args.syncSchedule === 'string' &&
       args.syncSchedule !== 'disabled'
     ) {
       throw new BadRequestException(
@@ -452,6 +452,22 @@ export class IntegrationsService {
       integration.config = encryptSensitiveConfigFields(dto.config, dek);
     }
 
+    // Reject an effective AWS workloadIdentity + schedule combination even
+    // when syncSchedule is omitted: a config-only update that switches an
+    // already-scheduled integration to workloadIdentity would otherwise leave
+    // the cron active for a connection method that cannot renew its token.
+    const effectiveConnectionMethod =
+      dto.config?.connectionMethod ??
+      decryptSensitiveConfigFields(integration.config, dek).connectionMethod;
+    const effectiveSyncSchedule =
+      dto.syncSchedule ?? integration.syncSchedule;
+
+    this.assertAwsWorkloadIdentityScheduleAllowed({
+      appType: integration.appType,
+      connectionMethod: effectiveConnectionMethod,
+      syncSchedule: effectiveSyncSchedule,
+    });
+
     // Re-register the periodic sync scheduler when the schedule changed
     // (SC-SCHED-3/4). Only cloud providers support schedules (F3).
     if (dto.syncSchedule !== undefined) {
@@ -464,15 +480,6 @@ export class IntegrationsService {
         );
       }
 
-      const effectiveConnectionMethod =
-        dto.config?.connectionMethod ??
-        decryptSensitiveConfigFields(integration.config, dek).connectionMethod;
-
-      this.assertAwsWorkloadIdentityScheduleAllowed({
-        appType: integration.appType,
-        connectionMethod: effectiveConnectionMethod,
-        syncSchedule: dto.syncSchedule,
-      });
       await this.integrationSyncService.applySchedule(
         integration,
         dto.syncSchedule,

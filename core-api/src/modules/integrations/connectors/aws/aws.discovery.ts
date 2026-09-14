@@ -115,6 +115,13 @@ class BudgetExhaustedError extends Error {
 }
 
 /**
+ * AwsSyncError subtype for the page cap, so `discoverS3` can convert it into
+ * `{ truncated: true }` while every other discoverer still lets it propagate as
+ * an AwsSyncError.
+ */
+class PageCapExceededError extends AwsSyncError {}
+
+/**
  * Repo target validators — mirror `TargetsService.validateTargetValue`
  * (`targets.service.ts:63-152`) so a candidate can NEVER fail ingestion.
  */
@@ -283,7 +290,7 @@ async function sendGuarded<T>(
 
 function assertPageCap(pages: number, label: string): void {
   if (pages > MAX_PAGES_PER_LIST) {
-    throw new AwsSyncError(
+    throw new PageCapExceededError(
       `${label} exceeded MAX_PAGES_PER_LIST (${MAX_PAGES_PER_LIST})`,
     );
   }
@@ -620,6 +627,7 @@ export async function discoverApiGateway(
       );
       for (const restApi of page.items ?? []) {
         if (restApi.disableExecuteApiEndpoint === true) continue;
+        if (restApi.endpointConfiguration?.types?.includes('PRIVATE')) continue;
         const apiId = restApi.id;
         if (!apiId) continue;
         const stages = await sendGuarded(budget, 'apigateway:GetStages', () =>
@@ -706,8 +714,8 @@ export async function discoverRds(
 }
 
 /**
- * S3 (account-global, called ONCE per sync): `ListBuckets` has NO pagination —
- * it is intentionally not looped. Public buckets →
+ * S3 (account-global, called ONCE per sync): `ListBuckets` is paginated via
+ * `ContinuationToken` and looped like every other List call. Public buckets →
  * `{bucket}.s3.amazonaws.com`. Region is resolved per bucket before the region
  * client is used.
  */
@@ -720,28 +728,47 @@ export async function discoverS3(
     const globalClient = new S3Client(
       baseConfig(credentials, S3_GLOBAL_REGION),
     );
-    const buckets = await sendGuarded(budget, 's3:ListBuckets', () =>
-      globalClient.send(new ListBucketsCommand({})),
-    );
 
-    for (const bucket of buckets.Buckets ?? []) {
-      const name = bucket.Name;
-      if (!name) continue;
-
-      let bucketRegion = S3_GLOBAL_REGION;
-      try {
-        const location = await sendGuarded(
-          budget,
-          's3:GetBucketLocation',
-          () => globalClient.send(new GetBucketLocationCommand({ Bucket: name })),
+    const bucketNames: string[] = [];
+    let continuationToken: string | undefined;
+    let pages = 0;
+    let truncated = false;
+    try {
+      for (;;) {
+        pages++;
+        assertPageCap(pages, 's3:ListBuckets');
+        const page = await sendGuarded(budget, 's3:ListBuckets', () =>
+          globalClient.send(
+            new ListBucketsCommand(
+              continuationToken !== undefined ? { ContinuationToken: continuationToken } : {},
+            ),
+          ),
         );
-        bucketRegion = normalizeBucketRegion(location.LocationConstraint);
-      } catch (error) {
-        if (error instanceof BudgetExhaustedError) throw error;
-        // Region unresolvable (AccessDenied/transient) — skip this bucket only.
-        logger.warn(`S3 region lookup failed for bucket ${name}; skipping`);
-        continue;
+        for (const bucket of page.Buckets ?? []) {
+          if (bucket.Name) bucketNames.push(bucket.Name);
+        }
+        continuationToken = page.ContinuationToken;
+        if (continuationToken === undefined) break;
       }
+    } catch (error) {
+      if (
+        error instanceof BudgetExhaustedError ||
+        error instanceof PageCapExceededError
+      ) {
+        // Budget/page-cap exhaustion is recoverable — surface partial results.
+        truncated = true;
+      } else {
+        throw error;
+      }
+    }
+
+    for (const name of bucketNames) {
+      const bucketRegion = await resolveBucketRegion(
+        globalClient,
+        name,
+        budget,
+      );
+      if (bucketRegion === null) continue;
 
       const regionalClient =
         bucketRegion === S3_GLOBAL_REGION
@@ -753,12 +780,29 @@ export async function discoverS3(
       }
     }
 
-    return { candidates: collector.toArray(), truncated: false };
+    return { candidates: collector.toArray(), truncated };
   } catch (error) {
     if (error instanceof BudgetExhaustedError) {
       return { candidates: collector.toArray(), truncated: true };
     }
     throw error;
+  }
+}
+
+async function resolveBucketRegion(
+  client: S3Client,
+  bucket: string,
+  budget: DiscoveryBudget,
+): Promise<string | null> {
+  try {
+    const location = await sendGuarded(budget, 's3:GetBucketLocation', () =>
+      client.send(new GetBucketLocationCommand({ Bucket: bucket })),
+    );
+    return normalizeBucketRegion(location.LocationConstraint);
+  } catch (error) {
+    if (error instanceof BudgetExhaustedError) throw error;
+    logger.warn(`S3 region lookup failed for bucket ${bucket}; skipping`);
+    return null;
   }
 }
 
@@ -771,8 +815,10 @@ function normalizeBucketRegion(constraint: string | undefined): string {
 
 /**
  * A bucket is treated as publicly exposed when its policy status reports public
- * AND the public-access-block does not neutralise public policies. A missing
- * bucket policy / missing block configuration means "not public" / "not blocked".
+ * AND `RestrictPublicBuckets` is not enabled — `BlockPublicPolicy` only blocks
+ * FUTURE public policies and does not neutralise an existing one. A missing
+ * bucket policy means "not public"; a missing block configuration means "not
+ * restricted".
  */
 async function bucketIsPublic(
   client: S3Client,
@@ -793,25 +839,26 @@ async function bucketIsPublic(
   }
   if (!policyIsPublic) return false;
 
-  let blockPublicPolicy = false;
+  let restrictPublicBuckets = false;
   try {
     const block = await sendGuarded(budget, 's3:GetPublicAccessBlock', () =>
       client.send(new GetPublicAccessBlockCommand({ Bucket: bucket })),
     );
-    blockPublicPolicy =
-      block.PublicAccessBlockConfiguration?.BlockPublicPolicy === true;
+    restrictPublicBuckets =
+      block.PublicAccessBlockConfiguration?.RestrictPublicBuckets === true;
   } catch (error) {
     if (error instanceof BudgetExhaustedError) throw error;
     // NoSuchPublicAccessBlockConfiguration → no block configured.
-    blockPublicPolicy = false;
+    restrictPublicBuckets = false;
   }
-  return !blockPublicPolicy;
+  return !restrictPublicBuckets;
 }
 
 /**
  * Enumerate regions enabled for the account. `AllRegions` is requested so
  * `not-opted-in` regions can be observed, then they are filtered out. There is
- * no region pagination — the list is capped at `MAX_REGIONS_PER_SYNC`.
+ * no region pagination — the list is capped at `MAX_REGIONS_PER_SYNC`, and the
+ * cap being hit is reported via `truncated`.
  */
 export async function listEnabledRegions(
   credentials: AwsSessionCredentials,
@@ -823,16 +870,17 @@ export async function listEnabledRegions(
     const response = await sendGuarded(budget, 'ec2:DescribeRegions', () =>
       client.send(new DescribeRegionsCommand({ AllRegions: true })),
     );
-    const regions = (response.Regions ?? [])
+    const filtered = (response.Regions ?? [])
       .filter(
         (item) =>
           item.OptInStatus === 'opt-in-not-required' ||
           item.OptInStatus === 'opted-in',
       )
       .map((item) => item.RegionName)
-      .filter((name): name is string => Boolean(name))
-      .slice(0, MAX_REGIONS_PER_SYNC);
-    return { regions, truncated: false };
+      .filter((name): name is string => Boolean(name));
+    const truncated = filtered.length > MAX_REGIONS_PER_SYNC;
+    const regions = filtered.slice(0, MAX_REGIONS_PER_SYNC);
+    return { regions, truncated };
   } catch (error) {
     if (error instanceof BudgetExhaustedError) {
       return { regions: [], truncated: true };
