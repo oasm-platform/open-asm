@@ -210,6 +210,128 @@ func TestHandleConnectorResultNonVulnCategoryKeepsPerChunkRawPath(t *testing.T) 
 // TestSeverityFromString: the enum mapping is case-insensitive over the
 // connector's closed set; anything else falls back to Core's default (INFO) —
 // the worker never invents enum values.
+// TestHandleConnectorResultAggregatesUrlDiscoveryChunks: a url_discovery
+// category job with N result chunks carrying URL findings must produce EXACTLY
+// ONE SubmitUrlDiscoveryResult (at drain end, on a clean Done) with all N URLs
+// accumulated — never a per-chunk submission — mirroring the vulnerabilities
+// aggregation path with raw "".
+func TestHandleConnectorResultAggregatesUrlDiscoveryChunks(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-url-1"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-url-1", category: "url_discovery", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 8)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	// Three chunks: 2 + 1 + 1 URL findings = 4 accumulated.
+	proxy.ForwardResult(execID, []byte(`{"url":"a"}`), []*connectorpb.Finding{
+		{Name: "https://example.com/a", Severity: "info", MatchedAt: "https://example.com/a", Host: "example.com"},
+		{Name: "https://example.com/b", Severity: "info", MatchedAt: "https://example.com/b", Host: "example.com"},
+	})
+	proxy.ForwardResult(execID, []byte(`{"url":"c"}`), []*connectorpb.Finding{
+		{Name: "https://example.com/c", Severity: "info", MatchedAt: "https://example.com/c", Host: "example.com"},
+	})
+	proxy.ForwardResult(execID, []byte(`{"url":"d"}`), []*connectorpb.Finding{
+		{Name: "https://example.com/d", Severity: "info", MatchedAt: "https://example.com/d", Host: "example.com"},
+	})
+
+	proxy.MarkDone(execID)
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 url_discovery submission, got %d", len(results))
+	}
+	got := results[0]
+	if got.jobID != "job-url-1" {
+		t.Fatalf("jobID: got %q, want job-url-1", got.jobID)
+	}
+	if got.isError {
+		t.Fatal("expected isError=false for a clean done")
+	}
+	if got.raw != "" {
+		t.Fatalf("expected raw \"\" for the aggregated submission, got %q", got.raw)
+	}
+	if len(got.urls) != 4 {
+		t.Fatalf("expected 4 accumulated urls, got %d: %+v", len(got.urls), got.urls)
+	}
+
+	// Order preserved: chunk order then finding order.
+	want := []string{"https://example.com/a", "https://example.com/b", "https://example.com/c", "https://example.com/d"}
+	for i, w := range want {
+		if got.urls[i].GetUrl() != w {
+			t.Fatalf("url[%d]: got %q, want %q (all: %+v)", i, got.urls[i].GetUrl(), w, got.urls)
+		}
+	}
+}
+
+// TestHandleConnectorResultEmptyUrlDiscoverySubmitsEmptyOnce: a clean Done with
+// zero chunks must still produce exactly one url_discovery submission carrying
+// raw "" and an empty URL list (the "empty" contract), not zero submissions.
+func TestHandleConnectorResultEmptyUrlDiscoverySubmitsEmptyOnce(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-url-empty"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-url-empty", category: "url_discovery", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	proxy.MarkDone(execID)
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 submission for an empty clean done, got %d", len(results))
+	}
+	if results[0].isError || results[0].raw != "" || len(results[0].urls) != 0 {
+		t.Fatalf("expected clean empty submission, got %+v", results[0])
+	}
+}
+
+// TestFindingToDiscoveredUrl_Nil: a nil finding maps to nil (skipped by the
+// caller), matching findingToVulnerability's nil-safety.
+func TestFindingToDiscoveredUrl_Nil(t *testing.T) {
+	if got := findingToDiscoveredUrl(nil); got != nil {
+		t.Fatalf("expected nil for nil finding, got %+v", got)
+	}
+}
+
 func TestSeverityFromString(t *testing.T) {
 	cases := []struct {
 		in   string

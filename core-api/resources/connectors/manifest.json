@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-13T14:47:23.3419122Z",
+  "generatedAt": "2026-09-14T13:41:44.986557Z",
   "connectors": [
     {
       "name": "Nessus",
@@ -7,34 +7,26 @@
       "version": "0.1.0",
       "image": "ghcr.io/oasm-platform/connector-nessus:0.1.0",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://www.tenable.com",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Tenable Nessus vulnerability scanner",
       "description": "Connects to a Tenable Nessus instance, creates and runs a scan against a target, and streams the discovered vulnerabilities back to the Worker as JSONL findings.",
-      "capabilities": [
-        "vulnerabilities"
-      ],
+      "capabilities": ["vulnerabilities"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
-            ],
+            "examples": ["https://example.com"],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -79,9 +71,7 @@
           },
           "url": {
             "description": "Base URL of the Nessus instance.",
-            "examples": [
-              "https://nessus.local:8834"
-            ],
+            "examples": ["https://nessus.local:8834"],
             "format": "uri",
             "title": "Nessus URL",
             "type": "string",
@@ -89,19 +79,13 @@
           },
           "username": {
             "description": "Nessus username for session authentication.",
-            "examples": [
-              "administrator"
-            ],
+            "examples": ["administrator"],
             "title": "Username",
             "type": "string",
             "ui:placeholder": "administrator"
           }
         },
-        "required": [
-          "url",
-          "username",
-          "password"
-        ],
+        "required": ["url", "username", "password"],
         "type": "object"
       },
       "resourceDefaults": {
@@ -117,34 +101,26 @@
       "version": "3.4.1",
       "image": "ghcr.io/oasm-platform/connector-nuclei:3.4.1",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://projectdiscovery.io",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Fast template-based vulnerability scanner",
       "description": "Runs ProjectDiscovery Nuclei template-based scans against a target URL to detect known vulnerabilities, misconfigurations, and exposed secrets.",
-      "capabilities": [
-        "vulnerabilities"
-      ],
+      "capabilities": ["vulnerabilities"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
-            ],
+            "examples": ["https://example.com"],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -158,12 +134,7 @@
           },
           "excludeTags": {
             "description": "Skip templates that match these tags.",
-            "examples": [
-              [
-                "dos",
-                "fuzz"
-              ]
-            ],
+            "examples": [["dos", "fuzz"]],
             "items": {
               "type": "string"
             },
@@ -183,19 +154,10 @@
             "type": "integer"
           },
           "severity": {
-            "default": [
-              "high",
-              "critical"
-            ],
+            "default": ["high", "critical"],
             "description": "Only report findings at the selected severity levels.",
             "items": {
-              "enum": [
-                "info",
-                "low",
-                "medium",
-                "high",
-                "critical"
-              ],
+              "enum": ["info", "low", "medium", "high", "critical"],
               "type": "string"
             },
             "title": "Severity levels",
@@ -203,12 +165,7 @@
           },
           "tags": {
             "description": "Only run templates matching these tags.",
-            "examples": [
-              [
-                "cve",
-                "rce"
-              ]
-            ],
+            "examples": [["cve", "rce"]],
             "items": {
               "type": "string"
             },
@@ -218,12 +175,7 @@
           },
           "templateIds": {
             "description": "Only run these specific template IDs.",
-            "examples": [
-              [
-                "CVE-2024-12345",
-                "wordpress-rce"
-              ]
-            ],
+            "examples": [["CVE-2024-12345", "wordpress-rce"]],
             "items": {
               "type": "string"
             },
@@ -247,34 +199,26 @@
       "version": "3.8.27",
       "image": "ghcr.io/oasm-platform/connector-wpscan:3.8.27",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://wpscan.com",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "WordPress vulnerability scanner",
       "description": "Scans WordPress sites using WPScan to enumerate vulnerable plugins and themes, detect known CVEs, misconfigurations, and weak credentials.",
-      "capabilities": [
-        "vulnerabilities"
-      ],
+      "capabilities": ["vulnerabilities"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
-            ],
+            "examples": ["https://example.com"],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -303,11 +247,7 @@
           "detectionMode": {
             "default": "mixed",
             "description": "Global detection mode used by all detections.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Detection mode",
             "type": "string"
           },
@@ -381,22 +321,14 @@
           "pluginsDetection": {
             "default": "passive",
             "description": "Detection mode used to enumerate plugins.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Plugins detection",
             "type": "string"
           },
           "pluginsVersionDetection": {
             "default": "mixed",
             "description": "Detection mode used to check plugins versions.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Plugins version detection",
             "type": "string"
           },
@@ -420,11 +352,7 @@
           },
           "scope": {
             "description": "Additional (sub-)domains to include in scope.",
-            "examples": [
-              [
-                "blog.example.com"
-              ]
-            ],
+            "examples": [["blog.example.com"]],
             "items": {
               "type": "string"
             },
@@ -434,11 +362,7 @@
           },
           "server": {
             "description": "Force the supplied server module instead of auto-detecting.",
-            "enum": [
-              "apache",
-              "iis",
-              "nginx"
-            ],
+            "enum": ["apache", "iis", "nginx"],
             "title": "Web server",
             "type": "string"
           },
@@ -449,21 +373,13 @@
           },
           "themesDetection": {
             "description": "Detection mode used to enumerate themes.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Themes detection",
             "type": "string"
           },
           "themesVersionDetection": {
             "description": "Detection mode used to check themes versions.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Themes version detection",
             "type": "string"
           },
@@ -491,9 +407,7 @@
             "ui:placeholder": "e.g. internal.corp"
           }
         },
-        "required": [
-          "apiToken"
-        ],
+        "required": ["apiToken"],
         "type": "object"
       },
       "resourceDefaults": {
@@ -502,6 +416,100 @@
         "timeoutSeconds": 600
       },
       "logo": "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAAZ00lEQVR4nO3dW6xtZXnH4WFio3IBVA2YtmzgAk8pRyXViGelViVAa2KwNN2EptrSVmxqaewFcFFTrKl4ItZAxNRD27QKQY2VWlE28VgQMIpwIWzaphBp2TZBjCbteNf0wGGvteda8zC+93ufJ5k4J96y1vyPb/zmXI/5v9EAAJRiAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAFPD1vfcMN++9d7jzvn3j83uH+x/4wfhvZ07Yddhw6EGPG0444vDhhU8/Ynz++PHfAr0zAKBT8ab/wRu+MVy559aHveEfSAyC3accO5x+4jHDUU8+ZPw3QI8MAOjMdbftHd700c+OA+De8dViYghcePrzDAHokAEAnYgr/jd99F83BsCynX/qszeGgNsD0A8DAJK7/4EHh3de+7XhoqtuGF+tTpwCvOOslwxnnPTU8RWQnQEAicXV/jlXfGq487v7xlfrccZJx4xD4KUbgwDIywCAhOKqP974r7rxjvHV+sWnBi4645ThjS9/9vgKyMgAgGRmx/17xhEwf9m/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YxkMABYiEoT1isAvHrAoA4ClEAnCaon8WDYDgKURCcLyifxYFQOApRMJwnKI/FglA4CVEQnCzoj8WAcDgJUSCcL2ROAXD1g1A4C1EAnC1kR+rJsBwNqIBOHRRH5MxQBg7USCMCPyY0oGAJMRCVKVyI8WGABMSiRINRH4xQOmZgDQBJEgvRP50RoDgGaIBOmRyI9WGQA0RyRIL0R+tMwAoFkiQbIS+ZGBAUDTRIJkE4FfPKB1BgApiARpnciPbAwA0hAJ0iKRH1kZAKQjEqQVIj8yMwBISyTIVER+9MAAIDWRIOsWgV88IDsDgC6IBFk1kR+9MQDohkiQVRD50SsDgO6IBFkWkR89MwDolkiQnRL5UYEBQNdEgmxXBH7xgN4ZAJQgEuRARH5UYwBQhkiQ/RH5UZUBQDkiQX5C5EdlBgBliQTrEvmBAUBxIsF6IvCLB1RnAMBIJNg/kR88nAEAPyYS7JPID/bPAIBHEAn2Q+QHmzMAYBMiwbxEfnBgBgBsQSSYTwR+8QC2ZgDAHESC7RP5wfYYADAnkWCbRH6wMwYAbJNIsB0iP9g5AwB2SCQ4HZEfLM4AgAWIBNcvAr94AIsxAGAJRIKrJ/KD5TIAYElEgqsh8oPVMABgyUSCyyPyg9UxAGBFRII7J/KD1TMAYIVEgtsXgV88gNUyAGANRIIHJvKD9TIAYE1Egvsn8oNpGACwZiLBnxH5wXQMAJhI5UhQ5AfTMwBgQhUjwQj84gFMywCABlSIBEV+0BYDABrRayQo8oM2GQDQmJ4iQZEftMsAgEZljgRFftA+AwAaljESjMAvHkDbDABIIEMkKPKDXAwASKLVSFDkBzkZAJBMS5GgyA/yMgAgqSkjQZEf5GcAQGJTRIIR+MUDyM0AgA6sIxIU+UFfDADoRESCEQjGrYFl3haI4/644hf5QV8MAOhM3BaINuCa8bbAIkPAGz/0zQCATsWJQIyAeFx/311zjYF403/BeNR/9vimL/CDvhkAUER8fHDveDrwyI8Pxuf4jzv48I2Hj/NBHQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQQYAABRkAABAQf8PtnDDPN4Ga00AAAAASUVORK5CYII="
+    },
+    {
+      "name": "gau - GetAllUrls",
+      "slug": "gau",
+      "version": "2.2.4",
+      "image": "ghcr.io/oasm-platform/connector-gau:2.2.4",
+      "author": "oasm",
+      "pricingTier": ["free"],
+      "homepage": "https://github.com/lc/gau",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
+      "shortDescription": "Historical URL discovery via public archives",
+      "description": "Discovers historical/archived URLs for a domain using gau (GetAllUrls) across Wayback Machine, Common Crawl, AlienVault OTX and urlscan.io.",
+      "capabilities": ["url_discovery"],
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "description": "Domain (or URL) to discover historical URLs for. Scheme/path stripped to the host.",
+            "examples": ["example.com"],
+            "format": "uri",
+            "title": "Target domain",
+            "type": "string",
+            "ui:placeholder": "example.com"
+          }
+        },
+        "required": ["target"],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "description": "Start timestamp filter YYYYMM (gau --from).",
+            "title": "From",
+            "type": "string",
+            "ui:placeholder": "201901"
+          },
+          "providers": {
+            "description": "Archive providers to query. Default: all four.",
+            "items": {
+              "enum": ["wayback", "commoncrawl", "otx", "urlscan"],
+              "type": "string"
+            },
+            "title": "Providers",
+            "type": "array",
+            "ui:placeholder": "wayback, commoncrawl, otx, urlscan"
+          },
+          "proxy": {
+            "description": "Proxy URL, e.g. http://127.0.0.1:8080 or socks5://127.0.0.1:9050.",
+            "title": "Proxy",
+            "type": "string",
+            "ui:placeholder": "http://127.0.0.1:8080"
+          },
+          "retries": {
+            "default": 5,
+            "description": "Provider request retries (gau --retries).",
+            "minimum": 0,
+            "title": "Retries",
+            "type": "integer"
+          },
+          "subs": {
+            "description": "Query providers for *.domain as well (gau --subs).",
+            "title": "Include subdomains",
+            "type": "boolean"
+          },
+          "threads": {
+            "default": 5,
+            "description": "Number of worker threads per provider (gau --threads).",
+            "minimum": 1,
+            "title": "Threads",
+            "type": "integer"
+          },
+          "timeout": {
+            "default": 45,
+            "description": "Per-request timeout in seconds (gau --timeout).",
+            "minimum": 1,
+            "title": "Request timeout",
+            "type": "integer"
+          },
+          "to": {
+            "description": "End timestamp filter YYYYMM (gau --to).",
+            "title": "To",
+            "type": "string",
+            "ui:placeholder": "202601"
+          }
+        },
+        "type": "object"
+      },
+      "resourceDefaults": {
+        "cpu": "250m",
+        "memory": "256Mi",
+        "timeoutSeconds": 900
+      }
     }
   ]
 }

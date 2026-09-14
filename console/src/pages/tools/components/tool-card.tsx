@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import Image from '@/components/ui/image';
+import ToolLogo from '@/components/ui/tool-logo';
 import { type Tool } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
 import { BadgeCheck } from 'lucide-react';
@@ -25,13 +25,8 @@ const ToolCard = ({ tool }: ToolCardProps) => {
       className="flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:border-primary hover:bg-accent/50 cursor-pointer"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <div className="light:bg-black dark:bg-white rounded-lg p-[3px] shrink-0">
-          <Image
-            className="rounded"
-            url={tool.logoUrl}
-            height={24}
-            width={24}
-          />
+        <div className="light:bg-black dark:bg-white rounded-lg p-[3px] shrink-0 overflow-hidden">
+          <ToolLogo name={tool.name} logoUrl={tool.logoUrl} size={24} />
         </div>
         <h3 className="text-base font-semibold">{tool.name}</h3>
         {tool.isOfficialSupport && (

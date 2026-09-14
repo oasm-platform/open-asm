@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import Image from '@/components/ui/image';
+import ToolLogo from '@/components/ui/tool-logo';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { JobListItemDto } from '@/services/apis/gen/queries';
@@ -133,10 +133,10 @@ export default function Runs() {
               params={{ id: row.original.tool.id ?? '' }}
               className="flex items-center gap-2"
             >
-              <Image
-                url={row.original.tool?.logoUrl}
-                width={30}
-                height={30}
+              <ToolLogo
+                name={row.original.tool.name ?? ''}
+                logoUrl={row.original.tool?.logoUrl}
+                size={30}
                 className="rounded-full"
               />
               <span className="capitalize font-bold">
@@ -313,10 +313,10 @@ export default function Runs() {
                     params={{ id: tool.id }}
                     className="flex items-center gap-2 hover:opacity-80"
                   >
-                    <Image
-                      url={tool.logoUrl}
-                      width={40}
-                      height={40}
+                    <ToolLogo
+                      name={tool.name}
+                      logoUrl={tool.logoUrl}
+                      size={40}
                       className="rounded-full border"
                     />
                     <span className="font-medium text-sm">{tool.name}</span>

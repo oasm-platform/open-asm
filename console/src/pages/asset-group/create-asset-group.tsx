@@ -30,6 +30,7 @@ import {
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { cn } from '@/lib/utils';
 import {
+  ToolCategory,
   useAssetGroupControllerCreate,
   useAssetsControllerGetHostAssets,
   useToolsControllerGetInstalledTools,
@@ -47,7 +48,7 @@ import {
   WrenchIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 const STEPS = [
   { title: 'Info', icon: <FileTextIcon className="size-4" /> },
@@ -98,9 +99,19 @@ export function CreateAssetGroup() {
     { query: { queryKey: ['create-group-hosts', page, pageSize, sortBy, sortOrder, filter] } },
   );
 
-  const toolsQuery = useToolsControllerGetInstalledTools({
-    category: 'vulnerabilities',
-  });
+  const toolsQuery = useToolsControllerGetInstalledTools();
+
+  // Pipeline-capable tool categories. url_discovery connectors (e.g. gau)
+  // run in the group pipeline alongside vulnerability scanners.
+  const pipelineTools = useMemo(
+    () =>
+      (toolsQuery.data?.data ?? []).filter(
+        (tool) =>
+          tool.category === ToolCategory.vulnerabilities ||
+          tool.category === ToolCategory.url_discovery,
+      ),
+    [toolsQuery.data?.data],
+  );
 
   const { mutate: createAssetGroup, isPending } = useAssetGroupControllerCreate();
 
@@ -309,7 +320,7 @@ export function CreateAssetGroup() {
 
           {step === 2 && (
             <ToolPipelineBuilder
-              tools={toolsQuery.data?.data ?? []}
+              tools={pipelineTools}
               value={pipeline}
               onChange={setPipeline}
               emptyMessage="No tools found"

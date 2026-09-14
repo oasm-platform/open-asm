@@ -329,6 +329,11 @@ func submitCategoryResult(ctx context.Context, grpcClient *grpcclient.Client, jo
 		return grpcClient.SubmitVulnerabilitiesResult(ctx, jobID, isError, raw, nil)
 	case "screenshot":
 		return grpcClient.SubmitScreenshotResult(ctx, jobID, isError, raw)
+	case "url_discovery":
+		// Per-chunk path (used for errors / partial drains): the connector's
+		// URLs travel in the structured payload at finalization, so the raw
+		// string is the only thing to forward here.
+		return grpcClient.SubmitUrlDiscoveryResult(ctx, jobID, isError, raw, nil)
 	default:
 		// Unknown category — use the deprecated generic endpoint
 		payload := &pb.DataPayloadResult{
@@ -368,6 +373,17 @@ func findingToVulnerability(f *connectorpb.Finding) *pb.Vulnerability {
 		Host:       f.GetHost(),
 		IpAddress:  f.GetIp(),
 	}
+}
+
+// findingToDiscoveredUrl maps one connector Finding onto the jobs_registry
+// DiscoveredUrl model. The gau (url_discovery) adapter encodes the discovered
+// URL in Finding.Name (one finding per URL, per the SDK's Finding-only
+// contract); a nil finding yields nil (skipped by the caller).
+func findingToDiscoveredUrl(f *connectorpb.Finding) *pb.DiscoveredUrl {
+	if f == nil {
+		return nil
+	}
+	return &pb.DiscoveredUrl{Url: f.GetName()}
 }
 
 // severityFromString maps the connector's lowercase severity string onto the
@@ -648,10 +664,11 @@ func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcc
 	var timerC <-chan time.Time = timer.C
 	submittedAny := false
 
-	// Accumulated structured findings for the vulnerabilities category: chunks
-	// are aggregated and submitted ONCE at drain end (see finalization below).
-	// Other categories keep the per-chunk raw submission path.
+	// Accumulated structured findings for the vulnerabilities and url_discovery
+	// categories: chunks are aggregated and submitted ONCE at drain end (see
+	// finalization below). Other categories keep the per-chunk raw path.
 	var vulns []*pb.Vulnerability
+	var urls []*pb.DiscoveredUrl
 
 	// Drain results from connector until channel closes (Done or disconnect)
 	// or the connector fails to connect within connectTimeout.
@@ -672,6 +689,15 @@ drain:
 				// Per-chunk log kept (bytes + findings count) even though the
 				// submission itself is deferred to the single drain-end call.
 				log.Info("[%s] connector result chunk: exec=%s bytes=%d findings=%d", entry.jobID, execID, len(msg.Data), len(msg.Findings))
+			} else if entry.category == "url_discovery" {
+				for _, f := range msg.Findings {
+					if u := findingToDiscoveredUrl(f); u != nil {
+						urls = append(urls, u)
+					}
+				}
+				// Same aggregation contract as vulnerabilities: per-chunk log
+				// only, the single submission happens at drain end below.
+				log.Info("[%s] connector result chunk: exec=%s bytes=%d urls=%d", entry.jobID, execID, len(msg.Data), len(msg.Findings))
 			} else if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(msg.Data)); err != nil {
 				log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector result", entry.jobID), err)
 			} else {
@@ -833,6 +859,16 @@ drain:
 			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector vulnerabilities", entry.jobID), err)
 		} else {
 			log.Info("[%s] connector vulnerabilities result submitted: exec=%s findings=%d", entry.jobID, execID, len(vulns))
+		}
+	case entry.category == "url_discovery":
+		// Clean Done: submit the aggregated URLs exactly once (raw is "" per
+		// contract — URLs travel in the structured payload). Placed before the
+		// !submittedAny branch so a Done with zero URLs still submits an empty
+		// list exactly once, mirroring the vulnerabilities contract.
+		if err := grpcClient.SubmitUrlDiscoveryResult(ctx, entry.jobID, false, "", urls); err != nil {
+			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector url discovery", entry.jobID), err)
+		} else {
+			log.Info("[%s] connector url discovery result submitted: exec=%s urls=%d", entry.jobID, execID, len(urls))
 		}
 	case !submittedAny:
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, "")

@@ -146,6 +146,8 @@ export class ToolSyncService implements OnModuleInit {
         return ToolCategory.VULNERABILITIES;
       case 'screenshot':
         return ToolCategory.SCREENSHOT;
+      case 'url_discovery':
+        return ToolCategory.URL_DISCOVERY;
       default:
         return ToolCategory.VULNERABILITIES;
     }
@@ -241,7 +243,12 @@ export class ToolSyncService implements OnModuleInit {
       const author = String((rawEntry['author'] as string) ?? '').trim().toLowerCase();
       const isOfficialSupport = author === 'oasm';
 
-      const logoUrl = `/connectors/${name}.png`;
+      // logoUrl must mirror the manifest's logo presence exactly: a missing/empty
+      // logo maps to SQL NULL (never a stale /connectors/<slug>.png path). The
+      // value is assigned as `null` explicitly (not omitted) so TypeORM's INSERT
+      // and `orUpdate` both write NULL rather than falling back to a DEFAULT.
+      const hasLogo = typeof logoBase64 === 'string' && logoBase64.length > 0;
+      const logoUrl = (hasLogo ? `/connectors/${name}.png` : null) as unknown as string;
 
       const insert: ToolInsert = {
         id: randomUUID(),
@@ -353,9 +360,18 @@ export class ToolSyncService implements OnModuleInit {
         existing.description = entry.insert.description;
         existing.category = entry.insert.category;
         existing.version = entry.insert.version;
+        const staleLogoUrl = existing.logoUrl;
         existing.logoUrl = entry.insert.logoUrl;
         existing.priority = entry.insert.priority;
         await this.toolsRepository.save(existing);
+        // Logo removed from the manifest: purge the now-orphaned stored object.
+        // Best-effort — a storage failure must not abort the sync.
+        if (staleLogoUrl && !entry.logoBase64) {
+          await this.storageService
+            .deleteFile(`connectors/${slug}.png`, 'system')
+            .then(() => this.logger.log(`Deleted stale connector logo for ${slug} -> connectors/${slug}.png`))
+            .catch((err) => this.logger.warn(`Failed to delete connector logo for ${slug}: ${err instanceof Error ? err.message : String(err)}`));
+        }
         this.logger.log(`Overrode tool "${slug}" with connector data (id=${existing.id})`);
         if (entry.logoBase64) {
           try {

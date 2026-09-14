@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import Image from '@/components/ui/image';
+import ToolLogo from '@/components/ui/tool-logo';
 import {
   Table,
   TableBody,
@@ -206,11 +206,11 @@ export default function ToolDetail() {
           <CardContent>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
               <div className="flex min-w-0 flex-1 items-center gap-4">
-                <Image
-                  url={tool?.logoUrl}
-                  width={80}
-                  height={80}
-                  className="size-20 shrink-0 rounded-2xl"
+                <ToolLogo
+                  name={tool.name}
+                  logoUrl={tool?.logoUrl}
+                  size={80}
+                  className="rounded-2xl"
                 />
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">

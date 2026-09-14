@@ -125,6 +125,7 @@ type fakeJobsRegistryService struct {
 	resultPortsFn      func(ctx context.Context, req *jobsRegistry.PortsResultRequest) (*jobsRegistry.JobResponse, error)
 	resultVulnsFn      func(ctx context.Context, req *jobsRegistry.VulnerabilitiesResultRequest) (*jobsRegistry.JobResponse, error)
 	resultScreenshotFn func(ctx context.Context, req *jobsRegistry.ScreenshotResultRequest) (*jobsRegistry.JobResponse, error)
+	resultUrlDiscFn    func(ctx context.Context, req *jobsRegistry.UrlDiscoveryResultRequest) (*jobsRegistry.JobResponse, error)
 
 	mu           sync.Mutex
 	lastMetadata metadata.MD // captured from incoming context
@@ -192,6 +193,14 @@ func (f *fakeJobsRegistryService) ResultScreenshot(ctx context.Context, req *job
 		return f.resultScreenshotFn(ctx, req)
 	}
 	return nil, status.Error(codes.Unimplemented, "result screenshot not configured")
+}
+
+func (f *fakeJobsRegistryService) ResultUrlDiscovery(ctx context.Context, req *jobsRegistry.UrlDiscoveryResultRequest) (*jobsRegistry.JobResponse, error) {
+	f.recordMetadata(ctx)
+	if f.resultUrlDiscFn != nil {
+		return f.resultUrlDiscFn(ctx, req)
+	}
+	return nil, status.Error(codes.Unimplemented, "result url discovery not configured")
 }
 
 // --- bufconn test server ---
