@@ -12,6 +12,8 @@ import {
   discoverApiGateway,
   discoverCloudFront,
   discoverEc2,
+  discoverVpcs,
+  discoverSubnets,
   discoverElbv2,
   discoverRds,
   discoverRoute53,
@@ -37,16 +39,20 @@ jest.mock('./aws/aws.discovery', () => {
     MAX_REGION_CONCURRENCY: number;
     isValidDomain: (value: string) => boolean;
     isValidPublicIp: (value: string) => boolean;
+    isValidCidr: (value: string) => boolean;
   }>('./aws/aws.discovery');
   return {
     MAX_API_CALLS_PER_SYNC: actual.MAX_API_CALLS_PER_SYNC,
     MAX_REGION_CONCURRENCY: actual.MAX_REGION_CONCURRENCY,
     isValidDomain: actual.isValidDomain,
     isValidPublicIp: actual.isValidPublicIp,
+    isValidCidr: actual.isValidCidr,
     discoverRoute53: jest.fn(),
     discoverCloudFront: jest.fn(),
     discoverS3: jest.fn(),
     discoverEc2: jest.fn(),
+    discoverVpcs: jest.fn(),
+    discoverSubnets: jest.fn(),
     discoverElbv2: jest.fn(),
     discoverApiGateway: jest.fn(),
     discoverRds: jest.fn(),
@@ -59,6 +65,8 @@ const DISCOVERY_MOCKS = [
   discoverCloudFront,
   discoverS3,
   discoverEc2,
+  discoverVpcs,
+  discoverSubnets,
   discoverElbv2,
   discoverApiGateway,
   discoverRds,
@@ -68,7 +76,7 @@ const CREDENTIALS = { accessKeyId: 'AKIA', secretAccessKey: 'secret' };
 
 function candidate(
   value: string,
-  type: 'DOMAIN' | 'IP' = 'DOMAIN',
+  type: 'DOMAIN' | 'IP' | 'CIDR' = 'DOMAIN',
   kind = 'ec2-instance',
 ): Candidate {
   return {
@@ -191,6 +199,32 @@ describe('AwsConnector ingestion', () => {
     );
     expect(result.targetsCreated).toBe(2);
     expect(result.assetsUpserted).toBe(2);
+  });
+
+  it('ING-1b: a CIDR candidate is created as TargetType.CIDR via createMultipleTargets', async () => {
+    jest.mocked(discoverVpcs).mockResolvedValue({
+      candidates: [candidate('10.0.0.0/16', 'CIDR', 'vpc')],
+      truncated: false,
+    });
+
+    const config = makeConfig();
+    const result = await new AwsConnector().syncAssets(config);
+
+    expect(config.targetsService.createMultipleTargets).toHaveBeenCalledWith(
+      { targets: [{ value: '10.0.0.0/16', type: 'CIDR' }] },
+      'ws-1',
+      config.actingUserContext,
+      undefined,
+      TargetSource.AWS,
+    );
+    expect(config.dataAdapterService.upsertAssetsByTargetId).toHaveBeenCalledWith(
+      't-10.0.0.0/16',
+      [{ value: '10.0.0.0/16', dnsRecords: expect.any(Object) }],
+      undefined,
+      { replaceDnsRecords: true },
+    );
+    expect(result.targetsCreated).toBe(1);
+    expect(result.assetsUpserted).toBe(1);
   });
 
   it('ING-2: existing targets are skipped by lookup — no create, upsert under the existing id', async () => {

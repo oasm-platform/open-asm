@@ -14,6 +14,8 @@ import {
   DescribeInstancesCommand,
   DescribeAddressesCommand,
   DescribeRegionsCommand,
+  DescribeVpcsCommand,
+  DescribeSubnetsCommand,
 } from '@aws-sdk/client-ec2';
 import {
   ElasticLoadBalancingV2Client,
@@ -71,7 +73,7 @@ const S3_GLOBAL_REGION = 'us-east-1';
 export type DnsRecordType = 'A' | 'AAAA' | 'CNAME' | 'MX' | 'NS' | 'SOA' | 'TXT';
 export type DnsRecords = Record<DnsRecordType, string[]>;
 
-export type CandidateType = 'DOMAIN' | 'IP';
+export type CandidateType = 'DOMAIN' | 'IP' | 'CIDR';
 
 export interface Candidate {
   value: string;
@@ -118,9 +120,26 @@ class BudgetExhaustedError extends Error {
  */
 export const DOMAIN_REGEX = /^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
 export const IPV4_REGEX = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+export const CIDR_REGEX =
+  /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/;
 
 export function isValidDomain(value: string): boolean {
   return DOMAIN_REGEX.test(value);
+}
+
+/**
+ * Syntactically valid IPv4 CIDR only — private ranges are ACCEPTED (AWS VPC and
+ * subnet CIDRs are private), and any prefix 0..32 is allowed.
+ */
+export function isValidCidr(value: string): boolean {
+  const match = value.match(CIDR_REGEX);
+  if (!match) return false;
+  const octets = [match[1], match[2], match[3], match[4]].map((octet) =>
+    Number.parseInt(octet, 10),
+  );
+  if (octets.some((octet) => octet < 0 || octet > 255)) return false;
+  const prefix = Number.parseInt(match[5], 10);
+  return prefix >= 0 && prefix <= 32;
 }
 
 function isPrivateIpv4(firstOctet: number, secondOctet: number): boolean {
@@ -166,6 +185,8 @@ class CandidateCollector {
   private readonly domains = new Map<string, Candidate>();
   private readonly ipsSeen = new Set<string>();
   private readonly ipList: Candidate[] = [];
+  private readonly cidrsSeen = new Set<string>();
+  private readonly cidrList: Candidate[] = [];
 
   addDomain(
     value: string,
@@ -205,8 +226,20 @@ class CandidateCollector {
     });
   }
 
+  addCidr(value: string, kind: string): void {
+    if (!isValidCidr(value)) return;
+    if (this.cidrsSeen.has(value)) return;
+    this.cidrsSeen.add(value);
+    this.cidrList.push({
+      value,
+      type: 'CIDR',
+      dnsRecords: emptyDnsRecords(),
+      kind,
+    });
+  }
+
   toArray(): Candidate[] {
-    return [...this.domains.values(), ...this.ipList];
+    return [...this.domains.values(), ...this.ipList, ...this.cidrList];
   }
 }
 
@@ -387,6 +420,92 @@ export async function discoverEc2(
       if (address.PublicIp !== undefined) {
         collector.addIp(address.PublicIp, 'ec2-eip');
       }
+    }
+
+    return { candidates: collector.toArray(), truncated: false };
+  } catch (error) {
+    if (error instanceof BudgetExhaustedError) {
+      return { candidates: collector.toArray(), truncated: true };
+    }
+    throw error;
+  }
+}
+
+/** VPC: `CidrBlock` + every `associated` entry in `CidrBlockAssociationSet`. */
+export async function discoverVpcs(
+  input: DiscoveryInput,
+): Promise<DiscoveryResult> {
+  const { credentials, region, budget } = input;
+  const collector = new CandidateCollector();
+  try {
+    const client = new EC2Client(baseConfig(credentials, region));
+
+    let nextToken: string | undefined;
+    let pages = 0;
+    for (;;) {
+      pages++;
+      assertPageCap(pages, 'ec2:DescribeVpcs');
+      const page = await sendGuarded(budget, 'ec2:DescribeVpcs', () =>
+        client.send(
+          new DescribeVpcsCommand(
+            nextToken !== undefined ? { NextToken: nextToken } : {},
+          ),
+        ),
+      );
+      for (const vpc of page.Vpcs ?? []) {
+        if (vpc.CidrBlock !== undefined) {
+          collector.addCidr(vpc.CidrBlock, 'vpc');
+        }
+        for (const association of vpc.CidrBlockAssociationSet ?? []) {
+          if (
+            association.CidrBlock !== undefined &&
+            association.CidrBlockState?.State === 'associated'
+          ) {
+            collector.addCidr(association.CidrBlock, 'vpc');
+          }
+        }
+      }
+      nextToken = page.NextToken;
+      if (nextToken === undefined) break;
+    }
+
+    return { candidates: collector.toArray(), truncated: false };
+  } catch (error) {
+    if (error instanceof BudgetExhaustedError) {
+      return { candidates: collector.toArray(), truncated: true };
+    }
+    throw error;
+  }
+}
+
+/** Subnet: `CidrBlock` per subnet. */
+export async function discoverSubnets(
+  input: DiscoveryInput,
+): Promise<DiscoveryResult> {
+  const { credentials, region, budget } = input;
+  const collector = new CandidateCollector();
+  try {
+    const client = new EC2Client(baseConfig(credentials, region));
+
+    let nextToken: string | undefined;
+    let pages = 0;
+    for (;;) {
+      pages++;
+      assertPageCap(pages, 'ec2:DescribeSubnets');
+      const page = await sendGuarded(budget, 'ec2:DescribeSubnets', () =>
+        client.send(
+          new DescribeSubnetsCommand(
+            nextToken !== undefined ? { NextToken: nextToken } : {},
+          ),
+        ),
+      );
+      for (const subnet of page.Subnets ?? []) {
+        if (subnet.CidrBlock !== undefined) {
+          collector.addCidr(subnet.CidrBlock, 'subnet');
+        }
+      }
+      nextToken = page.NextToken;
+      if (nextToken === undefined) break;
     }
 
     return { candidates: collector.toArray(), truncated: false };

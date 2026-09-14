@@ -1,12 +1,15 @@
 import {
   discoverRoute53,
   discoverEc2,
+  discoverVpcs,
+  discoverSubnets,
   discoverElbv2,
   discoverCloudFront,
   discoverApiGateway,
   discoverRds,
   discoverS3,
   listEnabledRegions,
+  isValidCidr,
   MAX_API_CALLS_PER_SYNC,
   MAX_PAGES_PER_LIST,
   type DiscoveryBudget,
@@ -53,6 +56,14 @@ jest.mock('@aws-sdk/client-ec2', () => ({
   })),
   DescribeRegionsCommand: jest.fn((input = {}) => ({
     type: 'ec2:DescribeRegions',
+    input,
+  })),
+  DescribeVpcsCommand: jest.fn((input = {}) => ({
+    type: 'ec2:DescribeVpcs',
+    input,
+  })),
+  DescribeSubnetsCommand: jest.fn((input = {}) => ({
+    type: 'ec2:DescribeSubnets',
     input,
   })),
 }));
@@ -332,6 +343,122 @@ describe('aws.discovery — EC2', () => {
 
     const result = await discoverEc2(input());
     expect(result.candidates).toEqual([]);
+  });
+});
+
+describe('aws.discovery — isValidCidr', () => {
+  it.each([
+    '10.0.0.0/16',
+    '10.0.0.0/8',
+    '172.16.0.0/12',
+    '192.168.1.0/24',
+    '203.0.113.0/24',
+    '8.8.8.0/32',
+    '0.0.0.0/0',
+  ])('accepts %s (private ranges allowed, any prefix)', (value) => {
+    expect(isValidCidr(value)).toBe(true);
+  });
+
+  it.each([
+    ['256.0.0.0/24', 'octet out of range'],
+    ['10.0.0.0/33', 'prefix out of range'],
+    ['10.0.0.0', 'no prefix'],
+    ['10.0.0.0/16/24', 'extra segment'],
+    ['not-a-cidr', 'non-CIDR text'],
+    ['10.0.0.0/-1', 'negative prefix'],
+  ])('rejects %s (%s)', (value) => {
+    expect(isValidCidr(value)).toBe(false);
+  });
+});
+
+describe('aws.discovery — VPC / Subnet', () => {
+  it('collects VPC CidrBlock + associated association blocks as CIDR candidates', async () => {
+    respond({
+      'ec2:DescribeVpcs': {
+        Vpcs: [
+          {
+            CidrBlock: '10.0.0.0/16',
+            CidrBlockAssociationSet: [
+              {
+                CidrBlock: '10.1.0.0/16',
+                CidrBlockState: { State: 'associated' },
+              },
+              {
+                CidrBlock: '10.2.0.0/16',
+                CidrBlockState: { State: 'disassociated' },
+              },
+            ],
+          },
+        ],
+        NextToken: undefined,
+      },
+    });
+
+    const result = await discoverVpcs(input());
+    const values = result.candidates.map((c) => c.value);
+    expect(values).toContain('10.0.0.0/16');
+    expect(values).toContain('10.1.0.0/16');
+    expect(values).not.toContain('10.2.0.0/16');
+    const vpc = result.candidates.find((c) => c.value === '10.0.0.0/16')!;
+    expect(vpc.type).toBe('CIDR');
+    expect(vpc.kind).toBe('vpc');
+    expect(vpc.dnsRecords.A).toEqual([]);
+  });
+
+  it('collects subnet CidrBlock as CIDR candidates', async () => {
+    respond({
+      'ec2:DescribeSubnets': {
+        Subnets: [
+          { CidrBlock: '10.0.1.0/24' },
+          { CidrBlock: '10.0.2.0/28' },
+          { CidrBlock: undefined },
+        ],
+        NextToken: undefined,
+      },
+    });
+
+    const result = await discoverSubnets(input());
+    const values = result.candidates.map((c) => c.value).sort();
+    expect(values).toEqual(['10.0.1.0/24', '10.0.2.0/28']);
+    for (const candidate of result.candidates) {
+      expect(candidate.type).toBe('CIDR');
+      expect(candidate.kind).toBe('subnet');
+    }
+  });
+
+  it('follows pagination via NextToken', async () => {
+    let call = 0;
+    mockSend.mockImplementation((cmd: MockedCommand) => {
+      if (cmd.type !== 'ec2:DescribeVpcs') {
+        throw new Error(`unexpected command ${cmd.type}`);
+      }
+      call += 1;
+      if (call === 1) {
+        return Promise.resolve({
+          Vpcs: [{ CidrBlock: '10.0.0.0/16' }],
+          NextToken: 'page-2',
+        });
+      }
+      return Promise.resolve({ Vpcs: [{ CidrBlock: '10.1.0.0/16' }] });
+    });
+
+    const result = await discoverVpcs(input());
+    const values = result.candidates.map((c) => c.value).sort();
+    expect(values).toEqual(['10.0.0.0/16', '10.1.0.0/16']);
+    expect(mockSend).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns truncated:true (never throws) at budget exhaustion', async () => {
+    respond({
+      'ec2:DescribeVpcs': {
+        Vpcs: [{ CidrBlock: '10.0.0.0/16' }],
+        NextToken: 'next-page',
+      },
+    });
+
+    const result = await discoverVpcs(input({ budget: budget(1) }));
+    expect(result.truncated).toBe(true);
+    expect(result.candidates.map((c) => c.value)).toContain('10.0.0.0/16');
   });
 });
 

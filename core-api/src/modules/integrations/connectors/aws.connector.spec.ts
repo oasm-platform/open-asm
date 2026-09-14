@@ -10,6 +10,8 @@ import {
   discoverApiGateway,
   discoverCloudFront,
   discoverEc2,
+  discoverVpcs,
+  discoverSubnets,
   discoverElbv2,
   discoverRds,
   discoverRoute53,
@@ -36,16 +38,20 @@ jest.mock('./aws/aws.discovery', () => {
     MAX_REGION_CONCURRENCY: number;
     isValidDomain: (value: string) => boolean;
     isValidPublicIp: (value: string) => boolean;
+    isValidCidr: (value: string) => boolean;
   }>('./aws/aws.discovery');
   return {
     MAX_API_CALLS_PER_SYNC: actual.MAX_API_CALLS_PER_SYNC,
     MAX_REGION_CONCURRENCY: actual.MAX_REGION_CONCURRENCY,
     isValidDomain: actual.isValidDomain,
     isValidPublicIp: actual.isValidPublicIp,
+    isValidCidr: actual.isValidCidr,
     discoverRoute53: jest.fn(),
     discoverCloudFront: jest.fn(),
     discoverS3: jest.fn(),
     discoverEc2: jest.fn(),
+    discoverVpcs: jest.fn(),
+    discoverSubnets: jest.fn(),
     discoverElbv2: jest.fn(),
     discoverApiGateway: jest.fn(),
     discoverRds: jest.fn(),
@@ -58,6 +64,8 @@ const DISCOVERY_MOCKS = [
   discoverCloudFront,
   discoverS3,
   discoverEc2,
+  discoverVpcs,
+  discoverSubnets,
   discoverElbv2,
   discoverApiGateway,
   discoverRds,
@@ -67,7 +75,7 @@ const CREDENTIALS = { accessKeyId: 'AKIA', secretAccessKey: 'secret' };
 
 function candidate(
   value: string,
-  type: 'DOMAIN' | 'IP' = 'DOMAIN',
+  type: 'DOMAIN' | 'IP' | 'CIDR' = 'DOMAIN',
   kind = 'ec2-instance',
 ): Candidate {
   return {
@@ -236,6 +244,48 @@ describe('AwsConnector', () => {
       expect(
         (config as unknown as { __syncResult: unknown }).__syncResult,
       ).toBe(result);
+    });
+
+    it('CONN-1a: a CIDR candidate is created with TargetType.CIDR', async () => {
+      jest
+        .mocked(discoverVpcs)
+        .mockResolvedValue({
+          candidates: [candidate('10.0.0.0/16', 'CIDR', 'vpc')],
+          truncated: false,
+        });
+
+      const config = makeConfig();
+      const result = await new AwsConnector().syncAssets(config);
+
+      expect(config.targetsService.createMultipleTargets).toHaveBeenCalledWith(
+        { targets: [{ value: '10.0.0.0/16', type: 'CIDR' }] },
+        'ws-1',
+        config.actingUserContext,
+        undefined,
+        TargetSource.AWS,
+      );
+      expect(result.targetsCreated).toBe(1);
+      expect(result.byKind).toEqual({ vpc: 1 });
+    });
+
+    it('CONN-1b: private VPC/subnet CIDRs survive normalization; bad CIDRs are dropped', async () => {
+      jest.mocked(discoverSubnets).mockResolvedValue({
+        candidates: [
+          candidate('10.0.1.0/24', 'CIDR', 'subnet'),
+          candidate('256.0.0.0/16', 'CIDR', 'subnet'),
+          candidate('not-a-cidr', 'CIDR', 'subnet'),
+        ],
+        truncated: false,
+      });
+
+      const config = makeConfig();
+      await new AwsConnector().syncAssets(config);
+
+      const created = config.targetsService.createMultipleTargets.mock
+        .calls[0][0] as CreateMultipleTargetsDto;
+      expect(created.targets).toEqual([
+        { value: '10.0.1.0/24', type: 'CIDR' },
+      ]);
     });
 
     it('CONN-2: assumeRole dry run probes the base identity AND assumes the first account role, writing nothing', async () => {

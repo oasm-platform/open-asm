@@ -26,6 +26,9 @@ import {
   discoverRds,
   discoverRoute53,
   discoverS3,
+  discoverSubnets,
+  discoverVpcs,
+  isValidCidr,
   isValidDomain,
   isValidPublicIp,
   listEnabledRegions,
@@ -81,6 +84,8 @@ const REGIONAL_DISCOVERERS: DiscoveryFn[] = [
   discoverElbv2,
   discoverApiGateway,
   discoverRds,
+  discoverVpcs,
+  discoverSubnets,
 ];
 
 /**
@@ -715,7 +720,9 @@ export class AwsConnector extends CloudProviderConnector {
       const valid =
         candidate.type === 'IP'
           ? isValidPublicIp(value)
-          : isValidDomain(value);
+          : candidate.type === 'CIDR'
+            ? isValidCidr(value)
+            : isValidDomain(value);
       if (!valid) continue;
 
       const existing = byValue.get(value);
@@ -780,7 +787,9 @@ export class AwsConnector extends CloudProviderConnector {
   }
 
   private toTargetType(type: CandidateType): TargetType {
-    return type === 'IP' ? TargetType.IP : TargetType.DOMAIN;
+    if (type === 'IP') return TargetType.IP;
+    if (type === 'CIDR') return TargetType.CIDR;
+    return TargetType.DOMAIN;
   }
 
   /** True when a create-target failure means the batch must be re-looked-up. */
