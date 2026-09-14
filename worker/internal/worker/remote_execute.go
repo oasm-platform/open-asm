@@ -141,7 +141,10 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 
 			switch resp.Type {
 			case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED:
-				log.Success("Session connected: %s (id: %s)", resp.SessionId, resp.Id)
+				// Stream-level handshake from core. Core sends CONNECTED once at
+				// subscribe time with empty session/command ids — no session
+				// exists yet, so log the worker id instead (already known here).
+				log.Success("Remote execute handshake confirmed (worker: %s)", grpcClient.WorkerID())
 
 			case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND:
 				sessionID := resp.SessionId

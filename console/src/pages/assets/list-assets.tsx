@@ -1,6 +1,5 @@
-import { Tabs } from '@/components/ui/tabs';
+import { Tabs, useQueryTab } from '@/components/ui/tabs';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { useNavigate, useSearch } from '@tanstack/react-router';
 import CreateWorkspace from '../workspaces/create-workspace';
 import AssetTabContent from './components/asset-tab';
 import FilterFormInfinite from './components/filter-form-infinite';
@@ -12,6 +11,17 @@ import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
 import TlsAssetsTab from './components/tls-assets-tab';
 import { GraphTab } from './components/graph-tab';
+
+const VALID_VALUES = [
+  'service',
+  'host',
+  'port',
+  'ip',
+  'technology',
+  'status-code',
+  'tls',
+  'graph',
+];
 
 export function ListAssets() {
   const tabList = [
@@ -58,19 +68,11 @@ export function ListAssets() {
   ];
 
   const { workspaces } = useWorkspaceSelector();
-  const search = useSearch({ strict: false });
-  const tab = (search as Record<string, string>).tab || 'service';
-  const navigate = useNavigate();
-
-  const handleTabChange = (value: string) => {
-    navigate({
-      search: ((prev: Record<string, unknown>) => ({
-        ...prev,
-        tab: value,
-        page: 1,
-      })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    });
-  };
+  const [tab, setTab] = useQueryTab({
+    tabParam: 'tab',
+    defaultValue: 'service',
+    validValues: VALID_VALUES,
+  });
 
   if (workspaces.length === 0) return <CreateWorkspace />;
 
@@ -80,7 +82,7 @@ export function ListAssets() {
         <FilterFormInfinite />
         {/* <ExportDataButton api="api/assets/services/export" prefix="assets" /> */}
       </div>
-      <Tabs value={tab} onValueChange={handleTabChange}>
+      <Tabs value={tab} onValueChange={setTab}>
         <TriggerList tabTriggerList={tabList} />
         {tabList.find((t) => t.value == tab)?.tab}
       </Tabs>

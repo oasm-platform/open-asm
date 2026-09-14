@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"oasm-worker/internal/config"
+	"oasm-worker/internal/connector"
+	"oasm-worker/internal/execution"
+	"oasm-worker/internal/runtime"
 	"os"
 	"path/filepath"
 	"sync"
@@ -56,6 +59,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		log.ErrorE("Failed to create OASM client", err)
 		return
 	}
+	grpcClient.SetRunMode(cfg.Mode)
 
 	// ponytail: lazy browser singleton — avoids ~300MB chromium resident when no screenshot jobs.
 	var (
@@ -131,6 +135,11 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		sessionCtx    context.Context
 		sessionCancel context.CancelFunc
 		pollerCancel  context.CancelFunc
+
+		// proxy and mgr are initialized after connector server setup but
+		// declared here so the pollLoop closure can capture them by reference.
+		proxy *connector.Proxy
+		mgr   *execution.Manager
 	)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
@@ -186,11 +195,13 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 				case semaphore <- struct{}{}:
 					wg.Add(1)
 					go func(sc context.Context) {
-						defer func() {
-							<-semaphore
-							wg.Done()
-						}()
-						hadJob := processJob(sc, grpcClient, getBrowser, toolPath, events)
+						defer wg.Done()
+						releaseSem := func() { <-semaphore }
+						hadJob, usedAsync := processJob(sc, grpcClient, getBrowser, toolPath, events, mgr, proxy, releaseSem)
+						if !usedAsync {
+							releaseSem() // Legacy: release at return
+						}
+						// Connector path: semaphore released by completion handler asynchronously.
 						select {
 						case hadJobCh <- hadJob:
 						default:
@@ -282,6 +293,108 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 	go grpcClient.Connect(workerCtx, ready)
 
+	// Connector machinery (gRPC server + Docker runtime) only for node mode.
+	// CLI workers may not have Docker installed — they run built-in tools only.
+	if cfg.Mode == "node" {
+		// Start connector gRPC server for Docker connectors.
+		// Non-fatal: worker can still operate legacy path without connector server.
+		proxy = connector.NewProxy()
+		proxy.SetLogger(log)
+		connectorServer, err := connector.NewServer(
+			// Bind all interfaces ("host:port" with an empty host): connector
+			// containers reach this listener via host.docker.internal / bridge
+			// IPs derived by resolveConnectorAddr. Never bind localhost — it
+			// would place the listener on the worker's loopback, unreachable
+			// from spawned containers. Guarded by TestConnectorServerBindsAllInterfaces.
+			fmt.Sprintf(":%d", cfg.ConnectorPort),
+			proxy,
+			cfg.ConnectorToken,
+		)
+		if err != nil {
+			log.Error("connector server init failed (non-fatal): %v", err)
+		} else {
+			connectorServer.SetLogger(log)
+			// mTLS is env-gated (WORKER_CONNECTOR_TLS_CERT/KEY/CA, all three
+			// required); without it the listener stays plaintext for backward
+			// compatibility. Cert contents are never logged.
+			if connectorServer.TLSEnabled() {
+				log.Info("connector server: mutual TLS enabled (client certificates verified against WORKER_CONNECTOR_TLS_CA)")
+			} else {
+				log.Warning("connector server: running WITHOUT TLS (plaintext) — set WORKER_CONNECTOR_TLS_CERT, WORKER_CONNECTOR_TLS_KEY and WORKER_CONNECTOR_TLS_CA to require client certificates")
+			}
+			go func() {
+				log.Success("connector server listening on %s", connectorServer.Addr())
+				if err := connectorServer.Serve(workerCtx); err != nil {
+					log.Warning("connector server stopped: %v", err)
+				}
+			}()
+		}
+
+		// Construct Docker runtime + execution manager for connector (image-based) jobs.
+		// ponytail: when legacy command path retires, limit moves into Manager and semaphore dies.
+		// Manager maxConcurrency=0 (unlimited) — the worker semaphore at :145 is the SOLE
+		// concurrency gate for both legacy and connector paths.
+		var mgrInit *execution.Manager
+		if proxy != nil {
+			// ConnectorAddr is an explicit override for the address containers use to reach
+			// this worker. Precedence: cfg.ConnectorAddr (populated from the
+			// WORKER_CONNECTOR_ADDR env by viper) > process env fallback > auto-derived
+			// (container self IPv4 / host.docker.internal / bridge IPv4 gateway).
+			// Empty = auto-derive; an IPv6 dial requires an explicit bracketed override.
+			dockerRT, err := runtime.NewDockerRuntime("", cfg.ConnectorAddr, cfg.ConnectorPort, cfg.ConnectorToken)
+			if err != nil {
+				log.Error("container engine unavailable — image/connector jobs disabled: %v", err)
+			} else {
+				mgrInit = execution.NewManager(dockerRT, 0)
+				mgrInit.SetLogger(log)
+				dockerRT.SetLogger(log)
+				// Per-execution single-use connector auth: the Manager mints a
+				// token per execution (before container creation) and the
+				// connector server validates Register against it.
+				if connectorServer != nil {
+					connectorServer.SetTokenLookup(mgrInit)
+				} else {
+					log.Warning("connector server unavailable — pooled container registration/auth skipped")
+				}
+				// Phase 2 warm pool: idle containers of the same image survive
+				// their execution and are reused for the next job (finished =
+				// idle, next acquire hits). WORKER_POOL_ENABLED=false keeps
+				// the legacy 1:1 model (every execution gets its own
+				// container, removed on Done).
+				poolMode := "1 container = 1 execution"
+				if cfg.PoolEnabled {
+					pool := execution.NewPoolManager(
+						time.Duration(cfg.ConnectorIdleTimeout)*time.Second,
+						cfg.MaxReplicasPerImage,
+						cfg.MaxJobsPerContainer,
+					)
+					mgrInit.SetPool(pool)
+					// Proxy routing: BindExec/ReleaseExec map executions to
+					// pooled containers; RemoveContainer drops swept/dead ones.
+					mgrInit.SetStreamBinder(proxy)
+					mgrInit.SetEvictor(proxy)
+					// Server handoff: Done → ReleaseToIdle (keep container +
+					// stream alive), unexpected stream death → ContainerDown
+					// (stop, remove, evict).
+					if connectorServer != nil {
+						connectorServer.SetPoolNotifier(mgrInit)
+					}
+					go mgrInit.SweepLoop(workerCtx)
+					// Startup prune: remove pooled containers orphaned by a
+					// crashed previous worker (tagged oasm.pool_key). The
+					// SDK's stream is killed by the removal; the container
+					// must not accumulate across restarts.
+					pruneCtx, pruneCancel := context.WithTimeout(workerCtx, 30*time.Second)
+					dockerRT.PrunePoolContainers(pruneCtx)
+					pruneCancel()
+					poolMode = fmt.Sprintf("warm pool: idle_timeout=%ds max_replicas_per_image=%d", cfg.ConnectorIdleTimeout, cfg.MaxReplicasPerImage)
+				}
+				log.Success("execution manager ready (Docker runtime, unlimited concurrency, %s)", poolMode)
+			}
+		}
+		mgr = mgrInit
+	}
+
 	ticker := time.NewTicker(time.Second)
 	go func() {
 		defer ticker.Stop()
@@ -333,6 +446,14 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	if lazyLauncher != nil {
 		lazyLauncher.Kill()
 		lazyLauncher.Cleanup()
+	}
+	// Shutdown drain: workerCancel() below only stops the pool SweepLoop —
+	// without an explicit drain every idle pooled container would outlive the
+	// worker (up-forever orphans). All jobs are done (wg.Wait above), so drain
+	// stops+removes the idle containers first; busy containers carrying live
+	// executions are untouched.
+	if mgr != nil {
+		mgr.DrainPool()
 	}
 	log.Success("Shutdown complete")
 

@@ -18,7 +18,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { PlusIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 interface Asset {
   id: string;
@@ -38,6 +38,13 @@ interface SelectAssetsDialogProps {
   onAssetsAdded?: () => void;
 }
 
+const defaultTrigger = (
+  <Button variant="outline">
+    <PlusIcon className="h-4 w-4" />
+    Add
+  </Button>
+);
+
 export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   assetGroupId,
   trigger,
@@ -52,6 +59,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
 
   // Mutations
   const addAssetsMutation = useAssetGroupControllerAddManyAssets();
+  const addAsset = addAssetsMutation.mutate;
 
   // Queries for assets not in asset group
   const {
@@ -69,10 +77,10 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   );
 
   // Handle adding selected assets to the group
-  const handleAddSelectedAssets = () => {
+  const handleAddSelectedAssets = useCallback(() => {
     if (selectedAssets.size === 0) return;
 
-    addAssetsMutation.mutate(
+    addAsset(
       {
         groupId: assetGroupId,
         data: { assetIds: Array.from(selectedAssets) },
@@ -91,97 +99,116 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
         },
       },
     );
-  };
-
-  // Reset table selection state when page changes to avoid incorrect "Select all" state
-  useEffect(() => {
-    // When page changes, we should reset the selection state of the table
-    // to avoid the "Select all" checkbox showing incorrect state
-  }, [page, pageSize, sortBy, sortOrder]);
+  }, [selectedAssets, addAsset, assetGroupId, queryClient, onAssetsAdded]);
 
   // Columns for assets not in group with selection
-  const assetsNotInGroupColumns: ColumnDef<Asset>[] = [
-    {
-      id: 'select',
-      header: () => {
-        // Calculate if all page rows are selected based on our selectedAssets state
-        const allIds =
-          assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) || [];
-        const allPageRowsSelected =
-          allIds.length > 0 && allIds.every((id) => selectedAssets.has(id));
-        const somePageRowsSelected = allIds.some((id) =>
-          selectedAssets.has(id),
-        );
+  const assetsNotInGroupColumns: ColumnDef<Asset>[] = useMemo(
+    () => [
+      {
+        id: 'select',
+        header: () => {
+          // Calculate if all page rows are selected based on our selectedAssets state
+          const allIds =
+            assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) || [];
+          const allPageRowsSelected =
+            allIds.length > 0 && allIds.every((id) => selectedAssets.has(id));
+          const somePageRowsSelected = allIds.some((id) =>
+            selectedAssets.has(id),
+          );
 
-        return (
-          <Checkbox
-            checked={
-              allPageRowsSelected || (somePageRowsSelected && 'indeterminate')
-            }
-            onCheckedChange={(value) => {
-              if (value) {
-                // When selecting all, add all visible assets that aren't already selected
-                const allIds =
-                  assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) ||
-                  [];
-                setSelectedAssets((prev) => new Set([...prev, ...allIds]));
-              } else {
-                // When deselecting all, remove all visible assets from selection
-                const allIds =
-                  assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) ||
-                  [];
+          return (
+            <Checkbox
+              checked={
+                allPageRowsSelected || (somePageRowsSelected && 'indeterminate')
+              }
+              onCheckedChange={(value) => {
+                if (value) {
+                  // When selecting all, add all visible assets that aren't already selected
+                  const allIds =
+                    assetsNotInGroupQuery.data?.data?.map(
+                      (asset) => asset.id,
+                    ) || [];
+                  setSelectedAssets((prev) => new Set([...prev, ...allIds]));
+                } else {
+                  // When deselecting all, remove all visible assets from selection
+                  const allIds =
+                    assetsNotInGroupQuery.data?.data?.map(
+                      (asset) => asset.id,
+                    ) || [];
+                  setSelectedAssets((prev) => {
+                    const newSet = new Set(prev);
+                    allIds.forEach((id) => newSet.delete(id));
+                    return newSet;
+                  });
+                }
+              }}
+              aria-label="Select all"
+            />
+          );
+        },
+        cell: ({ row }) => {
+          const assetId = row.original.id;
+          const isSelected = selectedAssets.has(assetId);
+
+          return (
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={(value) => {
                 setSelectedAssets((prev) => {
                   const newSet = new Set(prev);
-                  allIds.forEach((id) => newSet.delete(id));
+                  if (value) {
+                    newSet.add(assetId);
+                  } else {
+                    newSet.delete(assetId);
+                  }
                   return newSet;
                 });
-              }
-            }}
-            aria-label="Select all"
-          />
-        );
+              }}
+              aria-label="Select row"
+            />
+          );
+        },
+        enableSorting: false,
+        enableHiding: false,
       },
-      cell: ({ row }) => {
-        const assetId = row.original.id;
-        const isSelected = selectedAssets.has(assetId);
-
-        return (
-          <Checkbox
-            checked={isSelected}
-            onCheckedChange={(value) => {
-              setSelectedAssets((prev) => {
-                const newSet = new Set(prev);
-                if (value) {
-                  newSet.add(assetId);
-                } else {
-                  newSet.delete(assetId);
-                }
-                return newSet;
-              });
-            }}
-            aria-label="Select row"
-          />
-        );
+      {
+        accessorKey: 'value',
+        header: 'Host Value',
       },
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: 'value',
-      header: 'Host Value',
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'Created At',
-      cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
-    },
-  ];
+      {
+        accessorKey: 'createdAt',
+        header: 'Created At',
+        cell: ({ row }) =>
+          new Date(row.original.createdAt).toLocaleDateString(),
+      },
+    ],
+    [selectedAssets, assetsNotInGroupQuery.data],
+  );
 
-  const defaultTrigger = (
-    <Button variant="outline">
-      <PlusIcon className="h-4 w-4" />
-      Add
-    </Button>
+  const handleRowClick = useCallback(
+    (row: Asset) => {
+      const assetId = (row as Asset).id;
+      const isSelected = selectedAssets.has(assetId);
+      setSelectedAssets((prev) => {
+        const newSet = new Set(prev);
+        if (isSelected) {
+          newSet.delete(assetId);
+        } else {
+          newSet.add(assetId);
+        }
+        return newSet;
+      });
+    },
+    [selectedAssets],
+  );
+
+  const tableState = useMemo(
+    () => ({
+      rowSelection: Object.fromEntries(
+        Array.from(selectedAssets).map((id) => [id, true]),
+      ),
+    }),
+    [selectedAssets],
   );
 
   return (
@@ -206,37 +233,14 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
             filterValue={filter}
             onFilterChange={setFilter}
             filterColumnKey="value"
-            onPageChange={(newPage) => {
-              // When page changes, we should ensure the table selection is handled properly
-              setPage(newPage);
-            }}
+            onPageChange={setPage}
             onPageSizeChange={setPageSize}
             onSortChange={(col, order) => {
               setParams({ sortBy: col, sortOrder: order });
             }}
             totalItems={assetsNotInGroupQuery.data?.total || 0}
-            onRowClick={(row) => {
-              const assetId = (row as Asset).id;
-              const isSelected = selectedAssets.has(assetId);
-              setSelectedAssets((prev) => {
-                const newSet = new Set(prev);
-                if (isSelected) {
-                  newSet.delete(assetId);
-                } else {
-                  newSet.add(assetId);
-                }
-                return newSet;
-              });
-            }}
-            tableState={{
-              rowSelection: Array.from(selectedAssets).reduce(
-                (acc, id) => {
-                  acc[id] = true;
-                  return acc;
-                },
-                {} as Record<string, boolean>,
-              ),
-            }}
+            onRowClick={handleRowClick}
+            tableState={tableState}
           />
         </div>
         <DialogFooter className="flex sm:justify-between">

@@ -86,6 +86,8 @@ export enum WorkerType {
   BUILT_IN = 'built_in',
   /** Worker from external provider */
   PROVIDER = 'provider',
+  /** Worker from connector (container-based) */
+  CONNECTOR = 'connector',
 }
 
 /**

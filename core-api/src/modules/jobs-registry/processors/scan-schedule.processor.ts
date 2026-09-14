@@ -1,5 +1,5 @@
 import { BullMQName, JobRunType } from '@/common/enums/enum';
-import { AssetGroupService } from '@/modules/asset-group/asset-group.service';
+import { AssetGroupWorkflowService } from '@/modules/asset-group/asset-group-workflow.service';
 import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
 import { AssetsService } from '@/modules/assets/assets.service';
 import { Target } from '@/modules/targets/entities/target.entity';
@@ -22,13 +22,13 @@ export class AssetsDiscoveryScheduleConsumer extends WorkerHost {
 @Processor(BullMQName.ASSET_GROUPS_WORKFLOW_SCHEDULE)
 export class AssetGroupsScheduleConsumer extends WorkerHost {
   private readonly logger = new Logger(AssetGroupsScheduleConsumer.name);
-  constructor(private assetGroupService: AssetGroupService) {
+  constructor(private assetGroupWorkflowService: AssetGroupWorkflowService) {
     super();
   }
   async process(job: Job<AssetGroupWorkflow>): Promise<void> {
     const assetGroupWorkflowId = job.data.id;
     try {
-      await this.assetGroupService.runGroupWorkflowScheduler(
+      await this.assetGroupWorkflowService.runGroupWorkflowScheduler(
         assetGroupWorkflowId,
         JobRunType.SCHEDULED,
       );
@@ -41,7 +41,7 @@ export class AssetGroupsScheduleConsumer extends WorkerHost {
           `Asset group workflow "${assetGroupWorkflowId}" no longer exists, removing scheduled job`,
         );
         if (job.repeatJobKey) {
-          await this.assetGroupService.removeGroupWorkflowScheduler(
+          await this.assetGroupWorkflowService.removeGroupWorkflowScheduler(
             job.repeatJobKey,
           );
         } else {

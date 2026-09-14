@@ -30,6 +30,8 @@ RUN pnpm --filter core-api run build && \
   pnpm deploy --legacy --filter core-api --prod /prod/core-api && \
   mkdir -p /prod/core-api/proto && \
   cp -r core-api/src/proto/* /prod/core-api/proto/ 2>/dev/null || true && \
+  mkdir -p /prod/core-api/resources && \
+  cp -r core-api/resources/* /prod/core-api/resources/ 2>/dev/null || true && \
   rm -rf core-api/node_modules/.cache
 
 # Production stage
@@ -45,6 +47,7 @@ COPY --from=builder /prod/core-api/node_modules ./node_modules
 COPY --from=builder /prod/core-api/dist ./dist
 COPY --from=builder /prod/core-api/public ./public
 COPY --from=builder /prod/core-api/proto ./proto
+COPY --from=builder /prod/core-api/resources ./resources
 
 EXPOSE 6276
 

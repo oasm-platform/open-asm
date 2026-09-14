@@ -9,6 +9,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { TrashIcon } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
 import { SelectAssetsDialog } from './select-assets-dialog';
 
 interface Asset {
@@ -42,63 +43,66 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
   );
 
   // Mutations
-  const removeAssetsMutation = useAssetGroupControllerRemoveManyAssets();
+  const { mutate: removeAssets, isPending: removePending } =
+    useAssetGroupControllerRemoveManyAssets();
 
-  const handleRemoveAssets = (assetIds: string[]) => {
-    removeAssetsMutation.mutate(
-      {
-        groupId: assetGroupId,
-        data: { assetIds },
-      },
-      {
-        onSuccess: () => {
-          assetsInGroupQuery.refetch();
-          queryClient.invalidateQueries({
-            queryKey: ['assetGroupControllerGetAssetsByAssetGroupsId'],
-          });
-          queryClient.invalidateQueries({
-            queryKey: ['assetGroupControllerGetAssetsNotInAssetGroup'],
-          });
+  const handleRemoveAssets = useCallback(
+    (assetIds: string[]) => {
+      removeAssets(
+        {
+          groupId: assetGroupId,
+          data: { assetIds },
         },
-      },
-    );
-  };
+        {
+          onSuccess: () => {
+            queryClient.invalidateQueries({
+              queryKey: ['assetGroupControllerGetAssetsByAssetGroupsId'],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ['assetGroupControllerGetAssetsNotInAssetGroup'],
+            });
+          },
+        },
+      );
+    },
+    [assetGroupId, removeAssets, queryClient],
+  );
 
   // Asset table columns
-  const assetColumns: ColumnDef<Asset>[] = [
-    {
-      accessorKey: 'value',
-      header: 'Host value',
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'Created at',
-      cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => (
-        <ConfirmDialog
-          title="Confirm Delete"
-          description="Are you sure you want to remove this host from the group? This action cannot be undone."
-          onConfirm={() => handleRemoveAssets([row.original.id])}
-          confirmText="Remove"
-          cancelText="Cancel"
-          disabled={removeAssetsMutation.isPending}
-          trigger={
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={removeAssetsMutation.isPending}
-            >
-              <TrashIcon className="h-4 w-4" />
-            </Button>
-          }
-        />
-      ),
-    },
-  ];
+  const assetColumns: ColumnDef<Asset>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'value',
+        header: 'Host value',
+      },
+      {
+        accessorKey: 'createdAt',
+        header: 'Created at',
+        cell: ({ row }) =>
+          new Date(row.original.createdAt).toLocaleDateString(),
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => (
+          <ConfirmDialog
+            title="Confirm Delete"
+            description="Are you sure you want to remove this host from the group? This action cannot be undone."
+            onConfirm={() => handleRemoveAssets([row.original.id])}
+            confirmText="Remove"
+            cancelText="Cancel"
+            disabled={removePending}
+            trigger={
+              <Button variant="outline" size="sm" disabled={removePending}>
+                <TrashIcon className="h-4 w-4" />
+              </Button>
+            }
+          />
+        ),
+      },
+    ],
+    [handleRemoveAssets, removePending],
+  );
 
   return (
     <div className="w-full space-y-4">

@@ -13,8 +13,10 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
+import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { ToolsService } from '../tools/tools.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
@@ -53,10 +55,14 @@ describe('JobsRegistryService', () => {
     createQueryBuilder: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
   };
 
   const mockJobErrorLogRepository = {
     createQueryBuilder: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
   };
 
   const mockDataSource = {
@@ -90,6 +96,17 @@ describe('JobsRegistryService', () => {
 
   const mockWorkspacesService = {
     getWorkspaceConfigValue: jest.fn(),
+  };
+
+  const mockConnectorRegistryService = {
+    getConnector: jest.fn(),
+    getAllConnectors: jest.fn().mockReturnValue([]),
+  };
+
+    const mockToolConfigProfilesService = {
+    assertProfileOwnership: jest.fn(),
+    resolveConfigForDispatch: jest.fn(),
+    resolveConfigForJob: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -138,6 +155,14 @@ describe('JobsRegistryService', () => {
         {
           provide: EventEmitter2,
           useValue: { emit: jest.fn() },
+        },
+        {
+          provide: ConnectorRegistryService,
+          useValue: mockConnectorRegistryService,
+        },
+        {
+          provide: ToolConfigProfilesService,
+          useValue: mockToolConfigProfilesService,
         },
         JobsRegistryService,
       ],
@@ -1222,4 +1247,175 @@ describe('JobsRegistryService', () => {
       expect(mockJobHistoryRepository.update).toHaveBeenCalled();
     });
   });
+
+  // ── SCREENSHOT live asset-service filter ─────────────────────────────
+
+  describe('createNewJob — SCREENSHOT live asset-service filter', () => {
+    const mockJobRepo = {
+      create: jest
+        .fn()
+        .mockImplementation((partial: Record<string, unknown>) => ({
+          id: 'job-uuid',
+          ...partial,
+        })),
+      save: jest
+        .fn()
+        .mockImplementation((jobs: unknown) => Promise.resolve(jobs)),
+    };
+
+    let mockAssetServiceQB: Record<string, jest.Mock>;
+
+    const screenshotTool = {
+      id: 'tool-ss',
+      name: 'screenshot',
+      category: ToolCategory.SCREENSHOT,
+      priority: 4,
+    } as any;
+
+    const httpProbeTool = {
+      id: 'tool-hp',
+      name: 'httpx',
+      category: ToolCategory.HTTP_PROBE,
+      priority: 4,
+    } as any;
+
+    const makeService = (id: string) => ({
+      id,
+      value: `${id}.example.com`,
+      port: 443,
+      asset: { id: `asset-${id}`, isPrimary: true },
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJobHistoryRepository.create = jest
+        .fn()
+        .mockReturnValue({ id: 'jh-1' });
+      mockJobHistoryRepository.save = jest
+        .fn()
+        .mockResolvedValue({ id: 'jh-1' });
+      mockConnectorRegistryService.getConnector.mockReturnValue(null);
+
+      mockAssetServiceQB = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        distinct: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      const mockAssetServiceRepo = {
+        createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB),
+      };
+      mockDataSource.getRepository.mockImplementation((entity: any) => {
+        const name = entity?.name ?? entity;
+        if (name === 'AssetService') return mockAssetServiceRepo;
+        return mockJobRepo;
+      });
+    });
+
+    // Returns the first andWhere() SQL call containing an EXISTS subquery.
+    const findExistsAndWhere = (): string | undefined => {
+      const call = mockAssetServiceQB.andWhere.mock.calls.find(
+        ([sql]) => typeof sql === 'string' && sql.includes('EXISTS'),
+      );
+      return call?.[0] as string | undefined;
+    };
+
+    it('SCREENSHOT: filters to live services via EXISTS(http_responses failed=false) and creates one job per live service', async () => {
+      const liveServices = [makeService('as-1'), makeService('as-2')];
+      mockAssetServiceQB.getMany.mockResolvedValue(liveServices);
+
+      const result = await service.createNewJob({
+        tool: screenshotTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      // Authoritative "httpx confirmed live" predicate must be applied as an
+      // EXISTS subquery (no row multiplication => no DISTINCT required).
+      const existsSql = findExistsAndWhere();
+      expect(existsSql).toBeDefined();
+      expect(existsSql).toContain('http_responses');
+      expect(existsSql).toContain('hr."assetServiceId" = "assetServices"."id"');
+      expect(existsSql).toContain('hr.failed = false');
+
+      // The buggy innerJoin/DISTINCT approach must be gone.
+      expect(mockAssetServiceQB.innerJoin).not.toHaveBeenCalledWith(
+        'assetServices.httpResponses',
+        'httpResponse',
+      );
+      expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
+
+      expect(result).toHaveLength(2);
+      expect(mockJobRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockJobRepo.save).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ category: ToolCategory.SCREENSHOT }),
+        ]),
+      );
+    });
+
+    it('SCREENSHOT edge (empty): no live services => 0 jobs inserted, no throw', async () => {
+      mockAssetServiceQB.getMany.mockResolvedValue([]);
+
+      const result = await service.createNewJob({
+        tool: screenshotTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(result).toHaveLength(0);
+      expect(mockJobRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('SCREENSHOT edge (dedup): EXISTS yields one job per service even with many http_responses', async () => {
+      // A service with N http_responses still surfaces ONCE from getMany()
+      // because EXISTS is a semi-join (no row multiplication); assert exactly
+      // one job per service and that DISTINCT is not needed.
+      mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
+
+      const result = await service.createNewJob({
+        tool: screenshotTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(findExistsAndWhere()).toBeDefined();
+      expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+    });
+
+    it('HTTP_PROBE regression: no live filter applied; every service still produces a job', async () => {
+      const allServices = [
+        makeService('as-1'),
+        makeService('as-2'),
+        makeService('as-3'),
+      ];
+      mockAssetServiceQB.getMany.mockResolvedValue(allServices);
+
+      const result = await service.createNewJob({
+        tool: httpProbeTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(mockAssetServiceQB.innerJoin).not.toHaveBeenCalledWith(
+        'assetServices.httpResponses',
+        'httpResponse',
+      );
+      expect(mockAssetServiceQB.andWhere).not.toHaveBeenCalledWith(
+        'httpResponse.failed = false',
+      );
+      // Non-live (HTTP_PROBE) path must NOT add the EXISTS live predicate.
+      expect(findExistsAndWhere()).toBeUndefined();
+      expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
+      expect(result).toHaveLength(3);
+    });
+  });
+
 });

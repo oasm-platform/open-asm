@@ -20,3 +20,16 @@ describe('WorkersController workspace permission guards', () => {
     expect(required).toEqual(keys);
   });
 });
+
+describe('WorkersController.grpcGetManifest', () => {
+  it('returns an empty initCommands array (nuclei template updates temporarily disabled)', () => {
+    const controller = new WorkersController(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    expect(controller.grpcGetManifest()).toEqual({ initCommands: [] });
+  });
+});

@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { WorkflowContent } from '../entities/workflow.entity';
 
 export class CreateWorkflowDto {
@@ -16,6 +23,8 @@ export class CreateWorkflowDto {
   })
   @IsObject()
   @IsNotEmpty()
+  @ValidateNested()
+  @Type(() => WorkflowContent)
   content: WorkflowContent;
 
   @ApiProperty({

@@ -21,6 +21,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type WorkerRunMode int32
+
+const (
+	WorkerRunMode_WORKER_RUN_MODE_UNKNOWN WorkerRunMode = 0
+	WorkerRunMode_WORKER_RUN_MODE_CLI     WorkerRunMode = 1
+	WorkerRunMode_WORKER_RUN_MODE_NODE    WorkerRunMode = 2
+)
+
+// Enum value maps for WorkerRunMode.
+var (
+	WorkerRunMode_name = map[int32]string{
+		0: "WORKER_RUN_MODE_UNKNOWN",
+		1: "WORKER_RUN_MODE_CLI",
+		2: "WORKER_RUN_MODE_NODE",
+	}
+	WorkerRunMode_value = map[string]int32{
+		"WORKER_RUN_MODE_UNKNOWN": 0,
+		"WORKER_RUN_MODE_CLI":     1,
+		"WORKER_RUN_MODE_NODE":    2,
+	}
+)
+
+func (x WorkerRunMode) Enum() *WorkerRunMode {
+	p := new(WorkerRunMode)
+	*p = x
+	return p
+}
+
+func (x WorkerRunMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WorkerRunMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_workers_proto_enumTypes[0].Descriptor()
+}
+
+func (WorkerRunMode) Type() protoreflect.EnumType {
+	return &file_workers_proto_enumTypes[0]
+}
+
+func (x WorkerRunMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WorkerRunMode.Descriptor instead.
+func (WorkerRunMode) EnumDescriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{0}
+}
+
 type RemoteExecuteSubscribeEventType int32
 
 const (
@@ -54,11 +103,11 @@ func (x RemoteExecuteSubscribeEventType) String() string {
 }
 
 func (RemoteExecuteSubscribeEventType) Descriptor() protoreflect.EnumDescriptor {
-	return file_workers_proto_enumTypes[0].Descriptor()
+	return file_workers_proto_enumTypes[1].Descriptor()
 }
 
 func (RemoteExecuteSubscribeEventType) Type() protoreflect.EnumType {
-	return &file_workers_proto_enumTypes[0]
+	return &file_workers_proto_enumTypes[1]
 }
 
 func (x RemoteExecuteSubscribeEventType) Number() protoreflect.EnumNumber {
@@ -67,7 +116,7 @@ func (x RemoteExecuteSubscribeEventType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RemoteExecuteSubscribeEventType.Descriptor instead.
 func (RemoteExecuteSubscribeEventType) EnumDescriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{0}
+	return file_workers_proto_rawDescGZIP(), []int{1}
 }
 
 type RemoteExecuteResultEventType int32
@@ -109,11 +158,11 @@ func (x RemoteExecuteResultEventType) String() string {
 }
 
 func (RemoteExecuteResultEventType) Descriptor() protoreflect.EnumDescriptor {
-	return file_workers_proto_enumTypes[1].Descriptor()
+	return file_workers_proto_enumTypes[2].Descriptor()
 }
 
 func (RemoteExecuteResultEventType) Type() protoreflect.EnumType {
-	return &file_workers_proto_enumTypes[1]
+	return &file_workers_proto_enumTypes[2]
 }
 
 func (x RemoteExecuteResultEventType) Number() protoreflect.EnumNumber {
@@ -122,7 +171,7 @@ func (x RemoteExecuteResultEventType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RemoteExecuteResultEventType.Descriptor instead.
 func (RemoteExecuteResultEventType) EnumDescriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{1}
+	return file_workers_proto_rawDescGZIP(), []int{2}
 }
 
 type JoinRequest struct {
@@ -197,6 +246,7 @@ type WorkerMetadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          *string                `protobuf:"bytes,1,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	Os            *string                `protobuf:"bytes,2,opt,name=os,proto3,oneof" json:"os,omitempty"`
+	Mode          *WorkerRunMode         `protobuf:"varint,3,opt,name=mode,proto3,enum=workers.WorkerRunMode,oneof" json:"mode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -243,6 +293,13 @@ func (x *WorkerMetadata) GetOs() string {
 		return *x.Os
 	}
 	return ""
+}
+
+func (x *WorkerMetadata) GetMode() WorkerRunMode {
+	if x != nil && x.Mode != nil {
+		return *x.Mode
+	}
+	return WorkerRunMode_WORKER_RUN_MODE_UNKNOWN
 }
 
 type JoinResponse struct {
@@ -1112,12 +1169,14 @@ const file_workers_proto_rawDesc = "" +
 	"\x05token\x18\x03 \x01(\tH\x00R\x05token\x88\x01\x01\x128\n" +
 	"\bmetadata\x18\x04 \x01(\v2\x17.workers.WorkerMetadataH\x01R\bmetadata\x88\x01\x01B\b\n" +
 	"\x06_tokenB\v\n" +
-	"\t_metadata\"N\n" +
+	"\t_metadata\"\x88\x01\n" +
 	"\x0eWorkerMetadata\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x13\n" +
-	"\x02os\x18\x02 \x01(\tH\x01R\x02os\x88\x01\x01B\a\n" +
+	"\x02os\x18\x02 \x01(\tH\x01R\x02os\x88\x01\x01\x12/\n" +
+	"\x04mode\x18\x03 \x01(\x0e2\x16.workers.WorkerRunModeH\x02R\x04mode\x88\x01\x01B\a\n" +
 	"\x05_nameB\x05\n" +
-	"\x03_os\"N\n" +
+	"\x03_osB\a\n" +
+	"\x05_mode\"N\n" +
 	"\fJoinResponse\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12!\n" +
 	"\fworker_token\x18\x02 \x01(\tR\vworkerToken\"1\n" +
@@ -1176,7 +1235,11 @@ const file_workers_proto_rawDesc = "" +
 	"\texit_code\x18\x05 \x01(\x05R\bexitCode\"L\n" +
 	"\x16RemoteExecuteResultAck\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage*\xa7\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage*_\n" +
+	"\rWorkerRunMode\x12\x1b\n" +
+	"\x17WORKER_RUN_MODE_UNKNOWN\x10\x00\x12\x17\n" +
+	"\x13WORKER_RUN_MODE_CLI\x10\x01\x12\x18\n" +
+	"\x14WORKER_RUN_MODE_NODE\x10\x02*\xa7\x01\n" +
 	"\x1fRemoteExecuteSubscribeEventType\x12*\n" +
 	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN\x10\x00\x12,\n" +
 	"(REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED\x10\x01\x12*\n" +
@@ -1209,56 +1272,58 @@ func file_workers_proto_rawDescGZIP() []byte {
 	return file_workers_proto_rawDescData
 }
 
-var file_workers_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_workers_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_workers_proto_goTypes = []any{
-	(RemoteExecuteSubscribeEventType)(0),   // 0: workers.RemoteExecuteSubscribeEventType
-	(RemoteExecuteResultEventType)(0),      // 1: workers.RemoteExecuteResultEventType
-	(*JoinRequest)(nil),                    // 2: workers.JoinRequest
-	(*WorkerMetadata)(nil),                 // 3: workers.WorkerMetadata
-	(*JoinResponse)(nil),                   // 4: workers.JoinResponse
-	(*AliveRequest)(nil),                   // 5: workers.AliveRequest
-	(*AliveResponse)(nil),                  // 6: workers.AliveResponse
-	(*GetManifestRequest)(nil),             // 7: workers.GetManifestRequest
-	(*GetManifestResponse)(nil),            // 8: workers.GetManifestResponse
-	(*StorageRequest)(nil),                 // 9: workers.StorageRequest
-	(*StorageResponse)(nil),                // 10: workers.StorageResponse
-	(*NetworkInterfaceMessage)(nil),        // 11: workers.NetworkInterfaceMessage
-	(*ConnectInternalNetworkRequest)(nil),  // 12: workers.ConnectInternalNetworkRequest
-	(*ConnectInternalNetworkResponse)(nil), // 13: workers.ConnectInternalNetworkResponse
-	(*BuiltinToolRegistryRequest)(nil),     // 14: workers.BuiltinToolRegistryRequest
-	(*BuiltinToolRegistryResponse)(nil),    // 15: workers.BuiltinToolRegistryResponse
-	(*RemoteExecuteSubscribeRequest)(nil),  // 16: workers.RemoteExecuteSubscribeRequest
-	(*RemoteExecuteSubscribeResponse)(nil), // 17: workers.RemoteExecuteSubscribeResponse
-	(*RemoteExecuteResultStream)(nil),      // 18: workers.RemoteExecuteResultStream
-	(*RemoteExecuteResultAck)(nil),         // 19: workers.RemoteExecuteResultAck
+	(WorkerRunMode)(0),                     // 0: workers.WorkerRunMode
+	(RemoteExecuteSubscribeEventType)(0),   // 1: workers.RemoteExecuteSubscribeEventType
+	(RemoteExecuteResultEventType)(0),      // 2: workers.RemoteExecuteResultEventType
+	(*JoinRequest)(nil),                    // 3: workers.JoinRequest
+	(*WorkerMetadata)(nil),                 // 4: workers.WorkerMetadata
+	(*JoinResponse)(nil),                   // 5: workers.JoinResponse
+	(*AliveRequest)(nil),                   // 6: workers.AliveRequest
+	(*AliveResponse)(nil),                  // 7: workers.AliveResponse
+	(*GetManifestRequest)(nil),             // 8: workers.GetManifestRequest
+	(*GetManifestResponse)(nil),            // 9: workers.GetManifestResponse
+	(*StorageRequest)(nil),                 // 10: workers.StorageRequest
+	(*StorageResponse)(nil),                // 11: workers.StorageResponse
+	(*NetworkInterfaceMessage)(nil),        // 12: workers.NetworkInterfaceMessage
+	(*ConnectInternalNetworkRequest)(nil),  // 13: workers.ConnectInternalNetworkRequest
+	(*ConnectInternalNetworkResponse)(nil), // 14: workers.ConnectInternalNetworkResponse
+	(*BuiltinToolRegistryRequest)(nil),     // 15: workers.BuiltinToolRegistryRequest
+	(*BuiltinToolRegistryResponse)(nil),    // 16: workers.BuiltinToolRegistryResponse
+	(*RemoteExecuteSubscribeRequest)(nil),  // 17: workers.RemoteExecuteSubscribeRequest
+	(*RemoteExecuteSubscribeResponse)(nil), // 18: workers.RemoteExecuteSubscribeResponse
+	(*RemoteExecuteResultStream)(nil),      // 19: workers.RemoteExecuteResultStream
+	(*RemoteExecuteResultAck)(nil),         // 20: workers.RemoteExecuteResultAck
 }
 var file_workers_proto_depIdxs = []int32{
-	3,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
-	11, // 1: workers.ConnectInternalNetworkRequest.network_interfaces:type_name -> workers.NetworkInterfaceMessage
-	0,  // 2: workers.RemoteExecuteSubscribeResponse.type:type_name -> workers.RemoteExecuteSubscribeEventType
-	1,  // 3: workers.RemoteExecuteResultStream.type:type_name -> workers.RemoteExecuteResultEventType
-	2,  // 4: workers.WorkersService.Join:input_type -> workers.JoinRequest
-	5,  // 5: workers.WorkersService.Alive:input_type -> workers.AliveRequest
-	7,  // 6: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
-	9,  // 7: workers.WorkersService.Storage:input_type -> workers.StorageRequest
-	12, // 8: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
-	14, // 9: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
-	16, // 10: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
-	18, // 11: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
-	4,  // 12: workers.WorkersService.Join:output_type -> workers.JoinResponse
-	6,  // 13: workers.WorkersService.Alive:output_type -> workers.AliveResponse
-	8,  // 14: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
-	10, // 15: workers.WorkersService.Storage:output_type -> workers.StorageResponse
-	13, // 16: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
-	15, // 17: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
-	17, // 18: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
-	19, // 19: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
-	12, // [12:20] is the sub-list for method output_type
-	4,  // [4:12] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	4,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
+	0,  // 1: workers.WorkerMetadata.mode:type_name -> workers.WorkerRunMode
+	12, // 2: workers.ConnectInternalNetworkRequest.network_interfaces:type_name -> workers.NetworkInterfaceMessage
+	1,  // 3: workers.RemoteExecuteSubscribeResponse.type:type_name -> workers.RemoteExecuteSubscribeEventType
+	2,  // 4: workers.RemoteExecuteResultStream.type:type_name -> workers.RemoteExecuteResultEventType
+	3,  // 5: workers.WorkersService.Join:input_type -> workers.JoinRequest
+	6,  // 6: workers.WorkersService.Alive:input_type -> workers.AliveRequest
+	8,  // 7: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
+	10, // 8: workers.WorkersService.Storage:input_type -> workers.StorageRequest
+	13, // 9: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
+	15, // 10: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
+	17, // 11: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
+	19, // 12: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
+	5,  // 13: workers.WorkersService.Join:output_type -> workers.JoinResponse
+	7,  // 14: workers.WorkersService.Alive:output_type -> workers.AliveResponse
+	9,  // 15: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
+	11, // 16: workers.WorkersService.Storage:output_type -> workers.StorageResponse
+	14, // 17: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
+	16, // 18: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
+	18, // 19: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
+	20, // 20: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
+	13, // [13:21] is the sub-list for method output_type
+	5,  // [5:13] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_workers_proto_init() }
@@ -1273,7 +1338,7 @@ func file_workers_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workers_proto_rawDesc), len(file_workers_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      3,
 			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,

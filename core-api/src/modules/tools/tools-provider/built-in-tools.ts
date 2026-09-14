@@ -1,10 +1,8 @@
 /* eslint-disable */
 
-import type { Severity } from '@/common/enums/enum';
 import { JobPriority, ToolCategory } from '@/common/enums/enum';
 import { randomUUID } from 'crypto';
 import { Asset } from '../../assets/entities/assets.entity';
-import type { Vulnerability } from '../../vulnerabilities/entities/vulnerability.entity';
 import { Tool } from '../entities/tools.entity';
 
 export const builtInTools: Tool[] = [
@@ -78,84 +76,5 @@ export const builtInTools: Tool[] = [
     },
     version: '2.3.5',
     priority: JobPriority.MEDIUM,
-  },
-  {
-    name: 'nuclei',
-    category: ToolCategory.VULNERABILITIES,
-    description:
-      'Nuclei is a fast, customizable vulnerability scanner powered by the global security community and built on a simple YAML-based DSL, enabling collaboration to tackle trending vulnerabilities on the internet. It helps you find vulnerabilities in your applications, APIs, networks, DNS, and cloud configurations.',
-    logoUrl: '/static/images/nuclei.png',
-    command: 'nuclei -duc -u {{value}} -j --silent',
-    parser: (result: string) => {
-      const initialVulnerabilities = result
-        .split('\n')
-        .filter((line) => line.trim())
-        .map((line) => {
-          const finding = JSON.parse(line.trim());
-          const vulId = randomUUID();
-          const filePath = `${vulId}.json`;
-          return {
-            id: vulId,
-            name: finding['info']['name'] as string,
-            description: finding['info']['description'] as string,
-            severity: finding['info']['severity'].toLowerCase() as Severity,
-            tags: finding['info']['tags'] || [],
-            references: finding['info']['reference'] || [],
-            authors: finding['info']['author'] || [],
-            affectedUrl: finding['matched-at'] as string,
-            ipAddress: finding['ip'] as string,
-            host: finding['host'] as string,
-            ports: [finding['port']?.toString()] as string[],
-            cvssMetric: finding['info']['classification']?.[
-              'cvss-metrics'
-            ] as string,
-            cvssScore: finding['info']['classification']?.[
-              'cvss-score'
-            ] as number,
-            cveId: finding['info']['classification']?.['cve-id'] as string[],
-            cweId: finding['info']['classification']?.['cwe-id'] as string[],
-            extractorName: finding['extractor-name'] as string,
-            extractedResults: finding['extracted-results'] || [],
-            filePath,
-          };
-        })
-        .filter((v): v is NonNullable<typeof v> => v !== null);
-
-      const groupedVulnerabilities = new Map<
-        string,
-        (typeof initialVulnerabilities)[0]
-      >();
-
-      for (const vuln of initialVulnerabilities) {
-        if (groupedVulnerabilities.has(vuln.name)) {
-          const existingVuln = groupedVulnerabilities.get(vuln.name)!;
-          existingVuln.tags = [
-            ...new Set([...existingVuln.tags, ...vuln.tags]),
-          ];
-          existingVuln.references = [
-            ...new Set([...existingVuln.references, ...vuln.references]),
-          ];
-          existingVuln.authors = [
-            ...new Set([...existingVuln.authors, ...vuln.authors]),
-          ];
-          existingVuln.extractedResults = [
-            ...new Set([
-              ...existingVuln.extractedResults,
-              ...vuln.extractedResults,
-            ]),
-          ];
-        } else {
-          groupedVulnerabilities.set(vuln.name, { ...vuln });
-        }
-      }
-
-      const data = Array.from(
-        groupedVulnerabilities.values(),
-      ) as Vulnerability[];
-      return data;
-    },
-
-    version: '3.4.7',
-    priority: JobPriority.LOW,
   },
 ];

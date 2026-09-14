@@ -3,11 +3,8 @@ import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { CronSchedule } from '@/common/enums/enum';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import * as fs from 'fs';
-import * as yaml from 'js-yaml';
-import { Repository } from 'typeorm';
+import type { Repository } from 'typeorm';
 import type { User } from '../auth/entities/user.entity';
-import { Workspace } from '../workspaces/entities/workspace.entity';
 import type { CreateWorkflowDto } from './dto/create-workflow.dto';
 import type { GetManyWorkflowsQueryDto } from './dto/get-many-workflows.dto';
 import { Workflow } from './entities/workflow.entity';
@@ -38,41 +35,29 @@ describe('WorkflowsService', () => {
         WorkflowsService,
         {
           provide: getRepositoryToken(Workflow),
-          useClass: Repository,
-        },
-        {
-          provide: getRepositoryToken(Workspace),
-          useClass: Repository,
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
+            insert: jest.fn(),
+            update: jest.fn(),
+            save: jest.fn(),
+            remove: jest.fn(),
+            createQueryBuilder: jest.fn(() => ({
+              leftJoinAndSelect: jest.fn().mockReturnThis(),
+              leftJoin: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              select: jest.fn().mockReturnThis(),
+              orderBy: jest.fn().mockReturnThis(),
+              skip: jest.fn().mockReturnThis(),
+              take: jest.fn().mockReturnThis(),
+              getMany: jest.fn(),
+              getManyAndCount: jest.fn(),
+            })),
+          },
         },
       ],
-    })
-      .overrideProvider(getRepositoryToken(Workflow))
-      .useValue({
-        findOne: jest.fn(),
-        find: jest.fn(),
-        insert: jest.fn(),
-        update: jest.fn(),
-        save: jest.fn(),
-        remove: jest.fn(),
-        createQueryBuilder: jest.fn(() => ({
-          leftJoinAndSelect: jest.fn().mockReturnThis(),
-          leftJoin: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          select: jest.fn().mockReturnThis(),
-          orderBy: jest.fn().mockReturnThis(),
-          skip: jest.fn().mockReturnThis(),
-          take: jest.fn().mockReturnThis(),
-          getMany: jest.fn(),
-          getManyAndCount: jest.fn(),
-        })),
-      })
-      .overrideProvider(getRepositoryToken(Workspace))
-      .useValue({
-        find: jest.fn(),
-        findOne: jest.fn(),
-      })
-      .compile();
+    }).compile();
 
     service = module.get<WorkflowsService>(WorkflowsService);
     workflowRepository = module.get<Repository<Workflow>>(
@@ -82,74 +67,6 @@ describe('WorkflowsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
-  });
-
-  describe('getTemplate', () => {
-    it('should return a template by name', async () => {
-      jest
-        .spyOn(workflowRepository, 'findOne')
-        .mockResolvedValue(mockWorkflow as Workflow);
-
-      const result = await service.getTemplate('test-template');
-      expect(result).toEqual(mockWorkflow);
-    });
-
-    it('should throw error if template not found', async () => {
-      jest.spyOn(workflowRepository, 'findOne').mockResolvedValue(null);
-
-      await expect(service.getTemplate('non-existent')).rejects.toThrow(
-        'Template non-existent not found',
-      );
-    });
-  });
-
-  describe('listTemplates', () => {
-    it('should return YAML files from templates directory', () => {
-      const mockFiles = ['workflow1.yaml', 'workflow2.yml', 'other.txt'];
-      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
-      jest.spyOn(fs, 'readdirSync').mockReturnValue(mockFiles as any);
-
-      const result = service.listTemplates();
-      expect(result).toEqual(['workflow1.yaml', 'workflow2.yml']);
-    });
-
-    it('should return empty array if templates directory does not exist', () => {
-      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
-      jest.spyOn(fs, 'readdirSync').mockReturnValue([]);
-
-      const result = service.listTemplates();
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe('createDefaultWorkflows', () => {
-    it('should create default workflows for a workspace', async () => {
-      const mockYamlFiles = ['test-workflow.yaml'];
-      const mockFileContent = 'name: Test Workflow\non: { event: test }';
-
-      jest.spyOn(service, 'listTemplates').mockReturnValue(mockYamlFiles);
-      jest.spyOn(fs, 'readFileSync').mockReturnValue(mockFileContent);
-      jest.spyOn(yaml, 'load').mockReturnValue({
-        name: 'Test Workflow',
-        on: { event: 'test' },
-      });
-      jest.spyOn(workflowRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(workflowRepository, 'insert').mockResolvedValue({} as any);
-
-      await service.createDefaultWorkflows('workspace-1');
-
-      expect(workflowRepository.insert).toHaveBeenCalledWith({
-        name: 'Test workflow',
-        content: {
-          name: 'Test Workflow',
-          on: { event: ['test'] },
-        },
-        filePath: 'test-workflow.yaml',
-        workspace: { id: 'workspace-1' } as Workspace,
-        isCanDelete: false,
-        isCanEdit: false,
-      });
-    });
   });
 
   describe('createWorkflow', () => {
@@ -264,19 +181,6 @@ describe('WorkflowsService', () => {
 
       expect(result.data).toEqual(mockWorkflows);
       expect(result.total).toBe(1);
-    });
-  });
-
-  describe('getWorkflowsByWorkspace', () => {
-    it('should return all workflows for a workspace', async () => {
-      jest
-        .spyOn(workflowRepository, 'find')
-        .mockResolvedValue([mockWorkflow] as Workflow[]);
-
-      const result = await service.getWorkflowsByWorkspace({
-        id: 'workspace-1',
-      });
-      expect(result).toEqual([mockWorkflow]);
     });
   });
 });

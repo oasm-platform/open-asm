@@ -26,11 +26,15 @@ import {
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import { Workflow } from './entities/workflow.entity';
 import { WorkflowsService } from './workflows.service';
+import { WorkflowTemplateService } from './workflow-template.service';
 
 @ApiTags('Workflows')
 @Controller('workflows')
 export class WorkflowsController {
-  constructor(private readonly workflowsService: WorkflowsService) {}
+  constructor(
+    private readonly workflowsService: WorkflowsService,
+    private readonly workflowTemplateService: WorkflowTemplateService,
+  ) {}
 
   @Doc({
     summary: 'Get all workflow templates',
@@ -43,7 +47,7 @@ export class WorkflowsController {
   })
   @Get('templates')
   listTemplates() {
-    return this.workflowsService.listTemplates();
+    return this.workflowTemplateService.listTemplates();
   }
 
   @Doc({

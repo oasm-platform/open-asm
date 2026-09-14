@@ -1,5 +1,5 @@
 import Page from '@/components/common/page';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
 import useDebounce from '@/hooks/use-debounce';
 import type { GetIntegrationDto } from '@/services/apis/gen/queries';
 import {
@@ -48,21 +48,27 @@ export default function Integrations() {
   const [detailTarget, setDetailTarget] = useState<GetIntegrationDto | null>(
     null,
   );
-  const [categoryFilter, setCategoryFilter] = useState<string | undefined>(
-    undefined,
-  );
-  const [searchQuery, setSearchQuery] = useState('');
-  const debouncedSearch = useDebounce(searchQuery, 300);
-
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as Record<string, string>;
-  const activeTab = TABS.some((t) => t.value === search.tab)
-    ? search.tab
-    : 'applications';
+  const searchParam = search.search;
+  const categoryParam = search.category;
+  const debouncedSearch = useDebounce(searchParam ?? '', 300);
+  const [activeTab, setTab] = useQueryTab({
+    tabParam: 'tab',
+    defaultValue: 'applications',
+    validValues: ['applications', 'connected'],
+  });
 
-  const handleTabChange = (value: string) => {
+  const handleSearchChange = (value: string) => {
     navigate({
-      search: { ...search, tab: value } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      search: { ...search, search: value || undefined } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      replace: true,
+    });
+  };
+
+  const handleCategoryChange = (value: string | undefined) => {
+    navigate({
+      search: { ...search, category: value } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       replace: true,
     });
   };
@@ -113,9 +119,9 @@ export default function Integrations() {
   const filteredSchemas = useMemo(() => {
     const search = debouncedSearch.toLowerCase().trim();
     return appSchemas.filter((s) => {
-      if (categoryFilter) {
+      if (categoryParam) {
         const c = (s.properties?.category as { const?: string })?.const;
-        if (c !== categoryFilter) return false;
+        if (c !== categoryParam) return false;
       }
       if (search) {
         const title = (s.title ?? '').toLowerCase();
@@ -123,7 +129,7 @@ export default function Integrations() {
       }
       return true;
     });
-  }, [appSchemas, categoryFilter, debouncedSearch]);
+  }, [appSchemas, categoryParam, debouncedSearch]);
 
   const connectedIntegrations = connectedData?.data ?? [];
   const connectedTotal = connectedData?.total ?? 0;
@@ -171,7 +177,7 @@ export default function Integrations() {
     >
       <Tabs
         value={activeTab}
-        onValueChange={handleTabChange}
+        onValueChange={setTab}
         className="w-full"
       >
         <TabsList>
@@ -186,21 +192,21 @@ export default function Integrations() {
           ))}
         </TabsList>
 
-        <TabsContent value="applications" className="py-4">
+        <TabsContent value="applications" className="pt-2">
           <AppsTabContent
             appSchemas={appSchemas}
             filteredSchemas={filteredSchemas}
             categories={categories}
-            categoryFilter={categoryFilter}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onCategoryChange={setCategoryFilter}
+            categoryFilter={categoryParam}
+            searchQuery={searchParam ?? ''}
+            onSearchChange={handleSearchChange}
+            onCategoryChange={handleCategoryChange}
             onCardClick={handleCardClick}
             formatCategory={formatCategory}
           />
         </TabsContent>
 
-        <TabsContent value="connected" className="py-4">
+        <TabsContent value="connected" className="pt-2">
           <ConnectedTabContent
             connectedIntegrations={connectedIntegrations}
             connectedTotal={connectedTotal}

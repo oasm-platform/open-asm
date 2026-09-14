@@ -9,6 +9,7 @@ import { AssetGroupLastRunDto } from '../dto/asset-group-last-run.dto';
 @Entity('asset_group_workflows')
 @Index('IDX_agw_assetGroupId', ['assetGroup'])
 @Index('IDX_agw_workflowId', ['workflow'])
+@Index('IDX_agw_assetGroupId_workflowId', ['assetGroupId', 'workflowId'], { unique: true })
 export class AssetGroupWorkflow extends BaseEntity {
   @ApiProperty()
   @ManyToOne(() => AssetGroup, (assetGroup) => assetGroup.assetGroupWorkflows, {
@@ -28,6 +29,9 @@ export class AssetGroupWorkflow extends BaseEntity {
   })
   @JoinColumn({ name: 'workflowId' })
   workflow: Relation<Workflow>;
+
+  @Column({ name: 'workflowId', type: 'uuid' })
+  workflowId: string;
 
   // Stored as a plain string: the column is varchar and BullMQ accepts any
   // 5-field cron expression, so the schedule is no longer limited to the

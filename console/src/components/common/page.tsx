@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import { ArrowLeft, Loader2 } from 'lucide-react';
 import { usePermission } from '@/hooks/usePermission';
-import AccessDenied from './access-denied';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
 import { Button } from '../ui/button';
+import AccessDenied from './access-denied';
 
 interface PageProps {
   children?: React.ReactNode;
@@ -72,7 +72,7 @@ const Page = ({
           </div>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-visible">
         {permission && isLoading ? (
           <div className="flex h-full items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

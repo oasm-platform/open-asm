@@ -209,4 +209,51 @@ describe('TriggerWorkflowService', () => {
       expect(mockJobRegistryService.createNewJob).not.toHaveBeenCalled();
     });
   });
+
+  describe('trigger', () => {
+    it('RED: success → returns { success: true, workflowId }', async () => {
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAssetsDiscovery: true,
+      });
+      mockToolsService.getToolByNames.mockResolvedValue([
+        { name: 'subfinder', category: ToolCategory.SUBDOMAINS, priority: 4 },
+      ]);
+      mockJobRegistryService.createNewJob.mockResolvedValue([{ id: 'job-1' }]);
+
+      const result = await service.trigger('target.domain.create', mockTarget);
+
+      expect(result).toEqual({ workflowId: 'workflow-uuid', success: true });
+    });
+
+    it('RED: orphan configProfileId → returns { success: false, error } with profileId, warn-logs it', async () => {
+      const orphanWorkflow = {
+        ...mockWorkflow,
+        content: {
+          jobs: [
+            {
+              name: 'Nuclei',
+              run: 'nuclei',
+              configProfileId: 'orphan-profile-id',
+            },
+          ],
+        },
+      };
+      (mockDataSource.getRepository('' as any).createQueryBuilder as jest.Mock)().getOne.mockResolvedValue(orphanWorkflow);
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAssetsDiscovery: true,
+      });
+      mockToolsService.getToolByNames.mockResolvedValue([
+        { name: 'nuclei', category: ToolCategory.VULNERABILITIES, priority: 4 },
+      ]);
+      mockJobRegistryService.createNewJob.mockRejectedValue(
+        new Error('ToolConfigProfile orphan-profile-id not found'),
+      );
+
+      const result = await service.trigger('target.domain.create', mockTarget);
+
+      expect(result.success).toBe(false);
+      expect(result.workflowId).toBe('workflow-uuid');
+      expect(result.error).toContain('orphan-profile-id');
+    });
+  });
 });

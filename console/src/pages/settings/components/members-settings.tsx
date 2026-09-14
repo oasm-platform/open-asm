@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
@@ -73,8 +73,6 @@ const INVITATION_STATUS_VARIANT = {
   cancelled: 'outline',
 } as const;
 
-const MEMBERS_TAB_VALUES = ['members', 'invitations', 'permissions'];
-
 /**
  * Members settings page: members list, invitations and permission groups.
  * All mutations require the matching workspace permission; the backend
@@ -85,8 +83,12 @@ export default function MembersSettings() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const search = useSearch({ strict: false });
-  const navigate = useNavigate();
   const { hasPermission, isLoading: permissionLoading } = usePermission();
+  const [tab, setTab] = useQueryTab({
+    tabParam: 'tab',
+    defaultValue: 'members',
+    validValues: ['members', 'invitations', 'permissions'],
+  });
 
   if (!selectedWorkspaceId) {
     return (
@@ -117,23 +119,11 @@ export default function MembersSettings() {
     return <AccessDenied />;
   }
 
-  const requestedTab = (search as Record<string, string>).tab;
-  const tab = MEMBERS_TAB_VALUES.includes(requestedTab)
-    ? requestedTab
-    : 'members';
   const inviteRequested = Boolean((search as Record<string, unknown>).invite);
-  const handleTabChange = (value: string) => {
-    navigate({
-      search: ((prev: Record<string, unknown>) => ({
-        ...prev,
-        tab: value,
-      })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    });
-  };
 
   return (
     <div className="space-y-6">
-      <Tabs value={tab} onValueChange={handleTabChange}>
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="invitations">Invitations</TabsTrigger>

@@ -1,4 +1,4 @@
-name: vulnerability_scan_basic
+name: domain_discovery
 
 on:
   target: [domain.create, domain.re-scan]

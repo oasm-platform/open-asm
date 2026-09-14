@@ -1,14 +1,40 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
+  ValidateNested,
 } from 'class-validator';
 import { IsCronSchedule } from './cron-schedule.validator';
+
+export class AssetGroupToolInput {
+  @ApiProperty({ description: 'Tool ID' })
+  @IsUUID()
+  toolId: string;
+
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description: 'Inline config override for this tool',
+  })
+  @IsOptional()
+  @IsObject()
+  config?: Record<string, unknown>;
+
+  @ApiProperty({
+    required: false,
+    description: 'Reference to a saved config profile',
+  })
+  @IsOptional()
+  @IsUUID()
+  configProfileId?: string;
+}
 
 export class CreateAssetGroupDto {
   @ApiProperty({
@@ -70,4 +96,16 @@ export class CreateAssetGroupDto {
   @ArrayUnique()
   @ArrayMaxSize(1000)
   toolIds?: string[];
+
+  @ApiProperty({
+    description:
+      'Per-tool config inputs for the group workflow. When provided, overrides toolIds — each entry specifies a tool ID plus optional inline config or a config profile reference.',
+    type: [AssetGroupToolInput],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AssetGroupToolInput)
+  tools?: AssetGroupToolInput[];
 }

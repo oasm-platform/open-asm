@@ -1,39 +1,48 @@
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ToolsControllerGetManyToolsType, useToolsControllerInstallTool, useToolsControllerUninstallTool, type Tool } from "@/services/apis/gen/queries";
-import { CheckCircle } from "lucide-react";
+import {
+  ToolsControllerGetManyToolsType,
+  useToolsControllerInstallTool,
+  useToolsControllerUninstallTool,
+  type Tool,
+} from "@/services/apis/gen/queries";
+import { CheckCircle, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 interface ToolInstallButtonProps {
   tool: Tool;
-  workspaceId: string; // Workspace ID where the tool will be installed
-  onInstallChange?: () => void; // Callback when installation status changes
+  workspaceId: string;
+  onInstallChange?: () => void;
+  /** Applied to every rendered button so the parent can control layout (e.g. w-full). */
+  className?: string;
 }
 
-const ToolInstallButton = ({ tool, workspaceId, onInstallChange }: ToolInstallButtonProps) => {
-  // State to track the installation status
+const ToolInstallButton = ({
+  tool,
+  workspaceId,
+  onInstallChange,
+  className,
+}: ToolInstallButtonProps) => {
   const [isInstalled, setIsInstalled] = useState(tool.isInstalled);
 
-  // Update local state when the tool prop changes
   useEffect(() => {
     setIsInstalled(tool.isInstalled);
   }, [tool.isInstalled]);
 
-  // Using mutation hook for install API
   const installToolMutation = useToolsControllerInstallTool();
-
-  // Using mutation hook for uninstall API
   const uninstallToolMutation = useToolsControllerUninstallTool();
 
+  const isBuiltIn = tool.type === ToolsControllerGetManyToolsType.built_in;
+
   const handleInstall = () => {
-    // Check if workspaceId exists
     if (!workspaceId) {
-      toast("No workspace selected");
+      toast.error("No workspace selected");
       return;
     }
 
-    // Immediately update the UI state
+    // Optimistic: flip the state immediately; the refetch via onInstallChange
+    // reconciles with the server.
     setIsInstalled(true);
 
     installToolMutation.mutate(
@@ -45,27 +54,25 @@ const ToolInstallButton = ({ tool, workspaceId, onInstallChange }: ToolInstallBu
       },
       {
         onSuccess: () => {
-          toast("Tool installed successfully");
-          // Call callback to update the interface
+          toast.success("Tool added successfully");
           if (onInstallChange) onInstallChange();
         },
         onError: () => {
-          // Revert the UI state on error
           setIsInstalled(false);
-          toast("Failed to install tool");
+          toast.error("Failed to add tool");
         },
-      }
+      },
     );
   };
 
   const handleUninstall = () => {
-    // Check if workspaceId exists
     if (!workspaceId) {
-      toast("No workspace selected");
+      toast.error("No workspace selected");
       return;
     }
 
-    // Immediately update the UI state
+    // Optimistic: flip the state immediately; the refetch via onInstallChange
+    // reconciles with the server.
     setIsInstalled(false);
 
     uninstallToolMutation.mutate(
@@ -77,41 +84,38 @@ const ToolInstallButton = ({ tool, workspaceId, onInstallChange }: ToolInstallBu
       },
       {
         onSuccess: () => {
-          toast("Tool uninstalled successfully");
-          // Call callback to update the interface
+          toast.success("Tool removed successfully");
           if (onInstallChange) onInstallChange();
         },
         onError: () => {
-          // Revert the UI state on error
           setIsInstalled(true);
-          toast("Failed to uninstall tool");
+          toast.error("Failed to remove tool");
         },
-      }
+      },
     );
   };
 
-  // If the tool is installed (based on local state), show the installed button with checkmark
+  // Installed: confirm-guarded uninstall keeps the CTA meaningful (Added /
+  // Built-in). Config lives in the Configuration tab, not here.
   if (isInstalled) {
-    // For built-in tools, they cannot be uninstalled
-    const isBuiltIn = tool.type === ToolsControllerGetManyToolsType.built_in;
-
     return (
       <ConfirmDialog
-        title="Uninstall Tool"
-        description={`Are you sure you want to uninstall "${tool.name}"?`}
+        title="Remove Tool"
+        description={`Are you sure you want to remove "${tool.name}"?`}
         onConfirm={handleUninstall}
         disabled={isBuiltIn}
         trigger={
           <Button
             variant="outline"
+            className={className}
             disabled={uninstallToolMutation.isPending || isBuiltIn}
           >
             {uninstallToolMutation.isPending ? (
-              "Uninstalling..."
+              "Removing..."
             ) : (
               <>
-                <CheckCircle className="w-4 h-4" />
-                {isBuiltIn ? "Built-in" : "Installed"}
+                <CheckCircle className="mr-2 h-4 w-4" />
+                {isBuiltIn ? "Built-in" : "Added"}
               </>
             )}
           </Button>
@@ -120,29 +124,47 @@ const ToolInstallButton = ({ tool, workspaceId, onInstallChange }: ToolInstallBu
     );
   }
 
-  // Disable install when no workers are online
-  const noWorkers = !tool.availableWorkersCount || tool.availableWorkersCount === 0;
+  // Connectors add without a confirm dialog (the user then creates a
+  // configuration profile in the Configuration tab); other types keep the
+  // confirm gate.
+  if (tool.type === ToolsControllerGetManyToolsType.connector) {
+    return (
+      <Button
+        variant="default"
+        className={className}
+        onClick={handleInstall}
+        disabled={installToolMutation.isPending}
+      >
+        {installToolMutation.isPending ? (
+          "Adding..."
+        ) : (
+          <>
+            <Plus className="mr-2 h-4 w-4" />
+            Add
+          </>
+        )}
+      </Button>
+    );
+  }
 
-  // If the tool is not installed (based on local state), show the install button
   return (
     <ConfirmDialog
-      title="Install Tool"
-      description={
-        noWorkers
-          ? `"${tool.name}" requires at least one worker online.`
-          : `Are you sure you want to install "${tool.name}"?`
-      }
-      disabled={noWorkers}
+      title="Add Tool"
+      description={`Are you sure you want to add "${tool.name}"?`}
       onConfirm={handleInstall}
       trigger={
         <Button
           variant="default"
-          disabled={installToolMutation.isPending || noWorkers}
+          className={className}
+          disabled={installToolMutation.isPending}
         >
           {installToolMutation.isPending ? (
-            "Installing..."
+            "Adding..."
           ) : (
-            "Install"
+            <>
+              <Plus className="mr-2 h-4 w-4" />
+              Add
+            </>
           )}
         </Button>
       }

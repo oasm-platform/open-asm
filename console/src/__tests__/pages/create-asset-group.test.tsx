@@ -130,9 +130,12 @@ describe('CreateAssetGroup wizard page', () => {
     await user.click(await screen.findByText('https://example.com'));
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
-    // Step 3: tools selector (logo grid) with toggle selection
+    // Step 3: pipeline builder (logo grid) — open a tool and add it
     expect(await screen.findByText('Port scan')).toBeInTheDocument();
-    await user.click(screen.getByText('Subdomain scan'));
+    await user.click(
+      screen.getByRole('button', { name: 'Add Subdomain scan to pipeline' }),
+    );
+    await user.click(await screen.findByRole('button', { name: 'Add to pipeline' }));
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
     // Step 4: schedule builder; Next becomes Save
@@ -144,7 +147,7 @@ describe('CreateAssetGroup wizard page', () => {
     expect(dto).toMatchObject({
       name: 'My Group',
       hostIds: ['asset-1'],
-      toolIds: ['tool-1'],
+      tools: [{ toolId: 'tool-1' }],
     });
     expect(dto.schedule).toMatch(/^\S+ \S+ \S+ \S+ \S+$/);
     await waitFor(() => {

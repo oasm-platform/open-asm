@@ -25,12 +25,14 @@ import { randomUUID } from 'crypto';
 import { LessThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
+import { ToolSyncService } from '../tools/tool-sync.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import {
@@ -72,6 +74,8 @@ export class WorkersService {
     private redisService: RedisService,
 
     private aliveStreamManager: AliveStreamManager,
+
+    private readonly connectorRegistry: ConnectorRegistryService,
   ) {}
 
   /**
@@ -159,6 +163,29 @@ export class WorkersService {
   }
 
   /**
+   * Maps gRPC WorkerRunMode enum (numeric or string) to a stored string value.
+   * Numeric: 0→null (UNKNOWN), 1→'cli', 2→'node'.
+   * String: 'cli'→'cli', 'node'→'node', anything else→null.
+   * This is intentionally defensive — accepts both the proto numeric enum
+   * and plain strings for forward compatibility.
+   */
+  private mapRunMode(mode?: number | string): string | null {
+    if (mode === undefined || mode === null) return null;
+    if (typeof mode === 'number') {
+      if (mode === 1) return 'cli';
+      if (mode === 2) return 'node';
+      return null; // 0 or any other value → null (UNKNOWN)
+    }
+    // gRPC loader uses enums:String → proto enum arrives as name string
+    const lower = String(mode).toLowerCase();
+    if (lower === 'cli') return 'cli';
+    if (lower === 'node') return 'node';
+    if (lower === 'worker_run_mode_cli') return 'cli';
+    if (lower === 'worker_run_mode_node') return 'node';
+    return null;
+  }
+
+  /**
    * Retrieves a paginated list of workers.
    *
    * @param query - The query parameters for filtering and pagination,
@@ -169,7 +196,7 @@ export class WorkersService {
   public async getWorkers(
     query: GetManyWorkersDto,
   ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
-    const { page, limit, sortOrder, workspaceId, enabledAgentMode, scope } =
+    const { page, limit, sortOrder, workspaceId, enabledAgentMode, scope, runMode } =
       query;
     let { sortBy } = query;
     if (!sortBy) {
@@ -243,13 +270,39 @@ export class WorkersService {
       });
     }
 
+    // Add runMode filter if provided
+    if (runMode) {
+      queryBuilder.andWhere('w."runMode" = :runModeFilter', {
+        runModeFilter: runMode,
+      });
+    }
+
     const [workers, total] = await queryBuilder
       .orderBy(`w.${sortBy.replace(/[^a-zA-Z0-9_]/g, '')}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
 
-    // Get current jobs count and active tools for each worker
+    // All workers show all available tools (built-in + connector).
+    // Hoisted above the per-worker map: one query for built-in tools and one
+    // manifest read total, shared by every worker in the page (findings #3).
+    const [builtInTools, connectorList] = await Promise.all([
+      this.toolsService.getBuiltInTools(),
+      Promise.resolve(this.connectorRegistry.getAllConnectors()),
+    ]);
+
+    // Connector entries carry an honest shape: CONNECTOR type (not BUILT_IN),
+    // category derived from capabilities via the shared mapper (#2), and the
+    // stored logo path served by ConnectorLogoController instead of raw base64
+    // (#8). id stays the stable slug consumed by the console (#7).
+    const connectorTools: Tool[] = connectorList.map((c) => ({
+      id: c.slug,
+      name: c.name,
+      category: ToolSyncService.mapConnectorCapabilityToCategory(c.capabilities),
+      type: WorkerType.CONNECTOR,
+      logoUrl: c.logo ? `/connectors/${c.slug}.png` : undefined,
+    })) as Tool[];
+
     const workersWithJobCount = await Promise.all(
       workers.map(async (worker) => {
         const count = await this.jobsRegistryService['repo'].count({
@@ -259,16 +312,12 @@ export class WorkersService {
           },
         });
 
-        // Determine active tools based on worker type
-        let tools: Tool[] = [];
-        if (worker.type === WorkerType.BUILT_IN) {
-          // For BUILT_IN workers, return all built-in tools
-          const builtInTools = await this.toolsService.getBuiltInTools();
-          tools = builtInTools.data;
-        } else if (worker.tool) {
-          // For PROVIDER workers, return the current tool as array
-          tools = [worker.tool];
-        }
+        // Only node-mode workers run Docker connectors; CLI/legacy workers may
+        // not have Docker installed, so they get built-in tools only.
+        const tools: Tool[] =
+          worker.runMode === 'node'
+            ? [...builtInTools.data, ...connectorTools]
+            : [...builtInTools.data];
 
         return {
           ...worker,
@@ -337,6 +386,7 @@ export class WorkersService {
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
     const { apiKey, signature, token, metadata, ipAddress } = dto;
+    const runMode = this.mapRunMode(metadata?.mode);
 
     // 1. Validate signature first (mandatory)
     const workerSignature =
@@ -367,19 +417,27 @@ export class WorkersService {
       });
       if (existingWorker) {
         await this.fallbackWorkerRejoin(existingWorker.id);
+        const updates: Record<string, unknown> = {};
         if (ipAddress) {
-          await this.repo.update({ id: existingWorker.id }, { ipAddress });
+          updates.ipAddress = ipAddress;
         }
-        return existingWorker;
+        // Update runMode only if changed
+        if (runMode !== existingWorker.runMode) {
+          updates.runMode = runMode;
+        }
+        if (Object.keys(updates).length > 0) {
+          await this.repo.update({ id: existingWorker.id }, updates);
+        }
+        return this.repo.findOne({ where: { id: existingWorker.id } }) as Promise<WorkerInstance>;
       }
     }
 
     // 5. Create new worker after successful authentication
     if (isCloudWorker) {
-      return this.createCloudWorker(metadata, ipAddress);
+      return this.createCloudWorker(metadata, ipAddress, runMode);
     }
 
-    return this.createRegularWorker(apiKey, metadata, ipAddress);
+    return this.createRegularWorker(apiKey, metadata, ipAddress, runMode);
   }
 
   /**
@@ -391,6 +449,7 @@ export class WorkersService {
   private async createCloudWorker(
     metadata?: WorkerJoinDto['metadata'],
     ipAddress?: string,
+    runMode?: string | null,
   ): Promise<WorkerInstance> {
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
@@ -403,6 +462,7 @@ export class WorkersService {
       name: metadata?.name,
       os: metadata?.os,
       ipAddress,
+      runMode: runMode ?? null,
     };
 
     await this.repo.save(data);
@@ -429,6 +489,7 @@ export class WorkersService {
     apiKey: string,
     metadata?: WorkerJoinDto['metadata'],
     ipAddress?: string,
+    runMode?: string | null,
   ): Promise<WorkerInstance> {
     const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
       where: { key: apiKey },
@@ -456,6 +517,7 @@ export class WorkersService {
       name: metadata?.name,
       os: metadata?.os,
       ipAddress,
+      runMode: runMode ?? null,
     };
 
     await this.repo.save(data);

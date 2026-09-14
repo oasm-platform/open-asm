@@ -29,6 +29,15 @@ export class WorkerMetadataDto {
   @IsString()
   @IsOptional()
   os?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: [0, 1, 2],
+    description:
+      'Worker run mode enum over gRPC: 0=UNKNOWN, 1=CLI, 2=NODE. Accepts numeric or string.',
+  })
+  @IsOptional()
+  mode?: number | string;
 }
 
 export class WorkerJoinDto {
@@ -74,6 +83,11 @@ export class GetManyWorkersDto extends GetManyBaseQueryParams {
   @IsString()
   @IsOptional()
   scope?: string;
+
+  @ApiProperty({ required: false, enum: ['cli', 'node'] })
+  @IsString()
+  @IsOptional()
+  runMode?: string;
 
   @ApiProperty({ required: false })
   @IsBoolean()

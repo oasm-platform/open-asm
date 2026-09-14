@@ -1,4 +1,4 @@
-import { truncateUrl } from '@/utils/string';
+import { camelToTitle, truncateUrl } from '@/utils/string';
 
 describe('truncateUrl', () => {
   it('returns the url unchanged if shorter than maxLength', () => {
@@ -42,5 +42,22 @@ describe('truncateUrl', () => {
   it('handles very small maxLength', () => {
     const result = truncateUrl('https://example.com', 4);
     expect(result).toContain('...');
+  });
+});
+
+describe('camelToTitle', () => {
+  it('splits camelCase words and capitalizes the first', () => {
+    expect(camelToTitle('excludeTags')).toBe('Exclude Tags');
+    expect(camelToTitle('templateIds')).toBe('Template Ids');
+    expect(camelToTitle('connectionTimeout')).toBe('Connection Timeout');
+  });
+
+  it('keeps digits attached to the previous word', () => {
+    expect(camelToTitle('s3Bucket')).toBe('S3 Bucket');
+  });
+
+  it('handles single-word and empty input', () => {
+    expect(camelToTitle('profile')).toBe('Profile');
+    expect(camelToTitle('')).toBe('');
   });
 });

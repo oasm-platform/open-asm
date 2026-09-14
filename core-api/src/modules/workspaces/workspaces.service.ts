@@ -35,7 +35,7 @@ import { AuditContext, AuditService } from '../audit/audit.service';
 import { CreateNotificationDto } from '../notifications/dto/create-notification.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
-import { WorkflowsService } from '../workflows/workflows.service';
+import { WorkflowTemplateService } from '../workflows/workflow-template.service';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
 import {
@@ -101,7 +101,7 @@ export class WorkspacesService implements OnModuleInit {
     private readonly invitationRepository: Repository<WorkspaceInvitation>,
     private apiKeyService: ApiKeysService,
     private notificationsService: NotificationsService,
-    private workflowsService: WorkflowsService,
+    private workflowTemplateService: WorkflowTemplateService,
     private workspaceEncryptionService: WorkspaceEncryptionService,
     private auditService: AuditService,
   ) {}
@@ -157,7 +157,7 @@ export class WorkspacesService implements OnModuleInit {
       await this.seedOwnerPermissionGroup(newWorkspaceId, id, manager);
     });
 
-    await this.workflowsService.createDefaultWorkflows(newWorkspaceId);
+    await this.workflowTemplateService.createDefaultWorkflows(newWorkspaceId);
 
     const created = await this.repo.findOne({ where: { id: newWorkspaceId } });
     if (!created) {
