@@ -20,6 +20,7 @@ service JobsRegistryService {
   rpc ResultPorts (PortsResultRequest) returns (JobResponse);
   rpc ResultVulnerabilities (VulnerabilitiesResultRequest) returns (JobResponse);
   rpc ResultScreenshot (ScreenshotResultRequest) returns (JobResponse);
+  rpc ResultUrlDiscovery (UrlDiscoveryResultRequest) returns (JobResponse);
 }
 
 
@@ -236,4 +237,16 @@ enum Severity {
   MEDIUM = 2;
   HIGH = 3;
   CRITICAL = 4;
+}
+
+message UrlDiscoveryResultRequest {
+  string worker_id = 1;
+  string job_id = 2;
+  bool error = 3;
+  optional string raw = 4;
+  repeated DiscoveredUrl urls = 5;
+}
+
+message DiscoveredUrl {
+  string url = 1;
 }

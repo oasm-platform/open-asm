@@ -12,6 +12,7 @@ import {
 } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { IssuesService } from '../issues/issues.service';
@@ -277,6 +278,63 @@ export class DataAdapterService {
   }
 
   /**
+   * URL discovery data normalization: one row per unique URL, attached to the
+   * job's AssetService and JobHistory. Deduped in-app (Set) and DB-level
+   * (unique constraint + orIgnore) so worker retries / workflow re-runs are
+   * idempotent.
+   */
+  public async urlDiscovery({
+    data,
+    job,
+  }: DataAdapterInput<DiscoveredUrl[]>): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      if (!job.assetServiceId) {
+        this.logger.warn(
+          `urlDiscovery: job ${job.id} has no assetServiceId — skipping`,
+        );
+        await queryRunner.commitTransaction();
+        return;
+      }
+
+      const urls = [
+        ...new Set(
+          (data ?? [])
+            .map((d) => d?.url?.trim())
+            .filter((u): u is string => !!u),
+        ),
+      ];
+
+      if (urls.length > 0) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .insert()
+          .into(DiscoveredUrl)
+          .values(
+            urls.map((url) => ({
+              url,
+              assetServiceId: job.assetService?.id,
+              jobHistoryId: job.jobHistory.id,
+            })),
+          )
+          .orIgnore()
+          .execute();
+      }
+
+      await queryRunner.commitTransaction();
+      return;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
    *
    * @param param0
    * @returns
@@ -532,6 +590,10 @@ export class DataAdapterService {
           handler: (data: DataAdapterInput<ScreenshotPayload>) =>
             this.screenshot(data),
           validationClass: ScreenshotPayload,
+        },
+        [ToolCategory.URL_DISCOVERY]: {
+          handler: (data: DataAdapterInput<DiscoveredUrl[]>) =>
+            this.urlDiscovery(data),
         },
       };
 

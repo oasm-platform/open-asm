@@ -26,6 +26,7 @@ const (
 	JobsRegistryService_ResultPorts_FullMethodName           = "/jobs_registry.JobsRegistryService/ResultPorts"
 	JobsRegistryService_ResultVulnerabilities_FullMethodName = "/jobs_registry.JobsRegistryService/ResultVulnerabilities"
 	JobsRegistryService_ResultScreenshot_FullMethodName      = "/jobs_registry.JobsRegistryService/ResultScreenshot"
+	JobsRegistryService_ResultUrlDiscovery_FullMethodName    = "/jobs_registry.JobsRegistryService/ResultUrlDiscovery"
 )
 
 // JobsRegistryServiceClient is the client API for JobsRegistryService service.
@@ -43,6 +44,7 @@ type JobsRegistryServiceClient interface {
 	ResultPorts(ctx context.Context, in *PortsResultRequest, opts ...grpc.CallOption) (*JobResponse, error)
 	ResultVulnerabilities(ctx context.Context, in *VulnerabilitiesResultRequest, opts ...grpc.CallOption) (*JobResponse, error)
 	ResultScreenshot(ctx context.Context, in *ScreenshotResultRequest, opts ...grpc.CallOption) (*JobResponse, error)
+	ResultUrlDiscovery(ctx context.Context, in *UrlDiscoveryResultRequest, opts ...grpc.CallOption) (*JobResponse, error)
 }
 
 type jobsRegistryServiceClient struct {
@@ -123,6 +125,16 @@ func (c *jobsRegistryServiceClient) ResultScreenshot(ctx context.Context, in *Sc
 	return out, nil
 }
 
+func (c *jobsRegistryServiceClient) ResultUrlDiscovery(ctx context.Context, in *UrlDiscoveryResultRequest, opts ...grpc.CallOption) (*JobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JobResponse)
+	err := c.cc.Invoke(ctx, JobsRegistryService_ResultUrlDiscovery_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // JobsRegistryServiceServer is the server API for JobsRegistryService service.
 // All implementations must embed UnimplementedJobsRegistryServiceServer
 // for forward compatibility.
@@ -138,6 +150,7 @@ type JobsRegistryServiceServer interface {
 	ResultPorts(context.Context, *PortsResultRequest) (*JobResponse, error)
 	ResultVulnerabilities(context.Context, *VulnerabilitiesResultRequest) (*JobResponse, error)
 	ResultScreenshot(context.Context, *ScreenshotResultRequest) (*JobResponse, error)
+	ResultUrlDiscovery(context.Context, *UrlDiscoveryResultRequest) (*JobResponse, error)
 	mustEmbedUnimplementedJobsRegistryServiceServer()
 }
 
@@ -168,6 +181,9 @@ func (UnimplementedJobsRegistryServiceServer) ResultVulnerabilities(context.Cont
 }
 func (UnimplementedJobsRegistryServiceServer) ResultScreenshot(context.Context, *ScreenshotResultRequest) (*JobResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResultScreenshot not implemented")
+}
+func (UnimplementedJobsRegistryServiceServer) ResultUrlDiscovery(context.Context, *UrlDiscoveryResultRequest) (*JobResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResultUrlDiscovery not implemented")
 }
 func (UnimplementedJobsRegistryServiceServer) mustEmbedUnimplementedJobsRegistryServiceServer() {}
 func (UnimplementedJobsRegistryServiceServer) testEmbeddedByValue()                             {}
@@ -316,6 +332,24 @@ func _JobsRegistryService_ResultScreenshot_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _JobsRegistryService_ResultUrlDiscovery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UrlDiscoveryResultRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsRegistryServiceServer).ResultUrlDiscovery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobsRegistryService_ResultUrlDiscovery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsRegistryServiceServer).ResultUrlDiscovery(ctx, req.(*UrlDiscoveryResultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // JobsRegistryService_ServiceDesc is the grpc.ServiceDesc for JobsRegistryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -350,6 +384,10 @@ var JobsRegistryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResultScreenshot",
 			Handler:    _JobsRegistryService_ResultScreenshot_Handler,
+		},
+		{
+			MethodName: "ResultUrlDiscovery",
+			Handler:    _JobsRegistryService_ResultUrlDiscovery_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

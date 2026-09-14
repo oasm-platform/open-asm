@@ -777,6 +777,7 @@ export const JobListItemDtoCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   screenshot: 'screenshot',
+  url_discovery: 'url_discovery',
 } as const;
 
 export type JobListItemDto = {
@@ -824,6 +825,7 @@ export const JobTimelineItemToolCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   screenshot: 'screenshot',
+  url_discovery: 'url_discovery',
 } as const;
 
 export type JobTimelineItem = {
@@ -865,6 +867,7 @@ export const GetNextJobResponseDtoCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   screenshot: 'screenshot',
+  url_discovery: 'url_discovery',
 } as const;
 
 export type GetNextJobResponseDtoStatus =
@@ -1028,6 +1031,7 @@ export const ToolCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   screenshot: 'screenshot',
+  url_discovery: 'url_discovery',
 } as const;
 
 export type ToolType = (typeof ToolType)[keyof typeof ToolType];
@@ -1192,6 +1196,29 @@ export type ScreenshotResultDto = {
   raw: ScreenshotResultDtoRaw;
   /** Screenshot result data */
   payload: ScreenshotResultDtoPayload;
+};
+
+export type DiscoveredUrl = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+};
+
+/**
+ * Raw output string
+ */
+export type UrlDiscoveryResultDtoRaw = { [key: string]: unknown };
+
+export type UrlDiscoveryResultDto = {
+  /** Job ID to update */
+  jobId: string;
+  /** Indicates if result is an error */
+  error: boolean;
+  /** Raw output string */
+  raw: UrlDiscoveryResultDtoRaw;
+  /** Discovered URLs */
+  payload: DiscoveredUrl[];
 };
 
 export type JobHistoryResponseDtoStatus =
@@ -1671,6 +1698,7 @@ export const CreateToolDtoCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   screenshot: 'screenshot',
+  url_discovery: 'url_discovery',
 } as const;
 
 export type CreateToolDto = {
@@ -3371,6 +3399,7 @@ export const ToolsControllerGetManyToolsCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   screenshot: 'screenshot',
+  url_discovery: 'url_discovery',
 } as const;
 
 export type ToolsControllerGetInstalledToolsParams = {
@@ -3386,6 +3415,7 @@ export const ToolsControllerGetInstalledToolsCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   screenshot: 'screenshot',
+  url_discovery: 'url_discovery',
 } as const;
 
 export type SearchControllerSearchAssetsTargetsParams = {
@@ -13614,6 +13644,112 @@ export const useJobsRegistryControllerUpdateScreenshotResult = <
 > => {
   return useMutation(
     getJobsRegistryControllerUpdateScreenshotResultMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Submit discovered URLs for a job
+ * @summary Updates URL discovery results
+ */
+export const jobsRegistryControllerUpdateUrlDiscoveryResult = (
+  workerId: string,
+  urlDiscoveryResultDto: UrlDiscoveryResultDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/jobs-registry/${workerId}/result/url-discovery`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: urlDiscoveryResultDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getJobsRegistryControllerUpdateUrlDiscoveryResultMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof jobsRegistryControllerUpdateUrlDiscoveryResult>
+      >,
+      TError,
+      { workerId: string; data: UrlDiscoveryResultDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<ReturnType<typeof jobsRegistryControllerUpdateUrlDiscoveryResult>>,
+    TError,
+    { workerId: string; data: UrlDiscoveryResultDto },
+    TContext
+  > => {
+    const mutationKey = ['jobsRegistryControllerUpdateUrlDiscoveryResult'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof jobsRegistryControllerUpdateUrlDiscoveryResult>
+      >,
+      { workerId: string; data: UrlDiscoveryResultDto }
+    > = (props) => {
+      const { workerId, data } = props ?? {};
+
+      return jobsRegistryControllerUpdateUrlDiscoveryResult(
+        workerId,
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type JobsRegistryControllerUpdateUrlDiscoveryResultMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof jobsRegistryControllerUpdateUrlDiscoveryResult>>
+  >;
+export type JobsRegistryControllerUpdateUrlDiscoveryResultMutationBody =
+  UrlDiscoveryResultDto;
+export type JobsRegistryControllerUpdateUrlDiscoveryResultMutationError =
+  unknown;
+
+/**
+ * @summary Updates URL discovery results
+ */
+export const useJobsRegistryControllerUpdateUrlDiscoveryResult = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof jobsRegistryControllerUpdateUrlDiscoveryResult>
+      >,
+      TError,
+      { workerId: string; data: UrlDiscoveryResultDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof jobsRegistryControllerUpdateUrlDiscoveryResult>>,
+  TError,
+  { workerId: string; data: UrlDiscoveryResultDto },
+  TContext
+> => {
+  return useMutation(
+    getJobsRegistryControllerUpdateUrlDiscoveryResultMutationOptions(options),
     queryClient,
   );
 };

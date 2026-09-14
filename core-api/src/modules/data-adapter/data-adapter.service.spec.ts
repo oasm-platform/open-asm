@@ -825,6 +825,131 @@ describe('DataAdapterService', () => {
     });
   });
 
+  describe('urlDiscovery', () => {
+    const mockJob = {
+      id: 'job-id',
+      asset: {
+        id: 'asset-id',
+        value: 'example.com',
+        target: { id: 'target-id' },
+        targetId: 'target-id',
+        isEnabled: true,
+        dnsRecords: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      assetServiceId: 'service-id',
+      jobHistory: { id: 'history-id' },
+      tool: { id: 'tool-id', category: ToolCategory.URL_DISCOVERY },
+      assetService: { id: 'service-id' },
+      category: ToolCategory.URL_DISCOVERY,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as Job;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockQueryRunner.manager.createQueryBuilder.mockReturnThis();
+      mockQueryRunner.manager.insert.mockReturnThis();
+      mockQueryRunner.manager.into.mockReturnThis();
+      mockQueryRunner.manager.values.mockReturnThis();
+      mockQueryRunner.manager.orIgnore.mockReturnThis();
+      mockQueryRunner.manager.execute.mockResolvedValue(undefined);
+    });
+
+    it('S1: inserts one row per unique url with assetServiceId + jobHistoryId in a transaction', async () => {
+      const data = [
+        { url: 'https://a.example.com' },
+        { url: 'https://b.example.com' },
+      ] as any;
+
+      await service.urlDiscovery({ data, job: mockJob });
+
+      expect(mockQueryRunner.connect).toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.insert).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.orIgnore).toHaveBeenCalled();
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg).toHaveLength(2);
+      expect(valuesArg).toEqual([
+        {
+          url: 'https://a.example.com',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+        {
+          url: 'https://b.example.com',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+      ]);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('S2a: empty payload commits without insert and without throw', async () => {
+      await service.urlDiscovery({ data: [], job: mockJob });
+
+      expect(mockQueryRunner.manager.insert).not.toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('S2b: duplicate urls collapse to one row via Set + orIgnore', async () => {
+      const data = [
+        { url: 'https://dup.example.com' },
+        { url: 'https://dup.example.com' },
+        { url: 'https://dup.example.com' },
+      ] as any;
+
+      await service.urlDiscovery({ data, job: mockJob });
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg).toHaveLength(1);
+      expect(valuesArg[0].url).toBe('https://dup.example.com');
+      expect(mockQueryRunner.manager.orIgnore).toHaveBeenCalled();
+    });
+
+    it('S2c: missing assetServiceId skips insert with warn, no throw', async () => {
+      const noServiceJob = { ...mockJob, assetServiceId: undefined } as unknown as Job;
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => undefined);
+
+      await expect(
+        service.urlDiscovery({
+          data: [{ url: 'https://a.example.com' }] as any,
+          job: noServiceJob,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(mockQueryRunner.manager.insert).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('rolls back and rethrows on error', async () => {
+      mockQueryRunner.manager.execute.mockRejectedValue(new Error('DB error'));
+
+      await expect(
+        service.urlDiscovery({
+          data: [{ url: 'https://a.example.com' }] as any,
+          job: mockJob,
+        }),
+      ).rejects.toThrow('DB error');
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+  });
+
   describe('portsScanner', () => {
     const mockJob = {
       asset: {
@@ -1479,6 +1604,58 @@ describe('DataAdapterService', () => {
       expect(service.vulnerabilities).toHaveBeenCalledWith({
         data: mockData,
         job: mockJob,
+      });
+    });
+
+    it('S3: syncData routes URL_DISCOVERY to urlDiscovery and HTTP_PROBE to httpResponses', async () => {
+      const urlDiscoveryJob = {
+        asset: {
+          id: 'asset-id',
+          value: 'example.com',
+          target: { id: 'target-id' },
+          targetId: 'target-id',
+          isEnabled: true,
+          dnsRecords: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        assetServiceId: 'service-id',
+        assetService: { id: 'service-id' },
+        jobHistory: { id: 'history-id' },
+        tool: { id: 'tool-id', category: ToolCategory.URL_DISCOVERY },
+        category: ToolCategory.URL_DISCOVERY,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Job;
+
+      const urlData = [{ url: 'https://a.example.com' }] as any;
+
+      const urlDiscoverySpy = jest
+        .spyOn(service, 'urlDiscovery')
+        .mockResolvedValue();
+
+      await service.syncData({ data: urlData, job: urlDiscoveryJob });
+
+      expect(urlDiscoverySpy).toHaveBeenCalledWith({
+        data: urlData,
+        job: urlDiscoveryJob,
+      });
+
+      const httpProbeJob = {
+        ...urlDiscoveryJob,
+        tool: { id: 'tool-id', category: ToolCategory.HTTP_PROBE },
+        category: ToolCategory.HTTP_PROBE,
+      } as unknown as Job;
+      const httpData = { url: 'https://example.com' } as unknown as HttpResponse;
+      const httpSpy = jest
+        .spyOn(service, 'httpResponses')
+        .mockResolvedValue();
+
+      await service.syncData({ data: httpData, job: httpProbeJob });
+
+      expect(httpSpy).toHaveBeenCalledWith({
+        data: httpData,
+        job: httpProbeJob,
       });
     });
 

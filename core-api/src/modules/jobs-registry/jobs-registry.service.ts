@@ -290,11 +290,15 @@ export class JobsRegistryService {
     // Step 2: find appropriate data source based on tool category
     if (
       tool.category === ToolCategory.HTTP_PROBE ||
-      tool.category === ToolCategory.SCREENSHOT
+      tool.category === ToolCategory.SCREENSHOT ||
+      tool.category === ToolCategory.URL_DISCOVERY
     ) {
-      // HTTP_PROBE must probe every enabled asset_service port; SCREENSHOT must
-      // only target services httpx actually confirmed live.
-      const liveOnly = tool.category === ToolCategory.SCREENSHOT;
+      // HTTP_PROBE must probe every enabled asset_service port; SCREENSHOT and
+      // URL_DISCOVERY are HTTP-crawl follow-ups and must only target services
+      // httpx actually confirmed live.
+      const liveOnly =
+        tool.category === ToolCategory.SCREENSHOT ||
+        tool.category === ToolCategory.URL_DISCOVERY;
       const assetServices = await this.findAssetServicesForJob(
         targetIds,
         assetIds,

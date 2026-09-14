@@ -2,6 +2,7 @@ import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { JobRunType, JobStatus, ToolCategory } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { Asset } from '@/modules/assets/entities/assets.entity';
+import { DiscoveredUrl } from '@/modules/assets/entities/discovered-url.entity';
 import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
@@ -16,7 +17,6 @@ import {
   IsObject,
   IsOptional,
   IsUUID,
-  ValidateNested,
 } from 'class-validator';
 import { JobHistory } from '../entities/job-history.entity';
 import { Job } from '../entities/job.entity';
@@ -232,21 +232,32 @@ export class BaseResultDto {
 }
 
 export class SubdomainResultDto extends BaseResultDto {
+  // NOTE: deliberately NO @ValidateNested/@Type here. Asset is a TypeORM
+  // persistence entity with only @ApiProperty decorators (no class-validator
+  // metadata), so the global ValidationPipe({whitelist:true}) would recurse
+  // and strip every field. The REST path must pass the payload through intact,
+  // matching the gRPC path (controller.ts builds the DTO via plainToInstance).
   @ApiProperty({ description: 'Discovered subdomains', type: [Asset] })
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => Asset)
   @Expose()
   payload: Asset[];
 }
 
 export class HttpProbeResultDto extends BaseResultDto {
+  // See SubdomainResultDto: HttpResponse carries no validator metadata, so
+  // whitelist recursion would empty the payload.
   @ApiProperty({ description: 'HTTP probe response' })
   @IsObject()
-  @ValidateNested()
-  @Type(() => HttpResponse)
   @Expose()
   payload: HttpResponse;
+}
+
+export class UrlDiscoveryResultDto extends BaseResultDto {
+  // See SubdomainResultDto: DiscoveredUrl carries no validator metadata.
+  @ApiProperty({ description: 'Discovered URLs', type: [DiscoveredUrl] })
+  @IsArray()
+  @Expose()
+  payload: DiscoveredUrl[];
 }
 
 export class PortsResultDto extends BaseResultDto {
@@ -258,10 +269,9 @@ export class PortsResultDto extends BaseResultDto {
 }
 
 export class VulnerabilitiesResultDto extends BaseResultDto {
+  // See SubdomainResultDto: Vulnerability carries no validator metadata.
   @ApiProperty({ description: 'Found vulnerabilities', type: [Vulnerability] })
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => Vulnerability)
   @Expose()
   payload: Vulnerability[];
 }
