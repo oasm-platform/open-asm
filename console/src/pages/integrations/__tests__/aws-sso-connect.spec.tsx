@@ -185,6 +185,43 @@ describe('AwsSsoConnect', () => {
     });
   });
 
+  it('keeps region and startUrl read-only after authorization (binding guard)', async () => {
+    let polls = 0;
+    mocks.post.mockImplementation((url: string) => {
+      if (url.endsWith('/aws/sso/device')) return Promise.resolve(DEVICE_RESPONSE);
+      if (url.endsWith('/aws/sso/poll')) {
+        polls += 1;
+        return Promise.resolve(
+          polls === 1 ? { status: 'pending' } : AUTHORIZED_RESPONSE,
+        );
+      }
+      return Promise.reject(new Error(`unexpected url ${url}`));
+    });
+
+    const { user } = renderWithProviders(
+      <AwsSsoConnect name="My AWS" syncSchedule="disabled" />,
+    );
+
+    const regionInput = await screen.findByLabelText(/region/i);
+    const startUrlInput = await screen.findByLabelText(/start url/i);
+    expect(regionInput).not.toBeDisabled();
+    expect(startUrlInput).not.toBeDisabled();
+
+    await user.type(startUrlInput, 'https://my-sso.awsapps.com/start');
+    await user.click(
+      screen.getByRole('button', { name: /start authorization/i }),
+    );
+
+    await waitFor(() => {
+      expect(regionInput).toBeDisabled();
+      expect(startUrlInput).toBeDisabled();
+    });
+
+    await screen.findByText('Authorization complete');
+    expect(regionInput).toBeDisabled();
+    expect(startUrlInput).toBeDisabled();
+  });
+
   it(
     'keeps polling through slow_down until authorized',
     async () => {

@@ -36,6 +36,29 @@ import { TelegramConnect } from './telegram-connect';
 
 const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 
+const SSO_SECRET_FIELDS = ['clientId', 'clientSecret', 'refreshToken'];
+
+/**
+ * Payload config: keeps only currently-visible entries (drops stale values
+ * from a previously selected connection method) plus the always-hidden SSO
+ * credentials, which the schema hides forever but the connector requires.
+ */
+function buildDetailConfig(
+  schema: { properties?: Record<string, unknown>; [key: string]: unknown },
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  for (const [key, prop] of Object.entries(schema.properties ?? {})) {
+    if (key === 'app_type' || key === 'category') continue;
+    if (!(key in values)) continue;
+    const keep =
+      isPropertyVisible(prop as SchemaProperty, values) ||
+      SSO_SECRET_FIELDS.includes(key);
+    if (keep) config[key] = values[key];
+  }
+  return config;
+}
+
 /**
  * Fallback cron used when the schedule toggle is on but no cron was captured
  * yet. Computed lazily (not at module load) so DST-sensitive
@@ -157,6 +180,23 @@ export function IntegrationDetailSheet({
     ([key]) => key !== 'app_type' && key !== 'category',
   ) as [string, SchemaProperty][];
 
+  // The detail sheet never runs the SSO device flow, so switching an existing
+  // integration to `sso` would store no clientId/clientSecret/refreshToken and
+  // the connector would reject it at execute time. Omit the `sso` option unless
+  // the integration is already SSO.
+  const storedConnectionMethod = (integration.config as Record<string, unknown>)
+    ?.connectionMethod;
+  const editPropFor = (key: string, prop: SchemaProperty): SchemaProperty => {
+    if (
+      key !== 'connectionMethod' ||
+      storedConnectionMethod === 'sso' ||
+      !Array.isArray(prop.enum)
+    ) {
+      return prop;
+    }
+    return { ...prop, enum: prop.enum.filter((option) => option !== 'sso') };
+  };
+
   const configValue = (key: string) => {
     const val = (integration.config as Record<string, unknown>)[key];
     if (val === null || val === undefined) return '';
@@ -216,7 +256,7 @@ export function IntegrationDetailSheet({
       id: integration.id,
       data: {
         name: editName.trim(),
-        config: formValues as Record<string, unknown>,
+        config: buildDetailConfig(schema, formValues),
         ...(integration.category === CLOUD_PROVIDER_CATEGORY
           ? {
               syncSchedule: scheduleEnabled
@@ -279,7 +319,8 @@ export function IntegrationDetailSheet({
           {/* Ungrouped properties */}
           {isEditing
             ? ungroupedProperties.map(([key, prop]) => {
-                if (!isPropertyVisible(prop, conditionValues)) return null;
+                const editProp = editPropFor(key, prop);
+                if (!isPropertyVisible(editProp, conditionValues)) return null;
                 const label = prop.title ?? key;
                 const required = schema.required?.includes(key);
                 const textColor = prop['ui:text-color'];
@@ -297,12 +338,12 @@ export function IntegrationDetailSheet({
                     </Label>
                     <SchemaField
                       fieldKey={key}
-                      prop={prop}
+                      prop={editProp}
                       value={formValues[key] ?? ''}
                       onChange={(val) => handleValueChange(key, val)}
                       mode="edit"
                       autoComplete="off"
-                      visible={isPropertyVisible(prop, conditionValues)}
+                      visible={isPropertyVisible(editProp, conditionValues)}
                     />
                     {prop.description && (
                       <p className="text-xs text-muted-foreground">

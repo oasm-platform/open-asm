@@ -28,6 +28,65 @@ const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 /** Schema fields the AWS SSO wizard collects itself (not the raw form). */
 const AWS_SSO_WIZARD_FIELDS = ['region', 'startUrl', 'accountId', 'roleName'];
 
+interface SchemaAllOfEntry {
+  if?: { properties?: Record<string, { const?: unknown }> };
+  then?: { required?: string[] };
+}
+
+/**
+ * Effective required list: top-level `required` PLUS the `then.required` of
+ * every `allOf` entry whose `if.properties` matches the current form values.
+ * The AWS schema keeps method-scoped requirements in `allOf` (not `required`),
+ * so without this an accessKey form with empty credentials would pass
+ * client-side validation and only fail with a generic server toast.
+ */
+function getEffectiveRequired(
+  schema: { required?: string[]; [key: string]: unknown },
+  values: Record<string, unknown>,
+): string[] {
+  const base = (schema.required ?? []).filter(
+    (key) => key !== 'app_type' && key !== 'category',
+  );
+  const required = new Set(base);
+  const allOf = (schema.allOf as SchemaAllOfEntry[] | undefined) ?? [];
+  for (const entry of allOf) {
+    const conditionProps = entry.if?.properties;
+    if (conditionProps) {
+      const matches = Object.entries(conditionProps).every(
+        ([field, cond]) =>
+          cond.const === undefined || values[field] === cond.const,
+      );
+      if (!matches) continue;
+    }
+    for (const key of entry.then?.required ?? []) {
+      if (key !== 'app_type' && key !== 'category') required.add(key);
+    }
+  }
+  return [...required];
+}
+
+/**
+ * Payload config: only entries whose property is currently visible (drops
+ * stale values from a previously selected connection method), plus the
+ * discriminator `connectionMethod`. Never includes `app_type`/`category`.
+ */
+function buildVisibleConfig(
+  schema: { properties?: Record<string, unknown>; [key: string]: unknown },
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  for (const [key, prop] of Object.entries(schema.properties ?? {})) {
+    if (key === 'app_type' || key === 'category') continue;
+    if (!isPropertyVisible(prop as SchemaProperty, values)) continue;
+    if (!(key in values)) continue;
+    config[key] = values[key];
+  }
+  if (values.connectionMethod !== undefined) {
+    config.connectionMethod = values.connectionMethod;
+  }
+  return config;
+}
+
 interface ConnectIntegrationSheetProps {
   schema: {
     $id?: string;
@@ -139,6 +198,8 @@ export function ConnectIntegrationSheet({
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
 
+  const effectiveRequired = getEffectiveRequired(schema, formValues);
+
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     // AWS SSO is completed by the wizard's own Connect button; the sheet form
@@ -154,11 +215,9 @@ export function ConnectIntegrationSheet({
     }
 
     // Client-side required validation: the server 400 would otherwise surface
-    // as a generic failure toast (U4).
-    const requiredFields = (schema.required ?? []).filter(
-      (key) => key !== 'app_type' && key !== 'category',
-    );
-    const missing = requiredFields.filter((key) => {
+    // as a generic failure toast (U4). The effective list folds in allOf
+    // method-scoped requirements.
+    const missing = effectiveRequired.filter((key) => {
       const prop = schema.properties?.[key] as SchemaProperty | undefined;
       if (prop && !isPropertyVisible(prop, formValues)) return false;
       const value = formValues[key];
@@ -180,7 +239,7 @@ export function ConnectIntegrationSheet({
         // syncSchedule is only meaningful for cloud providers; omit it
         // otherwise so other categories never send 'disabled' (U11).
         ...(category === CLOUD_PROVIDER_CATEGORY ? { syncSchedule } : {}),
-        config: formValues as Record<string, unknown>,
+        config: buildVisibleConfig(schema, formValues),
       },
     });
   };
@@ -263,7 +322,7 @@ export function ConnectIntegrationSheet({
           {ungroupedProperties.map(([key, prop]) => {
             if (!isPropertyVisible(prop, formValues)) return null;
             const label = prop.title ?? key;
-            const required = schema.required?.includes(key);
+            const required = effectiveRequired.includes(key);
             const textColor = prop['ui:text-color'];
 
             return (

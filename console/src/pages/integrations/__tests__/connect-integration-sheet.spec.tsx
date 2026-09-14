@@ -144,21 +144,61 @@ const awsSchema = {
       'ui:visibleWhen': { field: 'connectionMethod', equals: 'sso' },
     },
   },
-  // Every method-scoped field is required at the top level; the sheet must skip
-  // the ones hidden by connectionMethod (todo 12), so hidden fields never block.
-  required: [
-    'app_type',
-    'category',
-    'connectionMethod',
-    'region',
-    'accessKeyId',
-    'secretAccessKey',
-    'roleArn',
-    'externalId',
-    'webIdentityToken',
-    'startUrl',
-    'accountId',
-    'roleName',
+  // Mirrors core-api aws.schema.ts: top-level required only names the
+  // discriminators; per-method requirements live in allOf.if/then.required.
+  required: ['app_type', 'category', 'connectionMethod', 'region'],
+  allOf: [
+    {
+      if: {
+        properties: { connectionMethod: { const: 'accessKey' } },
+        required: ['connectionMethod'],
+      },
+      then: { required: ['region', 'accessKeyId', 'secretAccessKey'] },
+    },
+    {
+      if: {
+        properties: { connectionMethod: { const: 'assumeRole' } },
+        required: ['connectionMethod'],
+      },
+      then: {
+        required: [
+          'region',
+          'roleArn',
+          'externalId',
+          'accessKeyId',
+          'secretAccessKey',
+        ],
+      },
+    },
+    {
+      if: {
+        properties: { connectionMethod: { const: 'crossAccountRole' } },
+        required: ['connectionMethod'],
+      },
+      then: {
+        required: [
+          'region',
+          'roleArn',
+          'externalId',
+          'accessKeyId',
+          'secretAccessKey',
+        ],
+      },
+    },
+    {
+      if: {
+        properties: { connectionMethod: { const: 'workloadIdentity' } },
+        required: ['connectionMethod'],
+      },
+      then: { required: ['region', 'roleArn', 'webIdentityToken'] },
+    },
+    {
+      if: {
+        properties: { connectionMethod: { const: 'sso' } },
+        required: ['connectionMethod'],
+      },
+      then: { required: ['region', 'startUrl', 'accountId', 'roleName'] },
+    },
   ],
   isAvailable: true,
 };
@@ -562,5 +602,55 @@ describe('ConnectIntegrationSheet', () => {
     expect(toast.error).not.toHaveBeenCalledWith(
       expect.stringContaining('required fields'),
     );
+  });
+
+  it('blocks submit on a missing method-scoped allOf required field', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await screen.findByRole('button', { name: /connect/i });
+
+    // accessKey is default; only the secret is filled — accessKeyId is missing
+    // via allOf.then.required, not top-level required.
+    await user.type(screen.getByLabelText(/secret access key/i), 'shh');
+    await user.click(screen.getByRole('button', { name: /connect/i }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('accessKeyId'),
+      );
+    });
+    expect(mocks.createMutate).not.toHaveBeenCalled();
+  });
+
+  it('excludes hidden method-scoped fields from the payload after switching method', async () => {
+    const { user } = renderWithProviders(
+      <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
+    );
+    await screen.findByRole('button', { name: /connect/i });
+
+    // Fill the accessKey credentials first…
+    await user.type(screen.getByLabelText(/access key id/i), 'AKIA-STALE');
+    await user.type(screen.getByLabelText(/secret access key/i), 'stale-secret');
+
+    // …then switch methods; those values are now hidden and must not ship.
+    await selectConnectionMethod(user, 'Workload Identity');
+    await user.type(screen.getByLabelText(/role arn/i), 'arn:aws:iam::1:role/x');
+    await user.type(
+      screen.getByLabelText(/web identity token/i),
+      'token-1',
+    );
+    await user.click(screen.getByRole('button', { name: /connect/i }));
+
+    await waitFor(() => {
+      expect(mocks.createMutate).toHaveBeenCalled();
+    });
+    const config = mocks.createMutate.mock.calls[0][0].data.config;
+    expect(config).toEqual({
+      connectionMethod: 'workloadIdentity',
+      region: 'us-east-1',
+      roleArn: 'arn:aws:iam::1:role/x',
+      webIdentityToken: 'token-1',
+    });
   });
 });

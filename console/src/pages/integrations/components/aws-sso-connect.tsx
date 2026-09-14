@@ -226,7 +226,7 @@ export function AwsSsoConnect({
           value={region}
           onChange={(e) => setRegion(e.target.value)}
           placeholder="us-east-1"
-          disabled={phase === 'authorizing'}
+          disabled={phase === 'authorizing' || phase === 'authorized'}
         />
       </div>
 
@@ -239,7 +239,7 @@ export function AwsSsoConnect({
           value={startUrl}
           onChange={(e) => setStartUrl(e.target.value)}
           placeholder="https://my-sso-portal.awsapps.com/start"
-          disabled={phase === 'authorizing'}
+          disabled={phase === 'authorizing' || phase === 'authorized'}
         />
       </div>
 
