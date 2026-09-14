@@ -464,7 +464,7 @@ describe('IntegrationSyncService', () => {
       );
     });
 
-    it('persistConfigPatch re-reads the current row and updates only the config column with the merged patch', async () => {
+    it('persistConfigPatch re-reads the current row and saves the merged, re-encrypted config', async () => {
       let capturedPatch:
         | ((patch: Record<string, unknown>) => Promise<void>)
         | undefined;
@@ -499,13 +499,11 @@ describe('IntegrationSyncService', () => {
       expect(repoMock.findOneBy).toHaveBeenCalledWith({
         id: 'integration-1',
       });
-      // Only the config column is written — never the stale full entity.
-      const [criteria, patch] = repoMock.update.mock.calls.at(-1) as [
-        { id: string },
-        { config: Record<string, unknown> },
-      ];
-      expect(criteria).toEqual({ id: 'integration-1' });
-      const stored = patch.config;
+      expect(repoMock.update).not.toHaveBeenCalled();
+      const saved = repoMock.save.mock.calls.at(-1)?.[0] as {
+        config: Record<string, unknown>;
+      };
+      const stored = saved.config;
       const decrypted = decryptSensitiveConfigFields(
         stored,
         Buffer.alloc(32, 1),
@@ -537,9 +535,10 @@ describe('IntegrationSyncService', () => {
       repoMock.update.mockClear();
 
       await service.runSync('integration-1', 'ws-1');
+      repoMock.save.mockClear();
       await capturedPatch?.({ refreshToken: 'rotated-token' });
 
-      expect(repoMock.update).not.toHaveBeenCalled();
+      expect(repoMock.save).not.toHaveBeenCalled();
     });
 
     it('rejects a scheduled AWS workloadIdentity sync before dispatching the connector', async () => {

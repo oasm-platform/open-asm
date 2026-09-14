@@ -296,7 +296,7 @@ export class IntegrationsController {
     // preserving the account order.
     const accounts: {
       accountId: string;
-      accountName: string;
+      accountName?: string;
       roles: string[];
     }[] = [];
     for (let i = 0; i < ssoAccounts.length; i += SSO_ROLE_FETCH_CONCURRENCY) {

@@ -260,14 +260,14 @@ export class IntegrationSyncService implements OnModuleInit {
         });
         if (!current) return;
         const dek = await this.workspaceEncryption.getDEK(workspaceId);
-        const merged = {
-          ...decryptSensitiveConfigFields(current.config, dek),
-          ...patch,
-        };
-        await this.integrationRepository.update(
-          { id: integrationId },
-          { config: encryptSensitiveConfigFields(merged, dek) },
+        current.config = encryptSensitiveConfigFields(
+          {
+            ...decryptSensitiveConfigFields(current.config, dek),
+            ...patch,
+          },
+          dek,
         );
+        await this.integrationRepository.save(current);
       },
     } as unknown as CloudProviderSyncConfig;
 
