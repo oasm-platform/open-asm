@@ -93,7 +93,7 @@
     "react-jsx-parser": "^2.4.1",
     "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0",
-    "recharts": "3.8.0",
+    "recharts": "3.10.1",
     "remark-gfm": "^4.0.1",
     "shiki": "^4.0.2",
     "sonner": "^2.0.6",
