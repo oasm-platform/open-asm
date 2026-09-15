@@ -17,6 +17,7 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     limit: number;
     ipAddresses?: string[];
     ports?: string[];
+    urls?: string[];
     techs?: string[];
     tlsHosts?: string[];
     statusCodes?: string[];
@@ -45,6 +46,7 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ipAddresses?: string[];
     techs?: string[];
     ports?: string[];
+    urls?: string[];
     hosts?: string[];
     statusCodes?: string[];
     tlsHosts?: string[];
@@ -101,6 +103,7 @@ export default function AssetProvider({
 
   const ipAddresses = toArray(search.ipAddresses);
   const ports = toArray(search.ports);
+  const urls = toArray(search.urls);
   const techs = toArray(search.techs);
   const hosts = toArray(search.hosts);
   const statusCodes = toArray(search.statusCodes);
@@ -165,6 +168,7 @@ export default function AssetProvider({
       limit: tableParams.pageSize,
       ipAddresses: ipAddresses,
       ports: ports,
+      urls: urls,
       techs: techs,
       hosts: hosts,
       statusCodes: statusCodes,
@@ -184,6 +188,7 @@ export default function AssetProvider({
       tableParams.sortOrder,
       ipAddresses,
       ports,
+      urls,
       techs,
       hosts,
       statusCodes,
@@ -215,6 +220,7 @@ export default function AssetProvider({
           tableParams.sortOrder,
           ipAddresses,
           ports,
+          urls,
           techs,
           hosts,
           statusCodes,
@@ -234,6 +240,7 @@ export default function AssetProvider({
       refetchInterval,
       ipAddresses,
       ports,
+      urls,
       techs,
       hosts,
       statusCodes,
@@ -255,6 +262,7 @@ export default function AssetProvider({
         filterParams: {
           ipAddresses,
           ports,
+          urls,
           techs,
           hosts,
           statusCodes,

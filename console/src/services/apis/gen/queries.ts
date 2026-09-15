@@ -1443,6 +1443,20 @@ export type GetManyGetPortAssetsDTODto = {
   pageCount: number;
 };
 
+export type GetUrlAssetsDTO = {
+  url: string;
+  assetCount: number;
+};
+
+export type GetManyGetUrlAssetsDTODto = {
+  data: GetUrlAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type TechnologyDetailDTOJs = { [key: string]: unknown };
 
 export type TechnologyDetailDTOMeta = { [key: string]: unknown };
@@ -3186,6 +3200,7 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  urls?: string[];
   /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
@@ -3210,6 +3225,7 @@ export type AssetsControllerGetIpAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  urls?: string[];
   /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
@@ -3234,6 +3250,7 @@ export type AssetsControllerGetHostAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  urls?: string[];
   /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
@@ -3258,6 +3275,32 @@ export type AssetsControllerGetPortAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  urls?: string[];
+  /**
+   * Filter assets created on or after this date (YYYY-MM-DD)
+   */
+  startDate?: string;
+  /**
+   * Filter assets created on or before this date (YYYY-MM-DD)
+   */
+  endDate?: string;
+};
+
+export type AssetsControllerGetUrlAssetsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  value?: string;
+  targetIds?: string[];
+  ipAddresses?: string[];
+  ports?: string[];
+  hosts?: string[];
+  techs?: string[];
+  statusCodes?: string[];
+  tlsHosts?: string[];
+  urls?: string[];
   /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
@@ -3282,6 +3325,7 @@ export type AssetsControllerGetTechnologyAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  urls?: string[];
   /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
@@ -3306,6 +3350,7 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  urls?: string[];
   /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
@@ -16158,6 +16203,365 @@ export function useAssetsControllerGetPortAssets<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getAssetsControllerGetPortAssetsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves a list of discovered urls with number of asset services.
+ * @summary Get urls along with number of assets
+ */
+export const assetsControllerGetUrlAssets = (
+  params?: AssetsControllerGetUrlAssetsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetUrlAssetsDTODto>(
+    { url: `/api/assets/url`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetUrlAssetsInfiniteQueryKey = (
+  params?: AssetsControllerGetUrlAssetsParams,
+) => {
+  return ['infinite', `/api/assets/url`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetUrlAssetsQueryKey = (
+  params?: AssetsControllerGetUrlAssetsParams,
+) => {
+  return [`/api/assets/url`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetUrlAssetsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+    AssetsControllerGetUrlAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetUrlAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetUrlAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetUrlAssetsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+    QueryKey,
+    AssetsControllerGetUrlAssetsParams['page']
+  > = ({ signal, pageParam }) =>
+    assetsControllerGetUrlAssets(
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+    TError,
+    TData,
+    QueryKey,
+    AssetsControllerGetUrlAssetsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetUrlAssetsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>
+>;
+export type AssetsControllerGetUrlAssetsInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetUrlAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+    AssetsControllerGetUrlAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AssetsControllerGetUrlAssetsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetUrlAssetsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetUrlAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+    AssetsControllerGetUrlAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetUrlAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetUrlAssetsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetUrlAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+    AssetsControllerGetUrlAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetUrlAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetUrlAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get urls along with number of assets
+ */
+
+export function useAssetsControllerGetUrlAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+    AssetsControllerGetUrlAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetUrlAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetUrlAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetUrlAssetsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getAssetsControllerGetUrlAssetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetUrlAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetUrlAssetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>
+  > = ({ signal }) =>
+    assetsControllerGetUrlAssets(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetUrlAssetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>
+>;
+export type AssetsControllerGetUrlAssetsQueryError = unknown;
+
+export function useAssetsControllerGetUrlAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+  TError = unknown,
+>(
+  params: undefined | AssetsControllerGetUrlAssetsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetUrlAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetUrlAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetUrlAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetUrlAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get urls along with number of assets
+ */
+
+export function useAssetsControllerGetUrlAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetUrlAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetUrlAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetUrlAssetsQueryOptions(
     params,
     options,
   );

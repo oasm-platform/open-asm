@@ -10,6 +10,7 @@ import StatusCodeAssetsTab from './components/status-code-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
 import TlsAssetsTab from './components/tls-assets-tab';
+import UrlAssetsTab from './components/url-assets-tab';
 import { GraphTab } from './components/graph-tab';
 
 const VALID_VALUES = [
@@ -17,6 +18,7 @@ const VALID_VALUES = [
   'host',
   'port',
   'ip',
+  'urls',
   'technology',
   'status-code',
   'tls',
@@ -44,6 +46,11 @@ export function ListAssets() {
       value: 'ip',
       text: 'IP Addresses',
       tab: <IpAssetsTab />,
+    },
+    {
+      value: 'urls',
+      text: 'URLs',
+      tab: <UrlAssetsTab />,
     },
     {
       value: 'technology',

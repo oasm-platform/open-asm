@@ -197,6 +197,40 @@ describe('AssetsService', () => {
         (mockAssetServiceRepository as any).addOrderBy,
       ).toHaveBeenCalledWith('asset_service.id', 'ASC');
     });
+
+    it('matches services by urls via EXISTS on discovered_urls only', async () => {
+      await service.getManyAsssetServices(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+          urls: ['https://a.com/probe'],
+        } as any,
+        'workspace-uuid',
+      );
+
+      const andWhere = mockAssetServiceRepository.andWhere as jest.Mock;
+      const urlsClause = andWhere.mock.calls
+        .map((call) => String(call[0]))
+        .find((clause) => clause.includes('EXISTS'));
+      expect(urlsClause).toBeDefined();
+      // The URL list is sourced from `discovered_urls` only; http_responses
+      // entries are httpx probe targets, not discovered urls.
+      expect(urlsClause).toContain('discovered_urls du');
+      expect(urlsClause).toContain('du.url = ANY(:urls)');
+      expect(urlsClause).not.toContain('http_responses');
+      expect(andWhere).toHaveBeenCalledWith(urlsClause, {
+        urls: ['https://a.com/probe'],
+      });
+      // The join-based filter is gone: no discoveredUrls join may remain.
+      expect(
+        (mockAssetServiceRepository as any).leftJoin,
+      ).not.toHaveBeenCalledWith(
+        'asset_service.discoveredUrls',
+        'discoveredUrls',
+      );
+    });
   });
 
   describe('getHostAssets', () => {
@@ -287,6 +321,155 @@ describe('AssetsService', () => {
         createdAt: new Date('2026-08-01T00:00:00.000Z'),
       });
     });
+  });
+
+  describe('getUrlAssets', () => {
+    /** SQL handed to `dataSource.createQueryBuilder().from(...)`. */
+    const fromSql = (): string =>
+      String(((mockDataSource as any).from as jest.Mock).mock.calls[0][0]);
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (mockAssetServiceRepository as any).select = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).where = jest.fn().mockReturnThis();
+      (mockAssetServiceRepository as any).getQuery = jest
+        .fn()
+        .mockReturnValue(
+          'SELECT asset_service.id FROM asset_services asset_service',
+        );
+      (mockAssetServiceRepository as any).getParameters = jest
+        .fn()
+        .mockReturnValue({ workspaceId: 'workspace-uuid' });
+      (mockDataSource as any).addSelect = jest.fn().mockReturnThis();
+      (mockDataSource as any).orderBy = jest.fn().mockReturnThis();
+      (mockDataSource as any).limit = jest.fn().mockReturnThis();
+      (mockDataSource as any).offset = jest.fn().mockReturnThis();
+      (mockDataSource as any).setParameters = jest.fn().mockReturnThis();
+      (mockDataSource as any).getRawOne = jest
+        .fn()
+        .mockResolvedValue({ count: '0' });
+      (mockDataSource as any).getRawMany = jest.fn().mockResolvedValue([]);
+    });
+
+    it('aggregates discovered_urls only, scoped to the filtered services', async () => {
+      (mockDataSource as any).getRawMany = jest.fn().mockResolvedValue([
+        { url: 'https://a.com/admin', assetCount: '3' },
+        { url: 'https://a.com/login', assetCount: '1' },
+      ]);
+      (mockDataSource as any).getRawOne = jest
+        .fn()
+        .mockResolvedValue({ count: '2' });
+
+      const result = await service.getUrlAssets(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'assetCount',
+          sortOrder: 'DESC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(result.total).toBe(2);
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0]).toMatchObject({
+        url: 'https://a.com/admin',
+        assetCount: '3',
+      });
+
+      // The single url source is `discovered_urls`; http_responses rows are
+      // httpx probe targets and must never widen the URL list.
+      const sql = fromSql();
+      expect(sql).toContain('discovered_urls');
+      expect(sql).not.toContain('http_responses');
+      expect(sql).not.toContain('UNION');
+      expect(sql).toContain('COUNT(DISTINCT du."assetServiceId")');
+      expect(sql).toContain('GROUP BY du.url');
+      // Every base filter still applies through the filtered service scope.
+      expect(sql).toContain(
+        'SELECT asset_service.id FROM asset_services asset_service',
+      );
+      // The now-unused discoveredUrls join must be gone (it only caused row
+      // multiplication for the paginated /api/assets query).
+      expect(
+        (mockAssetServiceRepository as any).leftJoin,
+      ).not.toHaveBeenCalledWith(
+        'asset_service.discoveredUrls',
+        'discoveredUrls',
+      );
+    });
+
+    it('returns total 0 when discovered_urls has no urls', async () => {
+      const result = await service.getUrlAssets(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'assetCount',
+          sortOrder: 'DESC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(result.total).toBe(0);
+      expect(result.data).toEqual([]);
+    });
+
+    it('applies the value filter case-insensitively on the discovered url', async () => {
+      await service.getUrlAssets(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'assetCount',
+          sortOrder: 'DESC',
+          value: 'admin',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(fromSql()).toContain('du.url ILIKE :urlValue');
+      const parameterCalls = (mockDataSource as any).setParameters.mock
+        .calls as unknown[][];
+      expect(
+        parameterCalls.some(
+          (call) =>
+            (call[0] as Record<string, unknown>).urlValue === '%admin%',
+        ),
+      ).toBe(true);
+    });
+
+    it('falls back to assetCount ordering for unknown sortBy values', async () => {
+      await service.getUrlAssets(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'bogus',
+          sortOrder: 'ASC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect((mockDataSource as any).orderBy).toHaveBeenCalledWith(
+        't."assetCount"',
+        'ASC',
+      );
+    });
+
+    it('sorts by the union url column when sortBy=url', async () => {
+      await service.getUrlAssets(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'url',
+          sortOrder: 'ASC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect((mockDataSource as any).orderBy).toHaveBeenCalledWith('t.url', 'ASC');
+    });
+
   });
 
   describe('getManyTls', () => {

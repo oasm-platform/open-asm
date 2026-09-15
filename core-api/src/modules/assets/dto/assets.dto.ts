@@ -123,6 +123,16 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   )
   tlsHosts?: string[];
 
+  @ApiProperty({
+    required: false,
+  })
+  @IsString({ each: true })
+  @IsOptional()
+  @Transform(({ value }: { value: string | string[] }): string[] =>
+    Array.isArray(value) ? value : [value],
+  )
+  urls?: string[];
+
   @ApiProperty({ required: false, description: 'Filter assets created on or after this date (YYYY-MM-DD)' })
   @IsOptional()
   @IsDateString()

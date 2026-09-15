@@ -31,6 +31,7 @@ import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
+import { GetUrlAssetsDTO } from './dto/get-url-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import {
@@ -211,6 +212,7 @@ export class AssetsService {
       techs,
       statusCodes,
       tlsHosts,
+      urls,
     } = query;
 
     const whereBuilder = {
@@ -233,6 +235,13 @@ export class AssetsService {
       ports: {
         value: ports,
         whereClause: `asset_service.port = ANY(:param)`,
+      },
+      urls: {
+        value: urls,
+        // A url row originates from `discovered_urls` (the gau
+        // `url_discovery` connector). EXISTS keeps the filter independent of
+        // any join, so asset pagination is not multiplied by url rows.
+        whereClause: `EXISTS (SELECT 1 FROM discovered_urls du WHERE du."assetServiceId" = asset_service.id AND du.url = ANY(:param))`,
       },
       statusCodes: {
         value: statusCodes,
@@ -713,6 +722,80 @@ export class AssetsService {
     const data = list.map((item: GetPortAssetsDTO) => {
       const obj = new GetPortAssetsDTO();
       obj.port = item.port;
+      obj.assetCount = item.assetCount;
+      return obj;
+    });
+
+    return getManyResponse({ query, data, total });
+  }
+
+  /**
+   * Retrieves a list of discovered urls with number of asset services
+   *
+   * Single source: `discovered_urls` (the gau `url_discovery` connector).
+   * Rows are grouped by url with COUNT(DISTINCT assetServiceId).
+   * `http_responses` (httpx probe targets) are deliberately excluded — they
+   * are probe endpoints, not discovered urls.
+   *
+   * @returns A promise that resolves to the list of discovered urls.
+   *
+   */
+  public async getUrlAssets(
+    query: GetAssetsQueryDto,
+    workspaceId: string,
+  ): Promise<GetManyBaseResponseDto<GetUrlAssetsDTO>> {
+    const offset = (query.page - 1) * query.limit;
+
+    // Whitelist: unknown sortBy values fall back to the aggregate column.
+    const sortColumn =
+      query.sortBy === 'url' ? 't.url' : 't."assetCount"';
+
+    // The filtered asset-service scope: reusing buildBaseQuery keeps every
+    // filter (targetIds/hosts/ip/ports/techs/statusCodes/tls/dates) intact.
+    const filteredServicesQuery = this.buildBaseQuery(
+      query,
+      workspaceId,
+    ).select('asset_service.id');
+
+    const parameters: Record<string, unknown> = {
+      ...filteredServicesQuery.getParameters(),
+    };
+    if (query.value) {
+      parameters.urlValue = `%${query.value}%`;
+    }
+
+    const groupedSql = `
+      SELECT du.url AS url, COUNT(DISTINCT du."assetServiceId") AS "assetCount"
+      FROM discovered_urls du
+      WHERE du.url IS NOT NULL AND du.url <> ''
+        AND du."assetServiceId" IN (${filteredServicesQuery.getQuery()})${
+          query.value ? ' AND du.url ILIKE :urlValue' : ''
+        }
+      GROUP BY du.url
+    `;
+
+    const totalInDb = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(*)')
+      .from('(' + groupedSql + ')', 't1')
+      .setParameters(parameters)
+      .getRawOne<{ count: number }>();
+
+    const list = await this.dataSource
+      .createQueryBuilder()
+      .select('t.url AS url, t."assetCount" AS "assetCount"')
+      .from('(' + groupedSql + ')', 't')
+      .setParameters(parameters)
+      .orderBy(sortColumn, query.sortOrder)
+      .limit(query.limit)
+      .offset(offset)
+      .getRawMany<GetUrlAssetsDTO>();
+
+    const total = totalInDb?.count ?? 0;
+
+    const data = list.map((item: GetUrlAssetsDTO) => {
+      const obj = new GetUrlAssetsDTO();
+      obj.url = item.url;
       obj.assetCount = item.assetCount;
       return obj;
     });

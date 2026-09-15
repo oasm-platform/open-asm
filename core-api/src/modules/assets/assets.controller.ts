@@ -18,6 +18,7 @@ import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
+import { GetUrlAssetsDTO } from './dto/get-url-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { ToggleAssetDto } from './dto/toggle-asset.dto';
@@ -112,6 +113,26 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetsService.getPortAssets(query, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get urls along with number of assets',
+    description:
+      'Retrieves a list of discovered urls with number of asset services.',
+    response: {
+      serialization: GetManyResponseDto(GetUrlAssetsDTO),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('asset.read')
+  @Get('/url')
+  getUrlAssets(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getUrlAssets(query, workspaceId);
   }
 
   @Doc({

@@ -18,6 +18,7 @@ const targetDetailSearchSchema = z.object({
   targetId: z.string().optional(),
   ipAddresses: z.union([z.string(), z.array(z.string())]).optional(),
   ports: z.union([z.string(), z.array(z.string())]).optional(),
+  urls: z.union([z.string(), z.array(z.string())]).optional(),
   techs: z.union([z.string(), z.array(z.string())]).optional(),
   hosts: z.union([z.string(), z.array(z.string())]).optional(),
   statusCodes: z.union([z.string(), z.array(z.string())]).optional(),

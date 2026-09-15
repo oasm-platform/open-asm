@@ -13,6 +13,7 @@ import {
   StatusCodesFacetedFilter,
   TechsFacetedFilter,
   TlsFacetedFilter,
+  UrlsFacetedFilter,
 } from './faceted-filter';
 
 export default function FilterFormInfinite() {
@@ -36,6 +37,7 @@ export default function FilterFormInfinite() {
     'statusCodes',
     'techs',
     'ports',
+    'urls',
     'hosts',
     'tlsHosts',
   ];
@@ -56,6 +58,7 @@ export default function FilterFormInfinite() {
         <div className="flex flex-wrap gap-x-2 gap-y-2 md:flex-nowrap md:gap-x-2">
           <IpFacetedFilter />
           <PortFacetedFilter />
+          <UrlsFacetedFilter />
           <TechsFacetedFilter />
           <StatusCodesFacetedFilter />
           <HostsFacetedFilter />
