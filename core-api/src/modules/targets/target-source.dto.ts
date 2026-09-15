@@ -1,4 +1,3 @@
-import { cloudflareSchema } from '@/modules/integrations/schemas/cloudflare.schema';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -24,11 +23,26 @@ export class TargetSourceDto {
 }
 
 /**
- * Integration schemas keyed by `$id`. Extend with a new entry when another
- * integration starts creating targets (raw `source` = schema `$id`).
+ * Lightweight metadata for integration-backed target sources, keyed by the
+ * integration schema `$id` (raw `source` value). Deliberately local so the
+ * targets module does not depend on connector/schema/AWS-SDK code, which would
+ * create an integrations↔targets module cycle. Add an entry when another
+ * integration starts creating targets.
  */
-const INTEGRATION_SOURCE_SCHEMAS: Record<string, typeof cloudflareSchema> = {
-  [cloudflareSchema.$id]: cloudflareSchema,
+interface IntegrationSourceSchema {
+  title: string;
+  icon?: string;
+}
+
+const INTEGRATION_SOURCE_SCHEMAS: Record<string, IntegrationSourceSchema> = {
+  cloudflare: {
+    title: 'Cloudflare',
+    icon: '/static/images/integrations/cloudflare.svg',
+  },
+  aws: {
+    title: 'AWS',
+    icon: '/static/images/integrations/aws.svg',
+  },
 };
 
 const MANUAL_SOURCE: TargetSourceDto = { source: 'Manual', icon: '' };

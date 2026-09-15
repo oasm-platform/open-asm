@@ -1,11 +1,15 @@
 import { NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { IntegrationType } from '@/common/enums/enum';
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
 import { IntegrationsController } from './integrations.controller';
+import { AwsSsoCompleteDto } from './dto/aws-sso.dto';
 import type { IntegrationsService } from './integrations.service';
 import type { TelegramConnectService } from './telegram-connect.service';
 import type { TelegramWebhookService } from './telegram-webhook.service';
+import type { AwsSsoService } from './connectors/aws/aws-sso.service';
 
 /**
  * API contract tests (SC-API-1..4) — controller mapping only, service mocked.
@@ -15,6 +19,12 @@ describe('IntegrationsController', () => {
     syncIntegration: jest.Mock;
     testIntegration: jest.Mock;
     createIntegration: jest.Mock;
+  };
+  let awsSsoServiceMock: {
+    startDeviceAuth: jest.Mock;
+    pollDeviceAuth: jest.Mock;
+    listSsoAccounts: jest.Mock;
+    listSsoRoles: jest.Mock;
   };
   let controller: IntegrationsController;
 
@@ -27,11 +37,18 @@ describe('IntegrationsController', () => {
       testIntegration: jest.fn(),
       createIntegration: jest.fn().mockResolvedValue({ id: 'integration-1' }),
     };
+    awsSsoServiceMock = {
+      startDeviceAuth: jest.fn(),
+      pollDeviceAuth: jest.fn(),
+      listSsoAccounts: jest.fn(),
+      listSsoRoles: jest.fn(),
+    };
 
     controller = new IntegrationsController(
       integrationsServiceMock as unknown as IntegrationsService,
       {} as unknown as TelegramConnectService,
       {} as unknown as TelegramWebhookService,
+      awsSsoServiceMock as unknown as AwsSsoService,
     );
   });
 
@@ -90,8 +107,8 @@ describe('IntegrationsController', () => {
     integrationsServiceMock.testIntegration.mockResolvedValue({
       success: false,
       category: IntegrationType.CLOUD_PROVIDER,
-      appType: 'aws',
-      message: 'No connector registered for appType "aws"',
+      appType: 'unregistered-app',
+      message: 'No connector registered for appType "unregistered-app"',
       timestamp: new Date().toISOString(),
     });
 
@@ -129,6 +146,232 @@ describe('IntegrationsController', () => {
       userId: 'user-1',
     });
   });
+
+  describe('AWS SSO connect endpoints', () => {
+    it('device maps the DTO into startDeviceAuth and returns the payload', async () => {
+      awsSsoServiceMock.startDeviceAuth.mockResolvedValue({
+        clientId: 'c1',
+        clientSecret: 's1',
+        deviceCode: 'd1',
+        userCode: 'ABCD-EFGH',
+        verificationUri: 'https://device.example/',
+        interval: 5,
+        expiresIn: 600,
+      });
+
+      const response = await controller.startAwsSsoDevice({
+        region: 'us-east-1',
+        startUrl: 'https://acme.awsapps.com/start',
+      });
+
+      expect(awsSsoServiceMock.startDeviceAuth).toHaveBeenCalledWith({
+        region: 'us-east-1',
+        startUrl: 'https://acme.awsapps.com/start',
+      });
+      expect(response.clientId).toBe('c1');
+      expect(response.deviceCode).toBe('d1');
+      expect(integrationsServiceMock.createIntegration).not.toHaveBeenCalled();
+    });
+
+    it('poll pending returns pending and creates no integration', async () => {
+      awsSsoServiceMock.pollDeviceAuth.mockResolvedValue({ status: 'pending' });
+
+      const response = await controller.pollAwsSsoDevice({
+        region: 'us-east-1',
+        clientId: 'c1',
+        clientSecret: 's1',
+        deviceCode: 'd1',
+      });
+
+      expect(response).toEqual({ status: 'pending' });
+      expect(awsSsoServiceMock.listSsoAccounts).not.toHaveBeenCalled();
+      expect(integrationsServiceMock.createIntegration).not.toHaveBeenCalled();
+    });
+
+    it('poll slow_down returns slow_down without listing accounts', async () => {
+      awsSsoServiceMock.pollDeviceAuth.mockResolvedValue({
+        status: 'slow_down',
+      });
+
+      const response = await controller.pollAwsSsoDevice({
+        region: 'us-east-1',
+        clientId: 'c1',
+        clientSecret: 's1',
+        deviceCode: 'd1',
+      });
+
+      expect(response).toEqual({ status: 'slow_down' });
+      expect(awsSsoServiceMock.listSsoAccounts).not.toHaveBeenCalled();
+    });
+
+    it('poll authorized returns the refresh token plus accounts with roles', async () => {
+      awsSsoServiceMock.pollDeviceAuth.mockResolvedValue({
+        status: 'authorized',
+        accessToken: 'at-1',
+        refreshToken: 'rt-1',
+      });
+      awsSsoServiceMock.listSsoAccounts.mockResolvedValue([
+        { accountId: '111', accountName: 'Prod' },
+        { accountId: '222', accountName: 'Dev' },
+      ]);
+      awsSsoServiceMock.listSsoRoles
+        .mockResolvedValueOnce([
+          { roleName: 'Admin' },
+          { roleName: 'ReadOnly' },
+        ])
+        .mockResolvedValueOnce([{ roleName: 'Dev' }]);
+
+      const response = await controller.pollAwsSsoDevice({
+        region: 'us-east-1',
+        clientId: 'c1',
+        clientSecret: 's1',
+        deviceCode: 'd1',
+      });
+
+      expect(response).toEqual({
+        status: 'authorized',
+        refreshToken: 'rt-1',
+        accounts: [
+          { accountId: '111', accountName: 'Prod', roles: ['Admin', 'ReadOnly'] },
+          { accountId: '222', accountName: 'Dev', roles: ['Dev'] },
+        ],
+      });
+      expect(awsSsoServiceMock.listSsoRoles).toHaveBeenCalledWith({
+        region: 'us-east-1',
+        accessToken: 'at-1',
+        accountId: '111',
+      });
+      expect(awsSsoServiceMock.listSsoRoles).toHaveBeenCalledWith({
+        region: 'us-east-1',
+        accessToken: 'at-1',
+        accountId: '222',
+      });
+      expect(integrationsServiceMock.createIntegration).not.toHaveBeenCalled();
+    });
+
+    it('poll authorized with many accounts bounds listSsoRoles concurrency and preserves order', async () => {
+      awsSsoServiceMock.pollDeviceAuth.mockResolvedValue({
+        status: 'authorized',
+        accessToken: 'at-1',
+        refreshToken: 'rt-1',
+      });
+      const ssoAccounts = Array.from({ length: 12 }, (_v, i) => ({
+        accountId: String(i),
+        accountName: `Acct-${i}`,
+      }));
+      awsSsoServiceMock.listSsoAccounts.mockResolvedValue(ssoAccounts);
+
+      let inFlight = 0;
+      let maxInFlight = 0;
+      awsSsoServiceMock.listSsoRoles.mockImplementation(
+        async (args: { accountId: string }) => {
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          inFlight--;
+          return [{ roleName: `Role-${args.accountId}` }];
+        },
+      );
+
+      const response = await controller.pollAwsSsoDevice({
+        region: 'us-east-1',
+        clientId: 'c1',
+        clientSecret: 's1',
+        deviceCode: 'd1',
+      });
+
+      expect(maxInFlight).toBeLessThanOrEqual(5);
+      expect(awsSsoServiceMock.listSsoRoles).toHaveBeenCalledTimes(12);
+      expect(response.accounts.map((a) => a.accountId)).toEqual(
+        ssoAccounts.map((a) => a.accountId),
+      );
+      expect(response.accounts[7]).toEqual({
+        accountId: '7',
+        accountName: 'Acct-7',
+        roles: ['Role-7'],
+      });
+    });
+
+    it('complete maps the DTO to createIntegration as aws/CLOUD_PROVIDER and returns the masked config', async () => {
+      integrationsServiceMock.createIntegration.mockResolvedValue({
+        id: 'integration-9',
+        appType: 'aws',
+        category: IntegrationType.CLOUD_PROVIDER,
+        config: {
+          connectionMethod: 'sso',
+          region: 'us-east-1',
+          accountId: '111',
+          roleName: 'Admin',
+          clientId: 'c1',
+          clientSecret: '****cret',
+          refreshToken: '****oken',
+        },
+      });
+
+      const response = await controller.completeAwsSso({
+        name: 'AWS SSO',
+        region: 'us-east-1',
+        startUrl: 'https://acme.awsapps.com/start',
+        accountId: '111',
+        roleName: 'Admin',
+        clientId: 'c1',
+        clientSecret: 's1',
+        refreshToken: 'rt-1',
+      }, 'ws-1', 'user-1');
+
+      expect(integrationsServiceMock.createIntegration).toHaveBeenCalledWith({
+        name: 'AWS SSO',
+        description: undefined,
+        appType: 'aws',
+        category: IntegrationType.CLOUD_PROVIDER,
+        config: {
+          connectionMethod: 'sso',
+          region: 'us-east-1',
+          startUrl: 'https://acme.awsapps.com/start',
+          accountId: '111',
+          roleName: 'Admin',
+          clientId: 'c1',
+          clientSecret: 's1',
+          refreshToken: 'rt-1',
+        },
+        workspaceId: 'ws-1',
+        userId: 'user-1',
+        syncSchedule: undefined,
+      });
+      expect(response.config.clientSecret).toBe('****cret');
+      expect(response.config.refreshToken).toBe('****oken');
+    });
+  });
+});
+
+describe('AwsSsoCompleteDto.name length bound', () => {
+  const base = {
+    region: 'us-east-1',
+    startUrl: 'https://acme.awsapps.com/start',
+    accountId: '111',
+    roleName: 'Admin',
+    clientId: 'c1',
+    clientSecret: 's1',
+    refreshToken: 'rt-1',
+  };
+
+  it('accepts a 255-char name', async () => {
+    const dto = plainToInstance(AwsSsoCompleteDto, {
+      ...base,
+      name: 'a'.repeat(255),
+    });
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
+
+  it('rejects a 256-char name with an error on name', async () => {
+    const dto = plainToInstance(AwsSsoCompleteDto, {
+      ...base,
+      name: 'a'.repeat(256),
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].property).toBe('name');
+  });
 });
 
 describe('IntegrationsController workspace permission guards', () => {
@@ -143,6 +386,9 @@ describe('IntegrationsController workspace permission guards', () => {
     ['deleteIntegration', 'DELETE /:id', ['integration.write']],
     ['testIntegration', 'POST /:id/test', ['integration.write']],
     ['syncIntegration', 'POST /:id/sync', ['integration.write']],
+    ['startAwsSsoDevice', 'POST /aws/sso/device', ['integration.write']],
+    ['pollAwsSsoDevice', 'POST /aws/sso/poll', ['integration.write']],
+    ['completeAwsSso', 'POST /aws/sso/complete', ['integration.write']],
     [
       'createTelegramPairing',
       'POST /:id/telegram/pairing',
@@ -158,12 +404,12 @@ describe('IntegrationsController workspace permission guards', () => {
 
   it.each(cases)('%s (%s) requires %j', (method, route, keys) => {
     const handler = (
-      IntegrationsController.prototype as Record<
+      IntegrationsController.prototype as unknown as Record<
         string,
         (...args: unknown[]) => unknown
       >
-    )[method] as object;
-    const required = reflector.getAllAndOverride(WorkspacePermissions, [
+    )[method];
+    const required = reflector.getAllAndOverride<string[]>(WorkspacePermissions, [
       handler,
       IntegrationsController,
     ]);
@@ -172,12 +418,12 @@ describe('IntegrationsController workspace permission guards', () => {
 
   it('should leave the public telegram webhook unguarded', () => {
     const handler = (
-      IntegrationsController.prototype as Record<
+      IntegrationsController.prototype as unknown as Record<
         string,
         (...args: unknown[]) => unknown
       >
-    ).telegramWebhook as object;
-    const required = reflector.getAllAndOverride(WorkspacePermissions, [
+    ).telegramWebhook;
+    const required = reflector.getAllAndOverride<string[]>(WorkspacePermissions, [
       handler,
       IntegrationsController,
     ]);

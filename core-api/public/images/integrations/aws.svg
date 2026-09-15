@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256px" height="256px" viewBox="0 0 256 256" version="1.1" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid">
+    <text x="128" y="122" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="96" font-weight="bold" fill="#252F3E">aws</text>
+    <path d="M28 152 C88 204 170 208 236 154 L236 174 C170 228 84 224 22 172 Z" fill="#FF9900"></path>
+    <path d="M236 154 L256 164 L236 174 Z" fill="#FF9900"></path>
+</svg>

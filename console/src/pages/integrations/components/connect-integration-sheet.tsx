@@ -1,10 +1,3 @@
-import {
-  SchemaForm,
-  type JSONSchema,
-  type SchemaProperty,
-  defaultsFromSchema,
-  getMissingRequired,
-} from '@/components/schema-form';
 import { Button } from '@/components/ui/button';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { Input } from '@/components/ui/input';
@@ -26,12 +19,83 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { AwsSsoConnect } from './aws-sso-connect';
 import { IntegrationLogo } from './integration-logo';
+import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
 
 const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 
+/** Schema fields the AWS SSO wizard collects itself (not the raw form). */
+const AWS_SSO_WIZARD_FIELDS = ['region', 'startUrl', 'accountId', 'roleName'];
+
+interface SchemaAllOfEntry {
+  if?: { properties?: Record<string, { const?: unknown }> };
+  then?: { required?: string[] };
+}
+
+/**
+ * Effective required list: top-level `required` PLUS the `then.required` of
+ * every `allOf` entry whose `if.properties` matches the current form values.
+ * The AWS schema keeps method-scoped requirements in `allOf` (not `required`),
+ * so without this an accessKey form with empty credentials would pass
+ * client-side validation and only fail with a generic server toast.
+ */
+function getEffectiveRequired(
+  schema: { required?: string[]; [key: string]: unknown },
+  values: Record<string, unknown>,
+): string[] {
+  const base = (schema.required ?? []).filter(
+    (key) => key !== 'app_type' && key !== 'category',
+  );
+  const required = new Set(base);
+  const allOf = (schema.allOf as SchemaAllOfEntry[] | undefined) ?? [];
+  for (const entry of allOf) {
+    const conditionProps = entry.if?.properties;
+    if (conditionProps) {
+      const matches = Object.entries(conditionProps).every(
+        ([field, cond]) =>
+          cond.const === undefined || values[field] === cond.const,
+      );
+      if (!matches) continue;
+    }
+    for (const key of entry.then?.required ?? []) {
+      if (key !== 'app_type' && key !== 'category') required.add(key);
+    }
+  }
+  return [...required];
+}
+
+/**
+ * Payload config: only entries whose property is currently visible (drops
+ * stale values from a previously selected connection method), plus the
+ * discriminator `connectionMethod`. Never includes `app_type`/`category`.
+ */
+function buildVisibleConfig(
+  schema: { properties?: Record<string, unknown>; [key: string]: unknown },
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  for (const [key, prop] of Object.entries(schema.properties ?? {})) {
+    if (key === 'app_type' || key === 'category') continue;
+    if (!isPropertyVisible(prop as SchemaProperty, values)) continue;
+    if (!(key in values)) continue;
+    config[key] = values[key];
+  }
+  if (values.connectionMethod !== undefined) {
+    config.connectionMethod = values.connectionMethod;
+  }
+  return config;
+}
+
 interface ConnectIntegrationSheetProps {
-  schema: JSONSchema;
+  schema: {
+    $id?: string;
+    title?: string;
+    description?: string;
+    properties?: Record<string, unknown>;
+    required?: string[];
+    [key: string]: unknown;
+  };
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -57,24 +121,61 @@ export function ConnectIntegrationSheet({
       setSyncSchedule('disabled');
       setDraftCron('');
       setScheduleEnabled(false);
-      const filteredProps = Object.fromEntries(
-        Object.entries(schema.properties ?? {}).filter(
-          ([key]) => key !== 'app_type' && key !== 'category',
-        ),
-      );
-      setFormValues(defaultsFromSchema(filteredProps));
+      const defaults: Record<string, unknown> = {};
+      for (const [key, prop] of Object.entries(schema.properties ?? {})) {
+        if (key === 'app_type' || key === 'category') continue;
+        const typedProp = prop as SchemaProperty;
+        if (typedProp.default !== undefined) {
+          defaults[key] = typedProp.default;
+        } else if (typedProp.type === 'array') {
+          defaults[key] = [''];
+        }
+      }
+      setFormValues(defaults);
     }
   }, [open, schema.title, schema.properties]);
 
   const appType = (schema.properties?.app_type as SchemaProperty | undefined)?.const ?? schema.$id ?? '';
   const category = (schema.properties?.category as SchemaProperty | undefined)?.const ?? '';
 
+  // AWS SSO uses the device-authorization wizard (todo 16) instead of raw
+  // schema fields: the OIDC client credentials + refresh token come from the
+  // poll response, not the form. Generated hooks don't exist until todo 18.
+  const isAwsSso = appType === 'aws' && formValues.connectionMethod === 'sso';
+
   // All properties except the hidden discriminator fields
   const formProperties = Object.entries(schema.properties ?? {}).filter(
-    ([key]) => key !== 'app_type' && key !== 'category',
+    ([key]) =>
+      key !== 'app_type' &&
+      key !== 'category' &&
+      !(
+        isAwsSso &&
+        (AWS_SSO_WIZARD_FIELDS.includes(key) || key === 'regions')
+      ),
   ) as [string, SchemaProperty][];
 
   // Group properties by ui:form:group for grid layout sections
+  const grouped = formProperties.reduce<
+    [
+      ungrouped: [string, SchemaProperty][],
+      groups: Record<string, [string, SchemaProperty][]>,
+    ]
+  >(
+    ([ungrouped, groups], entry) => {
+      const group = entry[1]['ui:form:group'];
+      if (group) {
+        groups[group] ??= [];
+        groups[group].push(entry);
+      } else {
+        ungrouped.push(entry);
+      }
+      return [ungrouped, groups];
+    },
+    [[], {}],
+  );
+
+  const [ungroupedProperties, propertyGroups] = grouped;
+
   const { mutate: createIntegration, isPending } =
     useIntegrationsControllerCreateIntegration({
       mutation: {
@@ -97,8 +198,13 @@ export function ConnectIntegrationSheet({
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
 
+  const effectiveRequired = getEffectiveRequired(schema, formValues);
+
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
+    // AWS SSO is completed by the wizard's own Connect button; the sheet form
+    // must never create the integration from raw schema values.
+    if (isAwsSso) return;
     if (!appType || !category) {
       toast.error('Invalid integration schema');
       return;
@@ -109,11 +215,15 @@ export function ConnectIntegrationSheet({
     }
 
     // Client-side required validation: the server 400 would otherwise surface
-    // as a generic failure toast (U4).
-    const requiredFields = (schema.required ?? []).filter(
-      (key) => key !== 'app_type' && key !== 'category',
-    );
-    const missing = getMissingRequired(formValues, requiredFields);
+    // as a generic failure toast (U4). The effective list folds in allOf
+    // method-scoped requirements.
+    const missing = effectiveRequired.filter((key) => {
+      const prop = schema.properties?.[key] as SchemaProperty | undefined;
+      if (prop && !isPropertyVisible(prop, formValues)) return false;
+      const value = formValues[key];
+      if (typeof value === 'string') return value.trim() === '';
+      return value === undefined || value === null;
+    });
     if (missing.length > 0) {
       toast.error(
         'Please fill in required fields: ' + missing.join(', '),
@@ -129,7 +239,7 @@ export function ConnectIntegrationSheet({
         // syncSchedule is only meaningful for cloud providers; omit it
         // otherwise so other categories never send 'disabled' (U11).
         ...(category === CLOUD_PROVIDER_CATEGORY ? { syncSchedule } : {}),
-        config: formValues as Record<string, unknown>,
+        config: buildVisibleConfig(schema, formValues),
       },
     });
   };
@@ -203,19 +313,96 @@ export function ConnectIntegrationSheet({
             </div>
           )}
 
-          {/* Schema-driven fields: ungrouped inputs + grouped switch grids */}
-          <SchemaForm
-            schema={{
-              properties: Object.fromEntries(formProperties),
-              required: (schema.required ?? []).filter(
-                (key) => key !== 'app_type' && key !== 'category',
-              ),
-            }}
-            values={formValues}
-            onChange={handleValueChange}
-            enableGroups
-            emptyMessage="No configuration required."
-          />
+          {!isAwsSso && formProperties.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No configuration required.
+            </p>
+          )}
+
+          {ungroupedProperties.map(([key, prop]) => {
+            if (!isPropertyVisible(prop, formValues)) return null;
+            const label = prop.title ?? key;
+            const required = effectiveRequired.includes(key);
+            const textColor = prop['ui:text-color'];
+
+            return (
+              <div key={key} className="space-y-2">
+                <Label
+                  htmlFor={key}
+                  {...(textColor ? { style: { color: textColor } } : {})}
+                >
+                  {label}
+                  {required && (
+                    <span className="ml-1 text-destructive">*</span>
+                  )}
+                </Label>
+                <SchemaField
+                  fieldKey={key}
+                  prop={prop}
+                  value={formValues[key] ?? ''}
+                  onChange={(val) => handleValueChange(key, val)}
+                  mode="edit"
+                  visible={isPropertyVisible(prop, formValues)}
+                />
+                {prop.description && (
+                  <p className="text-xs text-muted-foreground">
+                    {prop.description}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+
+          {Object.entries(propertyGroups).map(([groupKey, fields]) => {
+            const groupLabel =
+              groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
+
+            return (
+              <div key={groupKey} className="space-y-3">
+                <Label className="text-sm font-semibold">
+                  {groupLabel}
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {fields.map(([key, prop]) => {
+                    if (!isPropertyVisible(prop, formValues)) return null;
+                    const textColor = prop['ui:text-color'];
+                    return (
+                      <div key={key} className="space-y-2">
+                        <Label
+                          htmlFor={key}
+                          {...(textColor
+                            ? { style: { color: textColor } }
+                            : {})}
+                          className="text-sm font-normal"
+                        >
+                          {prop.title ?? key}
+                        </Label>
+                        <SchemaField
+                          fieldKey={key}
+                          prop={prop}
+                          value={formValues[key] ?? ''}
+                          onChange={(val) => handleValueChange(key, val)}
+                          mode="edit"
+                          visible={isPropertyVisible(prop, formValues)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {isAwsSso && (
+            <AwsSsoConnect
+              name={integrationName}
+              syncSchedule={syncSchedule}
+              onConnected={() => {
+                setFormValues({});
+                onOpenChange(false);
+              }}
+            />
+          )}
         </div>
 
         <SheetFooter>
@@ -227,10 +414,12 @@ export function ConnectIntegrationSheet({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Connect
-          </Button>
+          {!isAwsSso && (
+            <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Connect
+            </Button>
+          )}
         </SheetFooter>
         </form>
       </SheetContent>

@@ -96,6 +96,23 @@ export class IntegrationsService {
     return universalIntegrationSchema;
   }
 
+  private assertAwsWorkloadIdentityScheduleAllowed(args: {
+    appType: string;
+    connectionMethod: unknown;
+    syncSchedule?: string;
+  }): void {
+    if (
+      args.appType === 'aws' &&
+      args.connectionMethod === 'workloadIdentity' &&
+      typeof args.syncSchedule === 'string' &&
+      args.syncSchedule !== 'disabled'
+    ) {
+      throw new BadRequestException(
+        'AWS workloadIdentity integrations do not support scheduled syncs; the OIDC token is short-lived. Set syncSchedule to "disabled" and run manual syncs.',
+      );
+    }
+  }
+
   /**
    * Creates a new integration in the specified workspace.
    * Validates config against JSON Schema, encrypts sensitive fields, then persists.
@@ -124,6 +141,15 @@ export class IntegrationsService {
         'syncSchedule is only supported for CLOUD_PROVIDER integrations',
       );
     }
+
+    // AWS workloadIdentity relies on a short-lived OIDC token; a recurring
+    // sync would fail once the token expires, so only manual/disabled sync
+    // is allowed.
+    this.assertAwsWorkloadIdentityScheduleAllowed({
+      appType: args.appType,
+      connectionMethod: args.config.connectionMethod,
+      syncSchedule: args.syncSchedule,
+    });
 
     const dek = await this.workspaceEncryption.getDEK(args.workspaceId);
     const encryptedConfig = encryptSensitiveConfigFields(args.config, dek);
@@ -426,6 +452,22 @@ export class IntegrationsService {
       integration.config = encryptSensitiveConfigFields(dto.config, dek);
     }
 
+    // Reject an effective AWS workloadIdentity + schedule combination even
+    // when syncSchedule is omitted: a config-only update that switches an
+    // already-scheduled integration to workloadIdentity would otherwise leave
+    // the cron active for a connection method that cannot renew its token.
+    const effectiveConnectionMethod =
+      dto.config?.connectionMethod ??
+      decryptSensitiveConfigFields(integration.config, dek).connectionMethod;
+    const effectiveSyncSchedule =
+      dto.syncSchedule ?? integration.syncSchedule;
+
+    this.assertAwsWorkloadIdentityScheduleAllowed({
+      appType: integration.appType,
+      connectionMethod: effectiveConnectionMethod,
+      syncSchedule: effectiveSyncSchedule,
+    });
+
     // Re-register the periodic sync scheduler when the schedule changed
     // (SC-SCHED-3/4). Only cloud providers support schedules (F3).
     if (dto.syncSchedule !== undefined) {
@@ -437,6 +479,7 @@ export class IntegrationsService {
           'syncSchedule is only supported for CLOUD_PROVIDER integrations',
         );
       }
+
       await this.integrationSyncService.applySchedule(
         integration,
         dto.syncSchedule,
