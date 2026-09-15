@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T13:41:44.986557Z",
+  "generatedAt": "2026-09-15T06:40:24.4901235Z",
   "connectors": [
     {
       "name": "Nessus",
@@ -7,33 +7,41 @@
       "version": "0.1.0",
       "image": "ghcr.io/oasm-platform/connector-nessus:0.1.0",
       "author": "oasm",
-      "pricingTier": ["free"],
+      "pricingTier": [
+        "free"
+      ],
       "homepage": "https://www.tenable.com",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Tenable Nessus vulnerability scanner",
       "description": "Connects to a Tenable Nessus instance, creates and runs a scan against a target, and streams the discovered vulnerabilities back to the Worker as JSONL findings.",
-      "capabilities": ["vulnerabilities"],
+      "capabilities": [
+        "vulnerabilities"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": ["https://example.com"],
+            "examples": [
+              "https://example.com"
+            ],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": ["target"],
+        "required": [
+          "target"
+        ],
         "type": "object"
       },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
           "accessKey": {
-            "description": "Nessus API access key (alternative to username/password).",
+            "description": "Nessus API access key, paired with secretKey.",
             "title": "API access key",
             "type": "string",
             "ui:placeholder": "Enter API access key"
@@ -43,13 +51,6 @@
             "title": "Folder ID",
             "type": "string",
             "ui:placeholder": "e.g. 1"
-          },
-          "password": {
-            "description": "Nessus password for session authentication.",
-            "title": "Password",
-            "type": "string",
-            "ui:placeholder": "••••••••",
-            "ui:widget": "password"
           },
           "policyId": {
             "description": "ID of an existing Nessus scan policy.",
@@ -61,7 +62,8 @@
             "description": "Nessus API secret key, paired with accessKey.",
             "title": "API secret key",
             "type": "string",
-            "ui:placeholder": "Enter API secret key"
+            "ui:placeholder": "Enter API secret key",
+            "ui:widget": "password"
           },
           "templateUuid": {
             "description": "UUID of the Nessus scan template to use.",
@@ -71,21 +73,20 @@
           },
           "url": {
             "description": "Base URL of the Nessus instance.",
-            "examples": ["https://nessus.local:8834"],
+            "examples": [
+              "https://nessus.local:8834"
+            ],
             "format": "uri",
             "title": "Nessus URL",
             "type": "string",
             "ui:placeholder": "https://nessus.local:8834"
-          },
-          "username": {
-            "description": "Nessus username for session authentication.",
-            "examples": ["administrator"],
-            "title": "Username",
-            "type": "string",
-            "ui:placeholder": "administrator"
           }
         },
-        "required": ["url", "username", "password"],
+        "required": [
+          "url",
+          "accessKey",
+          "secretKey"
+        ],
         "type": "object"
       },
       "resourceDefaults": {
@@ -101,26 +102,34 @@
       "version": "3.4.1",
       "image": "ghcr.io/oasm-platform/connector-nuclei:3.4.1",
       "author": "oasm",
-      "pricingTier": ["free"],
+      "pricingTier": [
+        "free"
+      ],
       "homepage": "https://projectdiscovery.io",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Fast template-based vulnerability scanner",
       "description": "Runs ProjectDiscovery Nuclei template-based scans against a target URL to detect known vulnerabilities, misconfigurations, and exposed secrets.",
-      "capabilities": ["vulnerabilities"],
+      "capabilities": [
+        "vulnerabilities"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": ["https://example.com"],
+            "examples": [
+              "https://example.com"
+            ],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": ["target"],
+        "required": [
+          "target"
+        ],
         "type": "object"
       },
       "configSchema": {
@@ -134,7 +143,12 @@
           },
           "excludeTags": {
             "description": "Skip templates that match these tags.",
-            "examples": [["dos", "fuzz"]],
+            "examples": [
+              [
+                "dos",
+                "fuzz"
+              ]
+            ],
             "items": {
               "type": "string"
             },
@@ -154,10 +168,19 @@
             "type": "integer"
           },
           "severity": {
-            "default": ["high", "critical"],
+            "default": [
+              "high",
+              "critical"
+            ],
             "description": "Only report findings at the selected severity levels.",
             "items": {
-              "enum": ["info", "low", "medium", "high", "critical"],
+              "enum": [
+                "info",
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ],
               "type": "string"
             },
             "title": "Severity levels",
@@ -165,7 +188,12 @@
           },
           "tags": {
             "description": "Only run templates matching these tags.",
-            "examples": [["cve", "rce"]],
+            "examples": [
+              [
+                "cve",
+                "rce"
+              ]
+            ],
             "items": {
               "type": "string"
             },
@@ -175,7 +203,12 @@
           },
           "templateIds": {
             "description": "Only run these specific template IDs.",
-            "examples": [["CVE-2024-12345", "wordpress-rce"]],
+            "examples": [
+              [
+                "CVE-2024-12345",
+                "wordpress-rce"
+              ]
+            ],
             "items": {
               "type": "string"
             },
@@ -199,26 +232,34 @@
       "version": "3.8.27",
       "image": "ghcr.io/oasm-platform/connector-wpscan:3.8.27",
       "author": "oasm",
-      "pricingTier": ["free"],
+      "pricingTier": [
+        "free"
+      ],
       "homepage": "https://wpscan.com",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "WordPress vulnerability scanner",
       "description": "Scans WordPress sites using WPScan to enumerate vulnerable plugins and themes, detect known CVEs, misconfigurations, and weak credentials.",
-      "capabilities": ["vulnerabilities"],
+      "capabilities": [
+        "vulnerabilities"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": ["https://example.com"],
+            "examples": [
+              "https://example.com"
+            ],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": ["target"],
+        "required": [
+          "target"
+        ],
         "type": "object"
       },
       "configSchema": {
@@ -247,7 +288,11 @@
           "detectionMode": {
             "default": "mixed",
             "description": "Global detection mode used by all detections.",
-            "enum": ["mixed", "passive", "aggressive"],
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
             "title": "Detection mode",
             "type": "string"
           },
@@ -321,14 +366,22 @@
           "pluginsDetection": {
             "default": "passive",
             "description": "Detection mode used to enumerate plugins.",
-            "enum": ["mixed", "passive", "aggressive"],
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
             "title": "Plugins detection",
             "type": "string"
           },
           "pluginsVersionDetection": {
             "default": "mixed",
             "description": "Detection mode used to check plugins versions.",
-            "enum": ["mixed", "passive", "aggressive"],
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
             "title": "Plugins version detection",
             "type": "string"
           },
@@ -352,7 +405,11 @@
           },
           "scope": {
             "description": "Additional (sub-)domains to include in scope.",
-            "examples": [["blog.example.com"]],
+            "examples": [
+              [
+                "blog.example.com"
+              ]
+            ],
             "items": {
               "type": "string"
             },
@@ -362,7 +419,11 @@
           },
           "server": {
             "description": "Force the supplied server module instead of auto-detecting.",
-            "enum": ["apache", "iis", "nginx"],
+            "enum": [
+              "apache",
+              "iis",
+              "nginx"
+            ],
             "title": "Web server",
             "type": "string"
           },
@@ -373,13 +434,21 @@
           },
           "themesDetection": {
             "description": "Detection mode used to enumerate themes.",
-            "enum": ["mixed", "passive", "aggressive"],
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
             "title": "Themes detection",
             "type": "string"
           },
           "themesVersionDetection": {
             "description": "Detection mode used to check themes versions.",
-            "enum": ["mixed", "passive", "aggressive"],
+            "enum": [
+              "mixed",
+              "passive",
+              "aggressive"
+            ],
             "title": "Themes version detection",
             "type": "string"
           },
@@ -407,7 +476,9 @@
             "ui:placeholder": "e.g. internal.corp"
           }
         },
-        "required": ["apiToken"],
+        "required": [
+          "apiToken"
+        ],
         "type": "object"
       },
       "resourceDefaults": {
@@ -423,26 +494,34 @@
       "version": "2.2.4",
       "image": "ghcr.io/oasm-platform/connector-gau:2.2.4",
       "author": "oasm",
-      "pricingTier": ["free"],
+      "pricingTier": [
+        "free"
+      ],
       "homepage": "https://github.com/lc/gau",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Historical URL discovery via public archives",
       "description": "Discovers historical/archived URLs for a domain using gau (GetAllUrls) across Wayback Machine, Common Crawl, AlienVault OTX and urlscan.io.",
-      "capabilities": ["url_discovery"],
+      "capabilities": [
+        "url_discovery"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Domain (or URL) to discover historical URLs for. Scheme/path stripped to the host.",
-            "examples": ["example.com"],
+            "examples": [
+              "example.com"
+            ],
             "format": "uri",
             "title": "Target domain",
             "type": "string",
             "ui:placeholder": "example.com"
           }
         },
-        "required": ["target"],
+        "required": [
+          "target"
+        ],
         "type": "object"
       },
       "configSchema": {
@@ -457,7 +536,12 @@
           "providers": {
             "description": "Archive providers to query. Default: all four.",
             "items": {
-              "enum": ["wayback", "commoncrawl", "otx", "urlscan"],
+              "enum": [
+                "wayback",
+                "commoncrawl",
+                "otx",
+                "urlscan"
+              ],
               "type": "string"
             },
             "title": "Providers",
@@ -509,6 +593,178 @@
         "cpu": "250m",
         "memory": "256Mi",
         "timeoutSeconds": 900
+      }
+    },
+    {
+      "name": "katana - Web Crawler",
+      "slug": "katana",
+      "version": "1.7.0",
+      "image": "ghcr.io/oasm-platform/connector-katana:1.7.0",
+      "author": "oasm",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://github.com/projectdiscovery/katana",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
+      "shortDescription": "Web crawler and endpoint discovery",
+      "description": "Crawls a target website with katana (ProjectDiscovery) up to a configurable depth and streams every discovered HTTP/HTTPS URL as a finding for URL discovery.",
+      "capabilities": [
+        "url_discovery"
+      ],
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "description": "Domain (or URL) to crawl. Scheme/path stripped to the host.",
+            "examples": [
+              "example.com"
+            ],
+            "format": "uri",
+            "title": "Target domain",
+            "type": "string",
+            "ui:placeholder": "example.com"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "concurrency": {
+            "default": 10,
+            "description": "Number of concurrent fetchers (katana -c).",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Concurrency",
+            "type": "integer"
+          },
+          "crawlDuration": {
+            "default": 0,
+            "description": "Wall-clock budget for the crawl; 0 = unbounded (katana -ct). The adapter always enforces a 10 minute hard timeout.",
+            "minimum": 0,
+            "title": "Crawl duration (seconds)",
+            "type": "integer"
+          },
+          "crawlScope": {
+            "description": "In-scope URL regex to follow (katana -cs). Default scope stays the registered domain (rdn).",
+            "title": "Crawl scope regex",
+            "type": "string",
+            "ui:placeholder": ".*\\.example\\.com"
+          },
+          "depth": {
+            "default": 3,
+            "description": "Maximum link depth to crawl (katana -d).",
+            "maximum": 10,
+            "minimum": 1,
+            "title": "Crawl depth",
+            "type": "integer"
+          },
+          "extensionFilter": {
+            "description": "Drop URLs with these extensions (katana -ef), e.g. png, css.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Filter extensions",
+            "type": "array"
+          },
+          "extensionMatch": {
+            "description": "Only emit URLs with these extensions (katana -em), e.g. php, html.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Match extensions",
+            "type": "array"
+          },
+          "filterSimilar": {
+            "default": false,
+            "description": "Collapse near-duplicate URLs (katana -fsu). Dramatically reduces volume on some sites.",
+            "title": "Filter similar URLs",
+            "type": "boolean"
+          },
+          "filterSimilarThreshold": {
+            "default": 10,
+            "description": "Similarity threshold percentage for -fsu (katana -fst). Only applied when filterSimilar is on.",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Similar-URL threshold",
+            "type": "integer"
+          },
+          "headers": {
+            "description": "Header lines in \"Name: Value\" form, sent on every request (katana -H). Values containing commas are quoted automatically.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "array",
+            "ui:placeholder": "X-Api-Key: …"
+          },
+          "jsCrawl": {
+            "default": true,
+            "description": "Extract endpoints from JavaScript files (katana -jc). No browser required.",
+            "title": "Parse JavaScript",
+            "type": "boolean"
+          },
+          "maxDomainPages": {
+            "default": 0,
+            "description": "Maximum number of pages to crawl per domain, 0 = unlimited (katana -mdp). Note: caps pages, not discovered URLs.",
+            "minimum": 0,
+            "title": "Max domain pages",
+            "type": "integer"
+          },
+          "maxUrls": {
+            "default": 10000,
+            "description": "Hard cap on emitted findings. When reached, the crawl is stopped and partial results are kept.",
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "Max URLs (adapter cap)",
+            "type": "integer"
+          },
+          "parallelism": {
+            "default": 10,
+            "description": "Number of concurrent inputs to process (katana -p).",
+            "maximum": 10,
+            "minimum": 1,
+            "title": "Parallelism",
+            "type": "integer"
+          },
+          "proxy": {
+            "description": "Proxy URL, e.g. http://127.0.0.1:8080 or socks5://127.0.0.1:9050 (katana -proxy).",
+            "title": "Proxy",
+            "type": "string",
+            "ui:placeholder": "http://127.0.0.1:8080"
+          },
+          "rateLimit": {
+            "default": 150,
+            "description": "Maximum requests per second (katana -rl).",
+            "minimum": 1,
+            "title": "Rate limit (requests/second)",
+            "type": "integer"
+          },
+          "retries": {
+            "default": 1,
+            "description": "Number of request retries (katana -retry).",
+            "minimum": 0,
+            "title": "Retries",
+            "type": "integer"
+          },
+          "timeout": {
+            "default": 10,
+            "description": "Per-request timeout in seconds (katana -timeout).",
+            "minimum": 1,
+            "title": "Request timeout (seconds)",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "resourceDefaults": {
+        "cpu": "500m",
+        "memory": "512Mi",
+        "timeoutSeconds": 1200
       }
     }
   ]
