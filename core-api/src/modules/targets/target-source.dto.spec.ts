@@ -15,6 +15,13 @@ describe('toTargetSourceDto', () => {
     });
   });
 
+  it('maps the aws source to the AWS label and icon', () => {
+    expect(toTargetSourceDto('aws')).toEqual({
+      source: 'AWS',
+      icon: '/static/images/integrations/aws.svg',
+    });
+  });
+
   it('maps INTERNAL_NETWORK to the Internal Network label with no icon', () => {
     expect(toTargetSourceDto('INTERNAL_NETWORK')).toEqual({
       source: 'Internal Network',

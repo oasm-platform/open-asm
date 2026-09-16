@@ -94,6 +94,102 @@ const slackSchema = {
   isAvailable: true,
 };
 
+// Mirrors core-api aws.schema.ts (todo 9): connectionMethod enum + method-scoped
+// fields guarded by ui:visibleWhen (scalar AND array equals) + a grouped
+// non-boolean field (roleArn). Detail view resolves conditions against the
+// stored integration.config (todo 12).
+const awsSchema = {
+  $id: 'aws',
+  title: 'AWS',
+  description: 'Discover public AWS resources',
+  properties: {
+    app_type: { const: 'aws', title: 'App type' },
+    category: { const: 'CLOUD_PROVIDER', title: 'Category' },
+    connectionMethod: {
+      type: 'string',
+      enum: ['accessKey', 'assumeRole', 'crossAccountRole', 'workloadIdentity', 'sso'],
+      default: 'accessKey',
+      title: 'Connection method',
+    },
+    region: { type: 'string', default: 'us-east-1', title: 'AWS region' },
+    accessKeyId: {
+      type: 'string',
+      title: 'Access key ID',
+      'ui:visibleWhen': {
+        field: 'connectionMethod',
+        equals: ['accessKey', 'assumeRole', 'crossAccountRole'],
+      },
+    },
+    secretAccessKey: {
+      type: 'string',
+      format: 'password',
+      title: 'Secret access key',
+      'ui:visibleWhen': {
+        field: 'connectionMethod',
+        equals: ['accessKey', 'assumeRole', 'crossAccountRole'],
+      },
+    },
+    roleArn: {
+      type: 'string',
+      title: 'Role ARN',
+      'ui:form:group': 'role',
+      'ui:visibleWhen': {
+        field: 'connectionMethod',
+        equals: ['assumeRole', 'crossAccountRole', 'workloadIdentity'],
+      },
+    },
+    externalId: {
+      type: 'string',
+      format: 'password',
+      title: 'External ID',
+      'ui:visibleWhen': {
+        field: 'connectionMethod',
+        equals: ['assumeRole', 'crossAccountRole'],
+      },
+    },
+    webIdentityToken: {
+      type: 'string',
+      format: 'password',
+      title: 'Web identity token',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: 'workloadIdentity' },
+    },
+    startUrl: {
+      type: 'string',
+      title: 'Start URL',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: 'sso' },
+    },
+    accountId: {
+      type: 'string',
+      title: 'Account ID',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: 'sso' },
+    },
+    roleName: {
+      type: 'string',
+      title: 'Role name',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: 'sso' },
+    },
+    clientId: {
+      type: 'string',
+      title: 'SSO Client ID',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: '__never__' },
+    },
+    clientSecret: {
+      type: 'string',
+      format: 'password',
+      title: 'SSO Client Secret',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: '__never__' },
+    },
+    refreshToken: {
+      type: 'string',
+      format: 'password',
+      title: 'SSO Refresh Token',
+      'ui:visibleWhen': { field: 'connectionMethod', equals: '__never__' },
+    },
+  },
+  required: ['app_type', 'category', 'connectionMethod', 'region'],
+  isAvailable: true,
+};
+
 const baseIntegration = {
   id: 'int-1',
   name: 'Cloudflare',
@@ -468,6 +564,305 @@ describe('IntegrationDetailSheet', () => {
       expect(
         screen.getByRole('button', { name: /sync now/i }),
       ).toBeDisabled();
+    });
+  });
+
+  it('view mode resolves visibleWhen against the stored config: assumeRole shows roleArn + base creds', async () => {
+    const awsIntegration: GetIntegrationDto = {
+      ...baseIntegration,
+      name: 'AWS',
+      appType: 'aws',
+      category: 'CLOUD_PROVIDER',
+      config: {
+        connectionMethod: 'assumeRole',
+        region: 'us-east-1',
+        roleArn: 'arn:aws:iam::123:role/x',
+        accessKeyId: 'AKIA123',
+        secretAccessKey: 'secret-1234',
+        // Present in the stored config but NOT visible for assumeRole.
+        webIdentityToken: 'stale-token',
+        startUrl: 'stale-start-url',
+      },
+    };
+
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={awsIntegration}
+        schema={awsSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('arn:aws:iam::123:role/x')).toBeInTheDocument();
+    });
+    // Enum label, not the raw wire value.
+    expect(screen.getByText('Assume Role')).toBeInTheDocument();
+    expect(screen.queryByText('assumeRole')).not.toBeInTheDocument();
+    expect(screen.getByText('AKIA123')).toBeInTheDocument();
+    // Not in assumeRole's visible set: hidden values never render.
+    expect(screen.queryByText('stale-token')).not.toBeInTheDocument();
+    expect(screen.queryByText('stale-start-url')).not.toBeInTheDocument();
+  });
+
+  it('view mode hides roleArn when the stored connectionMethod is accessKey', async () => {
+    const awsIntegration: GetIntegrationDto = {
+      ...baseIntegration,
+      name: 'AWS',
+      appType: 'aws',
+      category: 'CLOUD_PROVIDER',
+      config: {
+        connectionMethod: 'accessKey',
+        region: 'us-east-1',
+        accessKeyId: 'AKIA123',
+        secretAccessKey: 'secret-1234',
+        roleArn: 'stale-role-arn',
+      },
+    };
+
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={awsIntegration}
+        schema={awsSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Access Key')).toBeInTheDocument();
+    });
+    expect(screen.getByText('AKIA123')).toBeInTheDocument();
+    // roleArn is in the stored config but not visible for accessKey.
+    expect(screen.queryByText('stale-role-arn')).not.toBeInTheDocument();
+  });
+
+  it('view mode shows only the sso fields for an sso integration', async () => {
+    const awsIntegration: GetIntegrationDto = {
+      ...baseIntegration,
+      name: 'AWS',
+      appType: 'aws',
+      category: 'CLOUD_PROVIDER',
+      config: {
+        connectionMethod: 'sso',
+        region: 'us-east-1',
+        startUrl: 'https://acme.awsapps.com/start',
+        accountId: '123456789012',
+        roleName: 'Admin',
+        // Present in the stored config but NOT visible for sso.
+        accessKeyId: 'stale-ak',
+        roleArn: 'stale-role-arn',
+      },
+    };
+
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={awsIntegration}
+        schema={awsSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('https://acme.awsapps.com/start'),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText('123456789012')).toBeInTheDocument();
+    expect(screen.getByText('Admin')).toBeInTheDocument();
+    // Hidden sso-incompatible values never render.
+    expect(screen.queryByText('stale-ak')).not.toBeInTheDocument();
+    expect(screen.queryByText('stale-role-arn')).not.toBeInTheDocument();
+  });
+
+  it('edit mode shows sso-only fields and hides base creds for an existing sso integration', async () => {
+    const ssoIntegration: GetIntegrationDto = {
+      ...baseIntegration,
+      name: 'AWS',
+      appType: 'aws',
+      category: 'CLOUD_PROVIDER',
+      config: {
+        connectionMethod: 'sso',
+        region: 'us-east-1',
+        startUrl: 'https://acme.awsapps.com/start',
+        accountId: '123456789012',
+        roleName: 'Admin',
+        clientId: 'client-1',
+        clientSecret: 'secret-1',
+        refreshToken: 'refresh-1',
+      },
+    };
+
+    const { user } = renderWithProviders(
+      <IntegrationDetailSheet
+        integration={ssoIntegration}
+        schema={awsSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Connection method' }),
+    );
+    await user.click(await screen.findByRole('option', { name: 'Sso' }));
+
+    expect(screen.getByLabelText(/start url/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/account id/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/role name/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/access key id/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/role arn/i)).not.toBeInTheDocument();
+  });
+
+  it('edit mode renders the grouped roleArn as a typed input, not a Switch (U11)', async () => {
+    const { user } = renderWithProviders(
+      <IntegrationDetailSheet
+        integration={cloudIntegration}
+        schema={awsSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Connection method' }),
+    );
+    await user.click(await screen.findByRole('option', { name: 'Assume Role' }));
+
+    const roleArn = screen.getByLabelText(/role arn/i);
+    expect(roleArn.tagName).toBe('INPUT');
+    expect(roleArn).toHaveAttribute('type', 'text');
+    expect(
+      screen.queryByRole('switch', { name: /role arn/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('omits the sso option when the stored method is not sso', async () => {
+    const awsIntegration: GetIntegrationDto = {
+      ...baseIntegration,
+      name: 'AWS',
+      appType: 'aws',
+      category: 'CLOUD_PROVIDER',
+      config: {
+        connectionMethod: 'accessKey',
+        region: 'us-east-1',
+        accessKeyId: 'AKIA123',
+        secretAccessKey: 'secret-1234',
+      },
+    };
+
+    const { user } = renderWithProviders(
+      <IntegrationDetailSheet
+        integration={awsIntegration}
+        schema={awsSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    const combo = await screen.findByRole('combobox', {
+      name: 'Connection method',
+    });
+    await user.click(combo);
+
+    expect(screen.queryByRole('option', { name: 'Sso' })).toBeNull();
+    expect(
+      screen.getByRole('option', { name: 'Assume Role' }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the sso option for an existing sso integration', async () => {
+    const ssoIntegration: GetIntegrationDto = {
+      ...baseIntegration,
+      name: 'AWS',
+      appType: 'aws',
+      category: 'CLOUD_PROVIDER',
+      config: {
+        connectionMethod: 'sso',
+        region: 'us-east-1',
+        startUrl: 'https://acme.awsapps.com/start',
+        accountId: '123456789012',
+        roleName: 'Admin',
+        clientId: 'client-1',
+        clientSecret: 'secret-1',
+        refreshToken: 'refresh-1',
+      },
+    };
+
+    const { user } = renderWithProviders(
+      <IntegrationDetailSheet
+        integration={ssoIntegration}
+        schema={awsSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Connection method' }),
+    );
+
+    expect(screen.getByRole('option', { name: 'Sso' })).toBeInTheDocument();
+  });
+
+  it('drops stale method-scoped config on save but preserves hidden sso creds', async () => {
+    const awsIntegration: GetIntegrationDto = {
+      ...baseIntegration,
+      name: 'AWS',
+      appType: 'aws',
+      category: 'CLOUD_PROVIDER',
+      config: {
+        connectionMethod: 'accessKey',
+        region: 'us-east-1',
+        accessKeyId: 'AKIA123',
+        secretAccessKey: 'secret-1234',
+        // Stale SSO-method values that are hidden for accessKey.
+        startUrl: 'https://acme.awsapps.com/start',
+        accountId: '123456789012',
+        roleName: 'Admin',
+        roleArn: 'stale-role-arn',
+        // Always-hidden SSO credentials the connector needs at execute time.
+        clientId: 'client-1',
+        clientSecret: 'secret-1',
+        refreshToken: 'refresh-1',
+      },
+    };
+
+    renderWithProviders(
+      <IntegrationDetailSheet
+        integration={awsIntegration}
+        schema={awsSchema}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    await screen.findByLabelText(/integration name/i);
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(mocks.updateMutate).toHaveBeenCalled();
+    });
+    const config = mocks.updateMutate.mock.calls[0][0].data.config;
+    expect(config).not.toHaveProperty('roleArn');
+    expect(config).not.toHaveProperty('startUrl');
+    expect(config).not.toHaveProperty('accountId');
+    expect(config).not.toHaveProperty('roleName');
+    expect(config).toMatchObject({
+      connectionMethod: 'accessKey',
+      region: 'us-east-1',
+      accessKeyId: 'AKIA123',
+      secretAccessKey: 'secret-1234',
+      clientId: 'client-1',
+      clientSecret: 'secret-1',
+      refreshToken: 'refresh-1',
     });
   });
 });

@@ -28,6 +28,9 @@ import {
 import { Target, TargetSource, TargetType } from './entities/target.entity';
 import { TargetSourceDto, toTargetSourceDto } from './target-source.dto';
 
+/** Rows per INSERT — 4 bind params each, well under PostgreSQL's 65535 limit. */
+export const ASSET_INSERT_CHUNK = 1000;
+
 @Injectable()
 export class TargetsService implements OnModuleInit {
   constructor(
@@ -48,17 +51,22 @@ export class TargetsService implements OnModuleInit {
   /**
    * Validates a target value based on its type.
    * For DOMAIN: Must be a valid root domain (not an IP address).
-   * For CIDR: Must be a valid CIDR notation with /24 prefix only and public IP.
+   * For CIDR: Must be a valid CIDR notation with /24 prefix only and public IP —
+   *   EXCEPT for AWS-sourced CIDRs (`isTrustedCidrSource`), where private
+   *   ranges and any prefix 1..32 are allowed (VPC/subnet CIDRs are private).
    * For IP: Must be a valid public IPv4 address.
    *
    * @param value - The target value to validate.
    * @param type - The type of target (DOMAIN, CIDR, or IP).
+   * @param isInternalNetwork - Whether the target belongs to an internal network.
+   * @param isTrustedCidrSource - Whether the source is trusted to supply private/any-prefix CIDRs.
    * @throws BadRequestException if validation fails.
    */
   private validateTargetValue(
     value: string,
     type: TargetType,
     isInternalNetwork: boolean = false,
+    isTrustedCidrSource: boolean = false,
   ): void {
     if (type === TargetType.DOMAIN) {
       // Validate root domain: must not be an IP address
@@ -103,16 +111,25 @@ export class TargetsService implements OnModuleInit {
         }
       }
 
-      // Validate prefix is exactly /24
+      // Validate prefix is exactly /24, unless the source is trusted (AWS).
       const prefix = parseInt(match[5]);
-      if (prefix !== 24) {
+      if (!isTrustedCidrSource && prefix !== 24) {
         throw new BadRequestException(
           `Invalid CIDR: "${value}" must use /24 prefix. Only /24 CIDR ranges are supported.`,
         );
       }
+      if (isTrustedCidrSource && (prefix < 1 || prefix > 32)) {
+        throw new BadRequestException(
+          `Invalid CIDR: "${value}" contains an invalid prefix. Prefix must be 1-32.`,
+        );
+      }
 
       // Validate IP is public (not private/localhost/reserved) unless it's an internal network
-      if (!isInternalNetwork && this.isPrivateIP(octets[0], octets[1])) {
+      if (
+        !isInternalNetwork &&
+        !isTrustedCidrSource &&
+        this.isPrivateIP(octets[0], octets[1])
+      ) {
         throw new BadRequestException(
           `Invalid CIDR: "${value}" is a private/reserved IP range. Only public IP ranges are allowed.`,
         );
@@ -189,28 +206,41 @@ export class TargetsService implements OnModuleInit {
   }
 
   /**
-   * Expands a CIDR /24 notation to an array of 256 IP addresses.
+   * Expands a CIDR notation to every address in the range.
    *
-   * @param cidr - CIDR notation (e.g., "192.168.1.0/24")
-   * @returns Array of 256 IP addresses
+   * ponytail: allocates the full array — AWS VPC/subnet CIDRs are /16../28, so
+   * the widest is 65536 entries. If arbitrary-source wide CIDRs are ever
+   * allowed, switch to streaming generation instead.
+   *
+   * @param cidr - CIDR notation (e.g., "10.0.0.0/16")
+   * @returns Array of IP addresses in the range
    */
   private expandCIDRToIPs(cidr: string): string[] {
     const match = cidr.match(
-      /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/24$/,
+      /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/,
     );
     if (!match) {
       throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
     }
 
-    const baseOctets = [
-      parseInt(match[1]),
-      parseInt(match[2]),
-      parseInt(match[3]),
-    ];
+    const o0 = parseInt(match[1]);
+    const o1 = parseInt(match[2]);
+    const o2 = parseInt(match[3]);
+    const o3 = parseInt(match[4]);
+    const prefix = parseInt(match[5]);
+    if (prefix < 0 || prefix > 32) {
+      throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
+    }
+
+    const base = ((o0 << 24) | (o1 << 16) | (o2 << 8) | o3) >>> 0;
+    const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+    const network = (base & mask) >>> 0;
+    const count = 2 ** (32 - prefix);
 
     const ips: string[] = [];
-    for (let i = 0; i < 256; i++) {
-      ips.push(`${baseOctets[0]}.${baseOctets[1]}.${baseOctets[2]}.${i}`);
+    for (let i = 0; i < count; i++) {
+      const n = (network + i) >>> 0;
+      ips.push(`${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`);
     }
 
     return ips;
@@ -272,10 +302,17 @@ export class TargetsService implements OnModuleInit {
   ): Promise<BulkTargetResultDto> {
     const { targets } = dto;
 
+    const trustedCidrSource = source === TargetSource.AWS;
+
     // Validate all targets before processing
     for (const target of targets) {
       const type = target.type || TargetType.DOMAIN;
-      this.validateTargetValue(target.value, type, !!internalNetworkId);
+      this.validateTargetValue(
+        target.value,
+        type,
+        !!internalNetworkId,
+        trustedCidrSource,
+      );
     }
 
     // Check if the workspace exists and the user is the owner
@@ -383,7 +420,7 @@ export class TargetsService implements OnModuleInit {
 
         for (const target of createdTargetEntities) {
           if (target.type === TargetType.CIDR) {
-            // Generate 256 IPs for CIDR /24
+            // Expand the CIDR range to one asset per IP.
             const ips = this.expandCIDRToIPs(target.value);
             ips.forEach((ip, index) => {
               assetValues.push({
@@ -412,13 +449,15 @@ export class TargetsService implements OnModuleInit {
           }
         }
 
-        await transactionalEntityManager
-          .createQueryBuilder()
-          .insert()
-          .into(Asset)
-          .values(assetValues)
-          .orIgnore()
-          .execute();
+        for (let i = 0; i < assetValues.length; i += ASSET_INSERT_CHUNK) {
+          await transactionalEntityManager
+            .createQueryBuilder()
+            .insert()
+            .into(Asset)
+            .values(assetValues.slice(i, i + ASSET_INSERT_CHUNK))
+            .orIgnore()
+            .execute();
+        }
 
         return {
           created: createdTargetEntities,

@@ -4,6 +4,8 @@ import type { WrapperType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { TargetsService } from '@/modules/targets/targets.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
+import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
@@ -18,12 +20,24 @@ import type { Queue } from 'bullmq';
 import { IsNull, Not } from 'typeorm';
 import type { Repository } from 'typeorm';
 import type {
-  CloudflareSyncConfig,
-  SyncResult,
-} from './connectors/cloudflare.connector';
+  CloudProviderSyncConfig,
+  ConnectorSyncResult,
+} from './connectors/connector.abstract';
+import { AwsSsoService } from './connectors/aws/aws-sso.service';
 import { runConnector } from './connectors/connector.factory';
 import { Integration } from './entities/integration.entity';
 import { IntegrationsService } from './integrations.service';
+import {
+  decryptSensitiveConfigFields,
+  encryptSensitiveConfigFields,
+} from './validators/integration.validator';
+
+/**
+ * Hard ceiling on a single sync run. The distributed lock TTL must be at least
+ * this long: a shorter TTL would let a second run start while the first is
+ * still writing (the connector itself stops starting new work at this bound).
+ */
+const MAX_SYNC_DURATION_MS = 30 * 60_000;
 
 /**
  * Owns the BullMQ repeat scheduler for periodic asset syncs of cloud-provider
@@ -45,6 +59,9 @@ export class IntegrationSyncService implements OnModuleInit {
     private readonly targetsService: TargetsService,
     private readonly dataAdapterService: DataAdapterService,
     private readonly workspacesService: WorkspacesService,
+    private readonly awsSsoService: AwsSsoService,
+    private readonly workspaceEncryption: WorkspaceEncryptionService,
+    private readonly redisLockService: RedisLockService,
   ) {}
 
   /**
@@ -187,7 +204,7 @@ export class IntegrationSyncService implements OnModuleInit {
     integrationId: string,
     workspaceId: string,
     opts?: { dryRun?: boolean },
-  ): Promise<SyncResult> {
+  ): Promise<ConnectorSyncResult> {
     const { integration, decryptedConfig } =
       await this.integrationsService.getIntegrationWithDecryptedConfig(
         integrationId,
@@ -204,27 +221,91 @@ export class IntegrationSyncService implements OnModuleInit {
       );
     }
 
+    // Defense-in-depth: a legacy row (scheduled before the create/update
+    // workloadIdentity guard existed) must not execute while its cron is
+    // still active — its OIDC token is short-lived and the run would fail
+    // every tick. A dry-run test and a manual run on a row with no active
+    // schedule stay allowed.
+    if (
+      integration.appType === 'aws' &&
+      decryptedConfig.connectionMethod === 'workloadIdentity' &&
+      typeof integration.syncSchedule === 'string' &&
+      integration.syncSchedule !== 'disabled' &&
+      !opts?.dryRun
+    ) {
+      throw new BadRequestException(
+        'AWS workloadIdentity integrations do not support scheduled syncs; the OIDC token is short-lived. Set syncSchedule to "disabled" and run manual syncs.',
+      );
+    }
+
     const config = {
       ...decryptedConfig,
       integrationId,
       workspaceId,
       __dryRun: opts?.dryRun ?? false,
+      maxSyncDurationMs: MAX_SYNC_DURATION_MS,
       targetsService: this.targetsService,
       dataAdapterService: this.dataAdapterService,
       actingUserContext: await this.resolveActingUser(workspaceId, integration),
-    } as unknown as CloudflareSyncConfig;
+      ssoService: this.awsSsoService,
+      // Persists a rotated SSO refresh token (and any other sensitive patch)
+      // re-encrypted with the workspace DEK, without touching lastRunAt. The
+      // row is re-read so a concurrent user edit is not clobbered by the
+      // stale snapshot; only the config column is written.
+      persistConfigPatch: async (
+        patch: Record<string, unknown>,
+      ): Promise<void> => {
+        const current = await this.integrationRepository.findOneBy({
+          id: integrationId,
+        });
+        if (!current) return;
+        const dek = await this.workspaceEncryption.getDEK(workspaceId);
+        current.config = encryptSensitiveConfigFields(
+          {
+            ...decryptSensitiveConfigFields(current.config, dek),
+            ...patch,
+          },
+          dek,
+        );
+        await this.integrationRepository.save(current);
+      },
+    } as unknown as CloudProviderSyncConfig;
 
-    const result = await runConnector(
-      integration.appType,
-      IntegrationType.CLOUD_PROVIDER,
-      config,
+    // Overlap guard: only one sync per integration runs at a time across all
+    // instances. A held lock is reported as zero (non-dry-run) so the scheduler
+    // keeps moving, but a dry run must FAIL — otherwise testIntegration would
+    // report success:true for a sync that never ran.
+    const result = await this.redisLockService.withLock(
+      'integration-sync:' + integrationId,
+      MAX_SYNC_DURATION_MS,
+      async () => {
+        const connectorResult = await runConnector(
+          integration.appType,
+          IntegrationType.CLOUD_PROVIDER,
+          config,
+        );
+
+        if (!connectorResult.success) {
+          // BadRequestException (not a plain Error) so callers can distinguish a
+          // failed connector run (e.g. dry-run test → success:false result) from
+          // a programming error, and the HTTP layer maps it to a 400.
+          throw new BadRequestException(
+            connectorResult.error ?? connectorResult.message,
+          );
+        }
+
+        return connectorResult;
+      },
     );
 
-    if (!result.success) {
-      // BadRequestException (not a plain Error) so callers can distinguish a
-      // failed connector run (e.g. dry-run test → success:false result) from
-      // a programming error, and the HTTP layer maps it to a 400.
-      throw new BadRequestException(result.error ?? result.message);
+    if (result === null) {
+      if (opts?.dryRun) {
+        throw new BadRequestException('integration sync already in progress');
+      }
+      this.logger.warn(
+        `Sync already in progress for integration ${integrationId}; skipping`,
+      );
+      return { targetsCreated: 0, assetsUpserted: 0 };
     }
 
     if (!opts?.dryRun) {
@@ -234,15 +315,7 @@ export class IntegrationSyncService implements OnModuleInit {
 
     // The connector stashes its counts on the config (config.__syncResult)
     // before returning, so they flow back to the API response.
-    return (
-      config.__syncResult ?? {
-        zones: 0,
-        records: 0,
-        wildcardZones: 0,
-        targetsCreated: 0,
-        assetsUpserted: 0,
-      }
-    );
+    return config.__syncResult ?? { targetsCreated: 0, assetsUpserted: 0 };
   }
 
   /**

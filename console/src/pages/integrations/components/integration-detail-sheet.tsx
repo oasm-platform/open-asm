@@ -1,9 +1,3 @@
-import {
-  SchemaForm,
-  type SchemaProperty,
-  defaultsFromSchema,
-  groupProperties,
-} from '@/components/schema-form';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
@@ -37,9 +31,33 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { SchemaOneOfItem } from '../index';
 import { IntegrationLogo } from './integration-logo';
+import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
 import { TelegramConnect } from './telegram-connect';
 
 const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
+
+const SSO_SECRET_FIELDS = ['clientId', 'clientSecret', 'refreshToken'];
+
+/**
+ * Payload config: keeps only currently-visible entries (drops stale values
+ * from a previously selected connection method) plus the always-hidden SSO
+ * credentials, which the schema hides forever but the connector requires.
+ */
+function buildDetailConfig(
+  schema: { properties?: Record<string, unknown>; [key: string]: unknown },
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  for (const [key, prop] of Object.entries(schema.properties ?? {})) {
+    if (key === 'app_type' || key === 'category') continue;
+    if (!(key in values)) continue;
+    const keep =
+      isPropertyVisible(prop as SchemaProperty, values) ||
+      SSO_SECRET_FIELDS.includes(key);
+    if (keep) config[key] = values[key];
+  }
+  return config;
+}
 
 /**
  * Fallback cron used when the schedule toggle is on but no cron was captured
@@ -85,18 +103,22 @@ export function IntegrationDetailSheet({
       setEditSchedule(
         scheduleOn && integration.syncSchedule ? integration.syncSchedule : '',
       );
-      const filteredProps = Object.fromEntries(
-        Object.entries(schema.properties ?? {}).filter(
-          ([key]) => key !== 'app_type' && key !== 'category',
-        ),
-      );
-      // Stored config wins; defaults apply only where config is absent.
-      const existingConfig = Object.fromEntries(
-        Object.entries(
-          (integration.config as Record<string, unknown>) ?? {},
-        ).filter(([, value]) => value !== undefined && value !== null),
-      );
-      setFormValues(defaultsFromSchema(filteredProps, existingConfig));
+      const values: Record<string, unknown> = {};
+      for (const [key, prop] of Object.entries(schema.properties ?? {})) {
+        if (key === 'app_type' || key === 'category') continue;
+        const configVal = (integration.config as Record<string, unknown>)[key];
+        if (configVal !== undefined && configVal !== null) {
+          values[key] = configVal;
+        } else {
+          const typedProp = prop as SchemaProperty;
+          if (typedProp.default !== undefined) {
+            values[key] = typedProp.default;
+          } else if (typedProp.type === 'array') {
+            values[key] = [''];
+          }
+        }
+      }
+      setFormValues(values);
     }
   }, [isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -158,6 +180,23 @@ export function IntegrationDetailSheet({
     ([key]) => key !== 'app_type' && key !== 'category',
   ) as [string, SchemaProperty][];
 
+  // The detail sheet never runs the SSO device flow, so switching an existing
+  // integration to `sso` would store no clientId/clientSecret/refreshToken and
+  // the connector would reject it at execute time. Omit the `sso` option unless
+  // the integration is already SSO.
+  const storedConnectionMethod = (integration.config as Record<string, unknown>)
+    ?.connectionMethod;
+  const editPropFor = (key: string, prop: SchemaProperty): SchemaProperty => {
+    if (
+      key !== 'connectionMethod' ||
+      storedConnectionMethod === 'sso' ||
+      !Array.isArray(prop.enum)
+    ) {
+      return prop;
+    }
+    return { ...prop, enum: prop.enum.filter((option) => option !== 'sso') };
+  };
+
   const configValue = (key: string) => {
     const val = (integration.config as Record<string, unknown>)[key];
     if (val === null || val === undefined) return '';
@@ -176,8 +215,31 @@ export function IntegrationDetailSheet({
     : '—';
 
   // Group properties by ui:form:group
-  const [ungroupedProperties, propertyGroups] =
-    groupProperties(formProperties);
+  const grouped = formProperties.reduce<
+    [
+      ungrouped: [string, SchemaProperty][],
+      groups: Record<string, [string, SchemaProperty][]>,
+    ]
+  >(
+    ([ungrouped, groups], entry) => {
+      const group = entry[1]['ui:form:group'];
+      if (group) {
+        groups[group] ??= [];
+        groups[group].push(entry);
+      } else {
+        ungrouped.push(entry);
+      }
+      return [ungrouped, groups];
+    },
+    [[], {}],
+  );
+
+  const [ungroupedProperties, propertyGroups] = grouped;
+
+  // VIEW mode has no form state; resolve conditions against the stored config.
+  const conditionValues = isEditing
+    ? formValues
+    : (integration.config as Record<string, unknown>);
 
   const handleValueChange = (key: string, value: unknown) => {
     setFormValues((prev) => ({ ...prev, [key]: value }));
@@ -194,7 +256,7 @@ export function IntegrationDetailSheet({
       id: integration.id,
       data: {
         name: editName.trim(),
-        config: formValues as Record<string, unknown>,
+        config: buildDetailConfig(schema, formValues),
         ...(integration.category === CLOUD_PROVIDER_CATEGORY
           ? {
               syncSchedule: scheduleEnabled
@@ -254,51 +316,60 @@ export function IntegrationDetailSheet({
             </div>
           )}
 
-          {/* Ungrouped properties: edit mode renders via shared SchemaForm */}
-          {isEditing ? (
-            <SchemaForm
-              schema={{
-                properties: Object.fromEntries(formProperties),
-                required: schema.required ?? [],
-              }}
-              values={formValues}
-              onChange={handleValueChange}
-              enableGroups
-              emptyMessage=""
-            />
-          ) :
-            ungroupedProperties.map(([key, prop]) => {
+          {/* Ungrouped properties */}
+          {isEditing
+            ? ungroupedProperties.map(([key, prop]) => {
+                const editProp = editPropFor(key, prop);
+                if (!isPropertyVisible(editProp, conditionValues)) return null;
                 const label = prop.title ?? key;
-                const value = configValue(key);
+                const required = schema.required?.includes(key);
+                const textColor = prop['ui:text-color'];
+
+                return (
+                  <div key={key} className="space-y-2">
+                    <Label
+                      htmlFor={key}
+                      {...(textColor ? { style: { color: textColor } } : {})}
+                    >
+                      {label}
+                      {required && (
+                        <span className="ml-1 text-destructive">*</span>
+                      )}
+                    </Label>
+                    <SchemaField
+                      fieldKey={key}
+                      prop={editProp}
+                      value={formValues[key] ?? ''}
+                      onChange={(val) => handleValueChange(key, val)}
+                      mode="edit"
+                      autoComplete="off"
+                      visible={isPropertyVisible(editProp, conditionValues)}
+                    />
+                    {prop.description && (
+                      <p className="text-xs text-muted-foreground">
+                        {prop.description}
+                      </p>
+                    )}
+                  </div>
+                );
+              })
+            : ungroupedProperties.map(([key, prop]) => {
+                if (!isPropertyVisible(prop, conditionValues)) return null;
+                const label = prop.title ?? key;
 
                 return (
                   <div key={key} className="space-y-1.5">
                     <Label className="text-sm font-medium text-foreground">
                       {label}
                     </Label>
-                    {prop.type === 'boolean' ? (
-                      <div className="flex h-9 items-center rounded-md border bg-muted/30 px-3 py-2">
-                        <Switch
-                          checked={value === true || value === 'true'}
-                          disabled
-                        />
-                      </div>
-                    ) : prop.format === 'password' ||
-                      prop['ui:widget'] === 'password' ? (
-                      // Never reveal the raw secret in view mode (U6): mask
-                      // it client-side even if the backend already masks.
-                      <div className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                        <span className="text-foreground break-words">
-                          {'****' + String(value).slice(-4)}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                        <span className="text-foreground break-words">
-                          {String(value)}
-                        </span>
-                      </div>
-                    )}
+                    <SchemaField
+                      fieldKey={key}
+                      prop={prop}
+                      value={configValue(key)}
+                      onChange={() => undefined}
+                      mode="view"
+                      visible={isPropertyVisible(prop, conditionValues)}
+                    />
                     {prop.description && (
                       <p className="text-xs text-muted-foreground">
                         {prop.description}
@@ -308,46 +379,52 @@ export function IntegrationDetailSheet({
                 );
               })}
 
-          {/* Grouped properties: view mode only (edit mode renders them via SchemaForm) */}
-          {!isEditing &&
-            Object.entries(propertyGroups).map(([groupKey, fields]) => {
-              const groupLabel =
-                groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
+          {/* Grouped properties */}
+          {Object.entries(propertyGroups).map(([groupKey, fields]) => {
+            const groupLabel =
+              groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
 
-              return (
-                <div key={groupKey} className="space-y-3">
-                  <Label className="text-sm font-semibold">
-                    {groupLabel}
-                  </Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {fields.map(([key, prop]) => {
-                      const textColor = prop['ui:text-color'];
-                      const value = configValue(key);
+            return (
+              <div key={groupKey} className="space-y-3">
+                <Label className="text-sm font-semibold">
+                  {groupLabel}
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {fields.map(([key, prop]) => {
+                    if (!isPropertyVisible(prop, conditionValues)) return null;
+                    const textColor = prop['ui:text-color'];
 
-                      return (
-                        <div key={key} className="flex items-center gap-2">
-                          <Switch
-                            name={key}
-                            id={key}
-                            checked={value === true || value === 'true'}
-                            disabled
-                          />
-                          <Label
-                            htmlFor={key}
-                            {...(textColor
-                              ? { style: { color: textColor } }
-                              : {})}
-                            className="text-sm font-normal"
-                          >
-                            {prop.title ?? key}
-                          </Label>
-                        </div>
-                      );
-                    })}
-                  </div>
+                    return (
+                      <div key={key} className="space-y-2">
+                        <Label
+                          htmlFor={key}
+                          {...(textColor
+                            ? { style: { color: textColor } }
+                            : {})}
+                          className="text-sm font-normal"
+                        >
+                          {prop.title ?? key}
+                        </Label>
+                        <SchemaField
+                          fieldKey={key}
+                          prop={prop}
+                          value={
+                            isEditing
+                              ? (formValues[key] ?? '')
+                              : configValue(key)
+                          }
+                          onChange={(val) => handleValueChange(key, val)}
+                          mode={isEditing ? 'edit' : 'view'}
+                          autoComplete="off"
+                          visible={isPropertyVisible(prop, conditionValues)}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
 
           {/* Telegram pairing section — only for telegram integrations */}
           {integration.appType === 'telegram' && !isEditing && (

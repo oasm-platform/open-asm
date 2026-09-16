@@ -737,6 +737,123 @@ describe('TargetsService', () => {
       expect(ips[255]).toBe('8.8.8.255');
     });
 
+    it('should accept a private non-/24 CIDR from AWS source and create 2^16 assets', async () => {
+      // Arrange
+      const dto = {
+        targets: [{ value: '10.0.0.0/16', type: TargetType.CIDR }],
+      };
+      const createdTargets = [
+        {
+          id: randomUUID(),
+          value: '10.0.0.0/16',
+          type: TargetType.CIDR,
+          scanSchedule: 'DISABLED',
+        },
+      ] as unknown as Target[];
+
+      const mockManager = createMockEntityManager({
+        existingTargets: [],
+        createdTargets,
+      });
+
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(mockManager),
+        );
+
+      // Act
+      const result = await service.createMultipleTargets(
+        dto,
+        workspaceId,
+        userContext,
+        undefined,
+        TargetSource.AWS,
+      );
+
+      // Assert: target created with source 'aws'
+      expect(result.created).toHaveLength(1);
+      const targetRows = (mockManager as any).createQueryBuilder().values.mock
+        .calls[0][0] as Array<Record<string, unknown>>;
+      expect(targetRows[0]).toMatchObject({
+        value: '10.0.0.0/16',
+        type: TargetType.CIDR,
+        source: 'aws',
+      });
+
+      // Assert: 65536 assets flushed in chunks (first value() call is the target insert)
+      const assetValueCalls = (
+        mockManager as any
+      ).createQueryBuilder().values.mock.calls
+        .slice(1)
+        .map((call: unknown[]) => call[0] as Array<Record<string, unknown>>);
+      const assetRows = assetValueCalls.flat();
+      expect(assetRows).toHaveLength(65536);
+      expect(assetValueCalls.length).toBe(66); // ceil(65536 / 1000)
+      expect(assetRows[0]).toMatchObject({
+        value: '10.0.0.0',
+        isPrimary: true,
+      });
+      expect(assetRows[1]).toMatchObject({
+        value: '10.0.0.1',
+        isPrimary: false,
+      });
+    });
+
+    it('should still reject a private non-/24 CIDR when the source is NOT AWS', async () => {
+      // Arrange
+      const dto = {
+        targets: [{ value: '10.0.0.0/16', type: TargetType.CIDR }],
+      };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "10.0.0.0/16" must use /24 prefix. Only /24 CIDR ranges are supported.',
+      );
+    });
+
+    it('should reject an AWS CIDR with a prefix outside 1..32', async () => {
+      // Arrange
+      const dto = {
+        targets: [{ value: '10.0.0.0/33', type: TargetType.CIDR }],
+      };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(
+          dto,
+          workspaceId,
+          userContext,
+          undefined,
+          TargetSource.AWS,
+        ),
+      ).rejects.toThrow(
+        'Invalid CIDR: "10.0.0.0/33" contains an invalid prefix. Prefix must be 1-32.',
+      );
+    });
+
+    it('should expand any CIDR prefix, not just /24', () => {
+      const slash24 = (service as any).expandCIDRToIPs('8.8.8.0/24');
+      expect(slash24).toHaveLength(256);
+      expect(slash24[0]).toBe('8.8.8.0');
+      expect(slash24[255]).toBe('8.8.8.255');
+
+      const slash30 = (service as any).expandCIDRToIPs('10.0.0.0/30');
+      expect(slash30).toEqual([
+        '10.0.0.0',
+        '10.0.0.1',
+        '10.0.0.2',
+        '10.0.0.3',
+      ]);
+
+      expect((service as any).expandCIDRToIPs('10.0.0.0/16')).toHaveLength(
+        65536,
+      );
+    });
+
     it('should default to DOMAIN type when type is not specified', async () => {
       // Arrange
       const dto = { targets: [{ value: 'example.com' }] };
