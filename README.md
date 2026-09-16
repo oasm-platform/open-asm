@@ -8,7 +8,7 @@
   <a href="https://github.com/oasm-platform/open-asm/releases"><img src="https://img.shields.io/github/v/release/oasm-platform/open-asm?style=for-the-badge&labelColor=black&color=black&logo=github&logoColor=2fc414" alt="Latest Release"></a>
   <a href="https://github.com/oasm-platform/open-asm/actions/workflows/build-nightly.yml"><img src="https://img.shields.io/github/actions/workflow/status/oasm-platform/open-asm/build-nightly.yml?style=for-the-badge&label=CI&labelColor=black&color=black&logo=githubactions&logoColor=2088FF" alt="CI"></a>
   <a href="https://hub.docker.com/r/oasm/oasm-api"><img src="https://img.shields.io/docker/pulls/oasm/oasm-api?style=for-the-badge&logo=docker&labelColor=black&color=black&logoColor=2496ED" alt="Docker Pulls"></a>
-  <a href="https://discord.gg/vJYq3QYph"><img src="https://img.shields.io/badge/discord-black?style=for-the-badge&logo=discord&labelColor=black&color=black&logoColor=5865F2" alt="Discord"></a>
+  <a href="https://discord.gg/fWqbNHXR8H"><img src="https://img.shields.io/badge/discord-black?style=for-the-badge&logo=discord&labelColor=black&color=black&logoColor=5865F2" alt="Discord"></a>
   <a href="https://www.linkedin.com/company/oasm-platform"><img src="https://custom-icon-badges.demolab.com/badge/LinkedIn-black?style=for-the-badge&logo=linkedin-white&logoColor=0A66C2&labelColor=black&color=black" alt="LinkedIn"></a>
   <a href="https://x.com/OasmPlatform"><img src="https://img.shields.io/static/v1?label=&message=@OasmPlatform&color=black&style=for-the-badge&logo=x&labelColor=black&logoColor=white" alt="X"></a>
   <a href="https://docs.oasm.dev"><img src="https://img.shields.io/badge/documentation--2fc414?style=for-the-badge&logo=gitbook&labelColor=black&color=black&logoColor=2fc414" alt="Documentation"></a>
@@ -19,6 +19,7 @@ AI-powered, open-source Attack Surface Management platform. Discover, monitor, a
 <p align="center">
   <a href="#features">Features</a> •
   <a href="#system-architecture">System Architecture</a> •
+  <a href="#connectors">Connectors</a> •
   <a href="#installation">Installation</a> •
   <a href="#developer-guide">Developer Guide</a> •
   <a href="#screenshots">Screenshots</a>
@@ -30,30 +31,30 @@ AI-powered, open-source Attack Surface Management platform. Discover, monitor, a
 - **Vulnerability Assessment** — Detect vulnerabilities and misconfigurations with issue tracking, risk analysis, and remediation guidance.
 - **Technology Detection** — Identify frameworks, platforms, and services running on discovered assets.
 - **Groups & Targeted Scanning** — Organize assets into groups with custom tool configurations and execution schedules for focused scans.
-- **Distributed Scanning Engine** — High-performance Go workers with gRPC communication, designed for horizontal scaling.
-- **Tool Integration** — Built-in integration with nuclei, subfinder, httpx, naabu, dnsx and an extensible framework for custom tools.
+- **Distributed Scanning Engine** — Horizontally scalable workers with a high-performance scanning engine and fault-tolerant job distribution.
+- **Tool Integration** — Pluggable security-tool connectors (nuclei, subfinder, httpx, naabu, dnsx, and more) sourced from the separate [oasm-connectors](https://github.com/oasm-platform/oasm-connectors) repository, plus an extensible SDK for custom tools.
 - **Workflow Automation** — Automated scan scheduling, alerts, and remediation workflows.
-- **Real-time Monitoring** — SSE-based real-time notifications and a live statistics dashboard.
+- **Real-time Monitoring** — Live notifications and a statistics dashboard fed by a streaming event channel.
 - **Search & Analytics** — Full-text search, asset filtering, risk trend analysis, and reporting.
 - **Integrations** — Connect Slack, Telegram, and Webhooks for event-driven security alerts.
 - **AI Assistant Integration** — MCP server enabling AI assistants (OpenAI, Anthropic, Google) to query and analyze asset data via natural language.
 - **Geo-IP Enrichment** — Automatic IP geolocation enrichment for discovered assets.
-- **File Storage** — S3-compatible object storage (Rustfs) for scan artifacts and reports.
+- **File Storage** — S3-compatible object storage for scan artifacts and reports.
 - **Multi-workspace** — Isolated environments for different organizations, projects, or environments.
 
 ## System Architecture
 
 The system runs on a distributed architecture consisting of:
 
-* A React-based web console (Vite + TanStack Query/Router) for user interaction, asset management, and real-time monitoring.
-* A NestJS core API service responsible for business logic, data persistence, and job orchestration.
-* A Redis-based queue and caching layer (BullMQ) enabling asynchronous job distribution, rate limiting, and system decoupling.
-* Distributed Go workers that execute high-performance scanning tasks via gRPC, designed for horizontal auto-scaling and fault tolerance.
-* A PostgreSQL database (with pgvector) for persistent storage of assets, scan results, and system state.
-* A Rustfs (S3-compatible) object storage for scan artifacts and reports.
+* A web console for user interaction, asset management, and real-time monitoring.
+* A core API service responsible for business logic, data persistence, and job orchestration.
+* A queue and caching layer enabling asynchronous job distribution, rate limiting, and system decoupling.
+* Distributed workers that execute high-performance scanning tasks, designed for horizontal auto-scaling and fault tolerance.
+* A relational database for persistent storage of assets, scan results, and system state.
+* S3-compatible object storage for scan artifacts and reports.
 * A Geo-IP proxy service for automatic IP geolocation enrichment.
 * An MCP (Model Context Protocol) server that provides structured context to AI systems.
-* Integration with AI/LLM components (AI SDK, LangGraph) for intelligent querying, analysis, and automation over collected asset data.
+* Integration with AI/LLM components for intelligent querying, analysis, and automation over collected asset data.
 
 ```mermaid
 graph TD
@@ -64,12 +65,12 @@ graph TD
 
     %% Core Components
     subgraph "OASM Platform"
-        Console[Web Console<br/>]
-        API[Core API Service<br/>]
-        DB[(PostgreSQL<br/>pgvector)]
-        Redis[(Redis / BullMQ)]
+        Console[Web Console]
+        API[Core API Service]
+        DB[(Database)]
+        Queue[(Queue & Cache)]
         MCP[MCP Server]
-        Rustfs[(Rustfs<br/>S3 Storage)]
+        Storage[(Object Storage)]
         GeoIP[Geo-IP Proxy]
 
         subgraph "Execution Plane"
@@ -84,14 +85,14 @@ graph TD
     Console <-->|REST API| API
 
     API <-->|Persist Data| DB
-    API <-->|Queue / Cache| Redis
-    API <-->|Store Artifacts| Rustfs
+    API <-->|Queue / Cache| Queue
+    API <-->|Store Artifacts| Storage
     API <-->|IP Enrichment| GeoIP
 
-    %% Job Flow (gRPC)
-    API <-->|gRPC Jobs| W1
-    API <-->|gRPC Jobs| W2
-    API <-->|gRPC Jobs| WN
+    %% Job Flow
+    API <-->|Jobs| W1
+    API <-->|Jobs| W2
+    API <-->|Jobs| WN
 
     %% Scan
     W1 -->|Scan| Internet
@@ -102,6 +103,30 @@ graph TD
     AI <-->|Query Context| MCP
     MCP <-->|Fetch Asset Data| API
 ```
+
+## Connectors
+
+Scanning tools are not hard-wired into this repository. They live in a companion repository, [oasm-connectors](https://github.com/oasm-platform/oasm-connectors), which ships each tool as an isolated Docker image wrapping a small Go SDK adapter. Open ASM consumes that catalog as data: it reads the connector manifest, resolves the image for a requested tool, and lets the worker run it on demand.
+
+```mermaid
+flowchart LR
+    MAN["oasm-connectors<br/>manifest.json"] -->|"task sync-connectors"| CORE[Core API]
+    CORE -->|"ExecutionCommand: image + inputs"| WK[Worker]
+    WK -->|"pull connector image"| DR[Docker Runtime]
+    DR --> CT[Connector container]
+    CT -.->|"stream findings"| WK
+    WK -.->|"persist findings"| CORE
+```
+
+How the two repositories fit together:
+
+1. **Catalog** — `oasm-connectors` aggregates every `<category>/<connector>/manifest.yaml` into a single `manifest.json` (built by its `combine-manifest` command). Each entry declares the connector's image, capabilities, inputs schema, and resource defaults.
+2. **Sync** — `task sync-connectors` pulls that manifest into `core-api/resources/connectors/manifest.json`, so the platform always knows which connectors exist and what each one accepts.
+3. **Dispatch** — for a scan, Core resolves the connector image from the manifest, validates the inputs against the connector's schema, and hands the worker an execution command carrying the image reference and the resolved inputs.
+4. **Execution** — the worker pulls the image and starts the container, passing the inputs through.
+5. **Findings** — inside the container the SDK adapter runs the wrapped tool and streams findings back to the worker, which persists them through Core into the asset inventory.
+
+Because connectors are versioned images referenced by the manifest, adding or upgrading a tool never requires an Open ASM release — you publish the connector in [oasm-connectors](https://github.com/oasm-platform/oasm-connectors) and re-sync the manifest (see that repository's README for the connector contract, SDK adapter interface, and Dockerfile pattern).
 
 ## Screenshots
 
@@ -154,13 +179,19 @@ To quickly get started with OASM using Docker:
    cp worker/example.env worker/.env
    ```
 
-3. Start the services:
+3. Pull the connector catalog:
+
+   ```bash
+   task sync-connectors
+   ```
+
+4. Start the services:
 
    ```bash
    docker compose up -d --build
    ```
 
-This will launch the entire system, including the console, core API, workers, PostgreSQL, Redis, Geo-IP proxy, and Rustfs storage. Access the console at `http://localhost:3000`.
+This will launch the entire system, including the console, core API, workers, database, queue, Geo-IP proxy, and object storage. Access the console at `http://localhost:3000`.
 
 ### Pre-built Images
 
@@ -192,23 +223,12 @@ task worker:dev
 ### Key Commands
 
 ```bash
-task test          # Run API tests
-task lint          # Lint API + Console
-task build         # Build all services
-task docker-compose # Start full stack with Docker
-task gen-api       # Regenerate console API client
-task proto         # Regenerate gRPC stubs
-task migration:run # Run database migrations
+task test            # Run API tests
+task lint            # Lint API + Console
+task build           # Build all services
+task docker-compose  # Start full stack with Docker
+task sync-connectors # Refresh the connector catalog from oasm-connectors
+task gen-api         # Regenerate console API client
+task proto           # Regenerate gRPC stubs
+task migration:run   # Run database migrations
 ```
-
-## Tech Stack
-
-| Service | Technology |
-|---------|-----------|
-| **Console** | React 19, Vite, Tailwind CSS v4, TanStack Query/Router, shadcn/ui |
-| **Core API** | NestJS 11, TypeORM, BullMQ, AI SDK, LangGraph |
-| **Worker** | Go 1.26, Cobra, Viper, go-rod (browser automation) |
-| **Database** | PostgreSQL 17 + pgvector |
-| **Queue/Cache** | Redis + BullMQ |
-| **Object Storage** | Rustfs (S3-compatible) |
-| **Communication** | REST API, gRPC, SSE |
