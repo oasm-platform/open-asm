@@ -24,14 +24,14 @@ const mockTools = [
     id: 'tool-1',
     name: 'Subdomain scan',
     description: 'Enumerate subdomains',
-    category: 'subdomains',
+    category: 'vulnerabilities',
     createdAt: '2026-01-01T00:00:00Z',
   },
   {
     id: 'tool-2',
     name: 'Port scan',
     description: 'Scan open ports',
-    category: 'ports_scanner',
+    category: 'vulnerabilities',
     createdAt: '2026-01-02T00:00:00Z',
   },
 ];

@@ -1,10 +1,5 @@
 {
-  "moduleFileExtensions": [
-    "js",
-    "json",
-    "ts",
-    "tsx"
-  ],
+  "moduleFileExtensions": ["js", "json", "ts", "tsx"],
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
@@ -13,25 +8,19 @@
       "@swc/jest",
       {
         "jsc": {
-          "parser": {
-            "syntax": "typescript",
-            "decorators": true
-          },
+          "parser": { "syntax": "typescript", "decorators": true },
           "target": "es5",
-          "transform": {
-            "legacyDecorator": true,
-            "decoratorMetadata": true
-          }
+          "transform": { "legacyDecorator": true, "decoratorMetadata": true }
         },
-        "module": {
-          "type": "commonjs",
-          "noInterop": true
-        }
+        "module": { "type": "commonjs", "noInterop": true }
       }
     ]
   },
   "moduleNameMapper": {
-    "^@/(.*)$": "../src/$1"
+    "^@/(.*)$": "../src/$1",
+    "^@react-pdf/renderer$": "<rootDir>/stubs/react-pdf-renderer.js"
   },
-  "transformIgnorePatterns": []
+  "transformIgnorePatterns": [
+    "node_modules/(?!(?:.pnpm/[^/]+/node_modules/)?(?:better-auth|better-call|@better-auth|@better-fetch|@noble|@opentelemetry|@standard-schema|@formatjs|intl-messageformat|rou3|set-cookie-parser|kysely|nanostores|zod|defu|jose|react|react-dom)(?:/|$))"
+  ]
 }

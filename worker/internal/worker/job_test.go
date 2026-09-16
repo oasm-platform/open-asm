@@ -93,6 +93,7 @@ type capturedResult struct {
 	raw     string
 	isError bool
 	vulns   []*pb.Vulnerability
+	urls    []*pb.DiscoveredUrl
 }
 
 func (s *testJobsServer) Next(_ context.Context, _ *pb.Worker) (*pb.Job, error) {
@@ -156,6 +157,17 @@ func (s *testJobsServer) ResultVulnerabilities(_ context.Context, req *pb.Vulner
 		raw = *req.Raw
 	}
 	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error, vulns: req.GetVulnerabilities().GetValues()})
+	return &pb.JobResponse{Success: true}, nil
+}
+
+func (s *testJobsServer) ResultUrlDiscovery(_ context.Context, req *pb.UrlDiscoveryResultRequest) (*pb.JobResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	raw := ""
+	if req.Raw != nil {
+		raw = *req.Raw
+	}
+	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error, urls: req.GetUrls()})
 	return &pb.JobResponse{Success: true}, nil
 }
 

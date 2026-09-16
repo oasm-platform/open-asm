@@ -71,7 +71,6 @@ core-api/.storage/*
 .direnv/
 .roo/*
 .agent/*
-# .agents/*
 .windsurf/*
 .claude/*
 docs/superpowers/*

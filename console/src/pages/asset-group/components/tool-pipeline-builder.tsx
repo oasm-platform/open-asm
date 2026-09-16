@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Image } from '@/components/ui/image';
+import { ToolLogo } from '@/components/ui/tool-logo';
 import { Input } from '@/components/ui/input';
 import {
   Popover,
@@ -295,10 +295,10 @@ const PipelineToolLogo = memo(
               'grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100',
           )}
         >
-          <Image
-            url={tool.logoUrl}
-            width={40}
-            height={40}
+          <ToolLogo
+            name={tool.name}
+            logoUrl={tool.logoUrl}
+            size={40}
             className="rounded-full border-2 border-[var(--color-primary)]/40 group-hover:border-[var(--color-primary)]"
           />
         </div>

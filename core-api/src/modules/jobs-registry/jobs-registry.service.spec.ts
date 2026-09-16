@@ -1418,4 +1418,197 @@ describe('JobsRegistryService', () => {
     });
   });
 
+  // ── url_discovery routing ────────────────────────────────────────────
+
+  describe('createNewJob — category routing', () => {
+    const mockJobRepo = {
+      create: jest
+        .fn()
+        .mockImplementation((partial: Record<string, unknown>) => ({
+          id: 'job-uuid',
+          ...partial,
+        })),
+      save: jest
+        .fn()
+        .mockImplementation((jobs: unknown) => Promise.resolve(jobs)),
+    };
+
+    let mockAssetServiceQB: Record<string, jest.Mock>;
+    let mockAssetQB: Record<string, jest.Mock>;
+
+    const urlDiscoveryTool = {
+      id: 'tool-ud',
+      name: 'katana',
+      category: ToolCategory.URL_DISCOVERY,
+      priority: 4,
+    } as any;
+
+    const screenshotTool = {
+      id: 'tool-ss',
+      name: 'screenshot',
+      category: ToolCategory.SCREENSHOT,
+      priority: 4,
+    } as any;
+
+    const httpProbeTool = {
+      id: 'tool-hp',
+      name: 'httpx',
+      category: ToolCategory.HTTP_PROBE,
+      priority: 4,
+    } as any;
+
+    const subdomainsTool = {
+      id: 'tool-sub',
+      name: 'subfinder',
+      category: ToolCategory.SUBDOMAINS,
+      priority: 4,
+    } as any;
+
+    const makeService = (id: string) => ({
+      id,
+      value: `${id}.example.com`,
+      port: 443,
+      asset: { id: `asset-${id}`, isPrimary: true, value: `${id}.example.com` },
+    });
+
+    const existsPredicate = (): string | undefined => {
+      const call = mockAssetServiceQB.andWhere.mock.calls.find(
+        ([sql]) => typeof sql === 'string' && sql.includes('EXISTS'),
+      );
+      return call?.[0] as string | undefined;
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJobHistoryRepository.create = jest
+        .fn()
+        .mockReturnValue({ id: 'jh-1' });
+      mockJobHistoryRepository.save = jest
+        .fn()
+        .mockResolvedValue({ id: 'jh-1' });
+      mockConnectorRegistryService.getConnector.mockReturnValue(null);
+
+      mockAssetServiceQB = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        distinct: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockAssetQB = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockDataSource.getRepository.mockImplementation((entity: any) => {
+        const name = entity?.name ?? entity;
+        if (name === 'AssetService') {
+          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB) };
+        }
+        if (name === 'Asset') {
+          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetQB) };
+        }
+        return mockJobRepo;
+      });
+    });
+
+    it('S1: URL_DISCOVERY finds asset services (not assets) and creates one job per service with assetService + jobHistory', async () => {
+      mockAssetServiceQB.getMany.mockResolvedValue([
+        makeService('as-1'),
+        makeService('as-2'),
+      ]);
+
+      const result = await service.createNewJob({
+        tool: urlDiscoveryTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(result).toHaveLength(2);
+      expect(mockAssetServiceQB.getMany).toHaveBeenCalled();
+      expect(mockAssetQB.getMany).not.toHaveBeenCalled();
+      for (const job of result) {
+        expect((job as any).assetService).toBeDefined();
+        expect((job as any).jobHistory).toBeDefined();
+        expect((job as any).category).toBe(ToolCategory.URL_DISCOVERY);
+      }
+    });
+
+    it('S2 edge: URL_DISCOVERY applies liveOnly=true (EXISTS http_responses failed=false)', async () => {
+      mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
+
+      await service.createNewJob({
+        tool: urlDiscoveryTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      const existsSql = existsPredicate();
+      expect(existsSql).toBeDefined();
+      expect(existsSql).toContain('http_responses');
+      expect(existsSql).toContain('hr.failed = false');
+    });
+
+    it('S3 regression: SUBDOMAINS uses findAssetsForJob, not asset services', async () => {
+      mockAssetQB.getMany.mockResolvedValue([
+        { id: 'asset-1', value: 'example.com', isPrimary: true },
+      ]);
+
+      const result = await service.createNewJob({
+        tool: subdomainsTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(mockAssetQB.getMany).toHaveBeenCalled();
+      expect(mockAssetServiceQB.getMany).not.toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+    });
+
+    it('S3 regression: SCREENSHOT uses asset services with liveOnly=true; HTTP_PROBE with liveOnly=false', async () => {
+      mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
+
+      await service.createNewJob({
+        tool: screenshotTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+      expect(existsPredicate()).toBeDefined();
+
+      jest.clearAllMocks();
+      mockJobHistoryRepository.create = jest.fn().mockReturnValue({ id: 'jh-1' });
+      mockJobHistoryRepository.save = jest.fn().mockResolvedValue({ id: 'jh-1' });
+      mockConnectorRegistryService.getConnector.mockReturnValue(null);
+      mockAssetServiceQB = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        distinct: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([makeService('as-1')]),
+      };
+      mockDataSource.getRepository.mockImplementation((entity: any) => {
+        const name = entity?.name ?? entity;
+        if (name === 'AssetService') {
+          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB) };
+        }
+        return mockJobRepo;
+      });
+
+      await service.createNewJob({
+        tool: httpProbeTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+      expect(existsPredicate()).toBeUndefined();
+    });
+  });
+
 });

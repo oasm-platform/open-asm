@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import Image from '@/components/ui/image';
+import ToolLogo from '@/components/ui/tool-logo';
 import {
   Table,
   TableBody,
@@ -32,10 +32,10 @@ import {
   type Tool,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import { useParams } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import { BadgeCheck, Box, Plus, Settings, Tag, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   ConfigProfilesSkeleton,
@@ -103,32 +103,6 @@ export default function ToolDetail() {
     useToolsControllerGetConnectorBySlug(toolSlug ?? '', {
       query: { enabled: Boolean(toolSlug), retry: false },
     });
-
-  // Tabs are URL-driven (?tab=overview|configuration) via Tabs tabParam.
-  const navigate = useNavigate();
-  const search = useSearch({ strict: false }) as { tab?: string };
-
-  // Default to Overview once its metadata resolves — first flip only, so a
-  // tab the user already picked (or linked) is never overridden.
-  const overviewDefaultApplied = useRef(false);
-  useEffect(() => {
-    if (
-      toolSlug &&
-      connectorMeta &&
-      !connectorMetaLoading &&
-      !overviewDefaultApplied.current &&
-      !search.tab
-    ) {
-      overviewDefaultApplied.current = true;
-      navigate({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        search: { ...search, tab: 'overview' } as any,
-        replace: true,
-      });
-    }
-    // `search` intentionally omitted — avoids a navigate loop on back/forward.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toolSlug, connectorMeta, connectorMetaLoading, navigate]);
 
   // Update local state when tool data changes
   useEffect(() => {
@@ -206,11 +180,11 @@ export default function ToolDetail() {
           <CardContent>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
               <div className="flex min-w-0 flex-1 items-center gap-4">
-                <Image
-                  url={tool?.logoUrl}
-                  width={80}
-                  height={80}
-                  className="size-20 shrink-0 rounded-2xl"
+                <ToolLogo
+                  name={tool.name}
+                  logoUrl={tool?.logoUrl}
+                  size={80}
+                  className="rounded-2xl"
                 />
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -253,8 +227,10 @@ export default function ToolDetail() {
         {tabs.length > 0 && (
           <Tabs
             tabParam="tab"
-            defaultValue="configuration"
-            validValues={['overview', 'configuration']}
+            // Valid values mirror the tabs that actually render, so a stale
+            // ?tab= (e.g. configuration after uninstalling) can't leave Radix
+            // with a value no trigger/content owns. Absent ?tab= -> first tab.
+            validValues={tabs.map((tab) => tab.id)}
             className="w-full"
           >
             <TabsList>

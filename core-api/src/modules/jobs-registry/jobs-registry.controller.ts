@@ -26,6 +26,7 @@ import { GrpcMethod } from '@nestjs/microservices';
 import { plainToInstance } from 'class-transformer';
 import { AuditLog } from '../audit/audit-log.decorator';
 import { Asset } from '../assets/entities/assets.entity';
+import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
@@ -42,6 +43,7 @@ import {
   ScreenshotResultDto,
   SubdomainResultDto,
   UpdateResultDto,
+  UrlDiscoveryResultDto,
   VulnerabilitiesResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
@@ -246,6 +248,24 @@ export class JobsRegistryController {
       workerId,
       dto,
       ToolCategory.SCREENSHOT,
+    );
+  }
+
+  @Doc({
+    summary: 'Updates URL discovery results',
+    description: 'Submit discovered URLs for a job',
+  })
+  @WorkerTokenAuth()
+  @Public()
+  @Post('/:workerId/result/url-discovery')
+  updateUrlDiscoveryResult(
+    @Param() { workerId }: WorkerIdParams,
+    @Body() dto: UrlDiscoveryResultDto,
+  ) {
+    return this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.URL_DISCOVERY,
     );
   }
 
@@ -583,6 +603,35 @@ export class JobsRegistryController {
       workerId,
       dto,
       ToolCategory.SCREENSHOT,
+    );
+    return { success: !!result.jobId };
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'ResultUrlDiscovery')
+  async resultUrlDiscovery({
+    workerId,
+    jobId,
+    error,
+    raw,
+    urls,
+  }: {
+    workerId: string;
+    jobId: string;
+    error: boolean;
+    raw?: string;
+    urls?: DiscoveredUrl[];
+  }): Promise<{ success: boolean }> {
+    const dto = plainToInstance(UrlDiscoveryResultDto, {
+      jobId,
+      error,
+      raw,
+      payload: urls ?? [],
+    });
+    const result = await this.jobsRegistryService.updateResultByCategory(
+      workerId,
+      dto,
+      ToolCategory.URL_DISCOVERY,
     );
     return { success: !!result.jobId };
   }

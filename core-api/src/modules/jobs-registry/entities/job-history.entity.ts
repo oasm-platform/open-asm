@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { JobRunType } from '@/common/enums/enum';
 import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
+import { DiscoveredUrl } from '@/modules/assets/entities/discovered-url.entity';
 import { Port } from '@/modules/assets/entities/ports.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
@@ -29,6 +30,11 @@ export class JobHistory extends BaseEntity {
     onDelete: 'CASCADE',
   })
   httpResponses?: Relation<HttpResponse[]>;
+
+  @OneToMany(() => DiscoveredUrl, (u) => u.jobHistory, {
+    onDelete: 'CASCADE',
+  })
+  discoveredUrls?: Relation<DiscoveredUrl[]>;
 
   /**
    * @deprecated Counter-based completion tracking is deprecated.

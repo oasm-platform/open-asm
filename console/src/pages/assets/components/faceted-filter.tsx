@@ -26,6 +26,7 @@ import {
   useAssetsControllerGetStatusCodeAssetsInfinite,
   useAssetsControllerGetTechnologyAssetsInfinite,
   useAssetsControllerGetTlsAssetsInfinite,
+  useAssetsControllerGetUrlAssetsInfinite,
 } from '@/services/apis/gen/queries';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Check, CirclePlus } from 'lucide-react';
@@ -353,6 +354,48 @@ export function PortFacetedFilter() {
       paramValues={filterParams.ports}
       title="Port"
       filterKey="ports"
+      options={options}
+      hasNextPage={hasNextPage}
+      fetchNextPage={fetchNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      isFetching={isFetching}
+    />
+  );
+}
+
+export function UrlsFacetedFilter() {
+  const [open, setOpen] = useState(false);
+  const { filterParams, queryFilterParams } = useAsset();
+  const [value, setValue] = useState('');
+
+  const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetching } =
+    useAssetsControllerGetUrlAssetsInfinite(
+      { ...queryFilterParams, ...filterParams, value: value },
+      {
+        query: {
+          getNextPageParam: (lastGroup) =>
+            lastGroup.hasNextPage ? lastGroup.page + 1 : undefined,
+          enabled: open,
+          initialPageParam: 1,
+          select: (res) => {
+            const items = res?.pages.flatMap((page) => page.data) || [];
+            return items.map((e) => ({
+              value: e.url?.toString() ?? '',
+              label: e.url?.toString() ?? '',
+            }));
+          },
+        },
+      },
+    );
+  const options = useMemo(() => data ?? [], [data]);
+  return (
+    <FacetedFilterTemplate
+      setValue={setValue}
+      open={open}
+      setOpen={setOpen}
+      paramValues={filterParams.urls}
+      title="URL"
+      filterKey="urls"
       options={options}
       hasNextPage={hasNextPage}
       fetchNextPage={fetchNextPage}

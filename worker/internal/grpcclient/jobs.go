@@ -108,6 +108,32 @@ func (c *Client) SubmitVulnerabilitiesResult(ctx context.Context, jobID string, 
 	return nil
 }
 
+// SubmitUrlDiscoveryResult submits URL discovery results for a job.
+//
+// Urls is a PLAIN repeated proto field on UrlDiscoveryResultRequest — unlike
+// the other category results it is NOT wrapped in a list message, so it is
+// passed through directly (never build a UrlDiscoveryList).
+func (c *Client) SubmitUrlDiscoveryResult(ctx context.Context, jobID string, isError bool, raw string, urls []*jobsRegistry.DiscoveredUrl) error {
+	req := &jobsRegistry.UrlDiscoveryResultRequest{
+		WorkerId: c.WorkerID(),
+		JobId:    jobID,
+		Error:    isError,
+		Urls:     urls,
+	}
+	if raw != "" {
+		req.Raw = &raw
+	}
+
+	resp, err := c.jobs.ResultUrlDiscovery(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to submit url-discovery result: %w", err)
+	}
+	if !resp.Success {
+		return fmt.Errorf("server rejected the url-discovery result submission")
+	}
+	return nil
+}
+
 // SubmitScreenshotResult submits screenshot capture results for a job.
 func (c *Client) SubmitScreenshotResult(ctx context.Context, jobID string, isError bool, raw string) error {
 	req := &jobsRegistry.ScreenshotResultRequest{

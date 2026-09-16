@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
-import Image from '@/components/ui/image';
+import ToolLogo from '@/components/ui/tool-logo';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -238,11 +238,11 @@ const ListWorkers = () => {
                       navigateWithParams(`/tools/${tool.id}`);
                     }}
                   >
-                    <Image
+                    <ToolLogo
                       className="rounded-full"
-                      height={30}
-                      width={30}
-                      url={tool.logoUrl}
+                      size={30}
+                      name={tool.name}
+                      logoUrl={tool.logoUrl}
                     />
                   </Button>
                 ))}

@@ -9,6 +9,7 @@ import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
+import { DiscoveredUrl } from './entities/discovered-url.entity';
 import { HttpResponse } from './entities/http-response.entity';
 import { TlsAssetsView } from './entities/tls-assets.entity';
 
@@ -20,6 +21,7 @@ import { TlsAssetsView } from './entities/tls-assets.entity';
       Job,
       Target,
       HttpResponse,
+      DiscoveredUrl,
       AssetService,
       TlsAssetsView,
       AgentLLMConfig,

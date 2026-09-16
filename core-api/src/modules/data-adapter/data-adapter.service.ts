@@ -12,6 +12,7 @@ import {
 } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { IssuesService } from '../issues/issues.service';
@@ -277,6 +278,74 @@ export class DataAdapterService {
   }
 
   /**
+   * URL discovery data normalization: one row per unique URL, attached to the
+   * job's AssetService and JobHistory. Deduped in-app (Set) and DB-level
+   * (unique constraint + orIgnore) so worker retries / workflow re-runs are
+   * idempotent.
+   */
+  public async urlDiscovery({
+    data,
+    job,
+  }: DataAdapterInput<DiscoveredUrl[]>): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      if (!job.assetServiceId) {
+        this.logger.warn(
+          `urlDiscovery: job ${job.id} has no assetServiceId — skipping`,
+        );
+        await queryRunner.commitTransaction();
+        return;
+      }
+
+      const MAX_URL_LENGTH = 2048;
+      const raw = (data ?? [])
+        .map((d) => d?.url?.trim())
+        .filter((u): u is string => !!u);
+      const tooLong = raw.filter((u) => u.length > MAX_URL_LENGTH);
+      if (tooLong.length > 0) {
+        this.logger.warn(
+          `urlDiscovery: dropped ${tooLong.length} url(s) longer than ${MAX_URL_LENGTH} chars for job ${job.id}`,
+        );
+      }
+      const urls = [...new Set(raw.filter((u) => u.length <= MAX_URL_LENGTH))];
+
+      if (urls.length > 0) {
+        // A single INSERT would exceed PostgreSQL's 65535 bind-parameter cap
+        // (3 params per row → ~21k rows), so insert in bounded chunks inside
+        // the same transaction.
+        const INSERT_BATCH_SIZE = 5000;
+        for (let i = 0; i < urls.length; i += INSERT_BATCH_SIZE) {
+          const batch = urls.slice(i, i + INSERT_BATCH_SIZE);
+          await queryRunner.manager
+            .createQueryBuilder()
+            .insert()
+            .into(DiscoveredUrl)
+            .values(
+              batch.map((url) => ({
+                url,
+                assetServiceId: job.assetServiceId,
+                jobHistoryId: job.jobHistory.id,
+              })),
+            )
+            .orIgnore()
+            .execute();
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
    *
    * @param param0
    * @returns
@@ -532,6 +601,10 @@ export class DataAdapterService {
           handler: (data: DataAdapterInput<ScreenshotPayload>) =>
             this.screenshot(data),
           validationClass: ScreenshotPayload,
+        },
+        [ToolCategory.URL_DISCOVERY]: {
+          handler: (data: DataAdapterInput<DiscoveredUrl[]>) =>
+            this.urlDiscovery(data),
         },
       };
 

@@ -1,4 +1,5 @@
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
+import { ToolCategory } from '@/common/enums/enum';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
@@ -96,5 +97,115 @@ describe('JobsRegistryController', () => {
       expect(result).toEqual({ id: '', asset: {}, command: '' });
     });
 
+  });
+
+  // ── url_discovery: REST + gRPC delegation ───────────────────────────
+
+  describe('url-discovery result endpoints', () => {
+    let controller: JobsRegistryController;
+    let mockJobsRegistryService: any;
+
+    beforeEach(async () => {
+      mockJobsRegistryService = {
+        getNextJob: jest.fn(),
+        updateResultByCategory: jest.fn().mockResolvedValue({
+          jobId: 'bull-job-id',
+          queueId: 'job-result',
+        }),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        controllers: [JobsRegistryController],
+        providers: [
+          { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          {
+            provide: ConnectorRegistryService,
+            useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
+          },
+          {
+            provide: ToolConfigProfilesService,
+            useValue: { resolveConfigForJob: jest.fn() },
+          },
+          { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
+          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
+          { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
+        ],
+      }).compile();
+
+      controller = module.get(JobsRegistryController);
+    });
+
+    it('S1 REST: POST :workerId/result/url-discovery delegates with ToolCategory.URL_DISCOVERY', async () => {
+      const dto = {
+        jobId: 'job-uuid',
+        error: false,
+        payload: [{ url: 'https://a.example.com' }],
+      } as any;
+
+      const result = await controller.updateUrlDiscoveryResult(
+        { workerId: 'worker-uuid' },
+        dto,
+      );
+
+      expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
+        1,
+      );
+      const [workerId, passedDto, category] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(workerId).toBe('worker-uuid');
+      expect(passedDto).toBe(dto);
+      expect(category).toBe(ToolCategory.URL_DISCOVERY);
+      expect(result).toEqual({ jobId: 'bull-job-id', queueId: 'job-result' });
+    });
+
+    it('S1 gRPC: ResultUrlDiscovery maps proto urls → dto.payload and returns {success:true}', async () => {
+      const urls = [
+        { url: 'https://a.example.com' },
+        { url: 'https://b.example.com' },
+      ];
+
+      const result = await controller.resultUrlDiscovery({
+        workerId: 'worker-uuid',
+        jobId: 'job-uuid',
+        error: false,
+        raw: 'raw-out',
+        urls,
+      });
+
+      expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
+        1,
+      );
+      const [, passedDto, category] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(passedDto.jobId).toBe('job-uuid');
+      expect(passedDto.raw).toBe('raw-out');
+      expect(passedDto.payload).toEqual(urls);
+      expect(category).toBe(ToolCategory.URL_DISCOVERY);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('S2 edge: urls undefined → payload [] (no throw)', async () => {
+      const result = await controller.resultUrlDiscovery({
+        workerId: 'worker-uuid',
+        jobId: 'job-uuid',
+        error: false,
+      });
+
+      const [, passedDto] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(passedDto.payload).toEqual([]);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('S3 regression: updatePortsResult still delegates with PORTS_SCANNER', async () => {
+      const dto = { jobId: 'job-uuid', error: false, payload: [80, 443] } as any;
+
+      await controller.updatePortsResult({ workerId: 'worker-uuid' }, dto);
+
+      const [, passedDto, category] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(passedDto).toBe(dto);
+      expect(category).toBe(ToolCategory.PORTS_SCANNER);
+    });
   });
 });

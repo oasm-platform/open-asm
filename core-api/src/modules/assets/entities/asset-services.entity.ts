@@ -14,6 +14,7 @@ import {
 } from 'typeorm';
 import { AssetTag } from './asset-tags.entity';
 import { Asset } from './assets.entity';
+import { DiscoveredUrl } from './discovered-url.entity';
 import { HttpResponse } from './http-response.entity';
 import { StatusCodeAssetsView } from './status-code-assets.entity';
 import { TlsAssetsView } from './tls-assets.entity';
@@ -45,6 +46,11 @@ export class AssetService extends BaseEntity {
     onDelete: 'CASCADE',
   })
   httpResponses?: Relation<HttpResponse[]>;
+
+  @OneToMany(() => DiscoveredUrl, (u) => u.assetService, {
+    onDelete: 'CASCADE',
+  })
+  discoveredUrls?: Relation<DiscoveredUrl[]>;
 
   @OneToMany(() => Job, (job) => job.assetService, {
     onDelete: 'CASCADE',

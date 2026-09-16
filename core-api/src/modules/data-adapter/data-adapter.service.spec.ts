@@ -825,6 +825,200 @@ describe('DataAdapterService', () => {
     });
   });
 
+  describe('urlDiscovery', () => {
+    const mockJob = {
+      id: 'job-id',
+      asset: {
+        id: 'asset-id',
+        value: 'example.com',
+        target: { id: 'target-id' },
+        targetId: 'target-id',
+        isEnabled: true,
+        dnsRecords: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      assetServiceId: 'service-id',
+      jobHistory: { id: 'history-id' },
+      tool: { id: 'tool-id', category: ToolCategory.URL_DISCOVERY },
+      assetService: { id: 'service-id' },
+      category: ToolCategory.URL_DISCOVERY,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as Job;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockQueryRunner.manager.createQueryBuilder.mockReturnThis();
+      mockQueryRunner.manager.insert.mockReturnThis();
+      mockQueryRunner.manager.into.mockReturnThis();
+      mockQueryRunner.manager.values.mockReturnThis();
+      mockQueryRunner.manager.orIgnore.mockReturnThis();
+      mockQueryRunner.manager.execute.mockResolvedValue(undefined);
+    });
+
+    it('S1: inserts one row per unique url with assetServiceId + jobHistoryId in a transaction', async () => {
+      const data = [
+        { url: 'https://a.example.com' },
+        { url: 'https://b.example.com' },
+      ] as any;
+
+      await service.urlDiscovery({ data, job: mockJob });
+
+      expect(mockQueryRunner.connect).toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.insert).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.orIgnore).toHaveBeenCalled();
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg).toHaveLength(2);
+      expect(valuesArg).toEqual([
+        {
+          url: 'https://a.example.com',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+        {
+          url: 'https://b.example.com',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+      ]);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('S2a: empty payload commits without insert and without throw', async () => {
+      await service.urlDiscovery({ data: [], job: mockJob });
+
+      expect(mockQueryRunner.manager.insert).not.toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('S2b: duplicate urls collapse to one row via Set + orIgnore', async () => {
+      const data = [
+        { url: 'https://dup.example.com' },
+        { url: 'https://dup.example.com' },
+        { url: 'https://dup.example.com' },
+      ] as any;
+
+      await service.urlDiscovery({ data, job: mockJob });
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg).toHaveLength(1);
+      expect(valuesArg[0].url).toBe('https://dup.example.com');
+      expect(mockQueryRunner.manager.orIgnore).toHaveBeenCalled();
+    });
+
+    it('S2c: missing assetServiceId skips insert with warn, no throw', async () => {
+      const noServiceJob = { ...mockJob, assetServiceId: undefined } as unknown as Job;
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => undefined);
+
+      await expect(
+        service.urlDiscovery({
+          data: [{ url: 'https://a.example.com' }] as any,
+          job: noServiceJob,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(mockQueryRunner.manager.insert).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('rolls back and rethrows on error', async () => {
+      mockQueryRunner.manager.execute.mockRejectedValue(new Error('DB error'));
+
+      await expect(
+        service.urlDiscovery({
+          data: [{ url: 'https://a.example.com' }] as any,
+          job: mockJob,
+        }),
+      ).rejects.toThrow('DB error');
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('F2: chunks inserts so a single statement never exceeds the PostgreSQL 65535 bind-parameter cap', async () => {
+      const data = Array.from({ length: 12000 }, (_, i) => ({
+        url: `https://h${i}.example.com`,
+      })) as any;
+
+      await service.urlDiscovery({ data, job: mockJob });
+
+      // 12000 rows / 5000-per-batch = 3 separate INSERT statements. Without
+      // chunking this is a single `.values(...)` call carrying 36000 params,
+      // which Postgres rejects with "bind message supplies N parameters".
+      const valuesCalls = mockQueryRunner.manager.values.mock.calls as Array<
+        [Array<Record<string, unknown>>]
+      >;
+      expect(valuesCalls).toHaveLength(3);
+      expect(valuesCalls[0][0]).toHaveLength(5000);
+      expect(valuesCalls[1][0]).toHaveLength(5000);
+      expect(valuesCalls[2][0]).toHaveLength(2000);
+      for (const [batch] of valuesCalls) {
+        expect(batch.length).toBeLessThanOrEqual(5000);
+      }
+      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(3);
+
+      // Every chunk stays inside the one transaction opened per call.
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalledTimes(1);
+    });
+
+    it('F5: drops over-long urls at the trust boundary but keeps normal ones', async () => {
+      const tooLongUrl = `https://a.example.com/${'x'.repeat(2048)}`;
+      expect(tooLongUrl.length).toBeGreaterThan(2048);
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => undefined);
+
+      await service.urlDiscovery({
+        data: [{ url: tooLongUrl }, { url: 'https://ok.example.com' }] as any,
+        job: mockJob,
+      });
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg).toHaveLength(1);
+      expect(valuesArg[0].url).toBe('https://ok.example.com');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('dropped 1 url(s) longer than 2048 chars'),
+      );
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it('F3: inserts the validated scalar assetServiceId when the relation is not loaded', async () => {
+      const jobWithoutRelation = {
+        ...mockJob,
+        assetService: undefined,
+      } as unknown as Job;
+
+      await service.urlDiscovery({
+        data: [{ url: 'https://c.example.com' }] as any,
+        job: jobWithoutRelation,
+      });
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg[0].assetServiceId).toBe('service-id');
+    });
+  });
+
   describe('portsScanner', () => {
     const mockJob = {
       asset: {
@@ -1479,6 +1673,58 @@ describe('DataAdapterService', () => {
       expect(service.vulnerabilities).toHaveBeenCalledWith({
         data: mockData,
         job: mockJob,
+      });
+    });
+
+    it('S3: syncData routes URL_DISCOVERY to urlDiscovery and HTTP_PROBE to httpResponses', async () => {
+      const urlDiscoveryJob = {
+        asset: {
+          id: 'asset-id',
+          value: 'example.com',
+          target: { id: 'target-id' },
+          targetId: 'target-id',
+          isEnabled: true,
+          dnsRecords: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        assetServiceId: 'service-id',
+        assetService: { id: 'service-id' },
+        jobHistory: { id: 'history-id' },
+        tool: { id: 'tool-id', category: ToolCategory.URL_DISCOVERY },
+        category: ToolCategory.URL_DISCOVERY,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Job;
+
+      const urlData = [{ url: 'https://a.example.com' }] as any;
+
+      const urlDiscoverySpy = jest
+        .spyOn(service, 'urlDiscovery')
+        .mockResolvedValue();
+
+      await service.syncData({ data: urlData, job: urlDiscoveryJob });
+
+      expect(urlDiscoverySpy).toHaveBeenCalledWith({
+        data: urlData,
+        job: urlDiscoveryJob,
+      });
+
+      const httpProbeJob = {
+        ...urlDiscoveryJob,
+        tool: { id: 'tool-id', category: ToolCategory.HTTP_PROBE },
+        category: ToolCategory.HTTP_PROBE,
+      } as unknown as Job;
+      const httpData = { url: 'https://example.com' } as unknown as HttpResponse;
+      const httpSpy = jest
+        .spyOn(service, 'httpResponses')
+        .mockResolvedValue();
+
+      await service.syncData({ data: httpData, job: httpProbeJob });
+
+      expect(httpSpy).toHaveBeenCalledWith({
+        data: httpData,
+        job: httpProbeJob,
       });
     });
 
