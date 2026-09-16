@@ -344,6 +344,7 @@ describe('AssetsService', () => {
         .mockReturnValue({ workspaceId: 'workspace-uuid' });
       (mockDataSource as any).addSelect = jest.fn().mockReturnThis();
       (mockDataSource as any).orderBy = jest.fn().mockReturnThis();
+      (mockDataSource as any).addOrderBy = jest.fn().mockReturnThis();
       (mockDataSource as any).limit = jest.fn().mockReturnThis();
       (mockDataSource as any).offset = jest.fn().mockReturnThis();
       (mockDataSource as any).setParameters = jest.fn().mockReturnThis();
@@ -468,6 +469,47 @@ describe('AssetsService', () => {
       );
 
       expect((mockDataSource as any).orderBy).toHaveBeenCalledWith('t.url', 'ASC');
+    });
+
+    it('adds t.url as a unique ORDER BY tiebreaker when sorting by assetCount', async () => {
+      await service.getUrlAssets(
+        {
+          page: 2,
+          limit: 10,
+          sortBy: 'assetCount',
+          sortOrder: 'ASC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect((mockDataSource as any).orderBy).toHaveBeenCalledWith(
+        't."assetCount"',
+        'ASC',
+      );
+      // Without a unique tiebreaker, rows with equal assetCount (nearly every
+      // url has a count of 1) are ordered arbitrarily by Postgres, so page 2
+      // can repeat rows from page 1 and skip others.
+      expect((mockDataSource as any).addOrderBy).toHaveBeenCalledWith(
+        't.url',
+        'ASC',
+      );
+    });
+
+    it('adds t.url as the tiebreaker when sorting by url', async () => {
+      await service.getUrlAssets(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'url',
+          sortOrder: 'DESC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect((mockDataSource as any).addOrderBy).toHaveBeenCalledWith(
+        't.url',
+        'DESC',
+      );
     });
 
   });

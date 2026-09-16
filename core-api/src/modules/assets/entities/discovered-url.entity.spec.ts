@@ -72,6 +72,14 @@ describe('DiscoveredUrl entity metadata', () => {
       expect(url).toBeDefined();
       expect(url?.options.nullable).not.toBe(true);
     });
+
+    it('declares uuid column types for the FK columns (matching the migration)', () => {
+      // The migration creates both columns as `uuid`. If the entity drifts back
+      // to varchar, the next `task migration:generate` emits spurious
+      // ALTER COLUMN TYPE statements for these columns.
+      expect(column('assetServiceId')?.options.type).toBe('uuid');
+      expect(column('jobHistoryId')?.options.type).toBe('uuid');
+    });
   });
 
   describe('trust boundary: global ValidationPipe whitelist keeps url', () => {

@@ -787,6 +787,10 @@ export class AssetsService {
       .from('(' + groupedSql + ')', 't')
       .setParameters(parameters)
       .orderBy(sortColumn, query.sortOrder)
+      // Unique tiebreaker: "assetCount" is not unique (nearly every url has
+      // a count of 1), so Postgres may order ties differently per query,
+      // causing rows to repeat/skip across offset pages.
+      .addOrderBy('t.url', query.sortOrder)
       .limit(query.limit)
       .offset(offset)
       .getRawMany<GetUrlAssetsDTO>();

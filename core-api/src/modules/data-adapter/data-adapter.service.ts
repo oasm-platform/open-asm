@@ -300,28 +300,39 @@ export class DataAdapterService {
         return;
       }
 
-      const urls = [
-        ...new Set(
-          (data ?? [])
-            .map((d) => d?.url?.trim())
-            .filter((u): u is string => !!u),
-        ),
-      ];
+      const MAX_URL_LENGTH = 2048;
+      const raw = (data ?? [])
+        .map((d) => d?.url?.trim())
+        .filter((u): u is string => !!u);
+      const tooLong = raw.filter((u) => u.length > MAX_URL_LENGTH);
+      if (tooLong.length > 0) {
+        this.logger.warn(
+          `urlDiscovery: dropped ${tooLong.length} url(s) longer than ${MAX_URL_LENGTH} chars for job ${job.id}`,
+        );
+      }
+      const urls = [...new Set(raw.filter((u) => u.length <= MAX_URL_LENGTH))];
 
       if (urls.length > 0) {
-        await queryRunner.manager
-          .createQueryBuilder()
-          .insert()
-          .into(DiscoveredUrl)
-          .values(
-            urls.map((url) => ({
-              url,
-              assetServiceId: job.assetService?.id,
-              jobHistoryId: job.jobHistory.id,
-            })),
-          )
-          .orIgnore()
-          .execute();
+        // A single INSERT would exceed PostgreSQL's 65535 bind-parameter cap
+        // (3 params per row → ~21k rows), so insert in bounded chunks inside
+        // the same transaction.
+        const INSERT_BATCH_SIZE = 5000;
+        for (let i = 0; i < urls.length; i += INSERT_BATCH_SIZE) {
+          const batch = urls.slice(i, i + INSERT_BATCH_SIZE);
+          await queryRunner.manager
+            .createQueryBuilder()
+            .insert()
+            .into(DiscoveredUrl)
+            .values(
+              batch.map((url) => ({
+                url,
+                assetServiceId: job.assetServiceId,
+                jobHistoryId: job.jobHistory.id,
+              })),
+            )
+            .orIgnore()
+            .execute();
+        }
       }
 
       await queryRunner.commitTransaction();

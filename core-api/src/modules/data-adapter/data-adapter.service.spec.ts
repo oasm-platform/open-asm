@@ -948,6 +948,75 @@ describe('DataAdapterService', () => {
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();
     });
+
+    it('F2: chunks inserts so a single statement never exceeds the PostgreSQL 65535 bind-parameter cap', async () => {
+      const data = Array.from({ length: 12000 }, (_, i) => ({
+        url: `https://h${i}.example.com`,
+      })) as any;
+
+      await service.urlDiscovery({ data, job: mockJob });
+
+      // 12000 rows / 5000-per-batch = 3 separate INSERT statements. Without
+      // chunking this is a single `.values(...)` call carrying 36000 params,
+      // which Postgres rejects with "bind message supplies N parameters".
+      const valuesCalls = mockQueryRunner.manager.values.mock.calls as Array<
+        [Array<Record<string, unknown>>]
+      >;
+      expect(valuesCalls).toHaveLength(3);
+      expect(valuesCalls[0][0]).toHaveLength(5000);
+      expect(valuesCalls[1][0]).toHaveLength(5000);
+      expect(valuesCalls[2][0]).toHaveLength(2000);
+      for (const [batch] of valuesCalls) {
+        expect(batch.length).toBeLessThanOrEqual(5000);
+      }
+      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(3);
+
+      // Every chunk stays inside the one transaction opened per call.
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalledTimes(1);
+    });
+
+    it('F5: drops over-long urls at the trust boundary but keeps normal ones', async () => {
+      const tooLongUrl = `https://a.example.com/${'x'.repeat(2048)}`;
+      expect(tooLongUrl.length).toBeGreaterThan(2048);
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => undefined);
+
+      await service.urlDiscovery({
+        data: [{ url: tooLongUrl }, { url: 'https://ok.example.com' }] as any,
+        job: mockJob,
+      });
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg).toHaveLength(1);
+      expect(valuesArg[0].url).toBe('https://ok.example.com');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('dropped 1 url(s) longer than 2048 chars'),
+      );
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it('F3: inserts the validated scalar assetServiceId when the relation is not loaded', async () => {
+      const jobWithoutRelation = {
+        ...mockJob,
+        assetService: undefined,
+      } as unknown as Job;
+
+      await service.urlDiscovery({
+        data: [{ url: 'https://c.example.com' }] as any,
+        job: jobWithoutRelation,
+      });
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg[0].assetServiceId).toBe('service-id');
+    });
   });
 
   describe('portsScanner', () => {

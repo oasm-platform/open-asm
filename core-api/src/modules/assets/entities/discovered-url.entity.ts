@@ -22,7 +22,7 @@ export class DiscoveredUrl extends BaseEntity {
   @Column({ type: 'varchar' })
   url: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'uuid' })
   assetServiceId: string;
 
   @ManyToOne(() => AssetService, (assetService) => assetService.discoveredUrls, {
@@ -31,7 +31,7 @@ export class DiscoveredUrl extends BaseEntity {
   @JoinColumn({ name: 'assetServiceId' })
   assetService: Relation<AssetService>;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   jobHistoryId: string;
 
   @ManyToOne(() => JobHistory, (jobHistory) => jobHistory.discoveredUrls, {
