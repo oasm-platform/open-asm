@@ -22,12 +22,20 @@ function useQueryTab({
   const search = useSearch({ strict: false }) as Record<string, unknown>;
 
   const raw = search[tabParam];
+  // When validValues is given it is the source of truth for what renders: a
+  // fallback outside that list leaves Radix with a value no trigger/content
+  // owns, so no panel mounts. Prefer defaultValue only when it actually exists.
+  const fallback = validValues
+    ? (validValues.includes(defaultValue ?? '')
+        ? defaultValue
+        : validValues?.[0]) ?? ''
+    : (defaultValue ?? '');
   const value =
     typeof raw === 'string' &&
     (!validValues || validValues.includes(raw)) &&
     raw
       ? raw
-      : (defaultValue ?? validValues?.[0] ?? '');
+      : fallback;
 
   const setValue = React.useCallback(
     (next: string) => {
