@@ -145,6 +145,7 @@ export const TargetSource = {
   MANUAL: 'MANUAL',
   cloudflare: 'cloudflare',
   aws: 'aws',
+  vercel: 'vercel',
   INTERNAL_NETWORK: 'INTERNAL_NETWORK',
 } as const;
 
@@ -2626,6 +2627,37 @@ export type TestIntegrationDto = {
   text?: string;
 };
 
+export type AwsSsoDeviceDto = {
+  /** AWS region hosting the IAM Identity Center instance */
+  region: string;
+  /** IAM Identity Center start URL */
+  startUrl: string;
+};
+
+export type AwsSsoPollDto = {
+  region: string;
+  /** OIDC client id from the device step */
+  clientId: string;
+  /** OIDC client secret from the device step */
+  clientSecret: string;
+  /** Device code from the device step */
+  deviceCode: string;
+};
+
+export type AwsSsoCompleteDto = {
+  /** @maxLength 255 */
+  name: string;
+  region: string;
+  startUrl: string;
+  accountId: string;
+  roleName: string;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
+  syncSchedule?: string;
+};
+
 export type TelegramConnectDtoStatus =
   (typeof TelegramConnectDtoStatus)[keyof typeof TelegramConnectDtoStatus];
 
@@ -3060,36 +3092,6 @@ export type Verification = {
   expiresAt: string;
   createdAt: string;
   updatedAt: string;
-};
-
-export type AwsSsoDeviceDto = {
-  /** AWS region hosting the IAM Identity Center instance */
-  region: string;
-  /** IAM Identity Center start URL */
-  startUrl: string;
-};
-
-export type AwsSsoPollDto = {
-  region: string;
-  /** OIDC client id from the device step */
-  clientId: string;
-  /** OIDC client secret from the device step */
-  clientSecret: string;
-  /** Device code from the device step */
-  deviceCode: string;
-};
-
-export type AwsSsoCompleteDto = {
-  name: string;
-  region: string;
-  startUrl: string;
-  accountId: string;
-  roleName: string;
-  clientId: string;
-  clientSecret: string;
-  refreshToken: string;
-  /** Cron schedule for periodic asset sync (5-field cron or "disabled") */
-  syncSchedule?: string;
 };
 
 export type AuditEventsControllerGetAuditEventsParams = {
@@ -31559,6 +31561,290 @@ export const useIntegrationsControllerSyncIntegration = <
 };
 
 /**
+ * Registers a public OIDC client and starts the IAM Identity Center device-authorization flow. Returns the client credentials, device/user codes and verification URIs the console displays. No integration is created until `complete`.
+ * @summary Start an AWS SSO device authorization
+ */
+export const integrationsControllerStartAwsSsoDevice = (
+  awsSsoDeviceDto: AwsSsoDeviceDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/integrations/aws/sso/device`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: awsSsoDeviceDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerStartAwsSsoDeviceMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
+    TError,
+    { data: AwsSsoDeviceDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
+  TError,
+  { data: AwsSsoDeviceDto },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerStartAwsSsoDevice'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
+    { data: AwsSsoDeviceDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return integrationsControllerStartAwsSsoDevice(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerStartAwsSsoDeviceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>
+>;
+export type IntegrationsControllerStartAwsSsoDeviceMutationBody =
+  AwsSsoDeviceDto;
+export type IntegrationsControllerStartAwsSsoDeviceMutationError = unknown;
+
+/**
+ * @summary Start an AWS SSO device authorization
+ */
+export const useIntegrationsControllerStartAwsSsoDevice = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
+      TError,
+      { data: AwsSsoDeviceDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
+  TError,
+  { data: AwsSsoDeviceDto },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerStartAwsSsoDeviceMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Polls the device-code grant. While pending/slow_down only the status is returned; once authorized the SSO accounts (and their roles) accessible to the signed-in user are returned.
+ * @summary Poll an AWS SSO device authorization
+ */
+export const integrationsControllerPollAwsSsoDevice = (
+  awsSsoPollDto: AwsSsoPollDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/integrations/aws/sso/poll`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: awsSsoPollDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerPollAwsSsoDeviceMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
+    TError,
+    { data: AwsSsoPollDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
+  TError,
+  { data: AwsSsoPollDto },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerPollAwsSsoDevice'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
+    { data: AwsSsoPollDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return integrationsControllerPollAwsSsoDevice(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerPollAwsSsoDeviceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>
+>;
+export type IntegrationsControllerPollAwsSsoDeviceMutationBody = AwsSsoPollDto;
+export type IntegrationsControllerPollAwsSsoDeviceMutationError = unknown;
+
+/**
+ * @summary Poll an AWS SSO device authorization
+ */
+export const useIntegrationsControllerPollAwsSsoDevice = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
+      TError,
+      { data: AwsSsoPollDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
+  TError,
+  { data: AwsSsoPollDto },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerPollAwsSsoDeviceMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Creates the AWS integration from the selected account/role and the refresh token acquired by the device flow. Config secrets are encrypted at rest and masked in the response.
+ * @summary Complete an AWS SSO connection
+ */
+export const integrationsControllerCompleteAwsSso = (
+  awsSsoCompleteDto: AwsSsoCompleteDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetIntegrationDto>(
+    {
+      url: `/api/integrations/aws/sso/complete`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: awsSsoCompleteDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIntegrationsControllerCompleteAwsSsoMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
+    TError,
+    { data: AwsSsoCompleteDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
+  TError,
+  { data: AwsSsoCompleteDto },
+  TContext
+> => {
+  const mutationKey = ['integrationsControllerCompleteAwsSso'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
+    { data: AwsSsoCompleteDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return integrationsControllerCompleteAwsSso(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IntegrationsControllerCompleteAwsSsoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>
+>;
+export type IntegrationsControllerCompleteAwsSsoMutationBody =
+  AwsSsoCompleteDto;
+export type IntegrationsControllerCompleteAwsSsoMutationError = unknown;
+
+/**
+ * @summary Complete an AWS SSO connection
+ */
+export const useIntegrationsControllerCompleteAwsSso = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
+      TError,
+      { data: AwsSsoCompleteDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
+  TError,
+  { data: AwsSsoCompleteDto },
+  TContext
+> => {
+  return useMutation(
+    getIntegrationsControllerCompleteAwsSsoMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Generates a unique 48-char connect token for the given Telegram integration. The user sends this token to the bot via /start <token> to pair their Telegram chat.
  * @summary Create a Telegram pairing token
  */
@@ -45284,290 +45570,6 @@ export const usePostAdminHasPermission = <
 > => {
   return useMutation(
     getPostAdminHasPermissionMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Registers a public OIDC client and starts the IAM Identity Center device-authorization flow. Returns the client credentials, device/user codes and verification URIs the console displays. No integration is created until `complete`.
- * @summary Start an AWS SSO device authorization
- */
-export const integrationsControllerStartAwsSsoDevice = (
-  awsSsoDeviceDto: AwsSsoDeviceDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/integrations/aws/sso/device`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: awsSsoDeviceDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getIntegrationsControllerStartAwsSsoDeviceMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
-    TError,
-    { data: AwsSsoDeviceDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
-  TError,
-  { data: AwsSsoDeviceDto },
-  TContext
-> => {
-  const mutationKey = ['integrationsControllerStartAwsSsoDevice'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
-    { data: AwsSsoDeviceDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return integrationsControllerStartAwsSsoDevice(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type IntegrationsControllerStartAwsSsoDeviceMutationResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>
->;
-export type IntegrationsControllerStartAwsSsoDeviceMutationBody =
-  AwsSsoDeviceDto;
-export type IntegrationsControllerStartAwsSsoDeviceMutationError = unknown;
-
-/**
- * @summary Start an AWS SSO device authorization
- */
-export const useIntegrationsControllerStartAwsSsoDevice = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
-      TError,
-      { data: AwsSsoDeviceDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof integrationsControllerStartAwsSsoDevice>>,
-  TError,
-  { data: AwsSsoDeviceDto },
-  TContext
-> => {
-  return useMutation(
-    getIntegrationsControllerStartAwsSsoDeviceMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Polls the device-code grant. While pending/slow_down only the status is returned; once authorized the SSO accounts (and their roles) accessible to the signed-in user are returned.
- * @summary Poll an AWS SSO device authorization
- */
-export const integrationsControllerPollAwsSsoDevice = (
-  awsSsoPollDto: AwsSsoPollDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/integrations/aws/sso/poll`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: awsSsoPollDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getIntegrationsControllerPollAwsSsoDeviceMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
-    TError,
-    { data: AwsSsoPollDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
-  TError,
-  { data: AwsSsoPollDto },
-  TContext
-> => {
-  const mutationKey = ['integrationsControllerPollAwsSsoDevice'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
-    { data: AwsSsoPollDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return integrationsControllerPollAwsSsoDevice(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type IntegrationsControllerPollAwsSsoDeviceMutationResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>
->;
-export type IntegrationsControllerPollAwsSsoDeviceMutationBody = AwsSsoPollDto;
-export type IntegrationsControllerPollAwsSsoDeviceMutationError = unknown;
-
-/**
- * @summary Poll an AWS SSO device authorization
- */
-export const useIntegrationsControllerPollAwsSsoDevice = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
-      TError,
-      { data: AwsSsoPollDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof integrationsControllerPollAwsSsoDevice>>,
-  TError,
-  { data: AwsSsoPollDto },
-  TContext
-> => {
-  return useMutation(
-    getIntegrationsControllerPollAwsSsoDeviceMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Creates the AWS integration from the selected account/role and the refresh token acquired by the device flow. Config secrets are encrypted at rest and masked in the response.
- * @summary Complete an AWS SSO connection
- */
-export const integrationsControllerCompleteAwsSso = (
-  awsSsoCompleteDto: AwsSsoCompleteDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetIntegrationDto>(
-    {
-      url: `/api/integrations/aws/sso/complete`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: awsSsoCompleteDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getIntegrationsControllerCompleteAwsSsoMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
-    TError,
-    { data: AwsSsoCompleteDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
-  TError,
-  { data: AwsSsoCompleteDto },
-  TContext
-> => {
-  const mutationKey = ['integrationsControllerCompleteAwsSso'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
-    { data: AwsSsoCompleteDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return integrationsControllerCompleteAwsSso(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type IntegrationsControllerCompleteAwsSsoMutationResult = NonNullable<
-  Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>
->;
-export type IntegrationsControllerCompleteAwsSsoMutationBody =
-  AwsSsoCompleteDto;
-export type IntegrationsControllerCompleteAwsSsoMutationError = unknown;
-
-/**
- * @summary Complete an AWS SSO connection
- */
-export const useIntegrationsControllerCompleteAwsSso = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
-      TError,
-      { data: AwsSsoCompleteDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof integrationsControllerCompleteAwsSso>>,
-  TError,
-  { data: AwsSsoCompleteDto },
-  TContext
-> => {
-  return useMutation(
-    getIntegrationsControllerCompleteAwsSsoMutationOptions(options),
     queryClient,
   );
 };
