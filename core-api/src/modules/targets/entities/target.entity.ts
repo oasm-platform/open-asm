@@ -37,6 +37,7 @@ export enum TargetSource {
   MANUAL = 'MANUAL',
   CLOUDFLARE = 'cloudflare',
   AWS = 'aws',
+  VERCEL = 'vercel',
   INTERNAL_NETWORK = 'INTERNAL_NETWORK',
 }
 
