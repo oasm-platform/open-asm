@@ -123,7 +123,7 @@ describe('VercelConnector', () => {
   });
 
   describe('syncAssets — happy path', () => {
-    it('SC-VC-2: two projects (one domain each) → counts, no cap, zero DB writes', async () => {
+    it('SC-VC-2: two projects (one domain each) → counts and one target+upsert per apex', async () => {
       const connector = new VercelConnector();
       jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
 
