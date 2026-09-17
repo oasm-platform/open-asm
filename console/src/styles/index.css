@@ -21,11 +21,7 @@
   body {
     @apply min-h-svh w-full bg-background text-foreground has-[div[data-variant='inset']]:bg-sidebar;
     font-family: var(--font-sans);
-    font-feature-settings:
-      'cv02',
-      'cv03',
-      'cv04',
-      'cv11';
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   /* Override Radix scroll locking for sticky headers */
@@ -137,6 +133,61 @@
   animation: graph-dash 1.4s linear infinite;
 }
 
+/* ── Worker graph flow edges ────────────────────────────────────────────
+ * The chain edges carry data both ways, so each edge stacks two dash layers
+ * over a static rail: `graph-flow-up` walks the dashes toward the edge end
+ * (up the chain, to the worker), `graph-flow-down` back toward the source
+ * (down to the tool). The 12px phase offset on `graph-flow-down` interleaves
+ * the two dash trains instead of letting them overlap — same 12px period as
+ * the `4 8` dash array. Applied per-edge via `graph-edge-flow`, and disabled
+ * under prefers-reduced-motion below.
+ */
+.react-flow__edge.graph-edge-flow path {
+  stroke: var(--color-graph-edge);
+  fill: none;
+  stroke-linecap: round;
+}
+
+.react-flow__edge.graph-edge-flow .graph-flow-rail {
+  stroke-width: 1.2;
+  opacity: 0.4;
+}
+
+.react-flow__edge.graph-edge-flow .graph-flow-up,
+.react-flow__edge.graph-edge-flow .graph-flow-down {
+  stroke-width: 1.6;
+  stroke-dasharray: 4 8;
+  /* Dashes carry far less ink than a solid line, so the old `0.55` almost
+   * vanished on the dark canvas; the moving layers need the extra weight. */
+  opacity: 0.95;
+}
+
+.react-flow__edge.graph-edge-flow .graph-flow-up {
+  animation: graph-flow-up 1.2s linear infinite;
+}
+
+.react-flow__edge.graph-edge-flow .graph-flow-down {
+  animation: graph-flow-down 1.2s linear infinite;
+}
+
+@keyframes graph-flow-up {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@keyframes graph-flow-down {
+  from {
+    stroke-dashoffset: 12;
+  }
+  to {
+    stroke-dashoffset: 36;
+  }
+}
+
 @keyframes graph-glow-pulse {
   0%,
   100% {
@@ -153,6 +204,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .react-flow__edge.graph-edge-returns .react-flow__edge-path,
+  .react-flow__edge.graph-edge-flow .graph-flow-up,
+  .react-flow__edge.graph-edge-flow .graph-flow-down,
   [data-graph-glow='true'] {
     animation: none;
   }

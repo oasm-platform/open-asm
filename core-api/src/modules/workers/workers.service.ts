@@ -15,6 +15,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -32,13 +33,14 @@ import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
-import { ToolSyncService } from '../tools/tool-sync.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import {
   GetManyWorkersDto,
+  GetWorkerResponseDto,
   WorkerAliveDto,
   WorkerJoinDto,
+  WorkerToolDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 
@@ -283,25 +285,16 @@ export class WorkersService {
       .take(limit)
       .getManyAndCount();
 
-    // All workers show all available tools (built-in + connector).
-    // Hoisted above the per-worker map: one query for built-in tools and one
-    // manifest read total, shared by every worker in the page (findings #3).
+    // Only tool counts are returned to clients (the full Tool[] payload was
+    // removed from GET /workers). Hoisted above the per-worker map: one query
+    // for built-in tools and one manifest read total, shared by every worker in
+    // the page (findings #3).
     const [builtInTools, connectorList] = await Promise.all([
       this.toolsService.getBuiltInTools(),
       Promise.resolve(this.connectorRegistry.getAllConnectors()),
     ]);
 
-    // Connector entries carry an honest shape: CONNECTOR type (not BUILT_IN),
-    // category derived from capabilities via the shared mapper (#2), and the
-    // stored logo path served by ConnectorLogoController instead of raw base64
-    // (#8). id stays the stable slug consumed by the console (#7).
-    const connectorTools: Tool[] = connectorList.map((c) => ({
-      id: c.slug,
-      name: c.name,
-      category: ToolSyncService.mapConnectorCapabilityToCategory(c.capabilities),
-      type: WorkerType.CONNECTOR,
-      logoUrl: c.logo ? `/connectors/${c.slug}.png` : undefined,
-    })) as Tool[];
+    const builtInToolsCount = builtInTools.data.length;
 
     const workersWithJobCount = await Promise.all(
       workers.map(async (worker) => {
@@ -313,16 +306,16 @@ export class WorkersService {
         });
 
         // Only node-mode workers run Docker connectors; CLI/legacy workers may
-        // not have Docker installed, so they get built-in tools only.
-        const tools: Tool[] =
+        // not have Docker installed, so they count built-in tools only.
+        const toolsCount =
           worker.runMode === 'node'
-            ? [...builtInTools.data, ...connectorTools]
-            : [...builtInTools.data];
+            ? builtInToolsCount + connectorList.length
+            : builtInToolsCount;
 
         return {
           ...worker,
           currentJobsCount: count,
-          tools,
+          toolsCount,
           isOnline: this.aliveStreamManager.isActive(worker.id),
         };
       }),
@@ -334,6 +327,93 @@ export class WorkersService {
       total,
       ignoreFields: ['token', 'tool'],
     });
+  }
+
+  /**
+   * Retrieves a single worker by id, including the individual tools it can run.
+   *
+   * The tool list mirrors the `toolsCount` rule used by {@link getWorkers}:
+   * node-mode workers run built-in tools plus Docker connectors, while
+   * cli/legacy workers only run built-in tools. Cloud workers have a null
+   * `workspaceId` and stay readable from any workspace.
+   *
+   * @param workerId - The worker's unique identifier.
+   * @param workspaceId - The caller's workspace, used for scoping.
+   * @returns The worker detail, or throws NotFoundException (never 403, so
+   *          worker existence is not leaked across workspaces).
+   */
+  public async getWorkerById(
+    workerId: string,
+    workspaceId?: string,
+  ): Promise<GetWorkerResponseDto> {
+    const worker = await this.repo.findOne({
+      where: { id: workerId },
+      relations: ['workspace', 'tool'],
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker not found');
+    }
+
+    // Cloud workers are shared (workspaceId === null) and must remain readable.
+    if (worker.workspaceId !== null && worker.workspaceId !== workspaceId) {
+      throw new NotFoundException('Worker not found');
+    }
+
+    const { data: builtInTools } = await this.toolsService.getBuiltInTools();
+
+    const tools: WorkerToolDto[] = builtInTools.map((tool) => ({
+      id: tool.id!,
+      name: tool.name,
+      logoUrl: tool.logoUrl,
+      category: tool.category,
+      type: 'builtin',
+    }));
+
+    // Only node-mode workers run Docker connectors; CLI/legacy workers may not
+    // have Docker installed, so they expose built-in tools only.
+    if (worker.runMode === 'node') {
+      tools.push(
+        ...this.connectorRegistry.getAllConnectors().map((connector) => ({
+          id: connector.slug,
+          name: connector.name,
+          logoUrl: connector.logo
+            ? `/connectors/${connector.slug}.png`
+            : undefined,
+          type: 'connector' as const,
+        })),
+      );
+    }
+
+    const currentJobsCount = await this.jobsRegistryService['repo'].count({
+      where: {
+        workerId: worker.id,
+        status: JobStatus.IN_PROGRESS,
+      },
+    });
+
+    // Never expose `token` — it is a live worker secret.
+    return {
+      id: worker.id,
+      createdAt: worker.createdAt,
+      updatedAt: worker.updatedAt,
+      lastSeenAt: worker.lastSeenAt,
+      name: worker.name,
+      os: worker.os,
+      ipAddress: worker.ipAddress,
+      type: worker.type,
+      scope: worker.scope,
+      runMode: worker.runMode as 'cli' | 'node' | null,
+      enabledAgentMode: worker.enabledAgentMode,
+      internalNetworkId: worker.internalNetworkId,
+      currentJobsCount,
+      toolsCount: tools.length,
+      isOnline: this.aliveStreamManager.isActive(worker.id),
+      tool: worker.tool
+        ? { id: worker.tool.id!, name: worker.tool.name }
+        : null,
+      tools,
+    };
   }
 
   /**
