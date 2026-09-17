@@ -3,6 +3,7 @@ import { cloudflareSchema } from './cloudflare.schema';
 import { jiraSchema } from './jira.schema';
 import { slackSchema } from './slack.schema';
 import { telegramSchema } from './telegram.schema';
+import { vercelSchema } from './vercel.schema';
 import { webhookSchema } from './webhook.schema';
 
 /**
@@ -28,6 +29,7 @@ export const universalIntegrationSchema = {
     slackSchema,
     telegramSchema,
     webhookSchema,
+    vercelSchema,
     // linearSchema,
     // Add more integration schemas here as they are implemented.
   ],
