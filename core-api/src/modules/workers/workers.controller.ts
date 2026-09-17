@@ -1,6 +1,7 @@
 import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
 import { Public } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
@@ -12,6 +13,8 @@ import {
   Controller,
   Get,
   Logger,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -24,6 +27,7 @@ import { join } from 'path';
 import { Observable } from 'rxjs';
 import {
   GetManyWorkersDto,
+  GetWorkerResponseDto,
   WorkerAliveDto,
   WorkerJoinDto,
 } from './dto/workers.dto';
@@ -90,6 +94,26 @@ export class WorkersController {
   @Get()
   getWorkers(@Query() query: GetManyWorkersDto) {
     return this.workersService.getWorkers(query);
+  }
+
+  @Doc({
+    summary: 'Get a worker by ID',
+    description:
+      'Retrieves a single worker by its ID, including its connected tools.',
+    response: {
+      serialization: GetWorkerResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('worker.read')
+  @Get(':id')
+  getWorkerById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetWorkerResponseDto> {
+    return this.workersService.getWorkerById(id, workspaceId);
   }
 
   @GrpcMethod('WorkersService', 'GetManifest')

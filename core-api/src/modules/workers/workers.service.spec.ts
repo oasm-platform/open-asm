@@ -1,5 +1,6 @@
-import { WorkerType } from '@/common/enums/enum';
+import { WorkerScope, WorkerType } from '@/common/enums/enum';
 import { ConfigService } from '@nestjs/config';
+import { NotFoundException } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -547,34 +548,235 @@ describe('WorkersService', () => {
       getManyAndCount: jest.fn().mockResolvedValue([rows, rows.length]),
     });
 
-    const runGetWorkers = async (rows: Record<string, unknown>[]) => {
+    const runGetWorkers = async (
+      rows: Record<string, unknown>[],
+      builtInTools: Record<string, unknown>[] = [],
+      connectors: Record<string, unknown>[] = [],
+    ) => {
       (mockWorkerInstanceRepository.createQueryBuilder as jest.Mock).mockReturnValue(
         buildQueryBuilder(rows),
       );
       (mockJobsRegistryService.repo as any).count = jest
         .fn()
         .mockResolvedValue(0);
+      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
+        data: builtInTools,
+      });
+      (
+        mockConnectorRegistryService.getAllConnectors as jest.Mock
+      ).mockReturnValue(connectors);
       return service.getWorkers({ page: 1, limit: 10 } as any);
     };
 
-    it('getMany hoists built-in tools query to single call', async () => {
-      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
-        data: [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
-      });
-
-      const result = await runGetWorkers([
-        { id: 'w-1' },
-        { id: 'w-2' },
-        { id: 'w-3' },
-      ]);
+    it('getWorkers returns toolsCount without the tools array', async () => {
+      const result = await runGetWorkers(
+        [{ id: 'w-1' }, { id: 'w-2' }, { id: 'w-3' }],
+        [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
+      );
 
       expect(mockToolsService.getBuiltInTools).toHaveBeenCalledTimes(1);
       expect(result.data).toHaveLength(3);
       for (const worker of result.data) {
-        expect(worker.tools).toEqual([
-          expect.objectContaining({ id: 'bt-1', name: 'subfinder' }),
-        ]);
+        expect(worker.toolsCount).toBe(1);
+        expect(worker).not.toHaveProperty('tools');
       }
+    });
+
+    it('getWorkers counts built-ins plus connectors only for node-mode workers', async () => {
+      const result = await runGetWorkers(
+        [
+          { id: 'w-node', runMode: 'node' },
+          { id: 'w-cli' },
+        ],
+        [
+          { id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN },
+          { id: 'bt-2', name: 'nuclei', type: WorkerType.BUILT_IN },
+        ],
+        [
+          { slug: 'c-1', name: 'Connector 1', capabilities: [] },
+          { slug: 'c-2', name: 'Connector 2', capabilities: [] },
+          { slug: 'c-3', name: 'Connector 3', capabilities: [] },
+        ],
+      );
+
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0].toolsCount).toBe(5);
+      expect(result.data[1].toolsCount).toBe(2);
+      for (const worker of result.data) {
+        expect(worker).not.toHaveProperty('tools');
+      }
+    });
+  });
+
+  describe('getWorkerById', () => {
+    const workerId = '11111111-1111-4111-8111-111111111111';
+    const workspaceId = '22222222-2222-4222-8222-222222222222';
+
+    const builtInToolFixtures = [
+      {
+        id: 'bt-1',
+        name: 'subfinder',
+        logoUrl: 'https://example.com/subfinder.png',
+        category: 'subdomains',
+        type: WorkerType.BUILT_IN,
+      },
+      {
+        id: 'bt-2',
+        name: 'nuclei',
+        logoUrl: null,
+        category: 'vulnerabilities',
+        type: WorkerType.BUILT_IN,
+      },
+    ];
+
+    const connectorFixtures = [
+      { slug: 'c-1', name: 'Connector 1', logo: true, capabilities: [] },
+      { slug: 'c-2', name: 'Connector 2', logo: false, capabilities: [] },
+      { slug: 'c-3', name: 'Connector 3', logo: true, capabilities: [] },
+    ];
+
+    const runGetWorkerById = async (
+      worker: Record<string, unknown> | null,
+      builtInTools: Record<string, unknown>[] = [],
+      connectors: Record<string, unknown>[] = [],
+    ) => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(
+        worker,
+      );
+      (mockJobsRegistryService.repo as any).count = jest
+        .fn()
+        .mockResolvedValue(0);
+      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
+        data: builtInTools,
+      });
+      (
+        mockConnectorRegistryService.getAllConnectors as jest.Mock
+      ).mockReturnValue(connectors);
+      return service.getWorkerById(workerId, workspaceId);
+    };
+
+    it('returns built-in tools only for a cli worker and keeps toolsCount in sync', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'cli', name: 'cli-1' },
+        builtInToolFixtures,
+        connectorFixtures,
+      );
+
+      expect(result.tools).toHaveLength(2);
+      expect(result.toolsCount).toBe(result.tools.length);
+      expect(result.tools).toEqual([
+        {
+          id: 'bt-1',
+          name: 'subfinder',
+          logoUrl: 'https://example.com/subfinder.png',
+          category: 'subdomains',
+          type: 'builtin',
+        },
+        {
+          id: 'bt-2',
+          name: 'nuclei',
+          logoUrl: null,
+          category: 'vulnerabilities',
+          type: 'builtin',
+        },
+      ]);
+      expect(result.runMode).toBe('cli');
+    });
+
+    it('appends connectors for a node worker and exposes slug as the id', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'node' },
+        builtInToolFixtures,
+        connectorFixtures,
+      );
+
+      expect(result.tools).toHaveLength(5);
+      expect(result.toolsCount).toBe(5);
+      expect(result.toolsCount).toBe(result.tools.length);
+
+      const connectors = result.tools.filter((tool) => tool.type === 'connector');
+      expect(connectors).toEqual([
+        {
+          id: 'c-1',
+          name: 'Connector 1',
+          logoUrl: '/connectors/c-1.png',
+          type: 'connector',
+        },
+        { id: 'c-2', name: 'Connector 2', logoUrl: undefined, type: 'connector' },
+        {
+          id: 'c-3',
+          name: 'Connector 3',
+          logoUrl: '/connectors/c-3.png',
+          type: 'connector',
+        },
+      ]);
+    });
+
+    it('throws NotFoundException when the worker does not exist', async () => {
+      await expect(
+        runGetWorkerById(null, builtInToolFixtures, connectorFixtures),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException when the worker belongs to another workspace', async () => {
+      await expect(
+        runGetWorkerById(
+          {
+            id: workerId,
+            workspaceId: '33333333-3333-4333-8333-333333333333',
+            runMode: 'cli',
+          },
+          builtInToolFixtures,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('does not throw for a cloud worker that has no workspace', async () => {
+      const result = await runGetWorkerById(
+        {
+          id: workerId,
+          workspaceId: null,
+          scope: WorkerScope.CLOUD,
+          runMode: 'cli',
+        },
+        builtInToolFixtures,
+      );
+
+      expect(result.id).toBe(workerId);
+    });
+
+    it('never exposes the worker token', async () => {
+      const result = await runGetWorkerById(
+        {
+          id: workerId,
+          workspaceId,
+          runMode: 'cli',
+          token: 'super-secret-token',
+        },
+        builtInToolFixtures,
+      );
+
+      expect(result).not.toHaveProperty('token');
+      expect(JSON.stringify(result)).not.toContain('super-secret-token');
+    });
+
+    it('exposes the bound tool as an id/name pair and null when absent', async () => {
+      const withTool = await runGetWorkerById(
+        {
+          id: workerId,
+          workspaceId,
+          runMode: 'cli',
+          tool: { id: 'tool-1', name: 'nuclei', token: 'nope' },
+        },
+        builtInToolFixtures,
+      );
+      expect(withTool.tool).toEqual({ id: 'tool-1', name: 'nuclei' });
+
+      const withoutTool = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'cli', tool: null },
+        builtInToolFixtures,
+      );
+      expect(withoutTool.tool).toBeNull();
     });
   });
 });

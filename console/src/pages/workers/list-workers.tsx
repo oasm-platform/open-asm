@@ -1,9 +1,7 @@
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
-import ToolLogo from '@/components/ui/tool-logo';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -21,10 +19,15 @@ import type {
   WorkerInstance,
   WorkersControllerGetWorkersParams,
 } from '@/services/apis/gen/queries';
+import { useNavigate } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Loader2Icon, Search, SearchX, Server } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { isWorkerOnline, WorkerStatus } from './worker-status';
+
+// `fromNow()` below needs the plugin; registered here so this file does not
+// silently depend on worker-status.tsx having been loaded first.
 dayjs.extend(relativeTime);
 
 const COMMON_PARAMS = {
@@ -42,26 +45,8 @@ const VALID_TABS = ['workspace', 'global'] as const;
 
 type WorkerSurface = 'ALL' | 'INTERNAL' | 'EXTERNAL';
 
-const isWorkerOnline = (worker: WorkerInstance) =>
-  worker.isOnline ??
-  new Date().getTime() - new Date(worker.lastSeenAt).getTime() < 30000;
-
-const WorkerStatus = ({ worker }: { worker: WorkerInstance }) =>
-  isWorkerOnline(worker) ? (
-    <>
-      <span className="relative flex h-2 w-2">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-      </span>
-      <span className="text-sm text-green-600">Online</span>
-    </>
-  ) : (
-    <span className="text-sm text-muted-foreground">
-      {dayjs(worker.lastSeenAt).fromNow()}
-    </span>
-  );
-
 const ListWorkers = () => {
+  const navigate = useNavigate();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -187,7 +172,18 @@ const ListWorkers = () => {
       {workers.map((worker) => (
         <Card
           key={worker.id}
-          className={`p-1 transition-opacity ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
+          role="button"
+          tabIndex={0}
+          onClick={() =>
+            navigate({ to: '/workers/$id', params: { id: worker.id } })
+          }
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              navigate({ to: '/workers/$id', params: { id: worker.id } });
+            }
+          }}
+          className={`cursor-pointer p-1 transition-opacity hover:border-primary ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
         >
           <CardContent className="p-3 space-y-4">
             <CardTitle className="flex items-center justify-between">
@@ -215,8 +211,9 @@ const ListWorkers = () => {
               <Badge
                 variant="secondary"
                 className={`${worker.internalNetworkId ? 'cursor-pointer hover:bg-secondary/80' : ''}`}
-                onClick={() => {
+                onClick={(e) => {
                   if (worker.internalNetworkId) {
+                    e.stopPropagation();
                     navigateWithParams(
                       `/internal-networks/${worker.internalNetworkId}`,
                     );
@@ -227,34 +224,20 @@ const ListWorkers = () => {
               </Badge>
             </CardTitle>
             <div className="flex justify-between items-center">
-              <div className="flex -space-x-2">
-                {worker.tools.map((tool) => (
-                  <Button
-                    key={tool.id}
-                    variant="ghost"
-                    className="h-8 w-8 p-0 rounded-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigateWithParams(`/tools/${tool.id}`);
-                    }}
-                  >
-                    <ToolLogo
-                      className="rounded-full"
-                      size={30}
-                      name={tool.name}
-                      logoUrl={tool.logoUrl}
-                    />
-                  </Button>
-                ))}
-              </div>
+              <span className="text-sm text-muted-foreground">
+                {worker.toolsCount ?? 0} tool
+                {(worker.toolsCount ?? 0) === 1 ? '' : 's'} connected
+              </span>
               <div className="flex justify-between">
                 {worker.currentJobsCount > 0 ? (
-                  <span className="text-green-600">
+                  <span className="text-sm text-green-600">
                     {worker.currentJobsCount} active job
                     {worker.currentJobsCount > 1 ? 's' : ''}
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">No active jobs</span>
+                  <span className="text-sm text-muted-foreground">
+                    No active jobs
+                  </span>
                 )}
               </div>
             </div>

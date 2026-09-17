@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import Image from '@/components/ui/image';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LogoFrame from '@/components/ui/logo-frame';
 import {
   Sheet,
   SheetContent,
@@ -174,14 +175,14 @@ export function ToolConnectorConfigSheet({
               behind the 24px icon; Image falls back to a generic icon when the
               tool has no logoUrl. */}
           <div className="flex items-center gap-2">
-            <div className="light:bg-black dark:bg-white rounded-lg p-[3px] shrink-0">
+            <LogoFrame className="shrink-0">
               <Image
                 className="rounded"
                 url={tool.logoUrl}
                 width={24}
                 height={24}
               />
-            </div>
+            </LogoFrame>
             <SheetTitle>
               {mode === 'inline'
                 ? 'Configure Tool'
