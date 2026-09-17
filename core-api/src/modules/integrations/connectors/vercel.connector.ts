@@ -1,5 +1,8 @@
-import { Logger } from '@nestjs/common';
+import { Logger, BadRequestException } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { IntegrationType } from '@/common/enums/enum';
+import type { TargetType } from '../../targets/entities/target.entity';
+import { TargetSource } from '../../targets/entities/target.entity';
 import {
   CloudProviderConnector,
   type CloudProviderSyncConfig,
@@ -23,6 +26,22 @@ const MAX_RETRY_AFTER_SECONDS = 60;
 /** Per-request deadline: a hung Vercel connection must not stall the sync
  * queue (one stuck repeat job would block every integration sync). */
 const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Canonical 7-key empty dnsRecords shape. Vercel's domain API exposes no DNS
+ * records, so every ingested asset starts empty — the scanners fill them in
+ * later. The upsert must NOT pass `replaceDnsRecords` (which would `orUpdate`
+ * the apex row with this empty shape and wipe scanner-discovered records).
+ */
+const EMPTY_DNS_RECORDS = {
+  A: [],
+  AAAA: [],
+  CNAME: [],
+  MX: [],
+  NS: [],
+  SOA: [],
+  TXT: [],
+};
 
 /** A Vercel project (only the fields the sync reads). */
 export interface VercelProject {
@@ -198,12 +217,49 @@ export class VercelConnector extends CloudProviderConnector {
       discovered.push(...domainsResult.domains);
     }
 
-    // Global grouping by apexName — todo 2 persists one target per group.
+    // Global grouping by apexName — one target per group.
     const groups = this.groupByApex(discovered);
     result.domains = [...groups.values()].reduce(
       (count, hosts) => count + hosts.length,
       0,
     );
+
+    // Dedupe key `${targetId}:${value}` across the whole sync, so a hostname
+    // seen under the same target (e.g. two projects sharing an apex) is only
+    // upserted once.
+    const seenAssets = new Set<string>();
+
+    for (const [apex, hosts] of groups) {
+      if (this.isPastDeadline(cfg, startedAt)) {
+        result.truncated = true;
+        break;
+      }
+
+      const targetId = await this.ensureTarget(apex, cfg, result);
+
+      // The apex is upserted only when the API actually returned it as a
+      // verified domain for this group — never fabricated. `hosts` already
+      // contains the apex iff it appeared in the fetched list.
+      const pending: Array<{ value: string; dnsRecords: typeof EMPTY_DNS_RECORDS }> =
+        [];
+      for (const value of hosts) {
+        const key = `${targetId}:${value}`;
+        if (seenAssets.has(key)) continue;
+        seenAssets.add(key);
+        pending.push({ value, dnsRecords: EMPTY_DNS_RECORDS });
+      }
+
+      if (pending.length === 0) continue;
+      // opts is deliberately undefined: the empty dnsRecords must never
+      // replace existing scanner-discovered apex records.
+      const inserted = await cfg.dataAdapterService.upsertAssetsByTargetId(
+        targetId,
+        pending,
+        undefined,
+        undefined,
+      );
+      result.assetsUpserted += inserted;
+    }
 
     this.logger.log(
       `Vercel sync finished for integration ${integrationId}: ${JSON.stringify(result)}`,
@@ -212,6 +268,64 @@ export class VercelConnector extends CloudProviderConnector {
     // without coupling to the connector factory's result message.
     cfg.__syncResult = result;
     return result;
+  }
+
+  /**
+   * Ensure a Target exists for the apex. Returns the target id.
+   * On a duplicate-creation race (another sync created the same target
+   * between lookup and insert) the "Target already exists" BadRequestException
+   * OR the unique-constraint violation (Postgres 23505, surfaced as
+   * QueryFailedError.driverError.code) is caught and the target is re-looked-up.
+   */
+  private async ensureTarget(
+    apex: string,
+    cfg: VercelSyncConfig,
+    result: SyncResult,
+  ): Promise<string> {
+    const { workspaceId, targetsService, actingUserContext } = cfg;
+    const existing = await targetsService.findByWorkspaceAndValues(workspaceId, [
+      apex,
+    ]);
+    const existingTarget = existing.find((t) => t.value === apex);
+    if (existingTarget) return existingTarget.id;
+
+    try {
+      const created = await targetsService.createMultipleTargets(
+        { targets: [{ value: apex, type: 'DOMAIN' as TargetType }] },
+        workspaceId,
+        actingUserContext,
+        undefined,
+        TargetSource.VERCEL,
+      );
+      result.targetsCreated++;
+      return created.created[0].id;
+    } catch (error) {
+      if (this.isDuplicateTargetError(error)) {
+        const reFound = await targetsService.findByWorkspaceAndValues(
+          workspaceId,
+          [apex],
+        );
+        const reTarget = reFound.find((t) => t.value === apex);
+        if (reTarget) return reTarget.id;
+      }
+      throw error;
+    }
+  }
+
+  /** True when a create-target failure means "already exists" (app-level
+   * BadRequestException or a Postgres unique-constraint violation). */
+  private isDuplicateTargetError(error: unknown): boolean {
+    if (
+      error instanceof BadRequestException &&
+      error.message.startsWith('Target already exists')
+    ) {
+      return true;
+    }
+    if (error instanceof QueryFailedError) {
+      const driverError = error.driverError as { code?: string } | undefined;
+      return driverError?.code === '23505';
+    }
+    return false;
   }
 
   /**

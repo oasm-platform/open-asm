@@ -74,11 +74,17 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     workspaceId: 'ws-1',
     integrationId: 'integration-1',
     targetsService: {
-      findByWorkspaceAndValues: jest.fn(),
-      createMultipleTargets: jest.fn(),
+      findByWorkspaceAndValues: jest.fn().mockResolvedValue([]),
+      createMultipleTargets: jest.fn().mockResolvedValue({
+        created: [{ id: 'target-created', value: 'example.com' }],
+        skipped: [],
+        totalRequested: 1,
+        totalCreated: 1,
+        totalSkipped: 0,
+      }),
     },
     dataAdapterService: {
-      upsertAssetsByTargetId: jest.fn(),
+      upsertAssetsByTargetId: jest.fn().mockResolvedValue(0),
     },
     actingUserContext: { id: 'user-1', userId: 'user-1' },
     ...overrides,
@@ -143,7 +149,7 @@ describe('VercelConnector', () => {
         projects: 2,
         domains: 2,
         truncated: false,
-        targetsCreated: 0,
+        targetsCreated: 2,
         assetsUpserted: 0,
       });
 
@@ -152,12 +158,12 @@ describe('VercelConnector', () => {
       expect(urls[1]).toContain('/v9/projects/prj_a/domains?');
       expect(urls[2]).toContain('/v9/projects/prj_b/domains?');
 
-      // Discovery-only todo: no persistence whatsoever.
-      expect(config.targetsService.findByWorkspaceAndValues).not.toHaveBeenCalled();
-      expect(config.targetsService.createMultipleTargets).not.toHaveBeenCalled();
+      // Two distinct apexes → two target lookups/creates and two upserts.
+      expect(config.targetsService.findByWorkspaceAndValues).toHaveBeenCalledTimes(2);
+      expect(config.targetsService.createMultipleTargets).toHaveBeenCalledTimes(2);
       expect(
         config.dataAdapterService.upsertAssetsByTargetId,
-      ).not.toHaveBeenCalled();
+      ).toHaveBeenCalledTimes(2);
     });
   });
 
