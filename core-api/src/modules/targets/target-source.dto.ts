@@ -43,6 +43,10 @@ const INTEGRATION_SOURCE_SCHEMAS: Record<string, IntegrationSourceSchema> = {
     title: 'AWS',
     icon: '/static/images/integrations/aws.svg',
   },
+  vercel: {
+    title: 'Vercel',
+    icon: '/static/images/integrations/vercel.svg',
+  },
 };
 
 const MANUAL_SOURCE: TargetSourceDto = { source: 'Manual', icon: '' };
