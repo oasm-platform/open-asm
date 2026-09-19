@@ -370,6 +370,7 @@ type Finding struct {
 	Host          string                 `protobuf:"bytes,12,opt,name=host,proto3" json:"host,omitempty"`
 	Ip            string                 `protobuf:"bytes,13,opt,name=ip,proto3" json:"ip,omitempty"`
 	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Description   string                 `protobuf:"bytes,15,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -500,6 +501,13 @@ func (x *Finding) GetTimestamp() *timestamppb.Timestamp {
 		return x.Timestamp
 	}
 	return nil
+}
+
+func (x *Finding) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
 }
 
 type Done struct {
@@ -786,7 +794,7 @@ const file_connector_proto_rawDesc = "" +
 	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\x12\x19\n" +
 	"\bis_error\x18\x03 \x01(\bR\aisError\x12.\n" +
-	"\bfindings\x18\x04 \x03(\v2\x12.connector.FindingR\bfindings\"\x95\x03\n" +
+	"\bfindings\x18\x04 \x03(\v2\x12.connector.FindingR\bfindings\"\xb7\x03\n" +
 	"\aFinding\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bseverity\x18\x02 \x01(\tR\bseverity\x12\x12\n" +
@@ -807,7 +815,8 @@ const file_connector_proto_rawDesc = "" +
 	"matched_at\x18\v \x01(\tR\tmatchedAt\x12\x12\n" +
 	"\x04host\x18\f \x01(\tR\x04host\x12\x0e\n" +
 	"\x02ip\x18\r \x01(\tR\x02ip\x128\n" +
-	"\ttimestamp\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"?\n" +
+	"\ttimestamp\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12 \n" +
+	"\vdescription\x18\x0f \x01(\tR\vdescription\"?\n" +
 	"\x04Done\x12!\n" +
 	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\xa4\x01\n" +
