@@ -471,7 +471,42 @@ export class DataAdapterService {
         .values(uniqueValues)
         .orUpdate({
           conflict_target: ['fingerprint'],
-          overwrite: ['updatedAt', 'severity', 'lastSeenDate'],
+          // Refresh every scanner-derived field on re-scan so rows created
+          // before an enrichment fix (description/synopsis/confidence/...) are
+          // backfilled. firstDetectedDate, isArchived and analyze* are preserved.
+          overwrite: [
+            'updatedAt',
+            'lastSeenDate',
+            'name',
+            'description',
+            'synopsis',
+            'severity',
+            'tags',
+            'references',
+            'authors',
+            'affectedUrl',
+            'ipAddress',
+            'host',
+            'ports',
+            'cvssMetric',
+            'cvssScore',
+            'epssScore',
+            'vprScore',
+            'confidence',
+            'cveId',
+            'bidId',
+            'cweId',
+            'ceaId',
+            'iava',
+            'cveUrl',
+            'cweUrl',
+            'solution',
+            'extractorName',
+            'extractedResults',
+            'publicationDate',
+            'modificationDate',
+            'filePath',
+          ],
         })
         .returning('*')
         .execute();

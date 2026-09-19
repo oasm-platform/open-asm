@@ -1477,6 +1477,7 @@ type Vulnerability struct {
 	JobHistoryId     string                 `protobuf:"bytes,32,opt,name=job_history_id,json=jobHistoryId,proto3" json:"job_history_id,omitempty"`
 	IsArchived       bool                   `protobuf:"varint,33,opt,name=is_archived,json=isArchived,proto3" json:"is_archived,omitempty"`
 	Fingerprint      string                 `protobuf:"bytes,34,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	Confidence       float64                `protobuf:"fixed64,35,opt,name=confidence,proto3" json:"confidence,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -1749,6 +1750,13 @@ func (x *Vulnerability) GetFingerprint() string {
 	return ""
 }
 
+func (x *Vulnerability) GetConfidence() float64 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
 type UrlDiscoveryResultRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
@@ -2006,7 +2014,7 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\tresolvers\x18\x1f \x03(\tR\tresolvers\x12,\n" +
 	"\x12chain_status_codes\x18  \x03(\tR\x10chainStatusCodes\x12(\n" +
 	"\x10asset_service_id\x18! \x01(\tR\x0eassetServiceId\x12$\n" +
-	"\x0ejob_history_id\x18\" \x01(\tR\fjobHistoryId\"\xb8\b\n" +
+	"\x0ejob_history_id\x18\" \x01(\tR\fjobHistoryId\"\xd8\b\n" +
 	"\rVulnerability\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -2049,7 +2057,10 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\x0ejob_history_id\x18  \x01(\tR\fjobHistoryId\x12\x1f\n" +
 	"\vis_archived\x18! \x01(\bR\n" +
 	"isArchived\x12 \n" +
-	"\vfingerprint\x18\" \x01(\tR\vfingerprint\"\xb6\x01\n" +
+	"\vfingerprint\x18\" \x01(\tR\vfingerprint\x12\x1e\n" +
+	"\n" +
+	"confidence\x18# \x01(\x01R\n" +
+	"confidence\"\xb6\x01\n" +
 	"\x19UrlDiscoveryResultRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x15\n" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12\x14\n" +

@@ -542,6 +542,7 @@ export class VulnerabilitiesService {
       cvssScore: vulnerability.cvssScore,
       epssScore: vulnerability.epssScore,
       vprScore: vulnerability.vprScore,
+      confidence: vulnerability.confidence,
       cveId: vulnerability.cveId,
       bidId: vulnerability.bidId,
       cweId: vulnerability.cweId,

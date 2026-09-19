@@ -36,7 +36,7 @@ func TestHandleConnectorResultAggregatesVulnerabilityChunks(t *testing.T) {
 
 	// Three chunks: 2 + 1 + 1 findings = 4 accumulated.
 	proxy.ForwardResult(execID, []byte(`{"template":"a"}`), []*connectorpb.Finding{
-		{Name: "CVE-2024-0001", Severity: "high", Tags: []string{"cve"}, References: []string{"https://nvd.nist.gov/vuln/detail/CVE-2024-0001"}, CveId: []string{"CVE-2024-0001"}, Host: "a.example.com", Ip: "10.0.0.1", CvssScore: 9.1, EpssScore: 0.5},
+		{Name: "CVE-2024-0001", Severity: "high", Tags: []string{"cve"}, References: []string{"https://nvd.nist.gov/vuln/detail/CVE-2024-0001"}, CveId: []string{"CVE-2024-0001"}, Host: "a.example.com", Ip: "10.0.0.1", CvssScore: 9.1, EpssScore: 0.5, Description: "long detail", Synopsis: "short summary", MatchedAt: "https://a.example.com/x", Ports: []string{"443"}, Authors: []string{"alice"}, VprScore: 7.2, BidId: []string{"12345"}, CeaId: []string{"CAE-1"}, Iava: []string{"2024-A-0001"}, Confidence: 95},
 		{Name: "CVE-2024-0002", Severity: "low", Host: "a.example.com", Ip: "10.0.0.1"},
 	})
 	proxy.ForwardResult(execID, []byte(`{"template":"b"}`), []*connectorpb.Finding{
@@ -115,6 +115,23 @@ func TestHandleConnectorResultAggregatesVulnerabilityChunks(t *testing.T) {
 	}
 	if got.vulns[2].GetSolution() != "upgrade" {
 		t.Fatalf("solution mapping: %q", got.vulns[2].GetSolution())
+	}
+	if f0.GetDescription() != "long detail" || f0.GetSynopsis() != "short summary" {
+		t.Fatalf("description/synopsis mapping: %q/%q", f0.GetDescription(), f0.GetSynopsis())
+	}
+	if f0.GetAffectedUrl() != "https://a.example.com/x" {
+		t.Fatalf("affected_url must come from matched_at: %q", f0.GetAffectedUrl())
+	}
+	if f0.GetConfidence() != 95 {
+		t.Fatalf("confidence mapping: %v", f0.GetConfidence())
+	}
+	if f0.GetVprScore() != 7.2 || len(f0.GetPorts()) != 1 || f0.GetPorts()[0] != "443" ||
+		len(f0.GetAuthors()) != 1 || f0.GetAuthors()[0] != "alice" ||
+		len(f0.GetBidId()) != 1 || f0.GetBidId()[0] != "12345" ||
+		len(f0.GetCeaId()) != 1 || f0.GetCeaId()[0] != "CAE-1" ||
+		len(f0.GetIava()) != 1 || f0.GetIava()[0] != "2024-A-0001" {
+		t.Fatalf("enrichment mapping: vpr=%v ports=%v authors=%v bid=%v cea=%v iava=%v",
+			f0.GetVprScore(), f0.GetPorts(), f0.GetAuthors(), f0.GetBidId(), f0.GetCeaId(), f0.GetIava())
 	}
 }
 

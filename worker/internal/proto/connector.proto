@@ -62,6 +62,17 @@ message Finding {
   string host = 12;
   string ip = 13;
   google.protobuf.Timestamp timestamp = 14;
+  string description = 15;
+  string synopsis = 16;
+  repeated string ports = 17;
+  repeated string authors = 18;
+  double vpr_score = 19;
+  repeated string bid_id = 20;
+  repeated string iava = 21;
+  google.protobuf.Timestamp publication_date = 22;
+  google.protobuf.Timestamp modification_date = 23;
+  double confidence = 24;
+  repeated string cea_id = 25;
 }
 
 message Done {

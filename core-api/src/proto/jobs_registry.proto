@@ -227,6 +227,7 @@ message Vulnerability {
   string job_history_id = 32;
   bool is_archived = 33;
   string fingerprint = 34;
+  double confidence = 35;
 }
 
 // --- Enums ---
