@@ -1130,6 +1130,7 @@ export type Vulnerability = {
   cvssScore: number;
   epssScore: number;
   vprScore: number;
+  confidence: number;
   cveId: string[];
   bidId: string[];
   cweId: string[];
