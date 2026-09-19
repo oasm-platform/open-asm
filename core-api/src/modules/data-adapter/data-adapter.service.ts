@@ -8,6 +8,7 @@ import { DataSource, InsertResult } from 'typeorm';
 import {
   NotificationScope,
   NotificationType,
+  Severity,
   ToolCategory,
 } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
@@ -433,8 +434,8 @@ export class DataAdapterService {
           ...vulnValues,
           severity:
             typeof vulnValues.severity === 'string'
-              ? vulnValues.severity.toLowerCase()
-              : vulnValues.severity,
+              ? (vulnValues.severity.toLowerCase() as Severity)
+              : Severity.INFO,
           fingerprint,
           assetId: job.asset.id,
           toolId: job.tool.id,
