@@ -431,6 +431,10 @@ export class DataAdapterService {
         delete vulnValues.id;
         return {
           ...vulnValues,
+          severity:
+            typeof vulnValues.severity === 'string'
+              ? vulnValues.severity.toLowerCase()
+              : vulnValues.severity,
           fingerprint,
           assetId: job.asset.id,
           toolId: job.tool.id,

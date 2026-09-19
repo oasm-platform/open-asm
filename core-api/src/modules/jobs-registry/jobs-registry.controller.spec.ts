@@ -208,4 +208,82 @@ describe('JobsRegistryController', () => {
       expect(category).toBe(ToolCategory.PORTS_SCANNER);
     });
   });
+
+  // ── vulnerability result: severity case normalization at gRPC boundary ──
+
+  describe('vulnerability result endpoints', () => {
+    let controller: JobsRegistryController;
+    let mockJobsRegistryService: any;
+
+    beforeEach(async () => {
+      mockJobsRegistryService = {
+        updateResultByCategory: jest.fn().mockResolvedValue({
+          jobId: 'bull-job-id',
+          queueId: 'job-result',
+        }),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        controllers: [JobsRegistryController],
+        providers: [
+          { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          {
+            provide: ConnectorRegistryService,
+            useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
+          },
+          {
+            provide: ToolConfigProfilesService,
+            useValue: { resolveConfigForJob: jest.fn() },
+          },
+          { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
+          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
+          { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
+        ],
+      }).compile();
+
+      controller = module.get(JobsRegistryController);
+    });
+
+    it('lowercases proto enum severity names before persisting', async () => {
+      const vulnerabilities = {
+        values: [
+          { name: 'CVE-1', severity: 'HIGH' },
+          { name: 'CVE-2', severity: 'Critical' },
+          { name: 'CVE-3', severity: 'info' },
+        ],
+      } as any;
+
+      const result = await controller.resultVulnerabilities({
+        workerId: 'worker-uuid',
+        jobId: 'job-uuid',
+        error: false,
+        vulnerabilities,
+      });
+
+      const [, passedDto, category] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(
+        (passedDto.payload as { severity: string }[]).map((v) => v.severity),
+      ).toEqual(['high', 'critical', 'info']);
+      expect(category).toBe(ToolCategory.VULNERABILITIES);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('falls back to info for unrecognized severity', async () => {
+      const vulnerabilities = {
+        values: [{ name: 'CVE-1', severity: 'SEVERITY_UNSPECIFIED' }],
+      } as any;
+
+      await controller.resultVulnerabilities({
+        workerId: 'worker-uuid',
+        jobId: 'job-uuid',
+        error: false,
+        vulnerabilities,
+      });
+
+      const [, passedDto] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(passedDto.payload[0].severity).toBe('info');
+    });
+  });
 });
