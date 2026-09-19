@@ -1,6 +1,113 @@
 {
-  "generatedAt": "2026-09-15T09:44:59.1522972Z",
+  "generatedAt": "2026-09-19T08:34:17.765928616Z",
   "connectors": [
+    {
+      "name": "Acunetix",
+      "slug": "acunetix",
+      "version": "0.1.0",
+      "image": "ghcr.io/oasm-platform/connector-acunetix:0.1.0",
+      "author": "oasm",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://www.acunetix.com",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
+      "shortDescription": "Acunetix web vulnerability scanner",
+      "description": "Connects to an Acunetix instance, runs a scan against a target, and streams the discovered vulnerabilities back to the Worker.",
+      "capabilities": [
+        "vulnerabilities"
+      ],
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "description": "Target URL or hostname to scan.",
+            "examples": [
+              "https://example.com"
+            ],
+            "format": "uri",
+            "title": "Scan target",
+            "type": "string",
+            "ui:placeholder": "https://example.com"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "apiKey": {
+            "description": "Acunetix API key sent in the X-Auth header.",
+            "title": "API key",
+            "type": "string",
+            "ui:placeholder": "Enter API key",
+            "ui:widget": "password"
+          },
+          "criticality": {
+            "default": 10,
+            "description": "Target business criticality: 30 Critical, 20 High, 10 Normal, 0 Low.",
+            "enum": [
+              30,
+              20,
+              10,
+              0
+            ],
+            "title": "Target criticality",
+            "type": "integer"
+          },
+          "disableTlsChecks": {
+            "description": "Skip TLS certificate verification (required for the self-signed certificate Acunetix ships by default).",
+            "title": "Disable TLS checks",
+            "type": "boolean"
+          },
+          "maxScanTime": {
+            "default": 0,
+            "description": "Maximum scan duration in minutes; 0 uses the Acunetix default.",
+            "minimum": 0,
+            "title": "Max scan time (minutes)",
+            "type": "integer"
+          },
+          "profileId": {
+            "default": "11111111-1111-1111-1111-111111111111",
+            "description": "Scan type (profile) UUID. Defaults to Full Scan.",
+            "title": "Scanning profile ID",
+            "type": "string",
+            "ui:placeholder": "11111111-1111-1111-1111-111111111111"
+          },
+          "targetDescription": {
+            "description": "Description stored on the Acunetix target created for this scan. Defaults to oasm-scan.",
+            "title": "Target description",
+            "type": "string",
+            "ui:placeholder": "oasm-scan"
+          },
+          "url": {
+            "description": "Base URL of the Acunetix instance (https://host:3443 for on-premises, https://app.invicti.com for Acunetix Online). /api/v1 is appended when absent.",
+            "examples": [
+              "https://acunetix.local:3443"
+            ],
+            "format": "uri",
+            "title": "Acunetix URL",
+            "type": "string",
+            "ui:placeholder": "https://acunetix.local:3443"
+          }
+        },
+        "required": [
+          "url",
+          "apiKey"
+        ],
+        "type": "object"
+      },
+      "resourceDefaults": {
+        "cpu": "500m",
+        "memory": "512Mi",
+        "timeoutSeconds": 900
+      },
+      "logo": "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"
+    },
     {
       "name": "Nessus",
       "slug": "nessus",
