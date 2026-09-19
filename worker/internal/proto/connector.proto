@@ -62,6 +62,7 @@ message Finding {
   string host = 12;
   string ip = 13;
   google.protobuf.Timestamp timestamp = 14;
+  string description = 15;
 }
 
 message Done {

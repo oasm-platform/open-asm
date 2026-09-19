@@ -352,26 +352,29 @@ func submitCategoryError(ctx context.Context, grpcClient *grpcclient.Client, eve
 }
 
 // findingToVulnerability maps one connector Finding onto the jobs_registry
-// Vulnerability model consumed by Core. Fields with no counterpart in
-// Vulnerability (matched_at, timestamp) are intentionally dropped. A nil
+// Vulnerability model consumed by Core. MatchedAt carries the concrete
+// affected URL and maps onto affected_url (the vulnerabilities.affectedUrl
+// column); timestamp has no counterpart in Vulnerability and is dropped. A nil
 // finding yields nil (skipped by the caller).
 func findingToVulnerability(f *connectorpb.Finding) *pb.Vulnerability {
 	if f == nil {
 		return nil
 	}
 	return &pb.Vulnerability{
-		Name:       f.GetName(),
-		Severity:   severityFromString(f.GetSeverity()),
-		Tags:       f.GetTags(),
-		References: f.GetReferences(),
-		CveId:      f.GetCveId(),
-		CweId:      f.GetCweId(),
-		CvssScore:  float32(f.GetCvssScore()),
-		CvssMetric: f.GetCvssMetrics(),
-		EpssScore:  float32(f.GetEpssScore()),
-		Solution:   f.GetSolution(),
-		Host:       f.GetHost(),
-		IpAddress:  f.GetIp(),
+		Name:        f.GetName(),
+		Severity:    severityFromString(f.GetSeverity()),
+		Description: f.GetDescription(),
+		Tags:        f.GetTags(),
+		References:  f.GetReferences(),
+		CveId:       f.GetCveId(),
+		CweId:       f.GetCweId(),
+		CvssScore:   float32(f.GetCvssScore()),
+		CvssMetric:  f.GetCvssMetrics(),
+		EpssScore:   float32(f.GetEpssScore()),
+		Solution:    f.GetSolution(),
+		Host:        f.GetHost(),
+		IpAddress:   f.GetIp(),
+		AffectedUrl: f.GetMatchedAt(),
 	}
 }
 
