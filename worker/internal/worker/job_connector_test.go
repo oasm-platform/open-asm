@@ -36,7 +36,7 @@ func TestHandleConnectorResultAggregatesVulnerabilityChunks(t *testing.T) {
 
 	// Three chunks: 2 + 1 + 1 findings = 4 accumulated.
 	proxy.ForwardResult(execID, []byte(`{"template":"a"}`), []*connectorpb.Finding{
-		{Name: "CVE-2024-0001", Severity: "high", Tags: []string{"cve"}, References: []string{"https://nvd.nist.gov/vuln/detail/CVE-2024-0001"}, CveId: []string{"CVE-2024-0001"}, Host: "a.example.com", Ip: "10.0.0.1", CvssScore: 9.1, EpssScore: 0.5},
+		{Name: "CVE-2024-0001", Severity: "high", Description: "an XSS issue", Tags: []string{"cve"}, References: []string{"https://nvd.nist.gov/vuln/detail/CVE-2024-0001"}, CveId: []string{"CVE-2024-0001"}, Host: "a.example.com", Ip: "10.0.0.1", CvssScore: 9.1, EpssScore: 0.5, MatchedAt: "https://a.example.com/search?q=1"},
 		{Name: "CVE-2024-0002", Severity: "low", Host: "a.example.com", Ip: "10.0.0.1"},
 	})
 	proxy.ForwardResult(execID, []byte(`{"template":"b"}`), []*connectorpb.Finding{
@@ -112,6 +112,12 @@ func TestHandleConnectorResultAggregatesVulnerabilityChunks(t *testing.T) {
 	}
 	if f0.GetHost() != "a.example.com" || f0.GetIpAddress() != "10.0.0.1" {
 		t.Fatalf("host/ip mapping: host=%q ip=%q", f0.GetHost(), f0.GetIpAddress())
+	}
+	if f0.GetAffectedUrl() != "https://a.example.com/search?q=1" {
+		t.Fatalf("matched_at → affected_url mapping: %q", f0.GetAffectedUrl())
+	}
+	if f0.GetDescription() != "an XSS issue" {
+		t.Fatalf("description mapping: %q", f0.GetDescription())
 	}
 	if got.vulns[2].GetSolution() != "upgrade" {
 		t.Fatalf("solution mapping: %q", got.vulns[2].GetSolution())
