@@ -102,6 +102,28 @@ export class GetManyWorkersDto extends GetManyBaseQueryParams {
 }
 
 /**
+ * A job a worker is running right now, as far as the worker diagram needs it:
+ * enough to label the node that is scanning. Deliberately tiny — the detail
+ * endpoint is polled every few seconds, and `/jobs-registry` is where full job
+ * records live.
+ */
+export class WorkerToolJobDto {
+  @ApiProperty({
+    required: false,
+    description:
+      'Asset value the job targets (host, domain, IP). Absent when the job runs against an asset service or a whole asset group.',
+  })
+  target?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Service value the job targets, when the job was queued for a specific service.',
+  })
+  service?: string;
+}
+
+/**
  * A single tool available on a worker. Built-in tools use the `Tool.id` (uuid)
  * as their identifier; Docker connectors use their manifest slug.
  */
@@ -111,7 +133,10 @@ export class WorkerToolDto {
   })
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description:
+      'Display name. Built-in tools use their product name; connectors use their manifest slug — the identifier clients write in tool config.',
+  })
   name: string;
 
   @ApiProperty({ required: false, nullable: true, type: String })
@@ -122,6 +147,13 @@ export class WorkerToolDto {
 
   @ApiProperty({ enum: ['builtin', 'connector'] })
   type: 'builtin' | 'connector';
+
+  @ApiProperty({
+    type: () => [WorkerToolJobDto],
+    description:
+      'Jobs this worker is currently running with this tool. Capped server-side; may be shorter than the worker-level `currentJobsCount`.',
+  })
+  currentJobs: WorkerToolJobDto[];
 }
 
 /**

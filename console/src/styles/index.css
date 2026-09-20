@@ -134,14 +134,12 @@
 }
 
 /* ── Worker graph flow edges ────────────────────────────────────────────
- * The chain edges carry data both ways, so each edge stacks two dash layers
- * over a static rail: `graph-flow-up` walks the dashes toward the edge end
- * (up the chain, to the worker), `graph-flow-down` back toward the source
- * (down to the tool). The 12px phase offset on `graph-flow-down` interleaves
- * the two dash trains instead of letting them overlap — same 12px period as
- * the `4 8` dash array. Applied per-edge via `graph-edge-flow`, and disabled
- * under prefers-reduced-motion below.
- */
+ * One directional stream, OASM -> worker -> tool: each edge stacks a single
+ * dash layer (`graph-flow`) over a static rail, and the dashes walk toward the
+ * edge target. Both endpoints anchor at the node centre (`CenterHandles`), so
+ * on every wire the train reads as flowing away from the platform. Applied
+ * per-edge via `graph-edge-flow`, and disabled under prefers-reduced-motion
+ * below. */
 .react-flow__edge.graph-edge-flow path {
   stroke: var(--color-graph-edge);
   fill: none;
@@ -153,38 +151,23 @@
   opacity: 0.4;
 }
 
-.react-flow__edge.graph-edge-flow .graph-flow-up,
-.react-flow__edge.graph-edge-flow .graph-flow-down {
+.react-flow__edge.graph-edge-flow .graph-flow {
   stroke-width: 1.6;
   stroke-dasharray: 4 8;
   /* Dashes carry far less ink than a solid line, so the old `0.55` almost
-   * vanished on the dark canvas; the moving layers need the extra weight. */
+   * vanished on the dark canvas; the moving layer needs the extra weight. */
   opacity: 0.95;
+  animation: graph-flow 1.2s linear infinite;
 }
 
-.react-flow__edge.graph-edge-flow .graph-flow-up {
-  animation: graph-flow-up 1.2s linear infinite;
-}
-
-.react-flow__edge.graph-edge-flow .graph-flow-down {
-  animation: graph-flow-down 1.2s linear infinite;
-}
-
-@keyframes graph-flow-up {
+@keyframes graph-flow {
   from {
     stroke-dashoffset: 0;
   }
   to {
+    /* Two dash periods per cycle: same apparent dash speed as the old
+     * `graph-flow-up`, and still an exact multiple so the loop is seamless. */
     stroke-dashoffset: -24;
-  }
-}
-
-@keyframes graph-flow-down {
-  from {
-    stroke-dashoffset: 12;
-  }
-  to {
-    stroke-dashoffset: 36;
   }
 }
 
@@ -204,8 +187,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .react-flow__edge.graph-edge-returns .react-flow__edge-path,
-  .react-flow__edge.graph-edge-flow .graph-flow-up,
-  .react-flow__edge.graph-edge-flow .graph-flow-down,
+  .react-flow__edge.graph-edge-flow .graph-flow,
   [data-graph-glow='true'] {
     animation: none;
   }
