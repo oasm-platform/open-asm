@@ -635,10 +635,22 @@ describe('WorkersService', () => {
       { slug: 'c-3', name: 'Connector 3', logo: true, capabilities: [] },
     ];
 
+    /** Stands in for the raw-value query builder `getRunningJobsByTool` uses. */
+    const buildRunningJobsQuery = (rows: Record<string, unknown>[]) => ({
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue(rows),
+    });
+
     const runGetWorkerById = async (
       worker: Record<string, unknown> | null,
       builtInTools: Record<string, unknown>[] = [],
       connectors: Record<string, unknown>[] = [],
+      runningJobRows: Record<string, unknown>[] = [],
     ) => {
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(
         worker,
@@ -646,6 +658,9 @@ describe('WorkersService', () => {
       (mockJobsRegistryService.repo as any).count = jest
         .fn()
         .mockResolvedValue(0);
+      (mockJobsRegistryService.repo as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(buildRunningJobsQuery(runningJobRows));
       (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
         data: builtInTools,
       });
@@ -671,6 +686,7 @@ describe('WorkersService', () => {
           logoUrl: 'https://example.com/subfinder.png',
           category: 'subdomains',
           type: 'builtin',
+          currentJobs: [],
         },
         {
           id: 'bt-2',
@@ -678,12 +694,13 @@ describe('WorkersService', () => {
           logoUrl: null,
           category: 'vulnerabilities',
           type: 'builtin',
+          currentJobs: [],
         },
       ]);
       expect(result.runMode).toBe('cli');
     });
 
-    it('appends connectors for a node worker and exposes slug as the id', async () => {
+    it('appends connectors for a node worker and exposes the slug as both id and name', async () => {
       const result = await runGetWorkerById(
         { id: workerId, workspaceId, runMode: 'node' },
         builtInToolFixtures,
@@ -698,18 +715,61 @@ describe('WorkersService', () => {
       expect(connectors).toEqual([
         {
           id: 'c-1',
-          name: 'Connector 1',
+          name: 'c-1',
           logoUrl: '/connectors/c-1.png',
           type: 'connector',
+          currentJobs: [],
         },
-        { id: 'c-2', name: 'Connector 2', logoUrl: undefined, type: 'connector' },
+        {
+          id: 'c-2',
+          name: 'c-2',
+          logoUrl: undefined,
+          type: 'connector',
+          currentJobs: [],
+        },
         {
           id: 'c-3',
-          name: 'Connector 3',
+          name: 'c-3',
           logoUrl: '/connectors/c-3.png',
           type: 'connector',
+          currentJobs: [],
         },
       ]);
+    });
+
+    it('groups the worker running jobs under the tool that executes them', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'node' },
+        builtInToolFixtures,
+        connectorFixtures,
+        [
+          // Connector job: `Tool.name` is the connector slug. These are the raw
+          // columns the query projects.
+          { tool: 'c-1', target: 'example.com', service: null },
+          // Built-in job with a concrete service.
+          {
+            tool: 'nuclei',
+            target: 'api.example.com',
+            service: 'https://api.example.com:8443',
+          },
+          // Asset-service-only job: no asset row, the service carries the label.
+          { tool: 'c-2', target: null, service: '10.0.0.5:9200' },
+          // Job whose tool relation was dropped — skipped, never crashed on.
+          { tool: null, target: null, service: null },
+        ],
+      );
+
+      const byName = new Map(result.tools.map((tool) => [tool.name, tool]));
+      expect(byName.get('c-1')?.currentJobs).toEqual([
+        { target: 'example.com', service: undefined },
+      ]);
+      expect(byName.get('nuclei')?.currentJobs).toEqual([
+        { target: 'api.example.com', service: 'https://api.example.com:8443' },
+      ]);
+      expect(byName.get('c-2')?.currentJobs).toEqual([
+        { target: '10.0.0.5:9200', service: '10.0.0.5:9200' },
+      ]);
+      expect(byName.get('subfinder')?.currentJobs).toEqual([]);
     });
 
     it('throws NotFoundException when the worker does not exist', async () => {

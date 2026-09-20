@@ -1712,14 +1712,24 @@ export const WorkerToolDtoType = {
   connector: 'connector',
 } as const;
 
+export type WorkerToolJobDto = {
+  /** Asset value the job targets (host, domain, IP). Absent when the job runs against an asset service or a whole asset group. */
+  target?: string;
+  /** Service value the job targets, when the job was queued for a specific service. */
+  service?: string;
+};
+
 export type WorkerToolDto = {
   /** Tool id. Built-in tools use the Tool uuid; connectors use the manifest slug. */
   id: string;
+  /** Display name. Built-in tools use their product name; connectors use their manifest slug — the identifier clients write in tool config. */
   name: string;
   /** @nullable */
   logoUrl?: string | null;
   category?: string;
   type: WorkerToolDtoType;
+  /** Jobs this worker is currently running with this tool. Capped server-side; may be shorter than the worker-level `currentJobsCount`. */
+  currentJobs: WorkerToolJobDto[];
 };
 
 export type GetWorkerResponseDtoType =

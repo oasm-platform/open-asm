@@ -41,8 +41,18 @@ import {
   WorkerAliveDto,
   WorkerJoinDto,
   WorkerToolDto,
+  WorkerToolJobDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+
+/**
+ * Cap on the running jobs returned per worker detail response. The console
+ * polls this endpoint every few seconds, so the payload is bounded on purpose:
+ * a busy worker can hold far more in-progress jobs than a diagram can draw, and
+ * `/jobs-registry` remains the endpoint that pages through all of them.
+ * `currentJobsCount` still reports the true total.
+ */
+const MAX_RUNNING_JOBS_PER_WORKER = 20;
 
 @Injectable()
 export class WorkersService {
@@ -368,6 +378,8 @@ export class WorkersService {
       logoUrl: tool.logoUrl,
       category: tool.category,
       type: 'builtin',
+      // Filled in below from the single running-jobs query.
+      currentJobs: [],
     }));
 
     // Only node-mode workers run Docker connectors; CLI/legacy workers may not
@@ -375,22 +387,24 @@ export class WorkersService {
     if (worker.runMode === 'node') {
       tools.push(
         ...this.connectorRegistry.getAllConnectors().map((connector) => ({
+          // Connectors are addressed by their manifest slug everywhere else
+          // (tool config, profiles, jobs), and the manifest display name is not
+          // unique. `name` is therefore the slug too, so clients render the
+          // identifier users actually write in config.
           id: connector.slug,
-          name: connector.name,
+          name: connector.slug,
           logoUrl: connector.logo
             ? `/connectors/${connector.slug}.png`
             : undefined,
           type: 'connector' as const,
+          currentJobs: [],
         })),
       );
     }
 
-    const currentJobsCount = await this.jobsRegistryService['repo'].count({
-      where: {
-        workerId: worker.id,
-        status: JobStatus.IN_PROGRESS,
-      },
-    });
+    const { jobsByTool, currentJobsCount } = await this.getRunningJobsByTool(
+      worker.id,
+    );
 
     // Never expose `token` — it is a live worker secret.
     return {
@@ -412,8 +426,73 @@ export class WorkersService {
       tool: worker.tool
         ? { id: worker.tool.id!, name: worker.tool.name }
         : null,
-      tools,
+      tools: tools.map((tool) => ({
+        ...tool,
+        currentJobs: jobsByTool.get(tool.name ?? tool.id) ?? [],
+      })),
     };
+  }
+
+  /** Real-time scan targets of a worker, grouped by tool.
+   *
+   * The console polls the detail endpoint every few seconds, so this stays one
+   * query with a hard cap: an indexed lookup on `IDX_jobs_workerId_status`,
+   * three left joins by primary key, and projection straight to raw values —
+   * no relation is materialised as an entity. `tool.name` is the connector slug
+   * for connector jobs (`Tool.name` is the slug by contract) and the built-in
+   * name otherwise, which is exactly the key {@link WorkerToolDto} uses.
+   *
+   * Deliberately a query builder rather than `repo.find`: `find` with `take`
+   * plus relations pages through a `SELECT DISTINCT` wrapper, and TypeORM does
+   * not project the `ORDER BY` column into it — the query fails with
+   * `column distinctAlias.Job_pickJobAt does not exist`.
+   *
+   * @returns The per-tool job list plus the worker's total running-job count.
+   *          The count can exceed the listed jobs, which are capped at
+   *          {@link MAX_RUNNING_JOBS_PER_WORKER}.
+   */
+  private async getRunningJobsByTool(workerId: string): Promise<{
+    jobsByTool: Map<string, WorkerToolJobDto[]>;
+    currentJobsCount: number;
+  }> {
+    const rows = await this.jobsRegistryService['repo']
+      .createQueryBuilder('job')
+      .leftJoin('job.tool', 'tool')
+      .leftJoin('job.asset', 'asset')
+      .leftJoin('job.assetService', 'service')
+      .where('job.workerId = :workerId', { workerId })
+      .andWhere('job.status = :status', { status: JobStatus.IN_PROGRESS })
+      .select([
+        'tool.name AS tool',
+        'asset.value AS target',
+        'service.value AS service',
+      ])
+      // Newest pickup first: when a worker runs more jobs than the cap, the
+      // ones it just started are the ones worth showing.
+      .orderBy('job.pickJobAt', 'DESC')
+      .limit(MAX_RUNNING_JOBS_PER_WORKER)
+      .getRawMany<{ tool: string | null; target: string | null; service: string | null }>();
+
+    const jobsByTool = new Map<string, WorkerToolJobDto[]>();
+    for (const row of rows) {
+      // A job whose tool relation was dropped has nothing to attach to.
+      if (!row.tool) continue;
+
+      const list = jobsByTool.get(row.tool) ?? [];
+      list.push({
+        // Both are null for jobs that target a whole asset group rather than a
+        // concrete value; the console only needs the label it can print.
+        target: row.target ?? row.service ?? undefined,
+        service: row.service ?? undefined,
+      });
+      jobsByTool.set(row.tool, list);
+    }
+
+    const currentJobsCount = await this.jobsRegistryService['repo'].count({
+      where: { workerId, status: JobStatus.IN_PROGRESS },
+    });
+
+    return { jobsByTool, currentJobsCount };
   }
 
   /**
