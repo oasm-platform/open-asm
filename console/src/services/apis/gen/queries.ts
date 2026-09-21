@@ -1663,7 +1663,7 @@ export type WorkerInstance = {
   scope: WorkerInstanceScope;
   tool: Tool;
   internalNetworkId: string;
-  tools: Tool[];
+  toolsCount?: number;
   enabledAgentMode?: boolean;
   /** @nullable */
   runMode?: WorkerInstanceRunMode;
@@ -1704,6 +1704,94 @@ export type GetManyWorkerInstanceDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type WorkerToolJobDto = {
+  /** Asset value the job targets (host, domain, IP). Absent when the job runs against an asset service or a whole asset group. */
+  target?: string;
+  /** Service value the job targets, when the job was queued for a specific service. */
+  service?: string;
+};
+
+export type WorkerToolDtoType =
+  (typeof WorkerToolDtoType)[keyof typeof WorkerToolDtoType];
+
+export const WorkerToolDtoType = {
+  builtin: 'builtin',
+  connector: 'connector',
+} as const;
+
+export type WorkerToolDto = {
+  /** Tool id. Built-in tools use the Tool uuid; connectors use the manifest slug. */
+  id: string;
+  /** Display name. Built-in tools use their product name; connectors use their manifest slug — the identifier clients write in tool config. */
+  name: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  category?: string;
+  type: WorkerToolDtoType;
+  /** Jobs this worker is currently running with this tool. Capped server-side; may be shorter than the worker-level `currentJobsCount`. */
+  currentJobs: WorkerToolJobDto[];
+};
+
+export type GetWorkerResponseDtoType =
+  (typeof GetWorkerResponseDtoType)[keyof typeof GetWorkerResponseDtoType];
+
+export const GetWorkerResponseDtoType = {
+  built_in: 'built_in',
+  provider: 'provider',
+  connector: 'connector',
+} as const;
+
+export type GetWorkerResponseDtoScope =
+  (typeof GetWorkerResponseDtoScope)[keyof typeof GetWorkerResponseDtoScope];
+
+export const GetWorkerResponseDtoScope = {
+  cloud: 'cloud',
+  workspace: 'workspace',
+} as const;
+
+/**
+ * @nullable
+ */
+export type GetWorkerResponseDtoRunMode =
+  | (typeof GetWorkerResponseDtoRunMode)[keyof typeof GetWorkerResponseDtoRunMode]
+  | null;
+
+export const GetWorkerResponseDtoRunMode = {
+  cli: 'cli',
+  node: 'node',
+} as const;
+
+/**
+ * The bound tool provider, when the worker is attached to one.
+ * @nullable
+ */
+export type GetWorkerResponseDtoTool = { [key: string]: unknown } | null;
+
+export type GetWorkerResponseDto = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  lastSeenAt: string;
+  name?: string;
+  os?: string;
+  ipAddress?: string;
+  type: GetWorkerResponseDtoType;
+  scope: GetWorkerResponseDtoScope;
+  /** @nullable */
+  runMode?: GetWorkerResponseDtoRunMode;
+  enabledAgentMode?: boolean;
+  internalNetworkId?: string;
+  currentJobsCount: number;
+  toolsCount: number;
+  isOnline: boolean;
+  /**
+   * The bound tool provider, when the worker is attached to one.
+   * @nullable
+   */
+  tool?: GetWorkerResponseDtoTool;
+  tools: WorkerToolDto[];
 };
 
 export type CreateToolDtoCategory =
@@ -19164,6 +19252,177 @@ export function useWorkersControllerGetWorkers<
 } {
   const queryOptions = getWorkersControllerGetWorkersQueryOptions(
     params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves a single worker by its ID, including its connected tools.
+ * @summary Get a worker by ID
+ */
+export const workersControllerGetWorkerById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetWorkerResponseDto>(
+    { url: `/api/workers/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkersControllerGetWorkerByIdQueryKey = (id: string) => {
+  return [`/api/workers/${id}`] as const;
+};
+
+export const getWorkersControllerGetWorkerByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getWorkersControllerGetWorkerByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workersControllerGetWorkerById>>
+  > = ({ signal }) =>
+    workersControllerGetWorkerById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkersControllerGetWorkerByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workersControllerGetWorkerById>>
+>;
+export type WorkersControllerGetWorkerByIdQueryError = unknown;
+
+export function useWorkersControllerGetWorkerById<
+  TData = Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+          TError,
+          Awaited<ReturnType<typeof workersControllerGetWorkerById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkersControllerGetWorkerById<
+  TData = Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+          TError,
+          Awaited<ReturnType<typeof workersControllerGetWorkerById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkersControllerGetWorkerById<
+  TData = Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a worker by ID
+ */
+
+export function useWorkersControllerGetWorkerById<
+  TData = Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workersControllerGetWorkerById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkersControllerGetWorkerByIdQueryOptions(
+    id,
     options,
   );
 

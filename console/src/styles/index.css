@@ -21,11 +21,7 @@
   body {
     @apply min-h-svh w-full bg-background text-foreground has-[div[data-variant='inset']]:bg-sidebar;
     font-family: var(--font-sans);
-    font-feature-settings:
-      'cv02',
-      'cv03',
-      'cv04',
-      'cv11';
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   /* Override Radix scroll locking for sticky headers */
@@ -137,6 +133,44 @@
   animation: graph-dash 1.4s linear infinite;
 }
 
+/* ── Worker graph flow edges ────────────────────────────────────────────
+ * One directional stream, OASM -> worker -> tool: each edge stacks a single
+ * dash layer (`graph-flow`) over a static rail, and the dashes walk toward the
+ * edge target. Both endpoints anchor at the node centre (`CenterHandles`), so
+ * on every wire the train reads as flowing away from the platform. Applied
+ * per-edge via `graph-edge-flow`, and disabled under prefers-reduced-motion
+ * below. */
+.react-flow__edge.graph-edge-flow path {
+  stroke: var(--color-graph-edge);
+  fill: none;
+  stroke-linecap: round;
+}
+
+.react-flow__edge.graph-edge-flow .graph-flow-rail {
+  stroke-width: 1.2;
+  opacity: 0.4;
+}
+
+.react-flow__edge.graph-edge-flow .graph-flow {
+  stroke-width: 1.6;
+  stroke-dasharray: 4 8;
+  /* Dashes carry far less ink than a solid line, so the old `0.55` almost
+   * vanished on the dark canvas; the moving layer needs the extra weight. */
+  opacity: 0.95;
+  animation: graph-flow 1.2s linear infinite;
+}
+
+@keyframes graph-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    /* Two dash periods per cycle: same apparent dash speed as the old
+     * `graph-flow-up`, and still an exact multiple so the loop is seamless. */
+    stroke-dashoffset: -24;
+  }
+}
+
 @keyframes graph-glow-pulse {
   0%,
   100% {
@@ -153,6 +187,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .react-flow__edge.graph-edge-returns .react-flow__edge-path,
+  .react-flow__edge.graph-edge-flow .graph-flow,
   [data-graph-glow='true'] {
     animation: none;
   }

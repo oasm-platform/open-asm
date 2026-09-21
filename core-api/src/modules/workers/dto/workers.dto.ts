@@ -1,4 +1,5 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { WorkerScope, WorkerType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -98,4 +99,119 @@ export class GetManyWorkersDto extends GetManyBaseQueryParams {
     return undefined;
   })
   enabledAgentMode?: boolean;
+}
+
+/**
+ * A job a worker is running right now, as far as the worker diagram needs it:
+ * enough to label the node that is scanning. Deliberately tiny — the detail
+ * endpoint is polled every few seconds, and `/jobs-registry` is where full job
+ * records live.
+ */
+export class WorkerToolJobDto {
+  @ApiProperty({
+    required: false,
+    description:
+      'Asset value the job targets (host, domain, IP). Absent when the job runs against an asset service or a whole asset group.',
+  })
+  target?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Service value the job targets, when the job was queued for a specific service.',
+  })
+  service?: string;
+}
+
+/**
+ * A single tool available on a worker. Built-in tools use the `Tool.id` (uuid)
+ * as their identifier; Docker connectors use their manifest slug.
+ */
+export class WorkerToolDto {
+  @ApiProperty({
+    description: 'Tool id. Built-in tools use the Tool uuid; connectors use the manifest slug.',
+  })
+  id: string;
+
+  @ApiProperty({
+    description:
+      'Display name. Built-in tools use their product name; connectors use their manifest slug — the identifier clients write in tool config.',
+  })
+  name: string;
+
+  @ApiProperty({ required: false, nullable: true, type: String })
+  logoUrl?: string | null;
+
+  @ApiProperty({ required: false })
+  category?: string;
+
+  @ApiProperty({ enum: ['builtin', 'connector'] })
+  type: 'builtin' | 'connector';
+
+  @ApiProperty({
+    type: () => [WorkerToolJobDto],
+    description:
+      'Jobs this worker is currently running with this tool. Capped server-side; may be shorter than the worker-level `currentJobsCount`.',
+  })
+  currentJobs: WorkerToolJobDto[];
+}
+
+/**
+ * Response DTO for a single worker (`GET /workers/:id`).
+ */
+export class GetWorkerResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+
+  @ApiProperty()
+  lastSeenAt: Date;
+
+  @ApiProperty({ required: false })
+  name?: string;
+
+  @ApiProperty({ required: false })
+  os?: string;
+
+  @ApiProperty({ required: false })
+  ipAddress?: string;
+
+  @ApiProperty({ enum: WorkerType })
+  type: WorkerType;
+
+  @ApiProperty({ enum: WorkerScope })
+  scope: WorkerScope;
+
+  @ApiProperty({ required: false, enum: ['cli', 'node'], nullable: true })
+  runMode?: 'cli' | 'node' | null;
+
+  @ApiProperty({ required: false })
+  enabledAgentMode?: boolean;
+
+  @ApiProperty({ required: false })
+  internalNetworkId?: string;
+
+  @ApiProperty()
+  currentJobsCount: number;
+
+  @ApiProperty()
+  toolsCount: number;
+
+  @ApiProperty()
+  isOnline: boolean;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description: 'The bound tool provider, when the worker is attached to one.',
+  })
+  tool?: { id: string; name: string } | null;
+
+  @ApiProperty({ type: () => [WorkerToolDto] })
+  tools: WorkerToolDto[];
 }

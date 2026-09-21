@@ -7,7 +7,7 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { ToolCategory } from '@/common/enums/enum';
+import { Severity, ToolCategory } from '@/common/enums/enum';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -83,6 +83,19 @@ function packStructFields(record: Record<string, unknown>): Record<string, Recor
     if (val !== undefined) fields[key] = packStructValue(val);
   }
   return fields;
+}
+
+const VALID_SEVERITIES = new Set<string>(Object.values(Severity));
+
+/**
+ * The gRPC loader is configured with `enums: String`, so the worker delivers
+ * severity as the proto enum NAME (e.g. "HIGH"). Normalize it to the domain's
+ * lowercase `Severity` at this trust boundary; anything unrecognized falls
+ * back to `info`.
+ */
+function normalizeSeverity(value: unknown): Severity {
+  const lower = typeof value === 'string' ? value.toLowerCase() : '';
+  return VALID_SEVERITIES.has(lower) ? (lower as Severity) : Severity.INFO;
 }
 
 @Controller('jobs-registry')
@@ -571,7 +584,10 @@ export class JobsRegistryController {
       jobId,
       error,
       raw,
-      payload: vulnerabilities?.values,
+      payload: vulnerabilities?.values?.map((vuln) => ({
+        ...vuln,
+        severity: normalizeSeverity(vuln.severity),
+      })),
     });
     const result = await this.jobsRegistryService.updateResultByCategory(
       workerId,

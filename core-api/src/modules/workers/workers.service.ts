@@ -15,6 +15,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -32,15 +33,26 @@ import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
-import { ToolSyncService } from '../tools/tool-sync.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import {
   GetManyWorkersDto,
+  GetWorkerResponseDto,
   WorkerAliveDto,
   WorkerJoinDto,
+  WorkerToolDto,
+  WorkerToolJobDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+
+/**
+ * Cap on the running jobs returned per worker detail response. The console
+ * polls this endpoint every few seconds, so the payload is bounded on purpose:
+ * a busy worker can hold far more in-progress jobs than a diagram can draw, and
+ * `/jobs-registry` remains the endpoint that pages through all of them.
+ * `currentJobsCount` still reports the true total.
+ */
+const MAX_RUNNING_JOBS_PER_WORKER = 20;
 
 @Injectable()
 export class WorkersService {
@@ -283,25 +295,16 @@ export class WorkersService {
       .take(limit)
       .getManyAndCount();
 
-    // All workers show all available tools (built-in + connector).
-    // Hoisted above the per-worker map: one query for built-in tools and one
-    // manifest read total, shared by every worker in the page (findings #3).
+    // Only tool counts are returned to clients (the full Tool[] payload was
+    // removed from GET /workers). Hoisted above the per-worker map: one query
+    // for built-in tools and one manifest read total, shared by every worker in
+    // the page (findings #3).
     const [builtInTools, connectorList] = await Promise.all([
       this.toolsService.getBuiltInTools(),
       Promise.resolve(this.connectorRegistry.getAllConnectors()),
     ]);
 
-    // Connector entries carry an honest shape: CONNECTOR type (not BUILT_IN),
-    // category derived from capabilities via the shared mapper (#2), and the
-    // stored logo path served by ConnectorLogoController instead of raw base64
-    // (#8). id stays the stable slug consumed by the console (#7).
-    const connectorTools: Tool[] = connectorList.map((c) => ({
-      id: c.slug,
-      name: c.name,
-      category: ToolSyncService.mapConnectorCapabilityToCategory(c.capabilities),
-      type: WorkerType.CONNECTOR,
-      logoUrl: c.logo ? `/connectors/${c.slug}.png` : undefined,
-    })) as Tool[];
+    const builtInToolsCount = builtInTools.data.length;
 
     const workersWithJobCount = await Promise.all(
       workers.map(async (worker) => {
@@ -313,16 +316,16 @@ export class WorkersService {
         });
 
         // Only node-mode workers run Docker connectors; CLI/legacy workers may
-        // not have Docker installed, so they get built-in tools only.
-        const tools: Tool[] =
+        // not have Docker installed, so they count built-in tools only.
+        const toolsCount =
           worker.runMode === 'node'
-            ? [...builtInTools.data, ...connectorTools]
-            : [...builtInTools.data];
+            ? builtInToolsCount + connectorList.length
+            : builtInToolsCount;
 
         return {
           ...worker,
           currentJobsCount: count,
-          tools,
+          toolsCount,
           isOnline: this.aliveStreamManager.isActive(worker.id),
         };
       }),
@@ -334,6 +337,162 @@ export class WorkersService {
       total,
       ignoreFields: ['token', 'tool'],
     });
+  }
+
+  /**
+   * Retrieves a single worker by id, including the individual tools it can run.
+   *
+   * The tool list mirrors the `toolsCount` rule used by {@link getWorkers}:
+   * node-mode workers run built-in tools plus Docker connectors, while
+   * cli/legacy workers only run built-in tools. Cloud workers have a null
+   * `workspaceId` and stay readable from any workspace.
+   *
+   * @param workerId - The worker's unique identifier.
+   * @param workspaceId - The caller's workspace, used for scoping.
+   * @returns The worker detail, or throws NotFoundException (never 403, so
+   *          worker existence is not leaked across workspaces).
+   */
+  public async getWorkerById(
+    workerId: string,
+    workspaceId?: string,
+  ): Promise<GetWorkerResponseDto> {
+    const worker = await this.repo.findOne({
+      where: { id: workerId },
+      relations: ['workspace', 'tool'],
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker not found');
+    }
+
+    // Cloud workers are shared (workspaceId === null) and must remain readable.
+    if (worker.workspaceId !== null && worker.workspaceId !== workspaceId) {
+      throw new NotFoundException('Worker not found');
+    }
+
+    const { data: builtInTools } = await this.toolsService.getBuiltInTools();
+
+    const tools: WorkerToolDto[] = builtInTools.map((tool) => ({
+      id: tool.id!,
+      name: tool.name,
+      logoUrl: tool.logoUrl,
+      category: tool.category,
+      type: 'builtin',
+      // Filled in below from the single running-jobs query.
+      currentJobs: [],
+    }));
+
+    // Only node-mode workers run Docker connectors; CLI/legacy workers may not
+    // have Docker installed, so they expose built-in tools only.
+    if (worker.runMode === 'node') {
+      tools.push(
+        ...this.connectorRegistry.getAllConnectors().map((connector) => ({
+          // Connectors are addressed by their manifest slug everywhere else
+          // (tool config, profiles, jobs), and the manifest display name is not
+          // unique. `name` is therefore the slug too, so clients render the
+          // identifier users actually write in config.
+          id: connector.slug,
+          name: connector.slug,
+          logoUrl: connector.logo
+            ? `/connectors/${connector.slug}.png`
+            : undefined,
+          type: 'connector' as const,
+          currentJobs: [],
+        })),
+      );
+    }
+
+    const { jobsByTool, currentJobsCount } = await this.getRunningJobsByTool(
+      worker.id,
+    );
+
+    // Never expose `token` — it is a live worker secret.
+    return {
+      id: worker.id,
+      createdAt: worker.createdAt,
+      updatedAt: worker.updatedAt,
+      lastSeenAt: worker.lastSeenAt,
+      name: worker.name,
+      os: worker.os,
+      ipAddress: worker.ipAddress,
+      type: worker.type,
+      scope: worker.scope,
+      runMode: worker.runMode as 'cli' | 'node' | null,
+      enabledAgentMode: worker.enabledAgentMode,
+      internalNetworkId: worker.internalNetworkId,
+      currentJobsCount,
+      toolsCount: tools.length,
+      isOnline: this.aliveStreamManager.isActive(worker.id),
+      tool: worker.tool
+        ? { id: worker.tool.id!, name: worker.tool.name }
+        : null,
+      tools: tools.map((tool) => ({
+        ...tool,
+        currentJobs: jobsByTool.get(tool.name ?? tool.id) ?? [],
+      })),
+    };
+  }
+
+  /** Real-time scan targets of a worker, grouped by tool.
+   *
+   * The console polls the detail endpoint every few seconds, so this stays one
+   * query with a hard cap: an indexed lookup on `IDX_jobs_workerId_status`,
+   * three left joins by primary key, and projection straight to raw values —
+   * no relation is materialised as an entity. `tool.name` is the connector slug
+   * for connector jobs (`Tool.name` is the slug by contract) and the built-in
+   * name otherwise, which is exactly the key {@link WorkerToolDto} uses.
+   *
+   * Deliberately a query builder rather than `repo.find`: `find` with `take`
+   * plus relations pages through a `SELECT DISTINCT` wrapper, and TypeORM does
+   * not project the `ORDER BY` column into it — the query fails with
+   * `column distinctAlias.Job_pickJobAt does not exist`.
+   *
+   * @returns The per-tool job list plus the worker's total running-job count.
+   *          The count can exceed the listed jobs, which are capped at
+   *          {@link MAX_RUNNING_JOBS_PER_WORKER}.
+   */
+  private async getRunningJobsByTool(workerId: string): Promise<{
+    jobsByTool: Map<string, WorkerToolJobDto[]>;
+    currentJobsCount: number;
+  }> {
+    const rows = await this.jobsRegistryService['repo']
+      .createQueryBuilder('job')
+      .leftJoin('job.tool', 'tool')
+      .leftJoin('job.asset', 'asset')
+      .leftJoin('job.assetService', 'service')
+      .where('job.workerId = :workerId', { workerId })
+      .andWhere('job.status = :status', { status: JobStatus.IN_PROGRESS })
+      .select([
+        'tool.name AS tool',
+        'asset.value AS target',
+        'service.value AS service',
+      ])
+      // Newest pickup first: when a worker runs more jobs than the cap, the
+      // ones it just started are the ones worth showing.
+      .orderBy('job.pickJobAt', 'DESC')
+      .limit(MAX_RUNNING_JOBS_PER_WORKER)
+      .getRawMany<{ tool: string | null; target: string | null; service: string | null }>();
+
+    const jobsByTool = new Map<string, WorkerToolJobDto[]>();
+    for (const row of rows) {
+      // A job whose tool relation was dropped has nothing to attach to.
+      if (!row.tool) continue;
+
+      const list = jobsByTool.get(row.tool) ?? [];
+      list.push({
+        // Both are null for jobs that target a whole asset group rather than a
+        // concrete value; the console only needs the label it can print.
+        target: row.target ?? row.service ?? undefined,
+        service: row.service ?? undefined,
+      });
+      jobsByTool.set(row.tool, list);
+    }
+
+    const currentJobsCount = await this.jobsRegistryService['repo'].count({
+      where: { workerId, status: JobStatus.IN_PROGRESS },
+    });
+
+    return { jobsByTool, currentJobsCount };
   }
 
   /**

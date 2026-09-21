@@ -1,10 +1,10 @@
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useToolsControllerGetManyTools,
   type ToolsControllerGetManyToolsCategory,
   type ToolsControllerGetManyToolsType,
 } from '@/services/apis/gen/queries';
 import { LayoutGrid } from 'lucide-react';
-import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import ToolsList from '../tools-list';
 
 interface MarketplaceProps {
@@ -20,6 +20,7 @@ const Marketplace = ({ toolType, search, category }: MarketplaceProps) => {
   const { data, isLoading } = useToolsControllerGetManyTools({
     type: toolType,
     category,
+    limit: 100,
     search: search || undefined,
   });
   const hasFilters = !!(search || category || toolType);
@@ -34,9 +35,7 @@ const Marketplace = ({ toolType, search, category }: MarketplaceProps) => {
           hasFilters ? 'No tools match your filters' : 'No tools found'
         }
         emptyDescription={
-          hasFilters
-            ? 'Try a different search term or category.'
-            : undefined
+          hasFilters ? 'Try a different search term or category.' : undefined
         }
       />
     </div>
