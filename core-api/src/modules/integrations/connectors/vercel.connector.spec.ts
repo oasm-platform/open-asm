@@ -808,5 +808,49 @@ describe('VercelConnector', () => {
       expect(result.projects).toBe(1);
       expect(result.domains).toBe(0);
     });
+
+    it('SC-VC-29: a malformed projects pagination cursor throws instead of reporting a complete sync', async () => {
+      const connector = new VercelConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      // `pagination.next` present but neither string nor number → the sync
+      // cannot continue; it must fail loudly, never drop the remaining pages.
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({
+          projects: [PROJECT_A],
+          pagination: { next: { cursor: 'x' } },
+        }),
+      );
+
+      const error = await connector
+        .syncAssets(makeConfig())
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(VercelSyncError);
+      expect((error as Error).message).toContain(
+        'pagination cursor has an unsupported type',
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('SC-VC-30: a malformed domains pagination cursor throws', async () => {
+      const connector = new VercelConnector();
+      jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
+
+      mockFetch
+        .mockResolvedValueOnce(mockResponse(projectsPage([PROJECT_A])))
+        .mockResolvedValueOnce(
+          mockResponse({ domains: [domain()], pagination: { next: [] } }),
+        );
+
+      const error = await connector
+        .syncAssets(makeConfig())
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(VercelSyncError);
+      expect((error as Error).message).toContain(
+        'pagination cursor has an unsupported type',
+      );
+    });
   });
 });

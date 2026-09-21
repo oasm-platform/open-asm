@@ -432,7 +432,9 @@ export class VercelConnector extends CloudProviderConnector {
         return { projects, truncated: false };
       }
       if (typeof next !== 'string' && typeof next !== 'number') {
-        return { projects, truncated: false };
+        throw new VercelSyncError(
+          'Vercel projects pagination cursor has an unsupported type',
+        );
       }
       const nextFrom = String(next);
       if (nextFrom === lastFrom) {
@@ -486,7 +488,9 @@ export class VercelConnector extends CloudProviderConnector {
         return { domains, truncated: false };
       }
       if (typeof next !== 'string' && typeof next !== 'number') {
-        return { domains, truncated: false };
+        throw new VercelSyncError(
+          'Vercel domains pagination cursor has an unsupported type',
+        );
       }
       const nextUntil = String(next);
       if (nextUntil === lastUntil) {
