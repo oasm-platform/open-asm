@@ -1,5 +1,6 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
+import * as crypto from 'crypto';
 import type { InsertResult } from 'typeorm';
 import { DataSource } from 'typeorm';
 import {
@@ -1159,6 +1160,7 @@ describe('DataAdapterService', () => {
       // Mock the full query builder chain for vulnerabilities
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([]),
@@ -1198,6 +1200,63 @@ describe('DataAdapterService', () => {
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
+    it('should preserve stored enrichment fields the incoming finding omits', async () => {
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      const incoming = {
+        name: 'Test Vulnerability',
+        severity: Severity.HIGH,
+        fingerprint: 'preserve-fingerprint',
+      } as unknown as Vulnerability;
+
+      const fingerprint = crypto
+        .createHash('md5')
+        .update('Test Vulnerability-asset-id-tool-id')
+        .digest('hex');
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          {
+            fingerprint,
+            description: 'stored description',
+            solution: 'stored solution',
+            cvssScore: 9.1,
+          },
+        ]),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: [incoming],
+          identifiers: [],
+        }),
+      };
+
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.vulnerabilities({ data: [incoming], job: mockJob });
+
+      const valuesArg = mockQueryBuilder.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg[0].description).toBe('stored description');
+      expect(valuesArg[0].solution).toBe('stored solution');
+      expect(valuesArg[0].cvssScore).toBe(9.1);
+    });
+
     it('should not create issues for vulnerabilities (creation logic is disabled)', async () => {
       // Issue creation from vulnerabilities is commented out in the service.
       // This test verifies no issue-related methods are called.
@@ -1215,6 +1274,7 @@ describe('DataAdapterService', () => {
 
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([]),
@@ -1293,6 +1353,7 @@ describe('DataAdapterService', () => {
 
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: getRawManyMock,
@@ -1349,6 +1410,7 @@ describe('DataAdapterService', () => {
 
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: getRawManyMock,
@@ -1399,6 +1461,7 @@ describe('DataAdapterService', () => {
 
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([]), // no existing fingerprints
