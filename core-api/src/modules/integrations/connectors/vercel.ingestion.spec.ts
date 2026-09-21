@@ -263,11 +263,9 @@ describe('VercelConnector ingestion', () => {
   });
 
   it.each([
-    ['unverified', { verified: false }],
     ['redirect', { redirect: 'www.example.com' }],
     ['gitBranch', { gitBranch: 'preview' }],
     ['customEnvironmentId', { customEnvironmentId: 'env_1' }],
-    ['.vercel.app name', { name: 'app.vercel.app' }],
     ['wildcard', { name: '*.example.com' }],
   ] as Array<[string, DomainOverrides]>)(
     'ING-5: a %s row is dropped',
@@ -292,6 +290,71 @@ describe('VercelConnector ingestion', () => {
       expect(result.domains).toBe(1);
     },
   );
+
+  it('ING-11: a default `<project>.vercel.app` domain creates a target keyed by the full hostname and upserts it', async () => {
+    stubSingleProjectFetch([
+      domain({ name: 'my-app.vercel.app', apexName: 'vercel.app' }),
+    ]);
+    const connector = new VercelConnector();
+    spySleep(connector);
+
+    const services = makeServices();
+    services.targetsService.findByWorkspaceAndValues.mockResolvedValue([]);
+    services.targetsService.createMultipleTargets.mockResolvedValue(
+      createResult('target-vercel', 'my-app.vercel.app'),
+    );
+
+    const result = await connector.syncAssets(makeConfig(services));
+
+    expect(services.targetsService.findByWorkspaceAndValues).toHaveBeenCalledWith(
+      'ws-1',
+      ['my-app.vercel.app'],
+    );
+    // The shared `vercel.app` apex must never be the target value.
+    expect(services.targetsService.createMultipleTargets).toHaveBeenCalledWith(
+      { targets: [{ value: 'my-app.vercel.app', type: 'DOMAIN' }] },
+      'ws-1',
+      services.actingUserContext,
+      undefined,
+      TargetSource.VERCEL,
+    );
+    expect(services.dataAdapterService.upsertAssetsByTargetId).toHaveBeenCalledWith(
+      'target-vercel',
+      [{ value: 'my-app.vercel.app', dnsRecords: EMPTY_DNS_RECORDS }],
+      undefined,
+      undefined,
+    );
+    expect(result.domains).toBe(1);
+    expect(result.targetsCreated).toBe(1);
+  });
+
+  it('ING-12: an unverified domain is still ingested (apex target + hostname asset)', async () => {
+    stubSingleProjectFetch([
+      domain({
+        name: 'pending.example.com',
+        apexName: 'example.com',
+        verified: false,
+      }),
+    ]);
+    const connector = new VercelConnector();
+    spySleep(connector);
+
+    const services = makeServices();
+    services.targetsService.findByWorkspaceAndValues.mockResolvedValue([
+      { id: 'target-existing', value: 'example.com' },
+    ]);
+
+    const result = await connector.syncAssets(makeConfig(services));
+
+    expect(services.targetsService.createMultipleTargets).not.toHaveBeenCalled();
+    expect(services.dataAdapterService.upsertAssetsByTargetId).toHaveBeenCalledWith(
+      'target-existing',
+      [{ value: 'pending.example.com', dnsRecords: EMPTY_DNS_RECORDS }],
+      undefined,
+      undefined,
+    );
+    expect(result.domains).toBe(1);
+  });
 
   it('ING-6a: a duplicate "Target already exists" race re-looks-up and does not throw', async () => {
     stubSingleProjectFetch([domain()]);

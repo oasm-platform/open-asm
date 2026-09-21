@@ -129,12 +129,13 @@ export interface VercelSyncConfig extends CloudProviderSyncConfig {
  *
  * - Projects come from `GET /v10/projects`; a bare array response or a
  *   `{projects, pagination}` object are both accepted.
- * - Each project's production, verified custom domains come from
- *   `GET /v9/projects/{id}/domains`.
- * - Generated (`.vercel.app`), wildcard, redirect, branch and
- *   custom-environment hosts are dropped by {@link isExcludedDomain}.
- * - Domains are grouped by `apexName` (todo 2 turns each group into a DOMAIN
- *   target + assets). This file performs NO persistence yet.
+ * - Each project's domains come from `GET /v9/projects/{id}/domains`,
+ *   including the default `.vercel.app` host and live-but-unverified custom
+ *   domains.
+ * - Wildcard, redirect, branch and custom-environment hosts are dropped by
+ *   {@link isExcludedDomain}.
+ * - Custom domains are grouped by `apexName`; default `.vercel.app` hosts are
+ *   grouped by their full hostname — see {@link groupingKey}.
  */
 export class VercelConnector extends CloudProviderConnector {
   private readonly logger = new Logger(VercelConnector.name);
@@ -329,10 +330,10 @@ export class VercelConnector extends CloudProviderConnector {
   }
 
   /**
-   * Group verified custom domains globally by their apex hostname.
-   * Rows failing {@link isExcludedDomain} or whose apex is not a valid root
-   * domain are skipped; the generated base domain `vercel.app` is hard-rejected
-   * as a grouping key.
+   * Group domains globally by their {@link groupingKey}.
+   * Rows failing {@link isExcludedDomain} or whose key is not a valid root
+   * domain are skipped; the shared base domain `vercel.app` is hard-rejected
+   * as a grouping key (a target must be a real, per-project domain).
    */
   private groupByApex(
     domains: VercelProjectDomain[],
@@ -340,35 +341,43 @@ export class VercelConnector extends CloudProviderConnector {
     const groups = new Map<string, string[]>();
     for (const domain of domains) {
       if (this.isExcludedDomain(domain)) continue;
-      const apex = domain.apexName;
-      if (!apex || apex.toLowerCase() === 'vercel.app') continue;
-      if (!this.isValidApex(apex)) continue;
-      const hosts = groups.get(apex);
+      const key = this.groupingKey(domain);
+      if (!key || key.toLowerCase() === 'vercel.app') continue;
+      if (!this.isValidApex(key)) continue;
+      const hosts = groups.get(key);
       if (hosts) {
         hosts.push(domain.name);
       } else {
-        groups.set(apex, [domain.name]);
+        groups.set(key, [domain.name]);
       }
     }
     return groups;
   }
 
   /**
-   * A domain is excluded from scanning when it is unverified, a wildcard,
-   * a redirect or preview (branch/custom-environment) host, or a generated
-   * `.vercel.app` hostname.
+   * Custom domains group by their apex (one target per registrable domain).
+   * A generated `<project>.vercel.app` host shares the `vercel.app` apex with
+   * every Vercel customer, so it is keyed by its full hostname instead — the
+   * apex would otherwise collapse unrelated projects into one bogus target.
+   */
+  private groupingKey(d: VercelProjectDomain): string {
+    if (/(^|\.)vercel\.app$/i.test(d.name)) return d.name;
+    return d.apexName;
+  }
+
+  /**
+   * A domain is excluded from scanning when it is a wildcard, a redirect, or a
+   * preview (branch/custom-environment) host. Default `<project>.vercel.app`
+   * domains and live-but-unverified custom domains ARE included.
    */
   private isExcludedDomain(d: VercelProjectDomain): boolean {
     const isPresent = (value: unknown): boolean =>
       value !== undefined && value !== null;
     return (
-      !d.verified ||
       d.name.startsWith('*') ||
       isPresent(d.redirect) ||
       isPresent(d.gitBranch) ||
-      isPresent(d.customEnvironmentId) ||
-      /(^|\.)vercel\.app$/i.test(d.name) ||
-      /(^|\.)vercel\.app$/i.test(d.apexName)
+      isPresent(d.customEnvironmentId)
     );
   }
 
@@ -446,7 +455,12 @@ export class VercelConnector extends CloudProviderConnector {
     startedAt: number,
   ): Promise<{ domains: VercelProjectDomain[]; truncated: boolean }> {
     const domains: VercelProjectDomain[] = [];
-    const basePath = `/v9/projects/${encodeURIComponent(projectId)}/domains?production=true&verified=true&redirects=false&limit=${DOMAINS_PAGE_SIZE}&order=DESC`;
+    // `verified=true` is deliberately NOT sent: it gates the TXT ownership
+    // challenge, not live DNS, so it would hide domains still pending
+    // verification without filtering anything unsafe. Redirect, branch and
+    // custom-environment proxies are dropped server-side by `redirects=false`
+    // and client-side by {@link isExcludedDomain}.
+    const basePath = `/v9/projects/${encodeURIComponent(projectId)}/domains?production=true&redirects=false&limit=${DOMAINS_PAGE_SIZE}&order=DESC`;
     let until: string | undefined;
     let lastUntil: string | undefined;
     let pages = 0;

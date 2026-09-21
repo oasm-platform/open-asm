@@ -321,8 +321,9 @@ describe('VercelConnector', () => {
       );
       expect(domainUrls).toHaveLength(2);
       expect(domainUrls[0]).toContain(
-        '/v9/projects/prj_a/domains?production=true&verified=true&redirects=false&limit=100&order=DESC',
+        '/v9/projects/prj_a/domains?production=true&redirects=false&limit=100&order=DESC',
       );
+      expect(domainUrls[0]).not.toContain('verified=true');
       expect(domainUrls[1]).toContain('until=1700000000000');
       expect(result.projects).toBe(1);
       expect(result.domains).toBe(2);
@@ -492,7 +493,7 @@ describe('VercelConnector', () => {
   });
 
   describe('exclusion + apex validation', () => {
-    it('SC-VC-16: .vercel.app (by name or apexName) and wildcard hosts are excluded from grouping', async () => {
+    it('SC-VC-16: default .vercel.app hosts group by full hostname, never the shared apex; wildcards are excluded', async () => {
       const connector = new VercelConnector();
       jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
 
@@ -502,23 +503,36 @@ describe('VercelConnector', () => {
           mockResponse(
             domainsPage([
               domain({ name: 'www.example.com', apexName: 'example.com' }),
-              domain({ name: 'app.vercel.app', apexName: 'example.com' }),
+              domain({ name: 'app.vercel.app', apexName: 'vercel.app' }),
               domain({
                 name: 'preview.myteam.vercel.app',
-                apexName: 'myteam.vercel.app',
+                apexName: 'vercel.app',
               }),
               domain({ name: '*.example.com', apexName: 'example.com' }),
             ]),
           ),
         );
 
-      const result = await connector.syncAssets(makeConfig());
+      const config = makeConfig();
+      const result = await connector.syncAssets(config);
 
       expect(result.projects).toBe(1);
-      expect(result.domains).toBe(1);
+      expect(result.domains).toBe(3);
+
+      const targetValues = config.targetsService.createMultipleTargets.mock.calls.map(
+        (call) =>
+          (call[0] as { targets: Array<{ value: string }> }).targets[0].value,
+      );
+      expect(targetValues).toEqual([
+        'example.com',
+        'app.vercel.app',
+        'preview.myteam.vercel.app',
+      ]);
+      // The shared `vercel.app` apex must NEVER become a target.
+      expect(targetValues).not.toContain('vercel.app');
     });
 
-    it('SC-VC-17: unverified / redirect / branch / custom-environment rows are excluded', async () => {
+    it('SC-VC-17: unverified domains are KEPT; redirect / branch / custom-environment rows are excluded', async () => {
       const connector = new VercelConnector();
       jest.spyOn(connector as any, 'sleep').mockResolvedValue(undefined);
 
@@ -554,7 +568,9 @@ describe('VercelConnector', () => {
 
       const result = await connector.syncAssets(makeConfig());
 
-      expect(result.domains).toBe(1);
+      // www + unverified share the example.com group; only the two other rows
+      // are dropped.
+      expect(result.domains).toBe(2);
     });
 
     it('SC-VC-18: an invalid apex and the bare `vercel.app` grouping key are skipped', async () => {
@@ -569,8 +585,8 @@ describe('VercelConnector', () => {
               domain({ name: 'a.example.com', apexName: 'example.com' }),
               // Not a valid apex (no dot + TLD) → the whole group is skipped.
               domain({ name: 'x.invalid', apexName: 'invalid' }),
-              // Rows whose name passes the exclusion regex but whose apex is the
-              // generated base domain must not create a group.
+              // A non-vercel.app name whose apex IS the shared base domain must
+              // not create a group keyed by `vercel.app`.
               domain({ name: 'notvercel.app', apexName: 'vercel.app' }),
             ]),
           ),
