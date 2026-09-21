@@ -91,7 +91,6 @@ const RESCAN_OVERWRITE_COLUMNS = [
   'cvssScore',
   'epssScore',
   'vprScore',
-  'confidence',
   'cveId',
   'bidId',
   'cweId',

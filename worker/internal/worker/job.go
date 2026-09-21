@@ -383,7 +383,6 @@ func findingToVulnerability(f *connectorpb.Finding) *pb.Vulnerability {
 		IpAddress:        f.GetIp(),
 		PublicationDate:  f.GetPublicationDate(),
 		ModificationDate: f.GetModificationDate(),
-		Confidence:       f.GetConfidence(),
 	}
 }
 

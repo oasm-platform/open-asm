@@ -71,7 +71,6 @@ message Finding {
   repeated string iava = 21;
   google.protobuf.Timestamp publication_date = 22;
   google.protobuf.Timestamp modification_date = 23;
-  double confidence = 24;
   repeated string cea_id = 25;
 }
 
