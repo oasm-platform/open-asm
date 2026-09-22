@@ -140,6 +140,53 @@ describe('JobResultProcessor', () => {
       );
       expect(mockJobRepository.save).not.toHaveBeenCalled();
     });
+
+    // Regression: the failure detail the worker collects (executor error,
+    // adapter error, tail of the container log) is written into `raw`. Throwing
+    // a fixed string discarded it, so the console could only ever show "Job
+    // reported error" and an operator had to shell into the worker to find out
+    // what actually broke.
+    it('should surface the worker failure detail instead of a generic message', async () => {
+      const detail =
+        'fatal: nmap: cannot resolve "nope.invalid"\n--- container logs (last 100 lines) ---\n' +
+        '[runtime] [ERROR] adapter error after 0 result(s) in 3s';
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: true,
+        raw: detail,
+        payload: [],
+      });
+      const lastAttemptBullJob = {
+        ...baseBullJob,
+        attemptsMade: 2,
+      } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+      await expect(processor.process(lastAttemptBullJob)).rejects.toThrow(
+        detail,
+      );
+
+      const [, , error] = mockJobsRegistryService.handleJobError.mock
+        .calls[0] as [unknown, unknown, Error];
+      expect(error.message).toBe(detail);
+    });
+
+    it('should fall back to the generic message when the failure detail is blank', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: true,
+        raw: '   \n  ',
+      });
+      const lastAttemptBullJob = {
+        ...baseBullJob,
+        attemptsMade: 2,
+      } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+      await expect(processor.process(lastAttemptBullJob)).rejects.toThrow(
+        'Job reported error',
+      );
+    });
   });
 
   describe('when processing succeeds for an external tool', () => {

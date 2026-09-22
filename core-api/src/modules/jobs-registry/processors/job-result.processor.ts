@@ -21,6 +21,22 @@ interface CategoryResultData {
   payload?: unknown;
 }
 
+/**
+ * The worker's failure report travels in `raw` when `error` is set. Returns it
+ * trimmed, or undefined when it carries nothing usable (a built-in tool that
+ * failed before producing output), so the caller can fall back to a generic
+ * message instead of persisting an empty error.
+ */
+function normalizeFailureReason(
+  raw: string | null | undefined,
+): string | undefined {
+  const reason = raw?.trim();
+  if (!reason) {
+    return undefined;
+  }
+  return reason;
+}
+
 @Processor(BullMQName.JOB_RESULT, {
   concurrency: 10,
 })
@@ -83,9 +99,16 @@ export class JobResultProcessor extends WorkerHost {
           bucket,
         );
 
-      // Check error flag BEFORE syncing data — avoid wasting work on failed jobs
+      // Check error flag BEFORE syncing data — avoid wasting work on failed jobs.
+      // The worker writes its failure report into `raw` (executor error, adapter
+      // error and the tail of the container log). Surfacing that instead of a
+      // fixed string is the whole difference between an actionable failure and
+      // "Job reported error" — the message lands on the job row AND in the
+      // error-log entry the console renders.
       if (rawResult?.error) {
-        throw new Error('Job reported error');
+        throw new Error(
+          normalizeFailureReason(rawResult.raw) ?? 'Job reported error',
+        );
       }
 
       const raw = rawResult.raw ?? undefined;
