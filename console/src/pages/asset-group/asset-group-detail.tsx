@@ -114,7 +114,7 @@ export default function AssetGroupDetail() {
       icon: Clock,
       label: 'Last run',
       value: lastRun?.createdAt
-        ? `${dayjs(lastRun.createdAt).fromNow()} · ${lastRun.jobRunType} · ${lastRun.status}`
+        ? `${dayjs(lastRun.createdAt).fromNow()} · ${lastRun.jobRunType}`
         : 'Never',
       title: stamp(lastRun?.createdAt),
     },
