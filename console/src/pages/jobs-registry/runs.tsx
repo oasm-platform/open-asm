@@ -1,24 +1,21 @@
-import { Link, useNavigate, useParams } from '@tanstack/react-router';
+import { Link, useParams } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 
+import { CodeBlock } from '@/components/common/code-block';
+import { CopyableValue } from '@/components/common/copyable-value';
 import Page from '@/components/common/page';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
-import { DataTable } from '@/components/ui/data-table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import ToolLogo from '@/components/ui/tool-logo';
 import JobStatusBadge from '@/components/ui/job-status';
+import ToolLogo from '@/components/ui/tool-logo';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { JobListItemDto } from '@/services/apis/gen/queries';
 import {
@@ -34,14 +31,168 @@ import dayjs from 'dayjs';
 import {
   ArrowRight,
   Calendar,
+  ChevronRight,
   Clock,
   MoreHorizontal,
+  TriangleAlert,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+
+const formatDate = (value?: string) =>
+  value && dayjs(value).isValid()
+    ? dayjs(value).format('YYYY-MM-DD HH:mm:ss')
+    : '—';
+
+/** Elapsed time between pickup and completion; only meaningful once completed. */
+const formatDuration = (job: JobListItemDto): string | null => {
+  const pickJobAt = dayjs(job.pickJobAt);
+  const completedAt = dayjs(job.completedAt);
+
+  if (
+    job.status !== JobStatus.completed ||
+    !pickJobAt.isValid() ||
+    !completedAt.isValid()
+  ) {
+    return null;
+  }
+
+  const totalSeconds = completedAt.diff(pickJobAt, 'second');
+  if (totalSeconds < 0) return null;
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${seconds}s`);
+
+  return parts.join(' ');
+};
+
+const getTitle = (row: JobListItemDto) =>
+  row.assetService?.value || row.asset?.value || row.id;
+
+const stripTrailingNewline = (value: unknown) =>
+  String(value ?? '').replace(/\n$/, '');
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <div className="min-w-0 text-sm">{children}</div>
+    </div>
+  );
+}
+
+/** Inline detail panel revealed by expanding a job row. */
+function JobDetailPanel({ job }: { job: JobListItemDto }) {
+  const duration = formatDuration(job);
+  const hasConfig = !!job.config && Object.keys(job.config).length > 0;
+
+  return (
+    <div className="space-y-5 border-l-2 border-primary/40 bg-muted/30 px-4 py-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Job ID">
+          <CopyableValue value={job.id} />
+        </Field>
+        <Field label="Worker ID">
+          {job.workerId ? (
+            <CopyableValue value={job.workerId} />
+          ) : (
+            <span className="text-muted-foreground">Not picked up yet</span>
+          )}
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Status">
+          <JobStatusBadge status={job.status as JobStatus} />
+        </Field>
+        <Field label="Category">
+          <span className="capitalize">{job.category.replace(/_/g, ' ')}</span>
+        </Field>
+        <Field label="Priority">{job.priority ?? '—'}</Field>
+        <Field label="Retries">{job.retryCount ?? 0}</Field>
+        <Field label="Created">{formatDate(job.createdAt)}</Field>
+        <Field label="Picked up">{formatDate(job.pickJobAt)}</Field>
+        <Field label="Completed">{formatDate(job.completedAt)}</Field>
+        <Field label="Duration">{duration ?? '—'}</Field>
+        <Field label="Asset">
+          {job.asset?.id ? (
+            <Link
+              to="/assets/$id"
+              params={{ id: job.asset.id }}
+              className="hover:underline"
+            >
+              {job.asset.value}
+            </Link>
+          ) : (
+            (job.asset?.value ?? '—')
+          )}
+        </Field>
+        <Field label="Asset service">
+          {job.assetServiceId ? (
+            <Link
+              to="/assets/$id"
+              params={{ id: job.assetServiceId }}
+              className="hover:underline"
+            >
+              {job.assetService?.value ?? job.assetServiceId}
+            </Link>
+          ) : (
+            '—'
+          )}
+        </Field>
+      </div>
+
+      {job.command && <CodeBlock language="command" value={job.command} />}
+
+      {hasConfig && (
+        <CodeBlock
+          language="config (secrets masked)"
+          value={JSON.stringify(job.config, null, 2)}
+        />
+      )}
+
+      {!!job.errorLogs?.length && (
+        <div className="space-y-2">
+          <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-destructive">
+            <TriangleAlert className="h-3.5 w-3.5" />
+            Error logs ({job.errorLogs.length})
+          </span>
+          {job.errorLogs.map((errorLog, index) => (
+            <div
+              key={errorLog.id ?? index}
+              className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3"
+            >
+              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-background/60 p-2 font-mono text-sm text-destructive">
+                {stripTrailingNewline(errorLog.logMessage)}
+              </pre>
+              {!!errorLog.payload && (
+                <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-background/60 p-2 font-mono text-xs text-muted-foreground">
+                  {stripTrailingNewline(errorLog.payload)}
+                </pre>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams({ strict: false });
-  const [jobError, setJobError] = useState<JobListItemDto | null>();
   const queryClient = useQueryClient();
 
   const { mutate: deleteJobMutate } = useJobsRegistryControllerDeleteJob();
@@ -101,24 +252,28 @@ export default function Runs() {
     },
   );
 
-  const getTitle = (row: JobListItemDto) => {
-    const value = row?.assetService
-      ? `${row.assetService.value}`
-      : row?.asset?.value;
-    return value;
-  };
-
   const columns: ColumnDef<JobListItemDto>[] = [
     {
       accessorKey: 'status',
       cell: ({ row }) => {
+        const errorCount = row.original.errorLogs?.length ?? 0;
         return (
           <div className="flex items-center gap-2">
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
             <JobStatusBadge
               onlyIcon
               status={row.original.status as JobStatus}
             />
             <span className="font-medium">{getTitle(row.original)}</span>
+            <Badge variant="outline" className="capitalize">
+              {row.original.category.replace(/_/g, ' ')}
+            </Badge>
+            {errorCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-destructive">
+                <TriangleAlert className="h-3.5 w-3.5" />
+                {errorCount}
+              </span>
+            )}
           </div>
         );
       },
@@ -126,12 +281,13 @@ export default function Runs() {
     {
       accessorKey: 'tool',
       cell: ({ row }) => (
-        <div className="min-h-[60px] flex items-center">
+        <div className="flex items-center">
           {row.original.tool ? (
             <Link
               to="/tools/$id"
               params={{ id: row.original.tool.id ?? '' }}
               className="flex items-center gap-2"
+              onClick={(e) => e.stopPropagation()}
             >
               <ToolLogo
                 name={row.original.tool.name ?? ''}
@@ -139,7 +295,7 @@ export default function Runs() {
                 size={30}
                 className="rounded-full"
               />
-              <span className="capitalize font-bold">
+              <span className="font-bold capitalize">
                 {row.original.tool.name}
               </span>
             </Link>
@@ -152,47 +308,17 @@ export default function Runs() {
     {
       accessorKey: 'createdAt',
       cell: ({ row }) => {
-        const updatedAt = dayjs(row.original.updatedAt);
-        const pickJobAt = dayjs(row.original.pickJobAt);
-        const completedAt = dayjs(row.original.completedAt);
-
-        // Calculate duration only if all dates are valid and job is completed
-        const isValidDates =
-          pickJobAt.isValid() &&
-          completedAt.isValid() &&
-          row.original.status === JobStatus.completed;
-
-        let durationDisplay = null;
-
-        if (isValidDates) {
-          const totalSeconds = completedAt.diff(pickJobAt, 'second');
-
-          // Only display if duration is positive
-          if (totalSeconds >= 0) {
-            const hours = Math.floor(totalSeconds / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            const seconds = totalSeconds % 60;
-
-            const parts = [];
-            if (hours > 0) parts.push(`${hours}h`);
-            if (minutes > 0) parts.push(`${minutes}m`);
-            parts.push(`${seconds}s`);
-
-            durationDisplay = parts.join(' ');
-          }
-        }
-
+        const duration = formatDuration(row.original);
         return (
-          <div className="text-sm text-muted-foreground flex flex-col gap-2">
-            <span className="flex gap-2 items-center">
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+            <span className="flex items-center gap-2">
               <Calendar size={20} />
-              {updatedAt.format('YYYY-MM-DD HH:mm:ss')}
+              {dayjs(row.original.updatedAt).format('YYYY-MM-DD HH:mm:ss')}
             </span>
-
-            {durationDisplay && (
-              <span className="flex gap-2 items-center">
+            {duration && (
+              <span className="flex items-center gap-2">
                 <Clock size={20} />
-                {durationDisplay}
+                {duration}
               </span>
             )}
           </div>
@@ -206,12 +332,21 @@ export default function Runs() {
           row.original.status === JobStatus.pending ||
           row.original.status === JobStatus.in_progress;
 
+        const refresh = () => {
+          queryClient.invalidateQueries({
+            queryKey: getJobsRegistryControllerGetJobHistoryDetailQueryKey(
+              jobHistoryId || '',
+            ),
+          });
+          queryClient.invalidateQueries({ queryKey: paginatedJobsQueryKey });
+        };
+
         return (
           <div className="flex justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="h-8 w-8 p-0 flex items-center justify-center"
+                  className="flex h-8 w-8 items-center justify-center p-0"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span className="sr-only">Open menu</span>
@@ -227,22 +362,7 @@ export default function Runs() {
                     title="Cancel Job"
                     description="Are you sure you want to cancel this job?"
                     onConfirm={() =>
-                      cancelJobMutate(
-                        { id: row.original.id },
-                        {
-                          onSuccess: () => {
-                            queryClient.invalidateQueries({
-                              queryKey:
-                                getJobsRegistryControllerGetJobHistoryDetailQueryKey(
-                                  jobHistoryId || '',
-                                ),
-                            });
-                            queryClient.invalidateQueries({
-                              queryKey: paginatedJobsQueryKey,
-                            });
-                          },
-                        },
-                      )
+                      cancelJobMutate({ id: row.original.id }, { onSuccess: refresh })
                     }
                     trigger={
                       <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -255,22 +375,7 @@ export default function Runs() {
                   title="Delete Job"
                   description="Are you sure you want to delete this job?"
                   onConfirm={() =>
-                    deleteJobMutate(
-                      { id: row.original.id },
-                      {
-                        onSuccess: () => {
-                          queryClient.invalidateQueries({
-                            queryKey:
-                              getJobsRegistryControllerGetJobHistoryDetailQueryKey(
-                                jobHistoryId || '',
-                              ),
-                          });
-                          queryClient.invalidateQueries({
-                            queryKey: paginatedJobsQueryKey,
-                          });
-                        },
-                      },
-                    )
+                    deleteJobMutate({ id: row.original.id }, { onSuccess: refresh })
                   }
                   trigger={
                     <DropdownMenuItem
@@ -289,7 +394,6 @@ export default function Runs() {
     },
   ];
 
-  const navigate = useNavigate();
   return (
     <Page
       permission="job.read"
@@ -303,9 +407,9 @@ export default function Runs() {
       {/* Tools Section */}
       {!!jobHistoryDetail?.tools?.length && (
         <Card className="mb-6 py-2">
-          <CardContent className="px-2 md:px-4 py-2">
+          <CardContent className="px-2 py-2 md:px-4">
             <CardTitle className="mb-3">Tools</CardTitle>
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex flex-wrap items-center gap-4">
               {jobHistoryDetail.tools.map((tool, index) => (
                 <div key={tool.id} className="flex items-center gap-2">
                   <Link
@@ -319,7 +423,7 @@ export default function Runs() {
                       size={40}
                       className="rounded-full border"
                     />
-                    <span className="font-medium text-sm">{tool.name}</span>
+                    <span className="text-sm font-medium">{tool.name}</span>
                     {tool.status && (
                       <JobStatusBadge
                         status={tool.status}
@@ -329,10 +433,7 @@ export default function Runs() {
                     )}
                   </Link>
                   {index < jobHistoryDetail.tools.length - 1 && (
-                    <ArrowRight
-                      className="text-muted-foreground"
-                      size={16}
-                    />
+                    <ArrowRight className="text-muted-foreground" size={16} />
                   )}
                 </div>
               ))}
@@ -341,76 +442,22 @@ export default function Runs() {
         </Card>
       )}
 
-      {!!jobsError && (
-        <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
-          Failed to load jobs. Please try again.
-        </div>
-      )}
-
-      <DataTable
+      <CollapsibleDataTable
         isShowHeader={false}
+        rowClassName="group"
         columns={columns}
         data={paginatedJobsData?.data || []}
         isLoading={isLoadingJobs}
-        showColumnVisibility={true}
-        showPagination={true}
         page={paginatedJobsData?.page ?? tableParams.page}
         pageSize={paginatedJobsData?.limit ?? tableParams.pageSize}
         totalItems={paginatedJobsData?.total ?? 0}
-        emptyMessage="No jobs found"
+        emptyMessage={
+          jobsError ? 'Failed to load jobs. Please try again.' : 'No jobs found'
+        }
         onPageChange={tableHandlers.setPage}
         onPageSizeChange={tableHandlers.setPageSize}
-        onRowClick={(row) => {
-          if (row.status === JobStatus.failed) {
-            setJobError(row);
-            return;
-          }
-          if (row.assetServiceId) {
-            navigate({ to: `/assets/${row.assetServiceId}` });
-          } else {
-            navigate({ to: '/assets', search: { filter: row?.asset?.value } });
-          }
-        }}
+        collapsibleElement={(job) => <JobDetailPanel job={job} />}
       />
-      <Dialog open={!!jobError} onOpenChange={() => setJobError(null)}>
-        <DialogContent className="max-h-[80vh] flex flex-col max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{jobError && getTitle(jobError)}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto pr-2 -mr-2 space-y-3">
-            {jobError?.errorLogs?.map((errorLog, index) => (
-              <div
-                className="rounded-lg border bg-muted/50 p-3"
-                key={errorLog.id}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Error {index + 1}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1">
-                      Payload
-                    </span>
-                    <pre className="text-sm font-mono bg-background rounded p-2 overflow-x-auto">
-                      {String(errorLog.payload).replace(/\n$/, '')}
-                    </pre>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1">
-                      Message
-                    </span>
-                    <pre className="text-sm font-mono bg-background rounded p-2 overflow-x-auto text-destructive">
-                      {String(errorLog.logMessage).replace(/\n$/, '')}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
     </Page>
   );
 }

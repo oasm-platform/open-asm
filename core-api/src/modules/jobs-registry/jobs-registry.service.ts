@@ -36,6 +36,10 @@ import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
+import {
+  getSensitiveFields,
+  maskProfile,
+} from '../tools/validators/tool-config-profiles.crypto';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
@@ -154,7 +158,37 @@ export class JobsRegistryService {
 
     const [data, total] = await qb.getManyAndCount();
 
+    // `config` is persisted already-decrypted (see resolveConfigForJob), so it
+    // must be masked before it leaves the API. The sensitive-name heuristic runs
+    // over both the connector schema and the actual keys, so a connector without
+    // a resolvable schema still masks instead of leaking plaintext.
+    for (const job of data) {
+      job.config = this.maskJobConfig(job);
+    }
+
     return getManyResponse<JobListItemDto>({ query, data, total });
+  }
+
+  /** Returns the job config with every secret replaced by a `****…` mask. */
+  private maskJobConfig(job: Job): Record<string, unknown> | null {
+    const config = job.config;
+    if (!config || typeof config !== 'object') return config ?? null;
+
+    const entry = job.tool
+      ? this.connectorRegistry.getConnector(job.tool.name)
+      : null;
+    const schemaFields = getSensitiveFields(
+      entry?.configSchema ?? entry?.inputsSchema,
+    );
+    // Synthesize a schema from the real keys: isSensitiveField() only needs the
+    // property name plus a truthy object value to apply the name heuristic.
+    const nameFields = getSensitiveFields({
+      properties: Object.fromEntries(
+        Object.keys(config).map((key) => [key, {}]),
+      ),
+    });
+
+    return maskProfile(config, [...new Set([...schemaFields, ...nameFields])]);
   }
 
   /**

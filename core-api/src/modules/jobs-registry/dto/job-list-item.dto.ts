@@ -63,6 +63,29 @@ export class JobListItemDto {
   @ApiProperty({ required: false })
   assetServiceId?: string;
 
+  @ApiProperty({
+    required: false,
+    description: 'JobPriority: 0 = critical, 4 = background',
+  })
+  priority?: number;
+
+  @ApiProperty({ required: false })
+  workerId?: string;
+
+  @ApiProperty({ required: false })
+  retryCount?: number;
+
+  /** Fully bound shell command; empty for connector jobs. */
+  @ApiProperty({ required: false })
+  command?: string;
+
+  /**
+   * Merged config the worker received, with every secret masked (`****…`).
+   * Never expose the raw column: it is persisted decrypted.
+   */
+  @ApiProperty({ required: false, type: Object })
+  config?: Record<string, unknown>;
+
   @ApiProperty({ type: () => JobListItemToolDto })
   tool?: JobListItemToolDto;
 

@@ -809,6 +809,65 @@ describe('JobsRegistryService', () => {
         'target',
       );
     });
+
+    it('should mask secrets in the returned job config', async () => {
+      mockJobRepository.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'job-1',
+            tool: { name: 'acunetix' },
+            config: {
+              url: 'https://acunetix.local',
+              apiKey: 'super-secret-key',
+            },
+          },
+        ],
+        1,
+      ]);
+      mockConnectorRegistryService.getConnector.mockReturnValue({
+        configSchema: {
+          properties: { apiKey: { type: 'string', 'ui:widget': 'password' } },
+        },
+      });
+
+      const result = await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(result.data[0].config).toEqual({
+        url: 'https://acunetix.local',
+        apiKey: '****-key',
+      });
+    });
+
+    it('should still mask secret-named config keys when no connector schema resolves', async () => {
+      mockJobRepository.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'job-2',
+            tool: { name: 'unknown-connector' },
+            config: { url: 'https://x.local', password: 'hunter2' },
+          },
+        ],
+        1,
+      ]);
+      mockConnectorRegistryService.getConnector.mockReturnValue(null);
+
+      const result = await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(result.data[0].config).toEqual({
+        url: 'https://x.local',
+        password: '****ter2',
+      });
+    });
   });
 
   describe('getManyJobHistories', () => {

@@ -782,6 +782,8 @@ export const JobListItemDtoCategory = {
   url_discovery: 'url_discovery',
 } as const;
 
+export type JobListItemDtoConfig = { [key: string]: unknown };
+
 export type JobListItemDto = {
   id: string;
   status: JobListItemDtoStatus;
@@ -791,6 +793,12 @@ export type JobListItemDto = {
   pickJobAt?: string;
   completedAt?: string;
   assetServiceId?: string;
+  /** JobPriority: 0 = critical, 4 = background */
+  priority?: number;
+  workerId?: string;
+  retryCount?: number;
+  command?: string;
+  config?: JobListItemDtoConfig;
   tool: JobListItemToolDto;
   asset: JobListItemAssetDto;
   assetService: AssetService;
