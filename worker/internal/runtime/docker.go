@@ -34,6 +34,9 @@ type DockerRuntime struct {
 	connectorAddr  string // resolved dial address containers use to reach the worker's connector gRPC server
 	connectorToken string // shared secret for connector authentication
 	logger         Logger
+	// pullProgress, when set, receives image pull progress: jobID, image,
+	// fraction downloaded (negative = indeterminate) and a terminal flag.
+	pullProgress func(jobID, image string, pulled float64, done bool)
 }
 
 // Logger receives DockerRuntime lifecycle log lines (image pull, create, start,
@@ -44,9 +47,22 @@ type Logger interface {
 	Warning(msg string, args ...any)
 }
 
-// SetLogger wires a lifecycle logger. Nil disables logging (safe).
+// ProgressLogger is the optional Logger extension for pull progress. A logger
+// that does not implement it (tests, plain loggers) simply gets no progress
+// reporting — pull still works, only the bar is missing.
+type ProgressLogger interface {
+	ImagePullProgress(jobID, image string, pulled float64, done bool)
+}
+
+// SetLogger wires a lifecycle logger. Nil disables logging (safe). A logger
+// implementing ProgressLogger additionally receives image pull progress.
 func (d *DockerRuntime) SetLogger(l Logger) {
 	d.logger = l
+	if pl, ok := l.(ProgressLogger); ok {
+		d.pullProgress = pl.ImagePullProgress
+	} else {
+		d.pullProgress = nil
+	}
 }
 
 func (d *DockerRuntime) logInfo(msg string, args ...any) {
@@ -59,6 +75,141 @@ func (d *DockerRuntime) logWarning(msg string, args ...any) {
 	if d.logger != nil {
 		d.logger.Warning(msg, args...)
 	}
+}
+
+// Image pull progress cadence. The Docker pull stream emits a frame per layer
+// per read, which is far more than a progress bar or a log needs; two updates
+// per second with a 1%-step floor keeps the display responsive without
+// flooding the TUI event channel.
+const (
+	pullProgressInterval = 500 * time.Millisecond
+	pullProgressStep     = 0.01
+)
+
+// pullFrame is one JSON object from the Docker pull stream. Progress fields
+// are per-layer byte counts; `error` marks a failed pull.
+type pullFrame struct {
+	Status         string `json:"status"`
+	ID             string `json:"id"`
+	Error          string `json:"error"`
+	ProgressDetail struct {
+		Current int64 `json:"current"`
+		Total   int64 `json:"total"`
+	} `json:"progressDetail"`
+}
+
+// pullAccumulator turns a stream of per-layer progress frames into one
+// monotonic fraction for the whole pull.
+//
+// Layering maths: every frame carries only its own layer's bytes, but layers
+// are downloaded in parallel, so naive summing double-counts and per-frame
+// percentages jump backwards. Instead each layer's HIGH-WATER mark is kept in
+// the map and the fraction is `sum(current) / sum(total)`. Total bytes only
+// grow as new layers appear, which makes the fraction monotonic in practice.
+type pullAccumulator struct {
+	layers  map[string][2]int64 // layer id -> {current high-water, total}
+	started bool
+}
+
+func newPullAccumulator() *pullAccumulator {
+	return &pullAccumulator{layers: map[string][2]int64{}}
+}
+
+// add records one frame. Fetching is gated until the first byte-progress
+// frame: an image whose layers are all cached reports "Download complete"
+// (with no progressDetail) for every layer, which must not be mistaken for a
+// real download.
+func (a *pullAccumulator) add(f pullFrame) {
+	if f.ProgressDetail.Total <= 0 {
+		return
+	}
+	cur, total := f.ProgressDetail.Current, f.ProgressDetail.Total
+	prev := a.layers[f.ID]
+	if cur > prev[0] {
+		prev[0] = cur
+	}
+	if total > prev[1] {
+		prev[1] = total
+	}
+	a.layers[f.ID] = prev
+	a.started = true
+}
+
+// fraction reports bytes downloaded over bytes known.
+func (a *pullAccumulator) fraction() (float64, bool) {
+	if !a.started {
+		return 0, false
+	}
+	var current, total int64
+	for _, l := range a.layers {
+		current += l[0]
+		total += l[1]
+	}
+	if total <= 0 {
+		return 0, false
+	}
+	got := float64(current) / float64(total)
+	if got > 1 {
+		got = 1
+	}
+	return got, true
+}
+
+// consumePull drains the pull stream, reporting progress through the wired
+// logger. It returns the first frame-level error, if any; the caller decides
+// how that interacts with the subsequent image inspect.
+//
+// Reporting is throttled: a tick is emitted when the fraction moves by at
+// least pullProgressStep, when pullProgressInterval has passed, and always on
+// completion. A frame-level error is reported as a terminal tick followed by a
+// warning line — the pull may still have succeeded for other layers.
+func (d *DockerRuntime) consumePull(ctx context.Context, r io.Reader, spec JobSpec) error {
+	acc := newPullAccumulator()
+	var firstErr error
+	var emitted float64
+	lastSent := time.Now()
+
+	report := func(done bool) {
+		if d.pullProgress == nil || !acc.started {
+			return
+		}
+		got, ok := acc.fraction()
+		if !ok && !done {
+			return
+		}
+		d.pullProgress(spec.JobID, spec.Image, got, done)
+	}
+
+	dec := json.NewDecoder(r)
+	for {
+		if ctx.Err() != nil {
+			break
+		}
+		var frame pullFrame
+		if err := dec.Decode(&frame); err != nil {
+			if err != io.EOF && firstErr == nil {
+				firstErr = fmt.Errorf("read pull progress: %w", err)
+			}
+			break
+		}
+		if frame.Error != "" && firstErr == nil {
+			firstErr = fmt.Errorf("%s", frame.Error)
+		}
+		acc.add(frame)
+
+		got, ok := acc.fraction()
+		if ok && (got-emitted >= pullProgressStep || time.Since(lastSent) >= pullProgressInterval) {
+			report(false)
+			emitted = got
+			lastSent = time.Now()
+		}
+	}
+	report(true)
+
+	if firstErr != nil {
+		d.logWarning("docker: image pull reported an error: %s: %v", spec.Image, firstErr)
+	}
+	return firstErr
 }
 
 // resolveHost resolves the Docker engine endpoint with precedence:
@@ -454,7 +605,12 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		if err != nil {
 			return Handle{}, fmt.Errorf("image pull %s: %w", spec.Image, err)
 		}
-		_, _ = io.Copy(io.Discard, pullReader)
+		// Stream the pull instead of discarding it: the JSON progress frames
+		// carry per-layer byte counts, which is the only way to tell a slow
+		// download from a stalled one. Consuming the stream is also required —
+		// the pull completes only while the reader is drained.
+		d.logInfo("docker: pulling image: %s", spec.Image)
+		d.consumePull(ctx, pullReader, spec)
 		pullReader.Close()
 		d.logInfo("docker: image pull done: %s", spec.Image)
 		inspect, _, _ = d.cli.ImageInspectWithRaw(ctx, spec.Image)

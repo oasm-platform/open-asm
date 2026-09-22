@@ -28,16 +28,20 @@ type layout struct {
 	bottomLines int
 	leftW       int
 	rightW      int
+	// progressLines is the image-pull progress section above the bottom row.
+	// 0 when nothing is pulling, so the section costs no space at rest.
+	progressLines int
 }
 
-func computeLayout(w, h int) layout {
+func computeLayout(w, h int, progressLines int) layout {
 	l := layout{
-		headerLines: 3,
-		gapLines:    1,
-		topLines:    10,
-		statusBar:   1,
+		headerLines:   3,
+		gapLines:      1,
+		topLines:      10,
+		statusBar:     1,
+		progressLines: progressLines,
 	}
-	l.bottomLines = h - l.headerLines - l.gapLines*2 - l.topLines - l.statusBar
+	l.bottomLines = h - l.headerLines - l.gapLines*2 - l.topLines - l.statusBar - l.progressLines
 	if l.bottomLines < 4 {
 		l.bottomLines = 4
 	}
@@ -77,6 +81,7 @@ type Model struct {
 	outputVP      outputModel
 	eventsList    eventsModel
 	statusBar     statusBarModel
+	pulls         progressModel
 }
 
 type activityEntry struct {
@@ -99,6 +104,7 @@ func NewModel(cfg *config.Config, events <-chan worker.TuiEvent) Model {
 	m.outputVP = newOutputModel()
 	m.eventsList = newEventsModel()
 	m.statusBar = newStatusBarModel()
+	m.pulls = newProgressModel()
 
 	return m
 }
@@ -224,6 +230,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			level:     level,
 			timestamp: msg.completedAt,
 		})
+		// A job that failed while its image was still pulling should leave the
+		// failed pull on screen instead of hiding it with the settle TTL. A
+		// successful job's row is already settled by the pull's done tick.
+		if !msg.success {
+			m.pulls.markFailed(msg.id)
+		}
 	case sessionCreatedMsg:
 		m.sessionsTable.handleSessionCreated(msg)
 		m.eventsList.addEvent(activityEntry{
@@ -267,6 +279,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case systemMetricsMsg:
 		m.headerComp.update(msg)
 		cmds = append(cmds, collectSystemMetrics())
+	case imagePullMsg:
+		m.pulls.prune()
+		m.pulls.update(msg.id, msg.image, msg.pulled, msg.done)
 	}
 
 	cmds = append(cmds, waitForEvent(m.events))
@@ -278,7 +293,7 @@ func (m *Model) resize() {
 		return
 	}
 
-	l := computeLayout(m.width, m.height)
+	l := computeLayout(m.width, m.height, m.pulls.height())
 
 	m.sessionsTable.table.SetHeight(l.topLines - 2)
 	m.sessionsTable.table.SetWidth(l.leftW - 4)
@@ -287,6 +302,7 @@ func (m *Model) resize() {
 	m.jobsTable.tableWidth = l.rightW
 	m.outputVP.setDimensions(l.leftW-2, l.bottomLines-2)
 	m.eventsList.setDimensions(l.rightW-2, l.bottomLines-2)
+	m.pulls.setWidth(m.width - pullLabelWidth - 4)
 }
 
 func (m Model) View() tea.View {
@@ -297,7 +313,7 @@ func (m Model) View() tea.View {
 		return tea.NewView(fmt.Sprintf("Terminal too small (%dx%d). Need 80x20.", m.width, m.height))
 	}
 
-	l := computeLayout(m.width, m.height)
+	l := computeLayout(m.width, m.height, m.pulls.height())
 
 	bordered := func(content string, w, h int) string {
 		innerH := h - 2
@@ -335,13 +351,14 @@ func (m Model) View() tea.View {
 	// Status bar
 	statusBar := m.statusBar.View(m.width)
 
-	// Assemble
-	return tea.NewView(strings.Join([]string{
-		header,
-		top,
-		bottom,
-		statusBar,
-	}, "\n"))
+	// Assemble. The image-pull section sits directly above the bottom row and
+	// collapses to nothing when no pull is running.
+	parts := []string{header, top}
+	if m.pulls.active() {
+		parts = append(parts, m.pulls.View())
+	}
+	parts = append(parts, bottom, statusBar)
+	return tea.NewView(strings.Join(parts, "\n"))
 }
 
 func waitForEvent(events <-chan worker.TuiEvent) tea.Cmd {
@@ -394,6 +411,8 @@ func eventToMsg(event worker.TuiEvent) tea.Msg {
 		return sessionClosedMsg{id: event.SessionID}
 	case worker.EventSessionOutput:
 		return sessionOutputMsg{id: event.SessionID, line: event.SessionOutput, stream: event.SessionStream}
+	case worker.EventImagePullProgress:
+		return imagePullMsg{id: event.JobID, image: event.Image, pulled: event.Pulled, done: event.Done}
 	}
 	return nil
 }

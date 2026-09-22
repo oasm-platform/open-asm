@@ -70,6 +70,13 @@ const (
 	tailMaxBytes = 32 * 1024
 )
 
+// tailGrace bounds the final log drain after the result stream closes. The
+// connector's terminal lines ("execution done", the adapter error) are written
+// to stderr just before Done, and Docker delivers them slightly after the
+// result stream ends; without this grace the failure payload would miss exactly
+// the lines that explain the failure. A var so tests can shrink it.
+var tailGrace = 150 * time.Millisecond
+
 // tailBuffer is a bounded ring buffer of container log lines. append drops the
 // oldest lines once the budget (100 lines / 32KB) is exceeded.
 type tailBuffer struct {
@@ -505,7 +512,10 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	for attempt := 0; attempt < 2; attempt++ {
 		execID, err = mgr.Submit(ctx, spec)
 		for err != nil && errors.Is(err, execution.ErrPoolExhausted) {
-			log.Info("[%s] Pool at replica cap for image %s, waiting for an idle pooled container (retry in %s)", job.Id, spec.Image, poolRetryDelay)
+			// Quota pressure is normal queueing, not an incident: the job stays
+			// queued in the TUI jobs table and retries silently. Logging it per
+			// retry produced one line every 2s per waiting job, which drowned
+			// the activity feed for zero added information.
 			select {
 			case <-ctx.Done():
 				// The wait outlived the job context — finalize as failed so Core
@@ -831,6 +841,31 @@ drain:
 	// OnConnectorDown already ran.
 	proxy.OnConnectorDown(execID)
 
+	// Drain the connector's last log lines before finalizing: the terminal
+	// trace (execution identity, progress, the adapter error) is written to
+	// stderr immediately before Done and reaches Docker just after the result
+	// stream closes. Bounded by tailGrace; a pooled container whose log stream
+	// never ends costs that grace once per job.
+	if tail != nil && logsCh != nil {
+		grace := time.NewTimer(tailGrace)
+		graceC := grace.C
+	finalTail:
+		for {
+			select {
+			case chunk, ok := <-logsCh:
+				if !ok {
+					break finalTail
+				}
+				for _, line := range splitLogChunk(chunk) {
+					tail.append(line)
+				}
+			case <-graceC:
+				break finalTail
+			}
+		}
+		grace.Stop()
+	}
+
 	// Check if connector reported an error via Done message.
 	errMsg, hasError := proxy.PopError(execID)
 	hadDone := proxy.PopDone(execID)
@@ -890,8 +925,20 @@ drain:
 			}
 		}
 	case hasError && errMsg != "":
-		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, errMsg)
+		// Attach the connector's own container log tail to the failure. Those
+		// lines are the SDK's tracing output (execution/job identity, inputs,
+		// progress, error) and they are the only record of WHY the job failed
+		// once the container is gone — without this the platform stores the
+		// Done string alone and the evidence never leaves the worker.
+		failMsg := errMsg
+		if tail != nil && tail.String() != "" {
+			failMsg += "\n--- container logs (last " + fmt.Sprintf("%d lines) ---", tailMaxLines) + "\n" + tail.String()
+		}
+		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, failMsg)
 		log.Warning("[%s] Connector job failed: execID=%s error=%s", entry.jobID, execID, errMsg)
+		if tail != nil && tail.String() != "" {
+			log.Warning("[%s] container logs for failed job %s (last %d lines):\n%s", entry.jobID, execID, tailMaxLines, tail.String())
+		}
 	case !hadDone:
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, "connector disconnected before Done")
 		log.Warning("[%s] Connector disconnected without Done: execID=%s", entry.jobID, execID)

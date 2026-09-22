@@ -80,14 +80,15 @@ export default function AssetGroupWorkflow({
   const removeWorkflowsMutation = useAssetGroupControllerRemoveManyWorkflows();
 
   // Tools rendered in the group workflow: providers + pipeline-capable
-  // categories (vulnerabilities, url_discovery)
+  // categories (vulnerabilities, url_discovery, ports_scanner)
   const toolProviders = useMemo(
     () =>
       workspaceToolsInstalled?.data?.filter(
         (tool) =>
           tool.type === ToolsControllerGetManyToolsType.provider ||
           tool.category === ToolCategory.vulnerabilities ||
-          tool.category === ToolCategory.url_discovery,
+          tool.category === ToolCategory.url_discovery ||
+          tool.category === ToolCategory.ports_scanner,
       ) || [],
     [workspaceToolsInstalled?.data],
   );

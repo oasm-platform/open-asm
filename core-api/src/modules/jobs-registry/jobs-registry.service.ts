@@ -339,9 +339,6 @@ export class JobsRegistryService {
         jobsToInsert.push(job);
       }
     } else {
-      // Cannot query assets for PORTS_SCANNER with assetIds
-      if (tool.category === ToolCategory.PORTS_SCANNER) assetIds = [];
-
       // For all other categories, use regular assets
       const assets = await this.findAssetsForJob(
         targetIds,
