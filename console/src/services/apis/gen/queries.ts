@@ -145,6 +145,7 @@ export const TargetSource = {
   MANUAL: 'MANUAL',
   cloudflare: 'cloudflare',
   aws: 'aws',
+  vercel: 'vercel',
   INTERNAL_NETWORK: 'INTERNAL_NETWORK',
 } as const;
 
@@ -1704,6 +1705,13 @@ export type GetManyWorkerInstanceDto = {
   pageCount: number;
 };
 
+export type WorkerToolJobDto = {
+  /** Asset value the job targets (host, domain, IP). Absent when the job runs against an asset service or a whole asset group. */
+  target?: string;
+  /** Service value the job targets, when the job was queued for a specific service. */
+  service?: string;
+};
+
 export type WorkerToolDtoType =
   (typeof WorkerToolDtoType)[keyof typeof WorkerToolDtoType];
 
@@ -1711,13 +1719,6 @@ export const WorkerToolDtoType = {
   builtin: 'builtin',
   connector: 'connector',
 } as const;
-
-export type WorkerToolJobDto = {
-  /** Asset value the job targets (host, domain, IP). Absent when the job runs against an asset service or a whole asset group. */
-  target?: string;
-  /** Service value the job targets, when the job was queued for a specific service. */
-  service?: string;
-};
 
 export type WorkerToolDto = {
   /** Tool id. Built-in tools use the Tool uuid; connectors use the manifest slug. */

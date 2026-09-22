@@ -22,6 +22,13 @@ describe('toTargetSourceDto', () => {
     });
   });
 
+  it('maps the vercel source to the Vercel label and icon', () => {
+    expect(toTargetSourceDto('vercel')).toEqual({
+      source: 'Vercel',
+      icon: '/static/images/integrations/vercel.svg',
+    });
+  });
+
   it('maps INTERNAL_NETWORK to the Internal Network label with no icon', () => {
     expect(toTargetSourceDto('INTERNAL_NETWORK')).toEqual({
       source: 'Internal Network',

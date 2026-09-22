@@ -67,6 +67,53 @@ export function mergeDnsRecords(
   return merged;
 }
 
+/**
+ * Scanner-derived vulnerability columns refreshed from the incoming finding on
+ * a fingerprint conflict. `firstDetectedDate`, `isArchived` and the `analyze*`
+ * fields are deliberately excluded so a re-scan cannot reset provenance,
+ * triage, or AI-analysis state.
+ */
+const RESCAN_OVERWRITE_COLUMNS = [
+  'updatedAt',
+  'lastSeenDate',
+  'name',
+  'description',
+  'synopsis',
+  'severity',
+  'tags',
+  'references',
+  'authors',
+  'affectedUrl',
+  'ipAddress',
+  'host',
+  'ports',
+  'cvssMetric',
+  'cvssScore',
+  'epssScore',
+  'vprScore',
+  'cveId',
+  'bidId',
+  'cweId',
+  'ceaId',
+  'iava',
+  'cveUrl',
+  'cweUrl',
+  'solution',
+  'extractorName',
+  'extractedResults',
+  'publicationDate',
+  'modificationDate',
+  'filePath',
+] as const;
+
+/**
+ * Columns an incoming finding may omit. `updatedAt`/`lastSeenDate` are always
+ * stamped by the ingest, so only the optionals need preserving.
+ */
+const RESCAN_PRESERVE_COLUMNS = RESCAN_OVERWRITE_COLUMNS.filter(
+  (column) => column !== 'updatedAt' && column !== 'lastSeenDate',
+);
+
 @Injectable()
 export class DataAdapterService {
   private readonly logger = new Logger(DataAdapterService.name);
@@ -454,19 +501,40 @@ export class DataAdapterService {
         new Map(values.map((v) => [v.fingerprint, v])).values(),
       );
 
-      // Pre-check: find which fingerprints already exist
-      // to avoid sending notifications for updated vulns
-      const existingRows = await manager
+      // Pre-check: load the stored rows for the fingerprints about to be
+      // upserted, both to avoid notifications for updated vulns and to reuse
+      // their enrichment values below.
+      const existingRows: Array<Record<string, unknown>> = await manager
         .createQueryBuilder()
         .select('v.fingerprint', 'fingerprint')
+        .addSelect(
+          RESCAN_PRESERVE_COLUMNS.map((column) => `v.${column} AS ${column}`),
+        )
         .from(Vulnerability, 'v')
         .where('v.fingerprint IN (:...fingerprints)', {
           fingerprints: uniqueValues.map((v) => v.fingerprint),
         })
         .getRawMany();
 
+      const existingByFingerprint = new Map<string, Record<string, unknown>>(
+        existingRows.map((row) => [row.fingerprint as string, row]),
+      );
+
+      // A finding that omits a field inserts NULL, and EXCLUDED would then
+      // erase the stored value on conflict — keep the old value instead.
+      for (const value of uniqueValues) {
+        const previous = existingByFingerprint.get(value.fingerprint);
+        if (!previous) continue;
+        const incoming = value as unknown as Record<string, unknown>;
+        for (const column of RESCAN_PRESERVE_COLUMNS) {
+          if (incoming[column] === undefined || incoming[column] === null) {
+            incoming[column] = previous[column];
+          }
+        }
+      }
+
       const existingFingerprints = new Set<string>(
-        (existingRows as { fingerprint: string }[]).map((r) => r.fingerprint),
+        existingByFingerprint.keys(),
       );
 
       const result = await manager
@@ -476,7 +544,7 @@ export class DataAdapterService {
         .values(uniqueValues)
         .orUpdate({
           conflict_target: ['fingerprint'],
-          overwrite: ['updatedAt', 'severity', 'lastSeenDate'],
+          overwrite: [...RESCAN_OVERWRITE_COLUMNS],
         })
         .returning('*')
         .execute();
