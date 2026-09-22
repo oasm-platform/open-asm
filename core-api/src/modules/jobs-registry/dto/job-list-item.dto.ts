@@ -84,7 +84,7 @@ export class JobListItemDto {
    * Never expose the raw column: it is persisted decrypted.
    */
   @ApiProperty({ required: false, type: Object })
-  config?: Record<string, unknown>;
+  config?: Record<string, unknown> | null;
 
   @ApiProperty({ type: () => JobListItemToolDto })
   tool?: JobListItemToolDto;
