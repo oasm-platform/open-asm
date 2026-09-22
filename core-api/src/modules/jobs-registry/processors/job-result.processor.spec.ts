@@ -171,6 +171,32 @@ describe('JobResultProcessor', () => {
       expect(error.message).toBe(detail);
     });
 
+    // The dialog shows the log's payload next to the message. A hardcoded `{}`
+    // rendered an empty "Payload" box, so whatever the connector had collected
+    // before failing (here: the open ports it had already parsed) was lost.
+    it('should persist the partial payload the connector collected before failing', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: true,
+        raw: 'nmap exited with code 1',
+        payload: [80, 443],
+      });
+      const lastAttemptBullJob = {
+        ...baseBullJob,
+        attemptsMade: 2,
+      } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+      await expect(processor.process(lastAttemptBullJob)).rejects.toThrow(
+        'nmap exited with code 1',
+      );
+
+      const [dto] = mockJobsRegistryService.handleJobError.mock.calls[0] as [
+        { data: { payload: unknown } },
+      ];
+      expect(dto.data.payload).toEqual([80, 443]);
+    });
+
     it('should fall back to the generic message when the failure detail is blank', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
       mockStorageService.readJsonFile.mockResolvedValue({

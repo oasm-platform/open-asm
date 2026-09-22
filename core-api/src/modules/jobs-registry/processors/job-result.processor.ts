@@ -37,6 +37,24 @@ function normalizeFailureReason(
   return reason;
 }
 
+/**
+ * A job failure carrying the partial result the worker had already collected.
+ *
+ * The console's error dialog renders the error log's payload next to the
+ * message, and the processor used to pass a hardcoded `{}` — the dialog showed
+ * an empty "Payload" box that told an operator nothing. The staged result
+ * document still holds whatever the connector produced before it failed (open
+ * ports, findings), so it rides along on the error instead of being dropped.
+ */
+class WithFailurePayload extends Error {
+  constructor(
+    message: string,
+    readonly payload: unknown,
+  ) {
+    super(message);
+  }
+}
+
 @Processor(BullMQName.JOB_RESULT, {
   concurrency: 10,
 })
@@ -106,8 +124,9 @@ export class JobResultProcessor extends WorkerHost {
       // "Job reported error" — the message lands on the job row AND in the
       // error-log entry the console renders.
       if (rawResult?.error) {
-        throw new Error(
+        throw new WithFailurePayload(
           normalizeFailureReason(rawResult.raw) ?? 'Job reported error',
+          rawResult.payload,
         );
       }
 
@@ -194,8 +213,13 @@ export class JobResultProcessor extends WorkerHost {
         bullJob.attemptsMade + 1 >= (bullJob.opts.attempts || 1);
 
       if (isLastAttempt) {
+        // `data` is a DataPayloadResult whose `payload` is the only field read
+        // back (handleJobError stores it verbatim in the error log); here it is
+        // just the array the connector had collected, hence the cast.
+        const partial = e instanceof WithFailurePayload ? e.payload : undefined;
+
         await this.jobsRegistryService.handleJobError(
-          { jobId, data: {} as DataPayloadResult },
+          { jobId, data: { payload: partial } as DataPayloadResult },
           job,
           e,
         );
