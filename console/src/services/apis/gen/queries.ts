@@ -3314,7 +3314,46 @@ export type JobsRegistryControllerGetManyJobHistoriesParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  jobHistoryId?: string;
+  /**
+   * Filter by job status; "all" disables the filter
+   */
+  jobStatus?: JobsRegistryControllerGetManyJobHistoriesJobStatus;
+  /**
+   * Filter by run type; "all" disables the filter
+   */
+  jobRunType?: JobsRegistryControllerGetManyJobHistoriesJobRunType;
+  /**
+   * Filter by creation date from (ISO 8601 format, e.g., 2026-01-01)
+   */
+  createdFrom?: string;
+  /**
+   * Filter by creation date to (ISO 8601 format, e.g., 2026-01-31)
+   */
+  createdTo?: string;
 };
+
+export type JobsRegistryControllerGetManyJobHistoriesJobStatus =
+  (typeof JobsRegistryControllerGetManyJobHistoriesJobStatus)[keyof typeof JobsRegistryControllerGetManyJobHistoriesJobStatus];
+
+export const JobsRegistryControllerGetManyJobHistoriesJobStatus = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+  skipped: 'skipped',
+  all: 'all',
+} as const;
+
+export type JobsRegistryControllerGetManyJobHistoriesJobRunType =
+  (typeof JobsRegistryControllerGetManyJobHistoriesJobRunType)[keyof typeof JobsRegistryControllerGetManyJobHistoriesJobRunType];
+
+export const JobsRegistryControllerGetManyJobHistoriesJobRunType = {
+  manual: 'manual',
+  scheduled: 'scheduled',
+  all: 'all',
+} as const;
 
 export type AssetsControllerGetAssetsInWorkspaceParams = {
   search?: string;

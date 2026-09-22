@@ -1,8 +1,5 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from '@/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
   BullMQName,
   CATEGORY_DATA_SOURCE_MAP,
@@ -30,7 +27,13 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
-import { DataSource, DeepPartial, In, Repository } from 'typeorm';
+import {
+  DataSource,
+  DeepPartial,
+  In,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
@@ -44,6 +47,7 @@ import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
+import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
@@ -90,6 +94,21 @@ const JOB_HISTORY_SORTABLE_COLUMNS: string[] = [
   'jobHistoryName',
   'jobRunType',
 ];
+
+/**
+ * A run's status rolled up from its jobs. Kept as one string because the same
+ * expression backs both the SELECT and the status filter (HAVING).
+ */
+const JOB_HISTORY_STATUS_SQL = `CASE
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') > 0
+               AND COUNT(*) FILTER (WHERE job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}')) = 0
+            THEN '${JobStatus.CANCELLED}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.SKIPPED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.SKIPPED}'
+          ELSE '${JobStatus.PENDING}'
+        END`;
 
 @Injectable()
 export class JobsRegistryService {
@@ -1177,14 +1196,46 @@ export class JobsRegistryService {
 
   public async getManyJobHistories(
     workspaceId: string,
-    query: GetManyBaseQueryParams,
+    query: GetManyJobHistoriesRequestDto,
   ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
-    const { limit, page, sortOrder } = query;
+    const { limit, page, sortOrder, search, jobStatus, jobRunType } = query;
+    const { createdFrom, createdTo } = query;
     let { sortBy } = query;
 
     if (!JOB_HISTORY_SORTABLE_COLUMNS.includes(sortBy)) {
       sortBy = 'createdAt';
     }
+
+    // Filters shared by the paged query and the count, so `total` always matches
+    // the rows on offer: free-text over the two names the list renders, run type
+    // and creation-date bounds (WHERE), plus the status rollup (HAVING — it is
+    // an aggregate, so it cannot be a WHERE).
+    const applyFilters = (qb: SelectQueryBuilder<JobHistory>) => {
+      if (search) {
+        qb.andWhere(
+          '(jobHistory.jobHistoryName ILIKE :search OR workflow.name ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+      if (jobRunType && jobRunType !== 'all') {
+        qb.andWhere('jobHistory.jobRunType = :jobRunType', { jobRunType });
+      }
+      if (createdFrom) {
+        qb.andWhere('jobHistory.createdAt >= :createdFrom', {
+          createdFrom: new Date(createdFrom),
+        });
+      }
+      if (createdTo) {
+        // The client sends a date, not an instant: include the whole end day.
+        const end = new Date(createdTo);
+        end.setHours(23, 59, 59, 999);
+        qb.andWhere('jobHistory.createdAt <= :createdTo', { createdTo: end });
+      }
+      // 'all' is a UI convention meaning "no status filter".
+      if (jobStatus && jobStatus !== 'all') {
+        qb.having(`${JOB_HISTORY_STATUS_SQL} = :jobStatus`, { jobStatus });
+      }
+    };
 
     // Define interface for raw query result
     interface RawJobHistoryResult {
@@ -1217,16 +1268,7 @@ export class JobsRegistryService {
         '"workflow"."name" as "workflowName"',
         '"jobHistory"."jobRunType" as "jobRunType"',
         'COUNT(job.id) as "totalJobs"',
-        `CASE
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') > 0
-               AND COUNT(*) FILTER (WHERE job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}')) = 0
-            THEN '${JobStatus.CANCELLED}'
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.SKIPPED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.SKIPPED}'
-          ELSE '${JobStatus.PENDING}'
-        END as "status"`,
+        `${JOB_HISTORY_STATUS_SQL} as "status"`,
       ])
       .groupBy('jobHistory.id')
       .addGroupBy('workflow.name')
@@ -1235,15 +1277,27 @@ export class JobsRegistryService {
       .offset((page - 1) * limit)
       .limit(limit);
 
+    applyFilters(qb);
+
     const rawResults = await qb.getRawMany<RawJobHistoryResult>();
-    const total = await this.jobHistoryRepo
+
+    // Count with the same GROUP BY + HAVING, then collapse to distinct id rows:
+    // the job join fans out one row per job, and `getCount` would drop the
+    // GROUP BY that the status HAVING depends on.
+    const totalQb = this.jobHistoryRepo
       .createQueryBuilder('jobHistory')
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
       .innerJoin('jTarget.workspace', 'workspace')
+      .leftJoin('jobHistory.workflow', 'workflow')
       .where('workspace.id = :workspaceId', { workspaceId })
-      .getCount();
+      .select('jobHistory.id', 'id')
+      .groupBy('jobHistory.id');
+
+    applyFilters(totalQb);
+
+    const total = (await totalQb.getRawMany<{ id: string }>()).length;
 
     // Transform raw results to match the response DTO structure
     const transformedData = rawResults.map((raw) => ({
