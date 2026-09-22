@@ -2,9 +2,9 @@ import { Link, useParams } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import { CodeBlock } from '@/components/common/code-block';
-import { CopyableValue } from '@/components/common/copyable-value';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -16,12 +16,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import JobStatusBadge from '@/components/ui/job-status';
 import ToolLogo from '@/components/ui/tool-logo';
+import { usePermission } from '@/hooks/usePermission';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { JobListItemDto } from '@/services/apis/gen/queries';
 import {
   JobStatus,
   getJobsRegistryControllerGetJobHistoryDetailQueryKey,
   useJobsRegistryControllerCancelJob,
+  useJobsRegistryControllerCancelJobHistory,
   useJobsRegistryControllerDeleteJob,
   useJobsRegistryControllerGetJobHistoryDetail,
   useJobsRegistryControllerGetManyJobs,
@@ -30,6 +32,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
   ArrowRight,
+  Ban,
   Calendar,
   ChevronRight,
   Clock,
@@ -89,7 +92,7 @@ function Field({
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <div className="min-w-0 text-sm">{children}</div>
+      <span className="truncate text-sm">{children}</span>
     </div>
   );
 }
@@ -101,20 +104,10 @@ function JobDetailPanel({ job }: { job: JobListItemDto }) {
 
   return (
     <div className="space-y-5 border-l-2 border-primary/40 bg-muted/30 px-4 py-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Job ID">
-          <CopyableValue value={job.id} />
-        </Field>
-        <Field label="Worker ID">
-          {job.workerId ? (
-            <CopyableValue value={job.workerId} />
-          ) : (
-            <span className="text-muted-foreground">Not picked up yet</span>
-          )}
-        </Field>
-      </div>
-
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Job ID">
+          <span className="font-mono text-xs">{job.id}</span>
+        </Field>
         <Field label="Status">
           <JobStatusBadge status={job.status as JobStatus} />
         </Field>
@@ -122,6 +115,9 @@ function JobDetailPanel({ job }: { job: JobListItemDto }) {
           <span className="capitalize">{job.category.replace(/_/g, ' ')}</span>
         </Field>
         <Field label="Priority">{job.priority ?? '—'}</Field>
+        <Field label="Worker">
+          <span className="font-mono text-xs">{job.workerId || '—'}</span>
+        </Field>
         <Field label="Retries">{job.retryCount ?? 0}</Field>
         <Field label="Created">{formatDate(job.createdAt)}</Field>
         <Field label="Picked up">{formatDate(job.pickJobAt)}</Field>
@@ -195,8 +191,13 @@ export default function Runs() {
   const { id: jobHistoryId } = useParams({ strict: false });
   const queryClient = useQueryClient();
 
+  const { hasPermission } = usePermission();
   const { mutate: deleteJobMutate } = useJobsRegistryControllerDeleteJob();
   const { mutate: cancelJobMutate } = useJobsRegistryControllerCancelJob();
+  const {
+    mutate: cancelRunMutate,
+    isPending: isCancellingRun,
+  } = useJobsRegistryControllerCancelJobHistory();
 
   const { tableParams, tableHandlers } = useServerDataTable({
     defaultPage: 1,
@@ -252,24 +253,41 @@ export default function Runs() {
     },
   );
 
+  /** Re-reads both the run summary (active job count) and the job table. */
+  const refresh = () => {
+    queryClient.invalidateQueries({
+      queryKey: getJobsRegistryControllerGetJobHistoryDetailQueryKey(
+        jobHistoryId || '',
+      ),
+    });
+    queryClient.invalidateQueries({ queryKey: paginatedJobsQueryKey });
+  };
+
+  const activeJobsCount = jobHistoryDetail?.activeJobsCount ?? 0;
+
   const columns: ColumnDef<JobListItemDto>[] = [
     {
       accessorKey: 'status',
       cell: ({ row }) => {
         const errorCount = row.original.errorLogs?.length ?? 0;
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
             <JobStatusBadge
               onlyIcon
               status={row.original.status as JobStatus}
             />
-            <span className="font-medium">{getTitle(row.original)}</span>
-            <Badge variant="outline" className="capitalize">
+            <span className="truncate font-medium">
+              {getTitle(row.original)}
+            </span>
+            <Badge
+              variant="outline"
+              className="shrink-0 font-normal capitalize text-muted-foreground"
+            >
               {row.original.category.replace(/_/g, ' ')}
             </Badge>
             {errorCount > 0 && (
-              <span className="flex items-center gap-1 text-xs text-destructive">
+              <span className="flex shrink-0 items-center gap-1 text-xs text-destructive">
                 <TriangleAlert className="h-3.5 w-3.5" />
                 {errorCount}
               </span>
@@ -306,24 +324,22 @@ export default function Runs() {
       ),
     },
     {
-      accessorKey: 'createdAt',
-      cell: ({ row }) => {
-        const duration = formatDuration(row.original);
-        return (
-          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <Calendar size={20} />
-              {dayjs(row.original.updatedAt).format('YYYY-MM-DD HH:mm:ss')}
-            </span>
-            {duration && (
-              <span className="flex items-center gap-2">
-                <Clock size={20} />
-                {duration}
-              </span>
-            )}
-          </div>
-        );
-      },
+      accessorKey: 'updatedAt',
+      cell: ({ row }) => (
+        <span className="flex items-center gap-2 text-sm text-muted-foreground tabular-nums">
+          <Calendar className="h-4 w-4 shrink-0" />
+          {formatDate(row.original.updatedAt)}
+        </span>
+      ),
+    },
+    {
+      id: 'duration',
+      cell: ({ row }) => (
+        <span className="flex items-center gap-2 text-sm text-muted-foreground tabular-nums">
+          <Clock className="h-4 w-4 shrink-0" />
+          {formatDuration(row.original) ?? '—'}
+        </span>
+      ),
     },
     {
       id: 'actions',
@@ -331,15 +347,6 @@ export default function Runs() {
         const canCancel =
           row.original.status === JobStatus.pending ||
           row.original.status === JobStatus.in_progress;
-
-        const refresh = () => {
-          queryClient.invalidateQueries({
-            queryKey: getJobsRegistryControllerGetJobHistoryDetailQueryKey(
-              jobHistoryId || '',
-            ),
-          });
-          queryClient.invalidateQueries({ queryKey: paginatedJobsQueryKey });
-        };
 
         return (
           <div className="flex justify-end">
@@ -403,6 +410,26 @@ export default function Runs() {
         jobHistoryDetail?.workflowName ||
         'Job History Detail'
       }
+      action={
+        activeJobsCount > 0 &&
+        hasPermission('job.write') && (
+          <ConfirmDialog
+            title="Cancel this run?"
+            description={`Stops the ${activeJobsCount} job(s) still pending or running and prevents the workflow from starting any further step. Jobs that already finished keep their result.`}
+            confirmText="Cancel run"
+            disabled={isCancellingRun}
+            onConfirm={() =>
+              cancelRunMutate({ id: jobHistoryId || '' }, { onSuccess: refresh })
+            }
+            trigger={
+              <Button variant="outline" disabled={isCancellingRun}>
+                <Ban className="h-4 w-4" />
+                Cancel run
+              </Button>
+            }
+          />
+        )
+      }
     >
       {/* Tools Section */}
       {!!jobHistoryDetail?.tools?.length && (
@@ -425,11 +452,7 @@ export default function Runs() {
                     />
                     <span className="text-sm font-medium">{tool.name}</span>
                     {tool.status && (
-                      <JobStatusBadge
-                        status={tool.status}
-                        onlyIcon
-                        className="px-0"
-                      />
+                      <JobStatusBadge status={tool.status} onlyIcon />
                     )}
                   </Link>
                   {index < jobHistoryDetail.tools.length - 1 && (

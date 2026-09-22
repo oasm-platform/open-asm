@@ -362,6 +362,27 @@ export class JobsRegistryController {
     return this.jobsRegistryService.cancelJob(workspaceId, params.id);
   }
 
+  @AuditLog('job.cancelled')
+  @WorkspaceAccess('job.write')
+  @Doc({
+    summary: 'Cancel a job history',
+    description:
+      'Cancels every job of a run that has not reached a terminal state and stops the workflow from spawning further steps',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('/histories/:id/cancel')
+  cancelJobHistory(
+    @WorkspaceId() workspaceId: string,
+    @Param() params: IdQueryParamDto,
+  ) {
+    return this.jobsRegistryService.cancelJobHistory(workspaceId, params.id);
+  }
+
   @WorkspaceAccess('job.delete')
   @Doc({
     summary: 'Delete a job',

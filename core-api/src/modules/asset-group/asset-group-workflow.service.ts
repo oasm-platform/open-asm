@@ -82,6 +82,8 @@ export class AssetGroupWorkflowService {
         `(
           SELECT
             CASE
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.CANCELLED}') > 0
+                   AND COUNT(*) FILTER (WHERE status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}')) = 0 THEN '${JobStatus.CANCELLED}'
               WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
               WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
               WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'

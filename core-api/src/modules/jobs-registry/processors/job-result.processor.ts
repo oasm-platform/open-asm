@@ -179,11 +179,32 @@ export class JobResultProcessor extends WorkerHost {
         });
       }
 
-      const completedJob = await this.jobRepo.save({
-        ...job,
-        status: JobStatus.COMPLETED,
-        completedAt: new Date(),
-      });
+      const completedAt = new Date();
+      // Conditional write: the run may have been cancelled (or the job
+      // re-run) while this result was being processed. Only the transition
+      // IN_PROGRESS → COMPLETED is ours to make — an unconditional save would
+      // overwrite the CANCELLED status and let the workflow keep spawning.
+      const completion = await this.jobRepo.update(
+        { id: job.id, status: JobStatus.IN_PROGRESS },
+        { status: JobStatus.COMPLETED, completedAt },
+      );
+
+      if (!completion.affected) {
+        this.logger.warn(
+          `Job ${job.id} left IN_PROGRESS before its result was applied; discarding result`,
+        );
+        try {
+          await this.storageService.deleteFile(fileName, bucket);
+        } catch (error) {
+          this.logger.error(
+            `Failed to delete discarded result file ${resultRef}:`,
+            error,
+          );
+        }
+        return;
+      }
+
+      const completedJob = { ...job, status: JobStatus.COMPLETED, completedAt };
 
       const nextStepJobCount =
         await this.jobsRegistryService.getNextStepForJob(completedJob);

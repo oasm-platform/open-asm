@@ -92,4 +92,8 @@ export class JobHistoryDetailResponseDto {
 
   @ApiProperty()
   jobHistoryName?: string;
+
+  /** Jobs still pending or in progress — the ones a cancel would stop. */
+  @ApiProperty()
+  activeJobsCount: number;
 }

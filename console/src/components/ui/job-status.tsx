@@ -83,7 +83,9 @@ const JobStatusBadge = ({
       variant={config.variant}
       className={cn(
         config.className +
-          ' h-8 flex items-center border-transparent select-none' +
+          // The border is always transparent, so the badge variant's padding
+          // only adds dead space around the icon/label.
+          ' h-8 px-0 flex items-center border-transparent select-none' +
           (onClick ? ' cursor-pointer' : ' cursor-default'),
         className,
       )}

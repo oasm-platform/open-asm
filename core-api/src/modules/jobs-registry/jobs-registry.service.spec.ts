@@ -375,6 +375,92 @@ describe('JobsRegistryService', () => {
     });
   });
 
+  describe('cancelJobHistory', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+    const mockHistoryId = 'history-uuid';
+
+    const buildQueryRunner = ({
+      belongsToWorkspace = true,
+      affected = 3,
+    } = {}) => {
+      const ownershipBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(belongsToWorkspace),
+      };
+      const updateBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected }),
+      };
+      const manager = {
+        // Called twice: with the entity (ownership lookup) and without (bulk update)
+        createQueryBuilder: jest.fn((entity?: unknown) =>
+          entity ? ownershipBuilder : updateBuilder,
+        ),
+      };
+
+      return {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager,
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+        ownershipBuilder,
+        updateBuilder,
+      };
+    };
+
+    it('cancels every job of the run, keeping the completion time of finished ones', async () => {
+      const qr = buildQueryRunner({ affected: 100 });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      const result = await service.cancelJobHistory(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      // COALESCE keeps the real completedAt so an already-finished job does not
+      // look like it completed at cancel time.
+      expect(qr.updateBuilder.set).toHaveBeenCalledWith({
+        status: JobStatus.CANCELLED,
+        completedAt: expect.any(Function),
+      });
+      expect(qr.updateBuilder.where).toHaveBeenCalledWith(
+        '"jobHistoryId" = :jobHistoryId',
+        { jobHistoryId: mockHistoryId },
+      );
+      expect(qr.commitTransaction).toHaveBeenCalled();
+      expect(result.message).toContain('100');
+    });
+
+    it('throws NotFoundException and rolls back for a history outside the workspace', async () => {
+      const qr = buildQueryRunner({ belongsToWorkspace: false });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      await expect(
+        service.cancelJobHistory(mockWorkspaceId, mockHistoryId),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(qr.rollbackTransaction).toHaveBeenCalled();
+      expect(qr.updateBuilder.execute).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a history that does not exist', async () => {
+      const qr = buildQueryRunner({ belongsToWorkspace: false });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      await expect(
+        service.cancelJobHistory(mockWorkspaceId, 'missing-history'),
+      ).rejects.toThrow(NotFoundException);
+      expect(qr.commitTransaction).not.toHaveBeenCalled();
+    });
+  });
+
   describe('deleteJob', () => {
     const mockWorkspaceId = 'workspace-uuid';
     const mockJobId = 'job-uuid';
@@ -561,6 +647,32 @@ describe('JobsRegistryService', () => {
         'name',
         'status',
       ]);
+    });
+
+    it('should report a tool as cancelled rather than completed once the run was cancelled', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({ data: [] });
+
+      await service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId);
+
+      const selectCalls = (mockJobRepository.select).mock.calls;
+      const selectArgs = selectCalls[selectCalls.length - 1][0] as string[];
+      const statusExpr = selectArgs.find((s) => s.includes('CASE'))!;
+      // Regression: a tool whose jobs finished before the cancel used to keep a
+      // green check, because the COMPLETED branch was reached first.
+      expect(statusExpr).toContain(
+        `WHEN COUNT(CASE WHEN job.status = '${JobStatus.CANCELLED}' THEN 1 END) > 0`,
+      );
+      expect(statusExpr.indexOf(JobStatus.CANCELLED)).toBeLessThan(
+        statusExpr.indexOf(JobStatus.COMPLETED),
+      );
     });
 
     it('should return detail for a history whose jobs were all deleted (ownership proven via workflow, tool status undefined)', async () => {
@@ -962,8 +1074,39 @@ describe('JobsRegistryService', () => {
         (s) => typeof s === 'string' && s.includes('FILTER'),
       ) as string;
       // All-cancelled histories must surface as cancelled, not pending
+      expect(statusExpr).toContain(`THEN '${JobStatus.CANCELLED}'`);
       expect(statusExpr).toContain(
-        `WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.CANCELLED}'`,
+        `job.status = '${JobStatus.CANCELLED}') > 0`,
+      );
+    });
+
+    it('should surface a cancelled run even when some jobs already completed', async () => {
+      const { qb, selectArgs } = buildHistoryQueryBuilder();
+      qb.getRawMany.mockResolvedValue([]);
+      qb.getCount.mockResolvedValue(0);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      const statusExpr = selectArgs[0].find(
+        (s) => typeof s === 'string' && s.includes('FILTER'),
+      ) as string;
+      // Derived purely from the child jobs: a cancelled job with nothing left
+      // pending/in-progress means the user stopped the run. Without this branch
+      // a run cancelled after 30/100 jobs would fall through to "pending".
+      expect(statusExpr).toContain(
+        `WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') > 0`,
+      );
+      expect(statusExpr).toContain(
+        `COUNT(*) FILTER (WHERE job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}')) = 0`,
+      );
+      expect(statusExpr.indexOf(JobStatus.CANCELLED)).toBeLessThan(
+        statusExpr.indexOf(JobStatus.FAILED),
       );
     });
 

@@ -1218,10 +1218,12 @@ export class JobsRegistryService {
         '"jobHistory"."jobRunType" as "jobRunType"',
         'COUNT(job.id) as "totalJobs"',
         `CASE
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') > 0
+               AND COUNT(*) FILTER (WHERE job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}')) = 0
+            THEN '${JobStatus.CANCELLED}'
           WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
           WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
           WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.CANCELLED}'
           WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.SKIPPED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.SKIPPED}'
           ELSE '${JobStatus.PENDING}'
         END as "status"`,
@@ -1298,6 +1300,8 @@ export class JobsRegistryService {
       .select([
         'job.toolId as "toolId"',
         `CASE
+          WHEN COUNT(CASE WHEN job.status = '${JobStatus.CANCELLED}' THEN 1 END) > 0
+               AND COUNT(CASE WHEN job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}') THEN 1 END) = 0 THEN '${JobStatus.CANCELLED}'
           WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
           WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
           WHEN COUNT(CASE WHEN job.status = '${JobStatus.FAILED}' THEN 1 END) > 0 THEN '${JobStatus.FAILED}'
@@ -1358,6 +1362,13 @@ export class JobsRegistryService {
       jobHistoryName,
     } = jobHistory;
 
+    const activeJobsCount = await this.repo.count({
+      where: {
+        jobHistory: { id: historyId },
+        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
+      },
+    });
+
     return {
       id: historyId,
       workflowName: workflow?.name,
@@ -1365,6 +1376,7 @@ export class JobsRegistryService {
       createdAt,
       updatedAt,
       tools,
+      activeJobsCount,
     };
   }
 
@@ -1452,6 +1464,67 @@ export class JobsRegistryService {
       await queryRunner.commitTransaction();
 
       return { message: 'Job cancelled successfully' };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Cancels a whole run: every job of the history becomes CANCELLED, so the run
+   * and the tools it spans all report the same thing the user just did. The run
+   * status itself is derived from its jobs (see getManyJobHistories).
+   */
+  public async cancelJobHistory(
+    workspaceId: string,
+    jobHistoryId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Histories created outside a workflow have no workspace relation, so the
+      // tenant check falls back to the targets of their jobs. A missing history
+      // simply fails this check.
+      const belongsToWorkspace = await queryRunner.manager
+        .createQueryBuilder(JobHistory, 'jobHistory')
+        .leftJoin('jobHistory.workflow', 'workflow')
+        .leftJoin('workflow.workspace', 'workflowWorkspace')
+        .leftJoin('jobHistory.jobs', 'job')
+        .leftJoin('job.asset', 'asset')
+        .leftJoin('asset.target', 'target')
+        .where('jobHistory.id = :jobHistoryId', { jobHistoryId })
+        .andWhere(
+          '(workflowWorkspace.id = :workspaceId OR target.workspaceId = :workspaceId)',
+          { workspaceId },
+        )
+        .getExists();
+
+      if (!belongsToWorkspace) {
+        throw new NotFoundException('Job history not found in workspace');
+      }
+
+      // Every job of the run reports cancelled, matching what the user did —
+      // a run is cancelled as a whole, so leaving some jobs "completed" made
+      // the tool and group statuses disagree with the run. completedAt is kept
+      // for jobs that had already finished, so their duration stays real.
+      const result = await queryRunner.manager
+        .createQueryBuilder()
+        .update(Job)
+        .set({
+          status: JobStatus.CANCELLED,
+          completedAt: () => 'COALESCE("completedAt", now())',
+        })
+        .where('"jobHistoryId" = :jobHistoryId', { jobHistoryId })
+        .execute();
+
+      await queryRunner.commitTransaction();
+
+      return {
+        message: `Cancelled run: ${result.affected ?? 0} job(s) stopped`,
+      };
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;

@@ -45,6 +45,10 @@ describe('JobsRegistryController', () => {
       expect(required('cancelJob')).toEqual(['job.write']);
     });
 
+    it('requires job.write on cancelJobHistory', () => {
+      expect(required('cancelJobHistory')).toEqual(['job.write']);
+    });
+
     it('requires job.delete on deleteJob', () => {
       expect(required('deleteJob')).toEqual(['job.delete']);
     });
