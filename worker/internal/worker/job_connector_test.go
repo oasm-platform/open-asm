@@ -338,6 +338,172 @@ func TestHandleConnectorResultEmptyUrlDiscoverySubmitsEmptyOnce(t *testing.T) {
 	}
 }
 
+// TestHandleConnectorResultErrorWithFindingsDeliversPartialSuccess: the
+// platform stopping a scan AFTER findings arrived (worker timeout cancel,
+// container kill, stream death with a Done error) must submit those findings
+// as a SUCCESS. An error result carries no payload to Core, so the old
+// behavior silently discarded every streamed finding and failed the job —
+// a long scan the platform ended is not a tool failure.
+func TestHandleConnectorResultErrorWithFindingsDeliversPartialSuccess(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-partial-1"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-partial-1", category: "vulnerabilities", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	// Findings streamed, THEN the platform stops the execution with an error.
+	proxy.ForwardResult(execID, []byte(`{}`), []*connectorpb.Finding{
+		{Name: "Partial finding 1", Severity: "high", Host: "slow.example.com"},
+		{Name: "Partial finding 2", Severity: "low", Host: "slow.example.com"},
+	})
+	proxy.SetError(execID, "context canceled")
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 submission, got %d", len(results))
+	}
+	got := results[0]
+	if got.isError {
+		t.Fatal("isError must be false: results already in hand must be delivered as success")
+	}
+	if got.raw != "" {
+		t.Fatalf("expected raw \"\" for the partial submission, got %q", got.raw)
+	}
+	if len(got.vulns) != 2 {
+		t.Fatalf("expected both streamed findings preserved, got %d: %+v", len(got.vulns), got.vulns)
+	}
+
+	// The lifecycle event must agree with the submission: not a failure.
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			if ev.Type != EventJobCompleted {
+				continue
+			}
+			if !ev.Success {
+				t.Fatalf("EventJobCompleted Success=false with %d findings delivered; error=%q", len(got.vulns), ev.ErrorMsg)
+			}
+			return
+		case <-deadline:
+			t.Fatal("expected an EventJobCompleted event")
+		}
+	}
+}
+
+// TestHandleConnectorResultDisconnectWithFindingsDeliversPartialSuccess: a
+// clean disconnect (no Done, no error) after findings arrived — worker
+// restart mid-scan — keeps the findings instead of failing the job with
+// "connector disconnected before Done".
+func TestHandleConnectorResultDisconnectWithFindingsDeliversPartialSuccess(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-partial-2"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-partial-2", category: "vulnerabilities", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	proxy.ForwardResult(execID, []byte(`{}`), []*connectorpb.Finding{
+		{Name: "Before restart", Severity: "medium", Host: "x.example.com"},
+	})
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 submission, got %d", len(results))
+	}
+	if results[0].isError {
+		t.Fatal("disconnect with findings must deliver them as success, not error")
+	}
+	if len(results[0].vulns) != 1 {
+		t.Fatalf("expected the streamed finding preserved, got %d", len(results[0].vulns))
+	}
+}
+
+// TestHandleConnectorResultUrlDiscoveryDisconnectKeepsUrls: same contract for
+// url_discovery — accumulated URLs survive a platform-side stop.
+func TestHandleConnectorResultUrlDiscoveryDisconnectKeepsUrls(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-partial-3"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-partial-3", category: "url_discovery", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	proxy.ForwardResult(execID, []byte(`{}`), []*connectorpb.Finding{
+		{Name: "https://example.com/kept", Severity: "info", MatchedAt: "https://example.com/kept", Host: "example.com"},
+	})
+	proxy.SetError(execID, "connector stopped")
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 submission, got %d", len(results))
+	}
+	if results[0].isError {
+		t.Fatal("url_discovery partial results must be delivered as success")
+	}
+	if len(results[0].urls) != 1 {
+		t.Fatalf("expected the streamed URL preserved, got %d", len(results[0].urls))
+	}
+}
+
 // TestFindingToDiscoveredUrl_Nil: a nil finding maps to nil (skipped by the
 // caller), matching findingToVulnerability's nil-safety.
 func TestFindingToDiscoveredUrl_Nil(t *testing.T) {
