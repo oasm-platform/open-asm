@@ -835,28 +835,60 @@ drain:
 	errMsg, hasError := proxy.PopError(execID)
 	hadDone := proxy.PopDone(execID)
 
+	// A stop imposed by the PLATFORM (worker timeout cancel, container kill,
+	// stream death, worker restart) after results already arrived is not a
+	// tool failure: the findings are real, the platform ended the scan. An
+	// error result carries no payload to Core, so reporting one here would
+	// discard every finding the connector already streamed — deliver them as
+	// a success instead and record the reason in the log. With zero results
+	// the same stop stays a failure: nothing to preserve, reason still
+	// matters (e.g. "did not connect within 5m0s").
+	partialOK := (hasError || !hadDone) && (len(vulns) > 0 || len(urls) > 0)
+
 	// Terminal lifecycle line: execution identity + outcome + duration.
 	errDetail := errMsg
 	if errDetail == "" {
 		errDetail = "-"
 	}
+	succeeded := !hasError || partialOK
 	finishedMsg := fmt.Sprintf("[%s] connector job finished: exec=%s success=%t error=%s duration=%s",
-		entry.jobID, execID, !hasError, errDetail, time.Since(startTime))
-	if hasError {
-		log.Warning("%s", finishedMsg)
-	} else {
+		entry.jobID, execID, succeeded, errDetail, time.Since(startTime))
+	if succeeded {
 		log.Success("%s", finishedMsg)
+	} else {
+		log.Warning("%s", finishedMsg)
 	}
 
 	Emit(events, TuiEvent{
 		Type:     EventJobCompleted,
 		JobID:    entry.jobID,
-		Success:  !hasError,
+		Success:  succeeded,
 		ErrorMsg: errMsg,
 		Duration: time.Since(startTime),
 	})
 
 	switch {
+	case partialOK:
+		// Platform stopped a scan that had already produced results: submit
+		// them as a success so Core persists them (its error path would drop
+		// the payload) and the job is not marked failed.
+		reason := errMsg
+		if reason == "" {
+			reason = "connector disconnected before Done"
+		}
+		if entry.category == "url_discovery" {
+			if err := grpcClient.SubmitUrlDiscoveryResult(ctx, entry.jobID, false, "", urls); err != nil {
+				log.ErrorE(fmt.Sprintf("[%s] Failed to submit partial url discovery", entry.jobID), err)
+			} else {
+				log.Warning("[%s] Connector stopped early (%s): submitted %d url(s) collected so far", entry.jobID, reason, len(urls))
+			}
+		} else {
+			if err := grpcClient.SubmitVulnerabilitiesResult(ctx, entry.jobID, false, "", vulns); err != nil {
+				log.ErrorE(fmt.Sprintf("[%s] Failed to submit partial vulnerabilities", entry.jobID), err)
+			} else {
+				log.Warning("[%s] Connector stopped early (%s): submitted %d finding(s) collected so far", entry.jobID, reason, len(vulns))
+			}
+		}
 	case hasError && errMsg != "":
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, errMsg)
 		log.Warning("[%s] Connector job failed: execID=%s error=%s", entry.jobID, execID, errMsg)
@@ -889,13 +921,16 @@ drain:
 	}
 
 	// Per-image backoff bookkeeping: the image is indicted only when the
-	// connector never reached Done (crash, timeout, disconnect, stream death) —
-	// that is an image/pool problem. A Done carrying an error means the
-	// connector ran fine and the failure belongs to the job target (e.g. wpscan
-	// "scan aborted: not WordPress"), so the image must not be penalised.
+	// connector never reached Done AND delivered nothing (crash, stream death
+	// before any result) — that is an image/pool problem. A Done carrying an
+	// error means the connector ran fine and the failure belongs to the job
+	// target (e.g. wpscan "scan aborted: not WordPress"), so the image must
+	// not be penalised; likewise a platform-side stop that still delivered
+	// findings (partialOK) proved the image works — indicting it after a long
+	// legitimate scan would fail every future job for that image.
 	// Fail-fast jobs never reach this point (no exec).
 	if entry.image != "" {
-		if !hadDone {
+		if !hadDone && !partialOK {
 			imageBackoff.RecordFailure(entry.image)
 		} else {
 			imageBackoff.RecordSuccess(entry.image)
