@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Statistic() {
   const navigate = useNavigate();
@@ -33,16 +34,16 @@ export default function Statistic() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 h-full">
         {[...Array(4)].map((_, index) => (
-          <Card key={index} className="animate-pulse">
+          <Card key={index} className="overflow-hidden relative group flex flex-col pb-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="h-4 bg-muted rounded w-16"></div>
-              <div className="h-5 w-5 bg-muted rounded-full"></div>
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="h-5 w-5 rounded-full" />
             </CardHeader>
             <CardContent>
-              <div className="h-8 bg-muted rounded w-8"></div>
-              <div className="mt-4 h-12 bg-muted rounded w-full opacity-50"></div>
+              <Skeleton className="h-9 w-24" />
+              <Skeleton className="mt-4 h-12 w-full" />
             </CardContent>
           </Card>
         ))}

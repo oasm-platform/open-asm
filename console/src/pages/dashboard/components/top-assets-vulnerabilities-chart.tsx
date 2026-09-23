@@ -4,6 +4,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/services/apis/gen/queries';
 import { Bug, ChevronRight } from 'lucide-react';
@@ -47,7 +48,11 @@ const TopAssetsVulnerabilities = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          Loading...
+          <div className="w-full space-y-3">
+            {[...Array(6)].map((_, index) => (
+              <Skeleton key={index} className="h-4 w-full" />
+            ))}
+          </div>
         </CardContent>
       </Card>
     );
