@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-22T16:47:32.4533778Z",
+  "generatedAt": "2026-09-23T02:14:03.6986254Z",
   "connectors": [
     {
       "name": "Acunetix",
@@ -7,34 +7,26 @@
       "version": "0.1.0",
       "image": "ghcr.io/oasm-platform/connector-acunetix:0.1.0",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://www.acunetix.com",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Acunetix web vulnerability scanner",
       "description": "Connects to an Acunetix instance, runs a scan against a target, and streams the discovered vulnerabilities back to the Worker.",
-      "capabilities": [
-        "vulnerabilities"
-      ],
+      "capabilities": ["vulnerabilities"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
-            ],
+            "examples": ["https://example.com"],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -50,12 +42,7 @@
           "criticality": {
             "default": 10,
             "description": "Target business criticality: 30 Critical, 20 High, 10 Normal, 0 Low.",
-            "enum": [
-              30,
-              20,
-              10,
-              0
-            ],
+            "enum": [30, 20, 10, 0],
             "title": "Target criticality",
             "type": "integer"
           },
@@ -86,19 +73,14 @@
           },
           "url": {
             "description": "Base URL of the Acunetix instance (https://host:3443 for on-premises, https://app.invicti.com for Acunetix Online). /api/v1 is appended when absent.",
-            "examples": [
-              "https://acunetix.local:3443"
-            ],
+            "examples": ["https://acunetix.local:3443"],
             "format": "uri",
             "title": "Acunetix URL",
             "type": "string",
             "ui:placeholder": "https://acunetix.local:3443"
           }
         },
-        "required": [
-          "url",
-          "apiKey"
-        ],
+        "required": ["url", "apiKey"],
         "type": "object"
       },
       "resourceDefaults": {
@@ -114,34 +96,26 @@
       "version": "2.2.4",
       "image": "ghcr.io/oasm-platform/connector-gau:2.2.4",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://github.com/lc/gau",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Historical URL discovery via public archives",
       "description": "Discovers historical/archived URLs for a domain using Gau (GetAllUrls) across Wayback Machine, Common Crawl, AlienVault OTX and urlscan.io.",
-      "capabilities": [
-        "url_discovery"
-      ],
+      "capabilities": ["url_discovery"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Domain (or URL) to discover historical URLs for. Scheme/path stripped to the host.",
-            "examples": [
-              "example.com"
-            ],
+            "examples": ["example.com"],
             "format": "uri",
             "title": "Target domain",
             "type": "string",
             "ui:placeholder": "example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -156,12 +130,7 @@
           "providers": {
             "description": "Archive providers to query. Default: all four.",
             "items": {
-              "enum": [
-                "wayback",
-                "commoncrawl",
-                "otx",
-                "urlscan"
-              ],
+              "enum": ["wayback", "commoncrawl", "otx", "urlscan"],
               "type": "string"
             },
             "title": "Providers",
@@ -221,34 +190,26 @@
       "version": "1.7.0",
       "image": "ghcr.io/oasm-platform/connector-katana:1.7.0",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://github.com/projectdiscovery/katana",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Web crawler and endpoint discovery",
       "description": "Crawls a target website with Katana (ProjectDiscovery) up to a configurable depth and streams every discovered HTTP/HTTPS URL as a finding for URL discovery.",
-      "capabilities": [
-        "url_discovery"
-      ],
+      "capabilities": ["url_discovery"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Domain (or URL) to crawl. Scheme/path stripped to the host.",
-            "examples": [
-              "example.com"
-            ],
+            "examples": ["example.com"],
             "format": "uri",
             "title": "Target domain",
             "type": "string",
             "ui:placeholder": "example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -394,34 +355,26 @@
       "version": "0.1.0",
       "image": "ghcr.io/oasm-platform/connector-nessus:0.1.0",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://www.tenable.com",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Tenable Nessus vulnerability scanner",
       "description": "Connects to a Tenable Nessus instance, creates and runs a scan against a target, and streams the discovered vulnerabilities back to the Worker as JSONL findings.",
-      "capabilities": [
-        "vulnerabilities"
-      ],
+      "capabilities": ["vulnerabilities"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
-            ],
+            "examples": ["https://example.com"],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -460,20 +413,14 @@
           },
           "url": {
             "description": "Base URL of the Nessus instance.",
-            "examples": [
-              "https://nessus.local:8834"
-            ],
+            "examples": ["https://nessus.local:8834"],
             "format": "uri",
             "title": "Nessus URL",
             "type": "string",
             "ui:placeholder": "https://nessus.local:8834"
           }
         },
-        "required": [
-          "url",
-          "accessKey",
-          "secretKey"
-        ],
+        "required": ["url", "accessKey", "secretKey"],
         "type": "object"
       },
       "resourceDefaults": {
@@ -489,34 +436,26 @@
       "version": "2.6.1",
       "image": "ghcr.io/oasm-platform/connector-nikto:2.6.1",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://cirt.net/Nikto2",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Signature-based web server and CGI scanner",
       "description": "Scans a web server for 7,000+ known issues: dangerous files and CGIs, outdated server software, missing security headers, and version-specific flaws. Each finding is classified from Nikto's own test database and correlated with CVE references.",
-      "capabilities": [
-        "vulnerabilities"
-      ],
+      "capabilities": ["vulnerabilities"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname. A bare host is prefixed with https://; an explicit port is preserved (example.com:8443).",
-            "examples": [
-              "https://example.com"
-            ],
+            "examples": ["https://example.com"],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -651,43 +590,34 @@
       "version": "7.97",
       "image": "ghcr.io/oasm-platform/connector-nmap:7.97",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://nmap.org",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "TCP/UDP port scanner",
       "description": "Scans a single host with Nmap (Nmap Security Scanner) and streams every open port as a finding for port scanning: one finding per protocol/port with its Nmap service name, product and version. Unprivileged TCP connect scan; requires no raw sockets.",
-      "capabilities": [
-        "ports_scanner"
-      ],
+      "capabilities": ["ports_scanner"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Host to scan: a hostname, an IPv4 literal, or a bracketed IPv6 literal. Scheme and path are stripped; CIDR ranges, lists and wildcards are rejected.",
-            "examples": [
-              "example.com",
-              "203.0.113.10"
-            ],
+            "examples": ["example.com", "203.0.113.10"],
             "format": "uri",
             "title": "Target host",
             "type": "string",
             "ui:placeholder": "example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
           "hostTimeout": {
-            "default": 0,
-            "description": "Give up on the host after this long (nmap --host-timeout). 0 = no per-host limit; the adapter always enforces a 20 minute hard timeout for the whole run.",
+            "default": 600,
+            "description": "Give up on the host after this long (nmap --host-timeout) and report what was found. Raise it for slow or heavily filtered targets; 0 = no per-host limit. The adapter always enforces a 20 minute hard timeout for the whole run.",
             "minimum": 0,
             "title": "Per-host timeout (seconds)",
             "type": "integer"
@@ -705,16 +635,16 @@
             "ui:placeholder": "22,80,443,8000-8100"
           },
           "retries": {
-            "default": 0,
-            "description": "Maximum probe retransmissions per port (nmap --max-retries). 0 = nmap default (10).",
+            "default": 2,
+            "description": "Maximum probe retransmissions per port (nmap --max-retries). Lower is faster on filtered hosts; raise it for lossy links.",
             "maximum": 10,
             "minimum": 1,
             "title": "Max retries",
             "type": "integer"
           },
           "topPorts": {
-            "default": 0,
-            "description": "Scan the N most common ports (nmap --top-ports). Ignored when ports is set. 0 = nmap default top-1000 list.",
+            "default": 1000,
+            "description": "Scan the N most common ports (nmap --top-ports). Ignored when ports is set. 1000 = nmap's own default port list.",
             "maximum": 65535,
             "minimum": 1,
             "title": "Top ports",
@@ -736,34 +666,26 @@
       "version": "3.4.1",
       "image": "ghcr.io/oasm-platform/connector-nuclei:3.4.1",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://projectdiscovery.io",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Fast template-based vulnerability scanner",
       "description": "Runs ProjectDiscovery Nuclei template-based scans against a target URL to detect known vulnerabilities, misconfigurations, and exposed secrets.",
-      "capabilities": [
-        "vulnerabilities"
-      ],
+      "capabilities": ["vulnerabilities"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
-            ],
+            "examples": ["https://example.com"],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -777,12 +699,7 @@
           },
           "excludeTags": {
             "description": "Skip templates that match these tags.",
-            "examples": [
-              [
-                "dos",
-                "fuzz"
-              ]
-            ],
+            "examples": [["dos", "fuzz"]],
             "items": {
               "type": "string"
             },
@@ -802,19 +719,10 @@
             "type": "integer"
           },
           "severity": {
-            "default": [
-              "high",
-              "critical"
-            ],
+            "default": ["high", "critical"],
             "description": "Only report findings at the selected severity levels.",
             "items": {
-              "enum": [
-                "info",
-                "low",
-                "medium",
-                "high",
-                "critical"
-              ],
+              "enum": ["info", "low", "medium", "high", "critical"],
               "type": "string"
             },
             "title": "Severity levels",
@@ -822,12 +730,7 @@
           },
           "tags": {
             "description": "Only run templates matching these tags.",
-            "examples": [
-              [
-                "cve",
-                "rce"
-              ]
-            ],
+            "examples": [["cve", "rce"]],
             "items": {
               "type": "string"
             },
@@ -837,12 +740,7 @@
           },
           "templateIds": {
             "description": "Only run these specific template IDs.",
-            "examples": [
-              [
-                "CVE-2024-12345",
-                "wordpress-rce"
-              ]
-            ],
+            "examples": [["CVE-2024-12345", "wordpress-rce"]],
             "items": {
               "type": "string"
             },
@@ -866,34 +764,26 @@
       "version": "2.17.0",
       "image": "ghcr.io/oasm-platform/connector-zap:2.17.0",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://www.zaproxy.org",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "OWASP ZAP dynamic web application scanner",
       "description": "Runs OWASP ZAP (Zed Attack Proxy) against a target web application using the Automation Framework, then streams the discovered alerts back to the Worker as normalized findings.",
-      "capabilities": [
-        "vulnerabilities"
-      ],
+      "capabilities": ["vulnerabilities"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL to scan. A bare host is prefixed with https://.",
-            "examples": [
-              "https://example.com"
-            ],
+            "examples": ["https://example.com"],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -943,10 +833,7 @@
           "scanMode": {
             "default": "baseline",
             "description": "baseline runs the spider and passive scanner only (safe). full additionally runs the active scanner, which actively attacks the target — use only with permission.",
-            "enum": [
-              "baseline",
-              "full"
-            ],
+            "enum": ["baseline", "full"],
             "title": "Scan mode",
             "type": "string"
           },
@@ -973,35 +860,26 @@
       "version": "2.4.1",
       "image": "ghcr.io/oasm-platform/connector-rustscan:2.4.1",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://github.com/bee-san/RustScan",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "Fast async TCP/UDP port scanner",
       "description": "Scans a single host with RustScan in greppable mode and streams every open port as a finding for port scanning: one finding per protocol/port. Async TCP connect scan; needs no raw sockets, no privileges and no nmap, so findings carry no service or version — run the Nmap connector alongside it for service detection.",
-      "capabilities": [
-        "ports_scanner"
-      ],
+      "capabilities": ["ports_scanner"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Host to scan: a hostname, an IPv4 literal, or a bracketed IPv6 literal. Scheme and path are stripped; CIDR ranges, lists and wildcards are rejected.",
-            "examples": [
-              "example.com",
-              "203.0.113.10"
-            ],
+            "examples": ["example.com", "203.0.113.10"],
             "format": "uri",
             "title": "Target host",
             "type": "string",
             "ui:placeholder": "example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -1065,34 +943,26 @@
       "version": "3.8.27",
       "image": "ghcr.io/oasm-platform/connector-wpscan:3.8.27",
       "author": "oasm",
-      "pricingTier": [
-        "free"
-      ],
+      "pricingTier": ["free"],
       "homepage": "https://wpscan.com",
       "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
       "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
       "shortDescription": "WordPress vulnerability scanner",
       "description": "Scans WordPress sites using WPScan to enumerate vulnerable plugins and themes, detect known CVEs, misconfigurations, and weak credentials.",
-      "capabilities": [
-        "vulnerabilities"
-      ],
+      "capabilities": ["vulnerabilities"],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
           "target": {
             "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
-            ],
+            "examples": ["https://example.com"],
             "format": "uri",
             "title": "Scan target",
             "type": "string",
             "ui:placeholder": "https://example.com"
           }
         },
-        "required": [
-          "target"
-        ],
+        "required": ["target"],
         "type": "object"
       },
       "configSchema": {
@@ -1121,11 +991,7 @@
           "detectionMode": {
             "default": "mixed",
             "description": "Global detection mode used by all detections.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Detection mode",
             "type": "string"
           },
@@ -1199,22 +1065,14 @@
           "pluginsDetection": {
             "default": "passive",
             "description": "Detection mode used to enumerate plugins.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Plugins detection",
             "type": "string"
           },
           "pluginsVersionDetection": {
             "default": "mixed",
             "description": "Detection mode used to check plugins versions.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Plugins version detection",
             "type": "string"
           },
@@ -1238,11 +1096,7 @@
           },
           "scope": {
             "description": "Additional (sub-)domains to include in scope.",
-            "examples": [
-              [
-                "blog.example.com"
-              ]
-            ],
+            "examples": [["blog.example.com"]],
             "items": {
               "type": "string"
             },
@@ -1252,11 +1106,7 @@
           },
           "server": {
             "description": "Force the supplied server module instead of auto-detecting.",
-            "enum": [
-              "apache",
-              "iis",
-              "nginx"
-            ],
+            "enum": ["apache", "iis", "nginx"],
             "title": "Web server",
             "type": "string"
           },
@@ -1267,21 +1117,13 @@
           },
           "themesDetection": {
             "description": "Detection mode used to enumerate themes.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Themes detection",
             "type": "string"
           },
           "themesVersionDetection": {
             "description": "Detection mode used to check themes versions.",
-            "enum": [
-              "mixed",
-              "passive",
-              "aggressive"
-            ],
+            "enum": ["mixed", "passive", "aggressive"],
             "title": "Themes version detection",
             "type": "string"
           },
@@ -1309,9 +1151,7 @@
             "ui:placeholder": "e.g. internal.corp"
           }
         },
-        "required": [
-          "apiToken"
-        ],
+        "required": ["apiToken"],
         "type": "object"
       },
       "resourceDefaults": {
