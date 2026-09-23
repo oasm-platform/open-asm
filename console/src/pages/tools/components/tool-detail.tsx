@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import LogoFrame from '@/components/ui/logo-frame';
 import ToolLogo from '@/components/ui/tool-logo';
 import {
   Table,
@@ -180,12 +181,15 @@ export default function ToolDetail() {
           <CardContent>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
               <div className="flex min-w-0 flex-1 items-center gap-4">
-                <ToolLogo
-                  name={tool.name}
-                  logoUrl={tool?.logoUrl}
-                  size={80}
-                  className="rounded-2xl"
-                />
+                {/* Same tile as the tools list: logos are drawn for light
+                    backgrounds, so a bare img disappears in dark mode. */}
+                <LogoFrame className="shrink-0 overflow-hidden">
+                  <ToolLogo
+                    name={tool.name}
+                    logoUrl={tool?.logoUrl}
+                    size={80}
+                  />
+                </LogoFrame>
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-semibold tracking-tight">
