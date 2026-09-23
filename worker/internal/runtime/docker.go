@@ -576,9 +576,10 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID)
 
 	// Container config: image, env, labels for lifecycle management.
-	// oasm.pool_key (normalized image) marks pooled containers so worker
-	// startup + sweeper can identify (and prune) them; oasm.last_used is
-	// informational only — the in-memory pool owns sweep timing.
+	// oasm.pool_key (normalized image) names pooled containers and lets the
+	// sweeper identify them; oasm-managed scopes the startup orphan
+	// reconcile; oasm.last_used is informational only — the in-memory pool
+	// owns sweep timing.
 	labels := map[string]string{
 		"trace_id":     opts.TraceID,
 		"tool":         spec.Tool,
@@ -591,6 +592,12 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	labels["oasm.pool_key"] = poolRef
 	labels["oasm.last_used"] = time.Now().UTC().Format(time.RFC3339)
+	// Ownership stamp (startup orphan reconcile): hash of the worker identity
+	// so a restarted worker reclaims ITS running orphans and never a
+	// sibling's. Absent for direct runtime users → tier 3 (keep) only.
+	if spec.WorkerID != "" {
+		labels["oasm.worker_id"] = spec.WorkerID
+	}
 	// Labels assigned after the struct literal so gofmt keeps
 	// "Image: spec.Image" single-spaced (source-guard test).
 	config := &container.Config{
@@ -677,7 +684,7 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	d.logInfo("docker: container started: %s exec=%s job=%s", containerID, execID, spec.JobID)
 
-	return Handle{
+	handle := Handle{
 		ID: containerID,
 		Labels: map[string]string{
 			"trace_id":      opts.TraceID,
@@ -685,7 +692,11 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 			"exec_id":       execID,
 			"oasm.pool_key": poolRef,
 		},
-	}, nil
+	}
+	if spec.WorkerID != "" {
+		handle.Labels["oasm.worker_id"] = spec.WorkerID
+	}
+	return handle, nil
 }
 
 // Start starts the container unless it is already running. Create already
@@ -950,24 +961,88 @@ func (d *DockerRuntime) Cleanup(ctx context.Context, h Handle) error {
 	return nil
 }
 
-// PrunePoolContainers removes every container tagged oasm.pool_key left over
-// from a previous worker process (crash/orphan guard). Called once at worker
-// startup when the pool is enabled; stale idle containers from a dead worker
-// must not accumulate forever. Best-effort — failures are logged, never fatal.
-func (d *DockerRuntime) PrunePoolContainers(ctx context.Context) {
+// ReconcileReport summarizes one startup ReconcileOrphans pass.
+type ReconcileReport struct {
+	StoppedRemoved    int // tier 1: terminal-state managed containers removed
+	OwnRunningRemoved int // tier 2: running containers stamped with our ownerID
+	SkippedForeign    int // tier 3: running containers kept (other/unknown owner)
+	Failed            int // remove attempts rejected by the engine
+}
+
+// ReconcileOrphans enforces the startup ownership policy over every
+// oasm-managed container on the engine (Docker labels are the source of
+// truth — no state store):
+//
+//	tier 1  exited/created/dead/removing → always remove: nothing can use
+//	        them and they only accumulate across crashes;
+//	tier 2  running/paused/restarting AND oasm.worker_id == ownerID
+//	        (non-empty) → force remove: a fresh process holds no streams or
+//	        exec tokens for them, so they can never be adopted;
+//	tier 3  live AND owner different or missing → KEEP: on a shared
+//	        docker.sock this may be a sibling worker's live container (a
+//	        core-side owner referee lands separately).
+//
+// ownerID empty (first-ever run: no signature, no token) degrades to tier 1
+// only — the fail-safe direction. Called once per boot from
+// reconcileStartupOrphans, before grpcClient.Connect: the fresh process owns
+// no containers yet, so tier-2 matches can only be dead predecessors'.
+// Best-effort — failures are logged, never fatal.
+func (d *DockerRuntime) ReconcileOrphans(ctx context.Context, ownerID string) ReconcileReport {
+	var rep ReconcileReport
 	if d.cli == nil {
-		return
+		return rep
 	}
 	f := filters.NewArgs()
-	f.Add("label", "oasm.pool_key")
-	report, err := d.cli.ContainersPrune(ctx, f)
+	f.Add("label", "oasm-managed=true")
+	list, err := d.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: f})
 	if err != nil {
-		d.logWarning("docker: pool prune failed: %v", err)
-		return
+		d.logWarning("docker: orphan reconcile list failed: %v", err)
+		return rep
 	}
-	if n := len(report.ContainersDeleted); n > 0 {
-		d.logInfo("docker: pruned %d stale pool container(s) from a previous worker", n)
+	for _, c := range list {
+		terminal := isTerminalState(c.State)
+		ours := ownerID != "" && c.Labels["oasm.worker_id"] == ownerID
+		switch {
+		case terminal, ours:
+			if err := d.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true}); err != nil {
+				rep.Failed++
+				d.logWarning("docker: orphan reconcile: remove %s failed: %v", shortID(c.ID), err)
+				continue
+			}
+			if terminal {
+				rep.StoppedRemoved++
+			} else {
+				rep.OwnRunningRemoved++
+			}
+		default:
+			rep.SkippedForeign++
+			d.logInfo("docker: orphan: keeping foreign running container %s owner=%q state=%q",
+				shortID(c.ID), c.Labels["oasm.worker_id"], c.State)
+		}
 	}
+	d.logInfo("docker: orphan reconcile: stopped=%d own_running=%d foreign_kept=%d failed=%d owner_id=%q",
+		rep.StoppedRemoved, rep.OwnRunningRemoved, rep.SkippedForeign, rep.Failed, ownerID)
+	return rep
+}
+
+// isTerminalState reports whether a container state is dead weight that can
+// never serve another execution (tier 1). Everything else — running, paused,
+// restarting, unknown — counts as live and requires ownership proof.
+func isTerminalState(state string) bool {
+	switch state {
+	case "exited", "created", "dead", "removing":
+		return true
+	default:
+		return false
+	}
+}
+
+// shortID trims a Docker ID to the conventional 12 chars for log lines.
+func shortID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
 }
 
 // buildContainerEnv constructs the env var slice for a connector container.
