@@ -2,12 +2,15 @@ package worker
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"oasm-worker/internal/connector"
+	"oasm-worker/internal/execution"
 	connectorpb "oasm-worker/internal/gen/connector"
 	pb "oasm-worker/internal/gen/jobs_registry"
+	"oasm-worker/internal/runtime"
 )
 
 // TestHandleConnectorResultAggregatesVulnerabilityChunks: N result chunks
@@ -506,6 +509,76 @@ func TestHandleConnectorResultUrlDiscoveryDisconnectKeepsUrls(t *testing.T) {
 
 // TestFindingToDiscoveredUrl_Nil: a nil finding maps to nil (skipped by the
 // caller), matching findingToVulnerability's nil-safety.
+// TestHandleConnectorResultFailureCarriesContainerLogs: a failing connector job
+// must reach Core with the container's own trace attached. The SDK writes
+// execution identity, inputs, progress and the adapter error to stderr, and the
+// worker is the only writer of that payload — without this the platform stores
+// the Done string alone and the evidence never leaves the container.
+func TestHandleConnectorResultFailureCarriesContainerLogs(t *testing.T) {
+	resetWorkerGlobals()
+	prevGrace := tailGrace
+	tailGrace = 20 * time.Millisecond
+	t.Cleanup(func() { tailGrace = prevGrace })
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+	fakeRT.SetLogLines([][]byte{
+		[]byte("[runtime] [INFO] execution_id=exec-log job_id=job-log execute start: inputs=target=example.com\n"),
+		[]byte("[runtime] [ERROR] execution_id=exec-log adapter error after 0 result(s) in 3s: fatal: nmap: cannot resolve\n"),
+		[]byte("[runtime] [INFO] execution_id=exec-log execution done: results=0 elapsed=3s error=fatal\n"),
+	})
+	fakeRT.SetInspectFn(func() runtime.InspectResult { return runtime.InspectResult{Running: true} })
+	mgr := execution.NewManager(fakeRT, 0)
+
+	// Logs is keyed on a Manager execution, so the exec must exist in Manager.
+	execID, err := mgr.Submit(context.Background(), execution.JobSpec{Tool: "nmap", Image: "ghcr.io/oasm-platform/connector-nmap:7.97"})
+	if err != nil {
+		t.Fatalf("mgr.Submit: %v", err)
+	}
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-log", category: "ports_scanner", release: func() {}, image: "ghcr.io/oasm-platform/connector-nmap:7.97"}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, mgr, &tailBuffer{})
+		close(done)
+	}()
+
+	proxy.SetError(execID, "fatal: nmap: cannot resolve \"nope.invalid\"")
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 error submission, got %d", len(results))
+	}
+	got := results[0]
+	if !got.isError {
+		t.Fatal("expected the failure to be submitted as an error")
+	}
+	for _, want := range []string{
+		"fatal: nmap: cannot resolve",
+		"--- container logs (last",
+		"execution_id=exec-log",
+		"execute start: inputs=target=example.com",
+		"adapter error after 0 result(s)",
+		"execution done: results=0",
+	} {
+		if !strings.Contains(got.raw, want) {
+			t.Errorf("failure payload missing %q\n--- payload ---\n%s", want, got.raw)
+		}
+	}
+}
+
 func TestFindingToDiscoveredUrl_Nil(t *testing.T) {
 	if got := findingToDiscoveredUrl(nil); got != nil {
 		t.Fatalf("expected nil for nil finding, got %+v", got)

@@ -97,7 +97,13 @@ describe('AssetGroupService', () => {
   const mockToolsService = {
     getProfileToolIds: jest.fn().mockResolvedValue(new Set()),
   };
-
+  /** getAssetGroupById counts its join rows through its own query builder. */
+  const mockAssetGroupCountBuilder = {
+    select: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    getRawOne: jest.fn().mockResolvedValue({ totalAssets: '0' }),
+  };
   const mockJobsRegistryService = {};
 
   const mockConnectorRegistryService = {
@@ -126,6 +132,12 @@ describe('AssetGroupService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockAssetGroupCountBuilder.getRawOne.mockResolvedValue({
+      totalAssets: '0',
+    });
+    mockAssetGroupRepo.createQueryBuilder.mockReturnValue(
+      mockAssetGroupCountBuilder,
+    );
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         { provide: getRepositoryToken(AssetGroup), useValue: mockAssetGroupRepo },
@@ -451,6 +463,44 @@ describe('AssetGroupService', () => {
 
       expect(result.assetGroupWorkflows).toEqual([]);
       expect(mockWorkflowService.getLastRunForWorkflows).toHaveBeenCalledWith([]);
+    });
+
+    it('should count the group hosts into totalAssets', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'Web Servers',
+        assetGroupWorkflows: [],
+      });
+      mockWorkflowService.getLastRunForWorkflows.mockResolvedValue(new Map());
+      mockAssetGroupCountBuilder.getRawOne.mockResolvedValue({
+        totalAssets: '7',
+      });
+
+      const result = await service.getAssetGroupById(groupId, workspaceId);
+
+      expect(result.totalAssets).toBe(7);
+      expect(mockAssetGroupCountBuilder.select).toHaveBeenCalledWith(
+        'COUNT(aga.id)',
+        'totalAssets',
+      );
+      expect(mockAssetGroupCountBuilder.where).toHaveBeenCalledWith(
+        'assetGroup.id = :id',
+        { id: groupId },
+      );
+    });
+
+    it('should default totalAssets to 0 when the count is empty', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'Web Servers',
+        assetGroupWorkflows: [],
+      });
+      mockWorkflowService.getLastRunForWorkflows.mockResolvedValue(new Map());
+      mockAssetGroupCountBuilder.getRawOne.mockResolvedValue(undefined);
+
+      const result = await service.getAssetGroupById(groupId, workspaceId);
+
+      expect(result.totalAssets).toBe(0);
     });
 
     it('should set lastRun to null when no job history exists', async () => {

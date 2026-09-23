@@ -2,10 +2,7 @@ import { Public, WorkspaceId } from '@/common/decorators/app.decorator';
 import { WorkerTokenAuth } from '@/common/decorators/worker-token-auth.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from '@/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { Severity, ToolCategory } from '@/common/enums/enum';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
@@ -31,6 +28,7 @@ import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
+import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
@@ -297,7 +295,7 @@ export class JobsRegistryController {
   @Get('/histories')
   getManyJobHistories(
     @WorkspaceId() workspaceId: string,
-    @Query() query: GetManyBaseQueryParams,
+    @Query() query: GetManyJobHistoriesRequestDto,
   ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
     return this.jobsRegistryService.getManyJobHistories(workspaceId, query);
   }
@@ -360,6 +358,27 @@ export class JobsRegistryController {
     @Param() params: IdQueryParamDto,
   ) {
     return this.jobsRegistryService.cancelJob(workspaceId, params.id);
+  }
+
+  @AuditLog('job.cancelled')
+  @WorkspaceAccess('job.write')
+  @Doc({
+    summary: 'Cancel a job history',
+    description:
+      'Cancels every job of a run that has not reached a terminal state and stops the workflow from spawning further steps',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('/histories/:id/cancel')
+  cancelJobHistory(
+    @WorkspaceId() workspaceId: string,
+    @Param() params: IdQueryParamDto,
+  ) {
+    return this.jobsRegistryService.cancelJobHistory(workspaceId, params.id);
   }
 
   @WorkspaceAccess('job.delete')

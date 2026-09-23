@@ -1,26 +1,92 @@
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/data-table';
+import { DatePickerWithRange } from '@/components/ui/date-picker-range';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   type JobHistoryResponseDto,
   JobStatus,
+  type JobsRegistryControllerGetManyJobHistoriesJobRunType,
+  type JobsRegistryControllerGetManyJobHistoriesJobStatus,
   useJobsRegistryControllerGetManyJobHistories,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
+import { format } from 'date-fns';
 import { Calendar } from 'lucide-react';
-import { useNavigate } from '@tanstack/react-router';
+import { useCallback, useState } from 'react';
+import type { DateRange } from 'react-day-picker';
+import {
+  RunStatusFilter,
+  RunTypeFilter,
+} from './components/run-status-filter';
 dayjs.extend(duration);
+
+/** Every filter except search lives in its own URL param, next to the table's
+ * own params, so a filtered view is shareable and survives a reload. */
+const ALL = 'all';
+
+const readParam = (value: string | string[] | undefined) =>
+  (Array.isArray(value) ? value[0] : value) || ALL;
+
+/** `undefined` unless both ends of the range are present. */
+const readDateParam = (value: string | string[] | undefined) => {
+  const raw = readParam(value);
+  return raw === ALL ? undefined : raw;
+};
 
 const JobsRegistryPage = () => {
   const navigate = useNavigate();
+  const urlSearch = useSearch({ strict: false }) as Record<
+    string,
+    string | string[]
+  >;
   const {
-    tableParams: { page, pageSize, sortBy, sortOrder },
-    tableHandlers: { setPage, setPageSize, setParams },
+    tableParams: { page, pageSize, sortBy, sortOrder, filter },
+    tableHandlers: { setPage, setPageSize, setParams, setFilter },
   } = useServerDataTable();
+
+  const statusFilter = readParam(urlSearch.status);
+  const runTypeFilter = readParam(urlSearch.jobRunType);
+
+  const urlFrom = readDateParam(urlSearch.createdFrom);
+  const urlTo = readDateParam(urlSearch.createdTo);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() =>
+    urlFrom && urlTo
+      ? { from: new Date(urlFrom), to: new Date(urlTo) }
+      : undefined,
+  );
+
+  /** Reset to page 1 and merge one param; `undefined` drops it from the URL. */
+  const setFilterParam = useCallback(
+    (key: string, value: string | undefined) => {
+      navigate({
+        search: ((prev: Record<string, unknown>) => ({
+          ...prev,
+          [key]: value,
+          page: undefined,
+        })) as never,
+        replace: true,
+      });
+    },
+    [navigate],
+  );
+
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
+    navigate({
+      search: ((prev: Record<string, unknown>) => ({
+        ...prev,
+        createdFrom: range?.from ? format(range.from, 'yyyy-MM-dd') : undefined,
+        createdTo: range?.to ? format(range.to, 'yyyy-MM-dd') : undefined,
+        page: undefined,
+      })) as never,
+      replace: true,
+    });
+  };
 
   const {
     data: jobsData,
@@ -33,6 +99,13 @@ const JobsRegistryPage = () => {
       limit: pageSize,
       sortBy,
       sortOrder,
+      search: filter,
+      jobStatus:
+        statusFilter as JobsRegistryControllerGetManyJobHistoriesJobStatus,
+      jobRunType:
+        runTypeFilter as JobsRegistryControllerGetManyJobHistoriesJobRunType,
+      createdFrom: urlFrom,
+      createdTo: urlTo,
     },
     {
       query: {
@@ -115,7 +188,11 @@ const JobsRegistryPage = () => {
   }
 
   return (
-    <Page title="Jobs Registry" permission="job.read">
+    <Page
+      title="Jobs Registry"
+      description="Every scan run in this workspace, newest first."
+      permission="job.read"
+    >
       <DataTable
         isShowHeader={false}
         columns={columns}
@@ -132,6 +209,30 @@ const JobsRegistryPage = () => {
         onSortChange={(col, order) => {
           setParams({ sortBy: col, sortOrder: order, page: 1 });
         }}
+        filterColumnKey="__search__"
+        filterValue={filter}
+        onFilterChange={setFilter}
+        toolbarComponents={[
+          <div key="filters" className="flex items-center gap-2">
+            <DatePickerWithRange
+              label="Date"
+              value={dateRange}
+              onChange={handleDateRangeChange}
+            />
+            <RunTypeFilter
+              value={runTypeFilter}
+              onValueChange={(value) =>
+                setFilterParam('jobRunType', value === ALL ? undefined : value)
+              }
+            />
+            <RunStatusFilter
+              value={statusFilter}
+              onValueChange={(value) =>
+                setFilterParam('status', value === ALL ? undefined : value)
+              }
+            />
+          </div>,
+        ]}
         showPagination={true}
         onRowClick={(row) => {
           navigate({ to: `/jobs/runs/${row.id}` });

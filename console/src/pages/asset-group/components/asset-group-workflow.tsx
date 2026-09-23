@@ -4,13 +4,6 @@ import {
   ToolPipelineBuilder,
   type PipelineToolEntry,
 } from '@/pages/asset-group/components/tool-pipeline-builder';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -80,14 +73,15 @@ export default function AssetGroupWorkflow({
   const removeWorkflowsMutation = useAssetGroupControllerRemoveManyWorkflows();
 
   // Tools rendered in the group workflow: providers + pipeline-capable
-  // categories (vulnerabilities, url_discovery)
+  // categories (vulnerabilities, url_discovery, ports_scanner)
   const toolProviders = useMemo(
     () =>
       workspaceToolsInstalled?.data?.filter(
         (tool) =>
           tool.type === ToolsControllerGetManyToolsType.provider ||
           tool.category === ToolCategory.vulnerabilities ||
-          tool.category === ToolCategory.url_discovery,
+          tool.category === ToolCategory.url_discovery ||
+          tool.category === ToolCategory.ports_scanner,
       ) || [],
     [workspaceToolsInstalled?.data],
   );
@@ -282,14 +276,14 @@ export default function AssetGroupWorkflow({
   }, [workflowId, draftSchedule, updateAssetGroupWorkflow, onRefetch]);
 
   return (
-    <div className="space-y-4 mb-4">
-      <Card className="py-2 gap-2">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 px-2 md:px-4 py-2">
+    <div className="flex flex-col gap-2">
+      <section className="flex flex-col gap-2 border-t pt-2">
+        <div className="flex flex-row items-center justify-between gap-4 px-2 py-2 md:px-4">
           <div>
-            <CardTitle>Schedule</CardTitle>
-            <CardDescription className="hidden md:block">
+            <div className="leading-none font-semibold">Schedule</div>
+            <div className="hidden text-sm text-muted-foreground md:block">
               Configure the scan frequency and run the workflow on demand.
-            </CardDescription>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {lastRun && (
@@ -314,8 +308,8 @@ export default function AssetGroupWorkflow({
               <Settings className="size-4" />
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-4 py-2">
+        </div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-4 py-2">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
               <div className="flex items-center gap-3">
@@ -394,16 +388,16 @@ export default function AssetGroupWorkflow({
               </SheetFooter>
             </SheetContent>
           </Sheet>
-        </CardContent>
-      </Card>
-      <Card className="py-2 gap-2">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 px-2 md:px-4 py-2">
+        </div>
+      </section>
+      <section className="flex flex-col gap-2 border-t pt-2">
+        <div className="flex flex-row items-center justify-between gap-4 px-2 py-2 md:px-4">
           <div>
-            <CardTitle>Tools</CardTitle>
-            <CardDescription className="hidden md:block">
+            <div className="leading-none font-semibold">Tools</div>
+            <div className="hidden text-sm text-muted-foreground md:block">
               Scanning tools assigned to this group. Click a tool to add or
               remove it.
-            </CardDescription>
+            </div>
           </div>
           <RunWorkflowButton
             id={workflowId}
@@ -415,8 +409,8 @@ export default function AssetGroupWorkflow({
             }
             onSuccess={onRefetch}
           />
-        </CardHeader>
-        <CardContent className="px-2 md:px-4 py-2">
+        </div>
+        <div className="px-2 md:px-4 py-2">
           {toolProviders.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-8 text-center">
               <p className="text-sm text-muted-foreground">
@@ -437,8 +431,8 @@ export default function AssetGroupWorkflow({
               disabled={isProcessing}
             />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   );
 }

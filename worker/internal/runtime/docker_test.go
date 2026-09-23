@@ -831,25 +831,30 @@ func TestCreateLogsLifecycleSteps(t *testing.T) {
 	}
 
 	lines := log.all()
-	if len(lines) != 3 {
-		t.Fatalf("expected exactly 3 lifecycle log lines, got %d: %v", len(lines), lines)
+	if len(lines) != 4 {
+		t.Fatalf("expected exactly 4 lifecycle log lines, got %d: %v", len(lines), lines)
 	}
 
-	// 1: image pull done.
-	if !strings.Contains(lines[0], "docker: image pull done:") || !strings.Contains(lines[0], "ghcr.io/open-asm/nuclei:1.0") {
-		t.Fatalf("pull line = %q", lines[0])
+	// 1: pull start — the operator sees the pull begin instead of a silent gap
+	// between job start and container created.
+	if !strings.Contains(lines[0], "docker: pulling image:") || !strings.Contains(lines[0], "ghcr.io/open-asm/nuclei:1.0") {
+		t.Fatalf("pull-start line = %q", lines[0])
 	}
-	// 2: container created — carries exec/job/tool/grpc identity.
+	// 2: image pull done.
+	if !strings.Contains(lines[1], "docker: image pull done:") || !strings.Contains(lines[1], "ghcr.io/open-asm/nuclei:1.0") {
+		t.Fatalf("pull line = %q", lines[1])
+	}
+	// 3: container created — carries exec/job/tool/grpc identity.
 	for _, want := range []string{
 		"docker: container created:", "exec=", "job=job-1", "tool=nuclei", "grpc=172.18.0.3:50051",
 	} {
-		if !strings.Contains(lines[1], want) {
-			t.Fatalf("created line %q missing %q", lines[1], want)
+		if !strings.Contains(lines[2], want) {
+			t.Fatalf("created line %q missing %q", lines[2], want)
 		}
 	}
-	// 3: container started — same exec identity as created.
-	if !strings.Contains(lines[2], "docker: container started:") || !strings.Contains(lines[2], "job=job-1") {
-		t.Fatalf("started line = %q", lines[2])
+	// 4: container started — same exec identity as created.
+	if !strings.Contains(lines[3], "docker: container started:") || !strings.Contains(lines[3], "job=job-1") {
+		t.Fatalf("started line = %q", lines[3])
 	}
 	execOf := func(line string) string {
 		start := strings.Index(line, "exec=")
@@ -862,10 +867,10 @@ func TestCreateLogsLifecycleSteps(t *testing.T) {
 		}
 		return rest
 	}
-	if execOf(lines[1]) == "" || execOf(lines[1]) != execOf(lines[2]) {
-		t.Fatalf("started line must reuse the created exec identity: %q vs %q", lines[1], lines[2])
+	if execOf(lines[2]) == "" || execOf(lines[2]) != execOf(lines[3]) {
+		t.Fatalf("started line must reuse the created exec identity: %q vs %q", lines[2], lines[3])
 	}
-	execID := execOf(lines[2])
+	execID := execOf(lines[3])
 	if len(execID) != 32 {
 		t.Fatalf("exec identity %q must be a 32-hex execution id", execID)
 	}

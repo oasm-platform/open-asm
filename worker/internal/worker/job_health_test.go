@@ -322,11 +322,12 @@ func TestHandleConnectorResultForwardsLogsToTail(t *testing.T) {
 	}
 }
 
-// TestProcessConnectorJobFailFastSkipsContainer tests the backoff gate: when
-// the image is backing off, a new job for the same image fails fast — no
-// container is created, Core receives a clear "backing off, retry in Xs"
-// error, and no async completion handler is spawned.
-func TestProcessConnectorJobFailFastSkipsContainer(t *testing.T) {
+// TestProcessConnectorJobWaitsOutBackoffThenRuns: when the image is backing
+// off, a new job for the same image must NOT be reported to Core as a failure
+// (that surfaced a spurious "image backing off" error in the UI on every retry
+// and burned the job's retry budget). The worker waits out the window and then
+// runs the job normally, so the UI only sees the real scan outcome.
+func TestProcessConnectorJobWaitsOutBackoffThenRuns(t *testing.T) {
 	resetWorkerGlobals()
 
 	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
@@ -335,8 +336,9 @@ func TestProcessConnectorJobFailFastSkipsContainer(t *testing.T) {
 	events := make(chan TuiEvent, 64)
 
 	image := "ghcr.io/open-asm/nuclei:1.0"
-	backoff := execution.NewImageBackoff()
-	backoff.RecordFailure(image)
+	// Short schedule so the wait is observable without stalling the test.
+	backoff := execution.NewImageBackoffWithSchedule(20*time.Millisecond, 40*time.Millisecond)
+	backoff.RecordFailure(image, "container exited early with code 137")
 	if ok, _ := backoff.Allow(image); ok {
 		t.Fatal("precondition: expected image backing off")
 	}
@@ -344,57 +346,82 @@ func TestProcessConnectorJobFailFastSkipsContainer(t *testing.T) {
 	defer func() { imageBackoff = oldBackoff }()
 
 	jobsSrv.nextFn = func() (*pb.Job, error) {
-		return &pb.Job{Id: "job-ff-1", Tool: "nuclei", Image: image}, nil
+		return &pb.Job{Id: "job-wait-1", Tool: "nuclei", Image: image}, nil
 	}
 
 	releaseCh := make(chan struct{}, 1)
 	releaseSem := func() { releaseCh <- struct{}{} }
 
+	start := time.Now()
 	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, releaseSem)
 
 	if !hadJob {
 		t.Fatal("expected hadJob=true")
 	}
+	if !usedAsync {
+		t.Fatal("expected usedAsync=true: the job must run once the window expires")
+	}
+	if fakeRT.CreateCount != 1 {
+		t.Fatalf("expected exactly 1 Create after the backoff window, got %d", fakeRT.CreateCount)
+	}
+	if waited := time.Since(start); waited < 20*time.Millisecond {
+		t.Fatalf("expected the worker to wait out the backoff window, returned after %s", waited)
+	}
+
+	// A backoff deferral is not a job failure: nothing may reach Core.
+	if results := jobsSrv.getResults(); len(results) != 0 {
+		t.Fatalf("expected no submission to Core while backing off, got %d", len(results))
+	}
+}
+
+// TestProcessConnectorJobGivesUpAfterBackoffBudget: a permanently broken image
+// must not hold the worker's concurrency slot forever. Once the wait budget is
+// exhausted the job fails once (so an operator sees it) instead of waiting out
+// the full window.
+func TestProcessConnectorJobGivesUpAfterBackoffBudget(t *testing.T) {
+	resetWorkerGlobals()
+	oldBudget := imageBackoffWaitBudget
+	imageBackoffWaitBudget = 50 * time.Millisecond
+	defer func() { imageBackoffWaitBudget = oldBudget }()
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	mgr := execution.NewManager(fakeRT, 0)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	image := "ghcr.io/open-asm/nuclei:1.0"
+	// Window far longer than the budget: Allow never flips before giving up.
+	backoff := execution.NewImageBackoffWithSchedule(time.Hour, 2*time.Hour)
+	backoff.RecordFailure(image, "container exited early with code 137")
+	oldBackoff := swapImageBackoff(backoff)
+	defer func() { imageBackoff = oldBackoff }()
+
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return &pb.Job{Id: "job-budget-1", Tool: "nuclei", Image: image}, nil
+	}
+
+	start := time.Now()
+	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, func() {})
+
+	if !hadJob {
+		t.Fatal("expected hadJob=true")
+	}
 	if usedAsync {
-		t.Fatal("expected usedAsync=false: fail-fast must not spawn a completion handler")
+		t.Fatal("expected usedAsync=false: the job gives up without running")
 	}
-
-	// No container may be created while the image is backing off.
 	if fakeRT.CreateCount != 0 {
-		t.Fatalf("expected 0 Create calls during backoff, got %d", fakeRT.CreateCount)
+		t.Fatalf("expected 0 Create calls while giving up, got %d", fakeRT.CreateCount)
+	}
+	if waited := time.Since(start); waited > 5*time.Second {
+		t.Fatalf("job waited %s — the budget must cap the wait", waited)
 	}
 
-	// The fail-fast error must reach Core with the retry hint.
 	results := jobsSrv.getResults()
 	if len(results) != 1 {
-		t.Fatalf("expected exactly 1 submission, got %d", len(results))
+		t.Fatalf("expected exactly 1 failure submission, got %d", len(results))
 	}
-	if !results[0].isError {
-		t.Fatal("expected the fail-fast submission to be an error")
-	}
-	if !strings.Contains(results[0].raw, "backing off") || !strings.Contains(results[0].raw, "retry in") {
-		t.Fatalf("expected 'backing off, retry in Xs' message, got %q", results[0].raw)
-	}
-
-	// The completion event must surface the same message.
-	close(events) // range below must terminate
-	gotCompleted := false
-	for ev := range events {
-		if ev.Type == EventJobCompleted {
-			gotCompleted = true
-			if ev.Success {
-				t.Fatal("expected Success=false for fail-fast completion")
-			}
-			if !strings.Contains(ev.ErrorMsg, "backing off") {
-				t.Fatalf("expected 'backing off' in completion error, got %q", ev.ErrorMsg)
-			}
-		}
-	}
-	if !gotCompleted {
-		t.Fatal("expected EventJobCompleted for fail-fast job")
-	}
-	if len(releaseCh) != 0 {
-		t.Fatal("fail-fast path must not release the semaphore itself (caller does)")
+	if !results[0].isError || !strings.Contains(results[0].raw, "still backing off") {
+		t.Fatalf("expected a single 'still backing off' error, got %q", results[0].raw)
 	}
 }
 

@@ -26,9 +26,14 @@ interface Asset {
 
 interface AssetSectionProps {
   assetGroupId: string;
+  /** Count reported by the group itself; falls back to the table total. */
+  totalAssets?: number;
 }
 
-export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
+export const AssetSection: React.FC<AssetSectionProps> = ({
+  assetGroupId,
+  totalAssets,
+}) => {
   const queryClient = useQueryClient();
 
   // Queries for assets in the asset group
@@ -104,41 +109,43 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
     [handleRemoveAssets, removePending],
   );
 
+  const hostCount = totalAssets ?? assetsInGroupQuery.data?.total ?? 0;
+
   return (
-    <div className="w-full space-y-4">
-      <div className="flex flex-row items-center justify-between space-y-0 pb-2 mb-4">
+    <section className="flex flex-col gap-2 border-t pt-2">
+      <div className="flex flex-row items-center justify-between gap-4 px-4 py-2 md:px-6">
         <div>
-          <h2 className="text-base font-semibold">Hosts</h2>
-          <p className="text-sm text-muted-foreground">
-            {assetsInGroupQuery.data?.total || 0} hosts in this group
-          </p>
+          <div className="leading-none font-semibold">Hosts</div>
+          <div className="hidden text-sm text-muted-foreground md:block">
+            {hostCount} host{hostCount === 1 ? '' : 's'} in this group
+          </div>
         </div>
-        <div className="flex space-x-2">
-          <SelectAssetsDialog
-            assetGroupId={assetGroupId}
-            onAssetsAdded={() => assetsInGroupQuery.refetch()}
-          />
-        </div>
+        <SelectAssetsDialog
+          assetGroupId={assetGroupId}
+          onAssetsAdded={() => assetsInGroupQuery.refetch()}
+        />
       </div>
-      <DataTable
-        columns={assetColumns}
-        data={assetsInGroupQuery.data?.data ?? []}
-        isLoading={assetsInGroupQuery.isLoading}
-        page={assetsInGroupQuery.data?.page ?? 1}
-        pageSize={assetsInGroupQuery.data?.limit ?? 10}
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        onSortChange={(col, order) => {
-          setParams({ sortBy: col, sortOrder: order });
-        }}
-        filterColumnKey="value"
-        filterValue={filter}
-        onFilterChange={setFilter}
-        totalItems={assetsInGroupQuery.data?.total ?? 0}
-        emptyMessage="No hosts in this group yet"
-      />
-    </div>
+      <div className="px-4 py-2 md:px-6">
+        <DataTable
+          columns={assetColumns}
+          data={assetsInGroupQuery.data?.data ?? []}
+          isLoading={assetsInGroupQuery.isLoading}
+          page={assetsInGroupQuery.data?.page ?? 1}
+          pageSize={assetsInGroupQuery.data?.limit ?? 10}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          onSortChange={(col, order) => {
+            setParams({ sortBy: col, sortOrder: order });
+          }}
+          filterColumnKey="value"
+          filterValue={filter}
+          onFilterChange={setFilter}
+          totalItems={assetsInGroupQuery.data?.total ?? 0}
+          emptyMessage="No hosts in this group yet"
+        />
+      </div>
+    </section>
   );
 };

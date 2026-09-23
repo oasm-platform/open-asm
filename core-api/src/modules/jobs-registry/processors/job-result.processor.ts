@@ -21,6 +21,40 @@ interface CategoryResultData {
   payload?: unknown;
 }
 
+/**
+ * The worker's failure report travels in `raw` when `error` is set. Returns it
+ * trimmed, or undefined when it carries nothing usable (a built-in tool that
+ * failed before producing output), so the caller can fall back to a generic
+ * message instead of persisting an empty error.
+ */
+function normalizeFailureReason(
+  raw: string | null | undefined,
+): string | undefined {
+  const reason = raw?.trim();
+  if (!reason) {
+    return undefined;
+  }
+  return reason;
+}
+
+/**
+ * A job failure carrying the partial result the worker had already collected.
+ *
+ * The console's error dialog renders the error log's payload next to the
+ * message, and the processor used to pass a hardcoded `{}` — the dialog showed
+ * an empty "Payload" box that told an operator nothing. The staged result
+ * document still holds whatever the connector produced before it failed (open
+ * ports, findings), so it rides along on the error instead of being dropped.
+ */
+class WithFailurePayload extends Error {
+  constructor(
+    message: string,
+    readonly payload: unknown,
+  ) {
+    super(message);
+  }
+}
+
 @Processor(BullMQName.JOB_RESULT, {
   concurrency: 10,
 })
@@ -83,9 +117,17 @@ export class JobResultProcessor extends WorkerHost {
           bucket,
         );
 
-      // Check error flag BEFORE syncing data — avoid wasting work on failed jobs
+      // Check error flag BEFORE syncing data — avoid wasting work on failed jobs.
+      // The worker writes its failure report into `raw` (executor error, adapter
+      // error and the tail of the container log). Surfacing that instead of a
+      // fixed string is the whole difference between an actionable failure and
+      // "Job reported error" — the message lands on the job row AND in the
+      // error-log entry the console renders.
       if (rawResult?.error) {
-        throw new Error('Job reported error');
+        throw new WithFailurePayload(
+          normalizeFailureReason(rawResult.raw) ?? 'Job reported error',
+          rawResult.payload,
+        );
       }
 
       const raw = rawResult.raw ?? undefined;
@@ -137,11 +179,32 @@ export class JobResultProcessor extends WorkerHost {
         });
       }
 
-      const completedJob = await this.jobRepo.save({
-        ...job,
-        status: JobStatus.COMPLETED,
-        completedAt: new Date(),
-      });
+      const completedAt = new Date();
+      // Conditional write: the run may have been cancelled (or the job
+      // re-run) while this result was being processed. Only the transition
+      // IN_PROGRESS → COMPLETED is ours to make — an unconditional save would
+      // overwrite the CANCELLED status and let the workflow keep spawning.
+      const completion = await this.jobRepo.update(
+        { id: job.id, status: JobStatus.IN_PROGRESS },
+        { status: JobStatus.COMPLETED, completedAt },
+      );
+
+      if (!completion.affected) {
+        this.logger.warn(
+          `Job ${job.id} left IN_PROGRESS before its result was applied; discarding result`,
+        );
+        try {
+          await this.storageService.deleteFile(fileName, bucket);
+        } catch (error) {
+          this.logger.error(
+            `Failed to delete discarded result file ${resultRef}:`,
+            error,
+          );
+        }
+        return;
+      }
+
+      const completedJob = { ...job, status: JobStatus.COMPLETED, completedAt };
 
       const nextStepJobCount =
         await this.jobsRegistryService.getNextStepForJob(completedJob);
@@ -171,8 +234,13 @@ export class JobResultProcessor extends WorkerHost {
         bullJob.attemptsMade + 1 >= (bullJob.opts.attempts || 1);
 
       if (isLastAttempt) {
+        // `data` is a DataPayloadResult whose `payload` is the only field read
+        // back (handleJobError stores it verbatim in the error log); here it is
+        // just the array the connector had collected, hence the cast.
+        const partial = e instanceof WithFailurePayload ? e.payload : undefined;
+
         await this.jobsRegistryService.handleJobError(
-          { jobId, data: {} as DataPayloadResult },
+          { jobId, data: { payload: partial } as DataPayloadResult },
           job,
           e,
         );

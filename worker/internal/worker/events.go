@@ -21,6 +21,10 @@ const (
 	EventSessionCommand
 	EventSessionClosed
 	EventSessionOutput
+	// EventImagePullProgress reports container-image pull progress (bytes
+	// downloaded across layers) for a single job. High-volume by nature — it
+	// is dropped like job output when the channel is full.
+	EventImagePullProgress
 )
 
 type TuiEvent struct {
@@ -54,6 +58,11 @@ type TuiEvent struct {
 	// Metrics
 	ActiveJobs     int
 	MaxConcurrency int
+
+	// Image pull progress
+	Image  string
+	Pulled float64 // 0..1 bytes downloaded across layers; -1 = indeterminate
+	Done   bool
 
 	// Session events
 	SessionID       string
@@ -98,6 +107,8 @@ func eventLabel(t TuiEventType) string {
 		return "SESSION"
 	case EventSessionOutput:
 		return "OUTPUT"
+	case EventImagePullProgress:
+		return "IMAGE"
 	default:
 		return "EVENT"
 	}
@@ -147,6 +158,20 @@ func Emit(events chan<- TuiEvent, event TuiEvent) {
 		case EventConnected:
 			fmt.Fprintf(os.Stderr, "[%s] %-7s [%s] Connected: worker=%s host=%s:%d\n",
 				ts, eventLabel(event.Type), src, event.WorkerID, event.Host, event.Port)
+		case EventImagePullProgress:
+			// One self-overwriting line instead of a line per update: a pull
+			// emits tens of progress ticks and headless logs are line-oriented.
+			// Nothing is printed once the pull finishes — the activity line
+			// that follows already reports the outcome.
+			if event.Done {
+				break
+			}
+			pct := "  ?  "
+			if event.Pulled >= 0 {
+				pct = fmt.Sprintf("%3.0f%%", event.Pulled*100)
+			}
+			fmt.Fprintf(os.Stderr, "\r[%s] %-7s [%s] pulling %s %s ",
+				ts, eventLabel(event.Type), src, event.Image, pct)
 		case EventDisconnected:
 			fmt.Fprintf(os.Stderr, "[%s] %-7s [%s] %s\n",
 				ts, eventLabel(event.Type), src, event.DisconnectReason)
@@ -186,7 +211,6 @@ func Emit(events chan<- TuiEvent, event TuiEvent) {
 	}
 }
 
-// TuiLogger routes log messages to the TUI events feed.
 type TuiLogger struct {
 	events chan<- TuiEvent
 	source string
@@ -244,4 +268,39 @@ func (l *TuiLogger) emit(level, msg string, args ...any) {
 		ActivityLevel: level,
 		Message:       formatted,
 	})
+}
+
+// ImagePullProgress reports container-image pull progress. `pulled` is the
+// fraction of bytes downloaded across layers (negative = indeterminate, e.g.
+// the layer list is not known yet); done=true marks the terminal update.
+//
+// This is deliberately NOT an activity log line: a pull emits tens of updates
+// per second, and one event per update would flood the activity feed an
+// operator reads for job outcomes. The TUI renders it as a dedicated progress
+// bar; headless mode overwrites a single stderr line.
+func (l *TuiLogger) ImagePullProgress(jobID, image string, pulled float64, done bool) {
+	if l.events == nil {
+		Emit(nil, TuiEvent{
+			Type:   EventImagePullProgress,
+			Source: l.source,
+			JobID:  jobID,
+			Image:  image,
+			Pulled: pulled,
+			Done:   done,
+		})
+		return
+	}
+	select {
+	case l.events <- TuiEvent{
+		Type:      EventImagePullProgress,
+		Timestamp: time.Now(),
+		Source:    l.source,
+		JobID:     jobID,
+		Image:     image,
+		Pulled:    pulled,
+		Done:      done,
+	}:
+	default:
+		// A dropped tick is invisible: the next one carries the running total.
+	}
 }

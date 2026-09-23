@@ -1,6 +1,7 @@
 import {
   BullMQName,
   JobPriority,
+  JobRunType,
   JobStatus,
   ToolCategory,
   WorkerType,
@@ -375,6 +376,92 @@ describe('JobsRegistryService', () => {
     });
   });
 
+  describe('cancelJobHistory', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+    const mockHistoryId = 'history-uuid';
+
+    const buildQueryRunner = ({
+      belongsToWorkspace = true,
+      affected = 3,
+    } = {}) => {
+      const ownershipBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(belongsToWorkspace),
+      };
+      const updateBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected }),
+      };
+      const manager = {
+        // Called twice: with the entity (ownership lookup) and without (bulk update)
+        createQueryBuilder: jest.fn((entity?: unknown) =>
+          entity ? ownershipBuilder : updateBuilder,
+        ),
+      };
+
+      return {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager,
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+        ownershipBuilder,
+        updateBuilder,
+      };
+    };
+
+    it('cancels every job of the run, keeping the completion time of finished ones', async () => {
+      const qr = buildQueryRunner({ affected: 100 });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      const result = await service.cancelJobHistory(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      // COALESCE keeps the real completedAt so an already-finished job does not
+      // look like it completed at cancel time.
+      expect(qr.updateBuilder.set).toHaveBeenCalledWith({
+        status: JobStatus.CANCELLED,
+        completedAt: expect.any(Function),
+      });
+      expect(qr.updateBuilder.where).toHaveBeenCalledWith(
+        '"jobHistoryId" = :jobHistoryId',
+        { jobHistoryId: mockHistoryId },
+      );
+      expect(qr.commitTransaction).toHaveBeenCalled();
+      expect(result.message).toContain('100');
+    });
+
+    it('throws NotFoundException and rolls back for a history outside the workspace', async () => {
+      const qr = buildQueryRunner({ belongsToWorkspace: false });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      await expect(
+        service.cancelJobHistory(mockWorkspaceId, mockHistoryId),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(qr.rollbackTransaction).toHaveBeenCalled();
+      expect(qr.updateBuilder.execute).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a history that does not exist', async () => {
+      const qr = buildQueryRunner({ belongsToWorkspace: false });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      await expect(
+        service.cancelJobHistory(mockWorkspaceId, 'missing-history'),
+      ).rejects.toThrow(NotFoundException);
+      expect(qr.commitTransaction).not.toHaveBeenCalled();
+    });
+  });
+
   describe('deleteJob', () => {
     const mockWorkspaceId = 'workspace-uuid';
     const mockJobId = 'job-uuid';
@@ -561,6 +648,32 @@ describe('JobsRegistryService', () => {
         'name',
         'status',
       ]);
+    });
+
+    it('should report a tool as cancelled rather than completed once the run was cancelled', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({ data: [] });
+
+      await service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId);
+
+      const selectCalls = (mockJobRepository.select).mock.calls;
+      const selectArgs = selectCalls[selectCalls.length - 1][0] as string[];
+      const statusExpr = selectArgs.find((s) => s.includes('CASE'))!;
+      // Regression: a tool whose jobs finished before the cancel used to keep a
+      // green check, because the COMPLETED branch was reached first.
+      expect(statusExpr).toContain(
+        `WHEN COUNT(CASE WHEN job.status = '${JobStatus.CANCELLED}' THEN 1 END) > 0`,
+      );
+      expect(statusExpr.indexOf(JobStatus.CANCELLED)).toBeLessThan(
+        statusExpr.indexOf(JobStatus.COMPLETED),
+      );
     });
 
     it('should return detail for a history whose jobs were all deleted (ownership proven via workflow, tool status undefined)', async () => {
@@ -809,6 +922,65 @@ describe('JobsRegistryService', () => {
         'target',
       );
     });
+
+    it('should mask secrets in the returned job config', async () => {
+      mockJobRepository.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'job-1',
+            tool: { name: 'acunetix' },
+            config: {
+              url: 'https://acunetix.local',
+              apiKey: 'super-secret-key',
+            },
+          },
+        ],
+        1,
+      ]);
+      mockConnectorRegistryService.getConnector.mockReturnValue({
+        configSchema: {
+          properties: { apiKey: { type: 'string', 'ui:widget': 'password' } },
+        },
+      });
+
+      const result = await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(result.data[0].config).toEqual({
+        url: 'https://acunetix.local',
+        apiKey: '****-key',
+      });
+    });
+
+    it('should still mask secret-named config keys when no connector schema resolves', async () => {
+      mockJobRepository.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'job-2',
+            tool: { name: 'unknown-connector' },
+            config: { url: 'https://x.local', password: 'hunter2' },
+          },
+        ],
+        1,
+      ]);
+      mockConnectorRegistryService.getConnector.mockReturnValue(null);
+
+      const result = await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(result.data[0].config).toEqual({
+        url: 'https://x.local',
+        password: '****ter2',
+      });
+    });
   });
 
   describe('getManyJobHistories', () => {
@@ -818,9 +990,11 @@ describe('JobsRegistryService', () => {
       innerJoin: jest.Mock<HistoryQueryBuilder>;
       leftJoin: jest.Mock<HistoryQueryBuilder>;
       where: jest.Mock<HistoryQueryBuilder>;
+      andWhere: jest.Mock<HistoryQueryBuilder>;
       select: (args: unknown[]) => HistoryQueryBuilder;
       groupBy: jest.Mock<HistoryQueryBuilder>;
       addGroupBy: jest.Mock<HistoryQueryBuilder>;
+      having: jest.Mock<HistoryQueryBuilder>;
       orderBy: jest.Mock<HistoryQueryBuilder>;
       addOrderBy: jest.Mock<HistoryQueryBuilder>;
       offset: jest.Mock<HistoryQueryBuilder>;
@@ -835,12 +1009,14 @@ describe('JobsRegistryService', () => {
         innerJoin: jest.fn().mockReturnThis(),
         leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         select: jest.fn((args: unknown[]) => {
           selectArgs.push(args);
           return qb;
         }),
         groupBy: jest.fn().mockReturnThis(),
         addGroupBy: jest.fn().mockReturnThis(),
+        having: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
         offset: jest.fn().mockReturnThis(),
@@ -851,15 +1027,32 @@ describe('JobsRegistryService', () => {
       return { qb, selectArgs };
     };
 
+    /**
+     * The method builds two query builders: the paged select and the distinct-id
+     * count. Return a fresh one per call and expose both, so assertions can pick
+     * the builder they care about regardless of call order.
+     */
+    const stubHistoryQueryBuilders = (total = 0) => {
+      const paged = buildHistoryQueryBuilder();
+      const count = buildHistoryQueryBuilder();
+      count.qb.getRawMany.mockResolvedValue(
+        Array.from({ length: total }, (_, i) => ({ id: `history-${i}` })),
+      );
+      mockJobHistoryRepository.createQueryBuilder.mockReset();
+      mockJobHistoryRepository.createQueryBuilder
+        .mockReturnValueOnce(paged.qb)
+        .mockReturnValueOnce(count.qb);
+      return { paged, count };
+    };
+
     beforeEach(() => {
       jest.clearAllMocks();
     });
 
     it('should compute totalJobs and status from joined jobs without correlated subqueries', async () => {
-      const { qb, selectArgs } = buildHistoryQueryBuilder();
+      const { paged, count } = stubHistoryQueryBuilders(2);
+      const { qb, selectArgs } = paged;
       qb.getRawMany.mockResolvedValue([]);
-      qb.getCount.mockResolvedValue(2);
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
 
       const result = await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -881,16 +1074,15 @@ describe('JobsRegistryService', () => {
       ) as string;
       expect(statusExpr).toContain(`job.status = '${JobStatus.FAILED}'`);
       expect(statusExpr).toContain(`job.status = '${JobStatus.IN_PROGRESS}'`);
-      // Separate count query is still executed (getCount would strip GROUP BY)
-      expect(qb.getCount).toHaveBeenCalled();
+      // Separate count query is still executed (it needs its own GROUP BY)
+      expect(count.qb.getRawMany).toHaveBeenCalled();
       expect(result.total).toBe(2);
     });
 
     it('should aggregate terminal cancelled status when all jobs are cancelled', async () => {
-      const { qb, selectArgs } = buildHistoryQueryBuilder();
+      const { paged } = stubHistoryQueryBuilders();
+      const { qb, selectArgs } = paged;
       qb.getRawMany.mockResolvedValue([]);
-      qb.getCount.mockResolvedValue(0);
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -903,16 +1095,45 @@ describe('JobsRegistryService', () => {
         (s) => typeof s === 'string' && s.includes('FILTER'),
       ) as string;
       // All-cancelled histories must surface as cancelled, not pending
+      expect(statusExpr).toContain(`THEN '${JobStatus.CANCELLED}'`);
       expect(statusExpr).toContain(
-        `WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.CANCELLED}'`,
+        `job.status = '${JobStatus.CANCELLED}') > 0`,
+      );
+    });
+
+    it('should surface a cancelled run even when some jobs already completed', async () => {
+      const { paged } = stubHistoryQueryBuilders();
+      const { qb, selectArgs } = paged;
+      qb.getRawMany.mockResolvedValue([]);
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      const statusExpr = selectArgs[0].find(
+        (s) => typeof s === 'string' && s.includes('FILTER'),
+      ) as string;
+      // Derived purely from the child jobs: a cancelled job with nothing left
+      // pending/in-progress means the user stopped the run. Without this branch
+      // a run cancelled after 30/100 jobs would fall through to "pending".
+      expect(statusExpr).toContain(
+        `WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') > 0`,
+      );
+      expect(statusExpr).toContain(
+        `COUNT(*) FILTER (WHERE job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}')) = 0`,
+      );
+      expect(statusExpr.indexOf(JobStatus.CANCELLED)).toBeLessThan(
+        statusExpr.indexOf(JobStatus.FAILED),
       );
     });
 
     it('should aggregate terminal skipped status when all jobs are skipped', async () => {
-      const { qb, selectArgs } = buildHistoryQueryBuilder();
+      const { paged } = stubHistoryQueryBuilders();
+      const { qb, selectArgs } = paged;
       qb.getRawMany.mockResolvedValue([]);
-      qb.getCount.mockResolvedValue(0);
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -931,8 +1152,8 @@ describe('JobsRegistryService', () => {
     });
 
     it('should fall back to createdAt and append an id tiebreaker for unknown sortBy', async () => {
-      const { qb } = buildHistoryQueryBuilder();
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+      const { paged } = stubHistoryQueryBuilders();
+      const { qb } = paged;
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -946,8 +1167,8 @@ describe('JobsRegistryService', () => {
     });
 
     it('should pass through whitelisted sortBy values', async () => {
-      const { qb } = buildHistoryQueryBuilder();
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+      const { paged } = stubHistoryQueryBuilders();
+      const { qb } = paged;
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -963,7 +1184,8 @@ describe('JobsRegistryService', () => {
     });
 
     it('should transform raw rows into the response DTO shape', async () => {
-      const { qb } = buildHistoryQueryBuilder();
+      const { paged } = stubHistoryQueryBuilders();
+      const { qb } = paged;
       qb.getRawMany.mockResolvedValue([
         {
           id: 'history-1',
@@ -976,7 +1198,6 @@ describe('JobsRegistryService', () => {
           jobRunType: 'manual',
         },
       ]);
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
 
       const result = await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -995,6 +1216,113 @@ describe('JobsRegistryService', () => {
         jobHistoryName: 'name-1',
         jobRunType: 'manual',
       });
+    });
+
+    it('should apply the search predicate to both the paged query and the count', async () => {
+      const { paged, count } = stubHistoryQueryBuilders();
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        search: 'nightly',
+      } as any);
+
+      const expected = {
+        search: '%nightly%',
+      };
+      expect(paged.qb.andWhere).toHaveBeenCalledWith(
+        '(jobHistory.jobHistoryName ILIKE :search OR workflow.name ILIKE :search)',
+        expected,
+      );
+      expect(count.qb.andWhere).toHaveBeenCalledWith(
+        '(jobHistory.jobHistoryName ILIKE :search OR workflow.name ILIKE :search)',
+        expected,
+      );
+    });
+
+    it('should filter on the status rollup via HAVING, and skip it for "all"', async () => {
+      const filtered = stubHistoryQueryBuilders();
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobStatus: JobStatus.FAILED,
+      } as any);
+
+      const [havingSql, havingParams] = filtered.paged.qb.having.mock.calls[0] as [
+        string,
+        { jobStatus: string },
+      ];
+      expect(havingSql).toContain('FILTER');
+      expect(havingParams).toEqual({ jobStatus: JobStatus.FAILED });
+      // The count must apply the same aggregate filter
+      expect(filtered.count.qb.having).toHaveBeenCalledWith(
+        havingSql,
+        havingParams,
+      );
+
+      const unfiltered = stubHistoryQueryBuilders();
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobStatus: 'all',
+      } as any);
+      expect(unfiltered.paged.qb.having).not.toHaveBeenCalled();
+      expect(unfiltered.count.qb.having).not.toHaveBeenCalled();
+    });
+
+    it('should filter by run type and a creation-date range on both queries', async () => {
+      const { paged, count } = stubHistoryQueryBuilders();
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobRunType: JobRunType.SCHEDULED,
+        createdFrom: '2026-01-01',
+        createdTo: '2026-01-31',
+      } as any);
+
+      const ranged = (qb: typeof paged.qb) => {
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          'jobHistory.jobRunType = :jobRunType',
+          { jobRunType: JobRunType.SCHEDULED },
+        );
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          'jobHistory.createdAt >= :createdFrom',
+          { createdFrom: new Date('2026-01-01') },
+        );
+        const [, params] = qb.andWhere.mock.calls.find(
+          ([sql]) => sql === 'jobHistory.createdAt <= :createdTo',
+        ) as [string, { createdTo: Date }];
+        // A bare date means "through the end of that day".
+        expect(params.createdTo.getHours()).toBe(23);
+        expect(params.createdTo.getMilliseconds()).toBe(999);
+      };
+
+      ranged(paged.qb);
+      ranged(count.qb);
+    });
+
+    it('should skip run type and date filters for "all" / absent values', async () => {
+      const { paged } = stubHistoryQueryBuilders();
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobRunType: 'all',
+      } as any);
+
+      expect(paged.qb.andWhere).not.toHaveBeenCalled();
     });
   });
 

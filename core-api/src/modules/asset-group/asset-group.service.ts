@@ -196,6 +196,20 @@ export class AssetGroupService {
           : null;
       }
 
+      // totalAssets is not a column — the list query computes it with a
+      // subquery, so the detail response has to count the join rows itself.
+      // COUNT(aga.id) is explicit: a bare getCount() would count group rows,
+      // not the joined assets.
+      const counted: { totalAssets: string } | undefined = await this
+        .assetGroupRepo
+        .createQueryBuilder('assetGroup')
+        .select('COUNT(aga.id)', 'totalAssets')
+        .innerJoin('assetGroup.assetGroupAssets', 'aga')
+        .where('assetGroup.id = :id', { id })
+        .getRawOne();
+
+      assetGroup.totalAssets = parseInt(counted?.totalAssets ?? '') || 0;
+
       return assetGroup;
     } catch (error) {
       this.logger.error(

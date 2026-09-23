@@ -17,6 +17,12 @@ describe('JobsRegistryController audit wiring (M4.4 decorator events)', () => {
     );
   });
 
+  it('cancelJobHistory is wired to the job.cancelled event', () => {
+    expect(
+      auditConfig(JobsRegistryController.prototype.cancelJobHistory),
+    ).toEqual(expect.objectContaining({ action: 'job.cancelled' }));
+  });
+
   it('cancelJob is bare: jobId is not capturable from body/result, no changes or metadata', () => {
     const config = auditConfig(JobsRegistryController.prototype.cancelJob);
     expect(config?.changes).toBeUndefined();

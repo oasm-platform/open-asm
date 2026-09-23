@@ -22,6 +22,9 @@ type ImageBackoff struct {
 type imageBackoffEntry struct {
 	consecutiveFails int
 	nextAllowedAt    time.Time
+	// lastReason is the reason recorded with the most recent failure. Kept for
+	// the next gate check's diagnostic log only — it never affects scheduling.
+	lastReason string
 }
 
 // DefaultImageBackoffBase is the base window: min(base*2^fails, max).
@@ -50,6 +53,15 @@ func newImageBackoffWithClock(now func() time.Time) *ImageBackoff {
 	return b
 }
 
+// NewImageBackoffWithSchedule creates a backoff with an explicit schedule
+// (tests and tuning): base is the first-failure window and max the hard cap.
+func NewImageBackoffWithSchedule(base, max time.Duration) *ImageBackoff {
+	b := NewImageBackoff()
+	b.base = base
+	b.max = max
+	return b
+}
+
 // Allow reports whether a job for image may start now. ok=false means the
 // image is backing off; retryIn is the remaining time until the next attempt
 // is allowed.
@@ -67,15 +79,31 @@ func (b *ImageBackoff) Allow(image string) (ok bool, retryIn time.Duration) {
 	return true, 0
 }
 
+// LastFailureReason returns the reason recorded with the most recent failure
+// for image ("" when the image has no recorded failure). Informational only.
+func (b *ImageBackoff) LastFailureReason(image string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if e := b.m[image]; e != nil {
+		return e.lastReason
+	}
+	return ""
+}
+
 // RecordFailure increments the consecutive-failure counter and extends the
-// next-allowed time by min(base*2^fails, max) from now.
-func (b *ImageBackoff) RecordFailure(image string) {
+// next-allowed time by min(base*2^fails, max) from now. The optional reason is
+// stored for the next gate check's diagnostic log (LastFailureReason) and does
+// not affect the schedule.
+func (b *ImageBackoff) RecordFailure(image string, reason ...string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	e := b.m[image]
 	if e == nil {
 		e = &imageBackoffEntry{}
 		b.m[image] = e
+	}
+	if len(reason) > 0 && reason[0] != "" {
+		e.lastReason = reason[0]
 	}
 	e.consecutiveFails++
 	// Exponential with overflow guard: min(base*2^fails, max), never past max.

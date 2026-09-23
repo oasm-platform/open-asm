@@ -34,7 +34,7 @@ describe('JobResultProcessor', () => {
   };
 
   const mockJobRepository = {
-    save: jest.fn(),
+    update: jest.fn(),
   };
 
   const baseBullJob = {
@@ -61,6 +61,7 @@ describe('JobResultProcessor', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockJobRepository.update.mockResolvedValue({ affected: 1 });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -107,7 +108,7 @@ describe('JobResultProcessor', () => {
         'job-results',
       );
       expect(mockStorageService.readJsonFile).not.toHaveBeenCalled();
-      expect(mockJobRepository.save).not.toHaveBeenCalled();
+      expect(mockJobRepository.update).not.toHaveBeenCalled();
     });
 
     it('should not throw when the orphaned file is already deleted', async () => {
@@ -138,12 +139,85 @@ describe('JobResultProcessor', () => {
         'job-1-1710000000000.json',
         'job-results',
       );
-      expect(mockJobRepository.save).not.toHaveBeenCalled();
+      expect(mockJobRepository.update).not.toHaveBeenCalled();
+    });
+
+    // Regression: the failure detail the worker collects (executor error,
+    // adapter error, tail of the container log) is written into `raw`. Throwing
+    // a fixed string discarded it, so the console could only ever show "Job
+    // reported error" and an operator had to shell into the worker to find out
+    // what actually broke.
+    it('should surface the worker failure detail instead of a generic message', async () => {
+      const detail =
+        'fatal: nmap: cannot resolve "nope.invalid"\n--- container logs (last 100 lines) ---\n' +
+        '[runtime] [ERROR] adapter error after 0 result(s) in 3s';
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: true,
+        raw: detail,
+        payload: [],
+      });
+      const lastAttemptBullJob = {
+        ...baseBullJob,
+        attemptsMade: 2,
+      } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+      await expect(processor.process(lastAttemptBullJob)).rejects.toThrow(
+        detail,
+      );
+
+      const [, , error] = mockJobsRegistryService.handleJobError.mock
+        .calls[0] as [unknown, unknown, Error];
+      expect(error.message).toBe(detail);
+    });
+
+    // The dialog shows the log's payload next to the message. A hardcoded `{}`
+    // rendered an empty "Payload" box, so whatever the connector had collected
+    // before failing (here: the open ports it had already parsed) was lost.
+    it('should persist the partial payload the connector collected before failing', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: true,
+        raw: 'nmap exited with code 1',
+        payload: [80, 443],
+      });
+      const lastAttemptBullJob = {
+        ...baseBullJob,
+        attemptsMade: 2,
+      } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+      await expect(processor.process(lastAttemptBullJob)).rejects.toThrow(
+        'nmap exited with code 1',
+      );
+
+      const [dto] = mockJobsRegistryService.handleJobError.mock.calls[0] as [
+        { data: { payload: unknown } },
+      ];
+      expect(dto.data.payload).toEqual([80, 443]);
+    });
+
+    it('should fall back to the generic message when the failure detail is blank', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: true,
+        raw: '   \n  ',
+      });
+      const lastAttemptBullJob = {
+        ...baseBullJob,
+        attemptsMade: 2,
+      } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+      await expect(processor.process(lastAttemptBullJob)).rejects.toThrow(
+        'Job reported error',
+      );
     });
   });
 
   describe('when processing succeeds for an external tool', () => {
-    it('should save the job as completed and delete the result file', async () => {
+    it('should complete the job and delete the result file', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
       mockStorageService.readJsonFile.mockResolvedValue({
         jobId: 'job-1',
@@ -152,7 +226,6 @@ describe('JobResultProcessor', () => {
         payload: { domains: ['example.com'] },
       });
       mockJobsRegistryService.getNextStepForJob.mockResolvedValue(1);
-      mockJobRepository.save.mockImplementation((job: Job) => job);
 
       await processor.process(baseBullJob);
 
@@ -160,9 +233,32 @@ describe('JobResultProcessor', () => {
         data: { domains: ['example.com'] },
         job: baseJob,
       });
-      expect(mockJobRepository.save).toHaveBeenCalledWith(
+      // Conditional on IN_PROGRESS so a concurrent cancel is not overwritten
+      expect(mockJobRepository.update).toHaveBeenCalledWith(
+        { id: 'job-1', status: JobStatus.IN_PROGRESS },
         expect.objectContaining({ status: JobStatus.COMPLETED }),
       );
+      expect(mockJobsRegistryService.markWorkflowDone).not.toHaveBeenCalled();
+      expect(storageService.deleteFile).toHaveBeenCalledWith(
+        'job-1-1710000000000.json',
+        'job-results',
+      );
+    });
+
+    it('should discard the result and spawn nothing when the job was cancelled mid-flight', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: false,
+        raw: null,
+        payload: { domains: ['example.com'] },
+      });
+      // The bulk cancel flipped the job out of IN_PROGRESS first.
+      mockJobRepository.update.mockResolvedValue({ affected: 0 });
+
+      await processor.process(baseBullJob);
+
+      expect(mockJobsRegistryService.getNextStepForJob).not.toHaveBeenCalled();
       expect(mockJobsRegistryService.markWorkflowDone).not.toHaveBeenCalled();
       expect(storageService.deleteFile).toHaveBeenCalledWith(
         'job-1-1710000000000.json',

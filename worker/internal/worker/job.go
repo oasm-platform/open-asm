@@ -64,11 +64,22 @@ func newDetachedCleanupContext() (context.Context, context.CancelFunc) {
 // health. A var (not const) so tests can shrink it.
 var healthPollInterval = 5 * time.Second
 
+// imageBackoffWaitBudget caps how long a single job waits out an image's
+// backoff window before failing once. A var (not const) so tests can shrink it.
+var imageBackoffWaitBudget = 5 * time.Minute
+
 // Container log tail budget attached to failure payloads sent to Core.
 const (
 	tailMaxLines = 100
 	tailMaxBytes = 32 * 1024
 )
+
+// tailGrace bounds the final log drain after the result stream closes. The
+// connector's terminal lines ("execution done", the adapter error) are written
+// to stderr just before Done, and Docker delivers them slightly after the
+// result stream ends; without this grace the failure payload would miss exactly
+// the lines that explain the failure. A var so tests can shrink it.
+var tailGrace = 150 * time.Millisecond
 
 // tailBuffer is a bounded ring buffer of container log lines. append drops the
 // oldest lines once the budget (100 lines / 32KB) is exceeded.
@@ -454,20 +465,56 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		}
 	}
 
-	// Per-image backoff gate: while the image is backing off, fail fast
-	// WITHOUT creating a container (no exec-N waste, no pending ExecuteJob).
-	if ok, retryIn := imageBackoff.Allow(spec.Image); !ok {
-		failMsg := fmt.Sprintf("image backing off, retry in %s (image=%s)", retryIn.Round(time.Second), spec.Image)
-		log.Warning("[%s] %s", job.Id, failMsg)
+	// Per-image backoff gate: a prior job for this image failed to launch or
+	// the connector never completed it, so the image is cooling down. WAIT out
+	// the remaining window instead of reporting a job failure: reporting made
+	// Core treat the rejection as a terminal error and requeue the job, so
+	// every retry surfaced another spurious "image backing off" failure and
+	// burned the job's retry budget. Waiting keeps the job alive and lets it
+	// run the moment the window expires, so the UI only ever sees the real
+	// outcome of the scan.
+	// The wait is bounded by imageBackoffWaitBudget: a permanently broken image
+	// fails once at the end instead of holding the concurrency slot forever.
+	failBackoff := func(msg string) (bool, bool) {
+		log.Warning("[%s] %s", job.Id, msg)
 		Emit(events, TuiEvent{
 			Type:     EventJobCompleted,
 			JobID:    job.Id,
 			Success:  false,
-			ErrorMsg: failMsg,
+			ErrorMsg: msg,
 			Duration: time.Since(startTime),
 		})
-		submitCategoryError(ctx, grpcClient, events, job.Id, category, failMsg)
+		cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+		submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
+		cleanupCancel()
 		return true, false // hadJob=true (job was pulled), caller releases semaphore
+	}
+	waitUntil := time.Now().Add(imageBackoffWaitBudget)
+	for {
+		ok, retryIn := imageBackoff.Allow(spec.Image)
+		if ok {
+			break
+		}
+		if time.Now().After(waitUntil) {
+			return failBackoff(fmt.Sprintf("image still backing off after %s (image=%s)", imageBackoffWaitBudget, spec.Image))
+		}
+		wait := retryIn
+		if remaining := time.Until(waitUntil); remaining < wait {
+			wait = remaining
+		}
+		reason := imageBackoff.LastFailureReason(spec.Image)
+		if reason == "" {
+			reason = "-"
+		}
+		log.Info("[%s] image backing off, retrying in %s (image=%s, last failure: %s)",
+			job.Id, retryIn.Round(time.Second), spec.Image, reason)
+		select {
+		case <-ctx.Done():
+			// Session ended while waiting (worker reconnect/cancel). Finalize as
+			// failed on a detached context so Core can re-queue the job.
+			return failBackoff(fmt.Sprintf("image backing off, session ended before retry (image=%s)", spec.Image))
+		case <-time.After(wait):
+		}
 	}
 
 	// Phase 3 replica quota: when every pooled container of this image is
@@ -505,13 +552,17 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	for attempt := 0; attempt < 2; attempt++ {
 		execID, err = mgr.Submit(ctx, spec)
 		for err != nil && errors.Is(err, execution.ErrPoolExhausted) {
-			log.Info("[%s] Pool at replica cap for image %s, waiting for an idle pooled container (retry in %s)", job.Id, spec.Image, poolRetryDelay)
+			// Quota pressure is normal queueing, not an incident: the job stays
+			// queued in the TUI jobs table and retries silently. Logging it per
+			// retry produced one line every 2s per waiting job, which drowned
+			// the activity feed for zero added information.
 			select {
 			case <-ctx.Done():
 				// The wait outlived the job context — finalize as failed so Core
-				// can re-queue the job elsewhere.
+				// can re-queue the job elsewhere. Quota pressure is local
+				// scheduling, not an image defect, so the image must NOT be
+				// indicted here (that would back off every future job).
 				msg := fmt.Sprintf("Submit failed: timed out waiting for a pooled container: %v", err)
-				imageBackoff.RecordFailure(spec.Image)
 				log.ErrorE(fmt.Sprintf("[%s] %s", job.Id, msg), err)
 				Emit(events, TuiEvent{
 					Type:     EventJobCompleted,
@@ -527,7 +578,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 			execID, err = mgr.Submit(ctx, spec)
 		}
 		if err != nil {
-			imageBackoff.RecordFailure(spec.Image)
+			imageBackoff.RecordFailure(spec.Image, err.Error())
 			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector job", job.Id), err)
 			Emit(events, TuiEvent{
 				Type:     EventJobCompleted,
@@ -596,7 +647,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		// Both attempts produced a container whose stream died before the
 		// send — out of options, fail the job.
 		msg := fmt.Sprintf("Failed to send ExecuteJob (stream died on reuse): %v", sendErr)
-		imageBackoff.RecordFailure(spec.Image)
+		imageBackoff.RecordFailure(spec.Image, sendErr.Error())
 		log.ErrorE(fmt.Sprintf("[%s] %s", job.Id, msg), sendErr)
 		Emit(events, TuiEvent{
 			Type:     EventJobCompleted,
@@ -831,6 +882,31 @@ drain:
 	// OnConnectorDown already ran.
 	proxy.OnConnectorDown(execID)
 
+	// Drain the connector's last log lines before finalizing: the terminal
+	// trace (execution identity, progress, the adapter error) is written to
+	// stderr immediately before Done and reaches Docker just after the result
+	// stream closes. Bounded by tailGrace; a pooled container whose log stream
+	// never ends costs that grace once per job.
+	if tail != nil && logsCh != nil {
+		grace := time.NewTimer(tailGrace)
+		graceC := grace.C
+	finalTail:
+		for {
+			select {
+			case chunk, ok := <-logsCh:
+				if !ok {
+					break finalTail
+				}
+				for _, line := range splitLogChunk(chunk) {
+					tail.append(line)
+				}
+			case <-graceC:
+				break finalTail
+			}
+		}
+		grace.Stop()
+	}
+
 	// Check if connector reported an error via Done message.
 	errMsg, hasError := proxy.PopError(execID)
 	hadDone := proxy.PopDone(execID)
@@ -890,8 +966,20 @@ drain:
 			}
 		}
 	case hasError && errMsg != "":
-		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, errMsg)
+		// Attach the connector's own container log tail to the failure. Those
+		// lines are the SDK's tracing output (execution/job identity, inputs,
+		// progress, error) and they are the only record of WHY the job failed
+		// once the container is gone — without this the platform stores the
+		// Done string alone and the evidence never leaves the worker.
+		failMsg := errMsg
+		if tail != nil && tail.String() != "" {
+			failMsg += "\n--- container logs (last " + fmt.Sprintf("%d lines) ---", tailMaxLines) + "\n" + tail.String()
+		}
+		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, failMsg)
 		log.Warning("[%s] Connector job failed: execID=%s error=%s", entry.jobID, execID, errMsg)
+		if tail != nil && tail.String() != "" {
+			log.Warning("[%s] container logs for failed job %s (last %d lines):\n%s", entry.jobID, execID, tailMaxLines, tail.String())
+		}
 	case !hadDone:
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, "connector disconnected before Done")
 		log.Warning("[%s] Connector disconnected without Done: execID=%s", entry.jobID, execID)
@@ -931,7 +1019,11 @@ drain:
 	// Fail-fast jobs never reach this point (no exec).
 	if entry.image != "" {
 		if !hadDone && !partialOK {
-			imageBackoff.RecordFailure(entry.image)
+			reason := errMsg
+			if reason == "" {
+				reason = "connector disconnected before Done"
+			}
+			imageBackoff.RecordFailure(entry.image, reason)
 		} else {
 			imageBackoff.RecordSuccess(entry.image)
 		}

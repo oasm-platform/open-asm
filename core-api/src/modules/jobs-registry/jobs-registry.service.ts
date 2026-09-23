@@ -1,8 +1,5 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from '@/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
   BullMQName,
   CATEGORY_DATA_SOURCE_MAP,
@@ -30,16 +27,27 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
-import { DataSource, DeepPartial, In, Repository } from 'typeorm';
+import {
+  DataSource,
+  DeepPartial,
+  In,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
+import {
+  getSensitiveFields,
+  maskProfile,
+} from '../tools/validators/tool-config-profiles.crypto';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
+import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
@@ -86,6 +94,21 @@ const JOB_HISTORY_SORTABLE_COLUMNS: string[] = [
   'jobHistoryName',
   'jobRunType',
 ];
+
+/**
+ * A run's status rolled up from its jobs. Kept as one string because the same
+ * expression backs both the SELECT and the status filter (HAVING).
+ */
+const JOB_HISTORY_STATUS_SQL = `CASE
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') > 0
+               AND COUNT(*) FILTER (WHERE job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}')) = 0
+            THEN '${JobStatus.CANCELLED}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
+          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.SKIPPED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.SKIPPED}'
+          ELSE '${JobStatus.PENDING}'
+        END`;
 
 @Injectable()
 export class JobsRegistryService {
@@ -154,7 +177,37 @@ export class JobsRegistryService {
 
     const [data, total] = await qb.getManyAndCount();
 
+    // `config` is persisted already-decrypted (see resolveConfigForJob), so it
+    // must be masked before it leaves the API. The sensitive-name heuristic runs
+    // over both the connector schema and the actual keys, so a connector without
+    // a resolvable schema still masks instead of leaking plaintext.
+    for (const job of data) {
+      job.config = this.maskJobConfig(job);
+    }
+
     return getManyResponse<JobListItemDto>({ query, data, total });
+  }
+
+  /** Returns the job config with every secret replaced by a `****…` mask. */
+  private maskJobConfig(job: Job): Record<string, unknown> | null {
+    const config = job.config;
+    if (!config || typeof config !== 'object') return config ?? null;
+
+    const entry = job.tool
+      ? this.connectorRegistry.getConnector(job.tool.name)
+      : null;
+    const schemaFields = getSensitiveFields(
+      entry?.configSchema ?? entry?.inputsSchema,
+    );
+    // Synthesize a schema from the real keys: isSensitiveField() only needs the
+    // property name plus a truthy object value to apply the name heuristic.
+    const nameFields = getSensitiveFields({
+      properties: Object.fromEntries(
+        Object.keys(config).map((key) => [key, {}]),
+      ),
+    });
+
+    return maskProfile(config, [...new Set([...schemaFields, ...nameFields])]);
   }
 
   /**
@@ -339,9 +392,6 @@ export class JobsRegistryService {
         jobsToInsert.push(job);
       }
     } else {
-      // Cannot query assets for PORTS_SCANNER with assetIds
-      if (tool.category === ToolCategory.PORTS_SCANNER) assetIds = [];
-
       // For all other categories, use regular assets
       const assets = await this.findAssetsForJob(
         targetIds,
@@ -1146,14 +1196,46 @@ export class JobsRegistryService {
 
   public async getManyJobHistories(
     workspaceId: string,
-    query: GetManyBaseQueryParams,
+    query: GetManyJobHistoriesRequestDto,
   ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
-    const { limit, page, sortOrder } = query;
+    const { limit, page, sortOrder, search, jobStatus, jobRunType } = query;
+    const { createdFrom, createdTo } = query;
     let { sortBy } = query;
 
     if (!JOB_HISTORY_SORTABLE_COLUMNS.includes(sortBy)) {
       sortBy = 'createdAt';
     }
+
+    // Filters shared by the paged query and the count, so `total` always matches
+    // the rows on offer: free-text over the two names the list renders, run type
+    // and creation-date bounds (WHERE), plus the status rollup (HAVING — it is
+    // an aggregate, so it cannot be a WHERE).
+    const applyFilters = (qb: SelectQueryBuilder<JobHistory>) => {
+      if (search) {
+        qb.andWhere(
+          '(jobHistory.jobHistoryName ILIKE :search OR workflow.name ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+      if (jobRunType && jobRunType !== 'all') {
+        qb.andWhere('jobHistory.jobRunType = :jobRunType', { jobRunType });
+      }
+      if (createdFrom) {
+        qb.andWhere('jobHistory.createdAt >= :createdFrom', {
+          createdFrom: new Date(createdFrom),
+        });
+      }
+      if (createdTo) {
+        // The client sends a date, not an instant: include the whole end day.
+        const end = new Date(createdTo);
+        end.setHours(23, 59, 59, 999);
+        qb.andWhere('jobHistory.createdAt <= :createdTo', { createdTo: end });
+      }
+      // 'all' is a UI convention meaning "no status filter".
+      if (jobStatus && jobStatus !== 'all') {
+        qb.having(`${JOB_HISTORY_STATUS_SQL} = :jobStatus`, { jobStatus });
+      }
+    };
 
     // Define interface for raw query result
     interface RawJobHistoryResult {
@@ -1186,14 +1268,7 @@ export class JobsRegistryService {
         '"workflow"."name" as "workflowName"',
         '"jobHistory"."jobRunType" as "jobRunType"',
         'COUNT(job.id) as "totalJobs"',
-        `CASE
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.CANCELLED}'
-          WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.SKIPPED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.SKIPPED}'
-          ELSE '${JobStatus.PENDING}'
-        END as "status"`,
+        `${JOB_HISTORY_STATUS_SQL} as "status"`,
       ])
       .groupBy('jobHistory.id')
       .addGroupBy('workflow.name')
@@ -1202,15 +1277,27 @@ export class JobsRegistryService {
       .offset((page - 1) * limit)
       .limit(limit);
 
+    applyFilters(qb);
+
     const rawResults = await qb.getRawMany<RawJobHistoryResult>();
-    const total = await this.jobHistoryRepo
+
+    // Count with the same GROUP BY + HAVING, then collapse to distinct id rows:
+    // the job join fans out one row per job, and `getCount` would drop the
+    // GROUP BY that the status HAVING depends on.
+    const totalQb = this.jobHistoryRepo
       .createQueryBuilder('jobHistory')
       .innerJoin('jobHistory.jobs', 'job')
       .innerJoin('job.asset', 'jAsset')
       .innerJoin('jAsset.target', 'jTarget')
       .innerJoin('jTarget.workspace', 'workspace')
+      .leftJoin('jobHistory.workflow', 'workflow')
       .where('workspace.id = :workspaceId', { workspaceId })
-      .getCount();
+      .select('jobHistory.id', 'id')
+      .groupBy('jobHistory.id');
+
+    applyFilters(totalQb);
+
+    const total = (await totalQb.getRawMany<{ id: string }>()).length;
 
     // Transform raw results to match the response DTO structure
     const transformedData = rawResults.map((raw) => ({
@@ -1267,6 +1354,8 @@ export class JobsRegistryService {
       .select([
         'job.toolId as "toolId"',
         `CASE
+          WHEN COUNT(CASE WHEN job.status = '${JobStatus.CANCELLED}' THEN 1 END) > 0
+               AND COUNT(CASE WHEN job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}') THEN 1 END) = 0 THEN '${JobStatus.CANCELLED}'
           WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
           WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
           WHEN COUNT(CASE WHEN job.status = '${JobStatus.FAILED}' THEN 1 END) > 0 THEN '${JobStatus.FAILED}'
@@ -1327,6 +1416,13 @@ export class JobsRegistryService {
       jobHistoryName,
     } = jobHistory;
 
+    const activeJobsCount = await this.repo.count({
+      where: {
+        jobHistory: { id: historyId },
+        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
+      },
+    });
+
     return {
       id: historyId,
       workflowName: workflow?.name,
@@ -1334,6 +1430,7 @@ export class JobsRegistryService {
       createdAt,
       updatedAt,
       tools,
+      activeJobsCount,
     };
   }
 
@@ -1421,6 +1518,67 @@ export class JobsRegistryService {
       await queryRunner.commitTransaction();
 
       return { message: 'Job cancelled successfully' };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Cancels a whole run: every job of the history becomes CANCELLED, so the run
+   * and the tools it spans all report the same thing the user just did. The run
+   * status itself is derived from its jobs (see getManyJobHistories).
+   */
+  public async cancelJobHistory(
+    workspaceId: string,
+    jobHistoryId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Histories created outside a workflow have no workspace relation, so the
+      // tenant check falls back to the targets of their jobs. A missing history
+      // simply fails this check.
+      const belongsToWorkspace = await queryRunner.manager
+        .createQueryBuilder(JobHistory, 'jobHistory')
+        .leftJoin('jobHistory.workflow', 'workflow')
+        .leftJoin('workflow.workspace', 'workflowWorkspace')
+        .leftJoin('jobHistory.jobs', 'job')
+        .leftJoin('job.asset', 'asset')
+        .leftJoin('asset.target', 'target')
+        .where('jobHistory.id = :jobHistoryId', { jobHistoryId })
+        .andWhere(
+          '(workflowWorkspace.id = :workspaceId OR target.workspaceId = :workspaceId)',
+          { workspaceId },
+        )
+        .getExists();
+
+      if (!belongsToWorkspace) {
+        throw new NotFoundException('Job history not found in workspace');
+      }
+
+      // Every job of the run reports cancelled, matching what the user did —
+      // a run is cancelled as a whole, so leaving some jobs "completed" made
+      // the tool and group statuses disagree with the run. completedAt is kept
+      // for jobs that had already finished, so their duration stays real.
+      const result = await queryRunner.manager
+        .createQueryBuilder()
+        .update(Job)
+        .set({
+          status: JobStatus.CANCELLED,
+          completedAt: () => 'COALESCE("completedAt", now())',
+        })
+        .where('"jobHistoryId" = :jobHistoryId', { jobHistoryId })
+        .execute();
+
+      await queryRunner.commitTransaction();
+
+      return {
+        message: `Cancelled run: ${result.affected ?? 0} job(s) stopped`,
+      };
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;

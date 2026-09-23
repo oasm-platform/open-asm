@@ -782,6 +782,8 @@ export const JobListItemDtoCategory = {
   url_discovery: 'url_discovery',
 } as const;
 
+export type JobListItemDtoConfig = { [key: string]: unknown };
+
 export type JobListItemDto = {
   id: string;
   status: JobListItemDtoStatus;
@@ -791,6 +793,12 @@ export type JobListItemDto = {
   pickJobAt?: string;
   completedAt?: string;
   assetServiceId?: string;
+  /** JobPriority: 0 = critical, 4 = background */
+  priority?: number;
+  workerId?: string;
+  retryCount?: number;
+  command?: string;
+  config?: JobListItemDtoConfig;
   tool: JobListItemToolDto;
   asset: JobListItemAssetDto;
   assetService: AssetService;
@@ -1289,6 +1297,7 @@ export type JobHistoryDetailResponseDto = {
   tools: ToolWithStatusDto[];
   workflowName?: string;
   jobHistoryName: string;
+  activeJobsCount: number;
 };
 
 export type PickToolIdName = {
@@ -3305,7 +3314,46 @@ export type JobsRegistryControllerGetManyJobHistoriesParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  jobHistoryId?: string;
+  /**
+   * Filter by job status; "all" disables the filter
+   */
+  jobStatus?: JobsRegistryControllerGetManyJobHistoriesJobStatus;
+  /**
+   * Filter by run type; "all" disables the filter
+   */
+  jobRunType?: JobsRegistryControllerGetManyJobHistoriesJobRunType;
+  /**
+   * Filter by creation date from (ISO 8601 format, e.g., 2026-01-01)
+   */
+  createdFrom?: string;
+  /**
+   * Filter by creation date to (ISO 8601 format, e.g., 2026-01-31)
+   */
+  createdTo?: string;
 };
+
+export type JobsRegistryControllerGetManyJobHistoriesJobStatus =
+  (typeof JobsRegistryControllerGetManyJobHistoriesJobStatus)[keyof typeof JobsRegistryControllerGetManyJobHistoriesJobStatus];
+
+export const JobsRegistryControllerGetManyJobHistoriesJobStatus = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+  skipped: 'skipped',
+  all: 'all',
+} as const;
+
+export type JobsRegistryControllerGetManyJobHistoriesJobRunType =
+  (typeof JobsRegistryControllerGetManyJobHistoriesJobRunType)[keyof typeof JobsRegistryControllerGetManyJobHistoriesJobRunType];
+
+export const JobsRegistryControllerGetManyJobHistoriesJobRunType = {
+  manual: 'manual',
+  scheduled: 'scheduled',
+  all: 'all',
+} as const;
 
 export type AssetsControllerGetAssetsInWorkspaceParams = {
   search?: string;
@@ -14634,6 +14682,98 @@ export const useJobsRegistryControllerCancelJob = <
 > => {
   return useMutation(
     getJobsRegistryControllerCancelJobMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Cancels every job of a run that has not reached a terminal state and stops the workflow from spawning further steps
+ * @summary Cancel a job history
+ */
+export const jobsRegistryControllerCancelJobHistory = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/jobs-registry/histories/${id}/cancel`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getJobsRegistryControllerCancelJobHistoryMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof jobsRegistryControllerCancelJobHistory>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof jobsRegistryControllerCancelJobHistory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['jobsRegistryControllerCancelJobHistory'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerCancelJobHistory>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return jobsRegistryControllerCancelJobHistory(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type JobsRegistryControllerCancelJobHistoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof jobsRegistryControllerCancelJobHistory>>
+>;
+
+export type JobsRegistryControllerCancelJobHistoryMutationError = unknown;
+
+/**
+ * @summary Cancel a job history
+ */
+export const useJobsRegistryControllerCancelJobHistory = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof jobsRegistryControllerCancelJobHistory>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof jobsRegistryControllerCancelJobHistory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getJobsRegistryControllerCancelJobHistoryMutationOptions(options),
     queryClient,
   );
 };
