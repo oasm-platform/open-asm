@@ -47,6 +47,7 @@ export default function Dashboard() {
             </div>
             <div className="flex-1">
               <IpLocationsCard
+                isLoading={locationsLoading}
                 data={ipLocationData}
                 totalIps={totalIps}
                 selectedCountry={selectedCountry}

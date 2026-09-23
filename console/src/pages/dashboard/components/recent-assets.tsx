@@ -5,6 +5,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAssetsControllerGetHostAssets } from '@/services/apis/gen/queries';
 import { ChevronRight, Clock } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
@@ -44,7 +45,11 @@ const RecentAssets = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          Loading...
+          <div className="w-full space-y-3">
+            {[...Array(6)].map((_, index) => (
+              <Skeleton key={index} className="h-4 w-full" />
+            ))}
+          </div>
         </CardContent>
       </Card>
     );

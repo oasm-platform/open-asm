@@ -1,4 +1,5 @@
 import { useTheme } from '@/components/ui/theme-provider';
+import { Skeleton } from '@/components/ui/skeleton';
 import countriesData from '@/data/countries.json';
 import type { IpLocationData } from '@/hooks/useIpLocationData';
 import ReactEChartsCore from 'echarts-for-react/esm/core';
@@ -31,6 +32,7 @@ interface IpLocationsCardProps {
   totalIps: number;
   selectedCountry?: string | null;
   onCountrySelect?: (countryCode: string | null) => void;
+  isLoading?: boolean;
 }
 
 export default function IpLocationsCard({
@@ -38,6 +40,7 @@ export default function IpLocationsCard({
   totalIps,
   selectedCountry,
   onCountrySelect,
+  isLoading = false,
 }: IpLocationsCardProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
@@ -182,6 +185,25 @@ export default function IpLocationsCard({
     }),
     [onCountrySelect],
   );
+
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border h-full">
+        <div className="p-4 pb-0 space-y-1.5">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-4 p-4 gap-4">
+          <div className="lg:col-span-3">
+            <Skeleton className="h-[560px] w-full rounded-xl" />
+          </div>
+          <div className="lg:col-span-1">
+            <Skeleton className="h-[400px] w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

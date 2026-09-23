@@ -2,13 +2,36 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import Score from './score';
 
 export default function VulnerabilityStatistic() {
-  const { statistics } = useStatistics();
+  const { statistics, isLoading } = useStatistics();
   const { calculateTrend } = useTimelineTrend();
+
+  if (isLoading) {
+    return (
+      <Card className="w-full h-full pt-3">
+        <div className="flex items-center justify-center flex-grow">
+          <Skeleton className="h-[170px] w-[170px] rounded-full" />
+        </div>
+        <CardHeader className="flex justify-between items-center">
+          <Skeleton className="h-5 w-48" />
+          <Bug />
+        </CardHeader>
+        <CardContent className="grid grid-cols-3 gap-4 -mt-2">
+          {Array.from({ length: 6 }, (_, index) => (
+            <div key={index} className="space-y-2 px-4 py-2">
+              <Skeleton className="mx-auto h-3 w-12" />
+              <Skeleton className="mx-auto h-7 w-10" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!statistics) return null;
 

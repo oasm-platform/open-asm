@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTlsStatistics } from '@/services/apis/gen/queries';
 import { format } from 'date-fns';
@@ -35,7 +36,13 @@ const TlsStatistics = () => {
         <CardHeader>
           <CardTitle>TLS Statistics</CardTitle>
         </CardHeader>
-        <CardContent>Loading...</CardContent>
+        <CardContent>
+          <div className="space-y-3">
+            {[...Array(5)].map((_, index) => (
+              <Skeleton key={index} className="h-4 w-full" />
+            ))}
+          </div>
+        </CardContent>
       </Card>
     );
   }
