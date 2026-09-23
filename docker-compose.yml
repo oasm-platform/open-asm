@@ -78,6 +78,10 @@ services:
       - WORKER_GRPC_PORT=16276
       - WORKER_MAX_CONCURRENCY=10
       - WORKER_TOOL_PATH=/app/oasm-tools
+      # Persist the join token on the worker-state volume: without it every
+      # container recreation mints a fresh identity and startup orphan
+      # reconcile can no longer recognize the previous run's containers.
+      - WORKER_TOKEN_FILE=/app/state/.worker-token
       # WORKER_CONNECTOR_ADDR: optional override for the address connector
       # containers dial back on (auto-derived when unset — host.docker.internal
       # on any OS via a host-gateway ExtraHosts mapping the worker adds on
@@ -92,6 +96,7 @@ services:
         max-file: '3'
     volumes:
       - worker-tools-cache:/app/oasm-tools:rw
+      - worker-state:/app/state
       # The worker spawns connector containers via the Docker Engine API
       # (internal/runtime/docker.go), so it MUST reach a daemon. Mount the host
       # socket (docker-outside-of-docker). SECURITY: docker.sock is
@@ -242,6 +247,7 @@ volumes:
   geoip-data:
   rustfs-data:
   worker-tools-cache:
+  worker-state:
 
 networks:
   oasm:
