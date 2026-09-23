@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sync the aggregate connector manifest from oasm-connectors develop branch
+// Sync the aggregate connector manifest from oasm-connectors main branch
 // into core-api/resources/connectors/manifest.json
 // Requires Node >= 22 (global fetch).
 
@@ -13,9 +13,9 @@ const DEST_DIR = join(REPO_ROOT, 'core-api', 'resources', 'connectors');
 const DEST_FILE = join(DEST_DIR, 'manifest.json');
 const TMP_FILE = join(DEST_DIR, 'manifest.json.tmp');
 const MANIFEST_URL =
-  'https://raw.githubusercontent.com/oasm-platform/oasm-connectors/refs/heads/develop/manifest.json';
+  'https://raw.githubusercontent.com/oasm-platform/oasm-connectors/refs/heads/main/manifest.json';
 // MANIFEST_PATH points the sync at a local oasm-connectors checkout instead of
-// the develop branch: a new connector is only on develop after it is merged, so
+// the main branch: a new connector is only on main after it is merged, so
 // reviewers need to sync the manifest they just generated. Unset (the default in
 // CI and for everyone else), the branch is the source of truth.
 const MANIFEST_PATH = process.env.MANIFEST_PATH;
@@ -26,7 +26,7 @@ function fail(message) {
 }
 
 // loadManifest returns the parsed manifest from MANIFEST_PATH when set, else
-// over the network from the develop branch.
+// over the network from the main branch.
 async function loadManifest() {
   if (MANIFEST_PATH) {
     let raw;
