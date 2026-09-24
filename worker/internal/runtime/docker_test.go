@@ -654,6 +654,10 @@ type fakeDockerEngine struct {
 	labels         map[string]string // Config.Labels of the created container
 	exists         bool              // a container currently exists in the engine (inspect/list 404 when false)
 	imageLabels    map[string]string // Config.Labels returned by ImageInspectWithRaw; nil = 404 (image absent)
+	list           []types.Container // seeded GET /containers/json response (orphan reconcile)
+	listCalls      int               // ContainerList requests served
+	listFilters    string            // filters query param of the last list request
+	removeIDs      []string          // container IDs from DELETE requests, in order
 }
 
 func newFakeDockerEngine() *fakeDockerEngine {
@@ -715,6 +719,26 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 			f.running = false
 			f.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && path == "/containers/json":
+			// ContainerList (startup orphan reconcile). MUST precede the
+			// inspect case below: "/containers/json" also matches its
+			// "/containers/" prefix + "/json" suffix.
+			f.mu.Lock()
+			f.listCalls++
+			f.listFilters = r.URL.Query().Get("filters")
+			seeded := f.list
+			f.mu.Unlock()
+			items := applyLabelFilter(seeded, f.listFilters)
+			if items == nil {
+				items = []types.Container{}
+			}
+			b, mErr := json.Marshal(items)
+			if mErr != nil {
+				http.Error(w, mErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(b)
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/json"):
 			f.mu.Lock()
 			running := f.running
@@ -764,6 +788,7 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 		case r.Method == http.MethodDelete && strings.HasPrefix(path, "/containers/"):
 			f.mu.Lock()
 			f.removed++
+			f.removeIDs = append(f.removeIDs, strings.TrimPrefix(path, "/containers/"))
 			removeErr := f.removeErr
 			f.mu.Unlock()
 			if removeErr != nil {
@@ -1238,9 +1263,9 @@ func TestCreateUsesOasmPrefixName(t *testing.T) {
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
 
-	// Phase 2 pooled naming: oasm-<tool>-<poolShort8>-<rand4>. The tool short
-	// comes from the POOL KEY (normalized image, sanitized, 8 chars), NOT the
-	// exec id — same-image containers share the prefix for docker ps grouping.
+	// Naming: oasm-<tool-slug>-<registry-slug>-<rand4> — the tool slug reads
+	// well in `docker ps`, the registry slug groups by source, and the exec id
+	// is deliberately absent (pooled containers are reused across executions).
 	if _, err := r.Create(context.Background(), JobSpec{
 		Tool:    "Nuclei Scanner",
 		Image:   "ghcr.io/open-asm/nuclei:1.0",
@@ -1262,14 +1287,14 @@ func TestCreateUsesOasmPrefixName(t *testing.T) {
 		t.Fatalf("container name %q must contain the sanitized tool name", name)
 	}
 	if !strings.Contains(name, "ghcr-io") {
-		t.Fatalf("container name %q must contain the sanitized pool-short (first 8 chars of the pool key)", name)
+		t.Fatalf("container name %q must contain the registry slug (ghcr.io → ghcr-io)", name)
 	}
 	if strings.Contains(name, "exec-7") {
 		t.Fatalf("container name %q must NOT carry the exec id (pooled naming by pool key)", name)
 	}
 }
 
-func TestCreateUsesPoolKeyShortInName(t *testing.T) {
+func TestCreateUsesRegistrySlugInName(t *testing.T) {
 	engine := newFakeDockerEngine()
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
@@ -1284,8 +1309,12 @@ func TestCreateUsesPoolKeyShortInName(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	if !strings.Contains(engine.createName, "library-") {
-		t.Fatalf("name %q must carry the 8-char pool-short of the pool key (library/nuclei → library-)", engine.createName)
+	// A bare "library/nuclei" carries no registry host → Docker Hub.
+	if !strings.Contains(engine.createName, "docker-io") {
+		t.Fatalf("name %q must carry the registry slug (library/nuclei → docker-io)", engine.createName)
+	}
+	if strings.Contains(engine.createName, "library-") {
+		t.Fatalf("name %q must not embed the image repository path", engine.createName)
 	}
 }
 

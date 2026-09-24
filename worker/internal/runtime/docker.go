@@ -402,8 +402,15 @@ func generateExecID() string {
 }
 
 // sanitizeToolName normalizes a tool name into Docker's container name charset
-// ([a-z0-9_.-]): lowercase, invalid runes collapse to '-', truncated to 80
-// chars so the final name stays well under Docker's 128-char limit.
+// ([a-z0-9_-]): lowercase, every non-alphanumeric rune collapses to a single
+// '-', truncated to 80 chars so the final name stays well under Docker's
+// 128-char limit.
+//
+// Runs of separators collapse too. A literal '-' is not special-cased as a
+// passthrough because that produced tripled separators from display names:
+// "Nikto - Web Server Scanner" → space '-', literal '-', space '-' → "nikto---
+// web-server-scanner". Separators are also trimmed after truncation so a cut
+// can never leave a dangling one.
 func sanitizeToolName(tool string) string {
 	t := strings.ToLower(tool)
 	var b strings.Builder
@@ -411,7 +418,7 @@ func sanitizeToolName(tool string) string {
 	dash := false
 	for _, r := range t {
 		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
 			b.WriteRune(r)
 			dash = false
 		default:
@@ -422,11 +429,12 @@ func sanitizeToolName(tool string) string {
 		}
 	}
 	s := strings.Trim(b.String(), "-")
+	if len(s) > maxToolSlugLen {
+		s = s[:maxToolSlugLen]
+	}
+	s = strings.Trim(s, "-")
 	if s == "" {
 		s = "tool"
-	}
-	if len(s) > 80 {
-		s = s[:80]
 	}
 	return s
 }
@@ -438,18 +446,65 @@ func randHex4() string {
 	return hex.EncodeToString(b)
 }
 
-// buildContainerName builds the pooled container name oasm-<tool>-<poolShort>-<rand4>.
-// The pool short is the sanitized pool key (normalized image) truncated to 8
-// chars: same-image containers in the pool share the prefix, so a container
-// listing groups a warm pool at a glance. The random suffix keeps concurrent
-// creates of the same tool collision-free; a 409 Conflict (stale container
-// holding the name) is retried once with a fresh suffix in Create.
-func buildContainerName(tool, poolRef string) string {
-	short := sanitizeToolName(poolRef)
-	if len(short) > 8 {
-		short = short[:8]
+// maxToolSlugLen caps the tool segment; maxRegistrySlugLen caps the registry
+// segment. Together they keep the whole name well under Docker's 128-char limit
+// (5 "oasm-" + 80 + 1 + 32 + 1 + 4 random = 123).
+const (
+	maxToolSlugLen     = 80
+	maxRegistrySlugLen = 32
+)
+
+// imageRegistrySlug extracts the registry host from an image reference and
+// renders it into Docker's container-name charset: "ghcr.io" → "ghcr-io",
+// "registry.local:5000/oasm/nmap:7.97" → "registry-local-5000".
+//
+// Only the REGISTRY is kept, never the repository path — the old scheme cut
+// the whole image key at 8 chars, which leaked the repo ("ghcr-io-open-asm-…")
+// and, when the cut landed on the separator, produced a doubled dash
+// ("oasm-nuclei-ghcr-io--a3f1").
+func imageRegistrySlug(image string) string {
+	ref := image
+	// Strip a digest: repo@sha256:… — the "@" tail carries no host.
+	if i := strings.Index(ref, "@"); i >= 0 {
+		ref = ref[:i]
 	}
-	return fmt.Sprintf("oasm-%s-%s-%s", sanitizeToolName(tool), short, randHex4())
+	// Strip a tag, but only when the colon comes after the last slash;
+	// otherwise it is a registry port ("registry:5000/repo").
+	if i := strings.LastIndex(ref, ":"); i >= 0 && i > strings.LastIndex(ref, "/") {
+		ref = ref[:i]
+	}
+	host := ""
+	if i := strings.Index(ref, "/"); i >= 0 {
+		host = ref[:i]
+	}
+	// Per Docker's reference grammar the first segment is a registry only when
+	// it looks like a host (has a dot or a port, or is "localhost"); otherwise
+	// it is a Docker Hub namespace ("library/nuclei") and the registry is the
+	// implicit default.
+	if host == "" || (host != "localhost" && !strings.ContainsAny(host, ".:")) {
+		return "docker-io"
+	}
+	slug := strings.Trim(sanitizeToolName(host), "-")
+	if len(slug) > maxRegistrySlugLen {
+		slug = strings.Trim(slug[:maxRegistrySlugLen], "-")
+	}
+	if slug == "" {
+		return "docker-io"
+	}
+	return slug
+}
+
+// buildContainerName builds the container name oasm-<tool-slug>-<registry-slug>-<rand4>
+// (e.g. "oasm-nikto-ghcr-io-1234"). The tool slug keeps a container listing
+// readable, the registry slug groups containers by source, and the random
+// suffix makes concurrent creates of the same tool collision-free; a 409
+// Conflict (stale container holding the name) is retried once with a fresh
+// suffix in Create.
+//
+// poolRef is the pool key when set, else the image — both carry the registry,
+// so the name stays identical whether or not the warm pool is enabled.
+func buildContainerName(tool, poolRef string) string {
+	return fmt.Sprintf("oasm-%s-%s-%s", sanitizeToolName(tool), imageRegistrySlug(poolRef), randHex4())
 }
 
 // imageIsCached reports whether the engine already holds a local copy of the
@@ -576,9 +631,10 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID)
 
 	// Container config: image, env, labels for lifecycle management.
-	// oasm.pool_key (normalized image) marks pooled containers so worker
-	// startup + sweeper can identify (and prune) them; oasm.last_used is
-	// informational only — the in-memory pool owns sweep timing.
+	// oasm.pool_key (normalized image) names pooled containers and lets the
+	// sweeper identify them; oasm-managed scopes the startup orphan
+	// reconcile; oasm.last_used is informational only — the in-memory pool
+	// owns sweep timing.
 	labels := map[string]string{
 		"trace_id":     opts.TraceID,
 		"tool":         spec.Tool,
@@ -591,6 +647,12 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	labels["oasm.pool_key"] = poolRef
 	labels["oasm.last_used"] = time.Now().UTC().Format(time.RFC3339)
+	// Ownership stamp (startup orphan reconcile): hash of the worker identity
+	// so a restarted worker reclaims ITS running orphans and never a
+	// sibling's. Absent for direct runtime users → tier 3 (keep) only.
+	if spec.WorkerID != "" {
+		labels["oasm.worker_id"] = spec.WorkerID
+	}
 	// Labels assigned after the struct literal so gofmt keeps
 	// "Image: spec.Image" single-spaced (source-guard test).
 	config := &container.Config{
@@ -648,9 +710,9 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	applyDefaultIsolation(hostConfig)
 
-	// Pooled container name: oasm-<tool>-<poolShort8>-<rand4> — same-image
-	// containers group under one short prefix; an idle warm container is
-	// reused by the next execution of the same image (Phase 2).
+	// Container name: oasm-<tool-slug>-<registry-slug>-<rand4>. An idle warm
+	// container is reused by the next execution of the same image (Phase 2);
+	// the name only has to be unique and readable, not the pool key itself.
 	name := buildContainerName(spec.Tool, poolRef)
 
 	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
@@ -677,7 +739,7 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	d.logInfo("docker: container started: %s exec=%s job=%s", containerID, execID, spec.JobID)
 
-	return Handle{
+	handle := Handle{
 		ID: containerID,
 		Labels: map[string]string{
 			"trace_id":      opts.TraceID,
@@ -685,7 +747,11 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 			"exec_id":       execID,
 			"oasm.pool_key": poolRef,
 		},
-	}, nil
+	}
+	if spec.WorkerID != "" {
+		handle.Labels["oasm.worker_id"] = spec.WorkerID
+	}
+	return handle, nil
 }
 
 // Start starts the container unless it is already running. Create already
@@ -950,24 +1016,88 @@ func (d *DockerRuntime) Cleanup(ctx context.Context, h Handle) error {
 	return nil
 }
 
-// PrunePoolContainers removes every container tagged oasm.pool_key left over
-// from a previous worker process (crash/orphan guard). Called once at worker
-// startup when the pool is enabled; stale idle containers from a dead worker
-// must not accumulate forever. Best-effort — failures are logged, never fatal.
-func (d *DockerRuntime) PrunePoolContainers(ctx context.Context) {
+// ReconcileReport summarizes one startup ReconcileOrphans pass.
+type ReconcileReport struct {
+	StoppedRemoved    int // tier 1: terminal-state managed containers removed
+	OwnRunningRemoved int // tier 2: running containers stamped with our ownerID
+	SkippedForeign    int // tier 3: running containers kept (other/unknown owner)
+	Failed            int // remove attempts rejected by the engine
+}
+
+// ReconcileOrphans enforces the startup ownership policy over every
+// oasm-managed container on the engine (Docker labels are the source of
+// truth — no state store):
+//
+//	tier 1  exited/created/dead/removing → always remove: nothing can use
+//	        them and they only accumulate across crashes;
+//	tier 2  running/paused/restarting AND oasm.worker_id == ownerID
+//	        (non-empty) → force remove: a fresh process holds no streams or
+//	        exec tokens for them, so they can never be adopted;
+//	tier 3  live AND owner different or missing → KEEP: on a shared
+//	        docker.sock this may be a sibling worker's live container (a
+//	        core-side owner referee lands separately).
+//
+// ownerID empty (first-ever run: no signature, no token) degrades to tier 1
+// only — the fail-safe direction. Called once per boot from
+// reconcileStartupOrphans, before grpcClient.Connect: the fresh process owns
+// no containers yet, so tier-2 matches can only be dead predecessors'.
+// Best-effort — failures are logged, never fatal.
+func (d *DockerRuntime) ReconcileOrphans(ctx context.Context, ownerID string) ReconcileReport {
+	var rep ReconcileReport
 	if d.cli == nil {
-		return
+		return rep
 	}
 	f := filters.NewArgs()
-	f.Add("label", "oasm.pool_key")
-	report, err := d.cli.ContainersPrune(ctx, f)
+	f.Add("label", "oasm-managed=true")
+	list, err := d.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: f})
 	if err != nil {
-		d.logWarning("docker: pool prune failed: %v", err)
-		return
+		d.logWarning("docker: orphan reconcile list failed: %v", err)
+		return rep
 	}
-	if n := len(report.ContainersDeleted); n > 0 {
-		d.logInfo("docker: pruned %d stale pool container(s) from a previous worker", n)
+	for _, c := range list {
+		terminal := isTerminalState(c.State)
+		ours := ownerID != "" && c.Labels["oasm.worker_id"] == ownerID
+		switch {
+		case terminal, ours:
+			if err := d.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true}); err != nil {
+				rep.Failed++
+				d.logWarning("docker: orphan reconcile: remove %s failed: %v", shortID(c.ID), err)
+				continue
+			}
+			if terminal {
+				rep.StoppedRemoved++
+			} else {
+				rep.OwnRunningRemoved++
+			}
+		default:
+			rep.SkippedForeign++
+			d.logInfo("docker: orphan: keeping foreign running container %s owner=%q state=%q",
+				shortID(c.ID), c.Labels["oasm.worker_id"], c.State)
+		}
 	}
+	d.logInfo("docker: orphan reconcile: stopped=%d own_running=%d foreign_kept=%d failed=%d owner_id=%q",
+		rep.StoppedRemoved, rep.OwnRunningRemoved, rep.SkippedForeign, rep.Failed, ownerID)
+	return rep
+}
+
+// isTerminalState reports whether a container state is dead weight that can
+// never serve another execution (tier 1). Everything else — running, paused,
+// restarting, unknown — counts as live and requires ownership proof.
+func isTerminalState(state string) bool {
+	switch state {
+	case "exited", "created", "dead", "removing":
+		return true
+	default:
+		return false
+	}
+}
+
+// shortID trims a Docker ID to the conventional 12 chars for log lines.
+func shortID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
 }
 
 // buildContainerEnv constructs the env var slice for a connector container.

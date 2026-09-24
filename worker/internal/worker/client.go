@@ -291,8 +291,6 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		}
 	}()
 
-	go grpcClient.Connect(workerCtx, ready)
-
 	// Connector machinery (gRPC server + Docker runtime) only for node mode.
 	// CLI workers may not have Docker installed — they run built-in tools only.
 	if cfg.Mode == "node" {
@@ -380,20 +378,26 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 						connectorServer.SetPoolNotifier(mgrInit)
 					}
 					go mgrInit.SweepLoop(workerCtx)
-					// Startup prune: remove pooled containers orphaned by a
-					// crashed previous worker (tagged oasm.pool_key). The
-					// SDK's stream is killed by the removal; the container
-					// must not accumulate across restarts.
-					pruneCtx, pruneCancel := context.WithTimeout(workerCtx, 30*time.Second)
-					dockerRT.PrunePoolContainers(pruneCtx)
-					pruneCancel()
 					poolMode = fmt.Sprintf("warm pool: idle_timeout=%ds max_replicas_per_image=%d", cfg.ConnectorIdleTimeout, cfg.MaxReplicasPerImage)
 				}
+				// Startup orphan reconcile (3-tier): deliberately OUTSIDE the
+				// pool branch — 1:1 mode leaks exited containers too. Runs
+				// pre-join (Connect starts only after this block), so OwnerID
+				// still reflects the boot identity and this process owns no
+				// containers yet. Bounded to 30s so a hung engine cannot stall
+				// startup; failures are logged by the runtime, never fatal.
+				reconcileStartupOrphans(workerCtx, dockerRT, grpcClient.OwnerID(), 30*time.Second)
 				log.Success("execution manager ready (Docker runtime, unlimited concurrency, %s)", poolMode)
 			}
 		}
 		mgr = mgrInit
 	}
+
+	// Connect AFTER node-mode setup: the startup orphan reconcile above must
+	// finish before this process can receive jobs (and thus create
+	// containers), so a fresh container can never be misclassified as a
+	// leftover of a previous run.
+	go grpcClient.Connect(workerCtx, ready)
 
 	ticker := time.NewTicker(time.Second)
 	go func() {

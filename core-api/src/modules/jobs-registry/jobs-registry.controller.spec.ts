@@ -101,6 +101,41 @@ describe('JobsRegistryController', () => {
       expect(result).toEqual({ id: '', asset: {}, command: '' });
     });
 
+    it('should send the connector slug, not the display name, as the job tool', async () => {
+      // The worker derives the container name and the in-container TOOL env var
+      // from the proto `tool` field. The manifest display name ("Nikto - Web
+      // Server Scanner") is not a safe identifier: it is long, not unique, and
+      // sanitizes into "nikto---web-server-scanner". The slug is the identifier
+      // connectors are addressed by everywhere else.
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'job-1',
+        workspaceId: 'ws-1',
+        category: 'vulnerability',
+        asset: { value: 'https://example.com' },
+        config: null,
+        configProfileId: undefined,
+        tool: { id: 'nikto', name: 'Nikto - Web Server Scanner' },
+      });
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'Nikto - Web Server Scanner',
+        slug: 'nikto',
+        image: 'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+
+      const result = await controller.next({ id: 'worker-1' });
+
+      // Lookup still keys off the persisted tool name...
+      expect(mockConnectorRegistry.getConnector).toHaveBeenCalledWith(
+        'Nikto - Web Server Scanner',
+      );
+      // ...but the worker receives the stable slug.
+      expect(result.tool).toBe('nikto');
+      expect(result.image).toBe(
+        'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      );
+    });
+
   });
 
   // ── url_discovery: REST + gRPC delegation ───────────────────────────

@@ -19,15 +19,24 @@ type JobSpec struct {
 	// random hex ID.
 	ExecID string
 	// PoolKey is the normalized (lowercase) container image the Manager
-	// resolves; the Docker runtime uses it for the pooled container name
-	// (oasm-<tool>-<poolShort>-<rand>) and the oasm.pool_key label. Empty for
-	// direct runtime users (legacy naming by execID).
+	// resolves; the Docker runtime uses it for the oasm.pool_key label and for
+	// the registry segment of the container name
+	// (oasm-<tool-slug>-<registry-slug>-<rand4>). Empty for direct runtime
+	// users, which fall back to the image.
 	PoolKey string
 	// ConnectorToken is the per-execution single-use connector auth token. It
 	// is injected as the container's WORKER_TOKEN env so the Register
 	// handshake authenticates against this execution only. Empty keeps the
 	// legacy shared-secret behavior (backend compatibility).
 	ConnectorToken string
+	// WorkerID is the owning worker's identity fingerprint
+	// (grpcclient.OwnerID(): hash of WORKER_SIGNATURE or the persisted join
+	// token — never the raw secret). Stamped as the oasm.worker_id container
+	// label so a restarted worker's ReconcileOrphans can tell its own orphans
+	// from a sibling worker's live containers on a shared engine. Empty
+	// (direct runtime users) → label omitted → never tier-2 removable by
+	// another worker.
+	WorkerID string
 }
 
 type RuntimeOpts struct {

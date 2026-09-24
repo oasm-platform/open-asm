@@ -324,6 +324,10 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			ExecID: id,
 			// Pooled container identity for name + labels (docker runtime).
 			PoolKey: poolKey,
+			// Ownership fingerprint (grpcclient.OwnerID) — forwarded verbatim
+			// so DockerRuntime.Create can stamp oasm.worker_id. Dropping it
+			// here would silently disable the startup orphan reconcile.
+			WorkerID: spec.WorkerID,
 			// Single-use auth: the connector's Register must present this
 			// token (WORKER_TOKEN env); the connector server validates it
 			// per-execution.
