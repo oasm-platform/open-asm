@@ -1263,9 +1263,9 @@ func TestCreateUsesOasmPrefixName(t *testing.T) {
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
 
-	// Phase 2 pooled naming: oasm-<tool>-<poolShort8>-<rand4>. The tool short
-	// comes from the POOL KEY (normalized image, sanitized, 8 chars), NOT the
-	// exec id — same-image containers share the prefix for docker ps grouping.
+	// Naming: oasm-<tool-slug>-<registry-slug>-<rand4> — the tool slug reads
+	// well in `docker ps`, the registry slug groups by source, and the exec id
+	// is deliberately absent (pooled containers are reused across executions).
 	if _, err := r.Create(context.Background(), JobSpec{
 		Tool:    "Nuclei Scanner",
 		Image:   "ghcr.io/open-asm/nuclei:1.0",
@@ -1287,14 +1287,14 @@ func TestCreateUsesOasmPrefixName(t *testing.T) {
 		t.Fatalf("container name %q must contain the sanitized tool name", name)
 	}
 	if !strings.Contains(name, "ghcr-io") {
-		t.Fatalf("container name %q must contain the sanitized pool-short (first 8 chars of the pool key)", name)
+		t.Fatalf("container name %q must contain the registry slug (ghcr.io → ghcr-io)", name)
 	}
 	if strings.Contains(name, "exec-7") {
 		t.Fatalf("container name %q must NOT carry the exec id (pooled naming by pool key)", name)
 	}
 }
 
-func TestCreateUsesPoolKeyShortInName(t *testing.T) {
+func TestCreateUsesRegistrySlugInName(t *testing.T) {
 	engine := newFakeDockerEngine()
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
@@ -1309,8 +1309,12 @@ func TestCreateUsesPoolKeyShortInName(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	if !strings.Contains(engine.createName, "library-") {
-		t.Fatalf("name %q must carry the 8-char pool-short of the pool key (library/nuclei → library-)", engine.createName)
+	// A bare "library/nuclei" carries no registry host → Docker Hub.
+	if !strings.Contains(engine.createName, "docker-io") {
+		t.Fatalf("name %q must carry the registry slug (library/nuclei → docker-io)", engine.createName)
+	}
+	if strings.Contains(engine.createName, "library-") {
+		t.Fatalf("name %q must not embed the image repository path", engine.createName)
 	}
 }
 

@@ -438,18 +438,61 @@ func randHex4() string {
 	return hex.EncodeToString(b)
 }
 
-// buildContainerName builds the pooled container name oasm-<tool>-<poolShort>-<rand4>.
-// The pool short is the sanitized pool key (normalized image) truncated to 8
-// chars: same-image containers in the pool share the prefix, so a container
-// listing groups a warm pool at a glance. The random suffix keeps concurrent
-// creates of the same tool collision-free; a 409 Conflict (stale container
-// holding the name) is retried once with a fresh suffix in Create.
-func buildContainerName(tool, poolRef string) string {
-	short := sanitizeToolName(poolRef)
-	if len(short) > 8 {
-		short = short[:8]
+// maxRegistrySlugLen caps the registry segment so the whole name stays well
+// under Docker's 128-char limit (5 + 80 tool + 1 + this + 1 + 4 random).
+const maxRegistrySlugLen = 32
+
+// imageRegistrySlug extracts the registry host from an image reference and
+// renders it into Docker's container-name charset: "ghcr.io" → "ghcr-io",
+// "registry.local:5000/oasm/nmap:7.97" → "registry-local-5000".
+//
+// Only the REGISTRY is kept, never the repository path — the old scheme cut
+// the whole image key at 8 chars, which leaked the repo ("ghcr-io-open-asm-…")
+// and, when the cut landed on the separator, produced a doubled dash
+// ("oasm-nuclei-ghcr-io--a3f1").
+func imageRegistrySlug(image string) string {
+	ref := image
+	// Strip a digest: repo@sha256:… — the "@" tail carries no host.
+	if i := strings.Index(ref, "@"); i >= 0 {
+		ref = ref[:i]
 	}
-	return fmt.Sprintf("oasm-%s-%s-%s", sanitizeToolName(tool), short, randHex4())
+	// Strip a tag, but only when the colon comes after the last slash;
+	// otherwise it is a registry port ("registry:5000/repo").
+	if i := strings.LastIndex(ref, ":"); i >= 0 && i > strings.LastIndex(ref, "/") {
+		ref = ref[:i]
+	}
+	host := ""
+	if i := strings.Index(ref, "/"); i >= 0 {
+		host = ref[:i]
+	}
+	// Per Docker's reference grammar the first segment is a registry only when
+	// it looks like a host (has a dot or a port, or is "localhost"); otherwise
+	// it is a Docker Hub namespace ("library/nuclei") and the registry is the
+	// implicit default.
+	if host == "" || (host != "localhost" && !strings.ContainsAny(host, ".:")) {
+		return "docker-io"
+	}
+	slug := strings.Trim(sanitizeToolName(host), "-")
+	if len(slug) > maxRegistrySlugLen {
+		slug = strings.Trim(slug[:maxRegistrySlugLen], "-")
+	}
+	if slug == "" {
+		return "docker-io"
+	}
+	return slug
+}
+
+// buildContainerName builds the container name oasm-<tool-slug>-<registry-slug>-<rand4>
+// (e.g. "oasm-nikto-ghcr-io-1234"). The tool slug keeps a container listing
+// readable, the registry slug groups containers by source, and the random
+// suffix makes concurrent creates of the same tool collision-free; a 409
+// Conflict (stale container holding the name) is retried once with a fresh
+// suffix in Create.
+//
+// poolRef is the pool key when set, else the image — both carry the registry,
+// so the name stays identical whether or not the warm pool is enabled.
+func buildContainerName(tool, poolRef string) string {
+	return fmt.Sprintf("oasm-%s-%s-%s", sanitizeToolName(tool), imageRegistrySlug(poolRef), randHex4())
 }
 
 // imageIsCached reports whether the engine already holds a local copy of the
@@ -655,9 +698,9 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	applyDefaultIsolation(hostConfig)
 
-	// Pooled container name: oasm-<tool>-<poolShort8>-<rand4> — same-image
-	// containers group under one short prefix; an idle warm container is
-	// reused by the next execution of the same image (Phase 2).
+	// Container name: oasm-<tool-slug>-<registry-slug>-<rand4>. An idle warm
+	// container is reused by the next execution of the same image (Phase 2);
+	// the name only has to be unique and readable, not the pool key itself.
 	name := buildContainerName(spec.Tool, poolRef)
 
 	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
