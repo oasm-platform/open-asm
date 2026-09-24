@@ -95,6 +95,39 @@ func TestBuildContainerNameFormat(t *testing.T) {
 	}
 }
 
+// Repeated separators in the source must collapse to one. A display name such
+// as "Nikto - Web Server Scanner" sanitizes to "nikto---web-server-scanner"
+// (space → '-', literal '-', space → '-') because the literal dash is a valid
+// character and resets the collapse state. Manifest slugs are the primary
+// input, but the worker must stay well-formed if a display name ever leaks
+// through an older core or a hand-edited manifest.
+func TestSanitizeToolNameCollapsesRepeatedSeparators(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{in: "Nikto - Web Server Scanner", want: "nikto-web-server-scanner"},
+		{in: "nikto---web", want: "nikto-web"},
+		{in: "a - - b", want: "a-b"},
+		{in: "Nuclei Scanner", want: "nuclei-scanner"},
+		{in: "trailing---", want: "trailing"},
+		{in: "---leading", want: "leading"},
+		{in: "", want: "tool"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			got := sanitizeToolName(tc.in)
+			if got != tc.want {
+				t.Fatalf("sanitizeToolName(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+			if strings.Contains(got, "--") {
+				t.Fatalf("sanitizeToolName(%q) = %q, must not contain a doubled separator", tc.in, got)
+			}
+		})
+	}
+}
+
 // The random suffix must actually vary so concurrent creates never collide and
 // a 409 Conflict retry lands on a fresh name.
 func TestBuildContainerNameRandomSuffixVaries(t *testing.T) {

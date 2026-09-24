@@ -402,8 +402,15 @@ func generateExecID() string {
 }
 
 // sanitizeToolName normalizes a tool name into Docker's container name charset
-// ([a-z0-9_.-]): lowercase, invalid runes collapse to '-', truncated to 80
-// chars so the final name stays well under Docker's 128-char limit.
+// ([a-z0-9_-]): lowercase, every non-alphanumeric rune collapses to a single
+// '-', truncated to 80 chars so the final name stays well under Docker's
+// 128-char limit.
+//
+// Runs of separators collapse too. A literal '-' is not special-cased as a
+// passthrough because that produced tripled separators from display names:
+// "Nikto - Web Server Scanner" → space '-', literal '-', space '-' → "nikto---
+// web-server-scanner". Separators are also trimmed after truncation so a cut
+// can never leave a dangling one.
 func sanitizeToolName(tool string) string {
 	t := strings.ToLower(tool)
 	var b strings.Builder
@@ -411,7 +418,7 @@ func sanitizeToolName(tool string) string {
 	dash := false
 	for _, r := range t {
 		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
 			b.WriteRune(r)
 			dash = false
 		default:
@@ -422,11 +429,12 @@ func sanitizeToolName(tool string) string {
 		}
 	}
 	s := strings.Trim(b.String(), "-")
+	if len(s) > maxToolSlugLen {
+		s = s[:maxToolSlugLen]
+	}
+	s = strings.Trim(s, "-")
 	if s == "" {
 		s = "tool"
-	}
-	if len(s) > 80 {
-		s = s[:80]
 	}
 	return s
 }
@@ -438,9 +446,13 @@ func randHex4() string {
 	return hex.EncodeToString(b)
 }
 
-// maxRegistrySlugLen caps the registry segment so the whole name stays well
-// under Docker's 128-char limit (5 + 80 tool + 1 + this + 1 + 4 random).
-const maxRegistrySlugLen = 32
+// maxToolSlugLen caps the tool segment; maxRegistrySlugLen caps the registry
+// segment. Together they keep the whole name well under Docker's 128-char limit
+// (5 "oasm-" + 80 + 1 + 32 + 1 + 4 random = 123).
+const (
+	maxToolSlugLen     = 80
+	maxRegistrySlugLen = 32
+)
 
 // imageRegistrySlug extracts the registry host from an image reference and
 // renders it into Docker's container-name charset: "ghcr.io" → "ghcr-io",

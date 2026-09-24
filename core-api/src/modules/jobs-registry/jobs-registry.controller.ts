@@ -440,7 +440,13 @@ export class JobsRegistryController {
         id: job.id,
         asset: job.asset,
         category: job.category,
-        tool: connectorEntry.name,
+        // The worker derives the connector container name and the in-container
+        // TOOL env var from this field, so it must be the manifest slug — the
+        // stable identifier connectors are addressed by everywhere else. The
+        // display name is long, not unique, and sanitizes into names like
+        // "oasm-nikto---web-server-scanner-ghcr-io-00fe". A malformed manifest
+        // without a slug falls back to the name so the job still runs.
+        tool: connectorEntry.slug || connectorEntry.name,
         image: connectorEntry.image,
         cpu: defaults.cpu,
         memory: defaults.memory,
