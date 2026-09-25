@@ -38,9 +38,32 @@ import {
   RemoteExecuteSubscribeService,
 } from './remote-execute-subscribe.service';
 import { WorkersService } from './workers.service';
+import { WorkerTelemetryService } from './worker-telemetry.service';
+import type {
+  WorkerTelemetryAck,
+  WorkerTelemetryRequest,
+} from './worker-telemetry.types';
 
 interface GrpcCall {
   getPeer?(): string | undefined;
+}
+
+interface GrpcTimestamp {
+  seconds: string;
+  nanos: number;
+}
+
+interface GrpcWorkerTelemetryAck
+  extends Omit<WorkerTelemetryAck, 'receivedAt'> {
+  receivedAt: GrpcTimestamp;
+}
+
+function toGrpcTimestamp(value: string): GrpcTimestamp {
+  const milliseconds = new Date(value).getTime();
+  return {
+    seconds: Math.floor(milliseconds / 1000).toString(),
+    nanos: (milliseconds % 1000) * 1_000_000,
+  };
 }
 
 @ApiTags('Workers')
@@ -52,6 +75,7 @@ export class WorkersController {
     private readonly remoteExecuteSubscribeService: RemoteExecuteSubscribeService,
     private readonly grpcWorkerContext: GrpcWorkerContext,
     private readonly aliveStreamManager: AliveStreamManager,
+    private readonly workerTelemetryService: WorkerTelemetryService,
   ) {}
 
   @Doc({
@@ -230,6 +254,29 @@ export class WorkersController {
         }
       };
     });
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('WorkersService', 'WorkerTelemetry')
+  async grpcWorkerTelemetry(
+    request: WorkerTelemetryRequest,
+    metadata: Metadata,
+  ): Promise<GrpcWorkerTelemetryAck> {
+    const workerToken = metadata.get(WORKER_TOKEN_HEADER)[0] as
+      | string
+      | undefined;
+    if (!workerToken) {
+      throw new RpcException('Worker token is missing');
+    }
+    const worker = this.grpcWorkerContext.getWorker(workerToken);
+    if (!worker) {
+      throw new RpcException('Worker not found in context');
+    }
+    const response = await this.workerTelemetryService.record(worker, request);
+    return {
+      ...response,
+      receivedAt: toGrpcTimestamp(response.receivedAt),
+    };
   }
 
   @GrpcMethod('WorkersService', 'ConnectInternalNetwork')

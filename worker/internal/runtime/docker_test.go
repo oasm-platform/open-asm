@@ -648,7 +648,11 @@ type fakeDockerEngine struct {
 	createNames    []string          // every create attempt name, in order
 	createConflict bool              // fail the next create with HTTP 409, then clear
 	health         string            // State.Health.Status, "" = no healthcheck
+	status         string            // State.Status
 	exitCode       int               // State.ExitCode
+	oomKilled      bool              // State.OOMKilled
+	startedAt      string            // State.StartedAt (RFC3339)
+	finishedAt     string            // State.FinishedAt (RFC3339)
 	logOutput      string            // payload for the container logs stream
 	logRaw         []byte            // verbatim bytes for the logs stream (raw/TTY); when set, served without a multiplex header
 	labels         map[string]string // Config.Labels of the created container
@@ -744,7 +748,11 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 			running := f.running
 			id := f.containerID
 			health := f.health
+			status := f.status
 			exitCode := f.exitCode
+			oomKilled := f.oomKilled
+			startedAt := f.startedAt
+			finishedAt := f.finishedAt
 			labels := f.labels
 			f.mu.Unlock()
 			healthJSON := ""
@@ -757,7 +765,7 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 				labelsJSON = string(b)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"Id":%q,"State":{"Running":%t,"ExitCode":%d%s},"Config":{"Labels":%s}}`, id, running, exitCode, healthJSON, labelsJSON)
+			fmt.Fprintf(w, `{"Id":%q,"State":{"Running":%t,"Status":%q,"ExitCode":%d,"OOMKilled":%t,"StartedAt":%q,"FinishedAt":%q%s},"Config":{"Labels":%s}}`, id, running, status, exitCode, oomKilled, startedAt, finishedAt, healthJSON, labelsJSON)
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/logs"):
 			// ContainerLogs with ShowStdout+ShowStderr returns a multiplexed
 			// stream (8-byte header: stream byte + uint32 BE length, then
@@ -1056,7 +1064,11 @@ func TestStartStartsStoppedContainer(t *testing.T) {
 func TestInspectReadsHealthAndExitCode(t *testing.T) {
 	engine := newFakeDockerEngine()
 	engine.health = "unhealthy"
+	engine.status = "exited"
 	engine.exitCode = 42
+	engine.oomKilled = true
+	engine.startedAt = "2026-09-24T08:00:00Z"
+	engine.finishedAt = "2026-09-24T08:05:00Z"
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
 
@@ -1069,6 +1081,12 @@ func TestInspectReadsHealthAndExitCode(t *testing.T) {
 	}
 	if res.ExitCode != 42 {
 		t.Fatalf("expected ExitCode=42, got %d", res.ExitCode)
+	}
+	if res.Status != "exited" || !res.OOMKilled {
+		t.Fatalf("expected exited/OOM state, got status=%q oom=%t", res.Status, res.OOMKilled)
+	}
+	if res.StartedAt.IsZero() || res.FinishedAt.IsZero() {
+		t.Fatalf("expected inspect timestamps, got started=%v finished=%v", res.StartedAt, res.FinishedAt)
 	}
 
 	// A container without a healthcheck must report empty Health (unknown).

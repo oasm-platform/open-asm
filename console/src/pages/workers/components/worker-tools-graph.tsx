@@ -669,18 +669,24 @@ export function WorkerToolsGraph({
 }) {
   const { resolvedTheme } = useTheme();
   const { name, os, isOnline, lastSeenAt } = worker;
+  // The graph is an execution view, not a tool catalog: only tools with
+  // running jobs get a node, whether they are builtin or connector tools.
+  const toolsWithJobs = useMemo(
+    () => tools.filter((tool) => (tool.currentJobs?.length ?? 0) > 0),
+    [tools],
+  );
   // Destructured first so the dependency list stays honest and statically
   // checkable: keying on these primitives rather than the `worker` object means
   // a fresh object literal at the call site does not rebuild the graph.
   const { nodes, edges, width, jobsY, jobsBottom } = useMemo(
-    () => buildGraph(tools, { name, os, isOnline, lastSeenAt }),
-    [tools, name, os, isOnline, lastSeenAt],
+    () => buildGraph(toolsWithJobs, { name, os, isOnline, lastSeenAt }),
+    [toolsWithJobs, name, os, isOnline, lastSeenAt],
   );
 
   // Tall canvas on purpose — the diagram is the page's main event. The height
   // comes from the layout rather than a constant, so the job arc never pushes
   // content outside the canvas.
-  const hasJobs = tools.some((tool) => (tool.currentJobs?.length ?? 0) > 0);
+  const hasJobs = toolsWithJobs.length > 0;
   const canvasHeight = hasJobs
     ? jobsBottom + JOB_NODE_HEIGHT + 2 * TIER_GAP
     : jobsY - TIER_GAP + NODE_HEIGHT + 2 * TIER_GAP;
@@ -702,7 +708,7 @@ export function WorkerToolsGraph({
   // boxes then visibly sit on top of each other until the next measurement
   // pass. Keying on the layout signature makes that pass start from an empty
   // store instead. Only the poll changing a job count alters this key.
-  const layoutKey = tools
+  const layoutKey = toolsWithJobs
     .map((tool) => `${tool.id}:${tool.currentJobs?.length ?? 0}`)
     .join('|');
 
@@ -712,7 +718,7 @@ export function WorkerToolsGraph({
     // user scrolls, instead of the whole chain being scaled down to nothing.
     <div className="w-full overflow-x-auto">
       <div
-        className="relative w-full rounded-lg border bg-graph-canvas"
+        className="relative w-full rounded-lg border bg-background p-1.5"
         style={{ minWidth: width, height: contentHeight }}
         role="application"
         aria-label="Connected tools graph"

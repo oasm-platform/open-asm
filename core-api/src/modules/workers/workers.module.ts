@@ -15,6 +15,9 @@ import { WorkersController } from './workers.controller';
 import { WorkersService } from './workers.service';
 import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
+import { RedisWorkerTelemetryStore } from './redis-worker-telemetry.store';
+import { WorkerTelemetryService } from './worker-telemetry.service';
+import { WorkerTelemetryStore } from './worker-telemetry.store';
 
 @Global()
 @Module({
@@ -38,12 +41,19 @@ import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
     RemoteExecuteSubscribeService,
     GrpcWorkerContext,
     AliveStreamManager,
+    RedisWorkerTelemetryStore,
+    {
+      provide: WorkerTelemetryStore,
+      useExisting: RedisWorkerTelemetryStore,
+    },
+    WorkerTelemetryService,
   ],
   exports: [
     WorkersService,
     RemoteExecuteSubscribeService,
     GrpcWorkerContext,
     AliveStreamManager,
+    WorkerTelemetryService,
   ],
 })
 export class WorkersModule {}

@@ -1,6 +1,9 @@
 package runtime
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // JobSpec is the single source used everywhere.
 type JobSpec struct {
@@ -47,14 +50,20 @@ type RuntimeOpts struct {
 }
 
 type Handle struct {
-	ID     string
-	Labels map[string]string
+	ID        string
+	Name      string
+	CreatedAt time.Time
+	Labels    map[string]string
 }
 
 type InspectResult struct {
-	Running  bool
-	ExitCode int
-	Error    string
+	Running    bool
+	Status     string
+	ExitCode   int
+	OOMKilled  bool
+	StartedAt  time.Time
+	FinishedAt time.Time
+	Error      string
 	// Health is the container's healthcheck status: "", "starting",
 	// "healthy" or "unhealthy". Empty = no healthcheck configured (unknown);
 	// the worker health monitor keys startup failures off "unhealthy" and

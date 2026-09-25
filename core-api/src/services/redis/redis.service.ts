@@ -353,6 +353,38 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Set a string value and its expiry in one atomic Redis operation.
+   *
+   * @param key - Redis key name
+   * @param seconds - Expiry time in seconds
+   * @param value - Value to set
+   * @returns OK if successful
+   */
+  public async setWithExpiry(
+    key: string,
+    seconds: number,
+    value: string | number,
+  ): Promise<string> {
+    if (!Number.isInteger(seconds) || seconds <= 0) {
+      throw new Error('Redis expiry seconds must be a positive integer');
+    }
+    try {
+      return await this.cacheClient.set(
+        key,
+        value.toString(),
+        'EX',
+        seconds,
+      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to set key with expiry ${key}: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
    * Set value in Redis with expiry (seconds)
    *
    * @param key - Redis key name

@@ -101,6 +101,7 @@
     "@nestjs/schematics": "^11.0.9",
     "@nestjs/testing": "^11.1.27",
     "@protobuf-ts/plugin": "^2.11.1",
+    "@protobuf-ts/protoc": "^2.11.1",
     "@protobuf-ts/runtime": "^2.11.1",
     "@protobuf-ts/runtime-rpc": "^2.11.1",
     "@swc/cli": "^0.7.9",

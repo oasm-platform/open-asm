@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"oasm-worker/internal/runtime"
 )
 
 // ErrPoolExhausted is returned by Manager.Submit (Phase 3 replica policy)
@@ -39,15 +41,22 @@ const (
 // poolEntry is one pooled container. Keyed by container ID in byID; idle
 // entries are additionally indexed by PoolKey for Acquire.
 type poolEntry struct {
-	ID         string    // docker container ID (runtime Handle.ID)
-	Image      string    // container image
-	PoolKey    string    // normalized image (lowercase) — the acquire key
-	Stream     string    // connector stream identity; set once the SDK registers
-	State      PoolState // idle | busy
-	LastUsedAt time.Time // last transition time; Sweep evicts idle entries past the idle timeout
-	ExecID     string    // owner execution ("" when idle)
-	CPU        string    // manifest cpu the container was created with (informational)
-	Memory     string    // manifest memory the container was created with (informational)
+	ID             string    // docker container ID (runtime Handle.ID)
+	Name           string    // human-readable OASM container name
+	Image          string    // container image
+	ImageVersion   string    // resolved connector version
+	Tool           string    // connector/tool slug
+	PoolKey        string    // normalized image (lowercase) — the acquire key
+	Stream         string    // connector stream identity; set once the SDK registers
+	State          PoolState // idle | busy
+	CreatedAt      time.Time
+	StateChangedAt time.Time
+	LastUsedAt     time.Time // last transition time; Sweep evicts idle entries past the idle timeout
+	ExecID         string    // owner execution ("" when idle)
+	LastJobID      string
+	LastTraceID    string
+	CPU            string // manifest cpu the container was created with (informational)
+	Memory         string // manifest memory the container was created with (informational)
 }
 
 // PoolManager tracks pooled containers and hands them out for reuse. It is
@@ -94,8 +103,15 @@ func (p *PoolManager) Add(entry poolEntry) {
 	if entry.State == "" {
 		entry.State = PoolStateIdle
 	}
+	now := p.now()
+	if entry.CreatedAt.IsZero() {
+		entry.CreatedAt = now
+	}
+	if entry.StateChangedAt.IsZero() {
+		entry.StateChangedAt = now
+	}
 	if entry.LastUsedAt.IsZero() {
-		entry.LastUsedAt = p.now()
+		entry.LastUsedAt = now
 	}
 	e := entry
 	p.byID[e.ID] = &e
@@ -135,6 +151,14 @@ func (p *PoolManager) unindexIdle(cid, key string) {
 // caller then creates a fresh container). MaxJobsPerContainer=1 is enforced
 // structurally: busy entries are not in the idle queue.
 func (p *PoolManager) Acquire(execID, image string) (string, bool) {
+	handle, ok := p.AcquireHandle(execID, image)
+	return handle.ID, ok
+}
+
+// AcquireHandle is Acquire with the stable container handle preserved. The
+// manager needs the name after a warm-pool reuse so telemetry can identify the
+// container even though the original Create call is no longer in the execution.
+func (p *PoolManager) AcquireHandle(execID, image string) (runtime.Handle, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	key := normalizePoolKey(image)
@@ -151,6 +175,7 @@ func (p *PoolManager) Acquire(execID, image string) (string, bool) {
 		e.State = PoolStateBusy
 		e.ExecID = execID
 		e.LastUsedAt = p.now()
+		e.StateChangedAt = e.LastUsedAt
 		// Re-acquire takes the container over from its previous execution.
 		// ReleaseToIdle deliberately KEEPS the previous owner mapping (for
 		// IsIdle) and clears the entry's ExecID, so the stale mapping is only
@@ -161,9 +186,9 @@ func (p *PoolManager) Acquire(execID, image string) (string, bool) {
 		p.purgeOwnerByContainer(cid)
 		p.owner[execID] = cid
 		p.unindexIdle(cid, key)
-		return cid, true
+		return runtime.Handle{ID: e.ID, Name: e.Name}, true
 	}
-	return "", false
+	return runtime.Handle{}, false
 }
 
 // ReleaseToIdle returns the container owned by execID to the idle queue.
@@ -181,6 +206,7 @@ func (p *PoolManager) ReleaseToIdle(execID string) {
 		e.State = PoolStateIdle
 		e.ExecID = ""
 		e.LastUsedAt = p.now()
+		e.StateChangedAt = e.LastUsedAt
 		p.indexIdle(e.ID, e.PoolKey)
 	}
 }

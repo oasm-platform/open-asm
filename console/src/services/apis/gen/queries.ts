@@ -1714,6 +1714,131 @@ export type GetManyWorkerInstanceDto = {
   pageCount: number;
 };
 
+export type WorkerTelemetryNodeDto = {
+  hostname: string;
+  os: string;
+  arch: string;
+  runMode: string;
+  cpuCount: number;
+  cpuUsagePercent: number;
+  /** Bytes represented as a decimal string. */
+  memoryUsedBytes: string;
+  /** Bytes represented as a decimal string. */
+  memoryTotalBytes: string;
+};
+
+export type WorkerTelemetryJobsDto = {
+  active: number;
+  maxConcurrency: number;
+};
+
+export type ManagedContainerTelemetryDtoRuntimeState =
+  (typeof ManagedContainerTelemetryDtoRuntimeState)[keyof typeof ManagedContainerTelemetryDtoRuntimeState];
+
+export const ManagedContainerTelemetryDtoRuntimeState = {
+  UNSPECIFIED: 'UNSPECIFIED',
+  PROVISIONING: 'PROVISIONING',
+  RUNNING: 'RUNNING',
+  EXITED: 'EXITED',
+  REMOVING: 'REMOVING',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+
+export type ManagedContainerTelemetryDtoHealthState =
+  (typeof ManagedContainerTelemetryDtoHealthState)[keyof typeof ManagedContainerTelemetryDtoHealthState];
+
+export const ManagedContainerTelemetryDtoHealthState = {
+  UNKNOWN: 'UNKNOWN',
+  NONE: 'NONE',
+  STARTING: 'STARTING',
+  HEALTHY: 'HEALTHY',
+  UNHEALTHY: 'UNHEALTHY',
+} as const;
+
+export type ManagedContainerTelemetryDtoExecutionState =
+  (typeof ManagedContainerTelemetryDtoExecutionState)[keyof typeof ManagedContainerTelemetryDtoExecutionState];
+
+export const ManagedContainerTelemetryDtoExecutionState = {
+  NONE: 'NONE',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+  FAILED: 'FAILED',
+} as const;
+
+export type ManagedContainerTelemetryDto = {
+  containerId: string;
+  containerName: string;
+  image: string;
+  imageVersion: string;
+  tool: string;
+  poolKey: string;
+  pooled: boolean;
+  runtimeState: ManagedContainerTelemetryDtoRuntimeState;
+  healthState: ManagedContainerTelemetryDtoHealthState;
+  executionState: ManagedContainerTelemetryDtoExecutionState;
+  connectorConnected: boolean;
+  exitCode?: number;
+  oomKilled: boolean;
+  createdAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  stateChangedAt?: string;
+  lastUsedAt?: string;
+  executionId?: string;
+  jobId?: string;
+  traceId?: string;
+  cpuLimitMillicores: number;
+  /** Bytes represented as a decimal string. */
+  memoryLimitBytes: string;
+  inspectionSucceeded: boolean;
+};
+
+export type WorkerContainersTelemetryDto = {
+  supported: boolean;
+  total: number;
+  active: number;
+  idle: number;
+  unhealthy: number;
+  truncated: boolean;
+  items: ManagedContainerTelemetryDto[];
+};
+
+export type WorkerTelemetryDtoState =
+  (typeof WorkerTelemetryDtoState)[keyof typeof WorkerTelemetryDtoState];
+
+export const WorkerTelemetryDtoState = {
+  UNSPECIFIED: 'UNSPECIFIED',
+  READY: 'READY',
+  DRAINING: 'DRAINING',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export type WorkerTelemetryDtoFreshness =
+  (typeof WorkerTelemetryDtoFreshness)[keyof typeof WorkerTelemetryDtoFreshness];
+
+export const WorkerTelemetryDtoFreshness = {
+  fresh: 'fresh',
+  stale: 'stale',
+} as const;
+
+export type WorkerTelemetryDto = {
+  schemaVersion: number;
+  workerId: string;
+  instanceId: string;
+  sequence: string;
+  state: WorkerTelemetryDtoState;
+  receivedAt: string;
+  observedAt: string;
+  startedAt?: string;
+  uptimeSeconds: number;
+  version: string;
+  freshness: WorkerTelemetryDtoFreshness;
+  node: WorkerTelemetryNodeDto;
+  jobs: WorkerTelemetryJobsDto;
+  containers: WorkerContainersTelemetryDto;
+};
+
 export type WorkerToolJobDto = {
   /** Asset value the job targets (host, domain, IP). Absent when the job runs against an asset service or a whole asset group. */
   target?: string;
@@ -1794,6 +1919,11 @@ export type GetWorkerResponseDto = {
   currentJobsCount: number;
   toolsCount: number;
   isOnline: boolean;
+  /**
+   * Latest ephemeral worker and container telemetry snapshot from Redis.
+   * @nullable
+   */
+  telemetry?: WorkerTelemetryDto | null;
   /**
    * The bound tool provider, when the worker is attached to one.
    * @nullable

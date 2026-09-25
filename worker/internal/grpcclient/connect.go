@@ -42,7 +42,11 @@ func (c *Client) Connect(ctx context.Context, ready chan<- bool) {
 		default:
 		}
 
+		telemetryCtx, stopTelemetry := context.WithCancel(ctx)
+		telemetryDone := c.startTelemetry(telemetryCtx)
 		err = c.Alive(ctx)
+		stopTelemetry()
+		<-telemetryDone
 
 		select {
 		case ready <- false:

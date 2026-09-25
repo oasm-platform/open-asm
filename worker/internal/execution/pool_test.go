@@ -26,6 +26,27 @@ func idleEntry(cid, key string, lastUsed time.Time) poolEntry {
 	}
 }
 
+func TestPoolAcquireHandlePreservesContainerName(t *testing.T) {
+	now := time.Now()
+	p, _ := newPoolForTest(t, now)
+	p.Add(poolEntry{
+		ID:         "c1",
+		Name:       "oasm-nuclei-abc123",
+		Image:      "nuclei",
+		PoolKey:    "nuclei",
+		State:      PoolStateIdle,
+		LastUsedAt: now,
+	})
+
+	handle, ok := p.AcquireHandle("exec-1", "nuclei")
+	if !ok {
+		t.Fatal("AcquireHandle must hit an idle container with a matching pool key")
+	}
+	if handle.Name != "oasm-nuclei-abc123" {
+		t.Fatalf("AcquireHandle returned name %q, want %q", handle.Name, "oasm-nuclei-abc123")
+	}
+}
+
 func TestPoolAcquireIdleContainerMarksBusy(t *testing.T) {
 	now := time.Now()
 	p, _ := newPoolForTest(t, now)

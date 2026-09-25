@@ -1,16 +1,16 @@
 import Page from '@/components/common/page';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 
-/** Full-page skeleton mirroring the worker detail card (identity + field grid)
- * and the bare connected-tools graph. */
+/** Full-page skeleton mirroring the combined identity/telemetry card and the
+ * connected-tools graph. */
 export function WorkerDetailSkeleton() {
   return (
     <Page isShowButtonGoBack permission="worker.read">
-      <div className="space-y-4">
+      <div className="space-y-6">
         <Card className="gap-0 overflow-hidden py-0">
-          <div className="flex items-center gap-4 p-5">
+          <div className="flex items-center gap-4 border-b border-border/60 p-6">
             <Skeleton className="size-16 shrink-0 rounded-2xl" />
             <div className="min-w-0 space-y-2">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -23,17 +23,29 @@ export function WorkerDetailSkeleton() {
               </div>
             </div>
           </div>
+
+          <div className="grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-32 rounded-xl" />
+            ))}
+          </div>
+
           <Separator />
-          <CardContent className="py-4">
-            <div className="grid gap-x-4 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                <Skeleton key={i} className="h-9 w-full" />
+
+          <div className="space-y-4 p-6">
+            <Skeleton className="h-6 w-28" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-28 rounded-xl" />
               ))}
             </div>
-          </CardContent>
+            <Skeleton className="h-40 rounded-xl" />
+          </div>
         </Card>
 
-        <Skeleton className="h-[320px] w-full rounded-lg" />
+        <div className="rounded-lg border p-1.5">
+          <Skeleton className="h-[620px] w-full rounded-md" />
+        </div>
       </div>
     </Page>
   );

@@ -10,6 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
+import { WorkerTelemetryDto } from './worker-telemetry.dto';
 
 export class WorkerManifestResponseDto {
   @ApiProperty({
@@ -204,6 +205,14 @@ export class GetWorkerResponseDto {
 
   @ApiProperty()
   isOnline: boolean;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: WorkerTelemetryDto,
+    description: 'Latest ephemeral worker and container telemetry snapshot from Redis.',
+  })
+  telemetry?: WorkerTelemetryDto | null;
 
   @ApiProperty({
     required: false,

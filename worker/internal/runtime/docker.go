@@ -740,11 +740,14 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	d.logInfo("docker: container started: %s exec=%s job=%s", containerID, execID, spec.JobID)
 
 	handle := Handle{
-		ID: containerID,
+		ID:        containerID,
+		Name:      name,
+		CreatedAt: time.Now().UTC(),
 		Labels: map[string]string{
 			"trace_id":      opts.TraceID,
 			"tool":          spec.Tool,
 			"exec_id":       execID,
+			"job_id":        spec.JobID,
 			"oasm.pool_key": poolRef,
 		},
 	}
@@ -790,7 +793,18 @@ func (d *DockerRuntime) Inspect(ctx context.Context, h Handle) (InspectResult, e
 	if err != nil {
 		return InspectResult{}, err
 	}
-	res := InspectResult{Running: j.State.Running, ExitCode: j.State.ExitCode}
+	res := InspectResult{
+		Running:   j.State.Running,
+		Status:    j.State.Status,
+		ExitCode:  j.State.ExitCode,
+		OOMKilled: j.State.OOMKilled,
+	}
+	if startedAt, err := time.Parse(time.RFC3339Nano, j.State.StartedAt); err == nil {
+		res.StartedAt = startedAt
+	}
+	if finishedAt, err := time.Parse(time.RFC3339Nano, j.State.FinishedAt); err == nil {
+		res.FinishedAt = finishedAt
+	}
 	if j.State.Health != nil {
 		res.Health = j.State.Health.Status
 	}

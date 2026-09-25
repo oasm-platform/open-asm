@@ -7,6 +7,7 @@ import (
 	"oasm-worker/internal/connector"
 	"oasm-worker/internal/execution"
 	"oasm-worker/internal/runtime"
+	"oasm-worker/internal/telemetry"
 	"os"
 	"path/filepath"
 	"sync"
@@ -138,8 +139,9 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 		// proxy and mgr are initialized after connector server setup but
 		// declared here so the pollLoop closure can capture them by reference.
-		proxy *connector.Proxy
-		mgr   *execution.Manager
+		proxy             *connector.Proxy
+		mgr               *execution.Manager
+		telemetryProvider *telemetry.Provider
 	)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
@@ -393,6 +395,36 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		mgr = mgrInit
 	}
 
+	var telemetryManager telemetry.Manager
+	if mgr != nil {
+		telemetryManager = mgr
+	}
+	var connectorState telemetry.ConnectorState
+	if proxy != nil {
+		connectorState = proxy
+	}
+	telemetryProvider, err = telemetry.NewProvider(
+		telemetryManager,
+		connectorState,
+		func() int {
+			activeJobsMu.RLock()
+			defer activeJobsMu.RUnlock()
+			return len(activeJobs)
+		},
+		cfg.MaxConcurrency,
+		cfg.Mode,
+		"dev",
+	)
+	if err != nil {
+		log.Warning("worker telemetry disabled: failed to initialize provider: %v", err)
+		telemetryProvider = nil
+	} else {
+		if cfg.Mode == "node" && mgr == nil {
+			telemetryProvider.SetState(workers.WorkerRuntimeState_WORKER_RUNTIME_STATE_DEGRADED)
+		}
+		grpcClient.SetTelemetryProvider(telemetryProvider)
+	}
+
 	// Connect AFTER node-mode setup: the startup orphan reconcile above must
 	// finish before this process can receive jobs (and thus create
 	// containers), so a fresh container can never be misclassified as a
@@ -458,6 +490,14 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	// executions are untouched.
 	if mgr != nil {
 		mgr.DrainPool()
+	}
+	if telemetryProvider != nil {
+		telemetryProvider.SetState(workers.WorkerRuntimeState_WORKER_RUNTIME_STATE_DRAINING)
+		reportCtx, cancelReport := context.WithTimeout(context.Background(), 2*time.Second)
+		if _, reportErr := grpcClient.ReportTelemetry(reportCtx); reportErr != nil {
+			log.Warning("final worker telemetry report failed: %v", reportErr)
+		}
+		cancelReport()
 	}
 	log.Success("Shutdown complete")
 
