@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
+  getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey,
+  getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey,
   useAssetGroupControllerAddManyAssets,
   useAssetGroupControllerGetAssetsNotInAssetGroup,
 } from '@/services/apis/gen/queries';
@@ -89,11 +91,16 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
         onSuccess: () => {
           setSelectedAssets(new Set());
           setOpen(false);
-          queryClient.invalidateQueries({
-            queryKey: ['assetGroupControllerGetAssetsByAssetGroupsId'],
+          void queryClient.invalidateQueries({
+            queryKey:
+              getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey(
+                assetGroupId,
+              ),
           });
-          queryClient.invalidateQueries({
-            queryKey: ['assetGroupControllerGetAssetsNotInAssetGroup'],
+          void queryClient.invalidateQueries({
+            queryKey: getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey(
+              assetGroupId,
+            ),
           });
           onAssetsAdded?.();
         },
