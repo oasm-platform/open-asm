@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package workers;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "./workers";
 
 message JoinRequest {
@@ -118,9 +120,117 @@ message RemoteExecuteResultAck {
   string message = 2;
 }
 
+enum WorkerRuntimeState {
+  WORKER_RUNTIME_STATE_UNSPECIFIED = 0;
+  WORKER_RUNTIME_STATE_READY = 1;
+  WORKER_RUNTIME_STATE_DRAINING = 2;
+  WORKER_RUNTIME_STATE_DEGRADED = 3;
+}
+
+enum ContainerRuntimeState {
+  CONTAINER_RUNTIME_STATE_UNSPECIFIED = 0;
+  CONTAINER_RUNTIME_STATE_PROVISIONING = 1;
+  CONTAINER_RUNTIME_STATE_RUNNING = 2;
+  CONTAINER_RUNTIME_STATE_EXITED = 3;
+  CONTAINER_RUNTIME_STATE_REMOVING = 4;
+  CONTAINER_RUNTIME_STATE_UNKNOWN = 5;
+}
+
+enum ContainerHealthState {
+  CONTAINER_HEALTH_STATE_UNKNOWN = 0;
+  CONTAINER_HEALTH_STATE_NONE = 1;
+  CONTAINER_HEALTH_STATE_STARTING = 2;
+  CONTAINER_HEALTH_STATE_HEALTHY = 3;
+  CONTAINER_HEALTH_STATE_UNHEALTHY = 4;
+}
+
+enum ContainerExecutionState {
+  CONTAINER_EXECUTION_STATE_NONE = 0;
+  CONTAINER_EXECUTION_STATE_ACTIVE = 1;
+  CONTAINER_EXECUTION_STATE_COMPLETED = 2;
+  CONTAINER_EXECUTION_STATE_CANCELLED = 3;
+  CONTAINER_EXECUTION_STATE_FAILED = 4;
+}
+
+message WorkerNodeTelemetry {
+  string hostname = 1;
+  string os = 2;
+  string arch = 3;
+  string run_mode = 4;
+  uint32 cpu_count = 5;
+  double cpu_usage_percent = 6;
+  uint64 memory_used_bytes = 7;
+  uint64 memory_total_bytes = 8;
+  reserved 9, 10;
+}
+
+message WorkerJobTelemetry {
+  uint32 active = 1;
+  uint32 max_concurrency = 2;
+}
+
+message ManagedContainerTelemetry {
+  string container_id = 1;
+  string container_name = 2;
+  string image = 3;
+  string image_version = 4;
+  string tool = 5;
+  string pool_key = 6;
+  bool pooled = 7;
+  ContainerRuntimeState runtime_state = 8;
+  ContainerHealthState health_state = 9;
+  ContainerExecutionState execution_state = 10;
+  bool connector_connected = 11;
+  optional int32 exit_code = 12;
+  bool oom_killed = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp started_at = 15;
+  optional google.protobuf.Timestamp finished_at = 16;
+  google.protobuf.Timestamp state_changed_at = 17;
+  google.protobuf.Timestamp last_used_at = 18;
+  optional string execution_id = 19;
+  optional string job_id = 20;
+  optional string trace_id = 21;
+  double cpu_limit_millicores = 22;
+  uint64 memory_limit_bytes = 23;
+  bool inspection_succeeded = 24;
+}
+
+message WorkerContainersTelemetry {
+  bool supported = 1;
+  uint32 total = 2;
+  uint32 active = 3;
+  uint32 idle = 4;
+  uint32 unhealthy = 5;
+  bool truncated = 6;
+  repeated ManagedContainerTelemetry items = 7;
+}
+
+message WorkerTelemetryRequest {
+  uint32 schema_version = 1;
+  string instance_id = 2;
+  uint64 sequence = 3;
+  google.protobuf.Timestamp observed_at = 4;
+  google.protobuf.Timestamp started_at = 5;
+  uint64 uptime_seconds = 6;
+  WorkerRuntimeState state = 7;
+  string version = 8;
+  WorkerNodeTelemetry node = 9;
+  WorkerJobTelemetry jobs = 10;
+  WorkerContainersTelemetry containers = 11;
+}
+
+message WorkerTelemetryResponse {
+  uint64 accepted_sequence = 1;
+  google.protobuf.Timestamp received_at = 2;
+  string worker_id = 3;
+  uint32 next_report_after_ms = 4;
+}
+
 service WorkersService {
   rpc Join(JoinRequest) returns (JoinResponse);
   rpc Alive(AliveRequest) returns (stream AliveResponse);
+  rpc WorkerTelemetry(WorkerTelemetryRequest) returns (WorkerTelemetryResponse);
   rpc GetManifest(GetManifestRequest) returns (GetManifestResponse);
   rpc Storage(StorageRequest) returns (stream StorageResponse);
   rpc ConnectInternalNetwork(ConnectInternalNetworkRequest) returns (ConnectInternalNetworkResponse);

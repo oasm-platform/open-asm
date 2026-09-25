@@ -17,6 +17,7 @@ import { RedisService } from '@/services/redis/redis.service';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
+import { WorkerTelemetryService } from './worker-telemetry.service';
 
 describe('WorkersService', () => {
   let service: WorkersService;
@@ -32,6 +33,7 @@ describe('WorkersService', () => {
   let mockRedisService: Partial<RedisService>;
   let mockAliveStreamManager: Partial<AliveStreamManager>;
   let mockConnectorRegistryService: Partial<ConnectorRegistryService>;
+  let mockWorkerTelemetryService: Partial<WorkerTelemetryService>;
 
   beforeEach(async () => {
     mockWorkerInstanceRepository = {
@@ -113,6 +115,10 @@ describe('WorkersService', () => {
       getConnector: jest.fn().mockReturnValue(null),
     };
 
+    mockWorkerTelemetryService = {
+      get: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkersService,
@@ -163,6 +169,10 @@ describe('WorkersService', () => {
         {
           provide: ConnectorRegistryService,
           useValue: mockConnectorRegistryService,
+        },
+        {
+          provide: WorkerTelemetryService,
+          useValue: mockWorkerTelemetryService,
         },
       ],
     }).compile();
@@ -651,6 +661,7 @@ describe('WorkersService', () => {
       builtInTools: Record<string, unknown>[] = [],
       connectors: Record<string, unknown>[] = [],
       runningJobRows: Record<string, unknown>[] = [],
+      telemetry?: Record<string, unknown> | null,
     ) => {
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(
         worker,
@@ -667,8 +678,47 @@ describe('WorkersService', () => {
       (
         mockConnectorRegistryService.getAllConnectors as jest.Mock
       ).mockReturnValue(connectors);
+      if (telemetry !== undefined) {
+        (mockWorkerTelemetryService.get as jest.Mock).mockResolvedValue(
+          telemetry,
+        );
+      }
       return service.getWorkerById(workerId, workspaceId);
     };
+
+    const containerTelemetry = (tools: string[]) => ({
+      schemaVersion: 1,
+      workerId,
+      instanceId: 'instance-1',
+      sequence: '12',
+      state: 'READY',
+      freshness: 'fresh',
+      containers: {
+        supported: true,
+        total: tools.length,
+        active: tools.length,
+        idle: 0,
+        unhealthy: 0,
+        truncated: false,
+        items: tools.map((tool, index) => ({
+          containerId: `container-${index}`,
+          containerName: `oasm-${tool}-${index}`,
+          image: `example/${tool}:latest`,
+          imageVersion: '1.0.0',
+          tool,
+          poolKey: `example/${tool}:latest`,
+          pooled: true,
+          runtimeState: 'RUNNING',
+          healthState: 'HEALTHY',
+          executionState: 'NONE',
+          connectorConnected: true,
+          oomKilled: false,
+          cpuLimitMillicores: 1000,
+          memoryLimitBytes: '1073741824',
+          inspectionSucceeded: true,
+        })),
+      },
+    });
 
     it('returns built-in tools only for a cli worker and keeps toolsCount in sync', async () => {
       const result = await runGetWorkerById(
@@ -705,10 +755,12 @@ describe('WorkersService', () => {
         { id: workerId, workspaceId, runMode: 'node' },
         builtInToolFixtures,
         connectorFixtures,
+        [],
+        containerTelemetry(['c-1', 'c-2']),
       );
 
-      expect(result.tools).toHaveLength(5);
-      expect(result.toolsCount).toBe(5);
+      expect(result.tools).toHaveLength(4);
+      expect(result.toolsCount).toBe(4);
       expect(result.toolsCount).toBe(result.tools.length);
 
       const connectors = result.tools.filter((tool) => tool.type === 'connector');
@@ -727,13 +779,35 @@ describe('WorkersService', () => {
           type: 'connector',
           currentJobs: [],
         },
-        {
-          id: 'c-3',
-          name: 'c-3',
-          logoUrl: '/connectors/c-3.png',
-          type: 'connector',
-          currentJobs: [],
-        },
+      ]);
+    });
+
+    it('excludes a connector with a running job but no container', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'node' },
+        builtInToolFixtures,
+        connectorFixtures,
+        [{ tool: 'c-1', target: 'example.com', service: null }],
+        containerTelemetry(['c-2']),
+      );
+
+      expect(result.tools.filter((tool) => tool.type === 'connector')).toEqual([
+        expect.objectContaining({ name: 'c-2', currentJobs: [] }),
+      ]);
+      expect(result.tools.find((tool) => tool.name === 'c-1')).toBeUndefined();
+    });
+
+    it('keeps a connector with a container even when it has no running job', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'node' },
+        builtInToolFixtures,
+        connectorFixtures,
+        [],
+        containerTelemetry(['c-3']),
+      );
+
+      expect(result.tools.filter((tool) => tool.type === 'connector')).toEqual([
+        expect.objectContaining({ name: 'c-3', currentJobs: [] }),
       ]);
     });
 
@@ -757,6 +831,7 @@ describe('WorkersService', () => {
           // Job whose tool relation was dropped — skipped, never crashed on.
           { tool: null, target: null, service: null },
         ],
+        containerTelemetry(['c-1', 'c-2']),
       );
 
       const byName = new Map(result.tools.map((tool) => [tool.name, tool]));
@@ -803,6 +878,28 @@ describe('WorkersService', () => {
       );
 
       expect(result.id).toBe(workerId);
+    });
+
+    it('includes the Redis telemetry snapshot without persisting it on the entity', async () => {
+      const telemetry = {
+        schemaVersion: 1,
+        workerId,
+        instanceId: 'instance-1',
+        sequence: '12',
+        state: 'READY',
+        freshness: 'fresh',
+      };
+      (mockWorkerTelemetryService.get as jest.Mock).mockResolvedValue(
+        telemetry,
+      );
+
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'cli' },
+        builtInToolFixtures,
+      );
+
+      expect(result.telemetry).toEqual(telemetry);
+      expect(mockWorkerTelemetryService.get).toHaveBeenCalledWith(workerId);
     });
 
     it('never exposes the worker token', async () => {

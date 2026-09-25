@@ -1,6 +1,10 @@
 package execution
 
-import "oasm-worker/internal/runtime"
+import (
+	"time"
+
+	"oasm-worker/internal/runtime"
+)
 
 // JobSpec is a single-source alias to runtime.JobSpec (Tool, Image, Version, Inputs, Limits, TraceID).
 // Image is REQUIRED via Core ConnectorRegistry (1.5); Worker never resolves manifest itself.
@@ -17,8 +21,11 @@ const (
 
 // Execution is per-execution state tracked by Manager.
 type Execution struct {
-	ID     string
-	Spec   JobSpec
-	State  State
-	Handle Handle
+	ID             string
+	Spec           JobSpec
+	State          State
+	Handle         Handle
+	CreatedAt      time.Time
+	StartedAt      time.Time
+	StateChangedAt time.Time
 }

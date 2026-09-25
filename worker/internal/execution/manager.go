@@ -253,8 +253,9 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	var adoptErr error
 	var h runtime.Handle
 	if p != nil {
-		if cid, ok := p.Acquire(id, poolKey); ok {
-			h = runtime.Handle{ID: cid}
+		if acquired, ok := p.AcquireHandle(id, poolKey); ok {
+			h = acquired
+			cid := h.ID
 			poolLogs = append(poolLogs, fmt.Sprintf("pool reuse: container %s pool_key=%s", cid, poolKey))
 			// Warm-pool reuse: the container's connector stream is already
 			// live under the PREVIOUS execution's ID (the SDK loops on Recv
@@ -359,13 +360,19 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		if p != nil {
 			cpu, mem := limitsCPUandMemory(spec.Limits)
 			p.Add(poolEntry{
-				ID:      h.ID,
-				Image:   spec.Image,
-				PoolKey: poolKey,
-				CPU:     cpu,
-				Memory:  mem,
-				State:   PoolStateBusy,
-				ExecID:  id,
+				ID:           h.ID,
+				Name:         h.Name,
+				Image:        spec.Image,
+				ImageVersion: spec.Version,
+				Tool:         spec.Tool,
+				PoolKey:      poolKey,
+				CPU:          cpu,
+				Memory:       mem,
+				State:        PoolStateBusy,
+				ExecID:       id,
+				LastJobID:    spec.JobID,
+				LastTraceID:  spec.TraceID,
+				CreatedAt:    h.CreatedAt,
 			})
 			poolLogs = append(poolLogs, fmt.Sprintf("pool miss: created replica container %s pool_key=%s busy=%d max=%d",
 				h.ID, poolKey, p.busyCount(poolKey), p.maxReplicasPerImage))
@@ -404,7 +411,16 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		}
 	}
 	m.mu.Lock()
-	m.execs[id] = &Execution{ID: id, Spec: spec, State: StateRunning, Handle: h}
+	now := time.Now().UTC()
+	m.execs[id] = &Execution{
+		ID:             id,
+		Spec:           spec,
+		State:          StateRunning,
+		Handle:         h,
+		CreatedAt:      now,
+		StartedAt:      now,
+		StateChangedAt: now,
+	}
 	// Route this execution to its container in the proxy. On a pool hit the
 	// stream may already be live — BindExec pre-closes the registration signal
 	// so the drain skips the connect timer.

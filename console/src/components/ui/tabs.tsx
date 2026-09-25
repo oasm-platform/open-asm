@@ -48,18 +48,27 @@ function useQueryTab({
     [navigate, tabParam],
   );
 
-  // Strip the tab search-param when navigating away so other pages don't inherit it.
+  // Strip the tab search-param when navigating away so other pages don't
+  // inherit it. Defer the cleanup by one microtask: React StrictMode performs
+  // a setup -> cleanup -> setup cycle during development, and deleting the
+  // query in that synthetic cleanup loses the tab restored from the URL.
+  const mountedRef = React.useRef(false);
   React.useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      navigate({
-        search: (prev: Record<string, unknown>) => {
-          const next = { ...prev };
-          delete next[tabParam];
-          return next;
-        },
-        replace: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+      mountedRef.current = false;
+      queueMicrotask(() => {
+        if (mountedRef.current) return;
+        navigate({
+          search: (prev: Record<string, unknown>) => {
+            const next = { ...prev };
+            delete next[tabParam];
+            return next;
+          },
+          replace: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+      });
     };
     // Only on unmount — navigate and tabParam are stable refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps

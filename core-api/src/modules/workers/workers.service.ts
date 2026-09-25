@@ -35,6 +35,7 @@ import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
+import { WorkerTelemetryService } from './worker-telemetry.service';
 import {
   GetManyWorkersDto,
   GetWorkerResponseDto,
@@ -86,6 +87,8 @@ export class WorkersService {
     private redisService: RedisService,
 
     private aliveStreamManager: AliveStreamManager,
+
+    private readonly workerTelemetryService: WorkerTelemetryService,
 
     private readonly connectorRegistry: ConnectorRegistryService,
   ) {}
@@ -370,7 +373,10 @@ export class WorkersService {
       throw new NotFoundException('Worker not found');
     }
 
-    const { data: builtInTools } = await this.toolsService.getBuiltInTools();
+    const [{ data: builtInTools }, telemetry] = await Promise.all([
+      this.toolsService.getBuiltInTools(),
+      this.workerTelemetryService.get(worker.id),
+    ]);
 
     const tools: WorkerToolDto[] = builtInTools.map((tool) => ({
       id: tool.id!,
@@ -382,23 +388,35 @@ export class WorkersService {
       currentJobs: [],
     }));
 
-    // Only node-mode workers run Docker connectors; CLI/legacy workers may not
-    // have Docker installed, so they expose built-in tools only.
-    if (worker.runMode === 'node') {
+    // Only node-mode workers run Docker connectors. A connector is exposed in
+    // the worker detail only when the latest telemetry proves that at least
+    // one managed container is using its tool; registry membership alone is
+    // not evidence that the worker currently has the tool.
+    const containerToolNames = new Set(
+      (telemetry?.containers?.items ?? [])
+        .map((item) => item.tool?.trim().toLowerCase())
+        .filter((tool): tool is string => Boolean(tool)),
+    );
+    if (worker.runMode === 'node' && containerToolNames.size > 0) {
       tools.push(
-        ...this.connectorRegistry.getAllConnectors().map((connector) => ({
-          // Connectors are addressed by their manifest slug everywhere else
-          // (tool config, profiles, jobs), and the manifest display name is not
-          // unique. `name` is therefore the slug too, so clients render the
-          // identifier users actually write in config.
-          id: connector.slug,
-          name: connector.slug,
-          logoUrl: connector.logo
-            ? `/connectors/${connector.slug}.png`
-            : undefined,
-          type: 'connector' as const,
-          currentJobs: [],
-        })),
+        ...this.connectorRegistry
+          .getAllConnectors()
+          .filter((connector) =>
+            containerToolNames.has(connector.slug.trim().toLowerCase()),
+          )
+          .map((connector) => ({
+            // Connectors are addressed by their manifest slug everywhere else
+            // (tool config, profiles, jobs), and the manifest display name is not
+            // unique. `name` is therefore the slug too, so clients render the
+            // identifier users actually write in config.
+            id: connector.slug,
+            name: connector.slug,
+            logoUrl: connector.logo
+              ? `/connectors/${connector.slug}.png`
+              : undefined,
+            type: 'connector' as const,
+            currentJobs: [],
+          })),
       );
     }
 
@@ -423,6 +441,7 @@ export class WorkersService {
       currentJobsCount,
       toolsCount: tools.length,
       isOnline: this.aliveStreamManager.isActive(worker.id),
+      telemetry,
       tool: worker.tool
         ? { id: worker.tool.id!, name: worker.tool.name }
         : null,

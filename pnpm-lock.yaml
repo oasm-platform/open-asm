@@ -624,6 +624,9 @@ importers:
       '@protobuf-ts/plugin':
         specifier: ^2.11.1
         version: 2.11.1
+      '@protobuf-ts/protoc':
+        specifier: ^2.11.1
+        version: 2.11.1
       '@protobuf-ts/runtime':
         specifier: ^2.11.1
         version: 2.11.1

@@ -26,6 +26,7 @@ type fakeWorkersService struct {
 	// Default: return Unimplemented errors.
 	joinFn         func(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error)
 	aliveFn        func(req *workers.AliveRequest, srv workers.WorkersService_AliveServer) error
+	telemetryFn    func(ctx context.Context, req *workers.WorkerTelemetryRequest) (*workers.WorkerTelemetryResponse, error)
 	storageFn      func(req *workers.StorageRequest, srv workers.WorkersService_StorageServer) error
 	manifestFn     func(ctx context.Context, req *workers.GetManifestRequest) (*workers.GetManifestResponse, error)
 	connectNetFn   func(ctx context.Context, req *workers.ConnectInternalNetworkRequest) (*workers.ConnectInternalNetworkResponse, error)
@@ -69,6 +70,13 @@ func (f *fakeWorkersService) Alive(req *workers.AliveRequest, srv workers.Worker
 		return f.aliveFn(req, srv)
 	}
 	return status.Error(codes.Unimplemented, "alive not configured")
+}
+
+func (f *fakeWorkersService) WorkerTelemetry(ctx context.Context, req *workers.WorkerTelemetryRequest) (*workers.WorkerTelemetryResponse, error) {
+	if f.telemetryFn != nil {
+		return f.telemetryFn(ctx, req)
+	}
+	return nil, status.Error(codes.Unimplemented, "telemetry not configured")
 }
 
 func (f *fakeWorkersService) Storage(req *workers.StorageRequest, srv workers.WorkersService_StorageServer) error {
