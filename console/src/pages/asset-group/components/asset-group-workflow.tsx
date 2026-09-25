@@ -4,6 +4,7 @@ import {
   ToolPipelineBuilder,
   type PipelineToolEntry,
 } from '@/pages/asset-group/components/tool-pipeline-builder';
+import { NoInstalledToolsState } from '@/pages/asset-group/components/no-installed-tools-state';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -37,12 +38,11 @@ import {
 import {
   CalendarClockIcon,
   HistoryIcon,
-  MoveUpRight,
+  LoaderCircleIcon,
   Settings,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
-import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 export default function AssetGroupWorkflow({
@@ -54,8 +54,10 @@ export default function AssetGroupWorkflow({
   workflows: AssetGroupWorkflowRelation[];
   onRefetch: () => void;
 }) {
-  const { data: workspaceToolsInstalled } =
-    useToolsControllerGetInstalledTools();
+  const {
+    data: workspaceToolsInstalled,
+    isLoading: isLoadingWorkspaceTools,
+  } = useToolsControllerGetInstalledTools();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSetScheduleOpen, setIsSetScheduleOpen] = useState(false);
@@ -410,19 +412,17 @@ export default function AssetGroupWorkflow({
             onSuccess={onRefetch}
           />
         </div>
-        <div className="px-2 md:px-4 py-2">
-          {toolProviders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                No scanning tools installed yet
-              </p>
-              <Link
-                className="text-blue-500 italic flex items-center gap-1 hover:underline"
-                to="/tools"
-              >
-                Open Marketplace <MoveUpRight className="w-4 h-4" />
-              </Link>
+        <div className="px-2 py-2 md:px-4">
+          {isLoadingWorkspaceTools ? (
+            <div
+              className="flex min-h-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted-foreground"
+              role="status"
+            >
+              <LoaderCircleIcon className="size-4 animate-spin" />
+              Loading installed tools...
             </div>
+          ) : toolProviders.length === 0 ? (
+            <NoInstalledToolsState />
           ) : (
             <ToolPipelineBuilder
               tools={toolProviders as Tool[]}

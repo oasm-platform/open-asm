@@ -1,10 +1,5 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TopAssetsVulnerabilitiesSkeleton } from './dashboard-skeleton';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/services/apis/gen/queries';
 import { Bug, ChevronRight } from 'lucide-react';
@@ -38,25 +33,7 @@ const TopAssetsVulnerabilities = () => {
 
   const assets = (apiData ?? []).filter((item) => item.total !== 0);
 
-  if (isLoading) {
-    return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bug className="h-5 w-5 text-primary" />
-            Top assets with most vulnerabilities
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          <div className="w-full space-y-3">
-            {[...Array(6)].map((_, index) => (
-              <Skeleton key={index} className="h-4 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  if (isLoading) return <TopAssetsVulnerabilitiesSkeleton />;
 
   if (error) {
     return (
