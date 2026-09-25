@@ -35,6 +35,7 @@ const mockTools = [
     createdAt: '2026-01-02T00:00:00Z',
   },
 ];
+const installedToolsRef = { current: mockTools };
 
 const { createMock } = vi.hoisted(() => ({ createMock: vi.fn() }));
 
@@ -61,7 +62,10 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
       isLoading: false,
     }),
     useToolsControllerGetInstalledTools: () => ({
-      data: { data: mockTools, total: mockTools.length },
+      data: {
+        data: installedToolsRef.current,
+        total: installedToolsRef.current.length,
+      },
       isLoading: false,
     }),
     useAssetGroupControllerCreate: () => ({
@@ -72,6 +76,7 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
 });
 
 beforeEach(() => {
+  installedToolsRef.current = mockTools;
   createMock.mockReset();
   // Resolve the create call with an id so the page navigates to the detail page
   createMock.mockImplementation(
@@ -101,6 +106,40 @@ describe('CreateAssetGroup wizard page', () => {
 
     await user.type(nameInput, 'My Group');
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+  });
+
+  it('guides users to install and select a tool when none are installed', async () => {
+    installedToolsRef.current = [];
+    const { user, router } = renderWithProviders(<CreateAssetGroup />, {
+      routePath: '/groups/create',
+    });
+
+    await user.type(await screen.findByLabelText('Name'), 'My Group');
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'No tools installed yet' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Install a compatible scanner and choose its configuration before adding it to this group.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Return here and add the tool to the group pipeline.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+
+    const toolsLink = screen.getByRole('link', {
+      name: /browse and install tools/i,
+    });
+    expect(toolsLink).toHaveAttribute('href', '/tools');
+
+    await user.click(toolsLink);
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/tools');
+    });
   });
 
   it('navigates to /groups when Cancel is clicked', async () => {

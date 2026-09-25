@@ -5,6 +5,7 @@ import {
   ToolPipelineBuilder,
   type PipelineToolEntry,
 } from '@/pages/asset-group/components/tool-pipeline-builder';
+import { NoInstalledToolsState } from '@/pages/asset-group/components/no-installed-tools-state';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -318,14 +319,24 @@ export function CreateAssetGroup() {
             />
           )}
 
-          {step === 2 && (
-            <ToolPipelineBuilder
-              tools={pipelineTools}
-              value={pipeline}
-              onChange={setPipeline}
-              emptyMessage="No tools found"
-            />
-          )}
+          {step === 2 &&
+            (toolsQuery.isLoading ? (
+              <div
+                className="flex min-h-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted-foreground"
+                role="status"
+              >
+                <LoaderCircleIcon className="size-4 animate-spin" />
+                Loading installed tools...
+              </div>
+            ) : pipelineTools.length === 0 ? (
+              <NoInstalledToolsState />
+            ) : (
+              <ToolPipelineBuilder
+                tools={pipelineTools}
+                value={pipeline}
+                onChange={setPipeline}
+              />
+            ))}
 
           {step === 3 && (
             <div className="max-w-2xl">

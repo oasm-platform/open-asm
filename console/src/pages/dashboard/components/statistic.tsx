@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
 import {
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DashboardStatsSkeleton } from './dashboard-skeleton';
 
 export default function Statistic() {
   const navigate = useNavigate();
@@ -32,24 +32,7 @@ export default function Statistic() {
     );
   }, [timelineData]);
 
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 h-full">
-        {[...Array(4)].map((_, index) => (
-          <Card key={index} className="overflow-hidden relative group flex flex-col pb-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <Skeleton className="h-5 w-24" />
-              <Skeleton className="h-5 w-5 rounded-full" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-9 w-24" />
-              <Skeleton className="mt-4 h-12 w-full" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
+  if (isLoading) return <DashboardStatsSkeleton />;
 
   const statsCards: Array<{
     title: string;

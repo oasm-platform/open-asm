@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
-import { Skeleton } from '@/components/ui/skeleton';
+import { VulnerabilityStatisticSkeleton } from './dashboard-skeleton';
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import Score from './score';
@@ -11,27 +11,7 @@ export default function VulnerabilityStatistic() {
   const { statistics, isLoading } = useStatistics();
   const { calculateTrend } = useTimelineTrend();
 
-  if (isLoading) {
-    return (
-      <Card className="w-full h-full pt-3">
-        <div className="flex items-center justify-center flex-grow">
-          <Skeleton className="h-[170px] w-[170px] rounded-full" />
-        </div>
-        <CardHeader className="flex justify-between items-center">
-          <Skeleton className="h-5 w-48" />
-          <Bug />
-        </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4 -mt-2">
-          {Array.from({ length: 6 }, (_, index) => (
-            <div key={index} className="space-y-2 px-4 py-2">
-              <Skeleton className="mx-auto h-3 w-12" />
-              <Skeleton className="mx-auto h-7 w-10" />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    );
-  }
+  if (isLoading) return <VulnerabilityStatisticSkeleton />;
 
   if (!statistics) return null;
 
@@ -126,9 +106,7 @@ export default function VulnerabilityStatistic() {
           {vulnerabilityStats.map((stat) => (
             <div key={stat.severity} className="text-center px-4 py-2">
               <p className="text-sm text-muted-foreground">{stat.label}</p>
-              <p
-                className={`text-2xl font-bold font-mono ${stat.colorClass}`}
-              >
+              <p className={`text-2xl font-bold font-mono ${stat.colorClass}`}>
                 <NumberAnimate value={stat.count} />
               </p>
             </div>

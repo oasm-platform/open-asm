@@ -31,14 +31,14 @@ export default function Dashboard() {
 
   if (workspaces.length === 0) {
     return (
-      <Page title="Dashboard">
+      <Page title="Dashboard" description="Workspace security overview">
         <CreateWorkspace />
       </Page>
     );
   }
 
   return (
-    <Page title="Dashboard">
+    <Page title="Dashboard" description="Workspace security overview">
       <div className="space-y-4">
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
           <div className="col-span-1 xl:col-span-3 order-2 xl:order-0 flex flex-col gap-4">
