@@ -14,6 +14,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflows.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
@@ -66,6 +67,18 @@ describe('JobsRegistryService', () => {
     save: jest.fn(),
   };
 
+  const mockAssetGroupWorkflowRepository = {
+    createQueryBuilder: jest.fn(),
+  };
+
+  let mockAssetGroupWorkflowQB: {
+    select: jest.Mock;
+    innerJoin: jest.Mock;
+    where: jest.Mock;
+    andWhere: jest.Mock;
+    getOne: jest.Mock;
+  };
+
   const mockDataSource = {
     createQueryRunner: jest.fn(),
     getRepository: jest.fn(),
@@ -111,6 +124,17 @@ describe('JobsRegistryService', () => {
   };
 
   beforeEach(async () => {
+    mockAssetGroupWorkflowQB = {
+      select: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    };
+    mockAssetGroupWorkflowRepository.createQueryBuilder.mockReturnValue(
+      mockAssetGroupWorkflowQB,
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {
@@ -124,6 +148,10 @@ describe('JobsRegistryService', () => {
         {
           provide: getRepositoryToken(JobErrorLog),
           useValue: mockJobErrorLogRepository,
+        },
+        {
+          provide: getRepositoryToken(AssetGroupWorkflow),
+          useValue: mockAssetGroupWorkflowRepository,
         },
         {
           provide: DataSource,
@@ -1417,6 +1445,153 @@ describe('JobsRegistryService', () => {
       expect(result).toBe(1);
     });
 
+    it('should expand PORTS_SCANNER to all target assets after SUBDOMAINS completes', async () => {
+      jest.clearAllMocks();
+      const createNewJob = jest
+        .spyOn(service, 'createNewJob')
+        .mockResolvedValue([]);
+      const completedSubdomainJob = {
+        id: 'subdomain-job-uuid',
+        category: ToolCategory.SUBDOMAINS,
+        tool: { name: 'subfinder' },
+        asset: {
+          id: 'primary-asset-uuid',
+          target: { id: 'target-uuid' },
+        },
+        jobHistory: {
+          workflow: {
+            id: 'target-workflow-uuid',
+            content: {
+              jobs: [
+                { name: 'discover-subdomains', run: 'subfinder' },
+                { name: 'scan-ports', run: 'naabu' },
+              ],
+            },
+            workspace: { id: 'workspace-uuid' },
+          },
+        },
+      };
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAssetsDiscovery: true,
+      });
+      mockToolsService.getToolByNames.mockResolvedValue([
+        {
+          name: 'naabu',
+          category: ToolCategory.PORTS_SCANNER,
+          priority: 3,
+        },
+      ]);
+
+      await service.getNextStepForJob(completedSubdomainJob as any);
+
+      expect(createNewJob).toHaveBeenCalledTimes(1);
+      const nextJobInput = createNewJob.mock.calls[0][0];
+      expect(nextJobInput.targetIds).toEqual(['target-uuid']);
+      expect(nextJobInput.assetIds).toBeUndefined();
+    });
+
+    it('should preserve an asset-scoped group when SUBDOMAINS is followed by PORTS_SCANNER', async () => {
+      jest.clearAllMocks();
+      const createNewJob = jest
+        .spyOn(service, 'createNewJob')
+        .mockResolvedValue([]);
+      const completedGroupSubdomainJob = {
+        id: 'group-subdomain-job-uuid',
+        category: ToolCategory.SUBDOMAINS,
+        tool: { name: 'subfinder' },
+        asset: {
+          id: 'selected-group-asset-uuid',
+          target: { id: 'target-uuid' },
+        },
+        jobHistory: {
+          jobHistoryName: 'Engineering group',
+          workflow: {
+            id: 'group-workflow-uuid',
+            content: {
+              jobs: [
+                { name: 'discover-subdomains', run: 'subfinder' },
+                { name: 'scan-ports', run: 'naabu' },
+              ],
+            },
+            workspace: { id: 'workspace-uuid' },
+          },
+        },
+      };
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAssetsDiscovery: true,
+      });
+      mockToolsService.getToolByNames.mockResolvedValue([
+        {
+          name: 'naabu',
+          category: ToolCategory.PORTS_SCANNER,
+          priority: 3,
+        },
+      ]);
+      mockAssetGroupWorkflowQB.getOne.mockResolvedValue({ id: 'group-run' });
+
+      await service.getNextStepForJob(completedGroupSubdomainJob as any);
+
+      expect(mockAssetGroupWorkflowRepository.createQueryBuilder).toHaveBeenCalledWith(
+        'assetGroupWorkflow',
+      );
+      expect(mockAssetGroupWorkflowQB.andWhere).toHaveBeenCalledWith(
+        'assetGroup.name = :jobHistoryName',
+        { jobHistoryName: 'Engineering group' },
+      );
+      expect(mockAssetGroupWorkflowQB.andWhere).toHaveBeenCalledWith(
+        'groupAsset.assetId = :assetId',
+        { assetId: 'selected-group-asset-uuid' },
+      );
+      expect(createNewJob).toHaveBeenCalledTimes(1);
+      expect(createNewJob.mock.calls[0][0].assetIds).toEqual([
+        'selected-group-asset-uuid',
+      ]);
+    });
+
+    it('should preserve the current asset scope for other PORTS_SCANNER transitions', async () => {
+      jest.clearAllMocks();
+      const createNewJob = jest
+        .spyOn(service, 'createNewJob')
+        .mockResolvedValue([]);
+      const completedVulnerabilityJob = {
+        id: 'vulnerability-job-uuid',
+        category: ToolCategory.VULNERABILITIES,
+        tool: { name: 'nuclei' },
+        asset: {
+          id: 'selected-asset-uuid',
+          target: { id: 'target-uuid' },
+        },
+        jobHistory: {
+          workflow: {
+            content: {
+              jobs: [
+                { name: 'scan-vulnerabilities', run: 'nuclei' },
+                { name: 'scan-ports', run: 'naabu' },
+              ],
+            },
+            workspace: { id: 'workspace-uuid' },
+          },
+        },
+      };
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAssetsDiscovery: true,
+      });
+      mockToolsService.getToolByNames.mockResolvedValue([
+        {
+          name: 'naabu',
+          category: ToolCategory.PORTS_SCANNER,
+          priority: 3,
+        },
+      ]);
+
+      await service.getNextStepForJob(completedVulnerabilityJob as any);
+
+      expect(createNewJob).toHaveBeenCalledTimes(1);
+      expect(createNewJob.mock.calls[0][0].assetIds).toEqual([
+        'selected-asset-uuid',
+      ]);
+    });
+
     it('should skip SUBDOMAINS and use next non-SUBDOMAINS when isAssetsDiscovery is false', async () => {
       const jobWithSubdomainNext = {
         id: 'job-uuid',
@@ -1792,6 +1967,13 @@ describe('JobsRegistryService', () => {
       priority: 4,
     } as any;
 
+    const portsScannerTool = {
+      id: 'tool-ports',
+      name: 'naabu',
+      category: ToolCategory.PORTS_SCANNER,
+      priority: 3,
+    } as any;
+
     const makeService = (id: string) => ({
       id,
       value: `${id}.example.com`,
@@ -1896,6 +2078,39 @@ describe('JobsRegistryService', () => {
       expect(mockAssetQB.getMany).toHaveBeenCalled();
       expect(mockAssetServiceQB.getMany).not.toHaveBeenCalled();
       expect(result).toHaveLength(1);
+    });
+
+    it('PORTS_SCANNER keeps the explicit asset scope supplied by a group workflow', async () => {
+      const selectedAssetIds = ['group-asset-1', 'group-asset-2'];
+      mockAssetQB.getMany.mockResolvedValue([
+        {
+          id: 'group-asset-1',
+          value: 'one.example.com',
+          isPrimary: true,
+        },
+        {
+          id: 'group-asset-2',
+          value: 'two.example.com',
+          isPrimary: true,
+        },
+      ]);
+
+      const result = await service.createNewJob({
+        tool: portsScannerTool,
+        assetIds: selectedAssetIds,
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(mockAssetQB.andWhere).toHaveBeenCalledWith(
+        'assets.id IN (:...assetIds)',
+        { assetIds: selectedAssetIds },
+      );
+      expect(mockAssetQB.andWhere).not.toHaveBeenCalledWith(
+        'assets.targetId IN (:...targetIds)',
+        expect.anything(),
+      );
+      expect(result.map((job) => job.asset.id)).toEqual(selectedAssetIds);
     });
 
     it('S3 regression: SCREENSHOT uses asset services with liveOnly=true; HTTP_PROBE with liveOnly=false', async () => {
