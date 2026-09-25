@@ -299,6 +299,12 @@ This starts:
 - Geo-IP proxy (port 4360)
 - Rustfs S3 storage (port 9000)
 
+The worker spawns connector containers through the host Docker daemon over the mounted `docker.sock`, so it must join the socket's owning group. `task docker-compose` reads that gid from the socket automatically. If the socket lives elsewhere or you start with raw `docker compose`, set it yourself:
+
+```bash
+WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose up -d --build
+```
+
 ## Local CI Testing
 
 Before pushing changes, you can run GitHub Actions workflows locally using [act](https://github.com/nektos/act) to catch issues early.

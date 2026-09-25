@@ -72,6 +72,16 @@ tasks:
   docker-compose:
     cmds:
       - |
+        # The worker mounts /var/run/docker.sock, owned root:docker (0660) on
+        # native Linux. Its gid is host-specific, so derive it from the socket
+        # instead of hardcoding (Docker Desktop reports 0). WORKER_DOCKER_GID
+        # overrides detection for remote engines or non-standard socket paths.
+        if [ -z "${WORKER_DOCKER_GID:-}" ]; then
+          socket="${DOCKER_SOCK:-/var/run/docker.sock}"
+          WORKER_DOCKER_GID="$(stat -c '%g' "$socket" 2>/dev/null || stat -f '%g' "$socket" 2>/dev/null || echo 0)"
+        fi
+        export WORKER_DOCKER_GID
+        echo "Docker socket group gid for worker: ${WORKER_DOCKER_GID}"
         docker compose --env-file ./core-api/.env up -d --build --force-recreate --scale worker=3
 
   proto:
