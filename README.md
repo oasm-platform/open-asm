@@ -188,17 +188,23 @@ To quickly get started with OASM using Docker:
 4. Start the services:
 
    ```bash
-   docker compose up -d --build
+   task docker-compose
    ```
 
 This will launch the entire system, including the console, core API, workers, database, queue, Geo-IP proxy, and object storage. Access the console at `http://localhost:3000`.
+
+> **Not using the task runner?** `task docker-compose` derives the host `docker.sock` group gid the worker needs. If you start with raw Compose instead, pass that gid explicitly — otherwise vulnerability-scan jobs fail with `permission denied` on Linux:
+>
+> ```bash
+> WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock 2>/dev/null || echo 0) docker compose up -d --build
+> ```
 
 ### Pre-built Images
 
 You can also use pre-built images from Docker Hub:
 
 ```bash
-docker compose -f docker-compose.yml up -d
+WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock 2>/dev/null || echo 0) docker compose -f docker-compose.yml up -d
 ```
 
 Images: `oasm/oasm-console`, `oasm/oasm-api`, `oasm/oasm-worker`
