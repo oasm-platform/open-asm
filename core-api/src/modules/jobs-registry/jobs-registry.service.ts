@@ -36,6 +36,7 @@ import {
 } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflows.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
@@ -116,6 +117,8 @@ export class JobsRegistryService {
     @InjectRepository(Job) public readonly repo: Repository<Job>,
     @InjectRepository(JobHistory)
     public readonly jobHistoryRepo: Repository<JobHistory>,
+    @InjectRepository(AssetGroupWorkflow)
+    private readonly assetGroupWorkflowRepo: Repository<AssetGroupWorkflow>,
     @InjectRepository(JobErrorLog)
     public readonly jobErrorLogRepo: Repository<JobErrorLog>,
     private dataSource: DataSource,
@@ -1099,6 +1102,16 @@ export class JobsRegistryService {
     });
 
     const nextJobMeta = jobs[nextToolIndex];
+    const isSubdomainToPortScanner =
+      job.category === ToolCategory.SUBDOMAINS &&
+      tools.some((tool) => tool.category === ToolCategory.PORTS_SCANNER);
+    // Subdomain discovery expands a target run with newly discovered assets.
+    // A group run must remain scoped to the assets explicitly selected by that
+    // group, even when its pipeline starts with SUBDOMAINS.
+    const isGroupRun =
+      isSubdomainToPortScanner && (await this.isAssetGroupWorkflowRun(job));
+    const shouldExpandToTargetAssets =
+      isSubdomainToPortScanner && !isGroupRun;
 
     const createPromises = tools.map((tool) =>
       this.createNewJob({
@@ -1106,7 +1119,7 @@ export class JobsRegistryService {
         config: nextJobMeta?.config,
         configProfileId: nextJobMeta?.configProfileId,
         targetIds: [job.asset.target.id],
-        assetIds: [job.asset.id],
+        assetIds: shouldExpandToTargetAssets ? undefined : [job.asset.id],
         workflow: job.jobHistory.workflow,
         jobHistory: job.jobHistory,
         priority: tool.priority,
@@ -1116,6 +1129,29 @@ export class JobsRegistryService {
 
     const results = await Promise.all(createPromises);
     return results.reduce((total, jobs) => total + jobs.length, 0);
+  }
+
+  private async isAssetGroupWorkflowRun(job: Job): Promise<boolean> {
+    const workflowId = job.jobHistory.workflow?.id;
+    const jobHistoryName = job.jobHistory.jobHistoryName;
+    const assetId = job.asset?.id;
+
+    if (!workflowId || !jobHistoryName || !assetId) {
+      return false;
+    }
+
+    const groupRun = await this.assetGroupWorkflowRepo
+      .createQueryBuilder('assetGroupWorkflow')
+      .select('assetGroupWorkflow.id')
+      .innerJoin('assetGroupWorkflow.assetGroup', 'assetGroup')
+      .innerJoin('assetGroupWorkflow.workflow', 'workflow')
+      .innerJoin('assetGroup.assetGroupAssets', 'groupAsset')
+      .where('workflow.id = :workflowId', { workflowId })
+      .andWhere('assetGroup.name = :jobHistoryName', { jobHistoryName })
+      .andWhere('groupAsset.assetId = :assetId', { assetId })
+      .getOne();
+
+    return groupRun !== null;
   }
 
   /**

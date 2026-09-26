@@ -3,6 +3,9 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
+  getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey,
+  getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey,
+  getAssetGroupControllerGetByIdQueryKey,
   useAssetGroupControllerGetAssetsByAssetGroupsId,
   useAssetGroupControllerRemoveManyAssets,
 } from '@/services/apis/gen/queries';
@@ -60,11 +63,20 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
         },
         {
           onSuccess: () => {
-            queryClient.invalidateQueries({
-              queryKey: ['assetGroupControllerGetAssetsByAssetGroupsId'],
+            void queryClient.invalidateQueries({
+              queryKey:
+                getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey(
+                  assetGroupId,
+                ),
             });
-            queryClient.invalidateQueries({
-              queryKey: ['assetGroupControllerGetAssetsNotInAssetGroup'],
+            void queryClient.invalidateQueries({
+              queryKey: getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey(
+                assetGroupId,
+              ),
+            });
+            void queryClient.invalidateQueries({
+              queryKey: getAssetGroupControllerGetByIdQueryKey(assetGroupId),
+              exact: true,
             });
           },
         },
