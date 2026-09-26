@@ -36,8 +36,8 @@ AI-powered, open-source Attack Surface Management platform. Discover, monitor, a
 - **Workflow Automation** — Automated scan scheduling, alerts, and remediation workflows.
 - **Real-time Monitoring** — Live notifications and a statistics dashboard fed by a streaming event channel.
 - **Search & Analytics** — Full-text search, asset filtering, risk trend analysis, and reporting.
-- **Integrations** — Connect Slack, Telegram, and Webhooks for event-driven security alerts.
-- **AI Assistant Integration** — MCP server enabling AI assistants (OpenAI, Anthropic, Google) to query and analyze asset data via natural language.
+- **Integrations** — Alert to Slack, Telegram, or any webhook, and pull assets in automatically from AWS, Cloudflare, and Vercel on a schedule.
+- **AI Assistant Integration** — MCP endpoint enabling AI assistants (OpenAI, Anthropic, Google) to query and analyze asset data via natural language.
 - **Geo-IP Enrichment** — Automatic IP geolocation enrichment for discovered assets.
 - **File Storage** — S3-compatible object storage for scan artifacts and reports.
 - **Multi-workspace** — Isolated environments for different organizations, projects, or environments.
@@ -49,11 +49,11 @@ The system runs on a distributed architecture consisting of:
 * A web console for user interaction, asset management, and real-time monitoring.
 * A core API service responsible for business logic, data persistence, and job orchestration.
 * A queue and caching layer enabling asynchronous job distribution, rate limiting, and system decoupling.
-* Distributed workers that execute high-performance scanning tasks, designed for horizontal auto-scaling and fault tolerance.
+* Distributed worker nodes that pull connector images and run scans in isolated containers, designed for horizontal auto-scaling and fault tolerance.
 * A relational database for persistent storage of assets, scan results, and system state.
 * S3-compatible object storage for scan artifacts and reports.
 * A Geo-IP proxy service for automatic IP geolocation enrichment.
-* An MCP (Model Context Protocol) server that provides structured context to AI systems.
+* An MCP (Model Context Protocol) endpoint that provides structured context to AI systems.
 * Integration with AI/LLM components for intelligent querying, analysis, and automation over collected asset data.
 
 ```mermaid
@@ -69,7 +69,7 @@ graph TD
         API[Core API Service]
         DB[(Database)]
         Queue[(Queue & Cache)]
-        MCP[MCP Server]
+        MCP[MCP Endpoint]
         Storage[(Object Storage)]
         GeoIP[Geo-IP Proxy]
 
@@ -77,6 +77,11 @@ graph TD
             W1[Worker 1]
             W2[Worker 2]
             WN[Worker N]
+        end
+
+        subgraph "Connector Containers"
+            C1[Connector Image]
+            CN[Connector Image N]
         end
     end
 
@@ -94,10 +99,14 @@ graph TD
     API <-->|Jobs| W2
     API <-->|Jobs| WN
 
-    %% Scan
-    W1 -->|Scan| Internet
-    W2 -->|Scan| Internet
-    WN -->|Scan| Internet
+    %% Scan — workers dispatch jobs to connector containers they spawn
+    W1 -->|Dispatch| C1
+    W2 -->|Dispatch| CN
+    WN -->|Dispatch| C1
+    C1 -->|Scan| Internet
+    CN -->|Scan| Internet
+    C1 -.->|Stream Findings| W1
+    CN -.->|Stream Findings| WN
 
     %% AI Flow
     AI <-->|Query Context| MCP
@@ -171,12 +180,12 @@ To quickly get started with OASM using Docker:
    cd open-asm
    ```
 
-2. Copy the example environment files:
+2. Copy the example environment files (note the dot in the worker template name):
 
    ```bash
    cp core-api/example.env core-api/.env
    cp console/example.env console/.env
-   cp worker/example.env worker/.env
+   cp worker/.example.env worker/.env
    ```
 
 3. Pull the connector catalog:
@@ -188,10 +197,10 @@ To quickly get started with OASM using Docker:
 4. Start the services:
 
    ```bash
-   docker compose up -d --build
+   task docker-compose
    ```
 
-This will launch the entire system, including the console, core API, workers, database, queue, Geo-IP proxy, and object storage. Access the console at `http://localhost:3000`.
+This will launch the entire system — console, core API, 3 workers, database, queue, Geo-IP proxy, and S3-compatible object storage — with migrations applied before the API starts. Access the console at `http://localhost:3000`.
 
 ### Pre-built Images
 
@@ -203,6 +212,10 @@ docker compose -f docker-compose.yml up -d
 
 Images: `oasm/oasm-console`, `oasm/oasm-api`, `oasm/oasm-worker`
 
+`task docker-compose` is the recommended entry point: it passes
+`--env-file ./core-api/.env`, rebuilds, force-recreates, and scales the worker
+service to 3 instances (the compose service key is `oasm-worker`).
+
 ## Developer Guide
 
 For detailed instructions on setting up your development environment, running services, and contributing, please refer to our dedicated [Developer Guide](DEVELOPER_GUIDE.md).
@@ -210,25 +223,35 @@ For detailed instructions on setting up your development environment, running se
 ### Quick Start
 
 ```bash
-# Install all dependencies and worker tools
+# Install dependencies, copy .env templates, start postgres + redis
 task init
 
 # Start API + Console dev servers
 task dev
 
-# Run workers locally
+# Run a worker locally (tools download automatically on first run)
 task worker:dev
 ```
 
+`task init` does not create `worker/.env` — copy `worker/.example.env` yourself and
+set `WORKER_API_KEY`.
+
 ### Key Commands
 
+All commands run from the repository root through `task`; raw `npm run` / `go test`
+invocations bypass the resource limits and configuration baked into the taskfiles.
+
 ```bash
-task test            # Run API tests
-task lint            # Lint API + Console
+task test            # Run API tests (console tests are excluded — use task console:test:run)
+task api:test        # API unit tests only
+task console:test:run # Console unit tests, single pass (CI equivalent)
+task worker:test     # Go worker tests
+task lint            # Lint API + Console (sequential)
 task build           # Build all services
-task docker-compose  # Start full stack with Docker
+task docker-compose  # Start full stack with Docker (3 workers)
 task sync-connectors # Refresh the connector catalog from oasm-connectors
-task gen-api         # Regenerate console API client
-task proto           # Regenerate gRPC stubs
+task gen-api         # Regenerate the OpenAPI spec + console API client
+task proto           # Regenerate Go gRPC stubs into worker/internal/gen
+task migration:generate name=AddFooColumn  # Generate a DB migration (never hand-write one)
 task migration:run   # Run database migrations
 ```

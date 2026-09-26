@@ -69,10 +69,12 @@ tasks:
   # Docker Compose orchestration
   # Starts all services using docker compose with environment variables
   # Builds and recreates containers with 3 worker instances
+  # NOTE: the compose service key is `oasm-worker` (not `worker`) — `--scale
+  # worker=3` fails with "no such service: worker: not found".
   docker-compose:
     cmds:
       - |
-        docker compose --env-file ./core-api/.env up -d --build --force-recreate --scale worker=3
+        docker compose --env-file ./core-api/.env up -d --build --force-recreate --scale oasm-worker=3
 
   proto:
     cmds:
@@ -111,8 +113,18 @@ tasks:
       - task: worker:clean
 
   # Generate migration with custom name
-  # Usage: task migration:generate MIGRATION_NAME=AddUserType
+  # Usage: task migration:generate name=AddUserType
+  #
+  # The variable is lowercase `name` (MIGRATION_NAME= is still accepted as an
+  # alias for backwards compatibility with older docs). If neither is set the
+  # task aborts instead of silently generating into an empty path.
+  #
+  # NEVER hand-write a file under core-api/src/database/migrations/ and never
+  # invoke the TypeORM CLI directly — the schema only changes through this task.
   migration:generate:
+    preconditions:
+      - sh: test -n "{{.name}}{{.MIGRATION_NAME}}"
+        msg: 'Migration name is required: task migration:generate name=AddUserType'
     cmds:
       - task: api:migration:generate
 
@@ -129,6 +141,9 @@ tasks:
       - task: api:migration:revert
 
   # Sync latest connectors manifest
+  # Pulls oasm-connectors/manifest.json into core-api/resources/connectors/manifest.json
+  # (the file the API reads to know which connector images exist). Set
+  # MANIFEST_PATH=<path> to read a local oasm-connectors checkout instead of main.
   sync-connectors:
     cmds:
       - node scripts/sync-tool-manifest.mjs

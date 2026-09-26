@@ -43,10 +43,19 @@ tasks:
       - rm -rf ./node_modules
       - rm -rf ./dist
   # Generate migration with custom name
-  # Usage: task migration:generate MIGRATION_NAME=AddUserType
+  # Usage: task migration:generate name=AddUserType
+  #
+  # `name` is the canonical variable; MIGRATION_NAME is accepted as an alias.
+  # Hand-writing files in src/database/migrations/ is forbidden — always generate
+  # here so the DataSource, ts-node paths and dotenv wiring stay correct.
   migration:generate:
+    vars:
+      MIGRATION_PATH: '{{.name}}{{.MIGRATION_NAME}}'
+    preconditions:
+      - sh: test -n "{{.MIGRATION_PATH}}"
+        msg: 'Migration name is required: task migration:generate name=AddUserType'
     cmds:
-      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:generate -d src/database/database-config.ts src/database/migrations/{{.name}}
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:generate -d src/database/database-config.ts src/database/migrations/{{.MIGRATION_PATH}}
   # Run all pending migrations
   # Executes all pending database migrations
   migration:run:
