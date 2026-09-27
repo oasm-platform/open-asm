@@ -103,12 +103,18 @@ services:
       # root-equivalent on the host — only run trusted images with this worker.
       - /var/run/docker.sock:/var/run/docker.sock
     # The image runs as non-root uid/gid 1000, but the mounted socket is owned
-    # by root:root (gid 0) — without this the daemon returns "permission denied"
-    # (and API version negotiation then falls back to 1.24). Add the socket's
-    # group. On Docker Desktop the gid is 0; on Linux hosts with a dedicated
-    # docker group use that gid instead (e.g. group_add: ['999']).
+    # by root:docker (mode 0660) on native Linux engines. Without the socket's
+    # group in the worker's supplementary groups the daemon answers "permission
+    # denied" and API version negotiation silently falls back to 1.24.
+    #
+    # The socket group's gid is host-specific: 0 on Docker Desktop (root:root)
+    # and the host's `docker` group gid on native Linux (commonly 999/986/968 —
+    # check with `stat -c '%g' /var/run/docker.sock`, or `stat -f '%g'` on
+    # macOS). `task docker-compose` detects it automatically; for a raw
+    # `docker compose up` set it explicitly, e.g.
+    #   WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose up -d
     group_add:
-      - '0'
+      - "${WORKER_DOCKER_GID:-0}"
     ports:
       # Connector gRPC listen port. Spawned connector containers run on the host
       # daemon (default bridge), so they must dial back through the host via
