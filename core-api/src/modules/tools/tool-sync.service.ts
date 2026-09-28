@@ -375,9 +375,8 @@ export class ToolSyncService implements OnModuleInit {
         this.logger.log(`Overrode tool "${slug}" with connector data (id=${existing.id})`);
         if (entry.logoBase64) {
           try {
-            const cleanBase64 = entry.logoBase64.includes(',') ? entry.logoBase64.split(',').pop()! : entry.logoBase64;
-            const buffer = Buffer.from(cleanBase64, 'base64');
-            if (buffer.length > 0) {
+            const buffer = this.decodeLogo(entry.logoBase64);
+            if (buffer) {
               await this.storageService
                 .uploadFile(`connectors/${slug}.png`, buffer, 'system')
                 .then(() => this.logger.log(`Uploaded connector logo for ${slug} -> connectors/${slug}.png`))
@@ -439,10 +438,8 @@ export class ToolSyncService implements OnModuleInit {
       const base64 = logoMap.get(tool.name);
       if (!base64) continue;
       try {
-        // Strip data URI prefix if present
-        const cleanBase64 = base64.includes(',') ? base64.split(',').pop()! : base64;
-        const buffer = Buffer.from(cleanBase64, 'base64');
-        if (buffer.length === 0) continue;
+        const buffer = this.decodeLogo(base64);
+        if (!buffer) continue;
         const fileName = `connectors/${tool.name}.png`;
         uploads.push(
           this.storageService
@@ -471,6 +468,17 @@ export class ToolSyncService implements OnModuleInit {
 
     this.logger.log(`Connector tools sync: committed ${committedTools.length} tool(s)`);
     return committedTools;
+  }
+
+  /**
+   * Decodes a manifest `logo` payload, stripping an optional data-URI prefix.
+   * Returns null when the payload holds no bytes, so callers can skip the write
+   * instead of storing an empty object.
+   */
+  private decodeLogo(base64: string): Buffer | null {
+    const cleanBase64 = base64.includes(',') ? base64.split(',').pop()! : base64;
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    return buffer.length > 0 ? buffer : null;
   }
 
   private async removeOrphanConnectorTools(currentNames: string[]): Promise<void> {
