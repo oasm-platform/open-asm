@@ -83,23 +83,71 @@ export class StorageService implements OnModuleInit {
     buffer: Buffer,
     bucket: string = 'default',
   ) {
-    try {
-      const key = `${bucket}/${fileName}`;
-      await this.rustFsClient.getClient().send(
+    const client = this.rustFsClient.getClient();
+    const putObject = () =>
+      client.send(
         new PutObjectCommand({
           Bucket: bucket,
           Key: fileName,
           Body: buffer,
         }),
       );
-      return { path: key };
+
+    try {
+      await putObject();
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred';
-      throw new InternalServerErrorException(
-        `Failed to save file: ${errorMessage}`,
-      );
+      // The happy path stays a single round-trip — no HeadBucket probe, no
+      // bucket churn. Only a genuinely missing bucket pays for a CreateBucket
+      // plus exactly one retry. A concurrent `onModuleInit` caller can reach
+      // this before `StorageService.onModuleInit` has created the buckets, and
+      // for one-shot startup syncs (e.g. ToolSyncService uploading connector
+      // logos) a failure here would never be retried.
+      if (!this.isNoSuchBucket(error)) {
+        throw this.toUploadError(error);
+      }
+
+      try {
+        await client.send(new CreateBucketCommand({ Bucket: bucket }));
+        this.logger.log(`Created bucket on demand: ${bucket}`);
+      } catch (createError: unknown) {
+        // Lost the race against another instance that created it first — the
+        // bucket exists either way, so the retry below is still correct.
+        if (!this.isBucketAlreadyExists(createError)) {
+          throw this.toUploadError(createError);
+        }
+      }
+
+      try {
+        await putObject();
+      } catch (retryError: unknown) {
+        throw this.toUploadError(retryError);
+      }
     }
+
+    return { path: `${bucket}/${fileName}` };
+  }
+
+  private isNoSuchBucket(error: unknown): boolean {
+    return (
+      error instanceof S3ServiceException &&
+      (error.name === 'NoSuchBucket' ||
+        error.$metadata.httpStatusCode === 404)
+    );
+  }
+
+  private isBucketAlreadyExists(error: unknown): boolean {
+    return (
+      error instanceof S3ServiceException &&
+      (error.name === 'BucketAlreadyExists' ||
+        error.name === 'BucketAlreadyOwnedByYou' ||
+        error.$metadata.httpStatusCode === 409)
+    );
+  }
+
+  private toUploadError(error: unknown): InternalServerErrorException {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error occurred';
+    return new InternalServerErrorException(`Failed to save file: ${errorMessage}`);
   }
 
   public async getFile(filePath: string, bucket: string = 'default'): Promise<StreamableFile> {
