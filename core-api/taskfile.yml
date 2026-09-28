@@ -16,7 +16,14 @@ tasks:
       NODE_ENV: 'production'
   install: pnpm install
   lint: pnpm run lint
-  proto: pnpm run proto:generate
+  # Regenerate the Go gRPC stubs for core-api/src/proto/*.proto into
+  # worker/internal/gen/**. There is no Node-side `proto:generate` script (the old
+  # ts-proto one was dropped with the Go worker rewrite), so delegate to the root
+  # `proto` task, which owns the protoc invocation and the two Go plugins.
+  # Requires `protoc` (provided by @protobuf-ts/protoc) and protoc-gen-go[-grpc].
+  proto:
+    cmds:
+      - task: :proto
   # Run tests
   # Executes unit and integration tests for the core-api application
   test:
