@@ -5,15 +5,8 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.m?(t|j)sx?$": [
-      "@swc/jest",
-      {
-        "jsc": {
-          "parser": { "syntax": "typescript", "decorators": true },
-          "target": "es5",
-          "transform": { "legacyDecorator": true, "decoratorMetadata": true }
-        },
-        "module": { "type": "commonjs", "noInterop": true }
-      }
+      "./swc-jest-transform.cjs",
+      {}
     ]
   },
   "moduleNameMapper": {
@@ -21,6 +14,6 @@
     "^@react-pdf/renderer$": "<rootDir>/stubs/react-pdf-renderer.js"
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!(?:.pnpm/[^/]+/node_modules/)?(?:better-auth|better-call|@better-auth|@better-fetch|@noble|@opentelemetry|@standard-schema|@formatjs|intl-messageformat|rou3|set-cookie-parser|kysely|nanostores|zod|defu|jose|react|react-dom)(?:/|$))"
+    "node_modules/(?!(?:.pnpm/[^/]+/node_modules/)?(?:better-auth|better-call|@better-auth|@better-fetch|@noble|@opentelemetry|@standard-schema|@formatjs|@nestjs|intl-messageformat|rou3|set-cookie-parser|kysely|nanostores|zod|defu|jose|file-type|load-esm|uid|react|react-dom)(?:/|$))"
   ]
 }

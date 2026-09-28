@@ -45,21 +45,21 @@
     "@langchain/langgraph": "^1.2.9",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "@nestjs/axios": "^4.0.1",
-    "@nestjs/bullmq": "^11.0.4",
-    "@nestjs/common": "^11.1.27",
-    "@nestjs/config": "^4.0.2",
-    "@nestjs/core": "^11.1.27",
-    "@nestjs/event-emitter": "^3.0.1",
-    "@nestjs/mapped-types": "^2.1.0",
-    "@nestjs/microservices": "^11.1.27",
-    "@nestjs/platform-express": "^11.1.27",
-    "@nestjs/schedule": "^6.1.0",
-    "@nestjs/serve-static": "^5.0.4",
-    "@nestjs/swagger": "^11.4.5",
-    "@nestjs/typeorm": "^11.0.3",
+    "@nestjs/axios": "^12.0.1",
+    "@nestjs/bullmq": "^12.0.0",
+    "@nestjs/common": "^12.1.0",
+    "@nestjs/config": "^12.0.1",
+    "@nestjs/core": "^12.1.0",
+    "@nestjs/event-emitter": "^12.0.1",
+    "@nestjs/mapped-types": "^12.0.0",
+    "@nestjs/microservices": "^12.1.0",
+    "@nestjs/platform-express": "^12.1.0",
+    "@nestjs/schedule": "^12.0.2",
+    "@nestjs/serve-static": "^12.0.0",
+    "@nestjs/swagger": "^12.0.2",
+    "@nestjs/typeorm": "^12.0.1",
     "@react-pdf/renderer": "^4.5.1",
-    "@scalar/nestjs-api-reference": "^1.2.3",
+    "@scalar/nestjs-api-reference": "^1.2.23",
     "@types/cookie-parser": "^1.4.10",
     "@types/multer": "^2.0.0",
     "ai": "^6.0.137",
@@ -83,7 +83,7 @@
     "multer": "^2.2.0",
     "mustache": "^4.2.0",
     "nanoid": "^3.3.18",
-    "nestjs-i18n": "^10.6.0",
+    "nestjs-i18n": "^10.8.5",
     "node-telegram-bot-api": "^1.2.0",
     "pg": "^8.16.0",
     "react": "^19.2.7",
@@ -97,15 +97,15 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.1",
-    "@nestjs/cli": "^11.0.23",
-    "@nestjs/schematics": "^11.0.9",
-    "@nestjs/testing": "^11.1.27",
+    "@nestjs/cli": "^12.0.7",
+    "@nestjs/schematics": "^12.0.5",
+    "@nestjs/testing": "^12.1.0",
     "@protobuf-ts/plugin": "^2.11.1",
     "@protobuf-ts/protoc": "^2.11.1",
     "@protobuf-ts/runtime": "^2.11.1",
     "@protobuf-ts/runtime-rpc": "^2.11.1",
-    "@swc/cli": "^0.7.9",
-    "@swc/core": "^1.15.3",
+    "@swc/cli": "^0.8.1",
+    "@swc/core": "^1.16.2",
     "@swc/jest": "^0.2.39",
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.6",
@@ -142,15 +142,8 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)sx?$": [
-        "@swc/jest",
-        {
-          "jsc": {
-            "parser": { "syntax": "typescript", "decorators": true },
-            "target": "es5",
-            "transform": { "legacyDecorator": true, "decoratorMetadata": true }
-          },
-          "module": { "type": "commonjs", "noInterop": true }
-        }
+        "<rootDir>/../test/swc-jest-transform.cjs",
+        {}
       ]
     },
     "collectCoverageFrom": [
@@ -162,7 +155,7 @@
       "^@/(.*)$": "<rootDir>/$1"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(better-auth|@react-pdf|react|react-dom|@react-pdf/renderer)/)"
+      "node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?(better-auth|@react-pdf|react|react-dom|@nestjs|@standard-schema|file-type|load-esm|uid)/)"
     ]
   }
 }
