@@ -44,21 +44,44 @@ describe('WorkerStreamRegistry', () => {
     registry.onModuleDestroy();
   });
 
-  it('tracks live streams per worker', () => {
-    const subject = new Subject<Record<string, unknown>>();
-    expect(registry.hasStream('worker-1')).toBe(false);
+  it('delivers a cancel only to the newest stream for a worker', () => {
+    // A reconnect replaces the stream. The stale teardown that follows must not
+    // detach the new stream, and cancels must reach the live one.
+    const stale = new Subject<Record<string, unknown>>();
+    const staleReceived: Record<string, unknown>[] = [];
+    stale.subscribe((value) => staleReceived.push(value));
+    registry.register('worker-1', stale);
 
-    registry.register('worker-1', subject);
-    expect(registry.hasStream('worker-1')).toBe(true);
+    const live = new Subject<Record<string, unknown>>();
+    const liveReceived: Record<string, unknown>[] = [];
+    live.subscribe((value) => liveReceived.push(value));
+    registry.register('worker-1', live);
 
-    // A stale teardown must not drop a newer stream for the same worker.
-    const replacement = new Subject<Record<string, unknown>>();
-    registry.register('worker-1', replacement);
-    registry.unregister('worker-1', subject);
-    expect(registry.hasStream('worker-1')).toBe(true);
+    // The replaced stream is closed by the registry, so anything subscribing to
+    // it afterwards completes immediately.
+    let staleCompleted = false;
+    stale.subscribe({ complete: () => (staleCompleted = true) });
+    expect(staleCompleted).toBe(true);
+    staleReceived.length = 0;
 
-    registry.unregister('worker-1', replacement);
-    expect(registry.hasStream('worker-1')).toBe(false);
+    // A late teardown of the replaced stream must not unregister the live one.
+    registry.unregister('worker-1', stale);
+
+    deliver({ workerId: 'worker-1', jobId: 'job-1', reason: 'cancelled by user' });
+    expect(liveReceived).toEqual([
+      {
+        cancel: {
+          jobId: 'job-1',
+          reason: 'cancelled by user',
+          cancelledBy: undefined,
+        },
+      },
+    ]);
+
+    registry.unregister('worker-1', live);
+    liveReceived.length = 0;
+    deliver({ workerId: 'worker-1', jobId: 'job-2', reason: 'x' });
+    expect(liveReceived).toHaveLength(0);
   });
 
   it('delivers a cancel to the instance holding the worker stream', () => {
@@ -85,9 +108,10 @@ describe('WorkerStreamRegistry', () => {
   });
 
   it('ignores cancels for workers another instance is streaming', () => {
-    deliver({ workerId: 'worker-9', jobId: 'job-1', reason: 'x' });
-    // Nothing to assert beyond "no throw": this instance holds no such stream.
-    expect(registry.hasStream('worker-9')).toBe(false);
+    // No throw and no delivery: this instance holds no such stream.
+    expect(() =>
+      deliver({ workerId: 'worker-9', jobId: 'job-1', reason: 'x' }),
+    ).not.toThrow();
   });
 
   it('ignores malformed and incomplete cancel payloads', () => {

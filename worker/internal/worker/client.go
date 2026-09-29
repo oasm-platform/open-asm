@@ -441,19 +441,24 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			return
 		}
 		log.Info("cancelling job %s on core request (reason=%s) exec=%s", jobID, reason, execID)
-		if mgr != nil {
-			cleanupCtx, cancelCleanup := newDetachedCleanupContext()
-			if err := mgr.Cancel(cleanupCtx, execID); err != nil {
-				log.ErrorE(fmt.Sprintf("[%s] Failed to cancel execution %s", jobID, execID), err)
+		// Docker's stop waits out a 10s grace period, and this handler runs on the
+		// stream's receive loop — doing it inline would stall heartbeats and
+		// serialize every subsequent cancel. Tear down off the loop.
+		go func() {
+			if mgr != nil {
+				cleanupCtx, cancelCleanup := newDetachedCleanupContext()
+				if err := mgr.Cancel(cleanupCtx, execID); err != nil {
+					log.ErrorE(fmt.Sprintf("[%s] Failed to cancel execution %s", jobID, execID), err)
+				}
+				cancelCleanup()
 			}
-			cancelCleanup()
-		}
-		if proxy != nil {
-			// Report the real reason instead of the generic "disconnected before
-			// Done" the drain would otherwise finalise the job with.
-			proxy.SetError(execID, fmt.Sprintf("cancelled: %s", reason))
-			proxy.OnConnectorDown(execID)
-		}
+			if proxy != nil {
+				// Report the real reason instead of the generic "disconnected
+				// before Done" the drain would otherwise finalise the job with.
+				proxy.SetError(execID, fmt.Sprintf("cancelled: %s", reason))
+				proxy.OnConnectorDown(execID)
+			}
+		}()
 	})
 
 	// Connect AFTER node-mode setup: the startup orphan reconcile above must

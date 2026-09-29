@@ -76,10 +76,6 @@ export class WorkerStreamRegistry implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  hasStream(workerId: string): boolean {
-    return this.outbound.has(workerId);
-  }
-
   /**
    * Fan a cancel out to all instances. Failures are surfaced to the caller
    * (job cancellation still succeeds in the DB; the worker simply keeps

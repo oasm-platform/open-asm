@@ -129,7 +129,6 @@ describe('JobsRegistryService', () => {
     publishCancel: jest.fn().mockResolvedValue(undefined),
     register: jest.fn(),
     unregister: jest.fn(),
-    hasStream: jest.fn().mockReturnValue(false),
   };
 
   beforeEach(async () => {

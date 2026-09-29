@@ -12,8 +12,9 @@ import (
 
 // StreamCancelFunc is invoked when core-api asks the worker to stop a job.
 // jobID is the correlation core owns — the worker resolves it to its execution
-// id internally. It runs on the stream's receive loop, so it must return
-// promptly (heavy work belongs behind a goroutine).
+// id internally. It runs on the stream's receive loop, which also carries
+// heartbeats, so it must return promptly: anything that blocks (a container
+// stop waits out a 10s grace period) belongs behind a goroutine.
 type StreamCancelFunc func(jobID, reason string)
 
 const (

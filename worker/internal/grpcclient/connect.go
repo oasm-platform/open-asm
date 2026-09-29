@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -11,6 +12,14 @@ import (
 // join/alive loop and always reflect the newest state (see notifyReady).
 func (c *Client) Connect(ctx context.Context, ready chan bool) {
 	currentDelay := c.connectBaseDelay
+	// The bidirectional stream outlives any single join/alive cycle: it owns
+	// its own reconnect loop and ctx is the process-lifetime worker context, not
+	// the per-iteration one. Starting it per iteration would leave the previous
+	// goroutine running, and the survivors would each keep (re)opening a stream,
+	// evicting each other from the server's registry — churn that silently drops
+	// cancels. Start it exactly once, after the first successful join (it needs
+	// the token that Join hands back).
+	var streamOnce sync.Once
 	for {
 		select {
 		case <-ctx.Done():
@@ -43,7 +52,7 @@ func (c *Client) Connect(ctx context.Context, ready chan bool) {
 		// Additive: a bidirectional stream that carries job cancels. It is owned
 		// by its own goroutine so a stream failure never disturbs the
 		// Join/Alive lifecycle that gates the ready state and the poller.
-		go c.runWorkerStream(ctx)
+		streamOnce.Do(func() { go c.runWorkerStream(ctx) })
 
 		err = c.Alive(ctx)
 		stopTelemetry()
