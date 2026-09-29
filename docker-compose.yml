@@ -76,7 +76,8 @@ services:
       - WORKER_MODE=node
       - WORKER_GRPC_HOST=core-api
       - WORKER_GRPC_PORT=16276
-      - WORKER_MAX_CONCURRENCY=10
+      # Concurrency auto-sizes from the container's CPU/RAM (cgroup-aware).
+      # Pin it by setting WORKER_MAX_CONCURRENCY to a positive value.
       - WORKER_TOOL_PATH=/app/oasm-tools
       # Persist the join token on the worker-state volume: without it every
       # container recreation mints a fresh identity and startup orphan

@@ -68,9 +68,10 @@ tasks:
 
   # Docker Compose orchestration
   # Starts all services using docker compose with environment variables
-  # Builds and recreates containers with 3 worker instances
-  # NOTE: the compose service key is `oasm-worker` (not `worker`) — `--scale
-  # worker=3` fails with "no such service: worker: not found".
+  # Builds and recreates the full stack with a single worker instance.
+  # NOTE: the compose service key is `oasm-worker` (not `worker`). The worker
+  # publishes the fixed connector port 26276 that spawned containers dial back
+  # on, so only ONE worker can run per host — do not add `--scale`.
   docker-compose:
     cmds:
       - |
@@ -86,7 +87,7 @@ tasks:
         fi
         export WORKER_DOCKER_GID
         echo "Docker socket group gid for worker: ${WORKER_DOCKER_GID}"
-        docker compose --env-file ./core-api/.env up -d --build --force-recreate --scale oasm-worker=3
+        docker compose --env-file ./core-api/.env up -d --build --force-recreate
 
   proto:
     cmds:
