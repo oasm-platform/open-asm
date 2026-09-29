@@ -227,6 +227,67 @@ message WorkerTelemetryResponse {
   uint32 next_report_after_ms = 4;
 }
 
+// --- bidirectional worker stream (Connect) ---
+// The worker opens one long-lived stream on Connect. It carries the register
+// handshake and heartbeats up, and register responses, heartbeats acks and job
+// cancellations down. Identity, job pull and results deliberately keep their
+// own RPCs; this stream only adds the push channel core-api lacked.
+
+message WorkerToCore {
+  oneof payload {
+    RegisterRequest register  = 1;
+    Heartbeat       heartbeat = 2;
+  }
+}
+
+message CoreToWorker {
+  oneof payload {
+    RegisterResponse register_resp  = 1;
+    HeartbeatAck     heartbeat_ack  = 2;
+    CancelRequest    cancel         = 3;
+  }
+}
+
+// Register is the first frame on every connect. It carries the same identity
+// material as Join: an API key (+ optional signature) for a first-ever connect,
+// or a persisted worker token to rejoin the same identity.
+message RegisterRequest {
+  string api_key = 1;
+  string signature = 2;
+  optional string token = 3;
+  optional WorkerMetadata metadata = 4;
+  optional string version = 5;
+}
+
+message RegisterResponse {
+  string worker_id = 1;
+  string worker_token = 2;
+  bool   accepted = 3;
+  string reason = 4;
+  // Server-driven liveness cadence. 0 means "use the client default".
+  uint32 heartbeat_interval_ms = 5;
+}
+
+message Heartbeat {
+  string worker_id = 1;
+  uint64 sequence = 2;
+  int64 at_ms = 3;
+}
+
+message HeartbeatAck {
+  string worker_id = 1;
+  int64 server_time_ms = 2;
+}
+
+// Cancel stops a running execution. It is keyed by job_id — not execution_id —
+// because that is the only correlation core-api owns (the Job entity has no
+// execution column); the worker resolves job_id -> execution id itself.
+message CancelRequest {
+  string job_id = 1;
+  string reason = 2;
+  optional string cancelled_by = 3;
+}
+
 service WorkersService {
   rpc Join(JoinRequest) returns (JoinResponse);
   rpc Alive(AliveRequest) returns (stream AliveResponse);
@@ -237,4 +298,7 @@ service WorkersService {
   rpc BuiltinToolRegistry(BuiltinToolRegistryRequest) returns (BuiltinToolRegistryResponse);
   rpc RemoteExecuteSubscribe(RemoteExecuteSubscribeRequest) returns (stream RemoteExecuteSubscribeResponse);
   rpc RemoteExecuteResult(RemoteExecuteResultStream) returns (RemoteExecuteResultAck);
+  // Long-lived bidirectional channel: the push half is what lets core-api stop a
+  // running job instead of only flipping its status in the database.
+  rpc Connect(stream WorkerToCore) returns (stream CoreToWorker);
 }

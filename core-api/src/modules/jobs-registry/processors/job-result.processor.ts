@@ -91,10 +91,13 @@ export class JobResultProcessor extends WorkerHost {
       jobId,
     );
     if (!job) {
-      // The job row is gone (e.g. workflow deleted or job created on another
-      // instance). Nothing can be processed — delete the staged result file so
-      // it does not accumulate in storage as an orphan.
-      this.logger.error(`Job not found: ${jobId} for worker: ${workerId}`);
+      // The job is no longer ours: deleted, or (the common case) cancelled or
+      // re-run while the worker was still executing it — the lookup only
+      // matches IN_PROGRESS. Nothing can be processed — delete the staged
+      // result file so it does not accumulate in storage as an orphan.
+      this.logger.warn(
+        `Job ${jobId} is no longer in progress for worker ${workerId} (cancelled, re-run or deleted); discarding result`,
+      );
       try {
         await this.storageService.deleteFile(fileName, bucket);
       } catch (error) {

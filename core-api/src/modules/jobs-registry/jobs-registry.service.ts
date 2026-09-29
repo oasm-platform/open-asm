@@ -47,6 +47,7 @@ import {
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
+import { WorkerStreamRegistry } from '../workers/worker-stream-registry.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
@@ -130,6 +131,7 @@ export class JobsRegistryService {
     private workspaceService: WorkspacesService,
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
+    private readonly workerStreamRegistry: WorkerStreamRegistry,
   ) {}
   private readonly logger = new Logger(JobsRegistryService.name);
   public async getManyJobs(
@@ -938,12 +940,24 @@ export class JobsRegistryService {
   }
 
   public async handleJobError(dto: UpdateResultDto, job: Job, error: Error) {
-    await this.repo.save({
-      ...job,
-      status: JobStatus.FAILED,
-      error: error.message,
-      retryCount: job.retryCount + 1,
-    });
+    // Conditional write, mirroring the success path: a job that was cancelled
+    // (or re-run) while this failure was in flight must KEEP that outcome. A
+    // worker legitimately reports an error when its execution is torn down by a
+    // cancellation, so an unconditional save here would turn every user cancel
+    // into a failure.
+    const failed = await this.repo.update(
+      { id: job.id, status: JobStatus.IN_PROGRESS },
+      {
+        status: JobStatus.FAILED,
+        retryCount: job.retryCount + 1,
+      },
+    );
+
+    if (!failed.affected) {
+      this.logger.warn(
+        `Job ${job.id} left IN_PROGRESS before its failure was applied; keeping its current status`,
+      );
+    }
 
     // Deduplicate error logs - only create new log if message differs from last error
     const lastErrorLog = await this.jobErrorLogRepo.findOne({
@@ -1546,12 +1560,38 @@ export class JobsRegistryService {
       // Verify job exists and belongs to workspace
       const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
 
-      // Update job status to cancelled
+      // Update job status to cancelled.
+      // Capture the execution owner BEFORE the overwrite: a job that was
+      // in_progress is being executed right now, and this id is the only way to
+      // reach the worker holding that execution.
+      const workerId = job.workerId;
+      const wasRunning = job.status === JobStatus.IN_PROGRESS;
       job.status = JobStatus.CANCELLED;
 
       await queryRunner.manager.save(job);
 
       await queryRunner.commitTransaction();
+
+      // Flipping the DB status alone stops nothing: the connector container
+      // keeps running until its own timeout. Ask the owning worker to stop via
+      // its bidirectional stream. Publication is best-effort — the cancel itself
+      // already succeeded, and an unreachable stream only means the scan stops on
+      // its timeout instead.
+      if (wasRunning && workerId) {
+        try {
+          await this.workerStreamRegistry.publishCancel({
+            workerId,
+            jobId,
+            reason: 'cancelled by user',
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Failed to publish cancel for job ${jobId} to worker ${workerId}: ${
+              error instanceof Error ? error.message : 'unknown error'
+            }`,
+          );
+        }
+      }
 
       return { message: 'Job cancelled successfully' };
     } catch (error) {
@@ -1596,6 +1636,18 @@ export class JobsRegistryService {
         throw new NotFoundException('Job history not found in workspace');
       }
 
+      // Capture which jobs are executing right now BEFORE the bulk update: only
+      // those need a stop signal, and their worker id disappears once the status
+      // is flipped.
+      const running = await queryRunner.manager
+        .createQueryBuilder(Job, 'job')
+        .select('job.id', 'jobId')
+        .addSelect('job.workerId', 'workerId')
+        .where('job."jobHistoryId" = :jobHistoryId', { jobHistoryId })
+        .andWhere('job.status = :status', { status: JobStatus.IN_PROGRESS })
+        .andWhere('job.workerId IS NOT NULL')
+        .getRawMany<{ jobId: string; workerId: string }>();
+
       // Every job of the run reports cancelled, matching what the user did —
       // a run is cancelled as a whole, so leaving some jobs "completed" made
       // the tool and group statuses disagree with the run. completedAt is kept
@@ -1611,6 +1663,25 @@ export class JobsRegistryService {
         .execute();
 
       await queryRunner.commitTransaction();
+
+      // Stop whatever is still executing. One event per job, all published after
+      // the commit so a worker never tears down work the database still records
+      // as running. Best-effort per job — a dead stream falls back to timeout.
+      for (const { jobId, workerId } of running ?? []) {
+        try {
+          await this.workerStreamRegistry.publishCancel({
+            workerId,
+            jobId,
+            reason: 'run cancelled by user',
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Failed to publish cancel for job ${jobId} to worker ${workerId}: ${
+              error instanceof Error ? error.message : 'unknown error'
+            }`,
+          );
+        }
+      }
 
       return {
         message: `Cancelled run: ${result.affected ?? 0} job(s) stopped`,

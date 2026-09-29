@@ -20,6 +20,7 @@ import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { ToolsService } from '../tools/tools.service';
+import { WorkerStreamRegistry } from '../workers/worker-stream-registry.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
@@ -49,6 +50,7 @@ describe('JobsRegistryService', () => {
     getOne: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
     count: jest.fn(),
     exists: jest.fn(),
   };
@@ -123,6 +125,12 @@ describe('JobsRegistryService', () => {
     resolveConfigForJob: jest.fn(),
   };
 
+  const mockWorkerStreamRegistry = {
+    publishCancel: jest.fn().mockResolvedValue(undefined),
+    register: jest.fn(),
+    unregister: jest.fn(),
+  };
+
   beforeEach(async () => {
     mockAssetGroupWorkflowQB = {
       select: jest.fn().mockReturnThis(),
@@ -193,6 +201,10 @@ describe('JobsRegistryService', () => {
           provide: ToolConfigProfilesService,
           useValue: mockToolConfigProfilesService,
         },
+        {
+          provide: WorkerStreamRegistry,
+          useValue: mockWorkerStreamRegistry,
+        },
         JobsRegistryService,
       ],
     }).compile();
@@ -200,6 +212,8 @@ describe('JobsRegistryService', () => {
     service = module.get<JobsRegistryService>(JobsRegistryService);
     // Manually set optional toolsService since @Optional() dependencies may not be injected in tests
     (service as any).toolsService = mockToolsService;
+    // The mocks are module-scoped, so cancel pushes must not leak between tests.
+    mockWorkerStreamRegistry.publishCancel.mockClear();
   });
 
   describe('reRunJob', () => {
@@ -351,6 +365,95 @@ describe('JobsRegistryService', () => {
       });
     });
 
+    it('publishes a cancel to the worker stream when the job was running', async () => {
+      // Given: a job that a worker is executing right now
+      const runningJob = {
+        id: mockJobId,
+        status: JobStatus.IN_PROGRESS,
+        workerId: 'worker-uuid',
+        retryCount: 0,
+        asset: { target: { id: 'target-uuid' } },
+      };
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: { save: jest.fn().mockResolvedValue(runningJob) },
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(runningJob);
+      mockWorkerStreamRegistry.publishCancel.mockClear();
+
+      // When: the job is cancelled from the console
+      await service.cancelJob(mockWorkspaceId, mockJobId);
+
+      // Then: the owning worker is told to stop, after the DB commit
+      expect(mockWorkerStreamRegistry.publishCancel).toHaveBeenCalledWith({
+        workerId: 'worker-uuid',
+        jobId: mockJobId,
+        reason: 'cancelled by user',
+      });
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it('does not publish a cancel when no worker was running the job', async () => {
+      // Given: a queued job that no worker has picked up
+      const pendingJob = {
+        id: mockJobId,
+        status: JobStatus.PENDING,
+        retryCount: 0,
+        asset: { target: { id: 'target-uuid' } },
+      };
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: { save: jest.fn().mockResolvedValue(pendingJob) },
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(pendingJob);
+      mockWorkerStreamRegistry.publishCancel.mockClear();
+
+      // When
+      await service.cancelJob(mockWorkspaceId, mockJobId);
+
+      // Then: nobody is told to stop anything
+      expect(mockWorkerStreamRegistry.publishCancel).not.toHaveBeenCalled();
+    });
+
+    it('still reports success when publishing the cancel fails', async () => {
+      // Given: a running job whose stream cannot be reached
+      const runningJob = {
+        id: mockJobId,
+        status: JobStatus.IN_PROGRESS,
+        workerId: 'worker-uuid',
+        retryCount: 0,
+        asset: { target: { id: 'target-uuid' } },
+      };
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: { save: jest.fn().mockResolvedValue(runningJob) },
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(runningJob);
+      mockWorkerStreamRegistry.publishCancel.mockRejectedValueOnce(
+        new Error('redis down'),
+      );
+
+      // When / Then: the cancellation itself still succeeds (best-effort push)
+      await expect(
+        service.cancelJob(mockWorkspaceId, mockJobId),
+      ).resolves.toEqual({ message: 'Job cancelled successfully' });
+    });
+
     it('should throw NotFoundException when job not found in workspace', async () => {
       const mockQueryRunner = {
         connect: jest.fn(),
@@ -411,12 +514,20 @@ describe('JobsRegistryService', () => {
     const buildQueryRunner = ({
       belongsToWorkspace = true,
       affected = 3,
+      running = [] as { jobId: string; workerId: string }[],
     } = {}) => {
       const ownershipBuilder = {
         leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(belongsToWorkspace),
+      };
+      const runningBuilder = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue(running),
       };
       const updateBuilder = {
         update: jest.fn().mockReturnThis(),
@@ -426,10 +537,13 @@ describe('JobsRegistryService', () => {
         execute: jest.fn().mockResolvedValue({ affected }),
       };
       const manager = {
-        // Called twice: with the entity (ownership lookup) and without (bulk update)
-        createQueryBuilder: jest.fn((entity?: unknown) =>
-          entity ? ownershipBuilder : updateBuilder,
-        ),
+        // Three shapes: the 'jobHistory' alias is the ownership lookup, the
+        // 'job' alias is the "which jobs are executing right now" lookup, and
+        // no alias is the bulk update.
+        createQueryBuilder: jest.fn((entity?: unknown, alias?: string) => {
+          if (alias === 'job') return runningBuilder;
+          return entity ? ownershipBuilder : updateBuilder;
+        }),
       };
 
       return {
@@ -440,6 +554,7 @@ describe('JobsRegistryService', () => {
         rollbackTransaction: jest.fn(),
         release: jest.fn(),
         ownershipBuilder,
+        runningBuilder,
         updateBuilder,
       };
     };
@@ -465,6 +580,34 @@ describe('JobsRegistryService', () => {
       );
       expect(qr.commitTransaction).toHaveBeenCalled();
       expect(result.message).toContain('100');
+      // Nothing was executing, so no worker is told to stop.
+      expect(mockWorkerStreamRegistry.publishCancel).not.toHaveBeenCalled();
+    });
+
+    it('stops every job of the run that a worker was executing', async () => {
+      const qr = buildQueryRunner({
+        affected: 2,
+        running: [
+          { jobId: 'job-a', workerId: 'worker-1' },
+          { jobId: 'job-b', workerId: 'worker-2' },
+        ],
+      });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+      mockWorkerStreamRegistry.publishCancel.mockClear();
+
+      await service.cancelJobHistory(mockWorkspaceId, mockHistoryId);
+
+      expect(mockWorkerStreamRegistry.publishCancel).toHaveBeenCalledTimes(2);
+      expect(mockWorkerStreamRegistry.publishCancel).toHaveBeenCalledWith({
+        workerId: 'worker-1',
+        jobId: 'job-a',
+        reason: 'run cancelled by user',
+      });
+      expect(mockWorkerStreamRegistry.publishCancel).toHaveBeenCalledWith({
+        workerId: 'worker-2',
+        jobId: 'job-b',
+        reason: 'run cancelled by user',
+      });
     });
 
     it('throws NotFoundException and rolls back for a history outside the workspace', async () => {

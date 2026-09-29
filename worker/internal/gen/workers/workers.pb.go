@@ -2043,6 +2043,517 @@ func (x *WorkerTelemetryResponse) GetNextReportAfterMs() uint32 {
 	return 0
 }
 
+type WorkerToCore struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*WorkerToCore_Register
+	//	*WorkerToCore_Heartbeat
+	Payload       isWorkerToCore_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkerToCore) Reset() {
+	*x = WorkerToCore{}
+	mi := &file_workers_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkerToCore) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkerToCore) ProtoMessage() {}
+
+func (x *WorkerToCore) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkerToCore.ProtoReflect.Descriptor instead.
+func (*WorkerToCore) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *WorkerToCore) GetPayload() isWorkerToCore_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *WorkerToCore) GetRegister() *RegisterRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*WorkerToCore_Register); ok {
+			return x.Register
+		}
+	}
+	return nil
+}
+
+func (x *WorkerToCore) GetHeartbeat() *Heartbeat {
+	if x != nil {
+		if x, ok := x.Payload.(*WorkerToCore_Heartbeat); ok {
+			return x.Heartbeat
+		}
+	}
+	return nil
+}
+
+type isWorkerToCore_Payload interface {
+	isWorkerToCore_Payload()
+}
+
+type WorkerToCore_Register struct {
+	Register *RegisterRequest `protobuf:"bytes,1,opt,name=register,proto3,oneof"`
+}
+
+type WorkerToCore_Heartbeat struct {
+	Heartbeat *Heartbeat `protobuf:"bytes,2,opt,name=heartbeat,proto3,oneof"`
+}
+
+func (*WorkerToCore_Register) isWorkerToCore_Payload() {}
+
+func (*WorkerToCore_Heartbeat) isWorkerToCore_Payload() {}
+
+type CoreToWorker struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*CoreToWorker_RegisterResp
+	//	*CoreToWorker_HeartbeatAck
+	//	*CoreToWorker_Cancel
+	Payload       isCoreToWorker_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CoreToWorker) Reset() {
+	*x = CoreToWorker{}
+	mi := &file_workers_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CoreToWorker) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CoreToWorker) ProtoMessage() {}
+
+func (x *CoreToWorker) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CoreToWorker.ProtoReflect.Descriptor instead.
+func (*CoreToWorker) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *CoreToWorker) GetPayload() isCoreToWorker_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *CoreToWorker) GetRegisterResp() *RegisterResponse {
+	if x != nil {
+		if x, ok := x.Payload.(*CoreToWorker_RegisterResp); ok {
+			return x.RegisterResp
+		}
+	}
+	return nil
+}
+
+func (x *CoreToWorker) GetHeartbeatAck() *HeartbeatAck {
+	if x != nil {
+		if x, ok := x.Payload.(*CoreToWorker_HeartbeatAck); ok {
+			return x.HeartbeatAck
+		}
+	}
+	return nil
+}
+
+func (x *CoreToWorker) GetCancel() *CancelRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*CoreToWorker_Cancel); ok {
+			return x.Cancel
+		}
+	}
+	return nil
+}
+
+type isCoreToWorker_Payload interface {
+	isCoreToWorker_Payload()
+}
+
+type CoreToWorker_RegisterResp struct {
+	RegisterResp *RegisterResponse `protobuf:"bytes,1,opt,name=register_resp,json=registerResp,proto3,oneof"`
+}
+
+type CoreToWorker_HeartbeatAck struct {
+	HeartbeatAck *HeartbeatAck `protobuf:"bytes,2,opt,name=heartbeat_ack,json=heartbeatAck,proto3,oneof"`
+}
+
+type CoreToWorker_Cancel struct {
+	Cancel *CancelRequest `protobuf:"bytes,3,opt,name=cancel,proto3,oneof"`
+}
+
+func (*CoreToWorker_RegisterResp) isCoreToWorker_Payload() {}
+
+func (*CoreToWorker_HeartbeatAck) isCoreToWorker_Payload() {}
+
+func (*CoreToWorker_Cancel) isCoreToWorker_Payload() {}
+
+// Register is the first frame on every connect. It carries the same identity
+// material as Join: an API key (+ optional signature) for a first-ever connect,
+// or a persisted worker token to rejoin the same identity.
+type RegisterRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ApiKey        string                 `protobuf:"bytes,1,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	Signature     string                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+	Token         *string                `protobuf:"bytes,3,opt,name=token,proto3,oneof" json:"token,omitempty"`
+	Metadata      *WorkerMetadata        `protobuf:"bytes,4,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
+	Version       *string                `protobuf:"bytes,5,opt,name=version,proto3,oneof" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterRequest) Reset() {
+	*x = RegisterRequest{}
+	mi := &file_workers_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterRequest) ProtoMessage() {}
+
+func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
+func (*RegisterRequest) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *RegisterRequest) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *RegisterRequest) GetSignature() string {
+	if x != nil {
+		return x.Signature
+	}
+	return ""
+}
+
+func (x *RegisterRequest) GetToken() string {
+	if x != nil && x.Token != nil {
+		return *x.Token
+	}
+	return ""
+}
+
+func (x *RegisterRequest) GetMetadata() *WorkerMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *RegisterRequest) GetVersion() string {
+	if x != nil && x.Version != nil {
+		return *x.Version
+	}
+	return ""
+}
+
+type RegisterResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkerId    string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	WorkerToken string                 `protobuf:"bytes,2,opt,name=worker_token,json=workerToken,proto3" json:"worker_token,omitempty"`
+	Accepted    bool                   `protobuf:"varint,3,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	Reason      string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Server-driven liveness cadence. 0 means "use the client default".
+	HeartbeatIntervalMs uint32 `protobuf:"varint,5,opt,name=heartbeat_interval_ms,json=heartbeatIntervalMs,proto3" json:"heartbeat_interval_ms,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *RegisterResponse) Reset() {
+	*x = RegisterResponse{}
+	mi := &file_workers_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterResponse) ProtoMessage() {}
+
+func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
+func (*RegisterResponse) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RegisterResponse) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *RegisterResponse) GetWorkerToken() string {
+	if x != nil {
+		return x.WorkerToken
+	}
+	return ""
+}
+
+func (x *RegisterResponse) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+func (x *RegisterResponse) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RegisterResponse) GetHeartbeatIntervalMs() uint32 {
+	if x != nil {
+		return x.HeartbeatIntervalMs
+	}
+	return 0
+}
+
+type Heartbeat struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	Sequence      uint64                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	AtMs          int64                  `protobuf:"varint,3,opt,name=at_ms,json=atMs,proto3" json:"at_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Heartbeat) Reset() {
+	*x = Heartbeat{}
+	mi := &file_workers_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Heartbeat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Heartbeat) ProtoMessage() {}
+
+func (x *Heartbeat) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
+func (*Heartbeat) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *Heartbeat) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *Heartbeat) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *Heartbeat) GetAtMs() int64 {
+	if x != nil {
+		return x.AtMs
+	}
+	return 0
+}
+
+type HeartbeatAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	ServerTimeMs  int64                  `protobuf:"varint,2,opt,name=server_time_ms,json=serverTimeMs,proto3" json:"server_time_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatAck) Reset() {
+	*x = HeartbeatAck{}
+	mi := &file_workers_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatAck) ProtoMessage() {}
+
+func (x *HeartbeatAck) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatAck.ProtoReflect.Descriptor instead.
+func (*HeartbeatAck) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *HeartbeatAck) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *HeartbeatAck) GetServerTimeMs() int64 {
+	if x != nil {
+		return x.ServerTimeMs
+	}
+	return 0
+}
+
+// Cancel stops a running execution. It is keyed by job_id — not execution_id —
+// because that is the only correlation core-api owns (the Job entity has no
+// execution column); the worker resolves job_id -> execution id itself.
+type CancelRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	CancelledBy   *string                `protobuf:"bytes,3,opt,name=cancelled_by,json=cancelledBy,proto3,oneof" json:"cancelled_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelRequest) Reset() {
+	*x = CancelRequest{}
+	mi := &file_workers_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelRequest) ProtoMessage() {}
+
+func (x *CancelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelRequest.ProtoReflect.Descriptor instead.
+func (*CancelRequest) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *CancelRequest) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *CancelRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *CancelRequest) GetCancelledBy() string {
+	if x != nil && x.CancelledBy != nil {
+		return *x.CancelledBy
+	}
+	return ""
+}
+
 var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
@@ -2203,7 +2714,44 @@ const file_workers_proto_rawDesc = "" +
 	"\vreceived_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"receivedAt\x12\x1b\n" +
 	"\tworker_id\x18\x03 \x01(\tR\bworkerId\x12/\n" +
-	"\x14next_report_after_ms\x18\x04 \x01(\rR\x11nextReportAfterMs*_\n" +
+	"\x14next_report_after_ms\x18\x04 \x01(\rR\x11nextReportAfterMs\"\x85\x01\n" +
+	"\fWorkerToCore\x126\n" +
+	"\bregister\x18\x01 \x01(\v2\x18.workers.RegisterRequestH\x00R\bregister\x122\n" +
+	"\theartbeat\x18\x02 \x01(\v2\x12.workers.HeartbeatH\x00R\theartbeatB\t\n" +
+	"\apayload\"\xcb\x01\n" +
+	"\fCoreToWorker\x12@\n" +
+	"\rregister_resp\x18\x01 \x01(\v2\x19.workers.RegisterResponseH\x00R\fregisterResp\x12<\n" +
+	"\rheartbeat_ack\x18\x02 \x01(\v2\x15.workers.HeartbeatAckH\x00R\fheartbeatAck\x120\n" +
+	"\x06cancel\x18\x03 \x01(\v2\x16.workers.CancelRequestH\x00R\x06cancelB\t\n" +
+	"\apayload\"\xdf\x01\n" +
+	"\x0fRegisterRequest\x12\x17\n" +
+	"\aapi_key\x18\x01 \x01(\tR\x06apiKey\x12\x1c\n" +
+	"\tsignature\x18\x02 \x01(\tR\tsignature\x12\x19\n" +
+	"\x05token\x18\x03 \x01(\tH\x00R\x05token\x88\x01\x01\x128\n" +
+	"\bmetadata\x18\x04 \x01(\v2\x17.workers.WorkerMetadataH\x01R\bmetadata\x88\x01\x01\x12\x1d\n" +
+	"\aversion\x18\x05 \x01(\tH\x02R\aversion\x88\x01\x01B\b\n" +
+	"\x06_tokenB\v\n" +
+	"\t_metadataB\n" +
+	"\n" +
+	"\b_version\"\xba\x01\n" +
+	"\x10RegisterResponse\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12!\n" +
+	"\fworker_token\x18\x02 \x01(\tR\vworkerToken\x12\x1a\n" +
+	"\baccepted\x18\x03 \x01(\bR\baccepted\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x122\n" +
+	"\x15heartbeat_interval_ms\x18\x05 \x01(\rR\x13heartbeatIntervalMs\"Y\n" +
+	"\tHeartbeat\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x1a\n" +
+	"\bsequence\x18\x02 \x01(\x04R\bsequence\x12\x13\n" +
+	"\x05at_ms\x18\x03 \x01(\x03R\x04atMs\"Q\n" +
+	"\fHeartbeatAck\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12$\n" +
+	"\x0eserver_time_ms\x18\x02 \x01(\x03R\fserverTimeMs\"w\n" +
+	"\rCancelRequest\x12\x15\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12&\n" +
+	"\fcancelled_by\x18\x03 \x01(\tH\x00R\vcancelledBy\x88\x01\x01B\x0f\n" +
+	"\r_cancelled_by*_\n" +
 	"\rWorkerRunMode\x12\x1b\n" +
 	"\x17WORKER_RUN_MODE_UNKNOWN\x10\x00\x12\x17\n" +
 	"\x13WORKER_RUN_MODE_CLI\x10\x01\x12\x18\n" +
@@ -2241,7 +2789,7 @@ const file_workers_proto_rawDesc = "" +
 	" CONTAINER_EXECUTION_STATE_ACTIVE\x10\x01\x12'\n" +
 	"#CONTAINER_EXECUTION_STATE_COMPLETED\x10\x02\x12'\n" +
 	"#CONTAINER_EXECUTION_STATE_CANCELLED\x10\x03\x12$\n" +
-	" CONTAINER_EXECUTION_STATE_FAILED\x10\x042\xf5\x05\n" +
+	" CONTAINER_EXECUTION_STATE_FAILED\x10\x042\xb2\x06\n" +
 	"\x0eWorkersService\x123\n" +
 	"\x04Join\x12\x14.workers.JoinRequest\x1a\x15.workers.JoinResponse\x128\n" +
 	"\x05Alive\x12\x15.workers.AliveRequest\x1a\x16.workers.AliveResponse0\x01\x12T\n" +
@@ -2251,7 +2799,8 @@ const file_workers_proto_rawDesc = "" +
 	"\x16ConnectInternalNetwork\x12&.workers.ConnectInternalNetworkRequest\x1a'.workers.ConnectInternalNetworkResponse\x12`\n" +
 	"\x13BuiltinToolRegistry\x12#.workers.BuiltinToolRegistryRequest\x1a$.workers.BuiltinToolRegistryResponse\x12k\n" +
 	"\x16RemoteExecuteSubscribe\x12&.workers.RemoteExecuteSubscribeRequest\x1a'.workers.RemoteExecuteSubscribeResponse0\x01\x12Z\n" +
-	"\x13RemoteExecuteResult\x12\".workers.RemoteExecuteResultStream\x1a\x1f.workers.RemoteExecuteResultAckB\vZ\t./workersb\x06proto3"
+	"\x13RemoteExecuteResult\x12\".workers.RemoteExecuteResultStream\x1a\x1f.workers.RemoteExecuteResultAck\x12;\n" +
+	"\aConnect\x12\x15.workers.WorkerToCore\x1a\x15.workers.CoreToWorker(\x010\x01B\vZ\t./workersb\x06proto3"
 
 var (
 	file_workers_proto_rawDescOnce sync.Once
@@ -2266,7 +2815,7 @@ func file_workers_proto_rawDescGZIP() []byte {
 }
 
 var file_workers_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_workers_proto_goTypes = []any{
 	(WorkerRunMode)(0),                     // 0: workers.WorkerRunMode
 	(RemoteExecuteSubscribeEventType)(0),   // 1: workers.RemoteExecuteSubscribeEventType
@@ -2299,7 +2848,14 @@ var file_workers_proto_goTypes = []any{
 	(*WorkerContainersTelemetry)(nil),      // 28: workers.WorkerContainersTelemetry
 	(*WorkerTelemetryRequest)(nil),         // 29: workers.WorkerTelemetryRequest
 	(*WorkerTelemetryResponse)(nil),        // 30: workers.WorkerTelemetryResponse
-	(*timestamppb.Timestamp)(nil),          // 31: google.protobuf.Timestamp
+	(*WorkerToCore)(nil),                   // 31: workers.WorkerToCore
+	(*CoreToWorker)(nil),                   // 32: workers.CoreToWorker
+	(*RegisterRequest)(nil),                // 33: workers.RegisterRequest
+	(*RegisterResponse)(nil),               // 34: workers.RegisterResponse
+	(*Heartbeat)(nil),                      // 35: workers.Heartbeat
+	(*HeartbeatAck)(nil),                   // 36: workers.HeartbeatAck
+	(*CancelRequest)(nil),                  // 37: workers.CancelRequest
+	(*timestamppb.Timestamp)(nil),          // 38: google.protobuf.Timestamp
 }
 var file_workers_proto_depIdxs = []int32{
 	8,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
@@ -2310,42 +2866,50 @@ var file_workers_proto_depIdxs = []int32{
 	4,  // 5: workers.ManagedContainerTelemetry.runtime_state:type_name -> workers.ContainerRuntimeState
 	5,  // 6: workers.ManagedContainerTelemetry.health_state:type_name -> workers.ContainerHealthState
 	6,  // 7: workers.ManagedContainerTelemetry.execution_state:type_name -> workers.ContainerExecutionState
-	31, // 8: workers.ManagedContainerTelemetry.created_at:type_name -> google.protobuf.Timestamp
-	31, // 9: workers.ManagedContainerTelemetry.started_at:type_name -> google.protobuf.Timestamp
-	31, // 10: workers.ManagedContainerTelemetry.finished_at:type_name -> google.protobuf.Timestamp
-	31, // 11: workers.ManagedContainerTelemetry.state_changed_at:type_name -> google.protobuf.Timestamp
-	31, // 12: workers.ManagedContainerTelemetry.last_used_at:type_name -> google.protobuf.Timestamp
+	38, // 8: workers.ManagedContainerTelemetry.created_at:type_name -> google.protobuf.Timestamp
+	38, // 9: workers.ManagedContainerTelemetry.started_at:type_name -> google.protobuf.Timestamp
+	38, // 10: workers.ManagedContainerTelemetry.finished_at:type_name -> google.protobuf.Timestamp
+	38, // 11: workers.ManagedContainerTelemetry.state_changed_at:type_name -> google.protobuf.Timestamp
+	38, // 12: workers.ManagedContainerTelemetry.last_used_at:type_name -> google.protobuf.Timestamp
 	27, // 13: workers.WorkerContainersTelemetry.items:type_name -> workers.ManagedContainerTelemetry
-	31, // 14: workers.WorkerTelemetryRequest.observed_at:type_name -> google.protobuf.Timestamp
-	31, // 15: workers.WorkerTelemetryRequest.started_at:type_name -> google.protobuf.Timestamp
+	38, // 14: workers.WorkerTelemetryRequest.observed_at:type_name -> google.protobuf.Timestamp
+	38, // 15: workers.WorkerTelemetryRequest.started_at:type_name -> google.protobuf.Timestamp
 	3,  // 16: workers.WorkerTelemetryRequest.state:type_name -> workers.WorkerRuntimeState
 	25, // 17: workers.WorkerTelemetryRequest.node:type_name -> workers.WorkerNodeTelemetry
 	26, // 18: workers.WorkerTelemetryRequest.jobs:type_name -> workers.WorkerJobTelemetry
 	28, // 19: workers.WorkerTelemetryRequest.containers:type_name -> workers.WorkerContainersTelemetry
-	31, // 20: workers.WorkerTelemetryResponse.received_at:type_name -> google.protobuf.Timestamp
-	7,  // 21: workers.WorkersService.Join:input_type -> workers.JoinRequest
-	10, // 22: workers.WorkersService.Alive:input_type -> workers.AliveRequest
-	29, // 23: workers.WorkersService.WorkerTelemetry:input_type -> workers.WorkerTelemetryRequest
-	12, // 24: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
-	14, // 25: workers.WorkersService.Storage:input_type -> workers.StorageRequest
-	17, // 26: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
-	19, // 27: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
-	21, // 28: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
-	23, // 29: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
-	9,  // 30: workers.WorkersService.Join:output_type -> workers.JoinResponse
-	11, // 31: workers.WorkersService.Alive:output_type -> workers.AliveResponse
-	30, // 32: workers.WorkersService.WorkerTelemetry:output_type -> workers.WorkerTelemetryResponse
-	13, // 33: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
-	15, // 34: workers.WorkersService.Storage:output_type -> workers.StorageResponse
-	18, // 35: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
-	20, // 36: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
-	22, // 37: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
-	24, // 38: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
-	30, // [30:39] is the sub-list for method output_type
-	21, // [21:30] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	38, // 20: workers.WorkerTelemetryResponse.received_at:type_name -> google.protobuf.Timestamp
+	33, // 21: workers.WorkerToCore.register:type_name -> workers.RegisterRequest
+	35, // 22: workers.WorkerToCore.heartbeat:type_name -> workers.Heartbeat
+	34, // 23: workers.CoreToWorker.register_resp:type_name -> workers.RegisterResponse
+	36, // 24: workers.CoreToWorker.heartbeat_ack:type_name -> workers.HeartbeatAck
+	37, // 25: workers.CoreToWorker.cancel:type_name -> workers.CancelRequest
+	8,  // 26: workers.RegisterRequest.metadata:type_name -> workers.WorkerMetadata
+	7,  // 27: workers.WorkersService.Join:input_type -> workers.JoinRequest
+	10, // 28: workers.WorkersService.Alive:input_type -> workers.AliveRequest
+	29, // 29: workers.WorkersService.WorkerTelemetry:input_type -> workers.WorkerTelemetryRequest
+	12, // 30: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
+	14, // 31: workers.WorkersService.Storage:input_type -> workers.StorageRequest
+	17, // 32: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
+	19, // 33: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
+	21, // 34: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
+	23, // 35: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
+	31, // 36: workers.WorkersService.Connect:input_type -> workers.WorkerToCore
+	9,  // 37: workers.WorkersService.Join:output_type -> workers.JoinResponse
+	11, // 38: workers.WorkersService.Alive:output_type -> workers.AliveResponse
+	30, // 39: workers.WorkersService.WorkerTelemetry:output_type -> workers.WorkerTelemetryResponse
+	13, // 40: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
+	15, // 41: workers.WorkersService.Storage:output_type -> workers.StorageResponse
+	18, // 42: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
+	20, // 43: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
+	22, // 44: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
+	24, // 45: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
+	32, // 46: workers.WorkersService.Connect:output_type -> workers.CoreToWorker
+	37, // [37:47] is the sub-list for method output_type
+	27, // [27:37] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_workers_proto_init() }
@@ -2356,13 +2920,24 @@ func file_workers_proto_init() {
 	file_workers_proto_msgTypes[0].OneofWrappers = []any{}
 	file_workers_proto_msgTypes[1].OneofWrappers = []any{}
 	file_workers_proto_msgTypes[20].OneofWrappers = []any{}
+	file_workers_proto_msgTypes[24].OneofWrappers = []any{
+		(*WorkerToCore_Register)(nil),
+		(*WorkerToCore_Heartbeat)(nil),
+	}
+	file_workers_proto_msgTypes[25].OneofWrappers = []any{
+		(*CoreToWorker_RegisterResp)(nil),
+		(*CoreToWorker_HeartbeatAck)(nil),
+		(*CoreToWorker_Cancel)(nil),
+	}
+	file_workers_proto_msgTypes[26].OneofWrappers = []any{}
+	file_workers_proto_msgTypes[30].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workers_proto_rawDesc), len(file_workers_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   24,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
