@@ -84,6 +84,9 @@ jobs:
   build:
     #    runs-on: self-hosted
     runs-on: ubuntu-latest
+    # Fail fast instead of hanging for GitHub's default 6h when a buildx/QEMU
+    # step stalls on a multi-arch build.
+    timeout-minutes: 45
 
     permissions:
       packages: write

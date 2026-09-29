@@ -53,6 +53,9 @@ jobs:
     name: Build Changed Services
     needs: detect-changes
     runs-on: ubuntu-latest
+    # Fail fast instead of hanging for GitHub's default 6h when a buildx/QEMU
+    # step stalls (a stalled amd64+arm64 build previously burned the full limit).
+    timeout-minutes: 45
     permissions:
       contents: read
       security-events: write
