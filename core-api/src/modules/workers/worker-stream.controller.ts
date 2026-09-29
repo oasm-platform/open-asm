@@ -12,7 +12,7 @@ import { WorkerStreamRegistry } from './worker-stream-registry.service';
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000;
 
 /**
- * Bidirectional `WorkerStreamService.Connect`.
+ * Bidirectional `WorkersService.Connect`.
  *
  * The worker opens one long-lived stream and the two sides exchange:
  *   worker → core: register (handshake), heartbeat
@@ -38,7 +38,7 @@ export class WorkerStreamController {
     private readonly workers: Repository<WorkerInstance>,
   ) {}
 
-  @GrpcStreamMethod('WorkerStreamService', 'Connect')
+  @GrpcStreamMethod('WorkersService', 'Connect')
   connect(
     frames$: Observable<Record<string, any>>,
     metadata: Metadata,

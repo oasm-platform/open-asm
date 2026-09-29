@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	stream "oasm-worker/internal/gen/worker_stream"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 // StreamCancelFunc is invoked when core-api asks the worker to stop a job.
@@ -37,7 +37,7 @@ const (
 // results keep their existing RPCs. The stream adds the missing push channel —
 // core-api telling this worker to stop a job.
 func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc) error {
-	svc := stream.NewWorkerStreamServiceClient(c.conn)
+	svc := workers.NewWorkersServiceClient(c.conn)
 	streamCtx, cancelStream := context.WithCancel(ctx)
 	defer cancelStream()
 
@@ -48,7 +48,7 @@ func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc)
 
 	// grpc-go allows one goroutine sending and one receiving; this function owns
 	// every Send, the helper goroutine below owns every Recv.
-	frames := make(chan *stream.CoreToWorker, streamFrameBuffer)
+	frames := make(chan *workers.CoreToWorker, streamFrameBuffer)
 	recvDone := make(chan error, 1)
 	go func() {
 		for {
@@ -67,17 +67,18 @@ func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc)
 
 	hostname, _ := os.Hostname()
 	osName := runtime.GOOS
-	mode := streamMapRunMode(c.runMode)
+	// Same enum as Join, so the same mapping applies.
+	mode := mapRunMode(c.runMode)
 	version := "dev"
 	token := c.auth.currentToken()
 
-	if err := session.Send(&stream.WorkerToCore{
-		Payload: &stream.WorkerToCore_Register{
-			Register: &stream.RegisterRequest{
+	if err := session.Send(&workers.WorkerToCore{
+		Payload: &workers.WorkerToCore_Register{
+			Register: &workers.RegisterRequest{
 				ApiKey:    c.apiKey,
 				Signature: c.signature,
 				Token:     &token,
-				Metadata:  &stream.WorkerMetadata{Name: &hostname, Os: &osName, Mode: &mode},
+				Metadata:  &workers.WorkerMetadata{Name: &hostname, Os: &osName, Mode: &mode},
 				Version:   &version,
 			},
 		},
@@ -104,9 +105,9 @@ func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc)
 
 		case <-heartbeat.C:
 			sequence++
-			if err := session.Send(&stream.WorkerToCore{
-				Payload: &stream.WorkerToCore_Heartbeat{
-					Heartbeat: &stream.Heartbeat{
+			if err := session.Send(&workers.WorkerToCore{
+				Payload: &workers.WorkerToCore_Heartbeat{
+					Heartbeat: &workers.Heartbeat{
 						WorkerId: c.WorkerID(),
 						Sequence: sequence,
 						AtMs:     time.Now().UnixMilli(),
@@ -118,13 +119,13 @@ func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc)
 
 		case frame := <-frames:
 			switch payload := frame.GetPayload().(type) {
-			case *stream.CoreToWorker_RegisterResp:
+			case *workers.CoreToWorker_RegisterResp:
 				resp := payload.RegisterResp
 				if !resp.GetAccepted() {
 					return fmt.Errorf("worker stream rejected: %s", resp.GetReason())
 				}
 				// Handshake done: the deadline only guards the open, never the
-				// long-lived stream.
+				// long-lived workers.
 				if !registerDeadline.Stop() {
 					select {
 					case <-registerDeadline.C:
@@ -138,10 +139,10 @@ func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc)
 					"worker stream registered (worker_id=%s)", resp.GetWorkerId(),
 				)
 
-			case *stream.CoreToWorker_HeartbeatAck:
+			case *workers.CoreToWorker_HeartbeatAck:
 				// Liveness acknowledgement; nothing to do.
 
-			case *stream.CoreToWorker_Cancel:
+			case *workers.CoreToWorker_Cancel:
 				cancel := payload.Cancel
 				if cancel.GetJobId() == "" {
 					continue
@@ -172,17 +173,5 @@ func (c *Client) runWorkerStream(ctx context.Context) {
 		if !c.waitWithContext(ctx, c.reconnectDelay) {
 			return
 		}
-	}
-}
-
-// streamMapRunMode converts the configured run mode to the proto enum.
-func streamMapRunMode(mode string) stream.WorkerRunMode {
-	switch mode {
-	case "cli":
-		return stream.WorkerRunMode_WORKER_RUN_MODE_CLI
-	case "node":
-		return stream.WorkerRunMode_WORKER_RUN_MODE_NODE
-	default:
-		return stream.WorkerRunMode_WORKER_RUN_MODE_UNKNOWN
 	}
 }

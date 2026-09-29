@@ -5,87 +5,50 @@ import (
 	"net"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
-	stream "oasm-worker/internal/gen/worker_stream"
+	workers "oasm-worker/internal/gen/workers"
 )
 
-// fakeWorkerStreamServer plays core-api: it answers the register handshake and
-// (optionally) pushes a cancellation down the same stream.
-type fakeWorkerStreamServer struct {
-	stream.UnimplementedWorkerStreamServiceServer
-
-	accept          bool
-	cancelJobID     string
-	sendEmptyCancel bool
-	registered      chan struct{}
+// streamTestService is the WorkersService fake plus a controllable Connect, the
+// bidirectional stream core-api uses to push job cancellations. Connect is a
+// method of WorkersService, so it has to be overridden on the service itself
+// rather than registered as a second service.
+type streamTestService struct {
+	*fakeWorkersService
+	handleConnect func(grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker]) error
+	connects      atomic.Int32
 }
 
-func (f *fakeWorkerStreamServer) Connect(
-	srv grpc.BidiStreamingServer[stream.WorkerToCore, stream.CoreToWorker],
+func (s *streamTestService) Connect(
+	srv grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker],
 ) error {
-	frame, err := srv.Recv()
-	if err != nil {
-		return err
-	}
-	if frame.GetRegister() == nil {
-		return status.Error(codes.InvalidArgument, "first frame must be register")
-	}
-	if f.registered != nil {
-		close(f.registered)
-	}
-
-	resp := &stream.RegisterResponse{
-		WorkerId:            "worker-1",
-		Accepted:            f.accept,
-		HeartbeatIntervalMs: 1000,
-	}
-	if !f.accept {
-		resp.Reason = "bad token"
-	}
-	if err := srv.Send(&stream.CoreToWorker{
-		Payload: &stream.CoreToWorker_RegisterResp{RegisterResp: resp},
-	}); err != nil {
-		return err
-	}
-	if !f.accept {
-		// Stay open so the client reliably processes the rejection instead of
-		// racing a closed stream.
+	s.connects.Add(1)
+	if s.handleConnect == nil {
 		<-srv.Context().Done()
 		return srv.Context().Err()
 	}
-
-	if f.sendEmptyCancel {
-		if err := srv.Send(&stream.CoreToWorker{
-			Payload: &stream.CoreToWorker_Cancel{Cancel: &stream.CancelRequest{Reason: "x"}},
-		}); err != nil {
-			return err
-		}
-	}
-	if f.cancelJobID != "" {
-		if err := srv.Send(&stream.CoreToWorker{
-			Payload: &stream.CoreToWorker_Cancel{
-				Cancel: &stream.CancelRequest{JobId: f.cancelJobID, Reason: "cancelled by user"},
-			},
-		}); err != nil {
-			return err
-		}
-	}
-
-	<-srv.Context().Done()
-	return srv.Context().Err()
+	return s.handleConnect(srv)
 }
 
-func newStreamTestClient(t *testing.T, srv stream.WorkerStreamServiceServer) *Client {
+// newStreamTestClient wires a client to a WorkersService whose Connect is driven
+// by handleConnect, and returns the service so tests can count Connect calls.
+func newStreamTestClient(
+	t *testing.T,
+	handleConnect func(grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker]) error,
+) (*Client, *streamTestService) {
 	t.Helper()
 	lis := bufconn.Listen(64 * 1024)
 	grpcSrv := grpc.NewServer()
-	stream.RegisterWorkerStreamServiceServer(grpcSrv, srv)
+	svc := &streamTestService{
+		fakeWorkersService: &fakeWorkersService{},
+		handleConnect:      handleConnect,
+	}
+	workers.RegisterWorkersServiceServer(grpcSrv, svc)
 	go func() { _ = grpcSrv.Serve(lis) }()
 
 	client, err := NewClient("test-api-key", "passthrough:///bufnet", "test-tools", &noOpLogger{},
@@ -101,12 +64,60 @@ func newStreamTestClient(t *testing.T, srv stream.WorkerStreamServiceServer) *Cl
 		_ = client.Close()
 		grpcSrv.Stop()
 	})
-	return client
+	return client, svc
+}
+
+// acceptingConnect answers the register handshake, then lets the test push
+// frames before holding the stream open.
+func acceptingConnect(
+	t *testing.T,
+	accepted bool,
+	push func(grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker]) error,
+) func(grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker]) error {
+	t.Helper()
+	return func(srv grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker]) error {
+		if _, err := srv.Recv(); err != nil {
+			return err
+		}
+		if err := srv.Send(&workers.CoreToWorker{
+			Payload: &workers.CoreToWorker_RegisterResp{
+				RegisterResp: &workers.RegisterResponse{
+					WorkerId:            "worker-1",
+					Accepted:            accepted,
+					Reason:              "bad token",
+					HeartbeatIntervalMs: 1000,
+				},
+			},
+		}); err != nil {
+			return err
+		}
+		if push != nil {
+			if err := push(srv); err != nil {
+				return err
+			}
+		}
+		// Stay open so the client reliably processes what we sent.
+		<-srv.Context().Done()
+		return srv.Context().Err()
+	}
 }
 
 func TestRunWorkerStream_DeliversCancelToHandler(t *testing.T) {
-	srv := &fakeWorkerStreamServer{accept: true, cancelJobID: "job-1", registered: make(chan struct{})}
-	client := newStreamTestClient(t, srv)
+	registered := make(chan struct{})
+	client, _ := newStreamTestClient(t, acceptingConnect(t, true, func(
+		srv grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker],
+	) error {
+		select {
+		case <-registered:
+		default:
+			close(registered)
+		}
+		return srv.Send(&workers.CoreToWorker{
+			Payload: &workers.CoreToWorker_Cancel{
+				Cancel: &workers.CancelRequest{JobId: "job-1", Reason: "cancelled by user"},
+			},
+		})
+	}))
 
 	received := make(chan string, 4)
 	client.SetStreamCancelHandler(func(jobID, reason string) {
@@ -118,7 +129,7 @@ func TestRunWorkerStream_DeliversCancelToHandler(t *testing.T) {
 	go func() { _ = client.RunWorkerStream(ctx, client.streamCancelHandler()) }()
 
 	select {
-	case <-srv.registered:
+	case <-registered:
 	case <-time.After(3 * time.Second):
 		t.Fatal("register frame was never sent")
 	}
@@ -134,8 +145,7 @@ func TestRunWorkerStream_DeliversCancelToHandler(t *testing.T) {
 }
 
 func TestRunWorkerStream_RejectedRegisterFails(t *testing.T) {
-	srv := &fakeWorkerStreamServer{accept: false}
-	client := newStreamTestClient(t, srv)
+	client, _ := newStreamTestClient(t, acceptingConnect(t, false, nil))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -150,8 +160,15 @@ func TestRunWorkerStream_RejectedRegisterFails(t *testing.T) {
 }
 
 func TestRunWorkerStream_IgnoresCancelWithoutJobID(t *testing.T) {
-	srv := &fakeWorkerStreamServer{accept: true, sendEmptyCancel: true}
-	client := newStreamTestClient(t, srv)
+	client, _ := newStreamTestClient(t, acceptingConnect(t, true, func(
+		srv grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker],
+	) error {
+		return srv.Send(&workers.CoreToWorker{
+			Payload: &workers.CoreToWorker_Cancel{
+				Cancel: &workers.CancelRequest{Reason: "no job id"},
+			},
+		})
+	}))
 
 	called := make(chan struct{}, 1)
 	client.SetStreamCancelHandler(func(jobID, reason string) {
