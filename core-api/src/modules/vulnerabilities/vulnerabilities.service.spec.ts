@@ -99,4 +99,27 @@ describe('VulnerabilitiesService', () => {
       new Set(['info', 'low', 'medium', 'high', 'critical']),
     );
   });
+
+  it('shipped vulnerability_scan_basic template matches the connector defaults (interactsh on, no redirects)', () => {
+    const templatePath = path.join(
+      __dirname,
+      '..',
+      'workflows',
+      'templates',
+      'vulnerability_scan_basic.yaml',
+    );
+    const doc = yaml.load(fs.readFileSync(templatePath, 'utf8')) as {
+      jobs: {
+        run: string;
+        config?: { interactsh?: boolean; followRedirects?: boolean };
+      }[];
+    };
+
+    const job = doc.jobs.find((j) => j.run === 'nuclei');
+    expect(job).toBeDefined();
+    // OOB/blind detection stays on; redirects stay off (following them floods
+    // honeypot/echo targets with false positives).
+    expect(job!.config?.interactsh).toBe(true);
+    expect(job!.config?.followRedirects).toBe(false);
+  });
 });
