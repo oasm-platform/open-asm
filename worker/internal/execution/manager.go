@@ -20,6 +20,14 @@ const (
 	JobMemoryKey = "memory"
 )
 
+// Fallback per-container admission requests when a job carries no explicit
+// limits. Connector jobs always carry the manifest resourceDefaults, so this is
+// only a safety net; the values mirror the manifest's DEFAULT_RESOURCE_DEFAULTS.
+const (
+	defaultCPURequestMillis = 500
+	defaultMemRequestBytes  = 512 << 20
+)
+
 // Logger receives error notifications from Manager when background
 // container-engine operations fail. TuiLogger (worker package) satisfies it.
 // A nil logger disables reporting.
@@ -251,7 +259,20 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	var poolLogs []string
 	var adoptEvicted string
 	var adoptErr error
+	// Declared resources for admission: the manifest limits core-api attached to
+	// the job, as numbers. Fall back to conservative defaults if a job carries
+	// none (should not happen for connector jobs).
+	cpuStr, memStr := limitsCPUandMemory(spec.Limits)
+	cpuRequestMillis, memRequestBytes := defaultCPURequestMillis, defaultMemRequestBytes
+	if v, err := resource.ParseCPU(cpuStr); err == nil && v > 0 {
+		cpuRequestMillis = v
+	}
+	if v, err := resource.ParseMemoryToBytes(memStr); err == nil && v > 0 {
+		memRequestBytes = v
+	}
+
 	var h runtime.Handle
+	reserved := false
 	if p != nil {
 		if acquired, ok := p.AcquireHandle(id, poolKey); ok {
 			h = acquired
@@ -282,25 +303,35 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 					poolLogs = append(poolLogs, fmt.Sprintf("pool adopt: container=%s exec=%s", cid, id))
 				}
 			}
-		} else if p.AtCapacity(poolKey) {
-			// Phase 3 replica quota: no idle container AND the image's busy
-			// count is at the cap — refuse instead of creating a replica. The
-			// caller (job.go) backs off and retries; no container is created,
-			// no Core failure is recorded.
-			busy, max := p.busyCount(poolKey), p.maxReplicasPerImage
-			poolLogs = append(poolLogs, fmt.Sprintf("pool exhausted: pool_key=%s busy=%d max=%d", poolKey, busy, max))
-			// No execution was created — drop the token so a stray connector
-			// can never authenticate against a ghost execution, and release
-			// the reserved slot.
-			m.pending--
-			m.tokenMu.Lock()
-			delete(m.tokens, id)
-			m.tokenMu.Unlock()
-			m.mu.Unlock()
-			for _, line := range poolLogs {
-				m.logInfo("%s", line)
+		}
+		if h.ID == "" {
+			// A fresh container is needed. Reserve a replica slot BEFORE the
+			// slow, lock-free runtime Create so concurrent Submits cannot each
+			// pass the capacity check and spawn a container — the race that
+			// started 12 nuclei containers for a cap of 1. The reservation is
+			// released on Create/Start failure and after Add on success.
+			if !p.ReserveReplica(id, poolKey, cpuRequestMillis, memRequestBytes) {
+				// Per-image quota or the node resource budget is reached: refuse
+				// instead of creating a replica. The caller (job.go) backs off
+				// and retries; no container is created, no Core failure is
+				// recorded.
+				busy, max := p.busyCount(poolKey), p.maxReplicasPerImage
+				poolLogs = append(poolLogs, fmt.Sprintf("pool exhausted: pool_key=%s busy=%d max=%d (node budget cpu=%dm mem=%dB, request cpu=%dm mem=%dB)",
+					poolKey, busy, max, p.cpuBudgetMillis, p.memBudgetBytes, cpuRequestMillis, memRequestBytes))
+				// No execution was created — drop the token so a stray
+				// connector can never authenticate against a ghost execution,
+				// and release the reserved concurrency slot.
+				m.pending--
+				m.tokenMu.Lock()
+				delete(m.tokens, id)
+				m.tokenMu.Unlock()
+				m.mu.Unlock()
+				for _, line := range poolLogs {
+					m.logInfo("%s", line)
+				}
+				return "", fmt.Errorf("%w: %s", ErrPoolExhausted, poolKey)
 			}
-			return "", fmt.Errorf("%w: %s", ErrPoolExhausted, poolKey)
+			reserved = true
 		}
 	}
 	// The runtime spec is built under the lock; the Docker calls (Create
@@ -342,13 +373,16 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		if err != nil {
 			// No execution was created — drop the token so a stray connector
 			// can never authenticate against a ghost execution, and release
-			// the reserved concurrency slot.
+			// the reserved concurrency slot and replica reservation.
 			m.mu.Lock()
 			m.pending--
 			m.mu.Unlock()
 			m.tokenMu.Lock()
 			delete(m.tokens, id)
 			m.tokenMu.Unlock()
+			if reserved {
+				p.ReleaseReplica(id)
+			}
 			return "", err
 		}
 		h = created
@@ -358,24 +392,29 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		// runtime call inside.
 		m.mu.Lock()
 		if p != nil {
-			cpu, mem := limitsCPUandMemory(spec.Limits)
 			p.Add(poolEntry{
-				ID:           h.ID,
-				Name:         h.Name,
-				Image:        spec.Image,
-				ImageVersion: spec.Version,
-				Tool:         spec.Tool,
-				PoolKey:      poolKey,
-				CPU:          cpu,
-				Memory:       mem,
-				State:        PoolStateBusy,
-				ExecID:       id,
-				LastJobID:    spec.JobID,
-				LastTraceID:  spec.TraceID,
-				CreatedAt:    h.CreatedAt,
+				ID:               h.ID,
+				Name:             h.Name,
+				Image:            spec.Image,
+				ImageVersion:     spec.Version,
+				Tool:             spec.Tool,
+				PoolKey:          poolKey,
+				CPU:              cpuStr,
+				Memory:           memStr,
+				CPURequestMillis: cpuRequestMillis,
+				MemRequestBytes:  memRequestBytes,
+				State:            PoolStateBusy,
+				ExecID:           id,
+				LastJobID:        spec.JobID,
+				LastTraceID:      spec.TraceID,
+				CreatedAt:        h.CreatedAt,
 			})
 			poolLogs = append(poolLogs, fmt.Sprintf("pool miss: created replica container %s pool_key=%s busy=%d max=%d",
 				h.ID, poolKey, p.busyCount(poolKey), p.maxReplicasPerImage))
+			if reserved {
+				// The pending creation is now a tracked busy container.
+				p.ReleaseReplica(id)
+			}
 		}
 		// Bind BEFORE Start: the connector can dial back as soon as the
 		// container boots. Routing the execution to its container first
@@ -396,6 +435,9 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			if p != nil {
 				if cid := p.Evict(id); cid != "" && evictor != nil {
 					evictor.RemoveContainer(cid)
+				}
+				if reserved {
+					p.ReleaseReplica(id)
 				}
 			}
 			if binder != nil {

@@ -250,6 +250,74 @@ done:
 	}
 }
 
+// receiveReady waits for one connection-state signal, failing the test on
+// timeout. Returns the received value.
+func receiveReady(t *testing.T, ready <-chan bool, timeout time.Duration) bool {
+	t.Helper()
+	select {
+	case v := <-ready:
+		return v
+	case <-time.After(timeout):
+		t.Fatal("timed out waiting for a ready signal")
+		return false
+	}
+}
+
+// A reconnect that happens while the ready consumer is busy must not strand the
+// consumer on a stale state. The ready channel is deliberately small and the
+// consumer (Start) can be busy for seconds running network setup and tool
+// downloads; a plain non-blocking send keeps the OLDEST pending value and drops
+// the newest. This test reproduces the exact production failure: the consumer
+// reads the first `true`, then a drop+reconnect cycle happens while it is not
+// reading. When it reads again it must observe the NEWEST state (`true`) — a
+// stale `false` would stop the job poller and the worker would then report
+// itself online forever yet never pull another job.
+func TestConnect_BusyConsumer_NewestStateWins(t *testing.T) {
+	// Given: a server that joins successfully; the first alive stream drops
+	// immediately, the second stays up.
+	srv := newTestServer(t)
+	var joins atomic.Int32
+	srv.workersSrv.joinFn = func(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
+		n := joins.Add(1)
+		id := fmt.Sprintf("w-%d", n)
+		return &workers.JoinResponse{WorkerId: id, WorkerToken: "tok-" + id}, nil
+	}
+	var aliveCalls atomic.Int32
+	srv.workersSrv.aliveFn = func(req *workers.AliveRequest, stream workers.WorkersService_AliveServer) error {
+		if aliveCalls.Add(1) == 1 {
+			_ = stream.Send(&workers.AliveResponse{WorkerId: "w-1", Alive: true, LastSeenAt: time.Now().Format(time.RFC3339)})
+			return nil // alive stream ends → the client reconnects
+		}
+		<-stream.Context().Done()
+		return stream.Context().Err()
+	}
+	srv.client.connectBaseDelay = 5 * time.Millisecond
+	srv.client.connectMaxDelay = 20 * time.Millisecond
+	srv.client.reconnectDelay = 5 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	// Production buffer size — one slot, so a newer state can be queued behind
+	// a stale one if the send path is naive.
+	ready := make(chan bool, 1)
+
+	go srv.client.Connect(ctx, ready)
+
+	// Consume the first `true` so the buffer starts empty.
+	if first := receiveReady(t, ready, 2*time.Second); !first {
+		t.Fatal("expected first ready signal to be true")
+	}
+
+	// Simulate a busy consumer: do not read while the drop (false) and the
+	// reconnect (true) happen.
+	time.Sleep(200 * time.Millisecond)
+
+	// Then: the newest state is what the consumer observes.
+	if got := receiveReady(t, ready, 2*time.Second); !got {
+		t.Fatal("consumer observed a stale `false`: the newer `true` was dropped, leaving the worker connected but with no job poller")
+	}
+}
+
 func TestConnect_ContextCancelled_StopsLoop(t *testing.T) {
 	// Given: a server that joins successfully and blocks the alive stream until cancelled
 	srv := newTestServer(t)
