@@ -160,7 +160,7 @@ The worker runs in one of two modes, reported to core-api when it joins:
 	rootCmd.Flags().String("api-key", "", "API key for authentication")
 	viper.BindPFlag("api_key", rootCmd.Flags().Lookup("api-key"))
 
-	rootCmd.Flags().Int("max-concurrency", 10, "Maximum number of concurrent tasks")
+	rootCmd.Flags().Int("max-concurrency", 0, "Maximum number of concurrent jobs; 0 (default) auto-sizes from the CPU/RAM available to the worker")
 	viper.BindPFlag("max_concurrency", rootCmd.Flags().Lookup("max-concurrency"))
 
 	rootCmd.Flags().String("grpc-host", "localhost", "gRPC server host")

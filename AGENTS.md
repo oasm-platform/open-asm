@@ -84,7 +84,7 @@ task migration:run
 task migration:revert
 
 # Docker
-task docker-compose    # build+recreate full stack, --scale oasm-worker=3
+task docker-compose    # build+recreate full stack (single worker instance)
 ```
 
 Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch`, `api:test:cov` exist as package scripts but have **no** task entry — add one instead of calling the script.
@@ -183,11 +183,11 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 
 ## Docker
 
-`task docker-compose` = `docker compose --env-file ./core-api/.env up -d --build --force-recreate --scale oasm-worker=3`.
+`task docker-compose` = `docker compose --env-file ./core-api/.env up -d --build --force-recreate`.
 
-Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api/health`), `oasm-worker` ×3 (socket-mounted, `:26276` published), `postgres` (pg17+pgvector), `redis`, `geo-ip` (`:4360`), `rustfs` (`:9000`/`:9001`), and a one-shot `migration` service that gates `core-api` startup (`service_completed_successfully`).
+Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api/health`), `oasm-worker` (socket-mounted, `:26276` published), `postgres` (pg17+pgvector), `redis`, `geo-ip` (`:4360`), `rustfs` (`:9000`/`:9001`), and a one-shot `migration` service that gates `core-api` startup (`service_completed_successfully`).
 
-The compose service key is `oasm-worker`, **not** `worker` — `--scale worker=3` fails with `no such service: worker: not found`. If you ever scale manually, use `docker compose up -d --scale oasm-worker=N`.
+The compose service key is `oasm-worker`, **not** `worker`. Do not scale that service: it publishes the fixed connector port `26276` that spawned connector containers dial back on, so a second replica fails with `Bind for 0.0.0.0:26276 failed: port is already allocated`. Run one worker per host.
 
 Volumes worth knowing: `pgdata`, `redis-data`, `geoip-data`, `rustfs-data`, `worker-tools-cache` (shared tool cache across workers), `worker-state` (worker join identity). `.open-api` is bind-mounted into `core-api` so the container regenerates the spec the console codegen consumes.
 

@@ -7,6 +7,7 @@ import (
 	"oasm-worker/internal/connector"
 	"oasm-worker/internal/execution"
 	"oasm-worker/internal/runtime"
+	"oasm-worker/internal/sysresources"
 	"oasm-worker/internal/telemetry"
 	"os"
 	"path/filepath"
@@ -24,6 +25,13 @@ var (
 	activeJobsMu sync.RWMutex
 	activeJobs   = make(map[string]struct{})
 )
+
+// connectorResourceHeadroom is the share of the node's CPU/RAM the worker will
+// reserve for connector containers. The rest is left for the worker itself, its
+// legacy (in-process) tool jobs and the OS. Admission then uses each container's
+// declared manifest limit as its request, so a burst of memory-heavy images
+// (e.g. nuclei 4GiB) cannot exhaust RAM.
+const connectorResourceHeadroom = 0.8
 
 func connectInternalNetwork(ctx context.Context, grpcClient *grpcclient.Client, network string, events chan<- TuiEvent) error {
 	log := NewTuiLogger(events, "Network")
@@ -131,14 +139,9 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 
+	// proxy and mgr are initialized after connector server setup but declared
+	// here so the pollLoop closure can capture them by reference.
 	var (
-		stateMu       sync.Mutex
-		sessionCtx    context.Context
-		sessionCancel context.CancelFunc
-		pollerCancel  context.CancelFunc
-
-		// proxy and mgr are initialized after connector server setup but
-		// declared here so the pollLoop closure can capture them by reference.
 		proxy             *connector.Proxy
 		mgr               *execution.Manager
 		telemetryProvider *telemetry.Provider
@@ -147,12 +150,59 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
 	var wg sync.WaitGroup
 
-	pollLoop := func(pollerCtx context.Context) {
-		backoff := time.Second
-		const maxBackoff = 5 * time.Second
+	pollLoop := func(pollerCtx, sessionCtx context.Context) {
+		policy := newPollPolicy()
 		hadJobCh := make(chan bool, 64)
-		timer := time.NewTimer(backoff)
+		timer := time.NewTimer(policy.backoff)
 		defer timer.Stop()
+		resetTimer := func(d time.Duration) {
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(d)
+		}
+
+		// dispatch acquires one free concurrency slot and starts a job pull/run.
+		// Returns false when every slot is busy.
+		dispatch := func() bool {
+			select {
+			case semaphore <- struct{}{}:
+				wg.Add(1)
+				go func(sc context.Context) {
+					defer wg.Done()
+					releaseSem := func() { <-semaphore }
+					hadJob, usedAsync := processJob(sc, grpcClient, getBrowser, toolPath, events, mgr, proxy, releaseSem)
+					if !usedAsync {
+						releaseSem() // Legacy: release at return
+					}
+					// Connector path: semaphore released by completion handler asynchronously.
+					select {
+					case hadJobCh <- hadJob:
+					default:
+					}
+				}(sessionCtx)
+				return true
+			default:
+				return false
+			}
+		}
+
+		// drainFeedback applies every completed poll's result so a burst of
+		// completions is reflected before the next dispatch cycle.
+		drainFeedback := func() {
+			for {
+				select {
+				case hadJob := <-hadJobCh:
+					policy.feedback(hadJob)
+				default:
+					return
+				}
+			}
+		}
+
 		for {
 			select {
 			case <-pollerCtx.Done():
@@ -160,138 +210,79 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			case <-ctx.Done():
 				return
 			case hadJob := <-hadJobCh:
-				if hadJob {
-					backoff = time.Second
-				} else {
-					backoff *= 2
-					if backoff > maxBackoff {
-						backoff = maxBackoff
-					}
+				wasFlowing := policy.flowing()
+				policy.feedback(hadJob)
+				// A job found while idle must trigger a quick refill instead of
+				// waiting out the long backoff already armed on the timer.
+				if !wasFlowing && policy.flowing() {
+					resetTimer(pollRefillDelay)
 				}
 			case <-timer.C:
-				// Apply any pending feedback before choosing next interval
-				select {
-				case hadJob := <-hadJobCh:
-					if hadJob {
-						backoff = time.Second
-					} else {
-						backoff *= 2
-						if backoff > maxBackoff {
-							backoff = maxBackoff
-						}
-					}
-				default:
-				}
-				stateMu.Lock()
-				cur := sessionCtx
-				stateMu.Unlock()
-				if cur == nil || cur.Err() != nil {
-					backoff *= 2
-					if backoff > maxBackoff {
-						backoff = maxBackoff
-					}
-					timer.Reset(backoff)
+				drainFeedback()
+				if sessionCtx == nil || sessionCtx.Err() != nil {
+					resetTimer(pollMaxBackoff)
 					continue
 				}
-				select {
-				case semaphore <- struct{}{}:
-					wg.Add(1)
-					go func(sc context.Context) {
-						defer wg.Done()
-						releaseSem := func() { <-semaphore }
-						hadJob, usedAsync := processJob(sc, grpcClient, getBrowser, toolPath, events, mgr, proxy, releaseSem)
-						if !usedAsync {
-							releaseSem() // Legacy: release at return
-						}
-						// Connector path: semaphore released by completion handler asynchronously.
-						select {
-						case hadJobCh <- hadJob:
-						default:
-						}
-					}(cur)
-					timer.Reset(backoff)
-				default:
-					timer.Reset(500 * time.Millisecond)
+				// Fill EVERY free slot, not one job per backoff tick: the old
+				// cadence left most of the configured concurrency idle while
+				// jobs sat pending in the registry.
+				dispatched := 0
+				for dispatched < policy.maxDispatch(cfg.MaxConcurrency) && dispatch() {
+					dispatched++
 				}
+				resetTimer(policy.nextDelay(dispatched))
 			}
 		}
 	}
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				stateMu.Lock()
-				if sessionCancel != nil {
+	// The connection→poller lifecycle lives in runReadyConsumer so its state
+	// machine is unit-testable: a duplicate or coalesced ready notification must
+	// never leave the worker connected without a job poller.
+	go runReadyConsumer(ctx, ready, readyDeps{
+		setup: func(parent context.Context) (context.Context, context.CancelFunc) {
+			sessionCtx, sessionCancel := context.WithCancel(parent)
+
+			if cfg.Network != "" {
+				if err := connectInternalNetwork(sessionCtx, grpcClient, cfg.Network, events); err != nil {
+					log.ErrorE("Failed to connect internal network", err)
 					sessionCancel()
+					return nil, nil
 				}
-				stateMu.Unlock()
-				return
-			case isConnected, ok := <-ready:
-				if !ok {
-					return
-				}
-
-				stateMu.Lock()
-				if sessionCancel != nil {
-					sessionCancel()
-				}
-
-				if isConnected {
-					log.Success("Worker connected/reconnected")
-					sessionCtx, sessionCancel = context.WithCancel(ctx)
-
-					Emit(events, TuiEvent{
-						Type:     EventConnected,
-						WorkerID: grpcClient.WorkerID(),
-						Host:     cfg.GrpcHost,
-						Port:     cfg.GrpcPort,
-					})
-
-					if cfg.Network != "" {
-						if err := connectInternalNetwork(sessionCtx, grpcClient, cfg.Network, events); err != nil {
-							log.ErrorE("Failed to connect internal network", err)
-							stateMu.Unlock()
-							continue
-						}
-						log.Success("Connected to internal network: %s", cfg.Network)
-					}
-
-					if err := grpcClient.DownloadTools(sessionCtx); err != nil {
-						log.ErrorE("Download tools failed", err)
-						stateMu.Unlock()
-						continue
-					}
-
-					go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events)
-
-					if pollerCancel != nil {
-						// Dedup: reconnect may emit ready=true without intervening disconnect.
-						log.Warning("Poller already running, skipping duplicate start")
-					} else {
-						var pollerCtx context.Context
-						pollerCtx, pollerCancel = context.WithCancel(sessionCtx)
-						go pollLoop(pollerCtx)
-						log.Success("Job poller started (concurrency: %d)", cfg.MaxConcurrency)
-					}
-				} else {
-					log.Warning("Disconnected from core, suspending...")
-					if pollerCancel != nil {
-						pollerCancel()
-						pollerCancel = nil
-					}
-					sessionCtx = nil
-					sessionCancel = nil
-
-					Emit(events, TuiEvent{
-						Type:             EventDisconnected,
-						DisconnectReason: "Connection lost",
-					})
-				}
-				stateMu.Unlock()
+				log.Success("Connected to internal network: %s", cfg.Network)
 			}
-		}
-	}()
+
+			if err := grpcClient.DownloadTools(sessionCtx); err != nil {
+				log.ErrorE("Download tools failed", err)
+				sessionCancel()
+				return nil, nil
+			}
+
+			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events)
+			return sessionCtx, sessionCancel
+		},
+		startPoller: func(sessionCtx context.Context) context.CancelFunc {
+			pollerCtx, pollerCancel := context.WithCancel(sessionCtx)
+			go pollLoop(pollerCtx, sessionCtx)
+			log.Success("Job poller started (concurrency: %d)", cfg.MaxConcurrency)
+			return pollerCancel
+		},
+		onConnected: func() {
+			log.Success("Worker connected/reconnected")
+			Emit(events, TuiEvent{
+				Type:     EventConnected,
+				WorkerID: grpcClient.WorkerID(),
+				Host:     cfg.GrpcHost,
+				Port:     cfg.GrpcPort,
+			})
+		},
+		onDisconnected: func() {
+			log.Warning("Disconnected from core, suspending...")
+			Emit(events, TuiEvent{
+				Type:             EventDisconnected,
+				DisconnectReason: "Connection lost",
+			})
+		},
+	})
 
 	// Connector machinery (gRPC server + Docker runtime) only for node mode.
 	// CLI workers may not have Docker installed — they run built-in tools only.
@@ -368,6 +359,15 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 						cfg.MaxReplicasPerImage,
 						cfg.MaxJobsPerContainer,
 					)
+					// Admission is resource-based, not a fixed container count:
+					// reserve a headroom-adjusted share of the node's CPU/RAM
+					// and let each container's declared limit decide whether
+					// another one still fits.
+					cpus, memoryBytes := sysresources.Detect()
+					pool.SetResourceBudget(
+						int(float64(cpus)*1000*connectorResourceHeadroom),
+						int(float64(memoryBytes)*connectorResourceHeadroom),
+					)
 					mgrInit.SetPool(pool)
 					// Proxy routing: BindExec/ReleaseExec map executions to
 					// pooled containers; RemoveContainer drops swept/dead ones.
@@ -406,11 +406,12 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	telemetryProvider, err = telemetry.NewProvider(
 		telemetryManager,
 		connectorState,
-		func() int {
-			activeJobsMu.RLock()
-			defer activeJobsMu.RUnlock()
-			return len(activeJobs)
-		},
+		// In-flight jobs = concurrency-gate usage. A semaphore slot is taken the
+		// moment a job is pulled and released only when it is finalized, so this
+		// matches the registry's IN_PROGRESS jobs shown by the job graph / list.
+		// The activeJobs map under-counts jobs queued behind the per-image pool,
+		// which made the worker telemetry box disagree with the job graph.
+		func() int { return len(semaphore) },
 		cfg.MaxConcurrency,
 		cfg.Mode,
 		"dev",
@@ -438,9 +439,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		for {
 			select {
 			case <-ticker.C:
-				activeJobsMu.RLock()
-				running := len(activeJobs)
-				activeJobsMu.RUnlock()
+				running := len(semaphore)
 
 				if running != lastLogged {
 					lastLogged = running
@@ -459,20 +458,12 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 	<-ctx.Done()
 	log.Info("Signal received, stopping...")
-
-	if pollerCancel != nil {
-		pollerCancel()
-	}
+	// runReadyConsumer stops the poller and cancels the session when this ctx is
+	// done, so no explicit cancel is needed here; in-flight jobs drain below.
 	log.Info("Poller stopped, waiting for jobs...")
 
 	wg.Wait()
 	log.Info("All jobs finished")
-
-	stateMu.Lock()
-	if sessionCancel != nil {
-		sessionCancel()
-	}
-	stateMu.Unlock()
 
 	if lazyBrowser != nil {
 		if err := lazyBrowser.Close(); err != nil {
