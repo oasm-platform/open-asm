@@ -1,4 +1,7 @@
-FROM node:26-alpine AS base
+# Build stages run on the native build platform (QEMU-free). The console build
+# emits static assets, so pnpm/vite must not execute under arm64 emulation where
+# QEMU aborts with SIGILL. Only the final nginx stage targets the requested arch.
+FROM --platform=$BUILDPLATFORM node:26-alpine AS base
 RUN apk add --no-cache curl bash
 RUN npm install -g corepack && corepack enable && corepack prepare pnpm@10.33.2 --activate
 ENV PNPM_HOME=/root/.local/share/pnpm
