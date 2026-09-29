@@ -35,6 +35,23 @@ var (
 	bridge   = make(map[string]*bridgeEntry) // executionID → entry
 )
 
+// findExecutionByJob resolves the execution currently running a job.
+//
+// core-api correlates a cancellation by jobId — it owns no execution id — so the
+// mapping lives here, in the bridge map, which every in-flight execution is
+// registered in. Connector (container) jobs only: a legacy in-process job has no
+// bridge entry, so cancelling one is a no-op and it ends on its own.
+func findExecutionByJob(jobID string) (string, bool) {
+	bridgeMu.Lock()
+	defer bridgeMu.Unlock()
+	for execID, entry := range bridge {
+		if entry != nil && entry.jobID == jobID {
+			return execID, true
+		}
+	}
+	return "", false
+}
+
 // imageBackoff gates container starts per image. Failures (submit error,
 // early exit, connect timeout) push the next allowed start out exponentially
 // (min(30s*2^fails, 10m)); success resets the counter. In-memory only — a

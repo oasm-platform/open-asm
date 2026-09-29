@@ -52,6 +52,12 @@ type Client struct {
 	telemetryBaseDelay   time.Duration // default 1s
 	telemetryMaxDelay    time.Duration // default 30s
 	telemetryCallTimeout time.Duration // default 3s
+
+	// streamCancel handles a job cancellation pushed by core-api over the
+	// bidirectional stream. Set once at startup (before Connect); nil means the
+	// stream is still opened but cancels are ignored.
+	streamCancelMu sync.RWMutex
+	streamCancel   StreamCancelFunc
 }
 
 // NewClient validates the required configuration and creates a lazily-dialing
@@ -157,6 +163,21 @@ func (c *Client) workersClient() workerPb.WorkersServiceClient { return c.worker
 
 // jobsClient returns the JobsRegistryService stub.
 func (c *Client) jobsClient() jobRegistryPb.JobsRegistryServiceClient { return c.jobs }
+
+// SetStreamCancelHandler registers the callback invoked when core-api asks this
+// worker to stop a job over the bidirectional stream. Must be called before
+// Connect; passing nil disables cancel handling.
+func (c *Client) SetStreamCancelHandler(fn StreamCancelFunc) {
+	c.streamCancelMu.Lock()
+	defer c.streamCancelMu.Unlock()
+	c.streamCancel = fn
+}
+
+func (c *Client) streamCancelHandler() StreamCancelFunc {
+	c.streamCancelMu.RLock()
+	defer c.streamCancelMu.RUnlock()
+	return c.streamCancel
+}
 
 // SetRunMode stores the worker run mode ("cli", "node", or "") which is
 // sent in metadata during Join. Must be called before Connect.

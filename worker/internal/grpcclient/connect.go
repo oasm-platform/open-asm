@@ -39,6 +39,12 @@ func (c *Client) Connect(ctx context.Context, ready chan bool) {
 
 		telemetryCtx, stopTelemetry := context.WithCancel(ctx)
 		telemetryDone := c.startTelemetry(telemetryCtx)
+
+		// Additive: a bidirectional stream that carries job cancels. It is owned
+		// by its own goroutine so a stream failure never disturbs the
+		// Join/Alive lifecycle that gates the ready state and the poller.
+		go c.runWorkerStream(ctx)
+
 		err = c.Alive(ctx)
 		stopTelemetry()
 		<-telemetryDone

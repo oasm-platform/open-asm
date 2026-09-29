@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package worker_stream;
+
+option go_package = "./worker_stream";
+
+// Stage 1 scope: a single bidirectional connection used to (a) establish the
+// worker identity, (b) carry liveness, and (c) push job cancellations from
+// core-api to a running worker. Results and telemetry deliberately stay on
+// their existing unary RPCs.
+//
+// This message set is intentionally free of imports from jobs_registry.proto /
+// workers.proto: keeping it self-contained means `task proto` needs no
+// cross-proto M-mapping and the generated Go package has no cross-package
+// dependency.
+service WorkerStreamService {
+  rpc Connect(stream WorkerToCore) returns (stream CoreToWorker);
+}
+
+// --- worker -> core ---
+message WorkerToCore {
+  oneof payload {
+    RegisterRequest register = 1;
+    Heartbeat heartbeat = 2;
+  }
+}
+
+// --- core -> worker ---
+message CoreToWorker {
+  oneof payload {
+    RegisterResponse register_resp = 1;
+    HeartbeatAck heartbeat_ack = 2;
+    CancelRequest cancel = 3;
+  }
+}
+
+// Register is the first frame on every connect. It carries the same identity
+// material as JobsRegistryService/Join: an API key (+ optional signature) for
+// a first-ever connect, or a persisted worker token to rejoin the same
+// identity.
+message RegisterRequest {
+  string api_key = 1;
+  string signature = 2;
+  optional string token = 3;
+  optional WorkerMetadata metadata = 4;
+  optional string version = 5;
+}
+
+enum WorkerRunMode {
+  WORKER_RUN_MODE_UNKNOWN = 0;
+  WORKER_RUN_MODE_CLI = 1;
+  WORKER_RUN_MODE_NODE = 2;
+}
+
+message WorkerMetadata {
+  optional string name = 1;
+  optional string os = 2;
+  optional string arch = 3;
+  optional WorkerRunMode mode = 4;
+}
+
+message Heartbeat {
+  string worker_id = 1;
+  uint64 sequence = 2;
+  int64 at_ms = 3;
+}
+
+// --- responses ---
+message RegisterResponse {
+  string worker_id = 1;
+  string worker_token = 2;
+  bool accepted = 3;
+  string reason = 4;
+  // Server-driven liveness cadence. 0 means "use the client default".
+  uint32 heartbeat_interval_ms = 5;
+}
+
+message HeartbeatAck {
+  string worker_id = 1;
+  int64 server_time_ms = 2;
+}
+
+// Cancel stops a running execution. It is keyed by job_id — not execution_id —
+// because that is the only correlation core-api owns (the Job entity has no
+// execution column); the worker resolves job_id -> execution id itself.
+message CancelRequest {
+  string job_id = 1;
+  string reason = 2;
+  optional string cancelled_by = 3;
+}

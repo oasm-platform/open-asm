@@ -124,10 +124,11 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
-      package: ['workers', 'jobs_registry'],
+      package: ['workers', 'jobs_registry', 'worker_stream'],
       protoPath: [
         join(__dirname, 'proto/workers.proto'),
         join(__dirname, 'proto/jobs_registry.proto'),
+        join(__dirname, 'proto/worker_stream.proto'),
       ],
       url: `0.0.0.0:${grpcPort}`,
       loader: {

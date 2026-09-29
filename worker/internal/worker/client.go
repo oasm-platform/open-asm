@@ -426,6 +426,36 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		grpcClient.SetTelemetryProvider(telemetryProvider)
 	}
 
+	// Job cancellation pushed by core-api over the bidirectional worker stream.
+	// Mirrors the internal teardown paths (health failure / connect timeout):
+	// the execution is cancelled (stops + removes the container) and the drain
+	// is unwound, which is what releases the concurrency slot and finalizes the
+	// job. The concurrency slot is deliberately NOT released here — the drain owns
+	// it, so releasing twice would corrupt the semaphore.
+	grpcClient.SetStreamCancelHandler(func(jobID, reason string) {
+		execID, running := findExecutionByJob(jobID)
+		if !running {
+			// Already finished, or it is a legacy in-process job with no
+			// container to stop. Either way there is nothing to do.
+			log.Info("cancel for job %s: no running container execution (reason=%s)", jobID, reason)
+			return
+		}
+		log.Info("cancelling job %s on core request (reason=%s) exec=%s", jobID, reason, execID)
+		if mgr != nil {
+			cleanupCtx, cancelCleanup := newDetachedCleanupContext()
+			if err := mgr.Cancel(cleanupCtx, execID); err != nil {
+				log.ErrorE(fmt.Sprintf("[%s] Failed to cancel execution %s", jobID, execID), err)
+			}
+			cancelCleanup()
+		}
+		if proxy != nil {
+			// Report the real reason instead of the generic "disconnected before
+			// Done" the drain would otherwise finalise the job with.
+			proxy.SetError(execID, fmt.Sprintf("cancelled: %s", reason))
+			proxy.OnConnectorDown(execID)
+		}
+	})
+
 	// Connect AFTER node-mode setup: the startup orphan reconcile above must
 	// finish before this process can receive jobs (and thus create
 	// containers), so a fresh container can never be misclassified as a
