@@ -1200,6 +1200,51 @@ describe('DataAdapterService', () => {
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
+    it('chunks the bulk insert to stay under the Postgres 65535-parameter limit', async () => {
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      // 1201 distinct findings → 1201 distinct fingerprints (the name drives
+      // the fingerprint). A single INSERT would declare ~1201 × N columns of
+      // parameters and overflow Postgres' 65535 cap, so the service must split
+      // it across several statements.
+      const many = Array.from(
+        { length: 1201 },
+        (_, i) =>
+          ({ name: `Vuln ${i}`, severity: Severity.HIGH }) as unknown as Vulnerability,
+      );
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ raw: [], identifiers: [] }),
+      };
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.vulnerabilities({ data: many, job: mockJob });
+
+      const chunkSizes = mockQueryBuilder.values.mock.calls.map(
+        (call) => (call[0] as unknown[]).length,
+      );
+      expect(chunkSizes.length).toBeGreaterThan(1);
+      expect(Math.max(...chunkSizes)).toBeLessThanOrEqual(500);
+      expect(chunkSizes.reduce((sum, n) => sum + n, 0)).toBe(1201);
+    });
+
     it('should preserve stored enrichment fields the incoming finding omits', async () => {
       mockDataSource.transaction.mockImplementation(
         async (callback: (manager: any) => Promise<any>) => {

@@ -114,6 +114,16 @@ const RESCAN_PRESERVE_COLUMNS = RESCAN_OVERWRITE_COLUMNS.filter(
   (column) => column !== 'updatedAt' && column !== 'lastSeenDate',
 );
 
+/**
+ * Rows per INSERT statement for the vulnerability upsert. Postgres' extended
+ * query protocol caps a prepared statement at 65535 parameters; a row here is
+ * ~45 columns, so a bulk insert of a couple thousand findings overflows the
+ * cap and the whole batch is rejected by the driver ("bind message has N
+ * parameter formats but 0 parameters"). 500 rows ≈ 22.5k parameters keeps a
+ * comfortable margin under the cap while limiting round-trips.
+ */
+export const VULNERABILITY_INSERT_CHUNK_SIZE = 500;
+
 @Injectable()
 export class DataAdapterService {
   private readonly logger = new Logger(DataAdapterService.name);
@@ -537,19 +547,31 @@ export class DataAdapterService {
         existingByFingerprint.keys(),
       );
 
-      const result = await manager
-        .createQueryBuilder()
-        .insert()
-        .into(Vulnerability)
-        .values(uniqueValues)
-        .orUpdate({
-          conflict_target: ['fingerprint'],
-          overwrite: [...RESCAN_OVERWRITE_COLUMNS],
-        })
-        .returning('*')
-        .execute();
-
-      const insertedVulnerabilities = result.raw as Vulnerability[];
+      // Chunk the upsert so no single statement exceeds Postgres' 65535
+      // parameter ceiling — see VULNERABILITY_INSERT_CHUNK_SIZE.
+      const insertedVulnerabilities: Vulnerability[] = [];
+      for (
+        let offset = 0;
+        offset < uniqueValues.length;
+        offset += VULNERABILITY_INSERT_CHUNK_SIZE
+      ) {
+        const chunk = uniqueValues.slice(
+          offset,
+          offset + VULNERABILITY_INSERT_CHUNK_SIZE,
+        );
+        const result = await manager
+          .createQueryBuilder()
+          .insert()
+          .into(Vulnerability)
+          .values(chunk)
+          .orUpdate({
+            conflict_target: ['fingerprint'],
+            overwrite: [...RESCAN_OVERWRITE_COLUMNS],
+          })
+          .returning('*')
+          .execute();
+        insertedVulnerabilities.push(...(result.raw as Vulnerability[]));
+      }
 
       // Only send notifications for truly new vulnerabilities,
       // not for existing ones that were just updated
