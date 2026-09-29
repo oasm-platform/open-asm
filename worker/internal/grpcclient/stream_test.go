@@ -20,10 +20,10 @@ import (
 type fakeWorkerStreamServer struct {
 	stream.UnimplementedWorkerStreamServiceServer
 
-	accept         bool
-	cancelJobID    string
+	accept          bool
+	cancelJobID     string
 	sendEmptyCancel bool
-	registered     chan struct{}
+	registered      chan struct{}
 }
 
 func (f *fakeWorkerStreamServer) Connect(
