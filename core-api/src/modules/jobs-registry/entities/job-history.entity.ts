@@ -21,8 +21,12 @@ export class JobHistory extends BaseEntity {
   })
   ports?: Relation<Port[]>;
 
+  // Vulnerabilities are anchored to the tool that found them (and the asset),
+  // not to the run that produced them. Deleting a job history (which cascades
+  // from a workflow/asset-group delete) must not delete findings, so the FK
+  // drops the provenance link instead of the row.
   @OneToMany(() => Vulnerability, (vulnerability) => vulnerability.jobHistory, {
-    onDelete: 'CASCADE',
+    onDelete: 'SET NULL',
   })
   vulnerabilities?: Relation<Vulnerability[]>;
 
