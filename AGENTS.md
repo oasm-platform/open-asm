@@ -38,7 +38,7 @@ Root `taskfile.yml` `includes` three sub-taskfiles (`core-api/`, `console/`, `wo
 
 ```bash
 # Full project
-task init              # pnpm install + go mod tidy + copy example.env + start postgres/redis
+task init              # pnpm install + go mod tidy + copy example.env + start postgres/redis/geo-ip/rustfs
 task dev               # api:dev + console:dev (NODE_ENV=development)
 task prod              # api:prod (NODE_ENV=production)
 task build             # api + console + worker (worker cross-compiles cli + app)
@@ -109,7 +109,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 
 ## Local Dev Setup
 
-1. `task init` — enables pnpm via corepack, copies `core-api/example.env` → `.env` and `console/example.env` → `.env` (only when missing), runs `pnpm install` + `task worker:install` (`go mod tidy`), and starts `postgres` + `redis` via compose.
+1. `task init` — enables pnpm via corepack, copies `core-api/example.env` → `.env` and `console/example.env` → `.env` (only when missing), runs `pnpm install` + `task worker:install` (`go mod tidy`), and starts `postgres` + `redis` + `geo-ip` + `rustfs` via compose.
 2. `worker/.env` must be created by hand from `worker/.example.env` (`task init` does not copy it) — `WORKER_API_KEY` must match the key core-api expects.
 3. `task dev` → API `:6276` (gRPC `:16276`, Swagger/Scalar at `/api/docs`), console `:5173`.
 4. `task worker:dev` for a local worker. Worker **tools are not installed by any task** — the worker pulls them at runtime: `DownloadTools` (`worker/internal/grpcclient/tools.go`) calls the core-api `BuiltinToolRegistry` gRPC, downloads/extracts the archives into `WORKER_TOOL_PATH` (default `oasm-tools`; Docker backs it with the shared `worker-tools-cache` volume), and caches versions in `.tool_versions.json` there. So the first worker boot needs core-api **and** its storage reachable. There is no `task worker:tools` — that task does not exist, and `worker/scripts/install.{sh,ps1}` are release-binary installers for end users, not tool installers.

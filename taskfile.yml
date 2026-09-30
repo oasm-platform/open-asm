@@ -99,6 +99,7 @@ tasks:
   # Project initialization
   # Sets up environment files and initializes the development environment
   # Enables pnpm via corepack, copies example env files, starts required infrastructure services
+  # Infrastructure: postgres (db), redis, geo-ip (ip), rustfs (storage)
   init:
     cmds:
       - |
@@ -111,7 +112,7 @@ tasks:
         pnpm --version > /dev/null 2>&1 ||
           corepack prepare pnpm@latest --activate 2>/dev/null || true
       - node -e "const fs=require('fs'); ['core-api','console'].forEach(d=>{const s=d+'/example.env',t=d+'/.env';if(!fs.existsSync(t))fs.copyFileSync(s,t)})"
-      - docker compose up -d postgres redis --force-recreate
+      - docker compose up -d postgres redis geo-ip rustfs --force-recreate
     deps:
       - install
 
@@ -160,3 +161,32 @@ tasks:
   sync-connectors:
     cmds:
       - node scripts/sync-tool-manifest.mjs
+
+  # Cut a release: validate, run the checks, tag, push — CI does the rest
+  #
+  #   task release -- v0.9.0            # the `--` is required, see below
+  #   task release VERSION=v0.9.0
+  #   task release -- v0.9.0 --dry-run
+  #   task release -- v0.9.0 --skip-checks
+  #   task release VERSION=v0.9.0 MESSAGE="Release v0.9.0" SKIP_CHECKS=1
+  #
+  # go-task reads a bare `task release v0.9.0` as a request for a task named
+  # `v0.9.0` and fails, so the separator (or the VERSION= form) is mandatory.
+  # Both are forwarded to scripts/release.mjs, which also accepts the env vars.
+  #
+  # Everything downstream keys off the tag: build-release.yml triggers on
+  # `push: tags: ['v*']`, so pushing the tag is what produces the binaries, the
+  # images and the draft release. The draft is published by hand afterwards —
+  # the workflow deliberately does not publish it.
+  release:
+    desc: Tag a release and push it, kicking off build-release.yml
+    preconditions:
+      - sh: test -n "{{.VERSION}}{{.CLI_ARGS}}"
+        msg: 'Version is required: task release -- v0.9.0'
+    env:
+      RELEASE_MESSAGE: '{{.MESSAGE}}'
+      RELEASE_DRY_RUN: '{{.DRY_RUN}}'
+      RELEASE_SKIP_CHECKS: '{{.SKIP_CHECKS}}'
+      RELEASE_BRANCH: '{{.BRANCH}}'
+    cmds:
+      - node scripts/release.mjs {{.VERSION}} {{.CLI_ARGS}}

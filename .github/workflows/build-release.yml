@@ -18,8 +18,13 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Keyed on the release target, not the ref. A dispatch resolves github.ref to
+  # the branch it was launched from, so every manual release off main shared one
+  # group and a second dispatch cancelled the first mid-publish. Serialise on
+  # the tag and queue instead of cancelling: a half-published release is worse
+  # than a slow one.
+  group: ${{ github.workflow }}-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.toTag || github.ref }}
+  cancel-in-progress: false
 
 env:
   IMAGE_NAME: oasm/oasm
@@ -68,6 +73,32 @@ jobs:
 
           ls -la dist/
 
+      # The body is generated here and passed to the action, rather than left to
+      # `generate_release_notes`. softprops' own notes generation resolves to a
+      # merge, not a replace: on the update path it falls back to the existing
+      # release body (github.ts:688-695) and then appends the freshly generated
+      # notes to it (github.ts:242-243) — so re-running this workflow for a tag
+      # that already has a draft doubled the notes. An explicit `body_path` is
+      # overwritten verbatim on every run, which makes the step idempotent.
+      # https://github.com/softprops/action-gh-release/issues/827
+      #
+      # scripts/release.mjs renders the same markdown the annotated tag carries
+      # locally, so the release page and `git show <tag>` can never disagree and
+      # there is no third-party action between a commit and its release note.
+      # `--to` matters: the tag that triggered this run is already in the
+      # checkout, so the range has to be anchored to the tag strictly before it.
+      - name: Generate release notes
+        env:
+          TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.toTag }}
+          FROM: ${{ inputs.fromTag }}
+        run: |
+          set -euo pipefail
+          args=(--notes-only --to "$TAG" --notes-file release-notes.md)
+          [ -n "$FROM" ] && args+=(--from "$FROM")
+          node scripts/release.mjs "${args[@]}"
+          echo "---"
+          cat release-notes.md
+
       - name: Upload to Release
         uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.toTag != '')
@@ -75,8 +106,7 @@ jobs:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.toTag }}
           files: |
             worker/dist/*
-          previous_tag: ${{ inputs.fromTag || '' }}
-          generate_release_notes: true
+          body_path: release-notes.md
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
