@@ -407,6 +407,35 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Appends an entry to a stream and returns its generated id.
+   *
+   * Uses `client`, not `subscriber`: a connection in subscriber mode rejects
+   * every command except (P)SUBSCRIBE, and XADD is a write. That constraint is
+   * the reason this service keeps a dedicated subscriber connection at all.
+   *
+   * `*` lets Redis assign the id, which is what orders the entry and lets a
+   * consumer group acknowledge it by id.
+   *
+   * @param stream - Redis stream key
+   * @param fields - Flat field→value map; every value must be a string
+   * @returns The stream entry id
+   */
+  public async xadd(
+    stream: string,
+    fields: Record<string, string>,
+  ): Promise<string> {
+    const pairs: string[] = [];
+    for (const [field, value] of Object.entries(fields)) {
+      pairs.push(field, value);
+    }
+    const id = await this.client.xadd(stream, '*', ...pairs);
+    if (id === null) {
+      throw new Error(`XADD to ${stream} returned no entry id`);
+    }
+    return id;
+  }
+
+  /**
    * Delete key from Redis
    *
    * @param key - Redis key name

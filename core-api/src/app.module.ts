@@ -19,6 +19,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { StorageModule } from './modules/storage/storage.module';
 import { McpServerModule } from './mcp/mcp.module';
 import { ServicesModule } from './services/services.module';
+import { EventBridgeModule } from './modules/event-bridge/event-bridge.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { ServicesModule } from './services/services.module';
     }),
     DatabaseModule,
     AuditModule,
+    EventBridgeModule,
     CombineModule,
     NotificationsModule,
     StorageModule,
