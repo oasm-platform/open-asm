@@ -3,6 +3,7 @@ import {
   buildWorkflowGraph,
   filterGraphByAssetsDiscovery,
   jobEntries,
+  normalizeWorkflowContent,
   planAdvance,
   reconcileStepStates,
   validateWorkflowGraph,
@@ -222,6 +223,69 @@ describe('buildWorkflowGraph', () => {
   it('treats an empty workflow as an empty graph', () => {
     expect(buildWorkflowGraph(content({})).steps).toEqual([]);
     expect(buildWorkflowGraph(undefined).steps).toEqual([]);
+  });
+});
+
+describe('normalizeWorkflowContent', () => {
+  it('converts a legacy array into a map keyed by the old names', () => {
+    const normalized = normalizeWorkflowContent({
+      name: 'legacy',
+      on: { target: [] },
+      jobs: [
+        { name: 'Scan Subdomain', run: 'subfinder' },
+        { name: 'Port Scan', run: 'naabu', needs: ['Scan Subdomain'] },
+      ],
+    });
+
+    expect(normalized.jobs).toEqual({
+      'Scan Subdomain': { run: 'subfinder' },
+      'Port Scan': { run: 'naabu', needs: ['Scan Subdomain'] },
+    });
+    // The rest of the content is untouched.
+    expect(normalized.name).toBe('legacy');
+  });
+
+  it('keeps the map form stable and drops a display name equal to the id', () => {
+    const normalized = normalizeWorkflowContent({
+      jobs: {
+        scan: { name: 'Scan Subdomain', run: 'subfinder' },
+        same: { name: 'same', run: 'naabu' },
+      },
+    });
+
+    expect(normalized.jobs).toEqual({
+      scan: { name: 'Scan Subdomain', run: 'subfinder' },
+      same: { run: 'naabu' },
+    });
+  });
+
+  it('normalizes a bare-string need and preserves config + profile', () => {
+    const normalized = normalizeWorkflowContent({
+      jobs: {
+        a: { run: 'naabu' },
+        b: {
+          run: 'httpx',
+          needs: 'a',
+          config: { retries: 2 },
+          configProfileId: 'profile-1',
+        },
+      },
+    });
+
+    expect(normalized.jobs.b).toEqual({
+      run: 'httpx',
+      needs: ['a'],
+      config: { retries: 2 },
+      configProfileId: 'profile-1',
+    });
+  });
+
+  it('throws on invalid content so callers can reject the write', () => {
+    expect(() =>
+      normalizeWorkflowContent({
+        jobs: { a: { run: 'naabu', needs: ['ghost'] } },
+      }),
+    ).toThrow(WorkflowGraphError);
   });
 });
 

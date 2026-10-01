@@ -6,7 +6,10 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 import { Workflow } from './entities/workflow.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
-import { validateWorkflowGraph } from './workflow-graph';
+import {
+  normalizeWorkflowContent,
+  WorkflowGraphError,
+} from './workflow-graph';
 
 
 @Injectable()
@@ -48,14 +51,18 @@ export class WorkflowTemplateService implements OnModuleInit {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           const parsed = yaml.load(fileContent) as Record<string, unknown>;
 
-          const newContent = this.normalizeOn(parsed);
-
-          const graphErrors = validateWorkflowGraph(
-            newContent,
-          );
-          if (graphErrors.length > 0) {
+          // Canonicalize + validate: the stored content is always the jobs map
+          // (a hand-written array template is converted, not rejected).
+          let newContent: Record<string, unknown>;
+          try {
+            newContent = normalizeWorkflowContent(this.normalizeOn(parsed));
+          } catch (error) {
+            const errors =
+              error instanceof WorkflowGraphError
+                ? error.errors
+                : [error instanceof Error ? error.message : String(error)];
             this.logger.error(
-              `Skipping workflow template ${fileName}: ${graphErrors.join('; ')}`,
+              `Skipping workflow template ${fileName}: ${errors.join('; ')}`,
             );
             continue;
           }

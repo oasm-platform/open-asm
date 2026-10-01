@@ -7,7 +7,10 @@ import { User } from '../auth/entities/user.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { GetManyWorkflowsQueryDto } from './dto/get-many-workflows.dto';
-import { validateWorkflowGraph } from './workflow-graph';
+import {
+  normalizeWorkflowContent,
+  WorkflowGraphError,
+} from './workflow-graph';
 
 const ALLOWED_WORKFLOW_SORT_FIELDS = ['createdAt', 'updatedAt', 'name'] as const;
 
@@ -33,11 +36,10 @@ export class WorkflowsService {
     workspace: { id: string },
   ): Promise<Workflow> {
     const { name, content, filePath } = createWorkflowDto;
-    this.assertValidContent(content);
 
     const workflow = new Workflow();
     workflow.name = name;
-    workflow.content = content;
+    workflow.content = this.normalizeContent(content);
     workflow.filePath =
       filePath || `${name.toLowerCase().replace(/\s+/g, '-')}.yaml`;
     workflow.createdBy = { id: createdBy.id } as User;
@@ -87,25 +89,33 @@ export class WorkflowsService {
   ): Promise<Workflow> {
     const workflow = await this.getWorkspaceWorkflow(id, workspace);
 
-    if (updateData.content) this.assertValidContent(updateData.content);
     if (updateData.name) workflow.name = updateData.name;
-    if (updateData.content) workflow.content = updateData.content;
+    if (updateData.content) {
+      workflow.content = this.normalizeContent(updateData.content);
+    }
     if (updateData.filePath) workflow.filePath = updateData.filePath;
 
     return await this.workflowRepository.save(workflow);
   }
 
   /**
-   * Rejects content that is not a valid step graph (unknown `needs` reference,
-   * duplicate step name or tool, self-dependency or a cycle) with a 400 instead
-   * of letting the run stall later.
+   * Validates the step graph and returns it in its canonical stored shape
+   * (`jobs` as a map keyed by job id). A legacy array is converted instead of
+   * being rejected, so old clients keep working while the database converges on
+   * one shape.
+   *
+   * @throws BadRequestException when the content is not a valid graph.
    */
-  private assertValidContent(content: WorkflowContent | undefined): void {
-    const errors = validateWorkflowGraph(content);
-    if (errors.length > 0) {
-      throw new BadRequestException(
-        `Invalid workflow content: ${errors.join('; ')}`,
-      );
+  private normalizeContent(content: WorkflowContent): WorkflowContent {
+    try {
+      return normalizeWorkflowContent(content);
+    } catch (error) {
+      if (error instanceof WorkflowGraphError) {
+        throw new BadRequestException(
+          `Invalid workflow content: ${error.errors.join('; ')}`,
+        );
+      }
+      throw error;
     }
   }
 

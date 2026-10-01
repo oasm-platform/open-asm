@@ -307,6 +307,37 @@ export function validateWorkflowGraph(content: {
 }
 
 /**
+ * Canonicalizes workflow content: `jobs` becomes a map keyed by job id, with
+ * `needs` normalized to a deduplicated list of ids. Applied on every write so
+ * the stored shape is always the DAG form, whatever the client sent — a legacy
+ * array is converted, taking each id from the old display name so existing runs
+ * and `needs` keep resolving.
+ *
+ * @throws WorkflowGraphError when the content is not a valid graph.
+ */
+export function normalizeWorkflowContent<T extends { jobs?: WorkflowJobsInput }>(
+  content: T,
+): T {
+  const graph = buildWorkflowGraph(content);
+  const jobs: Record<string, WorkflowStepDefinition> = {};
+
+  for (const step of graph.steps) {
+    jobs[step.id] = {
+      // The id is the identity; a name is only worth storing when it differs.
+      ...(step.name !== step.id ? { name: step.name } : {}),
+      run: step.run,
+      ...(step.needs.length > 0 ? { needs: step.needs } : {}),
+      ...(step.config !== undefined ? { config: step.config } : {}),
+      ...(step.configProfileId
+        ? { configProfileId: step.configProfileId }
+        : {}),
+    };
+  }
+
+  return { ...content, jobs };
+}
+
+/**
  * Drops every job whose tool is in the SUBDOMAINS category when the workspace
  * has assets discovery disabled, and removes the edges pointing at them so
  * their dependents become roots instead of waiting forever.

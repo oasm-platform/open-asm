@@ -10,6 +10,7 @@ import {
 } from '@/modules/targets/entities/target.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { TriggerWorkflowService } from '@/modules/workflows/trigger-workflow.service';
+import { WorkflowsService } from '@/modules/workflows/workflows.service';
 import type { INestApplication } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
@@ -203,6 +204,24 @@ describe('Workflow DAG run (e2e)', () => {
       'Port Scan': { status: 'dispatched', jobs: 1 },
     });
     expect(jobTools(history)).toEqual(['naabu', 'subfinder']);
+
+    // Updating that legacy workflow through the API converts the stored content
+    // to the canonical map shape — the database converges without a migration.
+    await app
+      .get(WorkflowsService)
+      .updateWorkflow(
+        legacyWorkflow.id,
+        { content: legacyWorkflow.content },
+        { id: workspaceId },
+      );
+
+    const stored = await dataSource
+      .getRepository(Workflow)
+      .findOneByOrFail({ id: legacyWorkflow.id });
+    expect(stored.content.jobs).toEqual({
+      'Scan Subdomain': { run: 'subfinder' },
+      'Port Scan': { run: 'naabu' },
+    });
   });
 
   async function completeJob(job: Job): Promise<void> {
