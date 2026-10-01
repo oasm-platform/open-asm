@@ -35,6 +35,7 @@ import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   GetNextJobResponseDto,
+  GetNextJobResult,
   HttpProbeResultDto,
   JobTimelineResponseDto,
   PortsResultDto,
@@ -402,15 +403,50 @@ export class JobsRegistryController {
 
   @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('JobsRegistryService', 'Next')
-  async next(
-    worker: { id: string },
-  ): Promise<Record<string, unknown>> {
+  async next(worker: { id: string }): Promise<Record<string, unknown>> {
     const job = await this.jobsRegistryService.getNextJob(worker.id);
 
     if (!job) {
       return { id: '', asset: {}, command: '' };
     }
 
+    return this.mapJobToGrpcJob(job);
+  }
+
+  /**
+   * Batched claim. Returns every job this worker can start right now — up to
+   * the `limit` it asks for, capped server-side — in one round-trip and one
+   * transaction, instead of one `Next` per free concurrency slot.
+   *
+   * An empty list is the "no work" signal, the same meaning as an empty `id`
+   * from `Next`. The worker sizes `limit` from its free slots, so the server
+   * never hands back more jobs than it can start.
+   */
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'NextBatch')
+  async nextBatch(request: {
+    id: string;
+    limit: number;
+  }): Promise<{ values: Record<string, unknown>[] }> {
+    const jobs = await this.jobsRegistryService.getNextJobs(
+      request.id,
+      Number(request.limit) || 1,
+    );
+
+    const values = await Promise.all(
+      jobs.map((job) => this.mapJobToGrpcJob(job)),
+    );
+
+    return { values };
+  }
+
+  /**
+   * Maps one claimed job to the gRPC `Job` wire shape. Shared by `Next` and
+   * `NextBatch` so the two paths can never drift apart.
+   */
+  private async mapJobToGrpcJob(
+    job: GetNextJobResult,
+  ): Promise<Record<string, unknown>> {
     // Connector path: tool metadata present → look up registry
     const connectorEntry = job.tool
       ? this.connectorRegistry.getConnector(job.tool.name)
