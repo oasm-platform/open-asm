@@ -226,9 +226,9 @@ const nodeTypes = {
 /**
  * Edge between a step and the step that needs it.
  *
- * While the dependent step is executing, the dependency is "arriving": two small
- * arrows travel the path from the finished step into the running one, looping
- * forever, so the handover is visible instead of implied by a static line.
+ * Live while either endpoint is executing: the arrows start travelling from the
+ * step the moment it runs (feeding the step that needs it), and keep travelling
+ * while the consumer runs — so the mutation flows forward along the chain.
  */
 function AnimatedStepEdge({
   sourceX,

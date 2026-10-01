@@ -143,7 +143,7 @@ describe('buildWorkflowGraphLayout', () => {
     });
   });
 
-  it('draws one custom edge per need, marking the running step’s dependency as active', () => {
+  it('draws one custom edge per need, live while either endpoint runs', () => {
     const { edges } = buildWorkflowGraphLayout(chain);
 
     expect(edges.map((edge) => edge.id)).toEqual([
@@ -153,24 +153,46 @@ describe('buildWorkflowGraphLayout', () => {
     ]);
     expect(edges.every((edge) => edge.type === 'step')).toBe(true);
 
-    // Only the handover into the executing step animates: http_probe is the
-    // step running, so the edge that feeds it carries the travelling arrows.
-    const live = edges.find((edge) => edge.id === 'port_scan->http_probe');
-    expect(live?.data).toEqual({ active: true });
-    expect(live?.animated).toBe(true);
-    expect(live?.style?.stroke).toBe('var(--primary)');
-    expect(live?.style?.strokeWidth).toBe(2);
-    // The active edge is solid (`undefined`) — the motion comes from the arrows,
-    // not from a marching-ants dash.
-    expect(live?.style?.strokeDasharray).toBeUndefined();
+    // http_probe runs: the edge feeding it travels, and so does the edge
+    // leading out of it into the step that needs it.
+    for (const id of ['port_scan->http_probe', 'http_probe->take_screenshot']) {
+      const live = edges.find((edge) => edge.id === id);
+      expect(live?.data).toEqual({ active: true });
+      expect(live?.animated).toBe(true);
+      expect(live?.style?.stroke).toBe('var(--primary)');
+      expect(live?.style?.strokeWidth).toBe(2);
+      // The active edge is solid (`undefined`) — the motion comes from the
+      // arrows, not from a marching-ants dash.
+      expect(live?.style?.strokeDasharray).toBeUndefined();
+    }
 
+    // Both endpoints of this one finished, so it settles back to a dashed line.
     const idle = edges.find((edge) => edge.id === 'scan_subdomain->port_scan');
     expect(idle?.data).toEqual({ active: false });
     expect(idle?.animated).toBe(false);
     expect(idle?.style?.strokeDasharray).toBe('4 4');
   });
 
-  it('keeps an edge idle until the step it feeds is the one running', () => {
+  it('starts the arrows from the running step into the one that needs it', () => {
+    const { edges } = buildWorkflowGraphLayout([
+      step('a', { status: 'dispatched' }),
+      step('b', { needs: ['a'], status: 'pending' }),
+    ]);
+
+    expect(edges[0].data).toEqual({ active: true });
+    expect(edges[0].style?.stroke).toBe('var(--primary)');
+  });
+
+  it('stops the arrows once neither endpoint is running', () => {
+    const { edges } = buildWorkflowGraphLayout([
+      step('a', { status: 'done' }),
+      step('b', { needs: ['a'], status: 'done' }),
+    ]);
+
+    expect(edges[0].data).toEqual({ active: false });
+  });
+
+  it('keeps an edge idle while neither endpoint is running', () => {
     const pendingOnly = buildWorkflowGraphLayout([
       step('a', { status: 'done' }),
       step('b', { needs: ['a'], status: 'pending' }),

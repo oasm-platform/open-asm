@@ -163,12 +163,17 @@ export function buildWorkflowGraphLayout(
     });
   }
 
+  // Status by id: an edge is live while EITHER endpoint is executing.
+  const statusById = new Map(steps.map((step) => [step.id, step.status]));
+
   const edges: Edge[] = steps.flatMap((step) =>
     step.needs.map((need) => {
-      // The handover edge: the step it needed is finished and this one is
-      // executing now. That is when the dependency actually travels, so that is
-      // the edge drawn with a continuous arrow flowing into the running step.
-      const isActive = step.status === 'dispatched';
+      // The dependency is moving as soon as the step it comes from starts
+      // running, and keeps moving while the step that consumes it runs — so the
+      // arrows reach the next step from the moment its `needs` step kicks off,
+      // not only once it is that step's turn.
+      const sourceRunning = statusById.get(need) === 'dispatched';
+      const isActive = sourceRunning || step.status === 'dispatched';
       const stroke =
         step.status === 'failed'
           ? 'var(--destructive)'
