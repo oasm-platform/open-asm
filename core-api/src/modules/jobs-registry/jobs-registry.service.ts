@@ -1325,10 +1325,10 @@ export class JobsRegistryService {
       sortBy = 'createdAt';
     }
 
-    // Filters shared by the paged query and the count, so `total` always matches
-    // the rows on offer: free-text over the two names the list renders, run type
-    // and creation-date bounds (WHERE), plus the status rollup (HAVING — it is
-    // an aggregate, so it cannot be a WHERE).
+    // Filters for the paged query. The status rollup is an aggregate, so it
+    // cannot be a WHERE and rides in HAVING; the free-text/run-type/date bounds
+    // are plain WHERE. `total` no longer needs its own pass — see the
+    // COUNT(*) OVER () note below.
     const applyFilters = (qb: SelectQueryBuilder<JobHistory>) => {
       if (search) {
         qb.andWhere(
@@ -1366,11 +1366,20 @@ export class JobsRegistryService {
       workflowName: string;
       jobHistoryName: string;
       jobRunType: JobRunType;
+      // Row count of the grouped result set, repeated on every row.
+      total: string;
     }
 
     // Aggregate totalJobs and status directly over the joined job rows.
     // The jobs relation is already inner-joined, so correlated subqueries
     // per row are unnecessary.
+    //
+    // `total` rides along as a window function instead of a second query:
+    // COUNT(*) OVER () is evaluated after GROUP BY and HAVING (so it sees the
+    // same filtered groups the page is drawn from) but before ORDER BY/LIMIT
+    // and OFFSET, so it is exactly the number of rows a full result set would
+    // have. The old approach re-ran the entire aggregate a second time just to
+    // count rows, doubling the cost of the busiest console page.
     const qb = this.jobHistoryRepo
       .createQueryBuilder('jobHistory')
       .innerJoin('jobHistory.jobs', 'job')
@@ -1388,6 +1397,7 @@ export class JobsRegistryService {
         '"jobHistory"."jobRunType" as "jobRunType"',
         'COUNT(job.id) as "totalJobs"',
         `${JOB_HISTORY_STATUS_SQL} as "status"`,
+        'COUNT(*) OVER () as "total"',
       ])
       .groupBy('jobHistory.id')
       .addGroupBy('workflow.name')
@@ -1400,23 +1410,10 @@ export class JobsRegistryService {
 
     const rawResults = await qb.getRawMany<RawJobHistoryResult>();
 
-    // Count with the same GROUP BY + HAVING, then collapse to distinct id rows:
-    // the job join fans out one row per job, and `getCount` would drop the
-    // GROUP BY that the status HAVING depends on.
-    const totalQb = this.jobHistoryRepo
-      .createQueryBuilder('jobHistory')
-      .innerJoin('jobHistory.jobs', 'job')
-      .innerJoin('job.asset', 'jAsset')
-      .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspace', 'workspace')
-      .leftJoin('jobHistory.workflow', 'workflow')
-      .where('workspace.id = :workspaceId', { workspaceId })
-      .select('jobHistory.id', 'id')
-      .groupBy('jobHistory.id');
-
-    applyFilters(totalQb);
-
-    const total = (await totalQb.getRawMany<{ id: string }>()).length;
+    // The window counts the filtered groups, so an empty page means no rows
+    // matched at all rather than a missing count.
+    const total =
+      rawResults.length > 0 ? parseInt(rawResults[0].total, 10) : 0;
 
     // Transform raw results to match the response DTO structure
     const transformedData = rawResults.map((raw) => ({

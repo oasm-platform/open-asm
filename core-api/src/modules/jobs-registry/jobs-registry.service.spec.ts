@@ -1201,21 +1201,16 @@ describe('JobsRegistryService', () => {
     };
 
     /**
-     * The method builds two query builders: the paged select and the distinct-id
-     * count. Return a fresh one per call and expose both, so assertions can pick
-     * the builder they care about regardless of call order.
+     * The method builds a SINGLE query builder. `total` used to require a
+     * second, distinct-id aggregate pass; it now rides on the paged select as a
+     * `COUNT(*) OVER ()` window, so tests drive one builder and the row count
+     * arrives in the same rows.
      */
-    const stubHistoryQueryBuilders = (total = 0) => {
+    const stubHistoryQueryBuilder = () => {
       const paged = buildHistoryQueryBuilder();
-      const count = buildHistoryQueryBuilder();
-      count.qb.getRawMany.mockResolvedValue(
-        Array.from({ length: total }, (_, i) => ({ id: `history-${i}` })),
-      );
       mockJobHistoryRepository.createQueryBuilder.mockReset();
-      mockJobHistoryRepository.createQueryBuilder
-        .mockReturnValueOnce(paged.qb)
-        .mockReturnValueOnce(count.qb);
-      return { paged, count };
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(paged.qb);
+      return { paged };
     };
 
     beforeEach(() => {
@@ -1223,9 +1218,21 @@ describe('JobsRegistryService', () => {
     });
 
     it('should compute totalJobs and status from joined jobs without correlated subqueries', async () => {
-      const { paged, count } = stubHistoryQueryBuilders(2);
+      const { paged } = stubHistoryQueryBuilder();
       const { qb, selectArgs } = paged;
-      qb.getRawMany.mockResolvedValue([]);
+      qb.getRawMany.mockResolvedValue([
+        {
+          id: 'history-1',
+          createdAt: new Date('2024-01-01T00:00:00Z'),
+          updatedAt: new Date('2024-01-02T00:00:00Z'),
+          totalJobs: '4',
+          status: JobStatus.IN_PROGRESS,
+          workflowName: 'workflow-1',
+          jobHistoryName: 'run-1',
+          jobRunType: JobRunType.MANUAL,
+          total: '2',
+        },
+      ]);
 
       const result = await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -1247,13 +1254,16 @@ describe('JobsRegistryService', () => {
       ) as string;
       expect(statusExpr).toContain(`job.status = '${JobStatus.FAILED}'`);
       expect(statusExpr).toContain(`job.status = '${JobStatus.IN_PROGRESS}'`);
-      // Separate count query is still executed (it needs its own GROUP BY)
-      expect(count.qb.getRawMany).toHaveBeenCalled();
+      expect(selectArgs[0]).toContain('COUNT(*) OVER () as "total"');
+      // One query serves both the page and its total
+      expect(mockJobHistoryRepository.createQueryBuilder).toHaveBeenCalledTimes(
+        1,
+      );
       expect(result.total).toBe(2);
     });
 
     it('should aggregate terminal cancelled status when all jobs are cancelled', async () => {
-      const { paged } = stubHistoryQueryBuilders();
+      const { paged } = stubHistoryQueryBuilder();
       const { qb, selectArgs } = paged;
       qb.getRawMany.mockResolvedValue([]);
 
@@ -1275,7 +1285,7 @@ describe('JobsRegistryService', () => {
     });
 
     it('should surface a cancelled run even when some jobs already completed', async () => {
-      const { paged } = stubHistoryQueryBuilders();
+      const { paged } = stubHistoryQueryBuilder();
       const { qb, selectArgs } = paged;
       qb.getRawMany.mockResolvedValue([]);
 
@@ -1304,7 +1314,7 @@ describe('JobsRegistryService', () => {
     });
 
     it('should aggregate terminal skipped status when all jobs are skipped', async () => {
-      const { paged } = stubHistoryQueryBuilders();
+      const { paged } = stubHistoryQueryBuilder();
       const { qb, selectArgs } = paged;
       qb.getRawMany.mockResolvedValue([]);
 
@@ -1325,7 +1335,7 @@ describe('JobsRegistryService', () => {
     });
 
     it('should fall back to createdAt and append an id tiebreaker for unknown sortBy', async () => {
-      const { paged } = stubHistoryQueryBuilders();
+      const { paged } = stubHistoryQueryBuilder();
       const { qb } = paged;
 
       await service.getManyJobHistories(mockWorkspaceId, {
@@ -1340,7 +1350,7 @@ describe('JobsRegistryService', () => {
     });
 
     it('should pass through whitelisted sortBy values', async () => {
-      const { paged } = stubHistoryQueryBuilders();
+      const { paged } = stubHistoryQueryBuilder();
       const { qb } = paged;
 
       await service.getManyJobHistories(mockWorkspaceId, {
@@ -1357,7 +1367,7 @@ describe('JobsRegistryService', () => {
     });
 
     it('should transform raw rows into the response DTO shape', async () => {
-      const { paged } = stubHistoryQueryBuilders();
+      const { paged } = stubHistoryQueryBuilder();
       const { qb } = paged;
       qb.getRawMany.mockResolvedValue([
         {
@@ -1391,8 +1401,8 @@ describe('JobsRegistryService', () => {
       });
     });
 
-    it('should apply the search predicate to both the paged query and the count', async () => {
-      const { paged, count } = stubHistoryQueryBuilders();
+    it('should apply the search predicate to the page query', async () => {
+      const { paged } = stubHistoryQueryBuilder();
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -1402,21 +1412,14 @@ describe('JobsRegistryService', () => {
         search: 'nightly',
       } as any);
 
-      const expected = {
-        search: '%nightly%',
-      };
       expect(paged.qb.andWhere).toHaveBeenCalledWith(
         '(jobHistory.jobHistoryName ILIKE :search OR workflow.name ILIKE :search)',
-        expected,
-      );
-      expect(count.qb.andWhere).toHaveBeenCalledWith(
-        '(jobHistory.jobHistoryName ILIKE :search OR workflow.name ILIKE :search)',
-        expected,
+        { search: '%nightly%' },
       );
     });
 
     it('should filter on the status rollup via HAVING, and skip it for "all"', async () => {
-      const filtered = stubHistoryQueryBuilders();
+      const filtered = stubHistoryQueryBuilder();
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -1432,13 +1435,8 @@ describe('JobsRegistryService', () => {
       ];
       expect(havingSql).toContain('FILTER');
       expect(havingParams).toEqual({ jobStatus: JobStatus.FAILED });
-      // The count must apply the same aggregate filter
-      expect(filtered.count.qb.having).toHaveBeenCalledWith(
-        havingSql,
-        havingParams,
-      );
 
-      const unfiltered = stubHistoryQueryBuilders();
+      const unfiltered = stubHistoryQueryBuilder();
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
         limit: 10,
@@ -1447,11 +1445,10 @@ describe('JobsRegistryService', () => {
         jobStatus: 'all',
       } as any);
       expect(unfiltered.paged.qb.having).not.toHaveBeenCalled();
-      expect(unfiltered.count.qb.having).not.toHaveBeenCalled();
     });
 
-    it('should filter by run type and a creation-date range on both queries', async () => {
-      const { paged, count } = stubHistoryQueryBuilders();
+    it('should filter by run type and a creation-date range on the page query', async () => {
+      const { paged } = stubHistoryQueryBuilder();
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -1481,11 +1478,10 @@ describe('JobsRegistryService', () => {
       };
 
       ranged(paged.qb);
-      ranged(count.qb);
     });
 
     it('should skip run type and date filters for "all" / absent values', async () => {
-      const { paged } = stubHistoryQueryBuilders();
+      const { paged } = stubHistoryQueryBuilder();
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
