@@ -107,6 +107,13 @@ export class WorkflowStepStatusDto {
   @ApiProperty({ description: 'Job rows this step fanned out to' })
   jobs: number;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Job rows that failed. A step is still done when it produced results (unless it sets allowFailure: false)',
+  })
+  failed?: number;
+
   @ApiProperty({ required: false })
   toolId?: string;
 

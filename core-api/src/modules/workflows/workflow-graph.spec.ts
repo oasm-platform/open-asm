@@ -199,6 +199,18 @@ describe('buildWorkflowGraph', () => {
     expect(graph.byId.get('Port Scan')?.needs).toEqual(['Scan Subdomain']);
   });
 
+  it('tolerates partial job failure unless the step opts out', () => {
+    const graph = buildWorkflowGraph(
+      content({
+        lenient: { run: 'subfinder' },
+        strict: { run: 'naabu', allowFailure: false },
+      }),
+    );
+
+    expect(graph.byId.get('lenient')?.allowFailure).toBe(true);
+    expect(graph.byId.get('strict')?.allowFailure).toBe(false);
+  });
+
   it('throws on a duplicate job id', () => {
     expect(() =>
       buildWorkflowGraph(
@@ -315,6 +327,20 @@ describe('normalizeWorkflowContent', () => {
       needs: ['a'],
       config: { retries: 2 },
       configProfileId: 'profile-1',
+    });
+  });
+
+  it('keeps an opt-out from tolerant failure through a write', () => {
+    const normalized = normalizeWorkflowContent({
+      jobs: {
+        strict: { run: 'naabu', allowFailure: false },
+        lenient: { run: 'httpx' },
+      },
+    });
+
+    expect(normalized.jobs).toEqual({
+      strict: { run: 'naabu', allowFailure: false },
+      lenient: { run: 'httpx' },
     });
   });
 
@@ -499,12 +525,37 @@ describe('reconcileStepStates', () => {
     expect(state.a).toMatchObject({ status: 'done', jobs: 3 });
   });
 
-  it('marks a job failed when any job failed and none is left', () => {
+  it('keeps a step done when only some of its jobs failed', () => {
     const state = reconcileStepStates(chain, stateOf({}), [
       summary('subfinder', { total: 2, completed: 1, failed: 1 }),
     ]);
 
+    // A fan-out step routinely has unroutable inputs; the failures stay visible
+    // on their own rows (and in `failed`) without failing the step.
+    expect(state.a).toMatchObject({ status: 'done', failed: 1 });
+  });
+
+  it('fails a step when every one of its jobs failed', () => {
+    const state = reconcileStepStates(chain, stateOf({}), [
+      summary('subfinder', { total: 2, failed: 2 }),
+    ]);
+
     expect(state.a.status).toBe('failed');
+  });
+
+  it('fails a step on any failure when it opts out of tolerance', () => {
+    const strict = buildWorkflowGraph(
+      content({
+        a: { run: 'subfinder' },
+        b: { run: 'naabu', needs: ['a'], allowFailure: false },
+      }),
+    );
+
+    const state = reconcileStepStates(strict, stateOf({}), [
+      summary('naabu', { total: 2, completed: 1, failed: 1 }),
+    ]);
+
+    expect(state.b.status).toBe('failed');
   });
 
   it('keeps a job dispatched when a sibling row is still running', () => {
@@ -548,7 +599,7 @@ describe('reconcileStepStates', () => {
     const state = reconcileStepStates(chain, stateOf({}), [
       {
         ...summary('subfinder', { total: 1, completed: 1 }),
-        lastCompletedAt: '2026-01-01T00:05:00.000Z',
+        lastTerminalAt: '2026-01-01T00:05:00.000Z',
       },
     ]);
 
@@ -556,6 +607,17 @@ describe('reconcileStepStates', () => {
       status: 'done',
       finishedAt: '2026-01-01T00:05:00.000Z',
     });
+  });
+
+  it('uses the last terminal job time even when that job failed', () => {
+    const state = reconcileStepStates(chain, stateOf({}), [
+      {
+        ...summary('subfinder', { total: 2, completed: 1, failed: 1 }),
+        lastTerminalAt: '2026-01-01T00:09:00.000Z',
+      },
+    ]);
+
+    expect(state.a.finishedAt).toBe('2026-01-01T00:09:00.000Z');
   });
 
   it('keeps state entries that are not part of the graph', () => {

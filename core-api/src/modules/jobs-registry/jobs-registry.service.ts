@@ -1434,6 +1434,7 @@ export class JobsRegistryService {
         status: state?.status ?? this.toRunStepStatus(derived),
         reason: state?.reason,
         jobs: state?.jobs ?? 0,
+        failed: state?.failed,
         toolId: tool?.id,
         logoUrl: tool?.logoUrl,
         dispatchedAt: state?.dispatchedAt

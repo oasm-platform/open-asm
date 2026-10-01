@@ -19,6 +19,14 @@ export interface WorkflowStepDefinition {
   name?: string;
   run: string;
   needs?: string | string[];
+  /**
+   * A fan-out step runs one job per asset/service, and some of those inputs are
+   * routinely unroutable (they simply have nothing to scan). By default the step
+   * counts as done as long as it produced results, and the failed jobs stay
+   * visible on their own rows. Set `false` to fail the step when any job fails
+   * (the strict, ci-like behaviour).
+   */
+  allowFailure?: boolean;
   config?: Record<string, unknown>;
   configProfileId?: string;
 }
@@ -42,6 +50,8 @@ export interface WorkflowStep {
   needs: string[];
   /** Original position — fallback ordering only. */
   order: number;
+  /** False makes any failed job fail the whole step (default: tolerate). */
+  allowFailure: boolean;
   config?: Record<string, unknown>;
   configProfileId?: string;
 }
@@ -74,6 +84,8 @@ export interface RunStepState {
   status: RunStepStatus;
   /** Job rows created for this step in this run. */
   jobs: number;
+  /** Job rows that ended in FAILED — a step can be done with some failures. */
+  failed?: number;
   reason?: RunStepSkipReason;
   dispatchedAt?: string;
   finishedAt?: string;
@@ -98,10 +110,11 @@ export interface StepJobSummary {
   failed: number;
   cancelled: number;
   /**
-   * When the last job of the step finished, so a step reconciled after the fact
-   * reports the real completion time instead of the moment it was noticed.
+   * When the step's last job reached a terminal state — completedAt where the
+   * job has one, its update time otherwise (a failed job has no completedAt).
+   * Lets a step reconciled after the fact report the real finish time.
    */
-  lastCompletedAt?: string;
+  lastTerminalAt?: string;
 }
 
 export interface AdvancePlan {
@@ -311,6 +324,8 @@ export function buildWorkflowGraph(content: {
       run,
       needs: normalizeNeeds(job.needs),
       order,
+      // Tolerate partial failure unless the author asked for strict.
+      allowFailure: job.allowFailure !== false,
       config: job.config,
       configProfileId: job.configProfileId,
     };
@@ -410,6 +425,7 @@ export function normalizeWorkflowContent<T extends { jobs?: WorkflowJobsInput }>
       ...(step.name !== step.id ? { name: step.name } : {}),
       run: step.run,
       ...(step.needs.length > 0 ? { needs: step.needs } : {}),
+      ...(step.allowFailure === false ? { allowFailure: false } : {}),
       ...(step.config !== undefined ? { config: step.config } : {}),
       ...(step.configProfileId
         ? { configProfileId: step.configProfileId }
@@ -567,6 +583,7 @@ export function reconcileStepStates(
         ...current,
         status: 'dispatched',
         jobs: jobs.total,
+        failed: jobs.failed || undefined,
         dispatchedAt: current.dispatchedAt ?? timestamp,
         reason: undefined,
         finishedAt: undefined,
@@ -577,7 +594,12 @@ export function reconcileStepStates(
     let status: RunStepStatus = 'done';
     let reason: RunStepSkipReason | undefined;
     if (jobs.failed > 0) {
-      status = 'failed';
+      // A fan-out step scans many inputs and some are routinely unroutable, so
+      // by default a step that produced results is done even with failures —
+      // the failed jobs stay visible on their own rows. A strict step
+      // (`allowFailure: false`) fails on any failure, and a step where nothing
+      // succeeded has no result to carry forward either way.
+      status = !step.allowFailure || jobs.completed === 0 ? 'failed' : 'done';
     } else if (jobs.cancelled > 0) {
       status = 'skipped';
       reason = 'run-cancelled';
@@ -586,9 +608,10 @@ export function reconcileStepStates(
     next[step.id] = {
       status,
       jobs: jobs.total,
+      failed: jobs.failed || undefined,
       reason,
       dispatchedAt: current.dispatchedAt ?? timestamp,
-      finishedAt: current.finishedAt ?? jobs.lastCompletedAt ?? timestamp,
+      finishedAt: current.finishedAt ?? jobs.lastTerminalAt ?? timestamp,
     };
   }
 

@@ -360,7 +360,10 @@ export class WorkflowRunnerService {
       .innerJoin('job.tool', 'tool')
       .select('tool.name', 'tool')
       .addSelect('COUNT(*)', 'total')
-      .addSelect(`MAX(job."completedAt")`, 'lastCompletedAt')
+      .addSelect(
+        `MAX(COALESCE(job."completedAt", job."updatedAt")) FILTER (WHERE job.status IN ('${JobStatus.COMPLETED}', '${JobStatus.FAILED}', '${JobStatus.CANCELLED}', '${JobStatus.SKIPPED}'))`,
+        'lastTerminalAt',
+      )
       .addSelect(
         `COUNT(*) FILTER (WHERE job.status = '${JobStatus.PENDING}')`,
         'pending',
@@ -386,7 +389,7 @@ export class WorkflowRunnerService {
       .getRawMany<Record<string, string | Date>>();
 
     return rows.map((row) => {
-      const lastCompletedAt = row['lastCompletedAt'];
+      const lastTerminalAt = row['lastTerminalAt'];
       return {
         tool: String(row['tool']),
         total: Number(row['total'] ?? 0),
@@ -396,10 +399,10 @@ export class WorkflowRunnerService {
         failed: Number(row['failed'] ?? 0),
         cancelled: Number(row['cancelled'] ?? 0),
         // pg hands timestamptz back as a Date; keep the summary a plain string.
-        lastCompletedAt:
-          lastCompletedAt instanceof Date
-            ? lastCompletedAt.toISOString()
-            : lastCompletedAt,
+        lastTerminalAt:
+          lastTerminalAt instanceof Date
+            ? lastTerminalAt.toISOString()
+            : lastTerminalAt,
       };
     });
   }

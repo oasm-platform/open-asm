@@ -949,7 +949,7 @@ describe('JobsRegistryService', () => {
             dispatchedAt: '2026-01-01T00:00:00.000Z',
             finishedAt: '2026-01-01T00:05:00.000Z',
           },
-          port_scan: { status: 'dispatched', jobs: 3 },
+          port_scan: { status: 'dispatched', jobs: 3, failed: 1 },
           http_probe: {
             status: 'skipped',
             jobs: 0,
@@ -1018,6 +1018,7 @@ describe('JobsRegistryService', () => {
           needs: ['scan_subdomain'],
           status: 'dispatched',
           jobs: 3,
+          failed: 1,
         },
         {
           id: 'http_probe',

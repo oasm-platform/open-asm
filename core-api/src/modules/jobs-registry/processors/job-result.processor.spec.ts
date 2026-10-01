@@ -239,6 +239,62 @@ describe('JobResultProcessor', () => {
     });
   });
 
+  describe('when a built-in tool finds nothing to scan', () => {
+    const naabuJob = () =>
+      ({
+        ...baseJob,
+        tool: {
+          name: 'naabu',
+          type: WorkerType.BUILT_IN,
+          category: ToolCategory.PORTS_SCANNER,
+        },
+      }) as unknown as Job;
+
+    // naabu exits non-zero when the host does not resolve. That is the target's
+    // condition, not the tool's failure: the job must complete with an empty
+    // result (previously it failed, and with the DAG engine a failed job skipped
+    // every step that needed it — one unroutable host killed the whole chain).
+    it('should complete the job instead of failing it', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(naabuJob());
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: true,
+        raw: '[FTL] Could not run enumeration = no valid ipv4 or ipv6 targets were found',
+        payload: [],
+      });
+
+      await processor.process(baseBullJob);
+
+      expect(mockDataAdapterService.syncData).not.toHaveBeenCalled();
+      expect(mockJobsRegistryService.handleJobError).not.toHaveBeenCalled();
+      expect(mockJobRepository.update).toHaveBeenCalledWith(
+        { id: 'job-1', status: JobStatus.IN_PROGRESS },
+        expect.objectContaining({ status: JobStatus.COMPLETED }),
+      );
+      expect(mockWorkflowRunnerService.onJobTerminal).toHaveBeenCalled();
+    });
+
+    it('should still fail the job on a real tool error', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(naabuJob());
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: true,
+        raw: 'naabu: permission denied',
+      });
+      const lastAttemptBullJob = {
+        ...baseBullJob,
+        attemptsMade: 2,
+      } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+      await expect(processor.process(lastAttemptBullJob)).rejects.toThrow(
+        'permission denied',
+      );
+
+      expect(mockJobsRegistryService.handleJobError).toHaveBeenCalled();
+      expect(mockJobRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('when processing succeeds for an external tool', () => {
     it('should complete the job and delete the result file', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);

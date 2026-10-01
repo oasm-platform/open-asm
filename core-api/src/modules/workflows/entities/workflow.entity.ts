@@ -6,6 +6,7 @@ import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiExtraModels, ApiProperty, getSchemaPath } from '@nestjs/swagger';
 import {
   IsArray,
+  IsBoolean,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -59,6 +60,16 @@ export class WorkflowJob {
   @IsArray()
   @IsString({ each: true })
   needs?: string[];
+
+  /**
+   * Whether some of this job's fan-out jobs may fail without failing the job.
+   * Defaults to true: a job that produced results is done, and the failed rows
+   * stay visible in the job list. `false` fails the job when any of them fails.
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  allowFailure?: boolean;
 
   @ApiProperty({ required: false, type: Object })
   @IsOptional()
