@@ -55,6 +55,13 @@ import { WorkerInstance } from './entities/worker.entity';
  */
 const MAX_RUNNING_JOBS_PER_WORKER = 20;
 
+/**
+ * How many times a FAILED job may be automatically requeued before it is left
+ * failed for a human to look at. Mirrors the increment in
+ * `JobsRegistryService.handleJobError`.
+ */
+const JOB_MAX_RETRIES = 4;
+
 @Injectable()
 export class WorkersService {
   private logger = new Logger('WorkersService');
@@ -738,25 +745,39 @@ export class WorkersService {
   }
 
   /**
-   * Resets stuck in_progress jobs (missing workers) and failed jobs (retryable) back to pending.
-   * This ensures jobs can be picked up by available workers.
+   * Requeues jobs that cannot make progress so an available worker can pick
+   * them up:
+   *
+   * - IN_PROGRESS jobs whose worker row is gone (the worker died mid-run).
+   * - FAILED jobs that still have retries left.
+   *
+   * Two exclusions are load-bearing:
+   *
+   * - A job with no asset can never be claimed — `getNextJob` INNER JOINs
+   *   `assets`. `persistFailedConfigJob` in the jobs registry writes exactly
+   *   those rows when an orphaned config profile blocks dispatch. Requeuing
+   *   them left the row PENDING forever and pinned its run at "in progress",
+   *   because no execution could ever finish it.
+   * - A job that has spent its retries is left alone. It used to be matched by
+   *   the WHERE and rewritten to the same value on every sweep, which only
+   *   produced dead tuples.
    */
   private async resetStuckAndFailedJobs() {
     await this.repo.manager.query(`
       UPDATE jobs j
-      SET status = CASE 
-          WHEN j.status = '${JobStatus.IN_PROGRESS}' AND j."workerId"::uuid NOT IN (
+      SET status = '${JobStatus.PENDING}',
+          "workerId" = NULL
+      WHERE (
+          j.status = '${JobStatus.IN_PROGRESS}'
+          AND j."workerId"::uuid NOT IN (
             SELECT id FROM workers
-          ) THEN '${JobStatus.PENDING}'
-          WHEN j.status = '${JobStatus.FAILED}' AND j."retryCount" < 4 THEN '${JobStatus.PENDING}'
-          ELSE j.status
-        END,
-        "workerId" = NULL
-      WHERE j.status = '${JobStatus.IN_PROGRESS}'
-        AND j."workerId"::uuid NOT IN (
-          SELECT id FROM workers
+          )
         )
-        OR j.status = '${JobStatus.FAILED}'
+        OR (
+          j.status = '${JobStatus.FAILED}'
+          AND j."retryCount" < ${JOB_MAX_RETRIES}
+          AND j."assetId" IS NOT NULL
+        )
     `);
   }
 

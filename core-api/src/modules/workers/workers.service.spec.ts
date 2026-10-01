@@ -1,4 +1,4 @@
-import { WorkerScope, WorkerType } from '@/common/enums/enum';
+import { JobStatus, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { ConfigService } from '@nestjs/config';
 import { NotFoundException } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
@@ -288,6 +288,50 @@ describe('WorkersService', () => {
 
       expect(mockAliveStreamManager.isActive).not.toHaveBeenCalled();
       expect(mockWorkerInstanceRepository.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('requeue of stuck and failed jobs', () => {
+    /**
+     * Drives `autoCleanupWorkersAndJobs` with no stale workers and captures the
+     * requeue SQL — the only place these rules live.
+     */
+    const captureRequeueSql = async () => {
+      const query = jest.fn().mockResolvedValue(undefined);
+      (mockWorkerInstanceRepository as any).manager = { query };
+      (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([]);
+
+      await service.autoCleanupWorkersAndJobs();
+
+      return String(query.mock.calls[0][0]);
+    };
+
+    it('requeues IN_PROGRESS jobs whose worker row is gone', async () => {
+      const sql = await captureRequeueSql();
+
+      expect(sql).toContain(`j.status = '${JobStatus.IN_PROGRESS}'`);
+      expect(sql).toContain('SELECT id FROM workers');
+      expect(sql).toContain(`status = '${JobStatus.PENDING}'`);
+      expect(sql).toContain('"workerId" = NULL');
+    });
+
+    it('never requeues a job with no asset, because nothing can ever claim it', async () => {
+      // getNextJob INNER JOINs assets, so an asset-less job — what
+      // persistFailedConfigJob writes when a config profile is orphaned — can
+      // never be picked up. Requeueing it left the row PENDING forever and
+      // pinned its run at "in progress", because no execution could finish it.
+      const sql = await captureRequeueSql();
+
+      expect(sql).toContain('j."assetId" IS NOT NULL');
+    });
+
+    it('leaves FAILED jobs untouched once their retries are spent', async () => {
+      // They used to be matched by the WHERE and rewritten to the same value on
+      // every sweep, which only produced dead tuples.
+      const sql = await captureRequeueSql();
+
+      expect(sql).toContain('j."retryCount" < 4');
+      expect(sql).not.toContain('ELSE j.status');
     });
   });
 
