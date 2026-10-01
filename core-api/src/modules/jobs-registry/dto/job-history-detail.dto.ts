@@ -74,6 +74,52 @@ export class ToolWithStatusDto {
   status?: JobStatus;
 }
 
+/**
+ * One step of the run's workflow graph. `status` is the engine's persisted step
+ * state (see `job_histories.steps`), so the UI can show which steps ran in
+ * parallel and why a step never ran.
+ */
+export class WorkflowStepStatusDto {
+  @ApiProperty({ description: 'Unique job id inside the workflow' })
+  id: string;
+
+  @ApiProperty({ description: 'Display label (the job id when no name is set)' })
+  name: string;
+
+  @ApiProperty()
+  run: string;
+
+  @ApiProperty({ type: [String], description: 'Ids of the jobs this one waits for' })
+  needs: string[];
+
+  @ApiProperty({
+    enum: ['pending', 'dispatched', 'done', 'failed', 'skipped'],
+  })
+  status: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Why the step was skipped: no-inputs, blocked-by-failure, assets-discovery-off or run-cancelled',
+  })
+  reason?: string;
+
+  @ApiProperty({ description: 'Job rows this step fanned out to' })
+  jobs: number;
+
+  @ApiProperty({ required: false })
+  toolId?: string;
+
+  @ApiProperty({ required: false })
+  logoUrl?: string;
+
+  @ApiProperty({ required: false })
+  dispatchedAt?: Date;
+
+  @ApiProperty({ required: false })
+  finishedAt?: Date;
+}
+
 export class JobHistoryDetailResponseDto {
   @ApiProperty()
   id: string;
@@ -86,6 +132,9 @@ export class JobHistoryDetailResponseDto {
 
   @ApiProperty({ type: () => [ToolWithStatusDto] })
   tools?: ToolWithStatusDto[];
+
+  @ApiProperty({ type: () => [WorkflowStepStatusDto] })
+  steps?: WorkflowStepStatusDto[];
 
   @ApiProperty({ required: false })
   workflowName?: string;

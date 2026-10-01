@@ -14,9 +14,10 @@ import { randomUUID } from 'crypto';
 import { In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobHistory } from '../jobs-registry/entities/job-history.entity';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { WorkflowRunnerService } from '../jobs-registry/workflow-runner.service';
 import { ToolsService } from '../tools/tools.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
+import { buildWorkflowGraph } from '../workflows/workflow-graph';
 import { AssetGroupLastRunDto } from './dto/asset-group-last-run.dto';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
 import { AssetGroup } from './entities/asset-groups.entity';
@@ -38,7 +39,7 @@ export class AssetGroupWorkflowService {
     @InjectQueue(BullMQName.ASSET_GROUPS_WORKFLOW_SCHEDULE)
     private scanScheduleQueue: Queue<AssetGroupWorkflow>,
     private toolsService: ToolsService,
-    private jobRegistryService: JobsRegistryService,
+    private workflowRunnerService: WorkflowRunnerService,
   ) {}
 
   /**
@@ -412,44 +413,55 @@ export class AssetGroupWorkflowService {
       );
     }
 
-    // Get the first job's tool name
-    const firstJobToolName = workflow.content.jobs[0]?.run;
+    // Every root step must be installed before the run starts: a run whose
+    // first step silently fails is worse than a clear 400 here.
+    await this.assertWorkflowRootToolsInstalled(workflow);
 
-    if (!firstJobToolName) {
-      throw new BadRequestException('Workflow does not have any jobs defined.');
-    }
-
-    // Require tool to be installed
-    const tools = await this.toolsService.getToolByNames({
-      names: [firstJobToolName],
-      isInstalled: true,
-    });
-
-    if (!tools || tools.length === 0) {
-      throw new BadRequestException(
-        `Tool "${firstJobToolName}" is not installed in the workspace.`,
-      );
-    }
-
-    // Only use the first tool found (should be exactly one)
-    const tool = tools[0];
-
-    const firstJob = workflow.content.jobs[0];
-
-    await this.jobRegistryService.createNewJob({
-      tool,
-      config: firstJob?.config,
-      configProfileId: firstJob?.configProfileId,
-      assetIds: assets.map((a) => a.id),
-      workflow: workflow,
-      priority: tool.priority,
+    await this.workflowRunnerService.startRun({
+      workflow,
       workspaceId: workflow.workspace.id,
       jobName: assetGroupName,
       jobRunType,
+      // Group runs stay pinned to the assets the group selected — the scope is
+      // what stops a subdomain step from fanning the run out to the whole target.
+      assetIds: assets.map((asset) => asset.id),
     });
+
     return {
       message: `Run scheduler for asset group workflow with ID ${assetGroupWorkflowId}`,
     };
+  }
+
+  /**
+   * Requires every root step's tool (a step without `needs`) to be installed in
+   * the workspace. Steps reached later through `needs` are resolved by the
+   * workflow runner, which fails the step and skips its dependents.
+   */
+  private async assertWorkflowRootToolsInstalled(
+    workflow: Workflow,
+  ): Promise<void> {
+    const graph = buildWorkflowGraph(workflow.content);
+    const rootToolNames = [
+      ...new Set(
+        graph.steps
+          .filter((step) => step.needs.length === 0)
+          .map((step) => step.run),
+      ),
+    ];
+    if (rootToolNames.length === 0) return;
+
+    const tools = await this.toolsService.getToolByNames({
+      names: rootToolNames,
+      isInstalled: true,
+    });
+    const installed = new Set(tools.map((tool) => tool.name));
+    const missing = rootToolNames.find((name) => !installed.has(name));
+
+    if (missing) {
+      throw new BadRequestException(
+        `Tool "${missing}" is not installed in the workspace.`,
+      );
+    }
   }
 
   /**

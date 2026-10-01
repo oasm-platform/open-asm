@@ -93,6 +93,47 @@ describe('WorkflowsService', () => {
       );
       expect(result).toEqual(mockWorkflow);
     });
+
+    it('rejects content whose needs reference an unknown step', async () => {
+      const createWorkflowDto = {
+        name: 'Broken Workflow',
+        content: {
+          on: { target: ['test'] },
+          jobs: [
+            { name: 'Port Scan', run: 'naabu', needs: ['ghost'] },
+          ],
+          name: 'Broken Workflow Content',
+        },
+      } as unknown as CreateWorkflowDto;
+
+      await expect(
+        service.createWorkflow(createWorkflowDto, { id: 'user-1' }, {
+          id: 'workspace-1',
+        }),
+      ).rejects.toThrow(/Invalid workflow content/);
+
+      expect(workflowRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects content with a dependency cycle', async () => {
+      const createWorkflowDto = {
+        name: 'Cyclic Workflow',
+        content: {
+          on: { target: ['test'] },
+          jobs: [
+            { name: 'A', run: 'naabu', needs: ['B'] },
+            { name: 'B', run: 'httpx', needs: ['A'] },
+          ],
+          name: 'Cyclic Workflow Content',
+        },
+      } as unknown as CreateWorkflowDto;
+
+      await expect(
+        service.createWorkflow(createWorkflowDto, { id: 'user-1' }, {
+          id: 'workspace-1',
+        }),
+      ).rejects.toThrow(/cycle/i);
+    });
   });
 
   describe('getWorkspaceWorkflow', () => {

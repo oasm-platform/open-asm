@@ -255,16 +255,17 @@ describe('AssetGroupService', () => {
         ['asset-1', 'asset-2'],
       );
 
-      // Workflow created with one job per tool
+      // Workflow created with one job per tool, keyed by tool name and with no
+      // `needs` (tools selected in a group run in parallel)
       expect(mockWorkflowRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           name: `Group Workflow - ${groupId}`,
           content: {
             on: { schedule: '0 0 * * *', target: [] },
-            jobs: [
-              { name: 'nmap', run: 'nmap' },
-              { name: 'gobuster', run: 'gobuster' },
-            ],
+            jobs: {
+              nmap: { run: 'nmap' },
+              gobuster: { run: 'gobuster' },
+            },
             name: `Group Workflow - ${groupId}`,
           },
           filePath: `group-${groupId}.yaml`,

@@ -1,12 +1,13 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Workflow } from './entities/workflow.entity';
+import { Workflow, WorkflowContent } from './entities/workflow.entity';
 import { User } from '../auth/entities/user.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { GetManyWorkflowsQueryDto } from './dto/get-many-workflows.dto';
+import { validateWorkflowGraph } from './workflow-graph';
 
 const ALLOWED_WORKFLOW_SORT_FIELDS = ['createdAt', 'updatedAt', 'name'] as const;
 
@@ -32,6 +33,7 @@ export class WorkflowsService {
     workspace: { id: string },
   ): Promise<Workflow> {
     const { name, content, filePath } = createWorkflowDto;
+    this.assertValidContent(content);
 
     const workflow = new Workflow();
     workflow.name = name;
@@ -85,11 +87,26 @@ export class WorkflowsService {
   ): Promise<Workflow> {
     const workflow = await this.getWorkspaceWorkflow(id, workspace);
 
+    if (updateData.content) this.assertValidContent(updateData.content);
     if (updateData.name) workflow.name = updateData.name;
     if (updateData.content) workflow.content = updateData.content;
     if (updateData.filePath) workflow.filePath = updateData.filePath;
 
     return await this.workflowRepository.save(workflow);
+  }
+
+  /**
+   * Rejects content that is not a valid step graph (unknown `needs` reference,
+   * duplicate step name or tool, self-dependency or a cycle) with a 400 instead
+   * of letting the run stall later.
+   */
+  private assertValidContent(content: WorkflowContent | undefined): void {
+    const errors = validateWorkflowGraph(content);
+    if (errors.length > 0) {
+      throw new BadRequestException(
+        `Invalid workflow content: ${errors.join('; ')}`,
+      );
+    }
   }
 
   /**

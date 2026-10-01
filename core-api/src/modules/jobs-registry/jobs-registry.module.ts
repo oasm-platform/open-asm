@@ -20,6 +20,7 @@ import {
   AssetGroupsScheduleConsumer,
   AssetsDiscoveryScheduleConsumer,
 } from './processors/scan-schedule.processor';
+import { WorkflowRunnerService } from './workflow-runner.service';
 
 @Global()
 @Module({
@@ -45,6 +46,7 @@ import {
   controllers: [JobsRegistryController],
   providers: [
     JobsRegistryService,
+    WorkflowRunnerService,
     AssetsDiscoveryScheduleConsumer,
     AssetGroupsScheduleConsumer,
     JobResultProcessor,
@@ -52,6 +54,6 @@ import {
     JobRetentionService,
     // IssueCreationProcessor,
   ],
-  exports: [JobsRegistryService],
+  exports: [JobsRegistryService, WorkflowRunnerService],
 })
 export class JobsRegistryModule {}

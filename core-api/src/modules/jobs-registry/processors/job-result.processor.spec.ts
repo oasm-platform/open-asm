@@ -8,6 +8,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { JobResultProcessor } from '@/modules/jobs-registry/processors/job-result.processor';
+import { WorkflowRunnerService } from '@/modules/jobs-registry/workflow-runner.service';
 
 describe('JobResultProcessor', () => {
   let processor: JobResultProcessor;
@@ -15,9 +16,11 @@ describe('JobResultProcessor', () => {
 
   const mockJobsRegistryService = {
     findJobForUpdate: jest.fn(),
-    getNextStepForJob: jest.fn(),
-    markWorkflowDone: jest.fn(),
     handleJobError: jest.fn(),
+  };
+
+  const mockWorkflowRunnerService = {
+    onJobTerminal: jest.fn(),
   };
 
   const mockDataAdapterService = {
@@ -69,6 +72,10 @@ describe('JobResultProcessor', () => {
         {
           provide: JobsRegistryService,
           useValue: mockJobsRegistryService,
+        },
+        {
+          provide: WorkflowRunnerService,
+          useValue: mockWorkflowRunnerService,
         },
         {
           provide: DataAdapterService,
@@ -140,6 +147,22 @@ describe('JobResultProcessor', () => {
         'job-results',
       );
       expect(mockJobRepository.update).not.toHaveBeenCalled();
+      // The step is terminal, so the engine must decide what happens to the
+      // dependents and whether the run is finished.
+      expect(mockWorkflowRunnerService.onJobTerminal).toHaveBeenCalledWith(
+        baseJob,
+      );
+    });
+
+    // BullMQ retries the result processing, so advancing the run here would
+    // skip the dependents of a job that may still succeed.
+    it('should not advance the run while the result may still be retried', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({ error: true });
+
+      await expect(processor.process(baseBullJob)).rejects.toThrow();
+
+      expect(mockWorkflowRunnerService.onJobTerminal).not.toHaveBeenCalled();
     });
 
     // Regression: the failure detail the worker collects (executor error,
@@ -225,7 +248,6 @@ describe('JobResultProcessor', () => {
         raw: null,
         payload: { domains: ['example.com'] },
       });
-      mockJobsRegistryService.getNextStepForJob.mockResolvedValue(1);
 
       await processor.process(baseBullJob);
 
@@ -238,7 +260,10 @@ describe('JobResultProcessor', () => {
         { id: 'job-1', status: JobStatus.IN_PROGRESS },
         expect.objectContaining({ status: JobStatus.COMPLETED }),
       );
-      expect(mockJobsRegistryService.markWorkflowDone).not.toHaveBeenCalled();
+      // The workflow engine decides what runs next (or that the run is done).
+      expect(mockWorkflowRunnerService.onJobTerminal).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'job-1', status: JobStatus.COMPLETED }),
+      );
       expect(storageService.deleteFile).toHaveBeenCalledWith(
         'job-1-1710000000000.json',
         'job-results',
@@ -258,8 +283,7 @@ describe('JobResultProcessor', () => {
 
       await processor.process(baseBullJob);
 
-      expect(mockJobsRegistryService.getNextStepForJob).not.toHaveBeenCalled();
-      expect(mockJobsRegistryService.markWorkflowDone).not.toHaveBeenCalled();
+      expect(mockWorkflowRunnerService.onJobTerminal).not.toHaveBeenCalled();
       expect(storageService.deleteFile).toHaveBeenCalledWith(
         'job-1-1710000000000.json',
         'job-results',

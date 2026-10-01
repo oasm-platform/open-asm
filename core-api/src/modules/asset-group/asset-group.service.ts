@@ -413,24 +413,31 @@ export class AssetGroupService {
       name: workflowName,
       content: {
         on: { schedule, target: [] },
-        jobs: tools.map((tool) => {
-          const input = inputByToolId.get(tool.id!);
-          let config = input?.config;
-          if (config && tool.type === WorkerType.CONNECTOR) {
-            const entry = this.connectorRegistry.getConnector(tool.name);
-            const schema = entry?.configSchema ?? entry?.inputsSchema;
-            const sensitiveFields = getSensitiveFields(schema);
-            config = encryptInlineConfig(config, sensitiveFields, dek);
-          }
-          return {
-            name: tool.name,
-            run: tool.name,
-            ...(config ? { config } : {}),
-            ...(input?.configProfileId
-              ? { configProfileId: input.configProfileId }
-              : {}),
-          };
-        }),
+        // Keyed by tool name: the pipeline builder cannot select the same tool
+        // twice, so the id is unique. No `needs` — every selected tool is a
+        // root and the run dispatches them in parallel.
+        jobs: Object.fromEntries(
+          tools.map((tool) => {
+            const input = inputByToolId.get(tool.id!);
+            let config = input?.config;
+            if (config && tool.type === WorkerType.CONNECTOR) {
+              const entry = this.connectorRegistry.getConnector(tool.name);
+              const schema = entry?.configSchema ?? entry?.inputsSchema;
+              const sensitiveFields = getSensitiveFields(schema);
+              config = encryptInlineConfig(config, sensitiveFields, dek);
+            }
+            return [
+              tool.name,
+              {
+                run: tool.name,
+                ...(config ? { config } : {}),
+                ...(input?.configProfileId
+                  ? { configProfileId: input.configProfileId }
+                  : {}),
+              },
+            ];
+          }),
+        ),
         name: workflowName,
       },
       filePath: `group-${groupId}.yaml`,

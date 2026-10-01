@@ -22,6 +22,7 @@ import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ToolsService } from '../tools/tools.service';
 import { WorkflowsService } from '../workflows/workflows.service';
+import { jobEntries } from '../workflows/workflow-graph';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   VulnerabilityStatisticsDto,
@@ -75,7 +76,7 @@ export class VulnerabilitiesService {
       );
     }
 
-    const job = workflow.content.jobs?.[0];
+    const job = jobEntries(workflow.content.jobs)[0]?.[1];
     await this.jobRegistryService.createNewJob({
       tool: tools[0],
       workflow,

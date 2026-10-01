@@ -6,6 +6,8 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 import { Workflow } from './entities/workflow.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import { validateWorkflowGraph } from './workflow-graph';
+
 
 @Injectable()
 export class WorkflowTemplateService implements OnModuleInit {
@@ -47,6 +49,16 @@ export class WorkflowTemplateService implements OnModuleInit {
           const parsed = yaml.load(fileContent) as Record<string, unknown>;
 
           const newContent = this.normalizeOn(parsed);
+
+          const graphErrors = validateWorkflowGraph(
+            newContent,
+          );
+          if (graphErrors.length > 0) {
+            this.logger.error(
+              `Skipping workflow template ${fileName}: ${graphErrors.join('; ')}`,
+            );
+            continue;
+          }
 
           const baseName = fileName.replace(/\.(yaml|yml)$/, '');
           const normalizedName = baseName

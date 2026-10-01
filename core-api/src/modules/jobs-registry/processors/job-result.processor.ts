@@ -12,6 +12,7 @@ import { Repository } from 'typeorm';
 import { DataPayloadResult } from '../dto/jobs-registry.dto';
 import { Job } from '../entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry.service';
+import { WorkflowRunnerService } from '../workflow-runner.service';
 
 /** Shape of result JSON stored on S3 by the new category-specific endpoint. */
 interface CategoryResultData {
@@ -63,6 +64,7 @@ export class JobResultProcessor extends WorkerHost {
 
   constructor(
     private readonly jobsRegistryService: JobsRegistryService,
+    private readonly workflowRunnerService: WorkflowRunnerService,
     private readonly dataAdapterService: DataAdapterService,
     private readonly redis: RedisService,
     private readonly storageService: StorageService,
@@ -209,12 +211,11 @@ export class JobResultProcessor extends WorkerHost {
 
       const completedJob = { ...job, status: JobStatus.COMPLETED, completedAt };
 
-      const nextStepJobCount =
-        await this.jobsRegistryService.getNextStepForJob(completedJob);
-
-      if (nextStepJobCount === 0) {
-        await this.jobsRegistryService.markWorkflowDone(job.jobHistory.id);
-      }
+      // Hand the terminal job to the workflow engine: it dispatches every step
+      // whose `needs` are now satisfied and marks the run done when nothing is
+      // left to run. A step that spawns no jobs is a no-input skip, not the end
+      // of the run — the engine decides.
+      await this.workflowRunnerService.onJobTerminal(completedJob);
 
       if (job.isPublishEvent) {
         await this.redis.publish(
@@ -247,6 +248,11 @@ export class JobResultProcessor extends WorkerHost {
           job,
           e,
         );
+
+        // A permanently failed job is a terminal outcome for its step: let the
+        // engine skip the dependents and finish the run (previously a failed
+        // step left the run "incomplete" forever).
+        await this.workflowRunnerService.onJobTerminal(job);
 
         // Final failure: delete the result file
         try {
