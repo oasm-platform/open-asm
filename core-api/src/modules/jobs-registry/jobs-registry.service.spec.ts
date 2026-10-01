@@ -7,7 +7,6 @@ import {
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
-import { RedisService } from '@/services/redis/redis.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -96,17 +95,6 @@ describe('JobsRegistryService', () => {
     upload: jest.fn(),
   };
 
-  const mockRedisService = {
-    publish: jest.fn(),
-    client: {
-      incr: jest.fn(),
-      decr: jest.fn(),
-      del: jest.fn(),
-      get: jest.fn(),
-      set: jest.fn(),
-    },
-  };
-
   const mockToolsService = {
     getInstalledTools: jest.fn(),
     getToolByNames: jest.fn(),
@@ -174,10 +162,6 @@ describe('JobsRegistryService', () => {
         {
           provide: StorageService,
           useValue: mockStorageService,
-        },
-        {
-          provide: RedisService,
-          useValue: mockRedisService,
         },
         {
           provide: ToolsService,

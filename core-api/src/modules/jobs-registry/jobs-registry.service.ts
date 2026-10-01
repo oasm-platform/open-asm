@@ -17,7 +17,6 @@ import {
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
-import { RedisService } from '@/services/redis/redis.service';
 import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -130,7 +129,6 @@ export class JobsRegistryService {
     private dataSource: DataSource,
     @Optional() private toolsService: ToolsService,
     private storageService: StorageService,
-    private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
     private eventEmitter: EventEmitter2,
     private workspaceService: WorkspacesService,
