@@ -19,7 +19,7 @@ import { JobHistory } from './job-history.entity';
 @Index('IDX_jobs_asset_status', ['asset', 'status'])
 @Index('IDX_jobs_tool', ['tool'])
 @Index('IDX_jobs_workerId_status', ['workerId', 'status'])
-@Index('IDX_jobs_jobHistoryId', ['jobHistory'])
+@Index('IDX_jobs_jobHistoryId_status', ['jobHistory', 'status'])
 @Index('IDX_jobs_assetServiceId', ['assetService'])
 @Index('IDX_jobs_category_status', ['category', 'status'])
 export class Job extends BaseEntity {
