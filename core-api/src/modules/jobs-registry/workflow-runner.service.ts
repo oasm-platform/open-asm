@@ -360,6 +360,7 @@ export class WorkflowRunnerService {
       .innerJoin('job.tool', 'tool')
       .select('tool.name', 'tool')
       .addSelect('COUNT(*)', 'total')
+      .addSelect(`MAX(job."completedAt")`, 'lastCompletedAt')
       .addSelect(
         `COUNT(*) FILTER (WHERE job.status = '${JobStatus.PENDING}')`,
         'pending',
@@ -382,17 +383,25 @@ export class WorkflowRunnerService {
       )
       .where('job."jobHistoryId" = :id', { id: jobHistoryId })
       .groupBy('tool.name')
-      .getRawMany<Record<string, string>>();
+      .getRawMany<Record<string, string | Date>>();
 
-    return rows.map((row) => ({
-      tool: row['tool'],
-      total: Number(row['total'] ?? 0),
-      pending: Number(row['pending'] ?? 0),
-      inProgress: Number(row['inProgress'] ?? 0),
-      completed: Number(row['completed'] ?? 0),
-      failed: Number(row['failed'] ?? 0),
-      cancelled: Number(row['cancelled'] ?? 0),
-    }));
+    return rows.map((row) => {
+      const lastCompletedAt = row['lastCompletedAt'];
+      return {
+        tool: String(row['tool']),
+        total: Number(row['total'] ?? 0),
+        pending: Number(row['pending'] ?? 0),
+        inProgress: Number(row['inProgress'] ?? 0),
+        completed: Number(row['completed'] ?? 0),
+        failed: Number(row['failed'] ?? 0),
+        cancelled: Number(row['cancelled'] ?? 0),
+        // pg hands timestamptz back as a Date; keep the summary a plain string.
+        lastCompletedAt:
+          lastCompletedAt instanceof Date
+            ? lastCompletedAt.toISOString()
+            : lastCompletedAt,
+      };
+    });
   }
 
   /** The job payload carried by `WORKFLOW_END` (statistics snapshot diff). */

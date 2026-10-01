@@ -544,6 +544,20 @@ describe('reconcileStepStates', () => {
     expect(second.a.status).toBe('done');
   });
 
+  it('reports the real completion time when a step is reconciled after the fact', () => {
+    const state = reconcileStepStates(chain, stateOf({}), [
+      {
+        ...summary('subfinder', { total: 1, completed: 1 }),
+        lastCompletedAt: '2026-01-01T00:05:00.000Z',
+      },
+    ]);
+
+    expect(state.a).toMatchObject({
+      status: 'done',
+      finishedAt: '2026-01-01T00:05:00.000Z',
+    });
+  });
+
   it('keeps state entries that are not part of the graph', () => {
     const state = reconcileStepStates(
       chain,

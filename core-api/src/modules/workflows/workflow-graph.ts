@@ -97,6 +97,11 @@ export interface StepJobSummary {
   completed: number;
   failed: number;
   cancelled: number;
+  /**
+   * When the last job of the step finished, so a step reconciled after the fact
+   * reports the real completion time instead of the moment it was noticed.
+   */
+  lastCompletedAt?: string;
 }
 
 export interface AdvancePlan {
@@ -583,7 +588,7 @@ export function reconcileStepStates(
       jobs: jobs.total,
       reason,
       dispatchedAt: current.dispatchedAt ?? timestamp,
-      finishedAt: current.finishedAt ?? timestamp,
+      finishedAt: current.finishedAt ?? jobs.lastCompletedAt ?? timestamp,
     };
   }
 
