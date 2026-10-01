@@ -5,7 +5,7 @@ import { StorageService } from '@/modules/storage/storage.service';
 import { builtInTools } from '@/modules/tools/tools-provider/built-in-tools';
 import { RedisService } from '@/services/redis/redis.service';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { BadGatewayException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job as BullJob } from 'bullmq';
 import { Repository } from 'typeorm';
@@ -150,19 +150,25 @@ export class JobResultProcessor extends WorkerHost {
           throw new Error(`Built-in step not found for tool: ${job.tool.name}`);
         }
 
-        if (!raw) {
-          throw new BadGatewayException(
-            `Raw CLI output is required for built-in tool: ${job.tool.name}`,
-          );
-        }
-
         if (!builtInStep.parser) {
           throw new Error(
             `Parser function not found for built-in tool: ${job.tool.name}`,
           );
         }
 
-        dataForSync = builtInStep.parser(raw);
+        if (!raw) {
+          // No output is a result, not a failure: the built-in CLIs exit 0 and
+          // print nothing when they find nothing (a host with no open port, a
+          // name that does not resolve, or a target dropping the probes). Failing
+          // here turned a normal "nothing found" into a failed step, which then
+          // skipped every job that needed it.
+          this.logger.log(
+            `Built-in tool ${job.tool.name} produced no output; treating job ${job.id} as an empty result`,
+          );
+          dataForSync = undefined;
+        } else {
+          dataForSync = builtInStep.parser(raw);
+        }
       } else {
         // External/custom tool — use the structured payload directly.
         // For the new category-specific endpoint the category is available

@@ -1,4 +1,4 @@
-import { JobStatus, WorkerType } from '@/common/enums/enum';
+import { JobStatus, ToolCategory, WorkerType } from '@/common/enums/enum';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { StorageService } from '@/modules/storage/storage.service';
 import { RedisService } from '@/services/redis/redis.service';
@@ -267,6 +267,40 @@ describe('JobResultProcessor', () => {
       expect(storageService.deleteFile).toHaveBeenCalledWith(
         'job-1-1710000000000.json',
         'job-results',
+      );
+    });
+
+    // Regression: naabu (and the other built-ins) exit 0 with an empty stdout
+    // when they find nothing — a host with no open port, a name that does not
+    // resolve, or a target dropping the probes. Failing the job there turns a
+    // normal "nothing here" into a failed step whose dependents are then
+    // skipped, so the whole recon chain died on wildcard-heavy domains.
+    it('should complete a built-in job that produced no output instead of failing it', async () => {
+      const naabuJob = {
+        ...baseJob,
+        tool: {
+          name: 'naabu',
+          type: WorkerType.BUILT_IN,
+          category: ToolCategory.PORTS_SCANNER,
+        },
+      } as unknown as Job;
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(naabuJob);
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: false,
+        raw: '',
+        payload: undefined,
+      });
+
+      await processor.process(baseBullJob);
+
+      expect(mockDataAdapterService.syncData).not.toHaveBeenCalled();
+      expect(mockJobRepository.update).toHaveBeenCalledWith(
+        { id: 'job-1', status: JobStatus.IN_PROGRESS },
+        expect.objectContaining({ status: JobStatus.COMPLETED }),
+      );
+      expect(mockWorkflowRunnerService.onJobTerminal).toHaveBeenCalledWith(
+        expect.objectContaining({ status: JobStatus.COMPLETED }),
       );
     });
 
