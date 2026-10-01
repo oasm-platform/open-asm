@@ -105,7 +105,7 @@ function statusMeta(status: string) {
 }
 
 function WorkflowStepNode({ data }: NodeProps) {
-  const { id, label, run, status, needs, jobs, reason, logoUrl } =
+  const { id, label, run, status, needs, jobs, failed, reason, logoUrl } =
     data as StepNodeData;
   const meta = statusMeta(status);
   const skipped = status === 'skipped';
@@ -157,6 +157,11 @@ function WorkflowStepNode({ data }: NodeProps) {
                   · {jobs} job{jobs > 1 ? 's' : ''}
                 </span>
               )}
+              {!!failed && failed > 0 && (
+                <span className="shrink-0 font-medium text-destructive">
+                  · {failed} failed
+                </span>
+              )}
             </div>
             <Handle
               type="source"
@@ -172,6 +177,9 @@ function WorkflowStepNode({ data }: NodeProps) {
           </p>
           <p className="text-muted-foreground">job id: {id}</p>
           {needs.length > 0 && <p>Waits for: {needs.join(', ')}</p>}
+          {!!failed && failed > 0 && (
+            <p className="text-destructive">{failed} job(s) failed</p>
+          )}
           {skipReason && <p>Skipped: {skipReason}</p>}
         </TooltipContent>
       </Tooltip>

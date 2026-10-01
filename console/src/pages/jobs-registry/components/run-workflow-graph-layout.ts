@@ -27,6 +27,8 @@ export interface StepNodeData extends Record<string, unknown> {
   status: string;
   needs: string[];
   jobs: number;
+  /** Job rows that failed — shown even when the step itself is done. */
+  failed?: number;
   reason?: string;
   logoUrl?: string;
 }
@@ -109,6 +111,7 @@ export function buildWorkflowGraphLayout(
           status: step.status,
           needs: step.needs,
           jobs: step.jobs,
+          failed: step.failed,
           reason: step.reason,
           logoUrl: step.logoUrl,
         } satisfies StepNodeData,

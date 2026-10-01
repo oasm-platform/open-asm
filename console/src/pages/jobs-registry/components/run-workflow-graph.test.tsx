@@ -62,6 +62,7 @@ const chainSteps = [
     needs: ['scan_subdomain'],
     status: 'dispatched',
     jobs: 13,
+    failed: 2,
   },
   {
     id: 'http_probe',
@@ -98,6 +99,9 @@ describe('RunWorkflowGraph', () => {
 
     expect(container.textContent).toContain('Port Scan');
     expect(container.textContent).toContain('naabu');
+    // A step that is done (or running) can still carry failed job rows; the
+    // count is shown so a partial failure is never hidden.
+    expect(container.textContent).toContain('2 failed');
     expect(container.textContent).not.toContain('Wave');
     expect(container.textContent).not.toContain('waves');
   });
