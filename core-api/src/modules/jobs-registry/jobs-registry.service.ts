@@ -1,6 +1,11 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
+  MAX_JOB_CLAIM_SIZE,
+  TIMELINE_LOOKBACK_DAYS,
+  WORKER_CLAIM_CACHE_MS,
+} from '@/common/constants/app.constants';
+import {
   BullMQName,
   CATEGORY_DATA_SOURCE_MAP,
   EventTriggerType,
@@ -111,33 +116,6 @@ const JOB_HISTORY_STATUS_SQL = `CASE
           WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.SKIPPED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.SKIPPED}'
           ELSE '${JobStatus.PENDING}'
         END`;
-
-/**
- * Hard ceiling on a single batched claim. A worker sizes its own claim from its
- * free concurrency slots, but it must never be able to drain an unbounded slice
- * of the queue in one request.
- */
-const MAX_JOB_CLAIM_SIZE = 100;
-
-/**
- * How long a worker row may be served from cache during job claims. Kept short
- * because the row carries routing fields (`internalNetworkId`, `tool`) that
- * decide which jobs the worker is allowed to claim — a long TTL lets a worker
- * keep claiming for a scope it no longer has.
- */
-const WORKER_CACHE_MS = 5_000;
-
-/**
- * How far back the dashboard timeline looks.
- *
- * The timeline query runs two window functions over every job of the workspace
- * and then keeps only the newest 15 groups, so without a bound it scans the
- * workspace's whole job history on every dashboard load. 30 days is
- * deliberately generous: long enough to cover any realistic scan cadence,
- * short enough that the scan stays proportional to recent activity instead of
- * to total history.
- */
-const TIMELINE_LOOKBACK_DAYS = 30;
 
 @Injectable()
 export class JobsRegistryService {
@@ -705,7 +683,7 @@ export class JobsRegistryService {
       relations: ['workspace', 'tool'],
       cache: {
         id: `workers:${workerId}`,
-        milliseconds: WORKER_CACHE_MS,
+        milliseconds: WORKER_CLAIM_CACHE_MS,
       },
     });
 

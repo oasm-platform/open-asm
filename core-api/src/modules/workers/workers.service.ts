@@ -34,6 +34,10 @@ import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import {
+  JOB_MAX_RETRIES,
+  MAX_RUNNING_JOBS_PER_WORKER,
+} from '@/common/constants/app.constants';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import { WorkerTelemetryService } from './worker-telemetry.service';
 import {
@@ -45,22 +49,6 @@ import {
   WorkerToolJobDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
-
-/**
- * Cap on the running jobs returned per worker detail response. The console
- * polls this endpoint every few seconds, so the payload is bounded on purpose:
- * a busy worker can hold far more in-progress jobs than a diagram can draw, and
- * `/jobs-registry` remains the endpoint that pages through all of them.
- * `currentJobsCount` still reports the true total.
- */
-const MAX_RUNNING_JOBS_PER_WORKER = 20;
-
-/**
- * How many times a FAILED job may be automatically requeued before it is left
- * failed for a human to look at. Mirrors the increment in
- * `JobsRegistryService.handleJobError`.
- */
-const JOB_MAX_RETRIES = 4;
 
 @Injectable()
 export class WorkersService {
