@@ -143,7 +143,7 @@ describe('buildWorkflowGraphLayout', () => {
     });
   });
 
-  it('draws one dashed edge per need, animated only on the running step', () => {
+  it('draws one custom edge per need, marking the running step’s dependency as active', () => {
     const { edges } = buildWorkflowGraphLayout(chain);
 
     expect(edges.map((edge) => edge.id)).toEqual([
@@ -151,9 +151,32 @@ describe('buildWorkflowGraphLayout', () => {
       'port_scan->http_probe',
       'http_probe->take_screenshot',
     ]);
-    expect(edges.find((edge) => edge.id === 'port_scan->http_probe')?.animated).toBe(true);
-    expect(edges.find((edge) => edge.id === 'scan_subdomain->port_scan')?.animated).toBe(false);
-    expect(edges[0].style?.strokeDasharray).toBe('4 4');
+    expect(edges.every((edge) => edge.type === 'step')).toBe(true);
+
+    // Only the handover into the executing step animates: http_probe is the
+    // step running, so the edge that feeds it carries the travelling arrows.
+    const live = edges.find((edge) => edge.id === 'port_scan->http_probe');
+    expect(live?.data).toEqual({ active: true });
+    expect(live?.animated).toBe(true);
+    expect(live?.style?.stroke).toBe('var(--primary)');
+    expect(live?.style?.strokeWidth).toBe(2);
+    // The active edge is solid (`undefined`) — the motion comes from the arrows,
+    // not from a marching-ants dash.
+    expect(live?.style?.strokeDasharray).toBeUndefined();
+
+    const idle = edges.find((edge) => edge.id === 'scan_subdomain->port_scan');
+    expect(idle?.data).toEqual({ active: false });
+    expect(idle?.animated).toBe(false);
+    expect(idle?.style?.strokeDasharray).toBe('4 4');
+  });
+
+  it('keeps an edge idle until the step it feeds is the one running', () => {
+    const pendingOnly = buildWorkflowGraphLayout([
+      step('a', { status: 'done' }),
+      step('b', { needs: ['a'], status: 'pending' }),
+    ]);
+
+    expect(pendingOnly.edges[0].data).toEqual({ active: false });
   });
 
   it('marks a failed edge and a skipped one differently', () => {

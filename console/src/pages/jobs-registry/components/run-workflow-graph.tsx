@@ -12,7 +12,11 @@ import type { WorkflowStepStatusDto } from '@/services/apis/gen/queries';
 import {
   Background,
   BackgroundVariant,
+  BaseEdge,
+  getSmoothStepPath,
   ReactFlow,
+  type EdgeProps,
+  type EdgeTypes,
   type NodeProps,
   type NodeTypes,
 } from '@xyflow/react';
@@ -201,6 +205,64 @@ const nodeTypes = {
   waveLabel: WaveLabelNode,
 } satisfies NodeTypes;
 
+/**
+ * Edge between a step and the step that needs it.
+ *
+ * While the dependent step is executing, the dependency is "arriving": two small
+ * arrows travel the path from the finished step into the running one, looping
+ * forever, so the handover is visible instead of implied by a static line.
+ */
+function AnimatedStepEdge({
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  data,
+  markerEnd,
+  style,
+}: EdgeProps) {
+  const [edgePath] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+  const active = (data as { active?: boolean } | undefined)?.active === true;
+
+  return (
+    <>
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
+      {active &&
+        [0, 0.55].map((delay) => (
+          <path
+            key={delay}
+            d="M -4,-3.5 L 5,0 L -4,3.5 Z"
+            fill="var(--primary)"
+            opacity={0.95}
+          >
+            {/* repeatCount=indefinite keeps the arrows flowing for as long as
+                the step runs, not just for one pass. */}
+            <animateMotion
+              dur="1.1s"
+              begin={`${delay}s`}
+              repeatCount="indefinite"
+              path={edgePath}
+              rotate="auto"
+            />
+          </path>
+        ))}
+    </>
+  );
+}
+
+const edgeTypes = {
+  step: AnimatedStepEdge,
+} satisfies EdgeTypes;
+
 interface RunWorkflowGraphProps {
   steps: WorkflowStepStatusDto[];
   /** Steps executing right now — more than one means the run branched. */
@@ -249,6 +311,7 @@ export default function RunWorkflowGraph({
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           colorMode={resolvedTheme}
           fitView
           fitViewOptions={{ padding: 0.15, maxZoom: 1 }}

@@ -157,30 +157,43 @@ export function buildWorkflowGraphLayout(
   }
 
   const edges: Edge[] = steps.flatMap((step) =>
-    step.needs.map((need) => ({
-      id: `${need}->${step.id}`,
-      source: need,
-      target: step.id,
-      type: 'smoothstep',
-      // A running step gets flowing dashes so the eye follows the live edge.
-      animated: step.status === 'dispatched',
-      style: {
-        stroke:
-          step.status === 'failed'
-            ? 'var(--destructive)'
-            : step.status === 'skipped'
-              ? 'var(--border)'
-              : 'var(--muted-foreground)',
-        strokeDasharray: '4 4',
-        strokeWidth: 1.5,
-      },
-      markerEnd: {
-        // Type-only: the layout module must not pull xyflow in at runtime.
-        type: 'arrowclosed' as EdgeMarker['type'],
-        width: 14,
-        height: 14,
-      },
-    })),
+    step.needs.map((need) => {
+      // The handover edge: the step it needed is finished and this one is
+      // executing now. That is when the dependency actually travels, so that is
+      // the edge drawn with a continuous arrow flowing into the running step.
+      const isActive = step.status === 'dispatched';
+      const stroke =
+        step.status === 'failed'
+          ? 'var(--destructive)'
+          : step.status === 'skipped'
+            ? 'var(--border)'
+            : isActive
+              ? 'var(--primary)'
+              : 'var(--muted-foreground)';
+
+      return {
+        id: `${need}->${step.id}`,
+        source: need,
+        target: step.id,
+        // Custom edge: it draws the travelling arrow itself, so the flow
+        // direction is explicit instead of relying on the default dashes.
+        type: 'step',
+        animated: isActive,
+        data: { active: isActive },
+        style: {
+          stroke,
+          strokeDasharray: isActive ? undefined : '4 4',
+          strokeWidth: isActive ? 2 : 1.5,
+        },
+        markerEnd: {
+          // Type-only: the layout module must not pull xyflow in at runtime.
+          type: 'arrowclosed' as EdgeMarker['type'],
+          width: 16,
+          height: 16,
+          color: stroke,
+        },
+      };
+    }),
   );
 
   return {
