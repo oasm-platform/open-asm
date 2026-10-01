@@ -33,7 +33,9 @@ describe('Workflow DAG run (e2e)', () => {
   let runner: WorkflowRunnerService;
   let workspaceId: string;
   let targetId: string;
+  let assetId: string;
   let historyId: string | undefined;
+  let legacyWorkflowId: string | undefined;
 
   const domain = `e2e-dag-${Date.now()}.example.com`;
 
@@ -72,11 +74,18 @@ describe('Workflow DAG run (e2e)', () => {
       isPrimary: true,
       isEnabled: true,
     });
+    const primaryAsset = await dataSource
+      .getRepository(Asset)
+      .findOneOrFail({ where: { targetId, isPrimary: true } });
+    assetId = primaryAsset.id;
   });
 
   afterAll(async () => {
     if (historyId) {
       await dataSource.getRepository(JobHistory).delete({ id: historyId });
+    }
+    if (legacyWorkflowId) {
+      await dataSource.getRepository(Workflow).delete({ id: legacyWorkflowId });
     }
     if (targetId) {
       await dataSource.getRepository(Target).delete({ id: targetId });
@@ -157,6 +166,43 @@ describe('Workflow DAG run (e2e)', () => {
     });
     // Every step is terminal and no job is left, so the run closed itself.
     expect(current.isCompleted).toBe(true);
+  });
+
+  // Asset groups created before the jobs-map switch still store `jobs` as an
+  // array. Such a workflow must keep running: the ids are derived from the old
+  // display names and, since no job declares `needs`, every job is a root and
+  // is dispatched in parallel on the same run.
+  it('runs a legacy array workflow as parallel roots', async () => {
+    const legacyWorkflow = await dataSource.getRepository(Workflow).save({
+      name: 'Legacy Pipeline',
+      filePath: `e2e-legacy-${Date.now()}.yaml`,
+      workspace: { id: workspaceId },
+      content: {
+        on: { target: [], schedule: '0 0 * * *' },
+        name: 'Legacy Pipeline',
+        jobs: [
+          { name: 'Scan Subdomain', run: 'subfinder' },
+          { name: 'Port Scan', run: 'naabu' },
+        ],
+      },
+    } as unknown as Workflow);
+    legacyWorkflowId = legacyWorkflow.id;
+
+    const { jobHistory, dispatched } = await runner.startRun({
+      workflow: legacyWorkflow,
+      workspaceId,
+      jobName: 'legacy-pipeline',
+      assetIds: [assetId],
+    });
+
+    expect(jobHistory).toBeTruthy();
+    const history = await reloadHistory(jobHistory!.id);
+    expect(dispatched).toBe(2);
+    expect(history.steps).toMatchObject({
+      'Scan Subdomain': { status: 'dispatched', jobs: 1 },
+      'Port Scan': { status: 'dispatched', jobs: 1 },
+    });
+    expect(jobTools(history)).toEqual(['naabu', 'subfinder']);
   });
 
   async function completeJob(job: Job): Promise<void> {

@@ -364,6 +364,37 @@ describe('WorkflowRunnerService', () => {
         expect(args.assetIds).toEqual(['asset-1', 'asset-2']);
       }
     });
+
+    // Asset groups created before the job-map switch still hold `jobs` as an
+    // array. They must keep running: the ids come from the old names and, with
+    // no `needs` anywhere, every job is a root and starts in parallel.
+    it('runs a legacy array workflow as parallel roots', async () => {
+      await setup(createFakeDb());
+      getToolByNames.mockResolvedValue([
+        tool('subfinder', ToolCategory.SUBDOMAINS),
+        tool('naabu', ToolCategory.PORTS_SCANNER),
+      ]);
+      const legacyWorkflow = workflow([]);
+      (legacyWorkflow.content as unknown as { jobs: unknown }).jobs = [
+        { name: 'Scan Subdomain', run: 'subfinder' },
+        { name: 'Port Scan', run: 'naabu' },
+      ];
+
+      const result = await service.startRun({
+        workflow: legacyWorkflow,
+        workspaceId: 'workspace-1',
+        jobName: 'group-1',
+        jobRunType: JobRunType.SCHEDULED,
+        assetIds: ['asset-1'],
+      });
+
+      expect(result.dispatched).toBe(2);
+      expect(createNewJob).toHaveBeenCalledTimes(2);
+      expect(db.history.steps).toMatchObject({
+        'Scan Subdomain': { status: 'dispatched', jobs: 1 },
+        'Port Scan': { status: 'dispatched', jobs: 1 },
+      });
+    });
   });
 
   describe('advanceRun', () => {
