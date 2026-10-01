@@ -2,6 +2,7 @@ import { Asset } from '@/modules/assets/entities/assets.entity';
 import { JobStatus } from '@/common/enums/enum';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
+import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { WorkflowRunnerService } from '@/modules/jobs-registry/workflow-runner.service';
 import {
   Target,
@@ -143,6 +144,18 @@ describe('Workflow DAG run (e2e)', () => {
     expect(history.jobs).toHaveLength(1);
     expect(history.jobs![0].tool.name).toBe('subfinder');
     expect(history.isCompleted).toBe(false);
+
+    // Dependency order, not jsonb key order: the stored map was re-sorted by
+    // Postgres, so the run detail must derive its order from `needs`.
+    const detail = await app
+      .get(JobsRegistryService)
+      .getJobHistoryDetail(workspaceId, history.id);
+    expect(detail.steps?.map((step) => step.id)).toEqual([
+      'scan_subdomain',
+      'port_scan',
+      'http_probe',
+      'take_screenshot',
+    ]);
 
     // ── subfinder done → naabu dispatched ────────────────────────────────
     await completeJob(history.jobs![0]);

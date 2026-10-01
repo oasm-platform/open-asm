@@ -959,17 +959,27 @@ describe('JobsRegistryService', () => {
         workflow: {
           name: 'test-workflow',
           content: {
+            // Stored in jsonb key order, NOT authored order, exactly as Postgres
+            // hands it back — the response must still come out dependencies-first.
             jobs: {
-              scan_subdomain: { name: 'Scan Subdomain', run: 'subfinder' },
-              port_scan: {
-                name: 'Port Scan',
-                run: 'naabu',
-                needs: ['scan_subdomain'],
-              },
               http_probe: {
                 name: 'HTTP Probe',
                 run: 'httpx',
                 needs: ['port_scan'],
+              },
+              take_screenshot: {
+                name: 'Take Screenshot',
+                run: 'screenshot',
+                needs: ['http_probe'],
+              },
+              scan_subdomain: {
+                name: 'Scan Subdomain',
+                run: 'subfinder',
+              },
+              port_scan: {
+                name: 'Port Scan',
+                run: 'naabu',
+                needs: ['scan_subdomain'],
               },
             },
           },
@@ -1016,6 +1026,14 @@ describe('JobsRegistryService', () => {
           needs: ['port_scan'],
           status: 'skipped',
           reason: 'blocked-by-failure',
+          jobs: 0,
+        },
+        {
+          id: 'take_screenshot',
+          name: 'Take Screenshot',
+          run: 'screenshot',
+          needs: ['http_probe'],
+          status: 'pending',
           jobs: 0,
         },
       ]);

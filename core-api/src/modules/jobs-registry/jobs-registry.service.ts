@@ -50,8 +50,8 @@ import {
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import {
-  jobEntries,
   normalizeNeeds,
+  orderedJobEntries,
   withStepSkipped,
   type RunStepStatus,
 } from '../workflows/workflow-graph';
@@ -1388,7 +1388,9 @@ export class JobsRegistryService {
       }
     }
 
-    const workflowJobs = jobEntries(jobHistory.workflow?.content.jobs);
+    // Dependency order, not stored order: `content` is jsonb and Postgres does
+    // not preserve the map's key order.
+    const workflowJobs = orderedJobEntries(jobHistory.workflow?.content.jobs);
 
     const tools = workflowJobs
       .map(([, job]) => installedToolsByName.get(job.run))

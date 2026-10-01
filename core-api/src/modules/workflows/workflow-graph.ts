@@ -175,6 +175,58 @@ function indexGraph(steps: WorkflowStep[]): WorkflowGraph {
   return { steps, byId, dependents };
 }
 
+/** Deterministic sibling order: display label first, then id. */
+function compareSteps(a: WorkflowStep, b: WorkflowStep): number {
+  return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+}
+
+/**
+ * Orders steps dependencies-first, with siblings ordered by label.
+ *
+ * The authored order of a `jobs` map cannot be trusted: `workflow.content` is a
+ * jsonb column and Postgres does not preserve object key order (it re-sorts keys
+ * by length, then bytes). Every consumer — dispatch, the run detail page, the
+ * tools list — therefore derives its order from this function instead of from
+ * the map.
+ *
+ * Cycles are already rejected by the caller, so every step comes out.
+ */
+function orderSteps(steps: WorkflowStep[]): WorkflowStep[] {
+  const byId = new Map(steps.map((step) => [step.id, step]));
+  const indegree = new Map<string, number>();
+  const dependents = new Map<string, string[]>();
+
+  for (const step of steps) {
+    indegree.set(step.id, step.needs.length);
+    for (const need of step.needs) {
+      const list = dependents.get(need) ?? [];
+      list.push(step.id);
+      dependents.set(need, list);
+    }
+  }
+
+  const ready = steps
+    .filter((step) => (indegree.get(step.id) ?? 0) === 0)
+    .sort(compareSteps);
+  const ordered: WorkflowStep[] = [];
+
+  while (ready.length > 0) {
+    const step = ready.shift()!;
+    ordered.push(step);
+    for (const dependentId of dependents.get(step.id) ?? []) {
+      const remaining = (indegree.get(dependentId) ?? 1) - 1;
+      indegree.set(dependentId, remaining);
+      if (remaining === 0) {
+        const dependent = byId.get(dependentId);
+        if (dependent) ready.push(dependent);
+        ready.sort(compareSteps);
+      }
+    }
+  }
+
+  return ordered;
+}
+
 /** Kahn's algorithm — returns the ids still stuck in a cycle, if any. */
 function findCycleNodes(steps: WorkflowStep[]): string[] {
   const indegree = new Map<string, number>();
@@ -290,7 +342,33 @@ export function buildWorkflowGraph(content: {
     throw new WorkflowGraphError(errors[0], errors);
   }
 
-  return indexGraph(steps);
+  const ordered = orderSteps(steps);
+  ordered.forEach((step, index) => {
+    step.order = index;
+  });
+
+  return indexGraph(ordered);
+}
+
+/**
+ * `[id, definition]` pairs in dependency order, for read paths (run detail,
+ * tools list) that must not fail on malformed legacy content — an invalid graph
+ * falls back to the raw order of the stored map.
+ */
+export function orderedJobEntries(
+  jobs: WorkflowJobsInput | undefined | null,
+): [string, WorkflowStepDefinition][] {
+  const entries = jobEntries(jobs);
+  try {
+    const graph = buildWorkflowGraph({ jobs: jobs ?? undefined });
+    const byId = new Map(entries);
+    return graph.steps.map((step) => [
+      step.id,
+      byId.get(step.id) ?? { run: step.run },
+    ]);
+  } catch {
+    return entries;
+  }
 }
 
 /** @returns the structural problems of a workflow definition, `[]` when valid. */

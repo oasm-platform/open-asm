@@ -89,12 +89,50 @@ describe('buildWorkflowGraph', () => {
     );
 
     expect(graph.steps.map((step) => step.needs)).toEqual([[], [], []]);
+    // Siblings come out by label, never in stored-map order.
     expect(graph.steps.map((step) => step.id)).toEqual([
-      'port_scan',
       'http_probe',
+      'port_scan',
       'vuln_scan',
     ]);
     expect(graph.steps.map((step) => step.order)).toEqual([0, 1, 2]);
+  });
+
+  // `content` is jsonb, which does not preserve key order — Postgres re-sorts
+  // the keys. The graph must therefore order jobs by `needs`, not by the order
+  // they happen to be stored in, or a recon chain renders out of order.
+  it('orders a chain dependencies-first regardless of stored key order', () => {
+    const graph = buildWorkflowGraph(
+      content({
+        take_screenshot: {
+          name: 'Take Screenshot',
+          run: 'screenshot',
+          needs: ['http_probe'],
+        },
+        http_probe: { name: 'HTTP Probe', run: 'httpx', needs: ['port_scan'] },
+        scan_subdomain: { name: 'Scan Subdomain', run: 'subfinder' },
+        port_scan: { name: 'Port Scan', run: 'naabu', needs: ['scan_subdomain'] },
+      }),
+    );
+
+    expect(graph.steps.map((step) => step.id)).toEqual([
+      'scan_subdomain',
+      'port_scan',
+      'http_probe',
+      'take_screenshot',
+    ]);
+    expect(graph.steps.map((step) => step.order)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('orders parallel siblings by their display label', () => {
+    const graph = buildWorkflowGraph(
+      content({
+        z_job: { name: 'Alpha', run: 'naabu' },
+        a_job: { name: 'Zulu', run: 'httpx' },
+      }),
+    );
+
+    expect(graph.steps.map((step) => step.id)).toEqual(['z_job', 'a_job']);
   });
 
   it('resolves a needs chain by job id', () => {

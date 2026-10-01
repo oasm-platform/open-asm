@@ -132,16 +132,22 @@ export default function AssetGroupWorkflow({
   const jobsJson = useMemo(() => JSON.stringify(jobs), [jobs]);
   const pipeline: PipelineToolEntry[] = useMemo(() => {
     const jobs = currentWorkflow?.workflow.content?.jobs ?? {};
-    return Object.values(jobs).map((job) => {
-      const tool = toolByName.get(job.run);
-      return {
-        toolId: tool?.id ?? job.run,
-        ...(job.config ? { config: job.config as Record<string, unknown> } : {}),
-        ...(job.configProfileId
-          ? { configProfileId: job.configProfileId }
-          : {}),
-      };
-    });
+    // Sorted by job id so the tool grid stays stable: `content` is stored as
+    // jsonb, which does not preserve the map's key order.
+    return Object.entries(jobs)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, job]) => {
+        const tool = toolByName.get(job.run);
+        return {
+          toolId: tool?.id ?? job.run,
+          ...(job.config
+            ? { config: job.config as Record<string, unknown> }
+            : {}),
+          ...(job.configProfileId
+            ? { configProfileId: job.configProfileId }
+            : {}),
+        };
+      });
     // jobsJson captures order + per-job config changes; toolByName covers id mapping.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobsJson, toolByName]);
