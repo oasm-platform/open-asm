@@ -860,7 +860,7 @@ function ToolPipelineBuilderComponent({
           </div>
           <span className="text-xs text-muted-foreground">
             {value.length} selected
-            {value.length > 0 ? ' · execution runs in # order' : ''}
+            {value.length > 0 ? ' · runs in parallel' : ''}
           </span>
         </div>
 

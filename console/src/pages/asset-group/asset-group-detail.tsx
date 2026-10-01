@@ -97,7 +97,7 @@ export default function AssetGroupDetail() {
   const workflows = data.assetGroupWorkflows ?? [];
   const workflow = workflows[0];
   const lastRun = workflow?.lastRun;
-  const toolCount = workflow?.workflow.content?.jobs?.length ?? 0;
+  const toolCount = Object.keys(workflow?.workflow.content?.jobs ?? {}).length;
 
   // One row per fact, one fact per row. The hero carries identity only (name +
   // the group colour, as a small swatch beside it) and never repeats a value
