@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	JobsRegistryService_Next_FullMethodName                  = "/jobs_registry.JobsRegistryService/Next"
+	JobsRegistryService_NextBatch_FullMethodName             = "/jobs_registry.JobsRegistryService/NextBatch"
 	JobsRegistryService_Result_FullMethodName                = "/jobs_registry.JobsRegistryService/Result"
 	JobsRegistryService_ResultSubdomains_FullMethodName      = "/jobs_registry.JobsRegistryService/ResultSubdomains"
 	JobsRegistryService_ResultHttpProbe_FullMethodName       = "/jobs_registry.JobsRegistryService/ResultHttpProbe"
@@ -36,6 +37,11 @@ const (
 // Service Definition
 type JobsRegistryServiceClient interface {
 	Next(ctx context.Context, in *Worker, opts ...grpc.CallOption) (*Job, error)
+	// Batch variant of Next. Claims up to `limit` eligible jobs in a single
+	// transaction so a worker fills every free concurrency slot with one
+	// round-trip instead of one per slot. `Next` is retained so workers built
+	// before this RPC keep working.
+	NextBatch(ctx context.Context, in *NextBatchRequest, opts ...grpc.CallOption) (*JobList, error)
 	// DEPRECATED: Use category-specific RPCs
 	Result(ctx context.Context, in *JobResultRequest, opts ...grpc.CallOption) (*JobResponse, error)
 	// Category-specific result RPCs
@@ -59,6 +65,16 @@ func (c *jobsRegistryServiceClient) Next(ctx context.Context, in *Worker, opts .
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Job)
 	err := c.cc.Invoke(ctx, JobsRegistryService_Next_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *jobsRegistryServiceClient) NextBatch(ctx context.Context, in *NextBatchRequest, opts ...grpc.CallOption) (*JobList, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JobList)
+	err := c.cc.Invoke(ctx, JobsRegistryService_NextBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +158,11 @@ func (c *jobsRegistryServiceClient) ResultUrlDiscovery(ctx context.Context, in *
 // Service Definition
 type JobsRegistryServiceServer interface {
 	Next(context.Context, *Worker) (*Job, error)
+	// Batch variant of Next. Claims up to `limit` eligible jobs in a single
+	// transaction so a worker fills every free concurrency slot with one
+	// round-trip instead of one per slot. `Next` is retained so workers built
+	// before this RPC keep working.
+	NextBatch(context.Context, *NextBatchRequest) (*JobList, error)
 	// DEPRECATED: Use category-specific RPCs
 	Result(context.Context, *JobResultRequest) (*JobResponse, error)
 	// Category-specific result RPCs
@@ -163,6 +184,9 @@ type UnimplementedJobsRegistryServiceServer struct{}
 
 func (UnimplementedJobsRegistryServiceServer) Next(context.Context, *Worker) (*Job, error) {
 	return nil, status.Error(codes.Unimplemented, "method Next not implemented")
+}
+func (UnimplementedJobsRegistryServiceServer) NextBatch(context.Context, *NextBatchRequest) (*JobList, error) {
+	return nil, status.Error(codes.Unimplemented, "method NextBatch not implemented")
 }
 func (UnimplementedJobsRegistryServiceServer) Result(context.Context, *JobResultRequest) (*JobResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Result not implemented")
@@ -220,6 +244,24 @@ func _JobsRegistryService_Next_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(JobsRegistryServiceServer).Next(ctx, req.(*Worker))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _JobsRegistryService_NextBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NextBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(JobsRegistryServiceServer).NextBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: JobsRegistryService_NextBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(JobsRegistryServiceServer).NextBatch(ctx, req.(*NextBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -360,6 +402,10 @@ var JobsRegistryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Next",
 			Handler:    _JobsRegistryService_Next_Handler,
+		},
+		{
+			MethodName: "NextBatch",
+			Handler:    _JobsRegistryService_NextBatch_Handler,
 		},
 		{
 			MethodName: "Result",

@@ -140,13 +140,13 @@ func splitLogChunk(chunk []byte) []string {
 	return out
 }
 
-func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
-	job, err := grpcClient.NextJob(ctx)
-	if err != nil {
-		NewTuiLogger(events, "Jobs").ErrorE("Failed to pull job", err)
-		return false, false
-	}
-	if job == nil || job.Id == "" {
+// processJob runs one already-claimed job.
+//
+// The caller owns the claim: the poll loop claims a batch up front so it can
+// fill every free concurrency slot with a single round-trip, and passing the
+// job in keeps this function free of any transport concern.
+func processJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
+	if job == nil || job.GetId() == "" {
 		return false, false
 	}
 

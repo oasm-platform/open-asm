@@ -10,7 +10,13 @@ import "google/protobuf/struct.proto";
 // Service Definition
 service JobsRegistryService {
   rpc Next (Worker) returns (Job);
-  
+
+  // Batch variant of Next. Claims up to `limit` eligible jobs in a single
+  // transaction so a worker fills every free concurrency slot with one
+  // round-trip instead of one per slot. `Next` is retained so workers built
+  // before this RPC keep working.
+  rpc NextBatch (NextBatchRequest) returns (JobList);
+
   // DEPRECATED: Use category-specific RPCs
   rpc Result (JobResultRequest) returns (JobResponse);
   
@@ -46,6 +52,21 @@ message Job {
   optional string cpu = 9;               // e.g. "500m" (millicores) or "1" (cores)
   optional string memory = 10;           // e.g. "512Mi", "1Gi"
   optional int32 timeout_seconds = 11;   // container timeout in seconds
+}
+
+// Request for the batched claim path. `limit` is the number of free
+// concurrency slots on the caller, so the server never hands back more jobs
+// than the worker can start immediately.
+message NextBatchRequest {
+  string id = 1;
+  int32 limit = 2;
+}
+
+// Ordered list of claimed jobs, highest priority first. Empty when nothing is
+// claimable for this worker — the caller must treat an empty list as "no work",
+// exactly like a `Next` response with an empty id.
+message JobList {
+  repeated Job values = 1;
 }
 
 message JobResponse {

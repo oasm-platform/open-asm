@@ -112,6 +112,21 @@ const JOB_HISTORY_STATUS_SQL = `CASE
           ELSE '${JobStatus.PENDING}'
         END`;
 
+/**
+ * Hard ceiling on a single batched claim. A worker sizes its own claim from its
+ * free concurrency slots, but it must never be able to drain an unbounded slice
+ * of the queue in one request.
+ */
+const MAX_JOB_CLAIM_SIZE = 100;
+
+/**
+ * How long a worker row may be served from cache during job claims. Kept short
+ * because the row carries routing fields (`internalNetworkId`, `tool`) that
+ * decide which jobs the worker is allowed to claim — a long TTL lets a worker
+ * keep claiming for a scope it no longer has.
+ */
+const WORKER_CACHE_MS = 5_000;
+
 @Injectable()
 export class JobsRegistryService {
   constructor(
@@ -634,13 +649,41 @@ export class JobsRegistryService {
    * @returns the next job associated with the worker, or `null` if none is found
    */
   public async getNextJob(workerId: string): Promise<GetNextJobResult | null> {
+    const jobs = await this.getNextJobs(workerId, 1);
+    return jobs[0] ?? null;
+  }
+
+  /**
+   * Claims up to `limit` eligible jobs for a worker in a single transaction.
+   *
+   * This is the batched form of `getNextJob`: a worker with N free concurrency
+   * slots issues one claim instead of N, collapsing N round-trips and N
+   * `FOR UPDATE` scans into one. The claim stays atomic per job — `SKIP LOCKED`
+   * plus a conditional status update — so two workers racing on the same queue
+   * never receive the same job.
+   *
+   * Jobs come back in dispatch order (priority desc, then oldest first). An
+   * empty array means nothing is claimable right now, which callers must treat
+   * exactly like a `null` from the single-job form.
+   */
+  public async getNextJobs(
+    workerId: string,
+    limit: number,
+  ): Promise<GetNextJobResult[]> {
+    // A worker controls how many slots it asks to fill, but never how much of
+    // the queue one claim may drain.
+    const claimSize = Math.max(
+      1,
+      Math.min(Math.floor(limit), MAX_JOB_CLAIM_SIZE),
+    );
+
     // [OPT-2] Fetch worker OUTSIDE transaction to reduce lock hold time
     const worker = await this.dataSource.getRepository(WorkerInstance).findOne({
       where: { id: workerId },
       relations: ['workspace', 'tool'],
       cache: {
         id: `workers:${workerId}`,
-        milliseconds: 1000 * 30,
+        milliseconds: WORKER_CACHE_MS,
       },
     });
 
@@ -673,19 +716,37 @@ export class JobsRegistryService {
         // CLI/legacy workers may lack Docker, so connector (image) tools are
         // only eligible for node-mode workers.
         const allowedToolNames = builtInTools.map((tool) => tool.name);
+        let connectorSlugs: string[] = [];
         if (worker.runMode === 'node') {
           // DB tool rows store the connector SLUG as `name` (e.g. 'nuclei'),
           // while the manifest display name is capitalized ('Nuclei'). The
           // `tool.name IN (:...names)` filter must use slugs or connector
           // jobs never match and stay PENDING forever.
-          const connectorTools = this.connectorRegistry
+          connectorSlugs = this.connectorRegistry
             .getAllConnectors()
             .map((c) => c.slug);
-          allowedToolNames.push(...connectorTools);
+          allowedToolNames.push(...connectorSlugs);
         }
         queryBuilder.andWhere('tool.name IN (:...names)', {
           names: allowedToolNames,
         });
+
+        // [OPT-6] Eligibility moved into the WHERE clause. It used to be a
+        // post-query check that rolled the whole claim back, so one ineligible
+        // job at the head of the queue starved every valid job behind it — and
+        // with a batched claim that meant silently returning no work at all.
+        // A job is runnable when it carries a command (built-in CLI tools) or
+        // belongs to a connector (whose jobs have no command by design).
+        if (connectorSlugs.length > 0) {
+          queryBuilder.andWhere(
+            `(jobs.command IS NOT NULL AND jobs.command <> '' OR tool.name IN (:...connectorSlugs))`,
+            { connectorSlugs },
+          );
+        } else {
+          queryBuilder.andWhere(
+            `jobs.command IS NOT NULL AND jobs.command <> ''`,
+          );
+        }
 
         if (worker.scope !== WorkerScope.CLOUD) {
           queryBuilder.andWhere('workspaces.id = :workspaceId', {
@@ -716,75 +777,83 @@ export class JobsRegistryService {
         queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
       }
 
-      // [OPT-4] SKIP LOCKED avoids workers blocking each other on the same row
-      const job = await queryBuilder
+      // [OPT-4] SKIP LOCKED avoids workers blocking each other on the same rows
+      const jobs = await queryBuilder
         .setLock('pessimistic_write', undefined, ['jobs'])
-        .limit(1)
-        .getOne();
+        .limit(claimSize)
+        .getMany();
 
-      if (!job) {
+      if (jobs.length === 0) {
         await queryRunner.rollbackTransaction();
-        return null;
+        return [];
       }
 
-      if (isBuiltInTools && !job.command) {
-        // Check if this is a connector tool (which has no command by design)
-        const isConnector = !!this.connectorRegistry.getConnector(
-          job.tool?.name ?? '',
-        );
-        if (!isConnector) {
-          await queryRunner.rollbackTransaction();
-          return null;
-        }
-      }
-
-      // [OPT-5] Use update() instead of save() — direct SQL, no extra SELECT
-      await queryRunner.manager.update(Job, job.id, {
-        workerId,
-        status: JobStatus.IN_PROGRESS,
-        pickJobAt: new Date(),
-      });
+      // [OPT-5] One UPDATE for the whole claim instead of one per job —
+      // direct SQL, no per-row SELECT.
+      await queryRunner.manager.update(
+        Job,
+        { id: In(jobs.map((job) => job.id)) },
+        {
+          workerId,
+          status: JobStatus.IN_PROGRESS,
+          pickJobAt: new Date(),
+        },
+      );
 
       await queryRunner.commitTransaction();
 
-      const base: GetNextJobResult = {
-        id: job.id,
-        category: job.category,
-        createdAt: job.createdAt,
-        updatedAt: job.updatedAt,
-        priority: job.priority,
-        command: job.command,
-        asset: job.asset,
-      };
-
-      // Connector support: include tool metadata for non-built-in workers
-      if (!isBuiltInTools && worker.tool) {
-        base.tool = { id: worker.tool.id!, name: worker.tool.name };
-        // Connector workers have no workspace — derive from job's target instead, fallback to worker workspace for backward compat
-        base.workspaceId =
-          job.asset.target?.workspaceId ??
-          (worker.workspace as { id?: string })?.id;
-        base.configProfileId = job.configProfileId;
-        base.config = job.config;
-      } else if (isBuiltInTools && job.tool) {
-        // Connector job picked up by BUILT_IN worker
-        base.tool = { id: job.tool.id!, name: job.tool.name };
-        base.workspaceId = job.asset.target?.workspaceId;
-        base.configProfileId = job.configProfileId;
-        base.config = job.config;
-      }
-
-      return base;
+      return jobs.map((job) =>
+        this.toGetNextJobResult(worker, isBuiltInTools, job),
+      );
     } catch (error) {
       Logger.error(
-        'Error in getNextJob',
+        'Error in getNextJobs',
         error instanceof Error ? error : new Error(String(error)),
       );
       await queryRunner.rollbackTransaction();
-      return null;
+      return [];
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Shapes a claimed Job row into the payload a worker consumes. Kept separate
+   * from the claim so `getNextJobs` stays a pure query/claim concern.
+   */
+  private toGetNextJobResult(
+    worker: WorkerInstance,
+    isBuiltInTools: boolean,
+    job: Job,
+  ): GetNextJobResult {
+    const base: GetNextJobResult = {
+      id: job.id,
+      category: job.category,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      priority: job.priority,
+      command: job.command,
+      asset: job.asset,
+    };
+
+    // Connector support: include tool metadata for non-built-in workers
+    if (!isBuiltInTools && worker.tool) {
+      base.tool = { id: worker.tool.id!, name: worker.tool.name };
+      // Connector workers have no workspace — derive from job's target instead, fallback to worker workspace for backward compat
+      base.workspaceId =
+        job.asset.target?.workspaceId ??
+        (worker.workspace as { id?: string })?.id;
+      base.configProfileId = job.configProfileId;
+      base.config = job.config;
+    } else if (isBuiltInTools && job.tool) {
+      // Connector job picked up by BUILT_IN worker
+      base.tool = { id: job.tool.id!, name: job.tool.name };
+      base.workspaceId = job.asset.target?.workspaceId;
+      base.configProfileId = job.configProfileId;
+      base.config = job.config;
+    }
+
+    return base;
   }
 
   /**

@@ -353,7 +353,7 @@ func TestProcessConnectorJobWaitsOutBackoffThenRuns(t *testing.T) {
 	releaseSem := func() { releaseCh <- struct{}{} }
 
 	start := time.Now()
-	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, releaseSem)
+	hadJob, usedAsync := processJob(context.Background(), pullJob(t, client), client, nil, "", events, mgr, proxy, releaseSem)
 
 	if !hadJob {
 		t.Fatal("expected hadJob=true")
@@ -401,7 +401,7 @@ func TestProcessConnectorJobGivesUpAfterBackoffBudget(t *testing.T) {
 	}
 
 	start := time.Now()
-	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, func() {})
+	hadJob, usedAsync := processJob(context.Background(), pullJob(t, client), client, nil, "", events, mgr, proxy, func() {})
 
 	if !hadJob {
 		t.Fatal("expected hadJob=true")
