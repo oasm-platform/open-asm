@@ -16,12 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import JobStatusBadge from '@/components/ui/job-status';
 import ToolLogo from '@/components/ui/tool-logo';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import RunWorkflowGraph from './components/run-workflow-graph';
 import { usePermission } from '@/hooks/usePermission';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { JobListItemDto } from '@/services/apis/gen/queries';
@@ -82,23 +77,6 @@ const formatDuration = (job: JobListItemDto): string | null => {
 
 const getTitle = (row: JobListItemDto) =>
   row.assetService?.value || row.asset?.value || row.id;
-
-/** The engine's step vocabulary mapped onto the status badge's job statuses. */
-const STEP_STATUS_TO_JOB_STATUS: Record<string, JobStatus> = {
-  pending: JobStatus.pending,
-  dispatched: JobStatus.in_progress,
-  done: JobStatus.completed,
-  failed: JobStatus.failed,
-  skipped: JobStatus.skipped,
-};
-
-/** Human-readable reason a step was skipped (`steps[].reason`). */
-const STEP_SKIP_REASON_LABEL: Record<string, string> = {
-  'no-inputs': 'nothing to scan in this step’s scope',
-  'blocked-by-failure': 'a step it needs failed',
-  'assets-discovery-off': 'assets discovery is disabled',
-  'run-cancelled': 'the run was cancelled',
-};
 
 const stripTrailingNewline = (value: unknown) =>
   String(value ?? '').replace(/\n$/, '');
@@ -476,91 +454,11 @@ export default function Runs() {
       {steps.length ? (
         <Card className="mb-6 py-2">
           <CardContent className="px-2 py-2 md:px-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <CardTitle>Workflow steps</CardTitle>
-              {runningSteps > 1 && (
-                <Badge variant="outline" className="font-normal">
-                  {runningSteps} steps running in parallel
-                </Badge>
-              )}
-            </div>
-            <TooltipProvider delayDuration={200}>
-              <div className="flex flex-wrap items-center gap-3">
-                {steps.map((step, index) => {
-                  const label = step.name || step.run;
-                  const skipReason = step.reason
-                    ? STEP_SKIP_REASON_LABEL[step.reason] ?? step.reason
-                    : undefined;
-                  return (
-                    <div key={step.id} className="flex items-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center gap-2 rounded-md border px-2 py-1">
-                            {step.toolId ? (
-                              <Link to="/tools/$id" params={{ id: step.toolId }}>
-                                <ToolLogo
-                                  name={step.run}
-                                  logoUrl={step.logoUrl}
-                                  size={32}
-                                  className="rounded-full border"
-                                />
-                              </Link>
-                            ) : (
-                              <ToolLogo
-                                name={step.run}
-                                logoUrl={step.logoUrl}
-                                size={32}
-                                className="rounded-full border"
-                              />
-                            )}
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">{label}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {step.needs.length > 0
-                                  ? `needs ${step.needs.join(', ')}`
-                                  : 'runs in parallel'}
-                                {step.jobs > 0
-                                  ? ` · ${step.jobs} job${step.jobs > 1 ? 's' : ''}`
-                                  : ''}
-                              </span>
-                            </div>
-                            <JobStatusBadge
-                              onlyIcon
-                              status={
-                                STEP_STATUS_TO_JOB_STATUS[step.status] ??
-                                JobStatus.pending
-                              }
-                            />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="font-medium capitalize">
-                            {label} · {step.status}
-                          </p>
-                          <p className="text-muted-foreground">job id: {step.id}</p>
-                          {step.needs.length > 0 && (
-                            <p>Waits for: {step.needs.join(', ')}</p>
-                          )}
-                          {skipReason && <p>Skipped: {skipReason}</p>}
-                          {step.dispatchedAt && (
-                            <p>Started {formatDate(String(step.dispatchedAt))}</p>
-                          )}
-                          {step.finishedAt && (
-                            <p>Finished {formatDate(String(step.finishedAt))}</p>
-                          )}
-                        </TooltipContent>
-                      </Tooltip>
-                      {index < steps.length - 1 && (
-                        <ArrowRight
-                          className="text-muted-foreground"
-                          size={16}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </TooltipProvider>
+            <CardTitle className="mb-3">Workflow</CardTitle>
+            <RunWorkflowGraph
+              steps={steps}
+              runningSteps={runningSteps}
+            />
           </CardContent>
         </Card>
       ) : (

@@ -1,0 +1,192 @@
+import type { WorkflowStepStatusDto } from '@/services/apis/gen/queries';
+import type { Edge, EdgeMarker, Node } from '@xyflow/react';
+
+/**
+ * Layout of a workflow run as a DAG, in "waves".
+ *
+ * Wave 1 holds the steps without `needs`; wave N every step whose dependencies
+ * all sit in earlier waves. Steps in one wave execute at the same time — that is
+ * what expressing a workflow with `needs` buys, and a single sequential column
+ * would hide it.
+ *
+ * Kept pure and free of React so it can be unit-tested, and deterministic so a
+ * step finishing never reshuffles the graph.
+ */
+
+const NODE_WIDTH = 236;
+const NODE_HEIGHT = 86;
+const COLUMN_GAP = 72;
+const ROW_GAP = 18;
+const LABEL_HEIGHT = 34;
+
+export { NODE_WIDTH, NODE_HEIGHT, LABEL_HEIGHT };
+
+export interface StepNodeData extends Record<string, unknown> {
+  id: string;
+  label: string;
+  run: string;
+  status: string;
+  needs: string[];
+  jobs: number;
+  reason?: string;
+  logoUrl?: string;
+  duration?: string;
+}
+
+export interface WaveNodeData extends Record<string, unknown> {
+  wave: number;
+  total: number;
+  done: number;
+  jobs: number;
+}
+
+export interface WorkflowGraphLayout {
+  nodes: Node[];
+  edges: Edge[];
+  /** Number of waves (columns) in the run. */
+  waves: number;
+  /** Natural height of the tallest column, so the canvas can size itself. */
+  contentHeight: number;
+}
+
+/**
+ * Wave index of every step: roots are wave 1, everything else is one past its
+ * deepest dependency. A cycle (which the backend rejects) cannot recurse forever
+ * — the guard parks the step in wave 1 instead.
+ */
+export function computeStepWaves(
+  steps: WorkflowStepStatusDto[],
+): Map<string, number> {
+  const byId = new Map(steps.map((step) => [step.id, step]));
+  const waves = new Map<string, number>();
+
+  const waveOf = (id: string, visiting: Set<string>): number => {
+    const known = waves.get(id);
+    if (known !== undefined) return known;
+    const step = byId.get(id);
+    if (!step || visiting.has(id)) return 0;
+    visiting.add(id);
+    const wave =
+      step.needs.length === 0
+        ? 0
+        : 1 + Math.max(...step.needs.map((need) => waveOf(need, visiting)));
+    visiting.delete(id);
+    waves.set(id, wave);
+    return wave;
+  };
+
+  for (const step of steps) waveOf(step.id, new Set());
+  return waves;
+}
+
+/** Wall-clock duration between dispatch and finish, when both are known. */
+export function stepDuration(
+  step: Pick<WorkflowStepStatusDto, 'dispatchedAt' | 'finishedAt'>,
+): string | undefined {
+  if (!step.dispatchedAt || !step.finishedAt) return undefined;
+  const ms =
+    new Date(step.finishedAt).getTime() - new Date(step.dispatchedAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return undefined;
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+/** Builds the React Flow nodes/edges for a run's steps. Pure — no DOM. */
+export function buildWorkflowGraphLayout(
+  steps: WorkflowStepStatusDto[],
+): WorkflowGraphLayout {
+  const waves = computeStepWaves(steps);
+  const waveCount = steps.length === 0 ? 0 : Math.max(...waves.values()) + 1;
+
+  const columns = new Map<number, WorkflowStepStatusDto[]>();
+  for (const step of steps) {
+    const wave = waves.get(step.id) ?? 0;
+    columns.set(wave, [...(columns.get(wave) ?? []), step]);
+  }
+
+  const tallest = Math.max(1, ...[...columns.values()].map((c) => c.length));
+  const columnHeight = tallest * NODE_HEIGHT + (tallest - 1) * ROW_GAP;
+
+  const nodes: Node[] = [];
+
+  for (let wave = 0; wave < waveCount; wave++) {
+    const column = columns.get(wave) ?? [];
+    const x = wave * (NODE_WIDTH + COLUMN_GAP);
+    const stackHeight =
+      column.length * NODE_HEIGHT + Math.max(0, column.length - 1) * ROW_GAP;
+    const startY = (columnHeight - stackHeight) / 2;
+
+    nodes.push({
+      id: `wave-${wave}`,
+      type: 'waveLabel',
+      position: { x, y: -LABEL_HEIGHT - 10 },
+      draggable: false,
+      selectable: false,
+      data: {
+        wave: wave + 1,
+        total: column.length,
+        done: column.filter((step) => step.status === 'done').length,
+        jobs: column.reduce((sum, step) => sum + step.jobs, 0),
+      } satisfies WaveNodeData,
+      style: { width: NODE_WIDTH },
+    });
+
+    column.forEach((step, index) => {
+      nodes.push({
+        id: step.id,
+        type: 'workflowStep',
+        position: { x, y: startY + index * (NODE_HEIGHT + ROW_GAP) },
+        draggable: false,
+        selectable: false,
+        data: {
+          id: step.id,
+          label: step.name || step.id,
+          run: step.run,
+          status: step.status,
+          needs: step.needs,
+          jobs: step.jobs,
+          reason: step.reason,
+          logoUrl: step.logoUrl,
+          duration: stepDuration(step),
+        } satisfies StepNodeData,
+        style: { width: NODE_WIDTH },
+      });
+    });
+  }
+
+  const edges: Edge[] = steps.flatMap((step) =>
+    step.needs.map((need) => ({
+      id: `${need}->${step.id}`,
+      source: need,
+      target: step.id,
+      type: 'smoothstep',
+      // A running step gets flowing dashes so the eye follows the live edge.
+      animated: step.status === 'dispatched',
+      style: {
+        stroke:
+          step.status === 'failed'
+            ? 'var(--destructive)'
+            : step.status === 'skipped'
+              ? 'var(--border)'
+              : 'var(--muted-foreground)',
+        strokeDasharray: '4 4',
+        strokeWidth: 1.5,
+      },
+      markerEnd: {
+        // Type-only: the layout module must not pull xyflow in at runtime.
+        type: 'arrowclosed' as EdgeMarker['type'],
+        width: 14,
+        height: 14,
+      },
+    })),
+  );
+
+  return {
+    nodes,
+    edges,
+    waves: waveCount,
+    contentHeight: LABEL_HEIGHT + columnHeight,
+  };
+}
