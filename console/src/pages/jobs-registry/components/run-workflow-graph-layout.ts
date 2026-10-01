@@ -131,6 +131,10 @@ export function buildWorkflowGraphLayout(
         jobs: column.reduce((sum, step) => sum + step.jobs, 0),
       } satisfies WaveNodeData,
       style: { width: NODE_WIDTH },
+      // Sizes are known up front, so React Flow can draw the edges on the first
+      // pass instead of waiting for its own measurement to settle (which, when
+      // it does not, leaves a graph of nodes with no connecting lines).
+      measured: { width: NODE_WIDTH, height: LABEL_HEIGHT },
     });
 
     column.forEach((step, index) => {
@@ -152,6 +156,9 @@ export function buildWorkflowGraphLayout(
           duration: stepDuration(step),
         } satisfies StepNodeData,
         style: { width: NODE_WIDTH },
+        // Explicit size: the edge layer needs node dimensions, and deriving them
+        // from the DOM is what stalled (nodes rendered, connections did not).
+        measured: { width: NODE_WIDTH, height: NODE_HEIGHT },
       });
     });
   }

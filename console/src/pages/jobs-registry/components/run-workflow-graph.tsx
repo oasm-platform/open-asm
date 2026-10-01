@@ -14,6 +14,8 @@ import {
   BackgroundVariant,
   BaseEdge,
   getSmoothStepPath,
+  Handle,
+  Position,
   ReactFlow,
   type EdgeProps,
   type EdgeTypes,
@@ -151,6 +153,16 @@ function WorkflowStepNode({ data }: NodeProps) {
               skipped && 'opacity-60',
             )}
           >
+            {/* React Flow anchors an edge on these. Without a Handle on the
+                custom node it cannot resolve the connection points and drops
+                the edge entirely — nodes render, connections do not. They are
+                invisible because this graph is read-only. */}
+            <Handle
+              type="target"
+              position={Position.Left}
+              isConnectable={false}
+              className="invisible !size-0 !min-h-0 !min-w-0 !border-0 !bg-transparent"
+            />
             <div className="flex items-center gap-1.5">
               <span className={cn('shrink-0', meta.text)}>{meta.icon}</span>
               {logoUrl && (
@@ -185,6 +197,12 @@ function WorkflowStepNode({ data }: NodeProps) {
             <span className="truncate text-[11px] text-muted-foreground">
               {subtitle}
             </span>
+            <Handle
+              type="source"
+              position={Position.Right}
+              isConnectable={false}
+              className="invisible !size-0 !min-h-0 !min-w-0 !border-0 !bg-transparent"
+            />
           </div>
         </TooltipTrigger>
         <TooltipContent className="max-w-72">
