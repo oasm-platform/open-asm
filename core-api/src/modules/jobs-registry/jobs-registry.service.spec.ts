@@ -2300,17 +2300,18 @@ describe('JobsRegistryService', () => {
   });
 
   describe('getNextJobs — batched claim', () => {
-    const buildWorker = (overrides: Record<string, unknown> = {}) =>
-      ({
-        id: 'worker-uuid',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.CLOUD,
-        runMode: 'node',
-        internalNetworkId: null,
-        workspace: { id: 'workspace-uuid' },
-        tool: null,
-        ...overrides,
-      }) as any;
+    const buildWorker = (
+      overrides: Record<string, unknown> = {},
+    ): Record<string, unknown> => ({
+      id: 'worker-uuid',
+      type: WorkerType.BUILT_IN,
+      scope: WorkerScope.CLOUD,
+      runMode: 'node',
+      internalNetworkId: null,
+      workspace: { id: 'workspace-uuid' },
+      tool: null,
+      ...overrides,
+    });
 
     const buildQueryRunner = (jobs: unknown[]) => {
       const qb = {
