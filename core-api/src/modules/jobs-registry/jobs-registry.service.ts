@@ -127,6 +127,18 @@ const MAX_JOB_CLAIM_SIZE = 100;
  */
 const WORKER_CACHE_MS = 5_000;
 
+/**
+ * How far back the dashboard timeline looks.
+ *
+ * The timeline query runs two window functions over every job of the workspace
+ * and then keeps only the newest 15 groups, so without a bound it scans the
+ * workspace's whole job history on every dashboard load. 30 days is
+ * deliberately generous: long enough to cover any realistic scan cadence,
+ * short enough that the scan stays proportional to recent activity instead of
+ * to total history.
+ */
+const TIMELINE_LOOKBACK_DAYS = 30;
+
 @Injectable()
 export class JobsRegistryService {
   constructor(
@@ -1045,6 +1057,11 @@ export class JobsRegistryService {
 
   /**
    * Retrieves a timeline of jobs grouped by tool name and target
+   *
+   * Scoped to the last {@link TIMELINE_LOOKBACK_DAYS} days because the window
+   * passes below process every row they are handed while the result is capped
+   * at 15 groups.
+   *
    * @returns A promise that resolves to a JobTimelineResponseDto containing the timeline data
    */
   public async getJobsTimeline(
@@ -1077,6 +1094,10 @@ export class JobsRegistryService {
         join tools on jobs."toolId" = tools.id
         join targets on assets."targetId" = targets.id
         where targets."workspaceId" = $1
+          -- Bound the window-function inputs to recent history: the two
+          -- window passes below process every row they are given, and only the
+          -- newest 15 groups are ever returned.
+          and jobs."createdAt" > now() - make_interval(days => $2)
         order by jobs."createdAt" desc
       ),
       grouped_with_id as (
@@ -1100,7 +1121,7 @@ export class JobsRegistryService {
       order by "jobHistoryId", min("createdAt") desc
       limit 15;
     `,
-      [workspaceId],
+      [workspaceId, TIMELINE_LOOKBACK_DAYS],
     );
 
     // Map the raw SQL results to our DTO format
@@ -1495,12 +1516,22 @@ export class JobsRegistryService {
       {},
       workspaceId,
     );
+    // Index installed tools by name once. The old `.find()` inside `.map()`
+    // rescanned the whole installed-tool list for every workflow step, making
+    // this O(steps x tools). First match wins, matching the previous behaviour.
+    const installedToolsByName = new Map<
+      string,
+      (typeof instaledTools.data)[number]
+    >();
+    for (const tool of instaledTools.data) {
+      if (!installedToolsByName.has(tool.name)) {
+        installedToolsByName.set(tool.name, tool);
+      }
+    }
+
     const tools = (
       jobHistory.workflow?.content.jobs
-        .map((job) => {
-          const tool = instaledTools.data.find((t) => t.name === job.run);
-          return tool;
-        })
+        .map((job) => installedToolsByName.get(job.run))
         .filter(
           (tool): tool is NonNullable<typeof tool> => tool !== undefined,
         ) ?? []
