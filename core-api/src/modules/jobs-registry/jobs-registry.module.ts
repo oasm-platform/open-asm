@@ -20,6 +20,7 @@ import {
   AssetGroupsScheduleConsumer,
   AssetsDiscoveryScheduleConsumer,
 } from './processors/scan-schedule.processor';
+import { WorkflowRunReconcilerService } from './workflow-run-reconciler.service';
 import { WorkflowRunnerService } from './workflow-runner.service';
 
 @Global()
@@ -47,6 +48,7 @@ import { WorkflowRunnerService } from './workflow-runner.service';
   providers: [
     JobsRegistryService,
     WorkflowRunnerService,
+    WorkflowRunReconcilerService,
     AssetsDiscoveryScheduleConsumer,
     AssetGroupsScheduleConsumer,
     JobResultProcessor,
