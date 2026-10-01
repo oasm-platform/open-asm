@@ -1586,6 +1586,87 @@ describe('JobsRegistryService', () => {
       expect(result).toBe(1);
     });
 
+    it('scopes a service job’s next step to that same service, not the whole asset', async () => {
+      // Given: an http_probe job that ran against ONE service of an asset
+      jest.clearAllMocks();
+      const createNewJob = jest
+        .spyOn(service, 'createNewJob')
+        .mockResolvedValue([]);
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAssetsDiscovery: true,
+      });
+      mockToolsService.getToolByNames.mockResolvedValue([
+        { name: 'screenshot', priority: 4, category: ToolCategory.SCREENSHOT },
+      ]);
+      const completedProbeJob = {
+        id: 'probe-job-uuid',
+        category: ToolCategory.HTTP_PROBE,
+        tool: { name: 'httpx' },
+        asset: { id: 'asset-uuid', target: { id: 'target-uuid' } },
+        assetService: { id: 'service-uuid' },
+        jobHistory: {
+          workflow: {
+            content: {
+              jobs: [
+                { name: 'job-1', run: 'httpx' },
+                { name: 'job-2', run: 'screenshot' },
+              ],
+            },
+            workspace: { id: 'workspace-uuid' },
+          },
+        },
+      };
+
+      // When
+      await service.getNextStepForJob(completedProbeJob as any);
+
+      // Then: the next step targets the same service. Passing only the asset
+      // re-fanned out to every live service of that asset, so N service jobs
+      // each re-created N jobs (N(N+1)/2 rows instead of N).
+      expect(createNewJob).toHaveBeenCalledWith(
+        expect.objectContaining({ assetServiceIds: ['service-uuid'] }),
+      );
+    });
+
+    it('leaves the asset-level fan-out untouched for an asset job', async () => {
+      // Given: a SUBDOMAINS job, which is scoped to an asset, not a service
+      jest.clearAllMocks();
+      const createNewJob = jest
+        .spyOn(service, 'createNewJob')
+        .mockResolvedValue([]);
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAssetsDiscovery: true,
+      });
+      mockToolsService.getToolByNames.mockResolvedValue([
+        { name: 'nmap', priority: 4, category: ToolCategory.PORTS_SCANNER },
+      ]);
+      const completedSubdomainJob = {
+        id: 'subdomain-job-uuid',
+        category: ToolCategory.SUBDOMAINS,
+        tool: { name: 'subfinder' },
+        asset: { id: 'asset-uuid', target: { id: 'target-uuid' } },
+        jobHistory: {
+          workflow: {
+            content: {
+              jobs: [
+                { name: 'job-1', run: 'subfinder' },
+                { name: 'job-2', run: 'nmap' },
+              ],
+            },
+            workspace: { id: 'workspace-uuid' },
+          },
+        },
+      };
+
+      // When
+      await service.getNextStepForJob(completedSubdomainJob as any);
+
+      // Then: no service filter, so the PORTS fan-out still covers the target
+      expect(createNewJob).toHaveBeenCalledWith(
+        expect.objectContaining({ assetServiceIds: undefined }),
+      );
+    });
+
     it('should expand PORTS_SCANNER to all target assets after SUBDOMAINS completes', async () => {
       jest.clearAllMocks();
       const createNewJob = jest

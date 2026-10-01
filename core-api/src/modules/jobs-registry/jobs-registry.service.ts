@@ -259,6 +259,7 @@ export class JobsRegistryService {
     targetIds,
     workspaceId,
     assetIds,
+    assetServiceIds,
     workflow,
     jobHistory: existingJobHistory,
     priority,
@@ -389,6 +390,7 @@ export class JobsRegistryService {
         assetIds,
         workspaceId,
         liveOnly,
+        assetServiceIds,
       );
 
       // Step 3: iterate tools and create jobs
@@ -596,6 +598,7 @@ export class JobsRegistryService {
     assetIds?: string[],
     workspaceId?: string,
     liveOnly?: boolean,
+    assetServiceIds?: string[],
   ): Promise<AssetService[]> {
     const assetServicesQueryBuilder = this.dataSource
       .getRepository(AssetService)
@@ -625,6 +628,13 @@ export class JobsRegistryService {
         {
           assetIds,
         },
+      );
+    }
+
+    if (assetServiceIds && assetServiceIds.length > 0) {
+      assetServicesQueryBuilder.andWhere(
+        'assetServices.id IN (:...assetServiceIds)',
+        { assetServiceIds },
       );
     }
 
@@ -1217,6 +1227,16 @@ export class JobsRegistryService {
     const shouldExpandToTargetAssets =
       isSubdomainToPortScanner && !isGroupRun;
 
+    // The completed job's execution unit decides the NEXT step's unit. An
+    // asset-service job (http_probe, screenshot, url_discovery) covers exactly
+    // ONE service, so the next step must be scoped to that same service.
+    // Passing only the asset made `createNewJob` fan the next step out to
+    // EVERY live service of the asset again, so N service jobs each re-created
+    // N jobs and the table grew as N(N+1)/2 instead of N. Measured on the dev
+    // database: 4 http_probe jobs produced 10 screenshot jobs (1+2+3+4), and
+    // every duplicated row in the whole table is a screenshot job.
+    const currentAssetServiceId = job.assetService?.id;
+
     const createPromises = tools.map((tool) =>
       this.createNewJob({
         tool,
@@ -1224,6 +1244,9 @@ export class JobsRegistryService {
         configProfileId: nextJobMeta?.configProfileId,
         targetIds: [job.asset.target.id],
         assetIds: shouldExpandToTargetAssets ? undefined : [job.asset.id],
+        assetServiceIds: currentAssetServiceId
+          ? [currentAssetServiceId]
+          : undefined,
         workflow: job.jobHistory.workflow,
         jobHistory: job.jobHistory,
         priority: tool.priority,
