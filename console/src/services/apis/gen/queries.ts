@@ -605,6 +605,7 @@ export type WorkflowJob = {
   name?: string;
   run: string;
   needs?: string[];
+  allowFailure?: boolean;
   config?: WorkflowJobConfig;
   configProfileId?: string;
 };
@@ -1321,6 +1322,8 @@ export type WorkflowStepStatusDto = {
   reason?: string;
   /** Job rows this step fanned out to */
   jobs: number;
+  /** Job rows that failed. A step is still done when it produced results (unless it sets allowFailure: false) */
+  failed?: number;
   toolId?: string;
   logoUrl?: string;
   dispatchedAt?: string;
