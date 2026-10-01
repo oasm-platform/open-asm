@@ -1,6 +1,11 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
+  MAX_JOB_CLAIM_SIZE,
+  TIMELINE_LOOKBACK_DAYS,
+  WORKER_CLAIM_CACHE_MS,
+} from '@/common/constants/app.constants';
+import {
   BullMQName,
   CATEGORY_DATA_SOURCE_MAP,
   EventTriggerType,
@@ -12,7 +17,6 @@ import {
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
-import { RedisService } from '@/services/redis/redis.service';
 import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -125,7 +129,6 @@ export class JobsRegistryService {
     private dataSource: DataSource,
     @Optional() private toolsService: ToolsService,
     private storageService: StorageService,
-    private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
     private eventEmitter: EventEmitter2,
     private workspaceService: WorkspacesService,
@@ -232,6 +235,7 @@ export class JobsRegistryService {
     targetIds,
     workspaceId,
     assetIds,
+    assetServiceIds,
     workflow,
     jobHistory: existingJobHistory,
     priority,
@@ -362,6 +366,7 @@ export class JobsRegistryService {
         assetIds,
         workspaceId,
         liveOnly,
+        assetServiceIds,
       );
 
       // Step 3: iterate tools and create jobs
@@ -569,6 +574,7 @@ export class JobsRegistryService {
     assetIds?: string[],
     workspaceId?: string,
     liveOnly?: boolean,
+    assetServiceIds?: string[],
   ): Promise<AssetService[]> {
     const assetServicesQueryBuilder = this.dataSource
       .getRepository(AssetService)
@@ -598,6 +604,13 @@ export class JobsRegistryService {
         {
           assetIds,
         },
+      );
+    }
+
+    if (assetServiceIds && assetServiceIds.length > 0) {
+      assetServicesQueryBuilder.andWhere(
+        'assetServices.id IN (:...assetServiceIds)',
+        { assetServiceIds },
       );
     }
 
@@ -634,13 +647,41 @@ export class JobsRegistryService {
    * @returns the next job associated with the worker, or `null` if none is found
    */
   public async getNextJob(workerId: string): Promise<GetNextJobResult | null> {
+    const jobs = await this.getNextJobs(workerId, 1);
+    return jobs[0] ?? null;
+  }
+
+  /**
+   * Claims up to `limit` eligible jobs for a worker in a single transaction.
+   *
+   * This is the batched form of `getNextJob`: a worker with N free concurrency
+   * slots issues one claim instead of N, collapsing N round-trips and N
+   * `FOR UPDATE` scans into one. The claim stays atomic per job — `SKIP LOCKED`
+   * plus a conditional status update — so two workers racing on the same queue
+   * never receive the same job.
+   *
+   * Jobs come back in dispatch order (priority desc, then oldest first). An
+   * empty array means nothing is claimable right now, which callers must treat
+   * exactly like a `null` from the single-job form.
+   */
+  public async getNextJobs(
+    workerId: string,
+    limit: number,
+  ): Promise<GetNextJobResult[]> {
+    // A worker controls how many slots it asks to fill, but never how much of
+    // the queue one claim may drain.
+    const claimSize = Math.max(
+      1,
+      Math.min(Math.floor(limit), MAX_JOB_CLAIM_SIZE),
+    );
+
     // [OPT-2] Fetch worker OUTSIDE transaction to reduce lock hold time
     const worker = await this.dataSource.getRepository(WorkerInstance).findOne({
       where: { id: workerId },
       relations: ['workspace', 'tool'],
       cache: {
         id: `workers:${workerId}`,
-        milliseconds: 1000 * 30,
+        milliseconds: WORKER_CLAIM_CACHE_MS,
       },
     });
 
@@ -673,19 +714,37 @@ export class JobsRegistryService {
         // CLI/legacy workers may lack Docker, so connector (image) tools are
         // only eligible for node-mode workers.
         const allowedToolNames = builtInTools.map((tool) => tool.name);
+        let connectorSlugs: string[] = [];
         if (worker.runMode === 'node') {
           // DB tool rows store the connector SLUG as `name` (e.g. 'nuclei'),
           // while the manifest display name is capitalized ('Nuclei'). The
           // `tool.name IN (:...names)` filter must use slugs or connector
           // jobs never match and stay PENDING forever.
-          const connectorTools = this.connectorRegistry
+          connectorSlugs = this.connectorRegistry
             .getAllConnectors()
             .map((c) => c.slug);
-          allowedToolNames.push(...connectorTools);
+          allowedToolNames.push(...connectorSlugs);
         }
         queryBuilder.andWhere('tool.name IN (:...names)', {
           names: allowedToolNames,
         });
+
+        // [OPT-6] Eligibility moved into the WHERE clause. It used to be a
+        // post-query check that rolled the whole claim back, so one ineligible
+        // job at the head of the queue starved every valid job behind it — and
+        // with a batched claim that meant silently returning no work at all.
+        // A job is runnable when it carries a command (built-in CLI tools) or
+        // belongs to a connector (whose jobs have no command by design).
+        if (connectorSlugs.length > 0) {
+          queryBuilder.andWhere(
+            `(jobs.command IS NOT NULL AND jobs.command <> '' OR tool.name IN (:...connectorSlugs))`,
+            { connectorSlugs },
+          );
+        } else {
+          queryBuilder.andWhere(
+            `jobs.command IS NOT NULL AND jobs.command <> ''`,
+          );
+        }
 
         if (worker.scope !== WorkerScope.CLOUD) {
           queryBuilder.andWhere('workspaces.id = :workspaceId', {
@@ -716,75 +775,83 @@ export class JobsRegistryService {
         queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
       }
 
-      // [OPT-4] SKIP LOCKED avoids workers blocking each other on the same row
-      const job = await queryBuilder
+      // [OPT-4] SKIP LOCKED avoids workers blocking each other on the same rows
+      const jobs = await queryBuilder
         .setLock('pessimistic_write', undefined, ['jobs'])
-        .limit(1)
-        .getOne();
+        .limit(claimSize)
+        .getMany();
 
-      if (!job) {
+      if (jobs.length === 0) {
         await queryRunner.rollbackTransaction();
-        return null;
+        return [];
       }
 
-      if (isBuiltInTools && !job.command) {
-        // Check if this is a connector tool (which has no command by design)
-        const isConnector = !!this.connectorRegistry.getConnector(
-          job.tool?.name ?? '',
-        );
-        if (!isConnector) {
-          await queryRunner.rollbackTransaction();
-          return null;
-        }
-      }
-
-      // [OPT-5] Use update() instead of save() — direct SQL, no extra SELECT
-      await queryRunner.manager.update(Job, job.id, {
-        workerId,
-        status: JobStatus.IN_PROGRESS,
-        pickJobAt: new Date(),
-      });
+      // [OPT-5] One UPDATE for the whole claim instead of one per job —
+      // direct SQL, no per-row SELECT.
+      await queryRunner.manager.update(
+        Job,
+        { id: In(jobs.map((job) => job.id)) },
+        {
+          workerId,
+          status: JobStatus.IN_PROGRESS,
+          pickJobAt: new Date(),
+        },
+      );
 
       await queryRunner.commitTransaction();
 
-      const base: GetNextJobResult = {
-        id: job.id,
-        category: job.category,
-        createdAt: job.createdAt,
-        updatedAt: job.updatedAt,
-        priority: job.priority,
-        command: job.command,
-        asset: job.asset,
-      };
-
-      // Connector support: include tool metadata for non-built-in workers
-      if (!isBuiltInTools && worker.tool) {
-        base.tool = { id: worker.tool.id!, name: worker.tool.name };
-        // Connector workers have no workspace — derive from job's target instead, fallback to worker workspace for backward compat
-        base.workspaceId =
-          job.asset.target?.workspaceId ??
-          (worker.workspace as { id?: string })?.id;
-        base.configProfileId = job.configProfileId;
-        base.config = job.config;
-      } else if (isBuiltInTools && job.tool) {
-        // Connector job picked up by BUILT_IN worker
-        base.tool = { id: job.tool.id!, name: job.tool.name };
-        base.workspaceId = job.asset.target?.workspaceId;
-        base.configProfileId = job.configProfileId;
-        base.config = job.config;
-      }
-
-      return base;
+      return jobs.map((job) =>
+        this.toGetNextJobResult(worker, isBuiltInTools, job),
+      );
     } catch (error) {
       Logger.error(
-        'Error in getNextJob',
+        'Error in getNextJobs',
         error instanceof Error ? error : new Error(String(error)),
       );
       await queryRunner.rollbackTransaction();
-      return null;
+      return [];
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Shapes a claimed Job row into the payload a worker consumes. Kept separate
+   * from the claim so `getNextJobs` stays a pure query/claim concern.
+   */
+  private toGetNextJobResult(
+    worker: WorkerInstance,
+    isBuiltInTools: boolean,
+    job: Job,
+  ): GetNextJobResult {
+    const base: GetNextJobResult = {
+      id: job.id,
+      category: job.category,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      priority: job.priority,
+      command: job.command,
+      asset: job.asset,
+    };
+
+    // Connector support: include tool metadata for non-built-in workers
+    if (!isBuiltInTools && worker.tool) {
+      base.tool = { id: worker.tool.id!, name: worker.tool.name };
+      // Connector workers have no workspace — derive from job's target instead, fallback to worker workspace for backward compat
+      base.workspaceId =
+        job.asset.target?.workspaceId ??
+        (worker.workspace as { id?: string })?.id;
+      base.configProfileId = job.configProfileId;
+      base.config = job.config;
+    } else if (isBuiltInTools && job.tool) {
+      // Connector job picked up by BUILT_IN worker
+      base.tool = { id: job.tool.id!, name: job.tool.name };
+      base.workspaceId = job.asset.target?.workspaceId;
+      base.configProfileId = job.configProfileId;
+      base.config = job.config;
+    }
+
+    return base;
   }
 
   /**
@@ -976,6 +1043,11 @@ export class JobsRegistryService {
 
   /**
    * Retrieves a timeline of jobs grouped by tool name and target
+   *
+   * Scoped to the last {@link TIMELINE_LOOKBACK_DAYS} days because the window
+   * passes below process every row they are handed while the result is capped
+   * at 15 groups.
+   *
    * @returns A promise that resolves to a JobTimelineResponseDto containing the timeline data
    */
   public async getJobsTimeline(
@@ -1008,6 +1080,10 @@ export class JobsRegistryService {
         join tools on jobs."toolId" = tools.id
         join targets on assets."targetId" = targets.id
         where targets."workspaceId" = $1
+          -- Bound the window-function inputs to recent history: the two
+          -- window passes below process every row they are given, and only the
+          -- newest 15 groups are ever returned.
+          and jobs."createdAt" > now() - make_interval(days => $2)
         order by jobs."createdAt" desc
       ),
       grouped_with_id as (
@@ -1031,7 +1107,7 @@ export class JobsRegistryService {
       order by "jobHistoryId", min("createdAt") desc
       limit 15;
     `,
-      [workspaceId],
+      [workspaceId, TIMELINE_LOOKBACK_DAYS],
     );
 
     // Map the raw SQL results to our DTO format
@@ -1127,6 +1203,16 @@ export class JobsRegistryService {
     const shouldExpandToTargetAssets =
       isSubdomainToPortScanner && !isGroupRun;
 
+    // The completed job's execution unit decides the NEXT step's unit. An
+    // asset-service job (http_probe, screenshot, url_discovery) covers exactly
+    // ONE service, so the next step must be scoped to that same service.
+    // Passing only the asset made `createNewJob` fan the next step out to
+    // EVERY live service of the asset again, so N service jobs each re-created
+    // N jobs and the table grew as N(N+1)/2 instead of N. Measured on the dev
+    // database: 4 http_probe jobs produced 10 screenshot jobs (1+2+3+4), and
+    // every duplicated row in the whole table is a screenshot job.
+    const currentAssetServiceId = job.assetService?.id;
+
     const createPromises = tools.map((tool) =>
       this.createNewJob({
         tool,
@@ -1134,6 +1220,9 @@ export class JobsRegistryService {
         configProfileId: nextJobMeta?.configProfileId,
         targetIds: [job.asset.target.id],
         assetIds: shouldExpandToTargetAssets ? undefined : [job.asset.id],
+        assetServiceIds: currentAssetServiceId
+          ? [currentAssetServiceId]
+          : undefined,
         workflow: job.jobHistory.workflow,
         jobHistory: job.jobHistory,
         priority: tool.priority,
@@ -1256,10 +1345,10 @@ export class JobsRegistryService {
       sortBy = 'createdAt';
     }
 
-    // Filters shared by the paged query and the count, so `total` always matches
-    // the rows on offer: free-text over the two names the list renders, run type
-    // and creation-date bounds (WHERE), plus the status rollup (HAVING — it is
-    // an aggregate, so it cannot be a WHERE).
+    // Filters for the paged query. The status rollup is an aggregate, so it
+    // cannot be a WHERE and rides in HAVING; the free-text/run-type/date bounds
+    // are plain WHERE. `total` no longer needs its own pass — see the
+    // COUNT(*) OVER () note below.
     const applyFilters = (qb: SelectQueryBuilder<JobHistory>) => {
       if (search) {
         qb.andWhere(
@@ -1297,11 +1386,20 @@ export class JobsRegistryService {
       workflowName: string;
       jobHistoryName: string;
       jobRunType: JobRunType;
+      // Row count of the grouped result set, repeated on every row.
+      total: string;
     }
 
     // Aggregate totalJobs and status directly over the joined job rows.
     // The jobs relation is already inner-joined, so correlated subqueries
     // per row are unnecessary.
+    //
+    // `total` rides along as a window function instead of a second query:
+    // COUNT(*) OVER () is evaluated after GROUP BY and HAVING (so it sees the
+    // same filtered groups the page is drawn from) but before ORDER BY/LIMIT
+    // and OFFSET, so it is exactly the number of rows a full result set would
+    // have. The old approach re-ran the entire aggregate a second time just to
+    // count rows, doubling the cost of the busiest console page.
     const qb = this.jobHistoryRepo
       .createQueryBuilder('jobHistory')
       .innerJoin('jobHistory.jobs', 'job')
@@ -1319,6 +1417,7 @@ export class JobsRegistryService {
         '"jobHistory"."jobRunType" as "jobRunType"',
         'COUNT(job.id) as "totalJobs"',
         `${JOB_HISTORY_STATUS_SQL} as "status"`,
+        'COUNT(*) OVER () as "total"',
       ])
       .groupBy('jobHistory.id')
       .addGroupBy('workflow.name')
@@ -1331,23 +1430,10 @@ export class JobsRegistryService {
 
     const rawResults = await qb.getRawMany<RawJobHistoryResult>();
 
-    // Count with the same GROUP BY + HAVING, then collapse to distinct id rows:
-    // the job join fans out one row per job, and `getCount` would drop the
-    // GROUP BY that the status HAVING depends on.
-    const totalQb = this.jobHistoryRepo
-      .createQueryBuilder('jobHistory')
-      .innerJoin('jobHistory.jobs', 'job')
-      .innerJoin('job.asset', 'jAsset')
-      .innerJoin('jAsset.target', 'jTarget')
-      .innerJoin('jTarget.workspace', 'workspace')
-      .leftJoin('jobHistory.workflow', 'workflow')
-      .where('workspace.id = :workspaceId', { workspaceId })
-      .select('jobHistory.id', 'id')
-      .groupBy('jobHistory.id');
-
-    applyFilters(totalQb);
-
-    const total = (await totalQb.getRawMany<{ id: string }>()).length;
+    // The window counts the filtered groups, so an empty page means no rows
+    // matched at all rather than a missing count.
+    const total =
+      rawResults.length > 0 ? parseInt(rawResults[0].total, 10) : 0;
 
     // Transform raw results to match the response DTO structure
     const transformedData = rawResults.map((raw) => ({
@@ -1429,12 +1515,22 @@ export class JobsRegistryService {
       {},
       workspaceId,
     );
+    // Index installed tools by name once. The old `.find()` inside `.map()`
+    // rescanned the whole installed-tool list for every workflow step, making
+    // this O(steps x tools). First match wins, matching the previous behaviour.
+    const installedToolsByName = new Map<
+      string,
+      (typeof instaledTools.data)[number]
+    >();
+    for (const tool of instaledTools.data) {
+      if (!installedToolsByName.has(tool.name)) {
+        installedToolsByName.set(tool.name, tool);
+      }
+    }
+
     const tools = (
       jobHistory.workflow?.content.jobs
-        .map((job) => {
-          const tool = instaledTools.data.find((t) => t.name === job.run);
-          return tool;
-        })
+        .map((job) => installedToolsByName.get(job.run))
         .filter(
           (tool): tool is NonNullable<typeof tool> => tool !== undefined,
         ) ?? []

@@ -14,6 +14,7 @@ import { Job } from './entities/job.entity';
 import { JobsRegistryController } from './jobs-registry.controller';
 import { JobsRegistryService } from './jobs-registry.service';
 import { JobResultCleanupService } from './job-result-cleanup.service';
+import { JobRetentionService } from './job-retention.service';
 import { JobResultProcessor } from './processors/job-result.processor';
 import {
   AssetGroupsScheduleConsumer,
@@ -48,6 +49,7 @@ import {
     AssetGroupsScheduleConsumer,
     JobResultProcessor,
     JobResultCleanupService,
+    JobRetentionService,
     // IssueCreationProcessor,
   ],
   exports: [JobsRegistryService],

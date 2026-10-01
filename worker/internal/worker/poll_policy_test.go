@@ -8,23 +8,17 @@ func TestPollPolicy_FlowFillsAllSlots(t *testing.T) {
 	if !p.flowing() {
 		t.Fatal("a fresh policy must be flowing so a backlog is drained at full concurrency")
 	}
-	if got := p.maxDispatch(12); got != 12 {
-		t.Fatalf("flowing maxDispatch(12) = %d, want 12 (fill every free slot)", got)
-	}
 	if got := p.nextDelay(3); got != pollRefillDelay {
 		t.Fatalf("flowing nextDelay = %v, want %v (refill freed slots quickly)", got, pollRefillDelay)
 	}
 }
 
-func TestPollPolicy_EmptyPollsBackOffAndProbeSingle(t *testing.T) {
+func TestPollPolicy_EmptyPollsBackOff(t *testing.T) {
 	p := newPollPolicy()
 	p.feedback(false)
 
 	if p.flowing() {
 		t.Fatal("an empty poll must stop the policy from flowing")
-	}
-	if got := p.maxDispatch(12); got != 1 {
-		t.Fatalf("idle maxDispatch(12) = %d, want 1 (single probe)", got)
 	}
 	if got := p.nextDelay(1); got != p.backoff || got <= pollIdleBackoff {
 		t.Fatalf("idle nextDelay = %v, want the grown backoff %v", got, p.backoff)

@@ -140,13 +140,13 @@ func splitLogChunk(chunk []byte) []string {
 	return out
 }
 
-func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
-	job, err := grpcClient.NextJob(ctx)
-	if err != nil {
-		NewTuiLogger(events, "Jobs").ErrorE("Failed to pull job", err)
-		return false, false
-	}
-	if job == nil || job.Id == "" {
+// processJob runs one already-claimed job.
+//
+// The caller owns the claim: the poll loop claims a batch up front so it can
+// fill every free concurrency slot with a single round-trip, and passing the
+// job in keeps this function free of any transport concern.
+func processJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
+	if job == nil || job.GetId() == "" {
 		return false, false
 	}
 
@@ -230,21 +230,52 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 		}
 		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
 		if err != nil {
+			// A page that will not render is the TARGET's condition, not the
+			// tool's failure, so this must not fail the job. Report an empty
+			// screenshot and let it complete: core's screenshot adapter returns
+			// early on an empty image, so nothing is written. The reason stays
+			// on the worker's activity log for diagnosis.
 			completed = true
 			Emit(events, TuiEvent{
 				Type:          EventActivity,
 				Source:        "Jobs",
 				ActivityLevel: "warning",
-				Message:       fmt.Sprintf("Screenshot failed: %v", err),
+				Message:       fmt.Sprintf("Screenshot skipped (%s): %s", formatURL(url), trimRodStack(err.Error())),
 			})
+
+			emptyPayload, marshalErr := emptyScreenshotPayload(url)
+			if marshalErr != nil {
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: fmt.Sprintf("Screenshot error: %v", marshalErr),
+					Duration: time.Since(startTime),
+				})
+				submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", marshalErr))
+				return true, false
+			}
+
+			if submitErr := submitCategoryResult(ctx, grpcClient, job.Id, category, false, emptyPayload); submitErr != nil {
+				// Reporting the empty result is an infrastructure concern — if
+				// the submission itself fails the job genuinely did not finish.
+				NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit empty screenshot result", job.Id), submitErr)
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: submitErr.Error(),
+					Duration: time.Since(startTime),
+				})
+				return true, false
+			}
+
 			Emit(events, TuiEvent{
 				Type:     EventJobCompleted,
 				JobID:    job.Id,
-				Success:  false,
-				ErrorMsg: fmt.Sprintf("Screenshot error: %v", err),
+				Success:  true,
 				Duration: time.Since(startTime),
 			})
-			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", err))
 			return true, false
 		}
 

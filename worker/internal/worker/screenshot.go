@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -51,6 +52,39 @@ func formatURL(target string) string {
 		return "https://" + target
 	}
 	return "http://" + target
+}
+
+// trimRodStack keeps only the first line of a go-rod error.
+//
+// rod's `Try` recovers the panic raised by the `Must*` calls and hands back an
+// error whose message is the panic value followed by the running goroutine's
+// whole stack (`error value: &rod.NavigationError{…}\ngoroutine 1342 [running]:
+// …`). None of that helps an operator — the first line already names the Chrome
+// failure — so drop it before the message reaches a log or an event.
+func trimRodStack(msg string) string {
+	if i := strings.IndexByte(msg, '\n'); i >= 0 {
+		msg = msg[:i]
+	}
+	return strings.TrimSpace(strings.TrimPrefix(msg, "error value: "))
+}
+
+// emptyScreenshotPayload is the result reported when a page could not be
+// rendered.
+//
+// A page that refuses to load is the TARGET's condition, not the tool's, so the
+// job still succeeds. Core requires a non-empty `raw` for built-in tools and
+// parses it with `JSON.parse`, so "empty" has to be a well-formed envelope with
+// no image rather than an empty string. Core's screenshot adapter returns early
+// when the image is empty, so nothing is written and no asset changes.
+func emptyScreenshotPayload(rawURL string) (string, error) {
+	payload, err := json.Marshal(struct {
+		Screenshot string `json:"screenshot"`
+		URL        string `json:"url"`
+	}{Screenshot: "", URL: formatURL(rawURL)})
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
 }
 
 func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL string) (string, error) {

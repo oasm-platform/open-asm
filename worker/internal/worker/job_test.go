@@ -223,6 +223,19 @@ func newWorkerTestSetup(t *testing.T) (*grpcclient.Client, *testJobsServer, *run
 	return client, jobsSrv, fakeRT
 }
 
+// pullJob fetches one job from the test server for processJob, which no longer
+// pulls on its own — the poller claims a whole batch up front and hands each
+// claimed job to processJob. Tests keep the old one-job-at-a-time shape by
+// pulling first.
+func pullJob(t *testing.T, c *grpcclient.Client) *pb.Job {
+	t.Helper()
+	job, err := c.NextJob(context.Background())
+	if err != nil {
+		t.Fatalf("NextJob: %v", err)
+	}
+	return job
+}
+
 // --- tests ---
 
 func TestProcessJobConnectorBranch(t *testing.T) {
@@ -252,7 +265,7 @@ func TestProcessJobConnectorBranch(t *testing.T) {
 	releaseCh := make(chan struct{}, 1)
 	releaseSem := func() { releaseCh <- struct{}{} }
 
-	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, releaseSem)
+	hadJob, usedAsync := processJob(context.Background(), pullJob(t, client), client, nil, "", events, mgr, proxy, releaseSem)
 
 	if !hadJob {
 		t.Fatal("expected hadJob=true")
@@ -330,7 +343,7 @@ func TestProcessConnectorJobSendsExecuteJob(t *testing.T) {
 	releaseCh := make(chan struct{}, 1)
 	releaseSem := func() { releaseCh <- struct{}{} }
 
-	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, releaseSem)
+	hadJob, usedAsync := processJob(context.Background(), pullJob(t, client), client, nil, "", events, mgr, proxy, releaseSem)
 	if !hadJob || !usedAsync {
 		t.Fatalf("expected (true, true), got (%v, %v)", hadJob, usedAsync)
 	}
@@ -459,7 +472,7 @@ func TestProcessJobLegacyBranch(t *testing.T) {
 		}, nil
 	}
 
-	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, nil, nil, nil)
+	hadJob, usedAsync := processJob(context.Background(), pullJob(t, client), client, nil, "", events, nil, nil, nil)
 
 	if !hadJob {
 		t.Fatal("expected hadJob=true")
@@ -486,7 +499,7 @@ func TestProcessJobNoJob(t *testing.T) {
 		return nil, nil
 	}
 
-	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, nil, nil, nil)
+	hadJob, usedAsync := processJob(context.Background(), pullJob(t, client), client, nil, "", events, nil, nil, nil)
 
 	if hadJob {
 		t.Fatal("expected hadJob=false when no job")
@@ -524,7 +537,7 @@ func TestProcessJobConnectorSubmitError(t *testing.T) {
 		}, nil
 	}
 
-	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, nil)
+	hadJob, usedAsync := processJob(context.Background(), pullJob(t, client), client, nil, "", events, mgr, proxy, nil)
 
 	if !hadJob {
 		t.Fatal("expected hadJob=true (job was pulled)")
@@ -579,7 +592,7 @@ func TestProcessJobConnectorCompletionReleasesSemaphore(t *testing.T) {
 	releaseCh := make(chan struct{}, 1)
 	releaseSem := func() { releaseCh <- struct{}{} }
 
-	hadJob, usedAsync := processJob(context.Background(), client, nil, "", events, mgr, proxy, releaseSem)
+	hadJob, usedAsync := processJob(context.Background(), pullJob(t, client), client, nil, "", events, mgr, proxy, releaseSem)
 	if !hadJob || !usedAsync {
 		t.Fatalf("expected (true, true), got (%v, %v)", hadJob, usedAsync)
 	}
