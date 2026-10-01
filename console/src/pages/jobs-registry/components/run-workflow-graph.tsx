@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { ToolLogo } from '@/components/ui/tool-logo';
 import {
   Tooltip,
@@ -34,7 +33,6 @@ import { useMemo } from 'react';
 import {
   buildWorkflowGraphLayout,
   type StepNodeData,
-  type WaveNodeData,
 } from './run-workflow-graph-layout';
 
 /**
@@ -42,11 +40,10 @@ import {
  *
  * One column per wave: wave 1 holds the steps without `needs`, wave N every step
  * whose dependencies all sit in earlier waves. Steps inside a wave execute at the
- * same time, which is what `needs` buys over a fixed order — the graph makes that
- * visible instead of drawing a single column for everything.
+ * same time, which is what `needs` buys over a fixed order.
  *
- * The run page already polls while any job is executing, so the graph updates
- * live as steps move from waiting → running → done.
+ * The page already polls while any job is executing, so the graph updates live
+ * as steps move from waiting → running → done.
  */
 
 const STATUS_META: Record<
@@ -103,44 +100,16 @@ const SKIP_REASON_LABEL: Record<string, string> = {
   'run-cancelled': 'the run was cancelled',
 };
 
-/** Legend/status order; also what the graph can render. */
-const STATUS_ORDER = [
-  'pending',
-  'dispatched',
-  'done',
-  'failed',
-  'skipped',
-] as const;
-
 function statusMeta(status: string) {
   return STATUS_META[status] ?? STATUS_META.pending;
 }
 
-function WaveLabelNode({ data }: NodeProps) {
-  const { wave, total, done, jobs } = data as WaveNodeData;
-  return (
-    <div className="flex items-center gap-2 border-b border-dashed pb-1.5 text-xs">
-      <span className="font-medium">Wave {wave}</span>
-      <span className="text-muted-foreground">
-        {done}/{total} done
-        {jobs > 0 ? ` · ${jobs} job${jobs > 1 ? 's' : ''}` : ''}
-      </span>
-    </div>
-  );
-}
-
 function WorkflowStepNode({ data }: NodeProps) {
-  const { id, label, run, status, needs, jobs, reason, logoUrl, duration } =
+  const { id, label, run, status, needs, jobs, reason, logoUrl } =
     data as StepNodeData;
   const meta = statusMeta(status);
   const skipped = status === 'skipped';
   const skipReason = reason ? (SKIP_REASON_LABEL[reason] ?? reason) : undefined;
-
-  const subtitle = skipReason
-    ? `skipped: ${skipReason}`
-    : needs.length > 0
-      ? `needs ${needs.join(', ')}`
-      : 'runs in parallel';
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -148,7 +117,7 @@ function WorkflowStepNode({ data }: NodeProps) {
         <TooltipTrigger asChild>
           <div
             className={cn(
-              'flex h-full flex-col justify-center gap-1 rounded-lg border bg-card px-2.5 py-2 text-left shadow-sm',
+              'flex h-full flex-col justify-center gap-1 rounded-lg border bg-card px-2.5 py-1.5 text-left shadow-sm',
               meta.border,
               skipped && 'opacity-60',
             )}
@@ -176,11 +145,6 @@ function WorkflowStepNode({ data }: NodeProps) {
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
                 {label}
               </span>
-              {duration && (
-                <span className="shrink-0 text-[11px] text-muted-foreground">
-                  {duration}
-                </span>
-              )}
             </div>
             <div className="flex items-center gap-1.5 text-xs">
               <span className={cn('font-medium', meta.text)}>{meta.label}</span>
@@ -194,9 +158,6 @@ function WorkflowStepNode({ data }: NodeProps) {
                 </span>
               )}
             </div>
-            <span className="truncate text-[11px] text-muted-foreground">
-              {subtitle}
-            </span>
             <Handle
               type="source"
               position={Position.Right}
@@ -220,7 +181,6 @@ function WorkflowStepNode({ data }: NodeProps) {
 
 const nodeTypes = {
   workflowStep: WorkflowStepNode,
-  waveLabel: WaveLabelNode,
 } satisfies NodeTypes;
 
 /**
@@ -228,7 +188,7 @@ const nodeTypes = {
  *
  * Live while either endpoint is executing: the arrows start travelling from the
  * step the moment it runs (feeding the step that needs it), and keep travelling
- * while the consumer runs — so the mutation flows forward along the chain.
+ * while the consumer runs — so the flow reads forward along the chain.
  */
 function AnimatedStepEdge({
   sourceX,
@@ -283,65 +243,35 @@ const edgeTypes = {
 
 interface RunWorkflowGraphProps {
   steps: WorkflowStepStatusDto[];
-  /** Steps executing right now — more than one means the run branched. */
-  runningSteps: number;
 }
 
-export default function RunWorkflowGraph({
-  steps,
-  runningSteps,
-}: RunWorkflowGraphProps) {
+export default function RunWorkflowGraph({ steps }: RunWorkflowGraphProps) {
   const { resolvedTheme } = useTheme();
-  const { nodes, edges, waves, contentHeight } = useMemo(
+  const { nodes, edges, contentHeight } = useMemo(
     () => buildWorkflowGraphLayout(steps),
     [steps],
   );
 
-  const height = Math.min(520, Math.max(200, contentHeight + 32));
+  const height = Math.min(520, Math.max(180, contentHeight + 32));
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-        {runningSteps > 1 && (
-          <Badge variant="outline" className="font-normal">
-            {runningSteps} steps running in parallel
-          </Badge>
-        )}
-        <span>
-          {waves} wave{waves > 1 ? 's' : ''} · {steps.length} step
-          {steps.length > 1 ? 's' : ''}
-        </span>
-        <span className="flex flex-wrap items-center gap-3">
-          {STATUS_ORDER.map((status) => {
-            const meta = statusMeta(status);
-            return (
-              <span key={status} className="flex items-center gap-1.5">
-                <span className={cn('size-2 rounded-full', meta.dot)} />
-                {meta.label}
-              </span>
-            );
-          })}
-        </span>
-      </div>
-
-      <div style={{ height }} className="rounded-lg border bg-card/40">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          colorMode={resolvedTheme}
-          fitView
-          fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
-          minZoom={0.35}
-          maxZoom={1.5}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-        </ReactFlow>
-      </div>
+    <div style={{ height }} className="rounded-lg border bg-card/40">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        colorMode={resolvedTheme}
+        fitView
+        fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+        minZoom={0.35}
+        maxZoom={1.5}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+      </ReactFlow>
     </div>
   );
 }

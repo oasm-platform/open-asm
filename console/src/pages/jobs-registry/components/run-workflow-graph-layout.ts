@@ -14,12 +14,11 @@ import type { Edge, EdgeMarker, Node } from '@xyflow/react';
  */
 
 const NODE_WIDTH = 236;
-const NODE_HEIGHT = 86;
+const NODE_HEIGHT = 72;
 const COLUMN_GAP = 72;
-const ROW_GAP = 18;
-const LABEL_HEIGHT = 34;
+const ROW_GAP = 16;
 
-export { NODE_WIDTH, NODE_HEIGHT, LABEL_HEIGHT };
+export { NODE_WIDTH, NODE_HEIGHT };
 
 export interface StepNodeData extends Record<string, unknown> {
   id: string;
@@ -30,14 +29,6 @@ export interface StepNodeData extends Record<string, unknown> {
   jobs: number;
   reason?: string;
   logoUrl?: string;
-  duration?: string;
-}
-
-export interface WaveNodeData extends Record<string, unknown> {
-  wave: number;
-  total: number;
-  done: number;
-  jobs: number;
 }
 
 export interface WorkflowGraphLayout {
@@ -79,20 +70,6 @@ export function computeStepWaves(
   return waves;
 }
 
-/** Wall-clock duration between dispatch and finish, when both are known. */
-export function stepDuration(
-  step: Pick<WorkflowStepStatusDto, 'dispatchedAt' | 'finishedAt'>,
-): string | undefined {
-  if (!step.dispatchedAt || !step.finishedAt) return undefined;
-  const ms =
-    new Date(step.finishedAt).getTime() - new Date(step.dispatchedAt).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return undefined;
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-}
-
 /** Builds the React Flow nodes/edges for a run's steps. Pure — no DOM. */
 export function buildWorkflowGraphLayout(
   steps: WorkflowStepStatusDto[],
@@ -118,25 +95,6 @@ export function buildWorkflowGraphLayout(
       column.length * NODE_HEIGHT + Math.max(0, column.length - 1) * ROW_GAP;
     const startY = (columnHeight - stackHeight) / 2;
 
-    nodes.push({
-      id: `wave-${wave}`,
-      type: 'waveLabel',
-      position: { x, y: -LABEL_HEIGHT - 10 },
-      draggable: false,
-      selectable: false,
-      data: {
-        wave: wave + 1,
-        total: column.length,
-        done: column.filter((step) => step.status === 'done').length,
-        jobs: column.reduce((sum, step) => sum + step.jobs, 0),
-      } satisfies WaveNodeData,
-      style: { width: NODE_WIDTH },
-      // Sizes are known up front, so React Flow can draw the edges on the first
-      // pass instead of waiting for its own measurement to settle (which, when
-      // it does not, leaves a graph of nodes with no connecting lines).
-      measured: { width: NODE_WIDTH, height: LABEL_HEIGHT },
-    });
-
     column.forEach((step, index) => {
       nodes.push({
         id: step.id,
@@ -153,7 +111,6 @@ export function buildWorkflowGraphLayout(
           jobs: step.jobs,
           reason: step.reason,
           logoUrl: step.logoUrl,
-          duration: stepDuration(step),
         } satisfies StepNodeData,
         style: { width: NODE_WIDTH },
         // Explicit size: the edge layer needs node dimensions, and deriving them
@@ -212,6 +169,6 @@ export function buildWorkflowGraphLayout(
     nodes,
     edges,
     waves: waveCount,
-    contentHeight: LABEL_HEIGHT + columnHeight,
+    contentHeight: columnHeight,
   };
 }

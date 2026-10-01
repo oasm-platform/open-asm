@@ -75,13 +75,11 @@ const chainSteps = [
 
 describe('RunWorkflowGraph', () => {
   it('gives every step node the handles React Flow anchors edges on', () => {
-    const { container } = render(
-      <RunWorkflowGraph steps={chainSteps} runningSteps={1} />,
-    );
+    const { container } = render(<RunWorkflowGraph steps={chainSteps} />);
 
-    // 3 step nodes + 3 wave labels.
+    // One node per step — no wave labels, no header.
     const nodes = container.querySelectorAll('.react-flow__node');
-    expect(nodes.length).toBe(6);
+    expect(nodes.length).toBe(3);
 
     const stepNodes = container.querySelectorAll(
       '.react-flow__node[data-id="port_scan"]',
@@ -91,17 +89,16 @@ describe('RunWorkflowGraph', () => {
     expect(stepNodes[0].querySelectorAll('.react-flow__handle.target').length).toBe(1);
     expect(stepNodes[0].querySelectorAll('.react-flow__handle.source').length).toBe(1);
 
-    // One target + one source per step node, nothing on the wave labels.
+    // One target + one source per step node.
     expect(container.querySelectorAll('.react-flow__handle').length).toBe(6);
   });
 
-  it('reports the wave and step counts, and the parallel badge past one', () => {
-    const { container } = render(
-      <RunWorkflowGraph steps={chainSteps} runningSteps={2} />,
-    );
+  it('renders the step cards without a header row', () => {
+    const { container } = render(<RunWorkflowGraph steps={chainSteps} />);
 
-    expect(container.textContent).toContain('3 waves');
-    expect(container.textContent).toContain('3 steps');
-    expect(container.textContent).toContain('2 steps running in parallel');
+    expect(container.textContent).toContain('Port Scan');
+    expect(container.textContent).toContain('naabu');
+    expect(container.textContent).not.toContain('Wave');
+    expect(container.textContent).not.toContain('waves');
   });
 });

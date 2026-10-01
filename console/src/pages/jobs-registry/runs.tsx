@@ -237,15 +237,6 @@ export default function Runs() {
     );
   }, [jobHistoryDetail?.steps, jobHistoryDetail?.tools]);
 
-  /** Steps executing right now — more than one means the workflow branched. */
-  const runningSteps = useMemo(
-    () =>
-      (jobHistoryDetail?.steps ?? []).filter(
-        (step) => step.status === 'dispatched',
-      ).length,
-    [jobHistoryDetail?.steps],
-  );
-
   useEffect(() => {
     hasActiveJobsRef.current = hasActiveJobs;
   }, [hasActiveJobs]);
@@ -455,10 +446,7 @@ export default function Runs() {
         <Card className="mb-6 py-2">
           <CardContent className="px-2 py-2 md:px-4">
             <CardTitle className="mb-3">Workflow</CardTitle>
-            <RunWorkflowGraph
-              steps={steps}
-              runningSteps={runningSteps}
-            />
+            <RunWorkflowGraph steps={steps} />
           </CardContent>
         </Card>
       ) : (

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   buildWorkflowGraphLayout,
   computeStepWaves,
-  stepDuration,
 } from './run-workflow-graph-layout';
 
 function step(
@@ -93,12 +92,12 @@ describe('computeStepWaves', () => {
 });
 
 describe('buildWorkflowGraphLayout', () => {
-  it('renders one wave label per wave and one node per step', () => {
+  it('renders one node per step and no decorative labels', () => {
     const { nodes, waves } = buildWorkflowGraphLayout(chain);
 
     expect(waves).toBe(4);
-    expect(nodes.filter((node) => node.type === 'waveLabel')).toHaveLength(4);
-    expect(nodes.filter((node) => node.type === 'workflowStep')).toHaveLength(4);
+    expect(nodes).toHaveLength(4);
+    expect(nodes.every((node) => node.type === 'workflowStep')).toBe(true);
   });
 
   it('left-to-right columns follow the waves, one step per column for a chain', () => {
@@ -126,21 +125,13 @@ describe('buildWorkflowGraphLayout', () => {
     expect(new Set(positions.map((p) => p.y)).size).toBe(3);
   });
 
-  it('counts the finished steps of each wave in its label', () => {
-    const { nodes } = buildWorkflowGraphLayout(chain);
+  it('sizes the canvas from the tallest column', () => {
+    const { contentHeight, nodes } = buildWorkflowGraphLayout(chain);
 
-    expect(nodes.find((node) => node.id === 'wave-0')?.data).toMatchObject({
-      wave: 1,
-      total: 1,
-      done: 1,
-      jobs: 1,
-    });
-    expect(nodes.find((node) => node.id === 'wave-2')?.data).toMatchObject({
-      wave: 3,
-      total: 1,
-      done: 0,
-      jobs: 42,
-    });
+    // Four waves of one node each: the box is as tall as a single node.
+    const yValues = nodes.map((node) => node.position.y);
+    expect(new Set(yValues).size).toBe(1);
+    expect(contentHeight).toBeGreaterThan(0);
   });
 
   it('draws one custom edge per need, live while either endpoint runs', () => {
@@ -232,33 +223,5 @@ describe('buildWorkflowGraphLayout', () => {
     expect(nodes).toEqual([]);
     expect(edges).toEqual([]);
     expect(waves).toBe(0);
-  });
-});
-
-describe('stepDuration', () => {
-  it('is undefined until the step has both timestamps', () => {
-    expect(stepDuration(step('a'))).toBeUndefined();
-    expect(
-      stepDuration(step('a', { dispatchedAt: '2026-01-01T00:00:00.000Z' })),
-    ).toBeUndefined();
-  });
-
-  it('formats seconds and minutes', () => {
-    expect(
-      stepDuration(
-        step('a', {
-          dispatchedAt: '2026-01-01T00:00:00.000Z',
-          finishedAt: '2026-01-01T00:00:12.000Z',
-        }),
-      ),
-    ).toBe('12s');
-    expect(
-      stepDuration(
-        step('a', {
-          dispatchedAt: '2026-01-01T00:00:00.000Z',
-          finishedAt: '2026-01-01T00:01:30.000Z',
-        }),
-      ),
-    ).toBe('1m 30s');
   });
 });
