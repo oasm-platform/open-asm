@@ -12,6 +12,7 @@ import {
   Background,
   BackgroundVariant,
   BaseEdge,
+  Controls,
   getSmoothStepPath,
   Handle,
   Position,
@@ -255,6 +256,20 @@ interface RunWorkflowGraphProps {
   steps: WorkflowStepStatusDto[];
 }
 
+/** Floor for the canvas height. The DAG is the page's main event — a run with a
+ * single wave would otherwise squeeze it into a letterbox strip, with the fit
+ * padding dominating the box and the step cards floating in the middle of
+ * nothing. Matches the worker detail graph, which floors its canvas for the same
+ * reason. */
+const MIN_CANVAS_HEIGHT = 480;
+
+/** Ceiling for the canvas height. `contentHeight` is exact, so the cap only ever
+ * bites on a run with a very wide wave; without it one run with a dozen parallel
+ * steps would push the job table a full screen down. Still far taller than the
+ * old 520px, so a wide DAG keeps its nodes legible instead of being shrunk to
+ * fit a strip. */
+const MAX_CANVAS_HEIGHT = 720;
+
 export default function RunWorkflowGraph({ steps }: RunWorkflowGraphProps) {
   const { resolvedTheme } = useTheme();
   const { nodes, edges, contentHeight } = useMemo(
@@ -262,7 +277,10 @@ export default function RunWorkflowGraph({ steps }: RunWorkflowGraphProps) {
     [steps],
   );
 
-  const height = Math.min(520, Math.max(180, contentHeight + 32));
+  const height = Math.min(
+    MAX_CANVAS_HEIGHT,
+    Math.max(MIN_CANVAS_HEIGHT, contentHeight + 32),
+  );
 
   return (
     <div style={{ height }} className="rounded-lg border bg-card/40">
@@ -279,8 +297,21 @@ export default function RunWorkflowGraph({ steps }: RunWorkflowGraphProps) {
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
+        // The wheel belongs to the page, not the canvas. `zoomOnScroll` stops the
+        // wheel from zooming the graph, and `preventScrolling={false}` stops the
+        // zoom handler from calling `preventDefault()` on it — without that second
+        // flag React Flow swallows the event and the page will not scroll while
+        // the cursor is over the diagram. Trackpad pinch (ctrl + wheel) still
+        // zooms, which is what `zoomOnPinch` keeps alive.
+        zoomOnScroll={false}
+        preventScrolling={false}
+        proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        {/* Same control bar as the worker detail graph: zoom, fit view and
+            lock. Zooming is a deliberate action here, not a side effect of
+            scrolling the page past the diagram. */}
+        <Controls showInteractive={false} />
       </ReactFlow>
     </div>
   );

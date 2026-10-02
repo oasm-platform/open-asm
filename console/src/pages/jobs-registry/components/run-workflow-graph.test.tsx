@@ -105,4 +105,42 @@ describe('RunWorkflowGraph', () => {
     expect(container.textContent).not.toContain('Wave');
     expect(container.textContent).not.toContain('waves');
   });
+
+  it('carries the same control bar as the worker detail graph', () => {
+    const { container } = render(<RunWorkflowGraph steps={chainSteps} />);
+
+    // Zoom in / zoom out / fit view / lock — the canvas is driven deliberately.
+    expect(container.querySelectorAll('.react-flow__controls').length).toBe(1);
+    expect(
+      container.querySelectorAll('.react-flow__controls-button').length,
+    ).toBeGreaterThanOrEqual(3);
+  });
+
+  it('hides the React Flow attribution link', () => {
+    const { container } = render(<RunWorkflowGraph steps={chainSteps} />);
+
+    // `proOptions.hideAttribution`, same as the worker detail graph.
+    expect(container.querySelectorAll('.react-flow__attribution').length).toBe(0);
+  });
+
+  it('leaves the mouse wheel to the page instead of zooming the canvas', () => {
+    const { container } = render(<RunWorkflowGraph steps={chainSteps} />);
+
+    // React Flow binds its wheel handler on `.react-flow__renderer` and calls
+    // `preventDefault()` on the event before doing anything else — that is what
+    // keeps the page from scrolling while the cursor sits over the diagram. A
+    // wheel event that comes back untouched is the observable form of "this
+    // graph does not zoom on scroll": the page scrolls, the canvas does not move.
+    const canvas = container.querySelector('.react-flow__renderer');
+    expect(canvas).not.toBeNull();
+
+    const wheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 120,
+    });
+    canvas?.dispatchEvent(wheel);
+
+    expect(wheel.defaultPrevented).toBe(false);
+  });
 });
