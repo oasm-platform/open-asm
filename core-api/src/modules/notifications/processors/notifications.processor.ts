@@ -26,6 +26,9 @@ import { Notification } from '../entities/notification.entity';
  */
 const ALLOWED_INTEGRATION_NOTIFICATION_TYPES: NotificationType[] = [
   NotificationType.ASSET_NEW_DETECT,
+  // A scan that stopped halfway is exactly what an operator needs pushed: the
+  // gap it leaves is the point, and it may come with no new assets at all.
+  NotificationType.SCAN_INCOMPLETE,
   NotificationType.NEW_VULNERABILITY_FOUND,
 ];
 

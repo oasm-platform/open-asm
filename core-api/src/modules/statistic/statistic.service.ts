@@ -20,6 +20,7 @@ import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { CreateJobs } from '../jobs-registry/dto/jobs-registry.dto';
 import { Job } from '../jobs-registry/entities/job.entity';
+import type { RunStepState } from '../workflows/workflow-graph';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
 import { AssetLocationDto } from './dto/asset-location.dto';
@@ -1508,32 +1509,78 @@ export class StatisticService {
           diffs[k] = after - before;
         }
       }
+
+      // A run can end without executing its whole graph: a failed step skips
+      // every step that needs it. "New assets discovered" would read as "the
+      // scan finished", and a run that died with nothing new to report would
+      // stay silent — both leave the operator with a wrong picture, so the
+      // snapshot report carries the incompleteness and a dead run reports
+      // itself even when it found nothing.
+      const steps = job.jobHistory?.steps ?? {};
+      const idsWith = (predicate: (state: RunStepState) => boolean) =>
+        Object.entries(steps)
+          .filter(([, state]) => predicate(state))
+          .map(([id]) => id);
+
+      const failedSteps = idsWith((state) => state.status === 'failed');
+      const blockedSteps = idsWith(
+        (state) => state.status === 'skipped' && state.reason === 'blocked-by-failure',
+      );
+      const cancelledSteps = idsWith(
+        (state) => state.status === 'skipped' && state.reason === 'run-cancelled',
+      );
+      const incomplete =
+        failedSteps.length + blockedSteps.length + cancelledSteps.length > 0;
+      const incompleteDetails = [
+        failedSteps.length > 0 ? `${failedSteps.join(', ')} failed` : '',
+        blockedSteps.length > 0
+          ? `${blockedSteps.join(', ')} skipped after a failure`
+          : '',
+        cancelledSteps.length > 0 ? `${cancelledSteps.join(', ')} cancelled` : '',
+      ]
+        .filter(Boolean)
+        .join('; ');
+
       const members = await this.workspacesService.getMemberOfWorkspaceByJobId(
         job.id,
       );
 
       if (members.length === 0) return;
 
-      if (Object.keys(diffs).length > 0) {
-        const recipientIds = members.map((m) => m.user.id);
-        const workspaceId = members[0].workspace.id;
+      const recipientIds = members.map((m) => m.user.id);
+      const workspaceId = members[0].workspace.id;
 
-        if (recipientIds.length > 0) {
-          await this.notificationsService.createNotification({
-            recipients: recipientIds,
-            scope: NotificationScope.GROUP,
-            type: NotificationType.ASSET_NEW_DETECT,
-            metadata: {
-              hosts: String(diffs.hosts ?? 0),
-              ports: String(diffs.ports ?? 0),
-              services: String(diffs.services ?? 0),
-              tech: String(diffs.techs ?? 0),
-              targetValue: job.asset.target.value,
-              targetId: job.asset.target.id,
-            },
-            workspaceId,
-          });
-        }
+      if (Object.keys(diffs).length > 0) {
+        await this.notificationsService.createNotification({
+          recipients: recipientIds,
+          scope: NotificationScope.GROUP,
+          type: NotificationType.ASSET_NEW_DETECT,
+          metadata: {
+            hosts: String(diffs.hosts ?? 0),
+            ports: String(diffs.ports ?? 0),
+            services: String(diffs.services ?? 0),
+            tech: String(diffs.techs ?? 0),
+            targetValue: job.asset.target.value,
+            targetId: job.asset.target.id,
+            // Empty string, never missing: the message template selects on it.
+            incomplete: incomplete ? 'true' : '',
+          },
+          workspaceId,
+        });
+      }
+
+      if (incomplete) {
+        await this.notificationsService.createNotification({
+          recipients: recipientIds,
+          scope: NotificationScope.GROUP,
+          type: NotificationType.SCAN_INCOMPLETE,
+          metadata: {
+            targetValue: job.asset.target.value,
+            targetId: job.asset.target.id,
+            details: incompleteDetails,
+          },
+          workspaceId,
+        });
       }
     }
   }
