@@ -599,23 +599,31 @@ export type GetManyGetManyWorkflowsResponseDtoDto = {
   pageCount: number;
 };
 
+export type WorkflowJobConfig = { [key: string]: unknown };
+
+export type WorkflowJob = {
+  name?: string;
+  run: string;
+  needs?: string[];
+  allowFailure?: boolean;
+  config?: WorkflowJobConfig;
+  configProfileId?: string;
+};
+
 export type On = {
   target: string[];
   schedule: string;
 };
 
-export type WorkflowJobConfig = { [key: string]: unknown };
-
-export type WorkflowJob = {
-  name: string;
-  run: string;
-  config?: WorkflowJobConfig;
-  configProfileId?: string;
-};
+/**
+ * Jobs keyed by a unique job id; `needs` references those same ids
+ */
+export type WorkflowContentJobs = { [key: string]: WorkflowJob };
 
 export type WorkflowContent = {
   on: On;
-  jobs: WorkflowJob[];
+  /** Jobs keyed by a unique job id; `needs` references those same ids */
+  jobs: WorkflowContentJobs;
   name: string;
 };
 
@@ -1290,11 +1298,44 @@ export type ToolWithStatusDto = {
   status?: ToolWithStatusDtoStatus;
 };
 
+export type WorkflowStepStatusDtoStatus =
+  (typeof WorkflowStepStatusDtoStatus)[keyof typeof WorkflowStepStatusDtoStatus];
+
+export const WorkflowStepStatusDtoStatus = {
+  pending: 'pending',
+  dispatched: 'dispatched',
+  done: 'done',
+  failed: 'failed',
+  skipped: 'skipped',
+} as const;
+
+export type WorkflowStepStatusDto = {
+  /** Unique job id inside the workflow */
+  id: string;
+  /** Display label (the job id when no name is set) */
+  name: string;
+  run: string;
+  /** Ids of the jobs this one waits for */
+  needs: string[];
+  status: WorkflowStepStatusDtoStatus;
+  /** Why the step was skipped: no-inputs, blocked-by-failure, assets-discovery-off or run-cancelled */
+  reason?: string;
+  /** Job rows this step fanned out to */
+  jobs: number;
+  /** Job rows that failed. A step is still done when it produced results (unless it sets allowFailure: false) */
+  failed?: number;
+  toolId?: string;
+  logoUrl?: string;
+  dispatchedAt?: string;
+  finishedAt?: string;
+};
+
 export type JobHistoryDetailResponseDto = {
   id: string;
   createdAt: string;
   updatedAt: string;
   tools: ToolWithStatusDto[];
+  steps: WorkflowStepStatusDto[];
   workflowName?: string;
   jobHistoryName: string;
   activeJobsCount: number;
@@ -2744,6 +2785,7 @@ export const CreateNotificationDtoType = {
   WORKSPACE_CREATED: 'WORKSPACE_CREATED',
   VULNERABILITY_ANALYSIS_COMPLETED: 'VULNERABILITY_ANALYSIS_COMPLETED',
   ASSET_NEW_DETECT: 'ASSET_NEW_DETECT',
+  SCAN_INCOMPLETE: 'SCAN_INCOMPLETE',
   NEW_VULNERABILITY_FOUND: 'NEW_VULNERABILITY_FOUND',
   WORKSPACE_INVITATION: 'WORKSPACE_INVITATION',
 } as const;

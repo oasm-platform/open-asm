@@ -3,8 +3,10 @@ import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-
 import { User } from '@/modules/auth/entities/user.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiExtraModels, ApiProperty, getSchemaPath } from '@nestjs/swagger';
 import {
+  IsArray,
+  IsBoolean,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -34,15 +36,40 @@ export class On {
 }
 
 export class WorkflowJob {
-  @ApiProperty()
+  /**
+   * Display label for the job. The job's identity — and what `needs` refers to
+   * — is its key in the `jobs` map, which is unique within the workflow.
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  name?: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
   run: string;
+
+  /**
+   * Ids of the jobs that must reach a terminal state before this one is
+   * dispatched. Empty/absent means the job is a root and runs in parallel with
+   * the other roots of the workflow.
+   */
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  needs?: string[];
+
+  /**
+   * Whether some of this job's fan-out jobs may fail without failing the job.
+   * Defaults to true: a job that produced results is done, and the failed rows
+   * stay visible in the job list. `false` fails the job when any of them fails.
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  allowFailure?: boolean;
 
   @ApiProperty({ required: false, type: Object })
   @IsOptional()
@@ -55,16 +82,30 @@ export class WorkflowJob {
   configProfileId?: string;
 }
 
+/**
+ * `ApiExtraModels(WorkflowJob)` registers the `WorkflowJob` schema — without it
+ * the `additionalProperties` $ref on `jobs` points at a schema that is never
+ * emitted.
+ */
+@ApiExtraModels(WorkflowJob)
 export class WorkflowContent {
   @ApiProperty({ type: On })
   @ValidateNested()
   @Type(() => On)
   on: On;
 
-  @ApiProperty({ type: [WorkflowJob] })
-  @ValidateNested({ each: true })
-  @Type(() => WorkflowJob)
-  jobs: WorkflowJob[];
+  /**
+   * Jobs keyed by a unique job id. `needs` on a job references those ids, so a
+   * step never has to be addressed by a display name.
+   */
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { $ref: getSchemaPath(WorkflowJob) },
+    description:
+      'Jobs keyed by a unique job id; `needs` references those same ids',
+  })
+  @IsObject()
+  jobs: Record<string, WorkflowJob>;
 
   @ApiProperty()
   name: string;

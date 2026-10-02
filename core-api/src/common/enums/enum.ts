@@ -177,6 +177,9 @@ export enum NotificationType {
   WORKSPACE_CREATED = 'WORKSPACE_CREATED',
   VULNERABILITY_ANALYSIS_COMPLETED = 'VULNERABILITY_ANALYSIS_COMPLETED',
   ASSET_NEW_DETECT = 'ASSET_NEW_DETECT',
+  /** A scan ended without running its whole workflow (a step failed, or a step
+   * that needed it was skipped). */
+  SCAN_INCOMPLETE = 'SCAN_INCOMPLETE',
   NEW_VULNERABILITY_FOUND = 'NEW_VULNERABILITY_FOUND',
   WORKSPACE_INVITATION = 'WORKSPACE_INVITATION',
 }

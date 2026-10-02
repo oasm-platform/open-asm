@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import JobStatusBadge from '@/components/ui/job-status';
 import ToolLogo from '@/components/ui/tool-logo';
+import RunWorkflowGraph from './components/run-workflow-graph';
 import { usePermission } from '@/hooks/usePermission';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { JobListItemDto } from '@/services/apis/gen/queries';
@@ -219,15 +220,22 @@ export default function Runs() {
       },
     });
 
-  // Check if any tools are still active via API status
+  // Check if any tools are still active via API status. Workflow runs carry
+  // their own per-step state; runs created before the engine only have tools.
   const hasActiveJobs = useMemo(() => {
+    const steps = jobHistoryDetail?.steps ?? [];
+    if (steps.length > 0) {
+      return steps.some(
+        (step) => step.status === 'pending' || step.status === 'dispatched',
+      );
+    }
     const tools = jobHistoryDetail?.tools || [];
     return tools.some(
       (tool) =>
         tool.status === JobStatus.pending ||
         tool.status === JobStatus.in_progress,
     );
-  }, [jobHistoryDetail?.tools]);
+  }, [jobHistoryDetail?.steps, jobHistoryDetail?.tools]);
 
   useEffect(() => {
     hasActiveJobsRef.current = hasActiveJobs;
@@ -264,6 +272,7 @@ export default function Runs() {
   };
 
   const activeJobsCount = jobHistoryDetail?.activeJobsCount ?? 0;
+  const steps = jobHistoryDetail?.steps ?? [];
 
   const columns: ColumnDef<JobListItemDto>[] = [
     {
@@ -431,38 +440,48 @@ export default function Runs() {
         )
       }
     >
-      {/* Tools Section */}
-      {!!jobHistoryDetail?.tools?.length && (
+      {/* Workflow steps (DAG) — falls back to the tool list for runs created
+          before the workflow engine existed. */}
+      {steps.length ? (
         <Card className="mb-6 py-2">
           <CardContent className="px-2 py-2 md:px-4">
-            <CardTitle className="mb-3">Tools</CardTitle>
-            <div className="flex flex-wrap items-center gap-4">
-              {jobHistoryDetail.tools.map((tool, index) => (
-                <div key={tool.id} className="flex items-center gap-2">
-                  <Link
-                    to="/tools/$id"
-                    params={{ id: tool.id }}
-                    className="flex items-center gap-2 hover:opacity-80"
-                  >
-                    <ToolLogo
-                      name={tool.name}
-                      logoUrl={tool.logoUrl}
-                      size={40}
-                      className="rounded-full border"
-                    />
-                    <span className="text-sm font-medium">{tool.name}</span>
-                    {tool.status && (
-                      <JobStatusBadge status={tool.status} onlyIcon />
-                    )}
-                  </Link>
-                  {index < jobHistoryDetail.tools.length - 1 && (
-                    <ArrowRight className="text-muted-foreground" size={16} />
-                  )}
-                </div>
-              ))}
-            </div>
+            <CardTitle className="mb-3">Workflow</CardTitle>
+            <RunWorkflowGraph steps={steps} />
           </CardContent>
         </Card>
+      ) : (
+        !!jobHistoryDetail?.tools?.length && (
+          <Card className="mb-6 py-2">
+            <CardContent className="px-2 py-2 md:px-4">
+              <CardTitle className="mb-3">Tools</CardTitle>
+              <div className="flex flex-wrap items-center gap-4">
+                {jobHistoryDetail.tools.map((tool, index) => (
+                  <div key={tool.id} className="flex items-center gap-2">
+                    <Link
+                      to="/tools/$id"
+                      params={{ id: tool.id }}
+                      className="flex items-center gap-2 hover:opacity-80"
+                    >
+                      <ToolLogo
+                        name={tool.name}
+                        logoUrl={tool.logoUrl}
+                        size={40}
+                        className="rounded-full border"
+                      />
+                      <span className="text-sm font-medium">{tool.name}</span>
+                      {tool.status && (
+                        <JobStatusBadge status={tool.status} onlyIcon />
+                      )}
+                    </Link>
+                    {index < jobHistoryDetail.tools.length - 1 && (
+                      <ArrowRight className="text-muted-foreground" size={16} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )
       )}
 
       <CollapsibleDataTable

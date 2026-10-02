@@ -501,6 +501,7 @@ describe('JobsRegistryService', () => {
       belongsToWorkspace = true,
       affected = 3,
       running = [] as { jobId: string; workerId: string }[],
+      steps = {},
     } = {}) => {
       const ownershipBuilder = {
         leftJoin: jest.fn().mockReturnThis(),
@@ -522,6 +523,12 @@ describe('JobsRegistryService', () => {
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected }),
       };
+      const findOne = jest.fn().mockResolvedValue({
+        id: mockHistoryId,
+        steps,
+        isCompleted: false,
+      });
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
       const manager = {
         // Three shapes: the 'jobHistory' alias is the ownership lookup, the
         // 'job' alias is the "which jobs are executing right now" lookup, and
@@ -530,6 +537,8 @@ describe('JobsRegistryService', () => {
           if (alias === 'job') return runningBuilder;
           return entity ? ownershipBuilder : updateBuilder;
         }),
+        findOne,
+        update,
       };
 
       return {
@@ -542,6 +551,8 @@ describe('JobsRegistryService', () => {
         ownershipBuilder,
         runningBuilder,
         updateBuilder,
+        findOne,
+        update,
       };
     };
 
@@ -596,6 +607,32 @@ describe('JobsRegistryService', () => {
       });
     });
 
+    it('closes the run so no further step can ever be dispatched', async () => {
+      const qr = buildQueryRunner({
+        steps: {
+          'Port Scan': { status: 'pending', jobs: 0 },
+          'HTTP Probe': { status: 'dispatched', jobs: 2 },
+          'Vuln Scan': { status: 'done', jobs: 1 },
+        },
+      });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      await service.cancelJobHistory(mockWorkspaceId, mockHistoryId);
+
+      const [, , patch]: [unknown, unknown, Record<string, unknown>] = qr
+        .update.mock.calls[0] as [unknown, unknown, Record<string, unknown>];
+      expect(qr.update).toHaveBeenCalledWith(
+        JobHistory,
+        { id: mockHistoryId },
+        expect.objectContaining({ isCompleted: true }),
+      );
+      expect(patch.steps).toMatchObject({
+        'Port Scan': { status: 'skipped', reason: 'run-cancelled' },
+        'HTTP Probe': { status: 'skipped', reason: 'run-cancelled' },
+        'Vuln Scan': { status: 'done' },
+      });
+    });
+
     it('throws NotFoundException and rolls back for a history outside the workspace', async () => {
       const qr = buildQueryRunner({ belongsToWorkspace: false });
       mockDataSource.createQueryRunner.mockReturnValue(qr);
@@ -606,6 +643,7 @@ describe('JobsRegistryService', () => {
 
       expect(qr.rollbackTransaction).toHaveBeenCalled();
       expect(qr.updateBuilder.execute).not.toHaveBeenCalled();
+      expect(qr.update).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException for a history that does not exist', async () => {
@@ -729,10 +767,11 @@ describe('JobsRegistryService', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       jobs: mockJobs,
+      steps: {},
       workflow: {
         name: 'test-workflow',
         content: {
-          jobs: [{ run: 'test-tool' }],
+          jobs: { test_step: { name: 'Test Step', run: 'test-tool' } },
         },
       },
       jobHistoryName: 'test-job-history',
@@ -795,6 +834,19 @@ describe('JobsRegistryService', () => {
             name: 'test-tool',
             logoUrl: 'http://example.com/logo.png',
             status: JobStatus.COMPLETED,
+          },
+        ],
+        steps: [
+          {
+            id: 'test_step',
+            name: 'Test Step',
+            run: 'test-tool',
+            needs: [],
+            // Derived from the job rows for a run created before the engine.
+            status: 'done',
+            jobs: 0,
+            toolId: 'tool-uuid',
+            logoUrl: 'http://example.com/logo.png',
           },
         ],
       });
@@ -872,7 +924,120 @@ describe('JobsRegistryService', () => {
             status: undefined,
           },
         ],
+        steps: [
+          {
+            id: 'test_step',
+            name: 'Test Step',
+            run: 'test-tool',
+            needs: [],
+            status: 'pending',
+            jobs: 0,
+            toolId: 'tool-uuid',
+            logoUrl: 'http://example.com/logo.png',
+          },
+        ],
       });
+    });
+
+    it('exposes the persisted step state of a DAG run', async () => {
+      const dagHistory = {
+        ...mockJobHistory,
+        steps: {
+          scan_subdomain: {
+            status: 'done',
+            jobs: 1,
+            dispatchedAt: '2026-01-01T00:00:00.000Z',
+            finishedAt: '2026-01-01T00:05:00.000Z',
+          },
+          port_scan: { status: 'dispatched', jobs: 3, failed: 1 },
+          http_probe: {
+            status: 'skipped',
+            jobs: 0,
+            reason: 'blocked-by-failure',
+          },
+        },
+        workflow: {
+          name: 'test-workflow',
+          content: {
+            // Stored in jsonb key order, NOT authored order, exactly as Postgres
+            // hands it back — the response must still come out dependencies-first.
+            jobs: {
+              http_probe: {
+                name: 'HTTP Probe',
+                run: 'httpx',
+                needs: ['port_scan'],
+              },
+              take_screenshot: {
+                name: 'Take Screenshot',
+                run: 'screenshot',
+                needs: ['http_probe'],
+              },
+              scan_subdomain: {
+                name: 'Scan Subdomain',
+                run: 'subfinder',
+              },
+              port_scan: {
+                name: 'Port Scan',
+                run: 'naabu',
+                needs: ['scan_subdomain'],
+              },
+            },
+          },
+        },
+      };
+      mockJobHistoryRepository.findOne.mockResolvedValue(dagHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({ data: [] });
+
+      const result = await service.getJobHistoryDetail(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(result.steps).toEqual([
+        {
+          id: 'scan_subdomain',
+          name: 'Scan Subdomain',
+          run: 'subfinder',
+          needs: [],
+          status: 'done',
+          jobs: 1,
+          dispatchedAt: new Date('2026-01-01T00:00:00.000Z'),
+          finishedAt: new Date('2026-01-01T00:05:00.000Z'),
+        },
+        {
+          id: 'port_scan',
+          name: 'Port Scan',
+          run: 'naabu',
+          needs: ['scan_subdomain'],
+          status: 'dispatched',
+          jobs: 3,
+          failed: 1,
+        },
+        {
+          id: 'http_probe',
+          name: 'HTTP Probe',
+          run: 'httpx',
+          needs: ['port_scan'],
+          status: 'skipped',
+          reason: 'blocked-by-failure',
+          jobs: 0,
+        },
+        {
+          id: 'take_screenshot',
+          name: 'Take Screenshot',
+          run: 'screenshot',
+          needs: ['http_probe'],
+          status: 'pending',
+          jobs: 0,
+        },
+      ]);
     });
 
     it('should throw NotFoundException when job history not found', async () => {
@@ -1476,484 +1641,6 @@ describe('JobsRegistryService', () => {
       } as any);
 
       expect(paged.qb.andWhere).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('getNextStepForJob', () => {
-    const mockJob = {
-      id: 'job-uuid',
-      tool: { name: 'tool-a' },
-      asset: {
-        target: { id: 'target-uuid' },
-      },
-      jobHistory: {
-        workflow: {
-          content: {
-            jobs: [
-              { name: 'job-1', run: 'tool-a' },
-              { name: 'job-2', run: 'tool-b' },
-            ],
-          },
-          workspace: { id: 'workspace-uuid' },
-        },
-      },
-    };
-
-    it('should return 0 when no workflow exists', async () => {
-      const jobNoWorkflow = { ...mockJob, jobHistory: { workflow: null } };
-
-      const result = await service.getNextStepForJob(jobNoWorkflow as any);
-
-      expect(result).toBe(0);
-    });
-
-    it('should return 0 when current tool not found in workflow', async () => {
-      const jobNoTool = {
-        ...mockJob,
-        tool: { name: 'unknown-tool' },
-      };
-
-      const result = await service.getNextStepForJob(jobNoTool as any);
-
-      expect(result).toBe(0);
-    });
-
-    it('should return 0 when current tool is last in workflow', async () => {
-      const lastToolJob = {
-        ...mockJob,
-        tool: { name: 'tool-b' },
-      };
-
-      const result = await service.getNextStepForJob(lastToolJob as any);
-
-      expect(result).toBe(0);
-    });
-
-    it('should return number of new jobs created when next step exists', async () => {
-      const jobWithNextStep = {
-        id: 'job-uuid',
-        tool: { name: 'tool-a' },
-        asset: {
-          target: { id: 'target-uuid' },
-        },
-        jobHistory: {
-          workflow: {
-            content: {
-              jobs: [
-                { name: 'job-1', run: 'tool-a' },
-                { name: 'job-2', run: 'tool-b' },
-              ],
-            },
-            workspace: { id: undefined },
-          },
-        },
-      };
-
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'tool-b', priority: 4, category: 'SUBDOMAINS' },
-      ]);
-
-      const mockQueryBuilder = {
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 'asset-1', isPrimary: true }]),
-      };
-      const mockJobRepo = {
-        create: jest.fn().mockReturnValue({}),
-        save: jest.fn().mockResolvedValue([{}]),
-        createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
-      };
-      mockDataSource.getRepository.mockReturnValue(mockJobRepo);
-
-      const result = await service.getNextStepForJob(jobWithNextStep as any);
-
-      expect(result).toBe(1);
-    });
-
-    it('scopes a service job’s next step to that same service, not the whole asset', async () => {
-      // Given: an http_probe job that ran against ONE service of an asset
-      jest.clearAllMocks();
-      const createNewJob = jest
-        .spyOn(service, 'createNewJob')
-        .mockResolvedValue([]);
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: true,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'screenshot', priority: 4, category: ToolCategory.SCREENSHOT },
-      ]);
-      const completedProbeJob = {
-        id: 'probe-job-uuid',
-        category: ToolCategory.HTTP_PROBE,
-        tool: { name: 'httpx' },
-        asset: { id: 'asset-uuid', target: { id: 'target-uuid' } },
-        assetService: { id: 'service-uuid' },
-        jobHistory: {
-          workflow: {
-            content: {
-              jobs: [
-                { name: 'job-1', run: 'httpx' },
-                { name: 'job-2', run: 'screenshot' },
-              ],
-            },
-            workspace: { id: 'workspace-uuid' },
-          },
-        },
-      };
-
-      // When
-      await service.getNextStepForJob(completedProbeJob as any);
-
-      // Then: the next step targets the same service. Passing only the asset
-      // re-fanned out to every live service of that asset, so N service jobs
-      // each re-created N jobs (N(N+1)/2 rows instead of N).
-      expect(createNewJob).toHaveBeenCalledWith(
-        expect.objectContaining({ assetServiceIds: ['service-uuid'] }),
-      );
-    });
-
-    it('leaves the asset-level fan-out untouched for an asset job', async () => {
-      // Given: a SUBDOMAINS job, which is scoped to an asset, not a service
-      jest.clearAllMocks();
-      const createNewJob = jest
-        .spyOn(service, 'createNewJob')
-        .mockResolvedValue([]);
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: true,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'nmap', priority: 4, category: ToolCategory.PORTS_SCANNER },
-      ]);
-      const completedSubdomainJob = {
-        id: 'subdomain-job-uuid',
-        category: ToolCategory.SUBDOMAINS,
-        tool: { name: 'subfinder' },
-        asset: { id: 'asset-uuid', target: { id: 'target-uuid' } },
-        jobHistory: {
-          workflow: {
-            content: {
-              jobs: [
-                { name: 'job-1', run: 'subfinder' },
-                { name: 'job-2', run: 'nmap' },
-              ],
-            },
-            workspace: { id: 'workspace-uuid' },
-          },
-        },
-      };
-
-      // When
-      await service.getNextStepForJob(completedSubdomainJob as any);
-
-      // Then: no service filter, so the PORTS fan-out still covers the target
-      expect(createNewJob).toHaveBeenCalledWith(
-        expect.objectContaining({ assetServiceIds: undefined }),
-      );
-    });
-
-    it('should expand PORTS_SCANNER to all target assets after SUBDOMAINS completes', async () => {
-      jest.clearAllMocks();
-      const createNewJob = jest
-        .spyOn(service, 'createNewJob')
-        .mockResolvedValue([]);
-      const completedSubdomainJob = {
-        id: 'subdomain-job-uuid',
-        category: ToolCategory.SUBDOMAINS,
-        tool: { name: 'subfinder' },
-        asset: {
-          id: 'primary-asset-uuid',
-          target: { id: 'target-uuid' },
-        },
-        jobHistory: {
-          workflow: {
-            id: 'target-workflow-uuid',
-            content: {
-              jobs: [
-                { name: 'discover-subdomains', run: 'subfinder' },
-                { name: 'scan-ports', run: 'naabu' },
-              ],
-            },
-            workspace: { id: 'workspace-uuid' },
-          },
-        },
-      };
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: true,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        {
-          name: 'naabu',
-          category: ToolCategory.PORTS_SCANNER,
-          priority: 3,
-        },
-      ]);
-
-      await service.getNextStepForJob(completedSubdomainJob as any);
-
-      expect(createNewJob).toHaveBeenCalledTimes(1);
-      const nextJobInput = createNewJob.mock.calls[0][0];
-      expect(nextJobInput.targetIds).toEqual(['target-uuid']);
-      expect(nextJobInput.assetIds).toBeUndefined();
-    });
-
-    it('should preserve an asset-scoped group when SUBDOMAINS is followed by PORTS_SCANNER', async () => {
-      jest.clearAllMocks();
-      const createNewJob = jest
-        .spyOn(service, 'createNewJob')
-        .mockResolvedValue([]);
-      const completedGroupSubdomainJob = {
-        id: 'group-subdomain-job-uuid',
-        category: ToolCategory.SUBDOMAINS,
-        tool: { name: 'subfinder' },
-        asset: {
-          id: 'selected-group-asset-uuid',
-          target: { id: 'target-uuid' },
-        },
-        jobHistory: {
-          jobHistoryName: 'Engineering group',
-          workflow: {
-            id: 'group-workflow-uuid',
-            content: {
-              jobs: [
-                { name: 'discover-subdomains', run: 'subfinder' },
-                { name: 'scan-ports', run: 'naabu' },
-              ],
-            },
-            workspace: { id: 'workspace-uuid' },
-          },
-        },
-      };
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: true,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        {
-          name: 'naabu',
-          category: ToolCategory.PORTS_SCANNER,
-          priority: 3,
-        },
-      ]);
-      mockAssetGroupWorkflowQB.getOne.mockResolvedValue({ id: 'group-run' });
-
-      await service.getNextStepForJob(completedGroupSubdomainJob as any);
-
-      expect(mockAssetGroupWorkflowRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'assetGroupWorkflow',
-      );
-      expect(mockAssetGroupWorkflowQB.andWhere).toHaveBeenCalledWith(
-        'assetGroup.name = :jobHistoryName',
-        { jobHistoryName: 'Engineering group' },
-      );
-      expect(mockAssetGroupWorkflowQB.andWhere).toHaveBeenCalledWith(
-        'groupAsset.assetId = :assetId',
-        { assetId: 'selected-group-asset-uuid' },
-      );
-      expect(createNewJob).toHaveBeenCalledTimes(1);
-      expect(createNewJob.mock.calls[0][0].assetIds).toEqual([
-        'selected-group-asset-uuid',
-      ]);
-    });
-
-    it('should preserve the current asset scope for other PORTS_SCANNER transitions', async () => {
-      jest.clearAllMocks();
-      const createNewJob = jest
-        .spyOn(service, 'createNewJob')
-        .mockResolvedValue([]);
-      const completedVulnerabilityJob = {
-        id: 'vulnerability-job-uuid',
-        category: ToolCategory.VULNERABILITIES,
-        tool: { name: 'nuclei' },
-        asset: {
-          id: 'selected-asset-uuid',
-          target: { id: 'target-uuid' },
-        },
-        jobHistory: {
-          workflow: {
-            content: {
-              jobs: [
-                { name: 'scan-vulnerabilities', run: 'nuclei' },
-                { name: 'scan-ports', run: 'naabu' },
-              ],
-            },
-            workspace: { id: 'workspace-uuid' },
-          },
-        },
-      };
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: true,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        {
-          name: 'naabu',
-          category: ToolCategory.PORTS_SCANNER,
-          priority: 3,
-        },
-      ]);
-
-      await service.getNextStepForJob(completedVulnerabilityJob as any);
-
-      expect(createNewJob).toHaveBeenCalledTimes(1);
-      expect(createNewJob.mock.calls[0][0].assetIds).toEqual([
-        'selected-asset-uuid',
-      ]);
-    });
-
-    it('should skip SUBDOMAINS and use next non-SUBDOMAINS when isAssetsDiscovery is false', async () => {
-      const jobWithSubdomainNext = {
-        id: 'job-uuid',
-        tool: { name: 'tool-a' },
-        asset: {
-          target: { id: 'target-uuid' },
-        },
-        jobHistory: {
-          workflow: {
-            content: {
-              jobs: [
-                { name: 'job-1', run: 'tool-a' },
-                { name: 'job-2', run: 'subfinder' },
-                { name: 'job-3', run: 'tool-c' },
-              ],
-            },
-            workspace: { id: 'workspace-uuid' },
-          },
-        },
-      };
-
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: false,
-      });
-
-      // toolsService.getToolByNames called twice:
-      // 1st call (batch-resolve remaining): subfinder + tool-c
-      // 2nd call (resolve nextTool): tool-c
-      mockToolsService.getToolByNames
-        .mockResolvedValueOnce([
-          { name: 'subfinder', category: ToolCategory.SUBDOMAINS },
-          { name: 'tool-c', category: ToolCategory.HTTP_PROBE },
-        ])
-        .mockResolvedValueOnce([
-          { name: 'tool-c', category: ToolCategory.HTTP_PROBE },
-        ]);
-
-      // tool-c is HTTP_PROBE => createNewJob calls findAssetServicesForJob => needs chained query builder
-      const mockAssetQueryBuilder = {
-        innerJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 'asset-service-1', value: 'example.com', port: 443, asset: { id: 'asset-1', isPrimary: true } }]),
-      };
-      const mockJobQueryBuilder = {
-        leftJoinAndWhere: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 'asset-1', isPrimary: true }]),
-      };
-      const mockAssetRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(mockAssetQueryBuilder),
-      };
-      const mockJobRepo = {
-        create: jest.fn().mockReturnValue({}),
-        save: jest.fn().mockResolvedValue([{}]),
-        createQueryBuilder: jest.fn().mockReturnValue(mockJobQueryBuilder),
-      };
-      mockDataSource.getRepository.mockImplementation((entity: any) => {
-        const name = entity?.name ?? entity;
-        if (name === 'AssetService') return mockAssetRepo;
-        return mockJobRepo;
-      });
-
-      const result = await service.getNextStepForJob(
-        jobWithSubdomainNext as any,
-      );
-
-      expect(result).toBe(1);
-      // Should have skipped subfinder and resolved tool-c
-      expect(mockToolsService.getToolByNames).toHaveBeenCalledWith({
-        names: ['subfinder', 'tool-c'],
-      });
-      expect(mockToolsService.getToolByNames).toHaveBeenLastCalledWith({
-        names: ['tool-c'],
-      });
-    });
-
-    it('should return 0 when all remaining tools are SUBDOMAINS and discovery is disabled', async () => {
-      const jobWithOnlySubdomainNext = {
-        id: 'job-uuid',
-        tool: { name: 'tool-a' },
-        asset: {
-          target: { id: 'target-uuid' },
-        },
-        jobHistory: {
-          workflow: {
-            content: {
-              jobs: [
-                { name: 'job-1', run: 'tool-a' },
-                { name: 'job-2', run: 'subfinder-1' },
-                { name: 'job-3', run: 'subfinder-2' },
-              ],
-            },
-            workspace: { id: 'workspace-uuid' },
-          },
-        },
-      };
-
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: false,
-      });
-
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'subfinder-1', category: ToolCategory.SUBDOMAINS },
-        { name: 'subfinder-2', category: ToolCategory.SUBDOMAINS },
-      ]);
-
-      const result = await service.getNextStepForJob(
-        jobWithOnlySubdomainNext as any,
-      );
-
-      expect(result).toBe(0);
-    });
-  });
-
-  describe('markWorkflowDone', () => {
-    const mockJobHistoryId = 'history-uuid';
-
-    beforeEach(() => {
-      jest.clearAllMocks();
-    });
-
-    it('should update job history isCompleted to true', async () => {
-      mockJobRepository.exists.mockResolvedValue(false);
-      mockJobHistoryRepository.update.mockResolvedValue({ affected: 1 });
-      mockJobHistoryRepository.findOne.mockResolvedValue({
-        id: mockJobHistoryId,
-        workflow: { name: 'test-workflow' },
-      });
-
-      await service.markWorkflowDone(mockJobHistoryId);
-
-      expect(mockJobRepository.exists).toHaveBeenCalled();
-      expect(mockJobHistoryRepository.update).toHaveBeenCalledWith(
-        { id: mockJobHistoryId, isCompleted: false },
-        { isCompleted: true },
-      );
-    });
-
-    it('should not update when there are pending jobs', async () => {
-      mockJobRepository.exists.mockResolvedValue(true);
-
-      await service.markWorkflowDone(mockJobHistoryId);
-
-      expect(mockJobHistoryRepository.update).not.toHaveBeenCalled();
-    });
-
-    it('should not update when already completed', async () => {
-      mockJobRepository.exists.mockResolvedValue(false);
-      mockJobHistoryRepository.update.mockResolvedValue({ affected: 0 });
-
-      await service.markWorkflowDone(mockJobHistoryId);
-
-      expect(mockJobHistoryRepository.update).toHaveBeenCalled();
     });
   });
 

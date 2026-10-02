@@ -1,12 +1,16 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Workflow } from './entities/workflow.entity';
+import { Workflow, WorkflowContent } from './entities/workflow.entity';
 import { User } from '../auth/entities/user.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { GetManyWorkflowsQueryDto } from './dto/get-many-workflows.dto';
+import {
+  normalizeWorkflowContent,
+  WorkflowGraphError,
+} from './workflow-graph';
 
 const ALLOWED_WORKFLOW_SORT_FIELDS = ['createdAt', 'updatedAt', 'name'] as const;
 
@@ -35,7 +39,7 @@ export class WorkflowsService {
 
     const workflow = new Workflow();
     workflow.name = name;
-    workflow.content = content;
+    workflow.content = this.normalizeContent(content);
     workflow.filePath =
       filePath || `${name.toLowerCase().replace(/\s+/g, '-')}.yaml`;
     workflow.createdBy = { id: createdBy.id } as User;
@@ -86,10 +90,38 @@ export class WorkflowsService {
     const workflow = await this.getWorkspaceWorkflow(id, workspace);
 
     if (updateData.name) workflow.name = updateData.name;
-    if (updateData.content) workflow.content = updateData.content;
+    if (updateData.content) {
+      workflow.content = this.normalizeContent(updateData.content);
+    }
     if (updateData.filePath) workflow.filePath = updateData.filePath;
 
     return await this.workflowRepository.save(workflow);
+  }
+
+  /**
+   * Validates the step graph and returns it in its canonical stored shape
+   * (`jobs` as a map keyed by job id). It also accepts the legacy array form —
+   * the template loader and the asset-group workflow writer both normalize
+   * before saving, so the database converges on one shape with no data
+   * migration, and every read path goes through the tolerant graph helpers.
+   *
+   * Note this is not the HTTP boundary: the create/update DTO already requires
+   * the map (`jobs` is an object), so a client still sending the legacy array is
+   * rejected by validation before it reaches this method.
+   *
+   * @throws BadRequestException when the content is not a valid graph.
+   */
+  private normalizeContent(content: WorkflowContent): WorkflowContent {
+    try {
+      return normalizeWorkflowContent(content);
+    } catch (error) {
+      if (error instanceof WorkflowGraphError) {
+        throw new BadRequestException(
+          `Invalid workflow content: ${error.errors.join('; ')}`,
+        );
+      }
+      throw error;
+    }
   }
 
   /**
