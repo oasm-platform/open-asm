@@ -131,15 +131,23 @@ export default function AssetGroupWorkflow({
   );
   const jobsJson = useMemo(() => JSON.stringify(jobs), [jobs]);
   const pipeline: PipelineToolEntry[] = useMemo(() => {
-    const jobs = currentWorkflow?.workflow.content?.jobs ?? {};
-    // Sorted by job id so the tool grid stays stable: `content` is stored as
-    // jsonb, which does not preserve the map's key order.
-    return Object.entries(jobs)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, job]) => {
-        const tool = toolByName.get(job.run);
+    // `Object.values`, not `Object.entries`: a workflow created before the
+    // map switch still stores `jobs` as an array, which the API still serves —
+    // its values are the job definitions either way.
+    const jobs = (currentWorkflow?.workflow.content?.jobs ?? {}) as Record<
+      string,
+      {
+        run?: string;
+        config?: Record<string, unknown>;
+        configProfileId?: string;
+      }
+    >;
+    const nameOf = (toolId: string) => toolById.get(toolId)?.name ?? toolId;
+    return Object.values(jobs)
+      .map((job) => {
+        const tool = job.run ? toolByName.get(job.run) : undefined;
         return {
-          toolId: tool?.id ?? job.run,
+          toolId: tool?.id ?? job.run ?? '',
           ...(job.config
             ? { config: job.config as Record<string, unknown> }
             : {}),
@@ -147,10 +155,15 @@ export default function AssetGroupWorkflow({
             ? { configProfileId: job.configProfileId }
             : {}),
         };
-      });
-    // jobsJson captures order + per-job config changes; toolByName covers id mapping.
+      })
+      // Sorted by tool name so the grid stays stable: `content` is stored as
+      // jsonb, which does not preserve the map's key order. Sorting on the tool
+      // name (not the map key) also keeps a legacy array-shaped `jobs` from
+      // sorting its index keys lexically, which puts "10" before "2".
+      .sort((a, b) => nameOf(a.toolId).localeCompare(nameOf(b.toolId)));
+    // jobsJson captures per-job config changes; the tool maps cover id mapping.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobsJson, toolByName]);
+  }, [jobsJson, toolByName, toolById]);
 
   const toolNameOf = useCallback(
     (entry: PipelineToolEntry): string =>

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildWorkflowGraphLayout,
   computeStepWaves,
+  describeStep,
 } from './run-workflow-graph-layout';
 
 function step(
@@ -149,18 +150,20 @@ describe('buildWorkflowGraphLayout', () => {
     for (const id of ['port_scan->http_probe', 'http_probe->take_screenshot']) {
       const live = edges.find((edge) => edge.id === id);
       expect(live?.data).toEqual({ active: true });
-      expect(live?.animated).toBe(true);
       expect(live?.style?.stroke).toBe('var(--primary)');
       expect(live?.style?.strokeWidth).toBe(2);
       // The active edge is solid (`undefined`) — the motion comes from the
-      // arrows, not from a marching-ants dash.
+      // arrows, not from a marching-ants dash. `animated` is deliberately NOT
+      // set: it only adds the `animated` class, and that class draws the dash
+      // in CSS, which an inline `undefined` cannot cancel.
       expect(live?.style?.strokeDasharray).toBeUndefined();
+      expect(live?.animated).toBeUndefined();
     }
 
     // Both endpoints of this one finished, so it settles back to a dashed line.
     const idle = edges.find((edge) => edge.id === 'scan_subdomain->port_scan');
     expect(idle?.data).toEqual({ active: false });
-    expect(idle?.animated).toBe(false);
+    expect(idle?.animated).toBeUndefined();
     expect(idle?.style?.strokeDasharray).toBe('4 4');
   });
 
@@ -203,6 +206,19 @@ describe('buildWorkflowGraphLayout', () => {
     expect(edges[1].style?.stroke).toBe('var(--border)');
   });
 
+  it('drops an edge whose source step is not part of the run', () => {
+    // Content whose graph failed validation comes back with the raw entries, so
+    // a `needs` id can point at a job that is not there. React Flow would drop
+    // the edge silently and leave the node stranded mid-graph.
+    const { nodes, edges } = buildWorkflowGraphLayout([
+      step('a', { status: 'done' }),
+      step('b', { needs: ['a', 'ghost'], status: 'done' }),
+    ]);
+
+    expect(nodes.map((node) => node.id)).toEqual(['a', 'b']);
+    expect(edges.map((edge) => edge.id)).toEqual(['a->b']);
+  });
+
   it('carries the step detail the node renders', () => {
     const { nodes } = buildWorkflowGraphLayout(chain);
     const screenshot = nodes.find((node) => node.id === 'take_screenshot');
@@ -215,6 +231,28 @@ describe('buildWorkflowGraphLayout', () => {
       needs: ['http_probe'],
       jobs: 0,
     });
+  });
+
+  it('gives every node an aria-label spelling out the whole step', () => {
+    const { nodes } = buildWorkflowGraphLayout([
+      step('scan', { status: 'done', jobs: 1 }),
+      step('probe', {
+        needs: ['scan'],
+        status: 'skipped',
+        reason: 'blocked-by-failure',
+      }),
+    ]);
+
+    expect(nodes.map((node) => node.ariaLabel)).toEqual([
+      'scan, scan, done, 1 job',
+      'probe, probe, skipped, 0 jobs, waits for scan, reason: blocked-by-failure',
+    ]);
+  });
+
+  it('describes a step with no id, deps or reason as the plainest summary', () => {
+    expect(
+      describeStep({ name: '', run: 'nuclei', status: 'pending', jobs: 0 } as WorkflowStepStatusDto),
+    ).toBe('nuclei, nuclei, pending, 0 jobs');
   });
 
   it('returns nothing for a run without steps', () => {

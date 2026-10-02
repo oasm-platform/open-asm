@@ -11,6 +11,30 @@ import {
   WorkflowGraphError,
 } from './workflow-graph';
 
+/**
+ * Key-order-insensitive JSON used to compare stored content with a template.
+ *
+ * `workflow.content` is a jsonb column and Postgres does not preserve object key
+ * order (it re-sorts keys by length, then bytes), so a plain `JSON.stringify`
+ * comparison between the freshly parsed template and the row read back from the
+ * database reports "changed" on every boot and rewrites every default workflow.
+ * Sorting the keys makes the comparison reflect the content, not the storage.
+ */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(',')}]`;
+  }
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      // jsonb has no `undefined`: a key that disappears on the round trip is
+      // not a content difference either.
+      .filter(([, entry]) => entry !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
 
 @Injectable()
 export class WorkflowTemplateService implements OnModuleInit {
@@ -174,15 +198,18 @@ export class WorkflowTemplateService implements OnModuleInit {
    * @returns Normalized workflow object
    */
 
+  /**
+   * Whether the parsed template differs from the stored content.
+   *
+   * Compared order-insensitively: `jobs` is a map and the stored copy comes back
+   * from jsonb with its keys re-sorted, so a key-order-sensitive comparison would
+   * report every default workflow as changed on every boot.
+   */
   private hasContentChanged(
     a: Record<string, unknown>,
     b: Record<string, unknown>,
   ): boolean {
-    if (a.name !== b.name) return true;
-    const aJobs = a.jobs as unknown[] | undefined;
-    const bJobs = b.jobs as unknown[] | undefined;
-    if ((aJobs?.length ?? 0) !== (bJobs?.length ?? 0)) return true;
-    return JSON.stringify(a) !== JSON.stringify(b);
+    return canonicalJson(a) !== canonicalJson(b);
   }
 
   private normalizeOn(obj: Record<string, unknown>): Record<string, unknown> {

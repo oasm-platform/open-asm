@@ -52,7 +52,6 @@ const STATUS_META: Record<
     label: string;
     icon: React.ReactNode;
     text: string;
-    dot: string;
     border: string;
   }
 > = {
@@ -60,35 +59,30 @@ const STATUS_META: Record<
     label: 'waiting',
     icon: <CircleDashed className="size-3.5" />,
     text: 'text-yellow-600 dark:text-yellow-500',
-    dot: 'bg-yellow-500',
     border: 'border-border',
   },
   dispatched: {
     label: 'running',
     icon: <Loader2 className="size-3.5 animate-spin" />,
     text: 'text-purple-600 dark:text-purple-400',
-    dot: 'bg-purple-500',
     border: 'border-purple-500/60',
   },
   done: {
     label: 'done',
     icon: <CircleCheck className="size-3.5" />,
     text: 'text-green-600 dark:text-green-500',
-    dot: 'bg-green-500',
     border: 'border-green-500/40',
   },
   failed: {
     label: 'failed',
     icon: <CircleAlert className="size-3.5" />,
     text: 'text-red-600 dark:text-red-500',
-    dot: 'bg-red-500',
     border: 'border-red-500/60',
   },
   skipped: {
     label: 'skipped',
     icon: <MinusCircle className="size-3.5" />,
     text: 'text-muted-foreground',
-    dot: 'bg-gray-400',
     border: 'border-border',
   },
 };
@@ -116,6 +110,9 @@ function WorkflowStepNode({ data }: NodeProps) {
       <Tooltip>
         <TooltipTrigger asChild>
           <div
+            // Focusable so the tooltip (and the skip reason it carries) is
+            // reachable by keyboard, not just by hover.
+            tabIndex={0}
             className={cn(
               'flex h-full flex-col justify-center gap-1 rounded-lg border bg-card px-2.5 py-1.5 text-left shadow-sm',
               meta.border,
@@ -160,6 +157,11 @@ function WorkflowStepNode({ data }: NodeProps) {
               {!!failed && failed > 0 && (
                 <span className="shrink-0 font-medium text-destructive">
                   · {failed} failed
+                </span>
+              )}
+              {skipReason && (
+                <span className="truncate text-muted-foreground">
+                  · {skipReason}
                 </span>
               )}
             </div>

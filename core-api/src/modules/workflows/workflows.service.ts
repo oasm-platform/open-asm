@@ -100,9 +100,14 @@ export class WorkflowsService {
 
   /**
    * Validates the step graph and returns it in its canonical stored shape
-   * (`jobs` as a map keyed by job id). A legacy array is converted instead of
-   * being rejected, so old clients keep working while the database converges on
-   * one shape.
+   * (`jobs` as a map keyed by job id). It also accepts the legacy array form —
+   * the template loader and the asset-group workflow writer both normalize
+   * before saving, so the database converges on one shape with no data
+   * migration, and every read path goes through the tolerant graph helpers.
+   *
+   * Note this is not the HTTP boundary: the create/update DTO already requires
+   * the map (`jobs` is an object), so a client still sending the legacy array is
+   * rejected by validation before it reaches this method.
    *
    * @throws BadRequestException when the content is not a valid graph.
    */

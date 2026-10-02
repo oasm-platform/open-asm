@@ -65,7 +65,8 @@ import {
   WorkflowStepStatusDto,
 } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
-import { JobListItemDto } from './dto/job-list-item.dto';import {
+import { JobListItemDto } from './dto/job-list-item.dto';
+import {
   BaseResultDto,
   CreateJobs,
   GetManyJobsQueryParams,
@@ -223,12 +224,6 @@ export class JobsRegistryService {
     return maskProfile(config, [...new Set([...schemaFields, ...nameFields])]);
   }
 
-  /**
-   * Creates jobs for given tools and targets, linked to a jobHistory.
-   * @param tools list of tools to run
-   * @param targets list of targets to scan
-   * @param workflow optional workflow to link
-   */
   /**
    * Creates jobs for given tools and targets, linked to a jobHistory.
    * @param tools list of tools to run

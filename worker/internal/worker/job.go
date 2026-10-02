@@ -579,7 +579,11 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	// poolWaitBudget caps how long one job waits for a free container slot of its
 	// image before it is reported back to Core. Queue pressure is normal, but a slot
 	// held by a wedged container must not hold a worker concurrency slot forever.
+	// The deadline is armed once per job — re-arming it per submit attempt would
+	// double the real bound (attempt 0 could burn the whole budget, then attempt 1
+	// would start a fresh one).
 	var poolWaitBudget = 10 * time.Minute
+	poolWaitUntil := time.Now().Add(poolWaitBudget)
 
 	// The ExecuteJob payload is identical across retries, so build it once.
 	inputs := make(map[string]string, len(spec.Inputs))
@@ -608,7 +612,6 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	var resultCh chan connector.ResultMsg
 	for attempt := 0; attempt < 2; attempt++ {
 		execID, err = mgr.Submit(ctx, spec)
-		poolWaitUntil := time.Now().Add(poolWaitBudget)
 		for err != nil && errors.Is(err, execution.ErrPoolExhausted) {
 			if time.Now().After(poolWaitUntil) {
 				// Local scheduling gave up on this job: report it so Core can
@@ -627,7 +630,14 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 					ErrorMsg: msg,
 					Duration: time.Since(startTime),
 				})
-				submitCategoryError(ctx, grpcClient, events, job.Id, category, msg)
+				// Reported on a DETACHED context, like failBackoff above: this
+				// branch is reached after the queue stayed full, which is exactly
+				// when a worker reconnect has cancelled the session ctx. Reporting
+				// on a cancelled ctx silently fails and leaves the job
+				// IN_PROGRESS in Core although the semaphore slot was released.
+				cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+				submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
+				cleanupCancel()
 				return true, false // hadJob=true (job was pulled), caller releases semaphore
 			}
 			// Quota pressure is normal queueing, not an incident: the job stays
@@ -649,7 +659,12 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 					ErrorMsg: msg,
 					Duration: time.Since(startTime),
 				})
-				submitCategoryError(ctx, grpcClient, events, job.Id, category, msg)
+				// Detached: ctx is already cancelled in this branch, so reporting
+				// on it can never reach Core and the job would stay
+				// IN_PROGRESS after the semaphore was released.
+				cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+				submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
+				cleanupCancel()
 				return true, false // hadJob=true (job was pulled), caller releases semaphore
 			case <-time.After(poolRetryDelay):
 			}

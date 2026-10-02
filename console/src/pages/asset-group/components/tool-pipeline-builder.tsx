@@ -30,8 +30,6 @@ import {
   type Tool,
 } from '@/services/apis/gen/queries';
 import {
-  ArrowDown,
-  ArrowUp,
   CheckIcon,
   Pencil,
   Plus,
@@ -49,7 +47,7 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 
-/** A single tool entry in the pipeline. Order in the array = execution order. */
+/** A single tool entry in the pipeline. The pipeline is an unordered set — the tools all run at once. */
 export interface PipelineToolEntry {
   toolId: string;
   config?: Record<string, unknown>;
@@ -59,7 +57,7 @@ export interface PipelineToolEntry {
 interface ToolPipelineBuilderProps {
   /** Full tool objects (with type / hasConfigProfile / isReady / logoUrl). */
   tools: Tool[];
-  /** Ordered entries — array order is the execution order. */
+  /** The selected entries. Order is presentation only; they run in parallel. */
   value: PipelineToolEntry[];
   onChange: (next: PipelineToolEntry[]) => void;
   disabled?: boolean;
@@ -321,30 +319,30 @@ const PipelineToolLogo = memo(
   }),
 );
 
-/** Action panel for a selected tool: order, badges, profile, inline config, move, remove. */
+/**
+ * Action panel for a selected tool: config profile, inline config, remove.
+ *
+ * There is no ordering control: the selected tools are saved as jobs without
+ * `needs`, so they all run at once, and the map key order is not preserved by
+ * jsonb anyway — a "move up" here would snap back on the next refetch.
+ */
 const SelectedToolPanel = memo(function SelectedToolPanel({
   tool,
   entry,
-  index,
-  total,
   knownProfileIds,
   disabled,
   onClose,
   onPatchEntry,
-  onMove,
   onRemove,
   onOpenSheet,
   onProfilesLoaded,
 }: {
   tool: Tool;
   entry: PipelineToolEntry;
-  index: number;
-  total: number;
   knownProfileIds: readonly string[] | undefined;
   disabled?: boolean;
   onClose: () => void;
   onPatchEntry: (id: string, patch: Partial<PipelineToolEntry>) => void;
-  onMove: (index: number, direction: -1 | 1) => void;
   onRemove: (id: string) => void;
   onOpenSheet: (toolId: string) => void;
   onProfilesLoaded: (toolId: string, ids: string[]) => void;
@@ -357,14 +355,8 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-          {index + 1}
-        </span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium capitalize">
           {toolLabel}
-        </span>
-        <span className="shrink-0 text-xs text-muted-foreground">
-          #{index + 1} of {total}
         </span>
         <Button
           variant="ghost"
@@ -406,29 +398,7 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
           Inline config
         </Button>
       </div>
-      <div className="flex items-center justify-between border-t pt-2">
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            disabled={disabled || index === 0}
-            onClick={() => onMove(index, -1)}
-            aria-label={`Move ${toolLabel} up`}
-          >
-            <ArrowUp className="size-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            disabled={disabled || index === total - 1}
-            onClick={() => onMove(index, 1)}
-            aria-label={`Move ${toolLabel} down`}
-          >
-            <ArrowDown className="size-3.5" />
-          </Button>
-        </div>
+      <div className="flex items-center justify-end border-t pt-2">
         <Button
           variant="ghost"
           size="sm"
@@ -529,26 +499,20 @@ const PendingToolPanel = memo(function PendingToolPanel({
   );
 });
 
-/** Missing installed tool circle + its remove/move popover. */
+/** Missing installed tool circle + its remove popover. */
 const MissingToolPopover = memo(function MissingToolPopover({
   toolId,
-  index,
-  total,
   open,
   disabled,
   onOpenChange,
   onToggle,
-  onMove,
   onRemove,
 }: {
   toolId: string;
-  index: number;
-  total: number;
   open: boolean;
   disabled?: boolean;
   onOpenChange: (toolId: string, open: boolean) => void;
   onToggle: (toolId: string) => void;
-  onMove: (index: number, direction: -1 | 1) => void;
   onRemove: (id: string) => void;
 }) {
   return (
@@ -576,42 +540,15 @@ const MissingToolPopover = memo(function MissingToolPopover({
           <span className="max-w-20 truncate text-center text-xs font-medium">
             {toolId}
           </span>
-          <span className="flex h-5 items-center">
-            <Badge variant="secondary" className="text-[10px]">
-              #{index + 1}
-            </Badge>
-          </span>
         </button>
       </PopoverAnchor>
       <PopoverContent side="bottom" align="center" className="w-72">
         <div className="flex flex-col gap-3">
           <p className="text-xs text-muted-foreground">
-            This tool is no longer installed — it stays in the
-            execution order until removed.
+            This tool is no longer installed — it stays in the pipeline until
+            removed.
           </p>
-          <div className="flex items-center justify-between border-t pt-2">
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                disabled={disabled || index === 0}
-                onClick={() => onMove(index, -1)}
-                aria-label="Move up"
-              >
-                <ArrowUp className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                disabled={disabled || index === total - 1}
-                onClick={() => onMove(index, 1)}
-                aria-label="Move down"
-              >
-                <ArrowDown className="size-3.5" />
-              </Button>
-            </div>
+          <div className="flex items-center justify-end border-t pt-2">
             <Button
               variant="ghost"
               size="sm"
@@ -633,8 +570,9 @@ const MissingToolPopover = memo(function MissingToolPopover({
  * Shared Option B pipeline builder for asset-group tool selection.
  * Circular logo grid (old ToolSelector look): click an unselected logo to
  * add it (blocked connectors open the inline config sheet first), click a
- * selected logo to open its action panel (order, profile, inline config,
- * move, remove).
+ * selected logo to open its action panel (profile, inline config, remove).
+ * The selected tools are saved as jobs with no `needs`, so they run in
+ * parallel — there is deliberately no ordering control.
  */
 function ToolPipelineBuilderComponent({
   tools,
@@ -676,11 +614,6 @@ function ToolPipelineBuilderComponent({
     () => new Map(value.map((e) => [e.toolId, e])),
     [value],
   );
-  const orderById = useMemo(
-    () => new Map(value.map((e, index) => [e.toolId, index])),
-    [value],
-  );
-
   const filteredTools = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return tools;
@@ -758,18 +691,6 @@ function ToolPipelineBuilderComponent({
       if (sheetToolId === id) setSheetToolId(null);
     },
     [onChange, value, sheetToolId],
-  );
-
-  const handleMove = useCallback(
-    (index: number, direction: -1 | 1) => {
-      const target = index + direction;
-      if (target < 0 || target >= value.length) return;
-      const next = [...value];
-      const [moved] = next.splice(index, 1);
-      next.splice(target, 0, moved);
-      onChange(next);
-    },
-    [onChange, value],
   );
 
   /**
@@ -912,7 +833,6 @@ function ToolPipelineBuilderComponent({
             }
             const entry = entryById.get(tool.id);
             if (!entry) return renderLogoButton(tool);
-            const index = orderById.get(tool.id) ?? 0;
             return (
               <Popover
                 key={tool.id}
@@ -933,13 +853,10 @@ function ToolPipelineBuilderComponent({
                   <SelectedToolPanel
                     tool={tool}
                     entry={entry}
-                    index={index}
-                    total={value.length}
                     knownProfileIds={knownProfilesByTool[tool.id]}
                     disabled={disabled}
                     onClose={handleCloseActive}
                     onPatchEntry={patchEntry}
-                    onMove={handleMove}
                     onRemove={handleRemove}
                     onOpenSheet={handleOpenSheet}
                     onProfilesLoaded={handleProfilesLoaded}
@@ -949,18 +866,14 @@ function ToolPipelineBuilderComponent({
             );
           })}
           {missingEntries.map((entry) => {
-            const index = orderById.get(entry.toolId) ?? 0;
             return (
               <MissingToolPopover
                 key={entry.toolId}
                 toolId={entry.toolId}
-                index={index}
-                total={value.length}
                 open={activeId === entry.toolId}
                 disabled={disabled}
                 onOpenChange={handleMissingOpenChange}
                 onToggle={handleMissingToggle}
-                onMove={handleMove}
                 onRemove={handleRemove}
               />
             );
