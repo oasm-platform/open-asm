@@ -1513,9 +1513,10 @@ export class StatisticService {
       // A run can end without executing its whole graph: a failed step skips
       // every step that needs it. "New assets discovered" would read as "the
       // scan finished", and a run that died with nothing new to report would
-      // stay silent — both leave the operator with a wrong picture, so the
-      // snapshot report carries the incompleteness and a dead run reports
-      // itself even when it found nothing.
+      // stay silent — so a run that did not finish reports itself, separately,
+      // naming what never ran. (Not a new argument on the discovery message:
+      // notifications already stored have no such metadata key, and a missing
+      // ICU variable makes the renderer fall back to raw template text.)
       const steps = job.jobHistory?.steps ?? {};
       const idsWith = (predicate: (state: RunStepState) => boolean) =>
         Object.entries(steps)
@@ -1562,8 +1563,6 @@ export class StatisticService {
             tech: String(diffs.techs ?? 0),
             targetValue: job.asset.target.value,
             targetId: job.asset.target.id,
-            // Empty string, never missing: the message template selects on it.
-            incomplete: incomplete ? 'true' : '',
           },
           workspaceId,
         });

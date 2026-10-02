@@ -203,7 +203,7 @@ describe('StatisticService', () => {
       ]);
     });
 
-    it('flags the discovery report as incomplete when a step failed', async () => {
+    it('reports an incomplete run alongside the discovery report', async () => {
       snapshotSpy().mockResolvedValue({
         hosts: 1,
         ports: 0,
@@ -219,13 +219,21 @@ describe('StatisticService', () => {
         }),
       );
 
+      // The discovery message keeps its original arguments: notifications
+      // stored before this change have no `incomplete` key, and a missing ICU
+      // variable makes the renderer fall back to raw template text.
       expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           type: NotificationType.ASSET_NEW_DETECT,
           scope: NotificationScope.GROUP,
-          metadata: expect.objectContaining({
-            services: '3',
-            incomplete: 'true',
+          metadata: expect.objectContaining({ services: '3' }),
+        }),
+      );
+      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.ASSET_NEW_DETECT,
+          metadata: expect.not.objectContaining({
+            incomplete: expect.anything(),
           }),
         }),
       );
@@ -278,7 +286,9 @@ describe('StatisticService', () => {
       expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           type: NotificationType.ASSET_NEW_DETECT,
-          metadata: expect.objectContaining({ incomplete: '' }),
+          metadata: expect.not.objectContaining({
+            incomplete: expect.anything(),
+          }),
         }),
       );
       const types = mockNotificationsService.createNotification.mock.calls.map(
