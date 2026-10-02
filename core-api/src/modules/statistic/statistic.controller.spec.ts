@@ -43,14 +43,16 @@ describe('StatisticController', () => {
   });
 
   describe('getStatistics', () => {
-    it('should call statisticService.getStatistics', async () => {
-      const query: GetStatisticQueryDto = { workspaceId: '1' };
+    it('should aggregate the guard-authorized workspace, not the query param', async () => {
+      const query: GetStatisticQueryDto = { workspaceId: 'other-tenant' };
       const expectedResult = { assets: 10, targets: 5 } as any;
       mockStatisticService.getStatistics.mockResolvedValue(expectedResult);
 
-      const result = await controller.getStatistics(query);
+      const result = await controller.getStatistics(query, 'authorized-ws');
       expect(result).toBe(expectedResult);
-      expect(service.getStatistics).toHaveBeenCalledWith(query);
+      expect(service.getStatistics).toHaveBeenCalledWith({
+        workspaceId: 'authorized-ws',
+      });
     });
   });
 

@@ -1,6 +1,7 @@
 import { NotificationScope, NotificationType } from '@/common/enums/enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
   IsArray,
   IsEnum,
   IsObject,
@@ -14,6 +15,9 @@ export class CreateNotificationDto {
     type: [String],
   })
   @IsArray()
+  // Same bulk ceiling the asset-group batch DTOs use — bounds the fan-out so a
+  // single call cannot enqueue a notification for an unbounded user list.
+  @ArrayMaxSize(1000)
   @IsString({ each: true })
   recipients: string[];
 

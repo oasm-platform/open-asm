@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -16,7 +17,11 @@ import { ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { I18nLang } from 'nestjs-i18n';
 import { AuthGuard } from '@/common/guards/auth.guard';
-import { getWorkspaceIdFromRequest } from '@/common/decorators/workspace-id.decorator';
+import {
+  WorkspaceId,
+  getWorkspaceIdFromRequest,
+} from '@/common/decorators/workspace-id.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { DeleteNotificationByRefDto } from './dto/delete-notification-by-ref.dto';
 import { UserContext } from '@/common/decorators/app.decorator';
@@ -63,9 +68,25 @@ export class NotificationsController {
     summary: 'Create a notification',
     description:
       'Create a new notification for a specific user or group of users',
+    request: {
+      getWorkspaceId: true,
+    },
   })
+  @WorkspaceAccess()
   @Post()
-  async createNotification(@Body() body: CreateNotificationDto) {
+  async createNotification(
+    @Body() body: CreateNotificationDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    // Membership in the authorized workspace is the caller's ceiling: a
+    // notification must never be attributed to a workspace the caller does not
+    // belong to, otherwise any member can spam another tenant's users.
+    if (body.workspaceId && body.workspaceId !== workspaceId) {
+      throw new ForbiddenException(
+        'You cannot create notifications for another workspace',
+      );
+    }
+
     return this.notificationsService.createNotification(body);
   }
 

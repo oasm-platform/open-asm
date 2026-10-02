@@ -50,12 +50,21 @@ export class TemplatesController {
     summary: 'Template upload',
     description: 'Upload a template to the storage',
     response: { serialization: UploadTemplateResponseDTO },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @WorkspaceAccess('template.write')
   @Post('upload')
-  uploadFile(@Body() template: UploadTemplateDTO) {
+  uploadFile(
+    @Body() template: UploadTemplateDTO,
+    @WorkspaceId() workspaceId: string,
+    @UserContext() userContext: UserContextPayload,
+  ) {
     return this.templateService.uploadFile(
       template.templateId,
+      workspaceId,
+      userContext,
       template.fileContent,
     );
   }

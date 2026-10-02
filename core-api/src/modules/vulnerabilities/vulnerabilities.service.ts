@@ -6,6 +6,7 @@ import {
   VulnerabilityAnalyzeStatus,
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { resolveSortBy } from '@/common/utils/resolveSortBy';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
@@ -33,6 +34,15 @@ import {
 } from './dto/get-vulnerability.dto';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
+
+/** Columns `GET /api/vulnerabilities` may order by. */
+const ALLOWED_VULNERABILITY_SORT_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'severity',
+  'name',
+  'id',
+] as const;
 
 @Injectable()
 export class VulnerabilitiesService {
@@ -133,11 +143,18 @@ export class VulnerabilitiesService {
       .take(limit);
 
     // Handle severity sorting with proper order
-    if (sortBy === 'severity') {
+    // SECURITY: sortBy is allow-listed before it reaches `.orderBy()`, which
+    // concatenates its argument into the SQL verbatim.
+    const safeSortBy = resolveSortBy(
+      sortBy,
+      ALLOWED_VULNERABILITY_SORT_FIELDS,
+      'createdAt',
+    );
+    if (safeSortBy === 'severity') {
       const { select, orderBy } = this.buildSeverityOrderQuery(sortOrder);
       queryBuilder.addSelect(select, 'severity_order').orderBy(orderBy, 'ASC');
     } else {
-      queryBuilder.orderBy(`vulnerabilities.${sortBy}`, sortOrder);
+      queryBuilder.orderBy(`vulnerabilities.${safeSortBy}`, sortOrder);
     }
 
     if (targetIds) {

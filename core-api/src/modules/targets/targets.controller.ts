@@ -210,11 +210,17 @@ export class TargetsController {
     response: {
       serialization: DefaultMessageResponseDto,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @WorkspaceAccess('target.write')
   @Post(':id/re-scan')
-  reScanTarget(@Param() { id }: IdQueryParamDto) {
-    return this.targetsService.assetService.reScan(id);
+  reScanTarget(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.assetService.reScan(id, workspaceId);
   }
 
   @Doc({
@@ -223,6 +229,9 @@ export class TargetsController {
       'Modifies the configuration and properties of an existing security testing target, allowing for dynamic adjustments to assessment parameters.',
     response: {
       serialization: Target,
+    },
+    request: {
+      getWorkspaceId: true,
     },
   })
   @AuditLog('target.updated', {
@@ -238,7 +247,11 @@ export class TargetsController {
   })
   @WorkspaceAccess('target.write')
   @Patch(':id')
-  updateTarget(@Param() { id }: IdQueryParamDto, @Body() dto: UpdateTargetDto) {
-    return this.targetsService.updateTarget(id, dto);
+  updateTarget(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: UpdateTargetDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.updateTarget(id, dto, workspaceId);
   }
 }

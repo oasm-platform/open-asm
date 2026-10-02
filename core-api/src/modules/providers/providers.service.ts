@@ -3,10 +3,21 @@ import { getManyResponse } from '@/utils/getManyResponse';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
+import { User } from '../auth/entities/user.entity';
 import { CreateProviderDto } from './dto/create-provider.dto';
 import { ProvidersQueryDto } from './dto/providers-query.dto';
 import { UpdateProviderDto } from './dto/update-provider.dto';
 import { ToolProvider } from './entities/provider.entity';
+
+/**
+ * Owner projection for provider responses. Per AGENTS.md a user response only
+ * ever exposes `id`, `name` and `image` — never email/role/ban fields.
+ */
+type ProviderOwner = Pick<User, 'id' | 'name' | 'image'>;
+
+export type ProviderResponse = Omit<ToolProvider, 'owner'> & {
+  owner: ProviderOwner;
+};
 
 @Injectable()
 export class ProvidersService {
@@ -68,11 +79,21 @@ export class ProvidersService {
   }
 
   /**
-   * Get a provider by ID
+   * Loads a provider and asserts the caller owns it.
+   *
+   * `ToolProvider` is user-owned (it has no workspace relation), so the
+   * authenticated user is the authorization boundary. A provider that does not
+   * exist and one owned by somebody else are both reported as not found so the
+   * route never confirms the existence of another user's provider.
+   *
    * @param id
+   * @param userContext
    * @returns
    */
-  async getProviderById(id: string): Promise<ToolProvider> {
+  private async findOwnedProvider(
+    id: string,
+    userContext: UserContextPayload,
+  ): Promise<ToolProvider> {
     const provider = await this.providersRepository.findOne({
       where: { id },
       relations: {
@@ -80,11 +101,33 @@ export class ProvidersService {
       },
     });
 
-    if (!provider) {
+    if (!provider || provider.owner?.id !== userContext.id) {
       throw new NotFoundException(`Provider with ID ${id} not found`);
     }
 
     return provider;
+  }
+
+  /**
+   * Get a provider by ID
+   * @param id
+   * @param userContext
+   * @returns
+   */
+  async getProviderById(
+    id: string,
+    userContext: UserContextPayload,
+  ): Promise<ProviderResponse> {
+    const provider = await this.findOwnedProvider(id, userContext);
+
+    return {
+      ...provider,
+      owner: {
+        id: provider.owner.id,
+        name: provider.owner.name,
+        image: provider.owner.image,
+      },
+    };
   }
 
   /**
@@ -98,16 +141,21 @@ export class ProvidersService {
     id: string,
     updateProviderDto: UpdateProviderDto,
     userContext: UserContextPayload,
-  ): Promise<ToolProvider> {
-    const provider = await this.getProviderById(id);
-
+  ): Promise<ProviderResponse> {
     // Check if user is owner of the provider
-    if (provider.owner.id !== userContext.id) {
-      throw new NotFoundException(`Provider with ID ${id} not found`);
-    }
+    const provider = await this.findOwnedProvider(id, userContext);
 
     Object.assign(provider, updateProviderDto);
-    return this.providersRepository.save(provider);
+    const saved = await this.providersRepository.save(provider);
+
+    return {
+      ...saved,
+      owner: {
+        id: provider.owner.id,
+        name: provider.owner.name,
+        image: provider.owner.image,
+      },
+    };
   }
 
   /**
@@ -120,11 +168,8 @@ export class ProvidersService {
     id: string,
     userContext: UserContextPayload,
   ): Promise<{ message: string }> {
-    const provider = await this.getProviderById(id);
     // Check if user is owner of the provider
-    if (provider.owner.id !== userContext.id) {
-      throw new NotFoundException(`Provider with ID ${id} not found`);
-    }
+    await this.findOwnedProvider(id, userContext);
 
     // Soft delete the provider
     await this.providersRepository.softDelete(id);

@@ -151,8 +151,15 @@ export class AssetGroupWorkflowService {
         );
       }
 
-      // Verify that all workflows exist
-      const workflows = await this.workflowRepo.findByIds(workflowIds);
+      // Verify that all workflows exist AND belong to the same workspace as the
+      // group. SECURITY: `findByIds(workflowIds)` was workspace-agnostic, so a
+      // caller could attach another tenant's workflow (and therefore schedule
+      // its scans) to their own group.
+      const workflows = workspaceId
+        ? await this.workflowRepo.find({
+            where: { id: In(workflowIds), workspace: { id: workspaceId } },
+          })
+        : await this.workflowRepo.findByIds(workflowIds);
       if (workflows.length !== workflowIds.length) {
         const foundWorkflowIds = workflows.map((workflow) => workflow.id);
         const missingWorkflowIds = workflowIds.filter(
@@ -312,15 +319,23 @@ export class AssetGroupWorkflowService {
    */
   async updateAssetGroupWorkflow(
     assetGroupWorkflowId: string,
+    workspaceId: string,
     updateData: Partial<{
       schedule?: string;
       jobId?: string;
     }>,
   ): Promise<AssetGroupWorkflow> {
     try {
-      // Find the existing relationship by ID
+      // Find the existing relationship by ID.
+      // SECURITY: scoped by the workspace the caller was authorized against —
+      // this relation owns a BullMQ repeat scheduler, so an unscoped lookup let
+      // any member rewrite another tenant's cron (continuous scans, or a
+      // silent monitoring stop by setting it to 'disabled').
       const assetGroupWorkspace = await this.assetGroupWorkflowRepo.findOne({
-        where: { id: assetGroupWorkflowId },
+        where: {
+          id: assetGroupWorkflowId,
+          assetGroup: { workspace: { id: workspaceId } },
+        },
         relations: ['assetGroup', 'workflow'],
       });
 
@@ -376,18 +391,29 @@ export class AssetGroupWorkflowService {
 
   public async runGroupWorkflowScheduler(
     assetGroupWorkflowId: string,
+    workspaceId: string | undefined,
     jobRunType: JobRunType,
   ): Promise<DefaultMessageResponseDto> {
-    // Get the asset group workflow to access the workflow and asset group
-    const assetGroupWorkflow = await this.assetGroupWorkflowRepo
+    // Get the asset group workflow to access the workflow and asset group.
+    //
+    // SECURITY: the lookup was unscoped, so any member able to reach this
+    // endpoint could trigger a workflow run inside a tenant they do not belong
+    // to. `workspaceId` is supplied by the HTTP path (from @WorkspaceId(),
+    // already authorized by WorkspacePermissionGuard). It is undefined only
+    // for the internal BullMQ repeat-scheduler, whose job payload originates
+    // from the scheduler row itself rather than from a user request.
+    const query = this.assetGroupWorkflowRepo
       .createQueryBuilder('assetGroupWorkflow')
       .innerJoinAndSelect('assetGroupWorkflow.workflow', 'workflow')
       .leftJoinAndSelect('workflow.workspace', 'workspace')
       .innerJoinAndSelect('assetGroupWorkflow.assetGroup', 'assetGroup')
       .where('assetGroupWorkflow.id = :assetGroupWorkflowId', {
         assetGroupWorkflowId,
-      })
-      .getOne();
+      });
+    if (workspaceId) {
+      query.andWhere('workspace.id = :workspaceId', { workspaceId });
+    }
+    const assetGroupWorkflow = await query.getOne();
 
     if (!assetGroupWorkflow) {
       throw new NotFoundException(

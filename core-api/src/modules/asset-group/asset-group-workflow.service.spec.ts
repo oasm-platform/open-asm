@@ -13,7 +13,7 @@ import { AssetGroupWorkflowService } from './asset-group-workflow.service';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
 import { AssetGroup } from './entities/asset-groups.entity';
 
-describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
+describe('AssetGroupWorkflowService â€” runGroupWorkflowScheduler', () => {
   let service: AssetGroupWorkflowService;
 
   const assetGroupWorkflowRepo = { createQueryBuilder: jest.fn() };
@@ -43,6 +43,7 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
       innerJoinAndSelect: jest.fn().mockReturnThis(),
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       getOne: jest.fn().mockResolvedValue({
         id: 'agw-1',
         workflow,
@@ -93,6 +94,7 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
   it('starts one run scoped to the group assets', async () => {
     const result = await service.runGroupWorkflowScheduler(
       'agw-1',
+      'workspace-1',
       JobRunType.SCHEDULED,
     );
 
@@ -113,7 +115,7 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
     ]);
 
     await expect(
-      service.runGroupWorkflowScheduler('agw-1', JobRunType.SCHEDULED),
+      service.runGroupWorkflowScheduler('agw-1', undefined, JobRunType.SCHEDULED),
     ).rejects.toThrow(BadRequestException);
 
     expect(workflowRunnerService.startRun).not.toHaveBeenCalled();
@@ -127,7 +129,7 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
     });
 
     await expect(
-      service.runGroupWorkflowScheduler('agw-1', JobRunType.SCHEDULED),
+      service.runGroupWorkflowScheduler('agw-1', undefined, JobRunType.SCHEDULED),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -136,11 +138,13 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
       innerJoinAndSelect: jest.fn().mockReturnThis(),
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       getOne: jest.fn().mockResolvedValue(null),
     });
 
     await expect(
-      service.runGroupWorkflowScheduler('agw-missing', JobRunType.SCHEDULED),
+      service.runGroupWorkflowScheduler('agw-missing', undefined, JobRunType.SCHEDULED),
     ).rejects.toThrow(NotFoundException);
   });
 });
+

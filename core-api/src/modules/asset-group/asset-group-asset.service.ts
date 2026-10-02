@@ -54,8 +54,18 @@ export class AssetGroupAssetService {
         );
       }
 
-      // Verify that all assets exist
-      const assets = await this.assetRepo.findByIds(assetIds);
+      // Verify that all assets exist AND belong to the same workspace as the
+      // group. SECURITY: the previous `findByIds(assetIds)` was workspace-
+      // agnostic, so a caller who could edit any group could attach another
+      // tenant's assets to it.
+      const assets = workspaceId
+        ? await this.assetRepo.find({
+            where: {
+              id: In(assetIds),
+              target: { workspace: { id: workspaceId } },
+            },
+          })
+        : await this.assetRepo.findByIds(assetIds);
       if (assets.length !== assetIds.length) {
         const foundAssetIds = assets.map((asset) => asset.id);
         const missingAssetIds = assetIds.filter(

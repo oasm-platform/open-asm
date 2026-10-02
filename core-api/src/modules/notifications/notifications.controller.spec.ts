@@ -27,7 +27,6 @@ describe('NotificationsController workspace permission guards', () => {
   );
 
   it.each([
-    ['createNotification', 'POST /'],
     ['markAllAsRead', 'PATCH /mark-read'],
     ['markAllAsUnread', 'PATCH /mark-unread'],
     ['markAsRead', 'PATCH /:id/read'],
@@ -41,5 +40,17 @@ describe('NotificationsController workspace permission guards', () => {
       NotificationsController,
     ]);
     expect(required).toBeUndefined();
+  });
+
+  it('createNotification (POST /) requires workspace membership', () => {
+    const handler = (
+      NotificationsController.prototype as Record<string, unknown>
+    ).createNotification as object;
+    // Empty permission list = any authenticated member of the authorized
+    // workspace; there is no notification.* write key in the catalog.
+    expect(reflector.getAllAndOverride(WorkspacePermissions, [
+      handler,
+      NotificationsController,
+    ])).toEqual([]);
   });
 });

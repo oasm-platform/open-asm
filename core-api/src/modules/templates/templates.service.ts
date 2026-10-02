@@ -67,17 +67,30 @@ export class TemplatesService {
 
   /**
    * Uploads file content for a specific template
+   *
+   * The template must belong to the workspace the caller was authorized for —
+   * template files are executed by the scanning worker, so an unscoped lookup
+   * would let any workspace member overwrite another tenant's template.
+   *
    * @param templateId The ID of the template to upload file for
+   * @param workspaceId The ID of the workspace containing the template
+   * @param userContext User context containing user information
    * @param fileContent The content of the file as a string
    * @returns Promise containing the upload result
-   * @throws BadRequestException if the template is not found
+   * @throws NotFoundException if the workspace or template is not found
+   * @throws BadRequestException if the template doesn't belong to the workspace
    */
-  public async uploadFile(templateId: string, fileContent: string) {
-    const template = await this.templateRepo.findOneBy({ id: templateId });
-
-    if (!template) {
-      throw new BadRequestException('Invalid upload request');
-    }
+  public async uploadFile(
+    templateId: string,
+    workspaceId: string,
+    userContext: UserContextPayload,
+    fileContent: string,
+  ) {
+    const template = await this.getTemplateById(
+      templateId,
+      workspaceId,
+      userContext,
+    );
 
     const fileBuffer = Buffer.from(fileContent, 'utf-8');
 

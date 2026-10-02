@@ -302,13 +302,20 @@ export class AssetsController {
     response: {
       serialization: GetAssetsResponseDto,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @WorkspaceAccess('asset.write')
   @Post('/toggle')
-  toggleAsset(@Body() toggleAssetDto: ToggleAssetDto) {
+  toggleAsset(
+    @Body() toggleAssetDto: ToggleAssetDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.assetsService.toggleAsset(
       toggleAssetDto.assetId,
       toggleAssetDto.isEnabled,
+      workspaceId,
     );
   }
 

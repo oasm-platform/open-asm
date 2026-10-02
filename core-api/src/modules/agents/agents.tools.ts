@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { tool } from 'ai';
 import { randomUUID } from 'node:crypto';
 import * as dns from 'node:dns/promises';
+import * as net from 'node:net';
 import { EventEmitter } from 'node:events';
 import { Repository } from 'typeorm';
 import { z } from 'zod';
@@ -50,19 +51,73 @@ const webFetchSchema = z.object({
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolType = any;
 
+/**
+ * True when `ip` (IPv4 or IPv6) is not globally routable — loopback,
+ * private, link-local, CGNAT, unspecified or reserved.
+ */
 function isPrivateIp(ip: string): boolean {
-  const parts = ip.split('.').map(Number);
-  if (parts.length !== 4 || parts.some(isNaN)) return false;
-  const [a, b] = parts;
-  if (a === 10) return true;
-  if (a === 127) return true;
-  if (a === 169 && b === 254) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 100 && b >= 64 && b <= 127) return true;
-  if (a === 0) return true;
+  const version = net.isIP(ip);
+  if (version === 4) {
+    const parts = ip.split('.').map(Number);
+    if (parts.length !== 4 || parts.some(isNaN)) return true;
+    const [a, b] = parts;
+    if (a === 0) return true; // "this" network
+    if (a === 10) return true; // RFC1918
+    if (a === 127) return true; // loopback
+    if (a === 169 && b === 254) return true; // link-local / cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return true; // RFC1918
+    if (a === 192 && b === 168) return true; // RFC1918
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT (RFC6598)
+    if (a === 192 && b === 0) return true; // IETF protocol assignments
+    if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking
+    if (a >= 224) return true; // multicast + reserved
+    return false;
+  }
+  if (version === 6) {
+    const lower = ip.toLowerCase().split('%')[0]; // strip zone id
+    if (lower === '::1' || lower === '::') return true; // loopback / unspecified
+    // IPv4-mapped (::ffff:127.0.0.1) must be judged by the embedded v4 address
+    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(lower);
+    if (mapped) return isPrivateIp(mapped[1]);
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // ULA
+    if (lower.startsWith('fe8') || lower.startsWith('fe9')) return true; // link-local
+    if (lower.startsWith('fea') || lower.startsWith('feb')) return true;
+    return false;
+  }
+  // Not a recognisable IP literal.
   return false;
 }
+
+/**
+ * SECURITY (SSRF): resolve `hostname` and reject it if ANY address is
+ * non-public.
+ *
+ * `dns.resolve4` alone was used previously, which meant a host that only
+ * publishes an AAAA record never entered the loop, and an IP-literal URL was
+ * never checked at all. `dns.lookup(..., { all: true })` returns every
+ * address the system resolver yields, for both families, and is what
+ * `fetch` itself will use.
+ */
+async function assertPublicHost(hostname: string): Promise<void> {
+  const literal = hostname.replace(/^\[|\]$/g, '');
+  if (net.isIP(literal)) {
+    if (isPrivateIp(literal)) {
+      throw new Error('Request blocked: target address is not publicly accessible');
+    }
+    return;
+  }
+  const addresses = await dns.lookup(hostname, { all: true, verbatim: true });
+  if (addresses.length === 0) {
+    throw new Error('Request blocked: host could not be resolved');
+  }
+  for (const { address } of addresses) {
+    if (isPrivateIp(address)) {
+      throw new Error('Request blocked: target address is not publicly accessible');
+    }
+  }
+}
+
+const MAX_FETCH_REDIRECTS = 3;
 
 @Injectable()
 export class AgentTool {
@@ -329,20 +384,39 @@ export class AgentTool {
         execute: async (params: z.infer<typeof webFetchSchema>) => {
           const { url: rawUrl } = params;
           try {
-            const parsedUrl = new URL(rawUrl);
-            if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-              return { error: 'Only http and https protocols are allowed', url: rawUrl };
-            }
-            const addresses = await dns.resolve4(parsedUrl.hostname);
-            for (const ip of addresses) {
-              if (isPrivateIp(ip)) {
-                return { error: 'Request blocked: target address is not publicly accessible', url: rawUrl };
+            // SECURITY: redirects were followed automatically and only the
+            // FIRST URL was validated, so a public host could bounce the
+            // server to 169.254.169.254 or an internal service. Follow them
+            // manually and re-validate every hop.
+            let currentUrl = new URL(rawUrl);
+            let response: Response | null = null;
+
+            for (let hop = 0; hop <= MAX_FETCH_REDIRECTS; hop++) {
+              if (currentUrl.protocol !== 'http:' && currentUrl.protocol !== 'https:') {
+                return { error: 'Only http and https protocols are allowed', url: currentUrl.toString() };
               }
+              await assertPublicHost(currentUrl.hostname);
+
+              response = await fetch(currentUrl.toString(), {
+                method: 'GET',
+                headers: { 'User-Agent': 'OASM-Security-Agent/1.0' },
+                redirect: 'manual',
+              });
+
+              const location = response.headers.get('location');
+              if (response.status >= 300 && response.status < 400 && location) {
+                if (hop === MAX_FETCH_REDIRECTS) {
+                  return { error: 'Too many redirects', url: currentUrl.toString() };
+                }
+                currentUrl = new URL(location, currentUrl);
+                continue;
+              }
+              break;
             }
-            const response = await fetch(rawUrl, {
-              method: 'GET',
-              headers: { 'User-Agent': 'OASM-Security-Agent/1.0' },
-            });
+
+            if (!response) {
+              return { error: 'Request produced no response', url: currentUrl.toString() };
+            }
             return { statusCode: response.status, body: await response.text() };
           } catch (error) {
             return {

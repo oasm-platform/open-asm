@@ -421,10 +421,16 @@ export class AssetsService {
   /**
    * Triggers a rescan for a specific asset by creating new jobs for relevant workers.
    *
-   * @param assetId - The ID of the asset to rescan.
+   * @param targetId - The ID of the target to rescan.
+   * @param workspaceId - The authorized workspace. HTTP callers must supply it so
+   *   the target is resolved inside their own workspace only. The BullMQ
+   *   scheduler path has no request context and omits it.
    * @throws Error if the asset is not found.
    */
-  public async reScan(targetId: string): Promise<DefaultMessageResponseDto> {
+  public async reScan(
+    targetId: string,
+    workspaceId?: string,
+  ): Promise<DefaultMessageResponseDto> {
     const asset = await this.assetRepo.findOne({
       where: {
         target: { id: targetId },
@@ -436,20 +442,24 @@ export class AssetsService {
       throw new NotFoundException('Asset not found');
     }
 
+    // Scoped to the caller's workspace: without this a member of one tenant
+    // could force scans against another tenant's target estate.
     const target = await this.targetRepo.findOne({
       where: {
         id: targetId,
+        ...(workspaceId ? { workspaceId } : {}),
       },
     });
-    const workspaceId =
+
+    const resolvedWorkspaceId =
       await this.workspaceService.getWorkspaceIdByTargetId(targetId);
 
-    if (!workspaceId) {
+    if (!resolvedWorkspaceId) {
       throw new NotFoundException('Workspace not found');
     }
 
     if (!target) {
-      throw new NotFoundException('Target not found');
+      throw new NotFoundException('Target not found in workspace');
     }
     const reScanCount = target.reScanCount + 1;
     await this.targetRepo.update(targetId, {
@@ -1223,13 +1233,19 @@ export class AssetsService {
   public async toggleAsset(
     assetId: string,
     isEnabled: boolean,
+    workspaceId: string,
   ): Promise<Asset> {
+    // Asset -> target -> workspace: the permission guard only proves the caller
+    // may write assets in `workspaceId`, not that `assetId` lives there.
     const asset = await this.assetRepo.findOne({
-      where: { id: assetId },
+      where: {
+        id: assetId,
+        target: { workspace: { id: workspaceId } },
+      },
     });
 
     if (!asset) {
-      throw new NotFoundException('Asset not found');
+      throw new NotFoundException('Asset not found in workspace');
     }
 
     // Update the asset's enabled status

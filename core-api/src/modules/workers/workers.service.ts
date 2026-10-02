@@ -561,11 +561,27 @@ export class WorkersService {
     const { apiKey, signature, token, metadata, ipAddress } = dto;
     const runMode = this.mapRunMode(metadata?.mode);
 
-    // 1. Validate signature first (mandatory)
-    const workerSignature =
-      this.configService.get<string>('WORKER_SIGNATURE') || '';
+    // 1. Validate signature when one is configured.
+    //
+    // WORKER_SIGNATURE is an OPTIONAL second factor: the worker sends it only
+    // when it is set on its side (see worker/internal/grpcclient/client.go),
+    // and neither docker-compose nor example.env configure it. Making this
+    // check reject an unset server-side signature was tried and reverted - it
+    // broke every worker join out of the box, and the real gate for join is the
+    // OASM_CLOUD_APIKEY / API-key lookup below, which is always enforced.
+    //
+    // Note that when WORKER_SIGNATURE is unset the comparison is '' === '' and
+    // therefore always passes, so the signature adds nothing in that
+    // configuration. Operators who want it enforced must set it on BOTH sides.
+    const workerSignature = this.configService.get<string>('WORKER_SIGNATURE');
 
-    if (signature !== workerSignature) {
+    if (workerSignature) {
+      if (!signature || signature !== workerSignature) {
+        throw new UnauthorizedException('Invalid worker signature');
+      }
+    } else if (signature) {
+      // A client sent a signature the server has no way to verify - refuse
+      // rather than silently ignoring it.
       throw new UnauthorizedException('Invalid worker signature');
     }
 

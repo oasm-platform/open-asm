@@ -13,7 +13,6 @@ import { fromNodeHeaders } from 'better-auth/node';
 import {
   API_GLOBAL_PREFIX,
   AUTH_INSTANCE_KEY,
-  MCP_API_KEY_HEADER,
   ROLE_METADATA_KEY,
 } from '../constants/app.constants';
 import { Role } from '../enums/enum';
@@ -72,9 +71,14 @@ export class AuthGuard implements CanActivate {
     const isPublic = this.reflector.get('PUBLIC', context.getHandler());
     if (isPublic || isDisabledAuth) return true;
 
-    // If any request carries an MCP API key header, skip session check.
-    // The downstream guard (McpGuard) validates the key and sets workspaceId.
-    if (request.headers[MCP_API_KEY_HEADER]) return true;
+    // NOTE: the MCP API key (`x-oasm-api-key`) is NOT consulted here.
+    //
+    // It used to be: `if (request.headers[MCP_API_KEY_HEADER]) return true;`
+    // That bypassed the session check *and* the @Roles check (which reads
+    // request.user, assigned further down) on EVERY route, for any value at
+    // all. It was also redundant: `disabledPaths` already prefix-matches
+    // '/api/mcp', so the real MCP handshake was skipped before reaching it.
+    // McpGuard on `GET /api/mcp` is the single place the key is validated.
 
     const currentSession = await this.auth.api.getSession({
       headers: fromNodeHeaders(request.headers),
@@ -93,13 +97,19 @@ export class AuthGuard implements CanActivate {
       request.user = currentSession.user as UserContextPayload;
     }
 
-    const rolesAccepted = this.reflector.get<Role[]>(
+    // getAllAndOverride (not get) so a CLASS-level `@Roles(Role.ADMIN)` is
+    // enforced too. `get(key, getHandler())` only ever saw handler-level
+    // metadata, so `@Roles` on a controller class was silently ignored.
+    const rolesAccepted = this.reflector.getAllAndOverride<Role[]>(
       ROLE_METADATA_KEY,
-      context.getHandler(),
+      [context.getHandler(), context.getClass()],
     );
 
     const userRole = request.user?.role;
-    if (userRole) {
+    if (rolesAccepted?.length) {
+      if (!userRole) {
+        throw new UnauthorizedException();
+      }
       this.validateUserRole(rolesAccepted, userRole);
     }
     return true;

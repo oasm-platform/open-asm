@@ -476,7 +476,13 @@ export class WorkspacesService implements OnModuleInit {
       };
 
       result[key] = {
-        value: workspace[key as keyof Workspace] as SwaggerPropertyMetadata['value'],
+        // SECURITY: Workspace gained a `toJSON()` method (to strip the DEK from
+        // responses). Casting the key to `keyof Workspace` therefore widened to
+        // every key *including* methods, which trips `unbound-method`. Read
+        // through an index signature instead — same value, no method in the type.
+        value: (workspace as unknown as Record<string, unknown>)[
+          key
+        ] as SwaggerPropertyMetadata['value'],
         type: typeName,
         title: safeString(metaObj?.title) ?? key,
         description: safeString(metaObj?.description) ?? '',

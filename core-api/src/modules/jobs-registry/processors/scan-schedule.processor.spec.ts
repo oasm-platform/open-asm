@@ -37,6 +37,7 @@ describe('AssetGroupsScheduleConsumer', () => {
 
     expect(mockAssetGroupWorkflowService.runGroupWorkflowScheduler).toHaveBeenCalledWith(
       'agw-1',
+      undefined, // internal scheduler: no request-scoped workspace
       JobRunType.SCHEDULED,
     );
     expect(mockAssetGroupWorkflowService.removeGroupWorkflowScheduler).not.toHaveBeenCalled();

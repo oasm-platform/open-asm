@@ -1,5 +1,6 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { BullMQName, CronSchedule, WorkerType } from '@/common/enums/enum';
+import { resolveSortBy } from '@/common/utils/resolveSortBy';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -20,6 +21,16 @@ import {
 } from '../tools/validators/tool-config-profiles.crypto';
 import { ToolsService } from '../tools/tools.service';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+
+/** Columns `GET /api/asset-group` may order by. */
+const ALLOWED_ASSET_GROUP_SORT_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'name',
+  'hexColor',
+  'lastRunAt',
+  'totalAssets',
+] as const;
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { normalizeWorkflowContent } from '../workflows/workflow-graph';
 import { AssetGroupToolInput, CreateAssetGroupDto } from './dto/create-asset-group.dto';
@@ -116,12 +127,19 @@ export class AssetGroupService {
 
       // Apply ordering, pagination to main query. lastRunAt/totalAssets are
       // select aliases (not entity columns), so order by the alias directly.
+      // SECURITY: sortBy is allow-listed — it is interpolated into `.orderBy()`
+      // which TypeORM does not parameterize.
+      const safeSortBy = resolveSortBy(
+        sortBy,
+        ALLOWED_ASSET_GROUP_SORT_FIELDS,
+        'createdAt',
+      );
       const orderColumn =
-        sortBy === 'lastRunAt'
+        safeSortBy === 'lastRunAt'
           ? '"lastRunAt"'
-          : sortBy === 'totalAssets'
+          : safeSortBy === 'totalAssets'
             ? '"totalAssets"'
-            : `assetGroup.${sortBy}`;
+            : `assetGroup.${safeSortBy}`;
       queryBuilder
         .orderBy(orderColumn, sortOrder)
         .offset(offset)
@@ -452,10 +470,16 @@ export class AssetGroupService {
   /**
    * Permanently removes an asset group
    */
-  async delete(id: string): Promise<DefaultMessageResponseDto> {
+  async delete(
+    id: string,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
-        where: { id },
+        // SECURITY: scope by the workspace the caller was authorized against.
+        // Without this predicate a member of ANY workspace could delete an
+        // asset group belonging to a DIFFERENT tenant.
+        where: { id, workspace: { id: workspaceId } },
         relations: { assetGroupWorkflows: { workflow: true } },
       });
 

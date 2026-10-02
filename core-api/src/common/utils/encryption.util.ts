@@ -12,7 +12,14 @@ const IV_LENGTH = 16;
 /**
  * Parse ENCRYPTION_KEYS env var into SHA-256 hashed key buffers.
  * Format: "key-v1,key-v2,key-v3" — comma-separated.
- * Falls back to DEFAULT_ENCRYPTION_KEY if env var is not set.
+ *
+ * SECURITY: this used to fall back to the hard-coded constant
+ * `DEFAULT_ENCRYPTION_KEY` (`'OASM_DEFAULT_ENCRYPTION_KEY'`) when the env var
+ * was absent. That KEK is published in the repository, so every workspace DEK,
+ * encrypted column and report-download HMAC became decryptable/forgeable by
+ * anyone with the source. It also rejected the literal placeholder shipped in
+ * `example.env` (`your-encryption-key-change-in-production`), which has the
+ * same problem. Now it throws instead — see ENCRYPTION_KEYS in example.env.
  *
  * Last key = active (used for encrypt).
  * All keys = valid for decrypt.
@@ -22,9 +29,42 @@ const IV_LENGTH = 16;
  */
 export function parseEncryptionKeys(): Buffer[] {
   const raw = process.env.ENCRYPTION_KEYS;
-  const keys = raw
-    ? raw.split(',').map((k) => k.trim()).filter(Boolean)
-    : [DEFAULT_ENCRYPTION_KEY];
+  if (process.env.NODE_ENV !== 'test' && !raw?.trim()) {
+    throw new Error(
+      'ENCRYPTION_KEYS is not set. Generate one with `openssl rand -base64 32` ' +
+        'and add it to core-api/.env (see core-api/example.env). The application ' +
+        'refuses to start with a hard-coded key-encryption key.',
+    );
+  }
+  const keys = (raw ?? DEFAULT_ENCRYPTION_KEY)
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+
+  if (keys.length === 0) {
+    throw new Error('ENCRYPTION_KEYS is empty; at least one key is required.');
+  }
+
+  // Only the ACTIVE (last) key is validated. A legacy placeholder may remain
+  // in the decrypt-only prefix after a rotation — that is the intended
+  // migration path for data encrypted before the fix, and it cannot affect
+  // newly written ciphertext. The active key is what must be real.
+  const active = keys[keys.length - 1];
+  if (
+    process.env.NODE_ENV !== 'test' &&
+    (active === DEFAULT_ENCRYPTION_KEY ||
+      active.startsWith('your-') ||
+      active === 'change_me')
+  ) {
+    throw new Error(
+      'The ACTIVE ENCRYPTION_KEYS entry (the last one) still holds a placeholder ' +
+        'or the former hard-coded default. Append a freshly generated key to rotate, ' +
+        'e.g. `openssl rand -base64 32`, so new data is encrypted with a secret that ' +
+        'is not published in this repository. Existing ciphertext stays readable ' +
+        'through the older decrypt-only entries.',
+    );
+  }
+
   return keys.map((k) => createHash('sha256').update(k).digest());
 }
 

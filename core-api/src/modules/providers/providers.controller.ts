@@ -59,8 +59,11 @@ export class ProvidersController {
     },
   })
   @Get(':id')
-  getProvider(@Param('id') id: string) {
-    return this.providersService.getProviderById(id);
+  getProvider(
+    @Param('id') id: string,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.providersService.getProviderById(id, userContext);
   }
 
   @Doc({

@@ -161,7 +161,12 @@ export class JobsRegistryController {
   @Doc({ summary: 'Updates the result of a job with the given worker ID.' })
   /**
    * @deprecated Use category-specific endpoints instead
+   *
+   * SECURITY: this handler was `@Public()` with no worker-token check, unlike
+   * every sibling result endpoint below. Anyone who knew a worker id could
+   * POST attacker-controlled scan results. Keep `@WorkerTokenAuth()` here.
    */
+  @WorkerTokenAuth()
   @Public()
   @Post('/:workerId/result')
   updateResult(

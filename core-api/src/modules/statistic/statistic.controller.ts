@@ -29,13 +29,20 @@ export class StatisticController {
     response: {
       serialization: StatisticResponseDto,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @WorkspaceAccess('workspace.read')
   @Get()
   getStatistics(
     @Query() query: GetStatisticQueryDto,
+    @WorkspaceId() workspaceId: string,
   ): Promise<StatisticResponseDto> {
-    return this.statisticService.getStatistics(query);
+    // The guard authorized the header workspace only. The `workspaceId` query
+    // param is still validated for API compatibility, but the authorized one
+    // wins so a caller cannot aggregate another tenant's numbers.
+    return this.statisticService.getStatistics({ ...query, workspaceId });
   }
 
   @Doc({

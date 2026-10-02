@@ -9,7 +9,7 @@ import { apiReference } from '@scalar/nestjs-api-reference';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import 'dotenv/config';
-import type { Response } from 'express';
+import type { RequestHandler, Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { join } from 'path';
@@ -26,6 +26,59 @@ import {
 import { AuthGuard } from './common/guards/auth.guard';
 import { requestIdMiddleware } from './common/middleware/request-id.middleware';
 import { mergeBetterAuthSpec } from './utils/mergeBetterAuth';
+
+/**
+ * Origins permitted to make credentialed cross-origin requests.
+ *
+ * SECURITY: `app.enableCors({ origin: true, ... })` reflected whatever Origin
+ * the client sent, and paired it with `Access-Control-Allow-Credentials: true`
+ * — any site could read authenticated API responses. `['*']` does not fix
+ * that: better-auth's own `enableCors` is registered later in the Express
+ * stack and, with `cors@2.8.x`, an array is not treated as literal `*`, so it
+ * omits the header instead of overwriting the reflected one.
+ *
+ * TRUSTED_ORIGINS is a comma-separated allow-list. Empty (the default) means
+ * no cross-origin credentialed access at all, which is correct for the
+ * bundled console served same-origin.
+ */
+function resolveCorsOrigins(): string[] {
+  const raw = process.env.TRUSTED_ORIGINS?.trim();
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Baseline security response headers.
+ *
+ * The API previously sent none of these: no `X-Frame-Options` (the Scalar
+ * docs page was frameable / clickjackable), no `X-Content-Type-Options`
+ * (MIME sniffing), no HSTS, no `Referrer-Policy`.
+ */
+function securityHeaders(): RequestHandler {
+  return (req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('X-DNS-Prefetch-Control', 'off');
+    res.setHeader('X-Download-Options', 'noopen');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    // HSTS only over TLS; sending it on plain HTTP is ignored by browsers
+    // and would be misleading.
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+      res.setHeader(
+        'Strict-Transport-Security',
+        'max-age=31536000; includeSubDomains',
+      );
+    }
+    next();
+  };
+}
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
@@ -47,9 +100,21 @@ async function bootstrap() {
     },
   });
 
+  // Security headers. Implemented directly rather than pulling in `helmet`
+  // (a dependency bump needs sign-off per AGENTS.md); these cover the same
+  // defaults that mattered for this app. Registered first so headers are
+  // present on every response, including the docs page and error paths.
+  app.use(securityHeaders());
+
   // Configure CORS
+  // SECURITY: `origin: true` reflects the request's Origin back in
+  // Access-Control-Allow-Origin together with Access-Control-Allow-Credentials,
+  // which let ANY origin issue credentialed requests (verified: a victim's
+  // member list was returned to an arbitrary Origin). Use an explicit
+  // allow-list driven by TRUSTED_ORIGINS instead.
+  const corsOrigins = resolveCorsOrigins();
   app.enableCors({
-    origin: true,
+    origin: corsOrigins.length > 0 ? corsOrigins : false,
     credentials: true,
   });
 

@@ -668,13 +668,20 @@ if (scope !== undefined) {
    *
    * @param id - The ID of the target to be updated.
    * @param dto - The data transfer object containing the target details to be updated.
-   * @throws NotFoundException if the target is not found.
+   * @param workspaceId - The ID of the workspace the target must belong to.
+   * @throws NotFoundException if the target is not found in the workspace.
    * @returns The updated target entity.
    */
-  public async updateTarget(id: string, dto: UpdateTargetDto) {
-    const target = await this.repo.findOneBy({ id });
+  public async updateTarget(
+    id: string,
+    dto: UpdateTargetDto,
+    workspaceId: string,
+  ) {
+    // Scoped to the caller's workspace: the permission guard only proves the
+    // caller may write targets in `workspaceId`, not that `id` lives there.
+    const target = await this.repo.findOneBy({ id, workspaceId });
     if (!target) {
-      throw new NotFoundException('Target not found');
+      throw new NotFoundException('Target not found in workspace');
     }
 
     let jobId: string | undefined;

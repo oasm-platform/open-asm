@@ -23,7 +23,7 @@ import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
 import { createReadStream } from 'fs';
 import { readdir } from 'fs/promises';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
 import { Observable } from 'rxjs';
 import {
   GetManyWorkersDto,
@@ -147,13 +147,29 @@ export class WorkersController {
     };
   }
 
+  @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('WorkersService', 'Storage')
   grpcStorage(request: {
     path: string;
   }): Observable<{ chunk: Buffer; offset: number; eof: boolean }> {
     return new Observable((subscriber) => {
       const normalizedPath = request.path.replace(/^static/, 'public');
-      const filePath = join(process.cwd(), normalizedPath);
+
+      // SECURITY: `join(cwd, normalizedPath)` collapses `..`, so a caller could
+      // read anything in the container (`.env` → ENCRYPTION_KEYS,
+      // RUSTFS_SECRET_KEY, dist/, …). Resolve, then require the result to stay
+      // inside the working directory before opening it.
+      const root = resolve(process.cwd());
+      const filePath = resolve(root, normalizedPath);
+      const isContained =
+        filePath === root || filePath.startsWith(root + sep);
+      if (!isContained) {
+        subscriber.error(
+          new RpcException('Path traversal is not allowed'),
+        );
+        return;
+      }
+
       const stream = createReadStream(filePath, { highWaterMark: 1024 * 1024 }); // 1MB chunks
       let offset = 0;
 

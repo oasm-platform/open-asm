@@ -133,4 +133,20 @@ export class Workspace extends BaseEntity {
   @IsOptional()
   @Column({ type: 'timestamp', nullable: true })
   dekAt?: Date | null;
+
+  /**
+   * SECURITY: never serialize the workspace DEK to clients.
+   *
+   * The entity has no `toJSON()`/`@Exclude()` and the app registers no
+   * `ClassSerializerInterceptor`, so every `GET /api/workspaces*` response
+   * shipped the wrapped data-encryption key to any member holding
+   * `workspace.read` — i.e. to the least-privileged member of a tenant, who
+   * could then retain key material and attack the ciphertext offline if
+   * `ENCRYPTION_KEYS` were ever weak or rotated into a backup.
+   */
+  toJSON(): Record<string, unknown> {
+    const json = { ...this } as Record<string, unknown>;
+    delete json.dek;
+    return json;
+  }
 }

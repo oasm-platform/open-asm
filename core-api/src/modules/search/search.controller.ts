@@ -1,4 +1,5 @@
 import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Controller, Delete, Get, Param, Query } from '@nestjs/common';
@@ -28,13 +29,21 @@ export class SearchController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read', 'target.read')
   @Get()
   searchAssetsTargets(
     @UserContext() user: User,
     @Query() query: SearchAssetsTargetsDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.searchService.searchAssetsTargets(user, query, workspaceId);
+    // The guard authorized the header workspace; force it onto the DTO so the
+    // aggregate counts can never be scoped to another tenant via the query
+    // string. The DTO property stays for API compatibility and is ignored.
+    return this.searchService.searchAssetsTargets(
+      user,
+      { ...query, workspaceId },
+      workspaceId,
+    );
   }
 
   @Doc({

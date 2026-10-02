@@ -28,8 +28,13 @@ export class AssetGroupsScheduleConsumer extends WorkerHost {
   async process(job: Job<AssetGroupWorkflow>): Promise<void> {
     const assetGroupWorkflowId = job.data.id;
     try {
+      // No workspaceId: this is the internal repeat-scheduler, whose payload
+      // comes from the scheduler row rather than a user request. The HTTP
+      // path (`POST /api/asset-group/workflows/:id/run`) passes the authorized
+      // workspace so a member cannot trigger another tenant's run.
       await this.assetGroupWorkflowService.runGroupWorkflowScheduler(
         assetGroupWorkflowId,
+        undefined,
         JobRunType.SCHEDULED,
       );
     } catch (error) {
