@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import type { WorkflowStepStatusDto } from '@/services/apis/gen/queries';
 import {
   Background,
-  BackgroundVariant,
   BaseEdge,
   Controls,
   getSmoothStepPath,
@@ -30,7 +29,7 @@ import {
   Loader2,
   MinusCircle,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import {
   buildWorkflowGraphLayout,
   type StepNodeData,
@@ -115,7 +114,7 @@ function WorkflowStepNode({ data }: NodeProps) {
             // reachable by keyboard, not just by hover.
             tabIndex={0}
             className={cn(
-              'flex h-full flex-col justify-center gap-1 rounded-lg border bg-card px-2.5 py-1.5 text-left shadow-sm',
+              'flex h-full items-center rounded-lg border bg-card px-2.5 py-1.5 text-left shadow-sm',
               meta.border,
               skipped && 'opacity-60',
             )}
@@ -130,41 +129,47 @@ function WorkflowStepNode({ data }: NodeProps) {
               isConnectable={false}
               className="invisible !size-0 !min-h-0 !min-w-0 !border-0 !bg-transparent"
             />
-            <div className="flex items-center gap-1.5">
-              <span className={cn('shrink-0', meta.text)}>{meta.icon}</span>
+            {/* Logo left, step name over tool name in the middle, status on the
+                far right and vertically centred. */}
+            <div className="flex h-full w-full items-center justify-between gap-2">
               {logoUrl && (
                 <ToolLogo
                   name={run}
                   logoUrl={logoUrl}
-                  size={16}
+                  size={28}
                   className="shrink-0 rounded-full border"
                 />
               )}
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                {label}
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5 pl-1">
+                <span className="truncate text-sm font-medium">{label}</span>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className={cn('font-medium', meta.text)}>
+                    {meta.label}
+                  </span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="truncate font-mono text-muted-foreground">
+                    {run}
+                  </span>
+                  {jobs > 0 && (
+                    <span className="shrink-0 text-muted-foreground">
+                      · {jobs} job{jobs > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {!!failed && failed > 0 && (
+                    <span className="shrink-0 font-medium text-destructive">
+                      · {failed} failed
+                    </span>
+                  )}
+                  {skipReason && (
+                    <span className="truncate text-muted-foreground">
+                      · {skipReason}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className={cn('flex shrink-0 items-center', meta.text)}>
+                {meta.icon}
               </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className={cn('font-medium', meta.text)}>{meta.label}</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="truncate font-mono text-muted-foreground">
-                {run}
-              </span>
-              {jobs > 0 && (
-                <span className="shrink-0 text-muted-foreground">
-                  · {jobs} job{jobs > 1 ? 's' : ''}
-                </span>
-              )}
-              {!!failed && failed > 0 && (
-                <span className="shrink-0 font-medium text-destructive">
-                  · {failed} failed
-                </span>
-              )}
-              {skipReason && (
-                <span className="truncate text-muted-foreground">
-                  · {skipReason}
-                </span>
-              )}
             </div>
             <Handle
               type="source"
@@ -270,7 +275,11 @@ const MIN_CANVAS_HEIGHT = 480;
  * fit a strip. */
 const MAX_CANVAS_HEIGHT = 720;
 
-export default function RunWorkflowGraph({ steps }: RunWorkflowGraphProps) {
+// Memoized: the run page re-renders on every poll tick and the canvas only
+// changes when `steps` does.
+const RunWorkflowGraph = memo(function RunWorkflowGraph({
+  steps,
+}: RunWorkflowGraphProps) {
   const { resolvedTheme } = useTheme();
   const { nodes, edges, contentHeight } = useMemo(
     () => buildWorkflowGraphLayout(steps),
@@ -283,7 +292,7 @@ export default function RunWorkflowGraph({ steps }: RunWorkflowGraphProps) {
   );
 
   return (
-    <div style={{ height }} className="rounded-lg border bg-card/40">
+    <div style={{ height }} className="rounded-lg border bg-background p-1.5">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -307,7 +316,13 @@ export default function RunWorkflowGraph({ steps }: RunWorkflowGraphProps) {
         preventScrolling={false}
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        {/* Same canvas paint as the worker detail graph: dots + grid line colour
+            come from the shared --color-graph-* tokens, so the run DAG sits on
+            the same surface as every other diagram instead of a lighter card. */}
+        <Background
+          color="var(--color-graph-edge)"
+          bgColor="var(--color-graph-canvas)"
+        />
         {/* Same control bar as the worker detail graph: zoom, fit view and
             lock. Zooming is a deliberate action here, not a side effect of
             scrolling the page past the diagram. */}
@@ -315,4 +330,6 @@ export default function RunWorkflowGraph({ steps }: RunWorkflowGraphProps) {
       </ReactFlow>
     </div>
   );
-}
+});
+
+export default RunWorkflowGraph;

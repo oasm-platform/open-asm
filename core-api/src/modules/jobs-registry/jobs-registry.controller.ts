@@ -33,6 +33,7 @@ import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
+import { JobHistoryWorkflowResponseDto } from './dto/job-history-workflow.dto';
 import {
   GetNextJobResponseDto,
   GetNextJobResult,
@@ -320,6 +321,26 @@ export class JobsRegistryController {
     @Param('id') id: string,
   ): Promise<JobHistoryDetailResponseDto> {
     return this.jobsRegistryService.getJobHistoryDetail(workspaceId, id);
+  }
+
+  @WorkspaceAccess('job.read')
+  @Doc({
+    summary: 'Get Job History Workflow',
+    description:
+      'Retrieves the workflow definition a run was created from, as JSON and as YAML, with the step state of that run.',
+    response: {
+      serialization: JobHistoryWorkflowResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('/histories/:id/workflow')
+  getJobHistoryWorkflow(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') id: string,
+  ): Promise<JobHistoryWorkflowResponseDto> {
+    return this.jobsRegistryService.getJobHistoryWorkflow(workspaceId, id);
   }
 
   @WorkspaceAccess('job.write')

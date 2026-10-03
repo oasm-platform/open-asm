@@ -89,10 +89,13 @@ export class WorkflowJob {
  */
 @ApiExtraModels(WorkflowJob)
 export class WorkflowContent {
-  @ApiProperty({ type: On })
+  /** Trigger conditions. Absent in a plain workflow — only scheduled ones
+   * carry `on`. */
+  @ApiProperty({ type: On, required: false })
   @ValidateNested()
   @Type(() => On)
-  on: On;
+  @IsOptional()
+  on?: On;
 
   /**
    * Jobs keyed by a unique job id. `needs` on a job references those ids, so a

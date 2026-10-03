@@ -621,7 +621,7 @@ export type On = {
 export type WorkflowContentJobs = { [key: string]: WorkflowJob };
 
 export type WorkflowContent = {
-  on: On;
+  on?: On;
   /** Jobs keyed by a unique job id; `needs` references those same ids */
   jobs: WorkflowContentJobs;
   name: string;
@@ -1341,6 +1341,15 @@ export type JobHistoryDetailResponseDto = {
   activeJobsCount: number;
 };
 
+export type JobHistoryWorkflowResponseDto = {
+  id: string;
+  jobHistoryName: string;
+  workflowId?: string;
+  workflowName?: string;
+  content?: WorkflowContent;
+  steps: WorkflowStepStatusDto[];
+};
+
 export type PickToolIdName = {
   id: string;
   name: string;
@@ -2003,15 +2012,11 @@ export type WorkspaceTool = {
 };
 
 export type AddToolToWorkspaceDto = {
-  /** The ID of the workspace */
-  workspaceId: string;
   /** The ID of the tool */
   toolId: string;
 };
 
 export type InstallToolDto = {
-  /** The ID of the workspace */
-  workspaceId: string;
   /** The ID of the tool */
   toolId: string;
 };
@@ -2338,6 +2343,39 @@ export type GetAgentModesResponseDto = {
   workers: WorkerInstance[];
 };
 
+export type CommandApprovalResponseDtoStatus =
+  (typeof CommandApprovalResponseDtoStatus)[keyof typeof CommandApprovalResponseDtoStatus];
+
+export const CommandApprovalResponseDtoStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export type CommandApprovalResponseDto = {
+  id: string;
+  /** @nullable */
+  conversationId?: string | null;
+  /** @nullable */
+  toolCallId?: string | null;
+  /** The command, cut to 2000 characters (ending in …) */
+  command: string;
+  /** Whether `command` was cut short */
+  commandTruncated: boolean;
+  status: CommandApprovalResponseDtoStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GetManyCommandApprovalResponseDtoDto = {
+  data: CommandApprovalResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type AgentCommandApprovalConversationId = { [key: string]: unknown };
 
 export type AgentCommandApprovalToolCallId = { [key: string]: unknown };
@@ -2381,6 +2419,8 @@ export type DecideCommandApprovalDto = {
   status: DecideCommandApprovalDtoStatus;
   /** Whether all later tool requests in this conversation should also be approved */
   allowConversation?: boolean;
+  /** Whether later calls of the same tool in this conversation should also be approved, whatever their input */
+  allowTool?: boolean;
   /**
    * Feedback describing what the agent should do after rejection
    * @maxLength 1000
@@ -3114,53 +3154,6 @@ export type GetManyNotificationResponseDtoDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-};
-
-/**
- * Type of the notification
- */
-export type CreateNotificationDtoScope =
-  (typeof CreateNotificationDtoScope)[keyof typeof CreateNotificationDtoScope];
-
-export const CreateNotificationDtoScope = {
-  SYSTEM: 'SYSTEM',
-  USER: 'USER',
-  GROUP: 'GROUP',
-} as const;
-
-/**
- * Type of the notification
- */
-export type CreateNotificationDtoType =
-  (typeof CreateNotificationDtoType)[keyof typeof CreateNotificationDtoType];
-
-export const CreateNotificationDtoType = {
-  WORKSPACE_CREATED: 'WORKSPACE_CREATED',
-  VULNERABILITY_ANALYSIS_COMPLETED: 'VULNERABILITY_ANALYSIS_COMPLETED',
-  ASSET_NEW_DETECT: 'ASSET_NEW_DETECT',
-  SCAN_INCOMPLETE: 'SCAN_INCOMPLETE',
-  NEW_VULNERABILITY_FOUND: 'NEW_VULNERABILITY_FOUND',
-  WORKSPACE_INVITATION: 'WORKSPACE_INVITATION',
-} as const;
-
-/**
- * Metadata for the notification content (variables for translation)
- */
-export type CreateNotificationDtoMetadata = { [key: string]: unknown };
-
-export type CreateNotificationDto = {
-  /** List of user IDs to receive the notification */
-  recipients: string[];
-  /** Type of the notification */
-  scope: CreateNotificationDtoScope;
-  /** Type of the notification */
-  type: CreateNotificationDtoType;
-  /** Metadata for the notification content (variables for translation) */
-  metadata?: CreateNotificationDtoMetadata;
-  /** Name of the feature this notification belongs to (e.g. "target"), used with refId to delete related notifications once the work is done */
-  ref?: string;
-  /** Identifier of the related feature record (e.g. "1234") */
-  refId?: string;
 };
 
 /**
@@ -4243,6 +4236,43 @@ export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
   workspaceId: string;
   targetIds?: string[];
 };
+
+export type AgentsControllerListCommandApprovalsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: AgentsControllerListCommandApprovalsSortBy;
+  sortOrder?: AgentsControllerListCommandApprovalsSortOrder;
+  /**
+   * Only return approvals in this status
+   */
+  status?: AgentsControllerListCommandApprovalsStatus;
+};
+
+export type AgentsControllerListCommandApprovalsSortBy =
+  (typeof AgentsControllerListCommandApprovalsSortBy)[keyof typeof AgentsControllerListCommandApprovalsSortBy];
+
+export const AgentsControllerListCommandApprovalsSortBy = {
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+} as const;
+
+export type AgentsControllerListCommandApprovalsSortOrder =
+  (typeof AgentsControllerListCommandApprovalsSortOrder)[keyof typeof AgentsControllerListCommandApprovalsSortOrder];
+
+export const AgentsControllerListCommandApprovalsSortOrder = {
+  ASC: 'ASC',
+  DESC: 'DESC',
+} as const;
+
+export type AgentsControllerListCommandApprovalsStatus =
+  (typeof AgentsControllerListCommandApprovalsStatus)[keyof typeof AgentsControllerListCommandApprovalsStatus];
+
+export const AgentsControllerListCommandApprovalsStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
 
 export type AgentsControllerGetConversationsParams = {
   search?: string;
@@ -15026,6 +15056,201 @@ export function useJobsRegistryControllerGetJobHistoryDetail<
     id,
     options,
   );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the workflow definition a run was created from, as JSON and as YAML, with the step state of that run.
+ * @summary Get Job History Workflow
+ */
+export const jobsRegistryControllerGetJobHistoryWorkflow = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<JobHistoryWorkflowResponseDto>(
+    {
+      url: `/api/jobs-registry/histories/${id}/workflow`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getJobsRegistryControllerGetJobHistoryWorkflowQueryKey = (
+  id: string,
+) => {
+  return [`/api/jobs-registry/histories/${id}/workflow`] as const;
+};
+
+export const getJobsRegistryControllerGetJobHistoryWorkflowQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getJobsRegistryControllerGetJobHistoryWorkflowQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>
+  > = ({ signal }) =>
+    jobsRegistryControllerGetJobHistoryWorkflow(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type JobsRegistryControllerGetJobHistoryWorkflowQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>
+  >;
+export type JobsRegistryControllerGetJobHistoryWorkflowQueryError = unknown;
+
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get Job History Workflow
+ */
+
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getJobsRegistryControllerGetJobHistoryWorkflowQueryOptions(id, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -26290,45 +26515,250 @@ export function useAgentsControllerGetAgentModes<
 }
 
 /**
- * History of remote commands the current user approved or rejected
+ * Paginated history of commands the current user approved or rejected, newest first
  * @summary List command approvals
  */
 export const agentsControllerListCommandApprovals = (
+  params?: AgentsControllerListCommandApprovalsParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AgentCommandApproval[]>(
-    { url: `/api/agents/command-approvals`, method: 'GET', signal },
+  return orvalClient<GetManyCommandApprovalResponseDtoDto>(
+    { url: `/api/agents/command-approvals`, method: 'GET', params, signal },
     options,
   );
 };
 
-export const getAgentsControllerListCommandApprovalsQueryKey = () => {
-  return [`/api/agents/command-approvals`] as const;
+export const getAgentsControllerListCommandApprovalsInfiniteQueryKey = (
+  params?: AgentsControllerListCommandApprovalsParams,
+) => {
+  return [
+    'infinite',
+    `/api/agents/command-approvals`,
+    ...(params ? [params] : []),
+  ] as const;
 };
+
+export const getAgentsControllerListCommandApprovalsQueryKey = (
+  params?: AgentsControllerListCommandApprovalsParams,
+) => {
+  return [
+    `/api/agents/command-approvals`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAgentsControllerListCommandApprovalsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerListCommandApprovalsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    QueryKey,
+    AgentsControllerListCommandApprovalsParams['page']
+  > = ({ signal, pageParam }) =>
+    agentsControllerListCommandApprovals(
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    TError,
+    TData,
+    QueryKey,
+    AgentsControllerListCommandApprovalsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerListCommandApprovalsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>>;
+export type AgentsControllerListCommandApprovalsInfiniteQueryError = unknown;
+
+export function useAgentsControllerListCommandApprovalsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AgentsControllerListCommandApprovalsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerListCommandApprovalsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerListCommandApprovalsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List command approvals
+ */
+
+export function useAgentsControllerListCommandApprovalsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAgentsControllerListCommandApprovalsInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 export const getAgentsControllerListCommandApprovalsQueryOptions = <
   TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
   TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAgentsControllerListCommandApprovalsQueryKey();
+    queryOptions?.queryKey ??
+    getAgentsControllerListCommandApprovalsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>
   > = ({ signal }) =>
-    agentsControllerListCommandApprovals(requestOptions, signal);
+    agentsControllerListCommandApprovals(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
@@ -26346,6 +26776,7 @@ export function useAgentsControllerListCommandApprovals<
   TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
   TError = unknown,
 >(
+  params: undefined | AgentsControllerListCommandApprovalsParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -26372,6 +26803,7 @@ export function useAgentsControllerListCommandApprovals<
   TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
   TError = unknown,
 >(
+  params?: AgentsControllerListCommandApprovalsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -26398,6 +26830,7 @@ export function useAgentsControllerListCommandApprovals<
   TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
   TError = unknown,
 >(
+  params?: AgentsControllerListCommandApprovalsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -26420,6 +26853,7 @@ export function useAgentsControllerListCommandApprovals<
   TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
   TError = unknown,
 >(
+  params?: AgentsControllerListCommandApprovalsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -26434,8 +26868,10 @@ export function useAgentsControllerListCommandApprovals<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions =
-    getAgentsControllerListCommandApprovalsQueryOptions(options);
+  const queryOptions = getAgentsControllerListCommandApprovalsQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -30909,102 +31345,6 @@ export function useNotificationsControllerGetNotifications<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-/**
- * Create a new notification for a specific user or group of users
- * @summary Create a notification
- */
-export const notificationsControllerCreateNotification = (
-  createNotificationDto: CreateNotificationDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/notifications`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createNotificationDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getNotificationsControllerCreateNotificationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-    TError,
-    { data: CreateNotificationDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-  TError,
-  { data: CreateNotificationDto },
-  TContext
-> => {
-  const mutationKey = ['notificationsControllerCreateNotification'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-    { data: CreateNotificationDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return notificationsControllerCreateNotification(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type NotificationsControllerCreateNotificationMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>
-  >;
-export type NotificationsControllerCreateNotificationMutationBody =
-  CreateNotificationDto;
-export type NotificationsControllerCreateNotificationMutationError = unknown;
-
-/**
- * @summary Create a notification
- */
-export const useNotificationsControllerCreateNotification = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-      TError,
-      { data: CreateNotificationDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-  TError,
-  { data: CreateNotificationDto },
-  TContext
-> => {
-  return useMutation(
-    getNotificationsControllerCreateNotificationMutationOptions(options),
-    queryClient,
-  );
-};
 
 /**
  * Subscribe to a Server-Sent Events (SSE) stream for real-time notifications
