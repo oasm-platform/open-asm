@@ -18,6 +18,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { Repository } from 'typeorm';
 
 import type { ConnectorTestResult } from './connectors/connector.factory';
@@ -34,6 +35,38 @@ import {
   severityProperties,
   universalIntegrationSchema,
 } from './schemas';
+
+/**
+ * Derives the Telegram webhook `secret_token` from the bot token.
+ *
+ * The webhook is a @Public() route, so Telegram's shared-secret header is the
+ * only thing distinguishing a genuine update from anyone who guesses the
+ * integration id. Deriving it (rather than storing it) keeps this fix free of a
+ * schema change: both `setWebhook` and the inbound controller compute the same
+ * value from the same bot token. Telegram accepts 1-256 chars from
+ * [A-Za-z0-9_-], which a hex digest satisfies.
+ */
+export function deriveTelegramWebhookSecret(botToken: string): string {
+  return createHmac('sha256', 'oasm.telegram.webhook')
+    .update(botToken)
+    .digest('hex');
+}
+
+/**
+ * Constant-time comparison of the inbound Telegram secret header against the
+ * expected value derived from the stored bot token.
+ */
+export function verifyTelegramWebhookSecret(
+  provided: string | undefined,
+  botToken: string,
+): boolean {
+  if (!provided) return false;
+  const expected = Buffer.from(deriveTelegramWebhookSecret(botToken), 'utf8');
+  const received = Buffer.from(provided, 'utf8');
+  return (
+    expected.length === received.length && timingSafeEqual(expected, received)
+  );
+}
 
 @Injectable()
 export class IntegrationsService {
@@ -68,7 +101,10 @@ export class IntegrationsService {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: webhookUrl }),
+          body: JSON.stringify({
+            url: webhookUrl,
+            secret_token: deriveTelegramWebhookSecret(botToken),
+          }),
         },
       );
       const data = (await res.json()) as { ok: boolean; description?: string };

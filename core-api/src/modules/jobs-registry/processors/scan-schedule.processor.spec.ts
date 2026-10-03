@@ -9,6 +9,7 @@ describe('AssetGroupsScheduleConsumer', () => {
   const mockAssetGroupWorkflowService = {
     runGroupWorkflowScheduler: jest.fn(),
     removeGroupWorkflowScheduler: jest.fn(),
+    getBindingWorkspace: jest.fn().mockResolvedValue('workspace-1'),
   };
 
   const createMockJob = (
@@ -38,6 +39,7 @@ describe('AssetGroupsScheduleConsumer', () => {
     expect(mockAssetGroupWorkflowService.runGroupWorkflowScheduler).toHaveBeenCalledWith(
       'agw-1',
       JobRunType.SCHEDULED,
+      'workspace-1',
     );
     expect(mockAssetGroupWorkflowService.removeGroupWorkflowScheduler).not.toHaveBeenCalled();
   });

@@ -243,8 +243,8 @@ export class AssetGroupController {
   @AuditLog('asset_group.deleted')
   @WorkspaceAccess('group.write')
   @Delete(':id')
-  delete(@Param('id') id: string) {
-    return this.assetGroupService.delete(id);
+  delete(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
+    return this.assetGroupService.delete(id, workspaceId);
   }
 
   @Doc({
@@ -310,12 +310,14 @@ export class AssetGroupController {
   updateAssetGroupWorkflow(
     @Param('id') assetGroupWorkflowId: string,
     @Body() updateDto: UpdateAssetGroupWorkflowDto,
+    @WorkspaceId() workspaceId: string,
   ) {
     return this.assetGroupWorkflowService.updateAssetGroupWorkflow(
       assetGroupWorkflowId,
       {
         schedule: updateDto.schedule,
       },
+      workspaceId,
     );
   }
 
@@ -331,10 +333,14 @@ export class AssetGroupController {
   })
   @WorkspaceAccess('workflow.write')
   @Post('workflows/:id/run')
-  runGroupWorkflowScheduler(@Param() queryParams: IdQueryParamDto) {
+  runGroupWorkflowScheduler(
+    @Param() queryParams: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.assetGroupWorkflowService.runGroupWorkflowScheduler(
       queryParams.id,
       JobRunType.MANUAL,
+      workspaceId,
     );
   }
 }

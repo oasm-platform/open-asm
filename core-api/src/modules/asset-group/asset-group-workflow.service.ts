@@ -132,11 +132,11 @@ export class AssetGroupWorkflowService {
     groupId: string,
     workflowIds: string[],
     schedule: string = CronSchedule.EVERY_3_DAYS,
-    workspaceId?: string,
+    workspaceId: string,
   ): Promise<DefaultMessageResponseDto> {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
-        where: { id: groupId },
+        where: { id: groupId, workspace: { id: workspaceId } },
         relations: ['workspace'],
       });
       if (!assetGroup) {
@@ -145,14 +145,17 @@ export class AssetGroupWorkflowService {
           `Asset group with ID "${groupId}" not found`,
         );
       }
-      if (workspaceId && assetGroup.workspace?.id !== workspaceId) {
-        throw new ForbiddenException(
-          'Group does not belong to this workspace',
-        );
-      }
 
-      // Verify that all workflows exist
-      const workflows = await this.workflowRepo.findByIds(workflowIds);
+      // Verify that all workflows exist AND belong to the same workspace. A bare
+      // findByIds would let a caller attach another tenant's workflow to their
+      // own group, and the (correctly scoped) group-detail endpoint would then
+      // serialise the foreign workflow.
+      const workflows = await this.workflowRepo.find({
+        where: {
+          id: In(workflowIds),
+          workspace: { id: workspaceId },
+        },
+      });
       if (workflows.length !== workflowIds.length) {
         const foundWorkflowIds = workflows.map((workflow) => workflow.id);
         const missingWorkflowIds = workflowIds.filter(
@@ -316,11 +319,16 @@ export class AssetGroupWorkflowService {
       schedule?: string;
       jobId?: string;
     }>,
+    workspaceId: string,
   ): Promise<AssetGroupWorkflow> {
     try {
-      // Find the existing relationship by ID
+      // Find the existing relationship by ID, constrained to the caller's
+      // workspace via the owning asset group.
       const assetGroupWorkspace = await this.assetGroupWorkflowRepo.findOne({
-        where: { id: assetGroupWorkflowId },
+        where: {
+          id: assetGroupWorkflowId,
+          assetGroup: { workspace: { id: workspaceId } },
+        },
         relations: ['assetGroup', 'workflow'],
       });
 
@@ -374,11 +382,39 @@ export class AssetGroupWorkflowService {
     }
   }
 
+  /**
+ * Resolves the workspace that owns a group→workflow binding.
+ *
+ * Needed by the internal scheduler, which receives only the binding id from the
+ * queue. The HTTP path gets this from `@WorkspaceId()` instead.
+ */
+async getBindingWorkspace(assetGroupWorkflowId: string): Promise<string> {
+    const binding = await this.assetGroupWorkflowRepo.findOne({
+      where: { id: assetGroupWorkflowId },
+      relations: ['workflow', 'assetGroup'],
+    });
+
+    const workspaceId =
+      binding?.workflow?.workspace?.id ?? binding?.assetGroup?.workspace?.id;
+
+    if (!workspaceId) {
+      throw new NotFoundException(
+        `Asset group workflow with ID "${assetGroupWorkflowId}" has no resolvable workspace`,
+      );
+    }
+
+    return workspaceId;
+  }
+
   public async runGroupWorkflowScheduler(
     assetGroupWorkflowId: string,
     jobRunType: JobRunType,
+    workspaceId: string,
   ): Promise<DefaultMessageResponseDto> {
-    // Get the asset group workflow to access the workflow and asset group
+    // Get the asset group workflow to access the workflow and asset group.
+    // The run executes under `workflow.workspace`, so constrain the lookup to the
+    // caller's workspace — otherwise any member could launch another tenant's
+    // workflow against that tenant's assets.
     const assetGroupWorkflow = await this.assetGroupWorkflowRepo
       .createQueryBuilder('assetGroupWorkflow')
       .innerJoinAndSelect('assetGroupWorkflow.workflow', 'workflow')
@@ -387,6 +423,7 @@ export class AssetGroupWorkflowService {
       .where('assetGroupWorkflow.id = :assetGroupWorkflowId', {
         assetGroupWorkflowId,
       })
+      .andWhere('workspace.id = :workspaceId', { workspaceId })
       .getOne();
 
     if (!assetGroupWorkflow) {

@@ -12,10 +12,9 @@ import {
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { TriggerWorkflowService } from '@/modules/workflows/trigger-workflow.service';
 import { WorkflowsService } from '@/modules/workflows/workflows.service';
-import type { INestApplication } from '@nestjs/common';
-import { Test, type TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
-import { AppModule } from './../src/app.module';
+import type { DataSource } from 'typeorm';
+import { closeTestApp, createTestApp } from './helpers/app';
+import { createUserWithWorkspace } from './helpers/workspace';
 
 /**
  * End-to-end proof of the `needs` DAG engine against the real database.
@@ -29,7 +28,7 @@ import { AppModule } from './../src/app.module';
 describe('Workflow DAG run (e2e)', () => {
   jest.setTimeout(60_000);
 
-  let app: INestApplication;
+  let app: Awaited<ReturnType<typeof createTestApp>>;
   let dataSource: DataSource;
   let trigger: TriggerWorkflowService;
   let runner: WorkflowRunnerService;
@@ -42,20 +41,14 @@ describe('Workflow DAG run (e2e)', () => {
   const domain = `e2e-dag-${Date.now()}.example.com`;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    app = await createTestApp();
+    dataSource = app.dataSource;
+    trigger = app.app.get(TriggerWorkflowService);
+    runner = app.app.get(WorkflowRunnerService);
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
-
-    dataSource = app.get(DataSource);
-    trigger = app.get(TriggerWorkflowService);
-    runner = app.get(WorkflowRunnerService);
-
-    const [workspace]: { id: string }[] = await dataSource.query(
-      'SELECT id FROM workspaces LIMIT 1',
-    );
+    // A real HTTP workspace instead of `SELECT id FROM workspaces LIMIT 1` —
+    // the old shape assumed a pre-seeded row and broke on an empty database.
+    const { workspace } = await createUserWithWorkspace(app.server, 'dag');
     workspaceId = workspace.id;
 
     // The template service rewrites the workflow content on boot, so this also
@@ -92,7 +85,7 @@ describe('Workflow DAG run (e2e)', () => {
     if (targetId) {
       await dataSource.getRepository(Target).delete({ id: targetId });
     }
-    await app?.close();
+    await closeTestApp(app?.app);
   });
 
   it('runs a needs chain step by step and finishes when a step has no inputs', async () => {
@@ -147,7 +140,7 @@ describe('Workflow DAG run (e2e)', () => {
 
     // Dependency order, not jsonb key order: the stored map was re-sorted by
     // Postgres, so the run detail must derive its order from `needs`.
-    const detail = await app
+    const detail = await app.app
       .get(JobsRegistryService)
       .getJobHistoryDetail(workspaceId, history.id);
     expect(detail.steps?.map((step) => step.id)).toEqual([
@@ -220,7 +213,7 @@ describe('Workflow DAG run (e2e)', () => {
 
     // Updating that legacy workflow through the API converts the stored content
     // to the canonical map shape — the database converges without a migration.
-    await app
+    await app.app
       .get(WorkflowsService)
       .updateWorkflow(
         legacyWorkflow.id,
