@@ -90,6 +90,12 @@ jobs:
         # the workspace root and installs every workspace package from there.
         run: pnpm install --frozen-lockfile
 
+      # `example.env` carries the full key surface the app expects at boot
+      # (GEO_IP_URL, RUSTFS_*, ...); anything missing here fails DI and takes
+      # down every spec. Individual values below override the placeholders.
+      - name: Seed env from example
+        run: cp example.env .env
+
       - name: Run e2e tests
         run: pnpm run test:e2e:ci
         env:
@@ -101,7 +107,9 @@ jobs:
           POSTGRES_SSL: 'false'
           REDIS_URL: redis://localhost:6379/0
           E2E_DROP_DB: '1'
-          # App boot needs at least one KEK. `.env` is gitignored, so the CI
-          # runner would otherwise boot with an empty encryption key set and
-          # workspace creation would fail. Local runs keep using `.env`.
+          # Placeholder KEK from example.env is fine locally but shared across
+          # the fleet; give the runner its own so ciphertext is not reused.
           ENCRYPTION_KEYS: 'e2e-e2e-e2e-e2e-e2e-e2e-e2e-e2e'
+          # example.env points at a password-protected Redis; the CI service
+          # container runs without --requirepass, so override the URL.
+          REDIS_URL: redis://localhost:6379/0
