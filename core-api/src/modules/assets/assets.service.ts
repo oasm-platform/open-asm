@@ -424,7 +424,20 @@ export class AssetsService {
    * @param assetId - The ID of the asset to rescan.
    * @throws Error if the asset is not found.
    */
-  public async reScan(targetId: string): Promise<DefaultMessageResponseDto> {
+  public async reScan(
+    targetId: string,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    // The rescan runs inside the target's own workspace — assert the caller is
+    // acting in that workspace before any worker jobs are dispatched.
+    const target = await this.targetRepo.findOne({
+      where: { id: targetId, workspaceId },
+    });
+
+    if (!target) {
+      throw new NotFoundException('Target not found');
+    }
+
     const asset = await this.assetRepo.findOne({
       where: {
         target: { id: targetId },
@@ -436,21 +449,6 @@ export class AssetsService {
       throw new NotFoundException('Asset not found');
     }
 
-    const target = await this.targetRepo.findOne({
-      where: {
-        id: targetId,
-      },
-    });
-    const workspaceId =
-      await this.workspaceService.getWorkspaceIdByTargetId(targetId);
-
-    if (!workspaceId) {
-      throw new NotFoundException('Workspace not found');
-    }
-
-    if (!target) {
-      throw new NotFoundException('Target not found');
-    }
     const reScanCount = target.reScanCount + 1;
     await this.targetRepo.update(targetId, {
       reScanCount,
@@ -1223,9 +1221,10 @@ export class AssetsService {
   public async toggleAsset(
     assetId: string,
     isEnabled: boolean,
+    workspaceId: string,
   ): Promise<Asset> {
     const asset = await this.assetRepo.findOne({
-      where: { id: assetId },
+      where: { id: assetId, target: { workspaceId } },
     });
 
     if (!asset) {

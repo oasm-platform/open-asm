@@ -43,6 +43,7 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
       innerJoinAndSelect: jest.fn().mockReturnThis(),
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       getOne: jest.fn().mockResolvedValue({
         id: 'agw-1',
         workflow,
@@ -94,6 +95,7 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
     const result = await service.runGroupWorkflowScheduler(
       'agw-1',
       JobRunType.SCHEDULED,
+      'workspace-1',
     );
 
     expect(workflowRunnerService.startRun).toHaveBeenCalledWith({
@@ -106,6 +108,33 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
     expect(result.message).toContain('agw-1');
   });
 
+  it('constrains the lookup to the caller workspace', async () => {
+    const andWhere = jest.fn().mockReturnThis();
+    assetGroupWorkflowRepo.createQueryBuilder.mockReturnValue({
+      innerJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere,
+      getOne: jest.fn().mockResolvedValue({
+        id: 'agw-1',
+        workflow,
+        assetGroup: { id: 'group-1', name: 'group-1' },
+      }),
+    });
+
+    await service.runGroupWorkflowScheduler(
+      'agw-1',
+      JobRunType.SCHEDULED,
+      'workspace-1',
+    );
+
+    // Without this predicate any workspace member could start another tenant's
+    // workflow against that tenant's assets.
+    expect(andWhere).toHaveBeenCalledWith('workspace.id = :workspaceId', {
+      workspaceId: 'workspace-1',
+    });
+  });
+
   it('requires every root step tool to be installed before starting', async () => {
     toolsService.getToolByNames.mockResolvedValue([
       { id: 'tool-httpx', name: 'httpx' },
@@ -113,7 +142,11 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
     ]);
 
     await expect(
-      service.runGroupWorkflowScheduler('agw-1', JobRunType.SCHEDULED),
+      service.runGroupWorkflowScheduler(
+        'agw-1',
+        JobRunType.SCHEDULED,
+        'workspace-1',
+      ),
     ).rejects.toThrow(BadRequestException);
 
     expect(workflowRunnerService.startRun).not.toHaveBeenCalled();
@@ -127,7 +160,11 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
     });
 
     await expect(
-      service.runGroupWorkflowScheduler('agw-1', JobRunType.SCHEDULED),
+      service.runGroupWorkflowScheduler(
+        'agw-1',
+        JobRunType.SCHEDULED,
+        'workspace-1',
+      ),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -136,11 +173,16 @@ describe('AssetGroupWorkflowService — runGroupWorkflowScheduler', () => {
       innerJoinAndSelect: jest.fn().mockReturnThis(),
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       getOne: jest.fn().mockResolvedValue(null),
     });
 
     await expect(
-      service.runGroupWorkflowScheduler('agw-missing', JobRunType.SCHEDULED),
+      service.runGroupWorkflowScheduler(
+        'agw-missing',
+        JobRunType.SCHEDULED,
+        'workspace-1',
+      ),
     ).rejects.toThrow(NotFoundException);
   });
 });

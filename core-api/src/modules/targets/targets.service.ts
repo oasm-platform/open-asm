@@ -671,8 +671,8 @@ if (scope !== undefined) {
    * @throws NotFoundException if the target is not found.
    * @returns The updated target entity.
    */
-  public async updateTarget(id: string, dto: UpdateTargetDto) {
-    const target = await this.repo.findOneBy({ id });
+  public async updateTarget(id: string, dto: UpdateTargetDto, workspaceId: string) {
+    const target = await this.repo.findOneBy({ id, workspaceId });
     if (!target) {
       throw new NotFoundException('Target not found');
     }

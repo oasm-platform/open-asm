@@ -27,7 +27,6 @@ describe('NotificationsController workspace permission guards', () => {
   );
 
   it.each([
-    ['createNotification', 'POST /'],
     ['markAllAsRead', 'PATCH /mark-read'],
     ['markAllAsUnread', 'PATCH /mark-unread'],
     ['markAsRead', 'PATCH /:id/read'],
@@ -41,5 +40,15 @@ describe('NotificationsController workspace permission guards', () => {
       NotificationsController,
     ]);
     expect(required).toBeUndefined();
+  });
+
+  // createNotification used to be in the list above. Every caller is an internal
+  // service and the console never called the route, so the endpoint was removed
+  // rather than gated — it let any authenticated user notify arbitrary users.
+  it('createNotification (POST /) is no longer exposed', () => {
+    expect(
+      (NotificationsController.prototype as Record<string, unknown>)
+        .createNotification,
+    ).toBeUndefined();
   });
 });

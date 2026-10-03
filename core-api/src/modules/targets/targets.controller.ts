@@ -213,8 +213,11 @@ export class TargetsController {
   })
   @WorkspaceAccess('target.write')
   @Post(':id/re-scan')
-  reScanTarget(@Param() { id }: IdQueryParamDto) {
-    return this.targetsService.assetService.reScan(id);
+  reScanTarget(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.assetService.reScan(id, workspaceId);
   }
 
   @Doc({
@@ -238,7 +241,11 @@ export class TargetsController {
   })
   @WorkspaceAccess('target.write')
   @Patch(':id')
-  updateTarget(@Param() { id }: IdQueryParamDto, @Body() dto: UpdateTargetDto) {
-    return this.targetsService.updateTarget(id, dto);
+  updateTarget(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: UpdateTargetDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.updateTarget(id, dto, workspaceId);
   }
 }

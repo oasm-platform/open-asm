@@ -118,8 +118,9 @@ export class IssuesController {
     @Param('id') id: string,
     @Body() updateIssueDto: UpdateIssueDto,
     @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.update(id, updateIssueDto, user.id);
+    return this.issuesService.update(id, updateIssueDto, user.id, workspaceId);
   }
 
   @Doc({
@@ -135,11 +136,13 @@ export class IssuesController {
     @Param() param: IdQueryParamDto,
     @Body() changeIssueStatusDto: ChangeIssueStatusDto,
     @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
   ) {
     return this.issuesService.changeStatus(
       param.id,
       changeIssueStatusDto,
       user.id,
+      workspaceId,
     );
   }
 
@@ -156,8 +159,14 @@ export class IssuesController {
     @Param('issueId') issueId: string,
     @Body() createCommentDto: CreateIssueCommentDto,
     @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.createComment(createCommentDto, issueId, user.id);
+    return this.issuesService.createComment(
+      createCommentDto,
+      issueId,
+      user.id,
+      workspaceId,
+    );
   }
 
   @Doc({
@@ -172,8 +181,13 @@ export class IssuesController {
   getCommentsByIssueId(
     @Param('issueId') issueId: string,
     @Query() query: GetManyBaseQueryParams,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.getCommentsByIssueId(issueId, query);
+    return this.issuesService.getCommentsByIssueId(
+      issueId,
+      query,
+      workspaceId,
+    );
   }
 
   @Doc({
@@ -199,8 +213,14 @@ export class IssuesController {
     @Param('id') id: string,
     @Body() updateCommentDto: UpdateIssueCommentDto,
     @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.updateCommentById(id, updateCommentDto, user.id);
+    return this.issuesService.updateCommentById(
+      id,
+      updateCommentDto,
+      user.id,
+      workspaceId,
+    );
   }
 
   @Doc({
@@ -225,7 +245,8 @@ export class IssuesController {
   deleteCommentById(
     @Param('id') id: string,
     @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.deleteCommentById(id, user.id);
+    return this.issuesService.deleteCommentById(id, user.id, workspaceId);
   }
 }

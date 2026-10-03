@@ -305,10 +305,14 @@ export class AssetsController {
   })
   @WorkspaceAccess('asset.write')
   @Post('/toggle')
-  toggleAsset(@Body() toggleAssetDto: ToggleAssetDto) {
+  toggleAsset(
+    @Body() toggleAssetDto: ToggleAssetDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.assetsService.toggleAsset(
       toggleAssetDto.assetId,
       toggleAssetDto.isEnabled,
+      workspaceId,
     );
   }
 

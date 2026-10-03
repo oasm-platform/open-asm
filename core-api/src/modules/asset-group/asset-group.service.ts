@@ -275,6 +275,7 @@ export class AssetGroupService {
           await this.assetAssetService.addManyAssets(
             savedAssetGroup.id,
             createAssetGroupDto.hostIds,
+            workspaceId,
           );
         }
 
@@ -452,10 +453,13 @@ export class AssetGroupService {
   /**
    * Permanently removes an asset group
    */
-  async delete(id: string): Promise<DefaultMessageResponseDto> {
+  async delete(
+    id: string,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
-        where: { id },
+        where: { id, workspace: { id: workspaceId } },
         relations: { assetGroupWorkflows: { workflow: true } },
       });
 

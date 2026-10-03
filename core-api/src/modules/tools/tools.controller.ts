@@ -1,5 +1,6 @@
-import { WorkspaceId } from '@/common/decorators/app.decorator';
+import { Roles, WorkspaceId } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
+import { Role } from '@/common/enums/enum';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -44,6 +45,7 @@ export class ToolsController {
       serialization: Tool,
     },
   })
+  @Roles(Role.ADMIN)
   @Post()
   createTool(@Body() dto: CreateToolDto) {
     return this.toolsService.createTool(dto);
@@ -78,8 +80,11 @@ export class ToolsController {
   })
   @WorkspaceAccess('workspace.write')
   @Post('add-to-workspace')
-  async addToolToWorkspace(@Body() dto: AddToolToWorkspaceDto) {
-    return this.toolsService.addToolToWorkspace(dto);
+  async addToolToWorkspace(
+    @Body() dto: AddToolToWorkspaceDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.toolsService.addToolToWorkspace(dto, workspaceId);
   }
 
   @Doc({
@@ -92,8 +97,8 @@ export class ToolsController {
   })
   @WorkspaceAccess('workspace.write')
   @Post('install')
-  async installTool(@Body() dto: InstallToolDto) {
-    return this.toolsService.installTool(dto);
+  async installTool(@Body() dto: InstallToolDto, @WorkspaceId() workspaceId: string) {
+    return this.toolsService.installTool(dto, workspaceId);
   }
 
   @Doc({
@@ -106,8 +111,8 @@ export class ToolsController {
   })
   @WorkspaceAccess('workspace.write')
   @Post('uninstall')
-  async uninstallTool(@Body() dto: InstallToolDto) {
-    return this.toolsService.uninstallTool(dto);
+  async uninstallTool(@Body() dto: InstallToolDto, @WorkspaceId() workspaceId: string) {
+    return this.toolsService.uninstallTool(dto, workspaceId);
   }
 
   @Doc({

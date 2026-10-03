@@ -561,10 +561,10 @@ describe('uninstallTool — cascades config profile deletion', () => {
   it('removes the workspace_tools row AND deletes config profiles for the (workspace, tool) pair', async () => {
     workspaceToolRepo.findOne.mockResolvedValue({ id: 'wt-1' });
 
-    const result = await service.uninstallTool({
-      toolId: 'tool-001',
-      workspaceId: 'ws-001',
-    });
+    const result = await service.uninstallTool(
+      { toolId: 'tool-001' },
+      'ws-001',
+    );
 
     expect(result).toEqual({ message: 'Tool uninstalled successfully.' });
     expect(workspaceToolRepo.findOne).toHaveBeenCalledWith({
@@ -585,10 +585,10 @@ describe('uninstallTool — cascades config profile deletion', () => {
   it('succeeds when the tool has NO config profiles (no-op profile delete, no throw)', async () => {
     workspaceToolRepo.findOne.mockResolvedValue({ id: 'wt-2' });
 
-    const result = await service.uninstallTool({
-      toolId: 'tool-002',
-      workspaceId: 'ws-002',
-    });
+    const result = await service.uninstallTool(
+      { toolId: 'tool-002' },
+      'ws-002',
+    );
 
     expect(result).toEqual({ message: 'Tool uninstalled successfully.' });
     expect(workspaceToolRepo.manager.transaction).toHaveBeenCalledTimes(1);
@@ -603,7 +603,7 @@ describe('uninstallTool — cascades config profile deletion', () => {
     workspaceToolRepo.findOne.mockResolvedValue(null);
 
     await expect(
-      service.uninstallTool({ toolId: 'tool-003', workspaceId: 'ws-003' }),
+      service.uninstallTool({ toolId: 'tool-003' }, 'ws-003'),
     ).rejects.toThrow(
       new BadRequestException('Tool is not installed in this workspace.'),
     );
@@ -617,7 +617,7 @@ describe('uninstallTool — cascades config profile deletion', () => {
   it('scopes the profile deletion to the uninstalled (workspace, tool) pair only', async () => {
     workspaceToolRepo.findOne.mockResolvedValue({ id: 'wt-4' });
 
-    await service.uninstallTool({ toolId: 'tool-shared', workspaceId: 'ws-A' });
+    await service.uninstallTool({ toolId: 'tool-shared' }, 'ws-A');
 
     expect(txManager.delete).toHaveBeenCalledTimes(1);
     // criteria pins BOTH ids — profiles of the same tool in other workspaces are untouched
