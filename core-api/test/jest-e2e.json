@@ -4,10 +4,7 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.m?(t|j)sx?$": [
-      "./swc-jest-transform.cjs",
-      {}
-    ]
+    "^.+\\.m?(t|j)sx?$": ["./swc-jest-transform.cjs", {}]
   },
   "moduleNameMapper": {
     "^@/(.*)$": "../src/$1",
@@ -15,5 +12,9 @@
   },
   "transformIgnorePatterns": [
     "node_modules/(?!(?:.pnpm/[^/]+/node_modules/)?(?:better-auth|better-call|@better-auth|@better-fetch|@noble|@opentelemetry|@standard-schema|@formatjs|@nestjs|intl-messageformat|rou3|set-cookie-parser|kysely|nanostores|zod|defu|jose|file-type|load-esm|uid|react|react-dom)(?:/|$))"
-  ]
+  ],
+  "setupFiles": ["<rootDir>/setup-env.ts"],
+  "globalSetup": "<rootDir>/global-setup.ts",
+  "globalTeardown": "<rootDir>/global-teardown.ts",
+  "testTimeout": 60000
 }

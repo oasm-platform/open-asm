@@ -33,7 +33,11 @@ import { ServicesModule } from './services/services.module';
       formatter: icuFormatter,
       loaderOptions: {
         path: path.join(__dirname, '/i18n/'),
-        watch: process.env.NODE_ENV !== 'production',
+        // Hot reload is a dev-server affordance. Every other mode (test, and
+        // anything else non-development) would leave a chokidar watcher
+        // holding the event loop open, which is what makes Jest report
+        // "A worker process has failed to exit gracefully".
+        watch: process.env.NODE_ENV === 'development',
       },
       logging: process.env.NODE_ENV !== 'production',
       resolvers: [

@@ -1,13 +1,11 @@
 import { ReflectionService } from '@grpc/reflection';
-import { Logger, ValidationPipe } from '@nestjs/common';
-import { NestFactory, Reflector } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import type { MicroserviceOptions } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
-import compression from 'compression';
-import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import type { Response } from 'express';
 import * as fs from 'fs';
@@ -15,78 +13,20 @@ import * as path from 'path';
 import { join } from 'path';
 import 'reflect-metadata';
 import { AppModule } from './app.module';
+import { configureApp } from './bootstrap/configure-app';
 import {
   API_GLOBAL_PREFIX,
   APP_NAME,
-  AUTH_INSTANCE_KEY,
-  CACHE_STATIC_RESOURCE,
   DEFAULT_GRPC_PORT,
   DEFAULT_PORT,
 } from './common/constants/app.constants';
-import { AuthGuard } from './common/guards/auth.guard';
-import { requestIdMiddleware } from './common/middleware/request-id.middleware';
 import { mergeBetterAuthSpec } from './utils/mergeBetterAuth';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
     logger: ['log', 'error', 'warn', 'verbose'],
   });
-  app.set('query parser', 'extended');
-
-  // First in the chain so every downstream middleware/guard/handler and the
-  // audit log share the same requestId (X-Request-Id round-trip).
-  app.use(requestIdMiddleware);
-
-  app.useStaticAssets(path.join(__dirname, '..', 'public'), {
-    prefix: '/api/static/',
-    setHeaders: (res: Response) => {
-      res.set(
-        'Cache-Control',
-        `max-age=${CACHE_STATIC_RESOURCE}, no-transform`,
-      );
-    },
-  });
-
-  // Configure CORS
-  app.enableCors({
-    origin: true,
-    credentials: true,
-  });
-
-  // Configure global guards
-  const reflector = app.get(Reflector);
-
-  app.useGlobalGuards(new AuthGuard(reflector, app.get(AUTH_INSTANCE_KEY)));
-
-  // Configure cookie parser
-  app.use(cookieParser());
-  // Compress responses — skip SSE streams to preserve real-time streaming
-  app.use(
-    compression({
-      filter: (req, res) => {
-        const contentType = res.getHeader('Content-Type');
-        if (
-          contentType &&
-          contentType.toString().includes('text/event-stream')
-        ) {
-          return false;
-        }
-        return compression.filter(req, res);
-      },
-    }),
-  );
-  // Configure global validation
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-    }),
-  );
-
-  // Configure global prefix
-  app.setGlobalPrefix(API_GLOBAL_PREFIX, {
-    exclude: [`/${API_GLOBAL_PREFIX}/auth/{*path}`, '/'],
-  });
+  configureApp(app);
 
   // API docs at http://localhost:6276/api/docs (Scalar)
   const config = new DocumentBuilder()
