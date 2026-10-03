@@ -10,10 +10,21 @@ on:
       - reopened
   workflow_dispatch:
 
+# Least privilege: nothing here writes to the repo, it only reads the checkout
+# and the PR file list. Without this block the workflow inherits the repository
+# default token scope, which CodeQL flags (actions/missing-workflow-permissions).
+permissions:
+  contents: read
+
 jobs:
   changes:
     name: Detect Changes
     runs-on: ubuntu-latest
+    # `dorny/paths-filter` lists the PR's modified files through the REST API on
+    # pull_request events, which `contents: read` alone does not cover.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       core-api: ${{ steps.filter.outputs.core-api }}
       workflow: ${{ steps.filter.outputs.workflow }}
@@ -41,6 +52,8 @@ jobs:
     # "Expected" forever for docs-only PRs and block merges.
     if: needs.changes.outputs.core-api == 'true' || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     services:
       postgres:
         image: pgvector/pgvector:pg17
