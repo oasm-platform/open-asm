@@ -95,7 +95,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List discovered assets (domains, IPs, URLs) in the workspace. Params: page, limit, value (filter text).',
-        parameters: getAssetsSchema,
+        inputSchema: getAssetsSchema,
         execute: async (params: z.infer<typeof getAssetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.assetsService.getManyAsssetServices(
@@ -123,7 +123,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List security vulnerabilities with severity. Params: page, limit, q (search e.g. "XSS", "CVE-2024").',
-        parameters: getVulnerabilitiesSchema,
+        inputSchema: getVulnerabilitiesSchema,
         execute: async (params: z.infer<typeof getVulnerabilitiesSchema>) => {
           const { page, limit, q } = params;
           const response = await this.vulnerabilitiesService.getVulnerabilities(
@@ -155,7 +155,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Show scanning scope (root domains, IP ranges added by user). Params: page, limit, value (filter text).',
-        parameters: getTargetsSchema,
+        inputSchema: getTargetsSchema,
         execute: async (params: z.infer<typeof getTargetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.targetsService.getTargetsInWorkspace(
@@ -183,7 +183,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Return security dashboard summary: asset/vulnerability counts, severity breakdown, security score. No params.',
-        parameters: z.object({}),
+        inputSchema: z.object({}),
         execute: async () =>
           this.statisticService.getStatistics({ workspaceId }),
       };
@@ -195,7 +195,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description: 'Get full technical details of a single asset by assetId.',
-        parameters: detailAssetSchema,
+        inputSchema: detailAssetSchema,
         execute: async (params: z.infer<typeof detailAssetSchema>) => {
           const { assetId } = params;
           return this.assetsService.getAssetById(assetId, workspaceId);
@@ -210,7 +210,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter).',
-        parameters: listAssetsInTargetSchema,
+        inputSchema: listAssetsInTargetSchema,
         execute: async (params: z.infer<typeof listAssetsInTargetSchema>) => {
           const { targetId, limit, page, value } = params;
           return this.assetsService.getManyAsssetServices(
@@ -235,7 +235,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Get full vulnerability report with CVSS, PoC, remediation steps. Params: vulnId.',
-        parameters: detailVulnSchema,
+        inputSchema: detailVulnSchema,
         execute: async (params: z.infer<typeof detailVulnSchema>) => {
           const vulnId: string = (params.vulnId ?? params.id) as string;
           return this.vulnerabilitiesService.getVulnerability(
@@ -253,7 +253,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List open network ports with asset counts. Params: page, limit, value (port number filter).',
-        parameters: getPortsSchema,
+        inputSchema: getPortsSchema,
         execute: async (params: z.infer<typeof getPortsSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getPortAssets(
@@ -277,7 +277,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List detected technologies (software, frameworks, servers). Params: page, limit, value (filter by name).',
-        parameters: getTechnologiesSchema,
+        inputSchema: getTechnologiesSchema,
         execute: async (params: z.infer<typeof getTechnologiesSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getTechnologyAssets(
@@ -301,7 +301,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List TLS/SSL certificates with issuer, subject, expiry. Params: page, limit, search (host name filter).',
-        parameters: getTlsSchema,
+        inputSchema: getTlsSchema,
         execute: async (params: z.infer<typeof getTlsSchema>) => {
           const { page, limit, search } = params;
           return this.assetsService.getManyTls(
@@ -325,7 +325,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'HTTP GET to any public URL. Returns statusCode + body. Params: url.',
-        parameters: webFetchSchema,
+        inputSchema: webFetchSchema,
         execute: async (params: z.infer<typeof webFetchSchema>) => {
           const { url: rawUrl } = params;
           try {
@@ -361,7 +361,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List security issues with status. Params: page, limit, search, status (OPEN/IN_PROGRESS/RESOLVED).',
-        parameters: listIssuesSchema,
+        inputSchema: listIssuesSchema,
         execute: async (params: z.infer<typeof listIssuesSchema>) => {
           const { page, limit, search, status } = params;
           const response = await this.issuesService.getMany(
@@ -394,7 +394,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description: 'Get full details of a single issue by issueId.',
-        parameters: detailIssueSchema,
+        inputSchema: detailIssueSchema,
         execute: async (params: z.infer<typeof detailIssueSchema>) => {
           const { issueId } = params;
           return this.issuesService.getById(issueId, workspaceId);
@@ -409,7 +409,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List installed security tools/scanners. Params: page, limit, q (search filter).',
-        parameters: listToolsSchema,
+        inputSchema: listToolsSchema,
         execute: async (params: z.infer<typeof listToolsSchema>) => {
           const { page, limit, q } = params;
           const response = await this.toolsService.getManyTools({
@@ -434,7 +434,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List connected worker nodes. Params: page, limit, q (search query).',
-        parameters: listWorkersSchema,
+        inputSchema: listWorkersSchema,
         execute: async (params: z.infer<typeof listWorkersSchema>) => {
           const { page, limit, q } = params;
           const response = await this.workersService.getWorkers({
@@ -461,7 +461,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List background scan jobs with status. Params: page, limit, jobHistoryId, jobStatus (completed/failed/active).',
-        parameters: listJobsSchema,
+        inputSchema: listJobsSchema,
         execute: async (params: z.infer<typeof listJobsSchema>) => {
           const { page, limit, jobHistoryId, jobStatus } = params;
           const response = await this.jobsRegistryService.getManyJobs(
@@ -497,7 +497,7 @@ export class AgentTool {
         'Output: stdout, stderr, exitCode, error, timedOut.',
         'Warning: OS-level permissions, no PTY, strict timeout.',
       ].join('\n'),
-      parameters: z.object({
+      inputSchema: z.object({
         command: z.string().min(1).describe('Shell command to execute'),
       }),
       execute: async (
@@ -632,7 +632,7 @@ export class AgentTool {
     const setPlanTool: any = {
       description:
         'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
-      parameters: z.object({
+      inputSchema: z.object({
         steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
       }),
       execute: async (params: { steps: string[] }) => {
@@ -776,7 +776,7 @@ export class AgentTool {
     const updateTodoStatusTool: any = {
       description:
         'Update the status of a specific step in the execution plan. You MUST call this at two points: (1) BEFORE starting work on a step — call transition_step(id, "in_progress"), and (2) AFTER finishing work on a step — call transition_step(id, "completed") or transition_step(id, "failed"). ALWAYS transition the current step before moving to the next sequential step. NEVER skip steps. NEVER call this for a step that is not your current step. Params: id (UUID of the step), status (pending/in_progress/completed/failed).',
-      parameters: z.object({
+      inputSchema: z.object({
         id: z.string().uuid().describe('Todo item ID'),
         status: z
           .enum(['pending', 'in_progress', 'completed', 'failed'])
@@ -854,7 +854,7 @@ export class AgentTool {
     const addTodoTool: any = {
       description:
         'Append a new step to the plan. Params: content (string). ONLY use when you genuinely discover a new requirement during execution that was not part of the original plan. Do NOT use to re-create steps you forgot to add earlier — finish the current step first.',
-      parameters: z.object({
+      inputSchema: z.object({
         content: z.string().min(1).describe('Todo content'),
       }),
       execute: async (params: { content: string }) => {
@@ -912,7 +912,7 @@ export class AgentTool {
     const clearPlanTool: any = {
       description:
         'Clear entire plan (irreversible). Then call formulate_plan to create a new one.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         try {
           await todoRepo.delete({ conversationId });
@@ -948,7 +948,7 @@ export class AgentTool {
       description:
         'Save a key-value pair to short-term memory (conversation scope). ' +
         'Use this to remember important findings during execution (e.g., discovered IPs, scan results, target info).',
-      parameters: z.object({
+      inputSchema: z.object({
         key: z
           .string()
           .min(1)
@@ -981,7 +981,7 @@ export class AgentTool {
 
     const stmReadTool: any = {
       description: 'Read a value from short-term memory by key.',
-      parameters: z.object({
+      inputSchema: z.object({
         key: z.string().describe('Memory key to read'),
       }),
       execute: async (params: { key: string }) => {
@@ -1015,7 +1015,7 @@ export class AgentTool {
 
     const stmListTool: any = {
       description: 'List all short-term memory entries for this conversation.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         try {
           const entries = await memoriesService.stmGetAll(conversationId);
@@ -1042,7 +1042,7 @@ export class AgentTool {
       description:
         'Save important information to long-term memory (workspace scope, persists across conversations). ' +
         'Use this for persistent knowledge like target profiles, known vulnerabilities, organizational policies.',
-      parameters: z.object({
+      inputSchema: z.object({
         content: z
           .string()
           .min(1)
@@ -1066,7 +1066,7 @@ export class AgentTool {
     const ltmAppendTool: any = {
       description:
         'Append information to existing long-term memory (keeps previous content).',
-      parameters: z.object({
+      inputSchema: z.object({
         content: z
           .string()
           .min(1)
@@ -1096,7 +1096,7 @@ export class AgentTool {
 
     const ltmReadTool: any = {
       description: 'Read the current long-term memory content.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         try {
           const record = await memoriesService.ltmGet(workspaceId, userId);

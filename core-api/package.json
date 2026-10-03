@@ -21,9 +21,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.64",
-    "@ai-sdk/google": "^3.0.53",
-    "@ai-sdk/openai": "^3.0.48",
+    "@ai-sdk/anthropic": "^4.0.71",
+    "@ai-sdk/google": "^4.0.87",
+    "@ai-sdk/openai": "^4.0.83",
     "@aws-sdk/client-api-gateway": "^3.1048.0",
     "@aws-sdk/client-apigatewayv2": "^3.1048.0",
     "@aws-sdk/client-cloudfront": "^3.1048.0",
@@ -54,7 +54,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@scalar/nestjs-api-reference": "^1.2.23",
     "@types/multer": "^2.0.0",
-    "ai": "^6.0.137",
+    "ai": "^7.0.127",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "axios": "^1.18.1",
@@ -134,7 +134,7 @@
       "^@/(.*)$": "<rootDir>/$1"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?(better-auth|@react-pdf|react|react-dom|@nestjs|@standard-schema|file-type|load-esm|uid)/)"
+      "node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?(better-auth|@react-pdf|react|react-dom|@nestjs|@standard-schema|file-type|load-esm|uid|ai|@ai-sdk|@workflow|eventsource-parser)/)"
     ]
   }
 }

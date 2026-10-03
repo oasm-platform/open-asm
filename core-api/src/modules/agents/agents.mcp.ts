@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { jsonSchema } from 'ai';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -86,7 +87,7 @@ export class AgentsMcpService {
         mcpTools[toolName] = {
           description:
             t.description || `MCP tool ${t.name} from ${server.name}`,
-          parameters: t.inputSchema,
+          inputSchema: jsonSchema(t.inputSchema as Parameters<typeof jsonSchema>[0]),
           execute: async (params: unknown) => {
             return this.callMcpTool(server, t.name, params);
           },

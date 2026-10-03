@@ -6,7 +6,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { LanguageModel, ToolSet, UIMessageChunk } from 'ai';
-import { generateText, stepCountIs, streamText } from 'ai';
+import {
+  generateText,
+  isStepCount,
+  streamText,
+  toUIMessageStream,
+} from 'ai';
 import * as fs from 'fs';
 import * as Mustache from 'mustache';
 import { EventEmitter } from 'node:events';
@@ -441,7 +446,7 @@ export class AgentsCompletionsService {
         model,
         messages: [{ role: 'user', content: prompt }],
         tools,
-        stopWhen: stepCountIs(20),
+        stopWhen: isStepCount(20),
         ...(() => {
           const opts = getReasoningProviderOptions(llmConfig.provider);
           return opts ? { providerOptions: opts } : {};
@@ -1084,6 +1089,8 @@ export class AgentsCompletionsService {
       // System context passed via dedicated option (avoids prompt injection risk)
       system: contextParts.join('\n\n'),
       messages: modelMessages,
+      // History may contain persisted system-role messages; v7 rejects them by default
+      allowSystemInMessages: true,
       // Retry transient provider errors (429 rate-limit, 500/502/503 server errors)
       maxRetries: 3,
       // Detect stuck streams: abort if no chunk arrives within 30 seconds
@@ -1092,7 +1099,7 @@ export class AgentsCompletionsService {
       ...(tools
         ? {
             tools,
-            stopWhen: stepCountIs(llmConfig.maxSteps ?? 20),
+            stopWhen: isStepCount(llmConfig.maxSteps ?? 20),
           }
         : {}),
       // Enable reasoning/thinking via provider-specific options
@@ -1146,7 +1153,7 @@ export class AgentsCompletionsService {
       // When streaming completes, persist accumulated text to DB
       // persist tool call data (for history rendering on page reload),
       // auto-complete stuck todos, and trigger compaction check
-      onFinish: (event) => {
+      onEnd: (event) => {
         const isAborted = () => abortSignal?.aborted ?? false;
 
         this.logger.log(
@@ -1220,7 +1227,7 @@ export class AgentsCompletionsService {
             let hasReasoningPart = false;
             for (const step of event.steps) {
               const stepReasoning =
-                typeof step.reasoning === 'string' ? step.reasoning : '';
+                step.reasoningText ?? '';
               if (stepReasoning.trim()) {
                 parts.push({ type: 'reasoning', text: stepReasoning.trim() });
                 hasReasoningPart = true;
@@ -1299,7 +1306,7 @@ export class AgentsCompletionsService {
     });
 
     // Convert the result stream to a UIMessageStream consumable by the frontend
-    const aiStream = result.toUIMessageStream();
+    const aiStream = toUIMessageStream({ stream: result.stream, tools });
 
     return { aiStream, conversationId, todosEmitter, finishPromise };
   }
