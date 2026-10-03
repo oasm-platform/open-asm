@@ -64,6 +64,13 @@ jobs:
           --health-retries 5
         ports:
           - 6379:6379
+      # GeoIpService probes its proxy on construction and rethrows on failure,
+      # so a missing endpoint takes down every suite rather than only the
+      # geo-dependent ones. Same image as docker-compose's `geo-ip` service.
+      geo-ip:
+        image: ghcr.io/l1ttps/geoip-proxy:latest
+        ports:
+          - 4360:4360
 
     defaults:
       run:
