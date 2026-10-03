@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Server } from 'http';
 import * as request from 'supertest';
 
@@ -15,7 +16,10 @@ export async function signUp(
 ): Promise<{ cookie: string; userId: string; email: string; password: string }> {
   // Unique per call: the users table is unique on email, and specs re-run
   // against a database that is deliberately NOT dropped locally between runs.
-  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  // `randomUUID`, not `Math.random`: the stamp only needs collision resistance,
+  // but CodeQL reads `Math.random` as insecure randomness (js/insecure-randomness)
+  // because the value ends up in an account identifier.
+  const stamp = randomUUID();
   const email = overrides.email ?? `e2e-${stamp}@example.com`;
   const password = overrides.password ?? 'Password123!';
 

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Server } from 'http';
 import * as request from 'supertest';
 import type { DataSource } from 'typeorm';
@@ -45,7 +46,10 @@ export async function createUser(
 export async function createWorkspace(
   server: Server,
   user: TestUser,
-  name = `e2e-ws-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  // `randomUUID`, not `Math.random`: the default name only needs to stay distinct
+  // between specs, but CodeQL reads `Math.random` as insecure randomness
+  // (js/insecure-randomness) because the value identifies a tenant-scoped row.
+  name = `e2e-ws-${randomUUID()}`,
 ): Promise<TestWorkspace> {
   const res = await request(server)
     .post('/api/workspaces')
