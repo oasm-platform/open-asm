@@ -86,12 +86,12 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        # `defaults.run.working-directory` above is core-api; pnpm walks up to
+        # the workspace root and installs every workspace package from there.
         run: pnpm install --frozen-lockfile
-        working-directory: .
 
       - name: Run e2e tests
-        run: task api:test:e2e:ci
-        working-directory: ..
+        run: pnpm run test:e2e:ci
         env:
           E2E_POSTGRES_DB: open_asm_test
           POSTGRES_HOST: localhost
