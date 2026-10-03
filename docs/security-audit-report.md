@@ -109,7 +109,7 @@ Branch: **`security-patch-2026-10-03`** (from `main`).
 | CT-13 | ✅ | `workspaceId` removed from `AddToolToWorkspaceDto` / `InstallToolDto`; taken from `@WorkspaceId()` |
 | SQ-01 | ✅ | Central `@Matches(/^[A-Za-z_][A-Za-z0-9_]*$/)` on `GetManyBaseQueryParams.sortBy` — one change, closes all 8 sinks |
 | AE-01 | ✅ | `@WorkerTokenAuth()` added |
-| AE-02 | ✅ | Deny-list inverted to a **public allow-list** (`system`, `nuclei-templates`, `cached-static`) |
+| AE-02 | ⏸️ | **Reverted at owner request.** Storage read is back to the original `@Public()` + deny-list (`privateBuckets = ['reports','job-results']`), so `screenshot` and `default` are publicly readable again. See the note below. |
 | AE-03 | ✅ | `@UseGuards(McpGuard)` on `POST /mcp/message` |
 | AE-04 | ✅ | `secret_token` derived via HMAC from the bot token, sent on `setWebhook`, verified with `timingSafeEqual` — no schema or `.env` change |
 | AE-06 | ✅ | `getProviderById(id, userContext)` enforces ownership; internal callers use a private raw loader |
@@ -122,6 +122,19 @@ Branch: **`security-patch-2026-10-03`** (from `main`).
 - **CF-03** `trustedOrigins: ['*']`
 - **AE-05** hardcoded `DEFAULT_ENCRYPTION_KEY` fallback
 - **AE-07** `POST /api/init-admin` check-then-act race — the correct fix is a partial unique index, i.e. a schema change requiring explicit approval
+
+### AE-02 — deferred, and the finding stands
+
+The storage hardening was implemented, caused a 403 on `GET /api/storage/screenshot/<key>.png`, and was **reverted at the owner's request** pending a separate plan. The vulnerability described in this report is therefore **still present**: `GET /api/storage/:bucket/:path` is `@Public()` and only blocks `reports` and `job-results`, so `screenshot` and `default` are readable without any credential.
+
+Why it matters, restated for whoever picks this up: a screenshot object key is `md5(asset.value)` (`data-adapter.service.ts:641`) — a flat key with no workspace prefix. Anyone who knows or can guess a target hostname can compute its md5 and read that tenant's screenshot of it, unauthenticated. For an ASM product those images routinely depict internal admin panels, dashboards and login pages.
+
+The implementation that was tried and backed out, for reference:
+1. Remove `@Public()`, add `@Optional()` — the global `AuthGuard` then still runs and populates `request.user`, while unauthenticated requests pass through (required because the login page renders the logo from the `system` bucket before a session exists).
+2. For non-public buckets, resolve the owning workspace (`asset_services` → `assets` → `targets` for `screenshot`; `reports` for `reports`) and require `WorkspacesService.getMembershipWithPermissions`.
+3. Buckets with no owner row (`job-results`, `default`) are not readable over HTTP; unknown keys return the same 404 so the endpoint is not a workspace-existence oracle.
+
+Re-applying it touches `StorageController`'s constructor, so note that `StorageModule` is `@Global()` and `WorkspacesModule` is `@Global()` — `WorkspacesService` is injectable without a new module import, and `DataSource` needs no wiring at all.
 
 **Follow-up needed before merge:** `POST /notifications` removal and the two tool DTO changes alter the public API contract, so `.open-api/open-api.json` and `console/src/services/apis/gen/queries.ts` need regenerating with `task gen-api` against a running API. That was not possible in this environment. Both are generated artifacts and should be refreshed before merge.
 

@@ -285,7 +285,7 @@ export class StorageController {
       throw new NotFoundException('File path is required');
     }
 
-    if (!this.storageService.isPublicBucket(bucket)) {
+    if (this.storageService.isPrivateBucket(bucket)) {
       throw new ForbiddenException('Access denied');
     }
 

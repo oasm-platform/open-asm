@@ -35,14 +35,7 @@ export class StorageService implements OnModuleInit {
     'default',
   ];
 
-  /**
-   * Buckets reachable through the unauthenticated `GET /storage/:bucket/:path`
-   * route. This is an ALLOW-list on purpose: the previous deny-list silently
-   * exposed every bucket registered above but not named in it, which is how
-   * tenant scan screenshots became world-readable. Only list a bucket here when
-   * it genuinely holds public, non-tenant data.
-   */
-  private readonly publicBuckets = ['system', 'nuclei-templates', 'cached-static'];
+  private readonly privateBuckets = ['reports', 'job-results'];
 
   private readonly downloadSecret: string;
 
@@ -57,8 +50,8 @@ export class StorageService implements OnModuleInit {
     await this.ensureBucketsExist();
   }
 
-  public isPublicBucket(bucket: string): boolean {
-    return this.publicBuckets.includes(bucket);
+  public isPrivateBucket(bucket: string): boolean {
+    return this.privateBuckets.includes(bucket);
   }
 
   private async ensureBucketsExist() {
