@@ -49,6 +49,12 @@ export class TechnologyForwarderService implements OnModuleInit {
    */
 
   async onModuleInit(): Promise<void> {
+    // The e2e harness boots the app once per spec file against a throwaway
+    // redis. Without this the first suite would kick off 26 sequential HTTP
+    // fetches of the technology catalogue, none of which any spec asserts on,
+    // and the surviving promises would race `app.close()`.
+    if (process.env.E2E === '1') return;
+
     // Check if initialization has already been logged globally
     const isAlreadyLogged = await this.redisService.cacheClient.get(
       this.INITIALIZATION_FLAG_KEY,
@@ -63,34 +69,49 @@ export class TechnologyForwarderService implements OnModuleInit {
     // Run data fetching asynchronously without awaiting to avoid blocking app startup
     this.fetchAndCacheAllTechnologies()
       .then(async () => {
-        // Double-check flag to prevent race conditions
-        const currentFlag = await this.redisService.cacheClient.get(
-          this.INITIALIZATION_FLAG_KEY,
-        );
-        if (currentFlag !== this.STATUS_TRUE) {
-          await this.redisService.cacheClient.set(
+        // Double-check flag to prevent race conditions. Guarded for the same
+        // reason as the failure path below: the redis client can be gone by the
+        // time a long background fetch finally settles.
+        try {
+          const currentFlag = await this.redisService.cacheClient.get(
             this.INITIALIZATION_FLAG_KEY,
-            this.STATUS_TRUE,
           );
-          this.logger.log(
-            'Technology data initialization completed successfully',
-          );
+          if (currentFlag !== this.STATUS_TRUE) {
+            await this.redisService.cacheClient.set(
+              this.INITIALIZATION_FLAG_KEY,
+              this.STATUS_TRUE,
+            );
+            this.logger.log(
+              'Technology data initialization completed successfully',
+            );
+          }
+        } catch {
+          // Losing the flag costs one redundant refresh on the next boot.
         }
       })
       .catch(async (error) => {
-        // Double-check flag to prevent race conditions
-        const currentFlag = await this.redisService.cacheClient.get(
-          this.INITIALIZATION_FLAG_KEY,
+        this.logger.error(
+          'Error during technology data initialization:',
+          error,
         );
-        if (currentFlag !== this.STATUS_TRUE) {
-          await this.redisService.cacheClient.set(
+        // Recording the failure flag is best-effort. If the redis client is
+        // already gone (process shutdown, or a test tearing the app down
+        // while this background fetch is still in flight) the re-check itself
+        // rejects, and because nothing awaits this chain that becomes an
+        // unhandled rejection that takes the process down with it.
+        try {
+          const currentFlag = await this.redisService.cacheClient.get(
             this.INITIALIZATION_FLAG_KEY,
-            this.STATUS_TRUE,
           );
-          this.logger.error(
-            'Error during technology data initialization:',
-            error,
-          );
+          if (currentFlag !== this.STATUS_TRUE) {
+            await this.redisService.cacheClient.set(
+              this.INITIALIZATION_FLAG_KEY,
+              this.STATUS_TRUE,
+            );
+          }
+        } catch {
+          // The flag only guards a redundant retry on the next boot; losing it
+          // is preferable to crashing the process from a shutdown race.
         }
       });
   }

@@ -75,7 +75,7 @@ describe('WorkspaceAccess', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             user: { id: 'user-1' },
-            params: { id: 'workspace-1' },
+            params: { id: '11111111-1111-4111-8111-111111111111' },
             headers: {},
           }),
         }),

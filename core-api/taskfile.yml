@@ -44,6 +44,20 @@ tasks:
   test:e2e:
     cmds:
       - pnpm run test:e2e
+  # Run a single e2e spec file, keeping the full config and RAM limits.
+  # Usage: task api:test:e2e:one SPEC=test/assets-url.e2e-spec.ts
+  test:e2e:one:
+    requires:
+      vars: [SPEC]
+    preconditions:
+      - sh: test -n "{{.SPEC}}"
+        msg: SPEC must identify one e2e spec file
+    cmds:
+      - pnpm run test:e2e -- --runTestsByPath {{.SPEC}}
+  # CI variant of the e2e suite (forces serial, capped memory, force exit).
+  test:e2e:ci:
+    cmds:
+      - pnpm run test:e2e:ci
   clean:
     cmds:
       - rm -rf ./husky

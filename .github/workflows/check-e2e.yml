@@ -1,0 +1,134 @@
+name: Check E2E
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
+
+# Least privilege: nothing here writes to the repo, it only reads the checkout
+# and the PR file list. Without this block the workflow inherits the repository
+# default token scope, which CodeQL flags (actions/missing-workflow-permissions).
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    # `dorny/paths-filter` lists the PR's modified files through the REST API on
+    # pull_request events, which `contents: read` alone does not cover.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      core-api: ${{ steps.filter.outputs.core-api }}
+      workflow: ${{ steps.filter.outputs.workflow }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core-api:
+              - 'core-api/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
+              - 'package.json'
+            workflow:
+              - '.github/workflows/check-e2e.yml'
+
+  e2e:
+    name: Check E2E / Core-API E2E
+    needs: changes
+    # Skipped jobs still produce a required check result of "pass", which is
+    # what makes a path-filtering CI safe as a branch-protection gate. A
+    # workflow-level `paths:` filter would instead make the check report
+    # "Expected" forever for docs-only PRs and block merges.
+    if: needs.changes.outputs.core-api == 'true' || needs.changes.outputs.workflow == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: open_asm_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      # GeoIpService probes its proxy on construction and rethrows on failure,
+      # so a missing endpoint takes down every suite rather than only the
+      # geo-dependent ones. Same image as docker-compose's `geo-ip` service.
+      geo-ip:
+        image: ghcr.io/l1ttps/geoip-proxy:latest
+        ports:
+          - 4360:4360
+
+    defaults:
+      run:
+        working-directory: core-api
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        # `defaults.run.working-directory` above is core-api; pnpm walks up to
+        # the workspace root and installs every workspace package from there.
+        run: pnpm install --frozen-lockfile
+
+      # `example.env` carries the full key surface the app expects at boot
+      # (GEO_IP_URL, RUSTFS_*, ...); anything missing here fails DI and takes
+      # down every spec. Individual values below override the placeholders.
+      - name: Seed env from example
+        run: cp example.env .env
+
+      - name: Run e2e tests
+        run: pnpm run test:e2e:ci
+        env:
+          E2E_POSTGRES_DB: open_asm_test
+          POSTGRES_HOST: localhost
+          POSTGRES_USERNAME: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_PORT: '5432'
+          POSTGRES_SSL: 'false'
+          # example.env points at a password-protected Redis; the CI service
+          # container runs without --requirepass, so override the URL.
+          REDIS_URL: redis://localhost:6379/0
+          E2E_DROP_DB: '1'
+          # Placeholder KEK from example.env is fine locally but shared across
+          # the fleet; give the runner its own so ciphertext is not reused.
+          ENCRYPTION_KEYS: 'e2e-e2e-e2e-e2e-e2e-e2e-e2e-e2e'
