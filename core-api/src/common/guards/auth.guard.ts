@@ -14,6 +14,7 @@ import {
   API_GLOBAL_PREFIX,
   AUTH_INSTANCE_KEY,
   MCP_API_KEY_HEADER,
+  MCP_AUTH_PATH,
   ROLE_METADATA_KEY,
 } from '../constants/app.constants';
 import { Role } from '../enums/enum';
@@ -29,6 +30,15 @@ import {
 export type UserSession = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getSession>>>
 >;
+
+/**
+ * True when the request targets the MCP controller. Prefix-matched so
+ * `/api/mcp/message` is covered alongside `/api/mcp` itself.
+ */
+function isMcpPath(requestPath: string): boolean {
+  const mcpPath = `/${API_GLOBAL_PREFIX}/${MCP_AUTH_PATH}`;
+  return requestPath === mcpPath || requestPath.startsWith(`${mcpPath}/`);
+}
 
 /**
  * NestJS guard that handles authentication for protected routes
@@ -72,9 +82,16 @@ export class AuthGuard implements CanActivate {
     const isPublic = this.reflector.get('PUBLIC', context.getHandler());
     if (isPublic || isDisabledAuth) return true;
 
-    // If any request carries an MCP API key header, skip session check.
-    // The downstream guard (McpGuard) validates the key and sets workspaceId.
-    if (request.headers[MCP_API_KEY_HEADER]) return true;
+    // MCP requests authenticate with an API key instead of a browser session;
+    // McpGuard (method guard on the MCP controller) validates the key and sets
+    // workspaceId. Scope the bypass to the MCP path itself — testing the header
+    // alone let ANY route be reached unauthenticated by sending a junk value.
+    if (
+      request.headers[MCP_API_KEY_HEADER] &&
+      isMcpPath(request.path)
+    ) {
+      return true;
+    }
 
     const currentSession = await this.auth.api.getSession({
       headers: fromNodeHeaders(request.headers),
@@ -93,9 +110,13 @@ export class AuthGuard implements CanActivate {
       request.user = currentSession.user as UserContextPayload;
     }
 
-    const rolesAccepted = this.reflector.get<Role[]>(
+    // getAllAndOverride, not get: class-level `@Roles(...)` lives on the
+    // constructor, and Reflect.getMetadata on the handler alone never walks up
+    // to it — so a controller annotated with @Roles(Role.ADMIN) at class level
+    // silently enforced nothing.
+    const rolesAccepted = this.reflector.getAllAndOverride<Role[] | undefined>(
       ROLE_METADATA_KEY,
-      context.getHandler(),
+      [context.getHandler(), context.getClass()],
     );
 
     const userRole = request.user?.role;

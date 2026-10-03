@@ -253,6 +253,7 @@ describe('AssetGroupService', () => {
       expect(mockAssetAssetService.addManyAssets).toHaveBeenCalledWith(
         groupId,
         ['asset-1', 'asset-2'],
+        'workspace-uuid',
       );
 
       // Workflow created with one job per tool, keyed by tool name and with no

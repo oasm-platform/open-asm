@@ -72,7 +72,11 @@ export class ProvidersService {
    * @param id
    * @returns
    */
-  async getProviderById(id: string): Promise<ToolProvider> {
+  /**
+   * Load a provider without an ownership check. Internal callers apply their
+   * own owner assertion; the public read path must not use this directly.
+   */
+  private async findProviderOrThrow(id: string): Promise<ToolProvider> {
     const provider = await this.providersRepository.findOne({
       where: { id },
       relations: {
@@ -81,6 +85,27 @@ export class ProvidersService {
     });
 
     if (!provider) {
+      throw new NotFoundException(`Provider with ID ${id} not found`);
+    }
+
+    return provider;
+  }
+
+  /**
+   * Get a provider by ID. Enforces ownership: update and delete both already
+   * did this check, the read path did not — so any authenticated user could
+   * read another user's provider row (including owner PII).
+   * @param id
+   * @param userContext
+   * @returns
+   */
+  async getProviderById(
+    id: string,
+    userContext: UserContextPayload,
+  ): Promise<ToolProvider> {
+    const provider = await this.findProviderOrThrow(id);
+
+    if (provider.owner.id !== userContext.id) {
       throw new NotFoundException(`Provider with ID ${id} not found`);
     }
 
@@ -99,7 +124,7 @@ export class ProvidersService {
     updateProviderDto: UpdateProviderDto,
     userContext: UserContextPayload,
   ): Promise<ToolProvider> {
-    const provider = await this.getProviderById(id);
+    const provider = await this.findProviderOrThrow(id);
 
     // Check if user is owner of the provider
     if (provider.owner.id !== userContext.id) {
@@ -120,7 +145,7 @@ export class ProvidersService {
     id: string,
     userContext: UserContextPayload,
   ): Promise<{ message: string }> {
-    const provider = await this.getProviderById(id);
+    const provider = await this.findProviderOrThrow(id);
     // Check if user is owner of the provider
     if (provider.owner.id !== userContext.id) {
       throw new NotFoundException(`Provider with ID ${id} not found`);

@@ -15,7 +15,9 @@ export class AssetsDiscoveryScheduleConsumer extends WorkerHost {
 
   async process(job: Job<Target>): Promise<void> {
     const targetId = job.data.id;
-    await this.assetService.reScan(targetId);
+    // The scheduled job carries the target row, which owns its workspace — the
+    // rescan must run as that tenant, and reScan refuses any other workspace.
+    await this.assetService.reScan(targetId, job.data.workspaceId);
   }
 }
 
@@ -28,9 +30,16 @@ export class AssetGroupsScheduleConsumer extends WorkerHost {
   async process(job: Job<AssetGroupWorkflow>): Promise<void> {
     const assetGroupWorkflowId = job.data.id;
     try {
+      // Internal scheduler: the binding id comes from our own queue, so the
+      // owning workspace is resolved from the row rather than a request header.
+      const workspaceId =
+        await this.assetGroupWorkflowService.getBindingWorkspace(
+          assetGroupWorkflowId,
+        );
       await this.assetGroupWorkflowService.runGroupWorkflowScheduler(
         assetGroupWorkflowId,
         JobRunType.SCHEDULED,
+        workspaceId,
       );
     } catch (error) {
       // The job is orphaned: its asset group/workflow was removed from the

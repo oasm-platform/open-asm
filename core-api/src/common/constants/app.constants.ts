@@ -13,8 +13,19 @@ export const WORKER_TIMEOUT = 60000; // milliseconds
 export const LIMIT_WORKSPACE_CREATE = 5;
 export const API_KEY_LENGTH = 36;
 export const MCP_API_KEY_HEADER = 'x-oasm-api-key';
+/** Controller path (under API_GLOBAL_PREFIX) that authenticates with MCP_API_KEY_HEADER instead of a session. */
+export const MCP_AUTH_PATH = 'mcp';
 export const WORKER_TOKEN_HEADER = 'worker-token';
-export const AUTH_IGNORE_ROUTERS = ['mcp', 'messages'];
+/**
+ * Controller paths (under API_GLOBAL_PREFIX) that authenticate with
+ * MCP_API_KEY_HEADER via McpGuard instead of a browser session.
+ *
+ * Deliberately narrow: every entry here is removed from the global AuthGuard
+ * for the whole sub-tree, so a path added here becomes unauthenticated for every
+ * method beneath it. Keep this list to controllers that actually carry
+ * `@UseGuards(McpGuard)` on all of their routes.
+ */
+export const AUTH_IGNORE_ROUTERS = ['mcp'];
 export const WEBAPP_ANALYZER_SRC_URL =
   'https://raw.githubusercontent.com/oasm-platform/webappanalyzer/main/src';
 export const GET_WORKSPACE_MCP_TOOL_NAME = 'get_workspaces';

@@ -162,6 +162,7 @@ export class JobsRegistryController {
   /**
    * @deprecated Use category-specific endpoints instead
    */
+  @WorkerTokenAuth()
   @Public()
   @Post('/:workerId/result')
   updateResult(
