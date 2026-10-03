@@ -6,7 +6,7 @@ export async function rawQuery<T = unknown>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  return dataSource.query(sql, params) as Promise<T[]>;
+  return dataSource.query(sql, params);
 }
 
 /**

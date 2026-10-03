@@ -12,7 +12,7 @@ import {
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { TriggerWorkflowService } from '@/modules/workflows/trigger-workflow.service';
 import { WorkflowsService } from '@/modules/workflows/workflows.service';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { closeTestApp, createTestApp } from './helpers/app';
 import { createUserWithWorkspace } from './helpers/workspace';
 
@@ -48,7 +48,7 @@ describe('Workflow DAG run (e2e)', () => {
 
     // A real HTTP workspace instead of `SELECT id FROM workspaces LIMIT 1` —
     // the old shape assumed a pre-seeded row and broke on an empty database.
-    const { user, workspace } = await createUserWithWorkspace(app.server, 'dag');
+    const { workspace } = await createUserWithWorkspace(app.server, 'dag');
     workspaceId = workspace.id;
 
     // The template service rewrites the workflow content on boot, so this also

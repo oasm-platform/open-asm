@@ -1,5 +1,5 @@
 import { AssetsService } from './../src/modules/assets/assets.service';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { closeTestApp, createTestApp } from './helpers/app';
 import { signUp } from './helpers/auth';
 import * as request from 'supertest';
@@ -47,7 +47,7 @@ describe('GET /api/assets/url (e2e)', () => {
   beforeAll(async () => {
     const created = await createTestApp();
     app = created.app as INestApplication<App>;
-    server = created.server as App;
+    server = created.server;
     dataSource = created.dataSource;
     assetsService = app.get(AssetsService);
 

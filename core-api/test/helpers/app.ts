@@ -50,7 +50,7 @@ export async function createTestApp(): Promise<TestApp> {
 
   return {
     app,
-    server: app.getHttpServer() as Server,
+    server: app.getHttpServer(),
     dataSource: app.get(DataSource),
   };
 }
@@ -92,7 +92,7 @@ export async function closeBullQueues(app: INestApplication): Promise<void> {
     let queue: { close(): Promise<void> } | undefined;
     try {
       queue = app.get<{ close(): Promise<void> }>(
-        getQueueToken(name as BullMQName),
+        getQueueToken(name),
         { strict: false },
       );
     } catch {

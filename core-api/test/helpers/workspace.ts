@@ -1,5 +1,6 @@
 import type { Server } from 'http';
 import * as request from 'supertest';
+import type { DataSource } from 'typeorm';
 import { signUp, wsHeaders } from './auth';
 
 /** A signed-up user plus the cookie that authenticates it. */
@@ -75,7 +76,7 @@ export async function createUserWithWorkspace(
  * local invocation, given the database is not dropped between runs.
  */
 export async function cleanupE2eData(
-  dataSource: import('typeorm').DataSource,
+  dataSource: DataSource,
   ids: { workspaceIds?: string[]; userIds?: string[] },
 ): Promise<void> {
   const { workspaceIds = [], userIds = [] } = ids;

@@ -1,0 +1,107 @@
+name: Check E2E
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      core-api: ${{ steps.filter.outputs.core-api }}
+      workflow: ${{ steps.filter.outputs.workflow }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core-api:
+              - 'core-api/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
+              - 'package.json'
+            workflow:
+              - '.github/workflows/check-e2e.yml'
+
+  e2e:
+    name: Check E2E / Core-API E2E
+    needs: changes
+    # Skipped jobs still produce a required check result of "pass", which is
+    # what makes a path-filtering CI safe as a branch-protection gate. A
+    # workflow-level `paths:` filter would instead make the check report
+    # "Expected" forever for docs-only PRs and block merges.
+    if: needs.changes.outputs.core-api == 'true' || needs.changes.outputs.workflow == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: open_asm_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    defaults:
+      run:
+        working-directory: core-api
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Run e2e tests
+        run: task api:test:e2e:ci
+        working-directory: ..
+        env:
+          E2E_POSTGRES_DB: open_asm_test
+          POSTGRES_HOST: localhost
+          POSTGRES_USERNAME: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_PORT: '5432'
+          POSTGRES_SSL: 'false'
+          REDIS_URL: redis://localhost:6379/0
+          E2E_DROP_DB: '1'
+          # App boot needs at least one KEK. `.env` is gitignored, so the CI
+          # runner would otherwise boot with an empty encryption key set and
+          # workspace creation would fail. Local runs keep using `.env`.
+          ENCRYPTION_KEYS: 'e2e-e2e-e2e-e2e-e2e-e2e-e2e-e2e'

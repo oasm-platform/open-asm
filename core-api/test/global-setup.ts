@@ -11,6 +11,10 @@
  * The migrations themselves are never hand-written (AGENTS.md hard rule) — this
  * only executes whatever is already in `src/database/migrations/`.
  */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+// `@types/pg` is not vendored in this repo, so the pg Client arrives as an
+// unresolved any here. This jest setup hook only needs `connect`/`query`/`end`
+// at runtime, which the pg package provides.
 import { Client } from 'pg';
 import { DataSource } from 'typeorm';
 import { databaseConnectionConfig, dataSourceOptions } from '../src/database/database-config';

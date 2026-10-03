@@ -7,6 +7,10 @@
  * replaying all of them, which is both faster and a useful sanity check that
  * the migrations are re-runnable.
  */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+// `@types/pg` is not vendored in this repo, so the pg Client arrives as an
+// unresolved any here. The teardown script is a jest global hook that only
+// needs `connect`/`query`/`end` at runtime, which the pg package provides.
 import { Client } from 'pg';
 import { databaseConnectionConfig } from '../src/database/database-config';
 import { pinTestEnv, shouldDropDatabase } from './pin-test-env';
