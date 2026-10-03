@@ -62,9 +62,14 @@ import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto'
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import {
   JobHistoryDetailResponseDto,
+  ToolWithStatusDto,
   WorkflowStepStatusDto,
 } from './dto/job-history-detail.dto';
+import type { WorkflowJob } from '../workflows/entities/workflow.entity';
+import type { WorkflowStepDefinition } from '../workflows/workflow-graph';
+import type { WorkflowContent } from '../workflows/entities/workflow.entity';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
+import { JobHistoryWorkflowResponseDto } from './dto/job-history-workflow.dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
 import {
   BaseResultDto,
@@ -101,6 +106,23 @@ const JOB_SORTABLE_COLUMNS: string[] = [
  * Sortable columns for JobHistory, whitelisted to prevent SQL injection via
  * ORDER BY interpolation.
  */
+/**
+ * Key order of one job, matching the workflow templates. See
+ * `orderWorkflowContent`.
+ */
+const orderJob = (job: WorkflowStepDefinition): WorkflowJob => ({
+  ...(job.name ? { name: job.name } : {}),
+  run: job.run,
+  // Authored `needs` may be a single string (legacy array form); the
+  // definition is always stored canonical.
+  ...(normalizeNeeds(job.needs).length ? { needs: normalizeNeeds(job.needs) } : {}),
+  ...(job.allowFailure !== undefined
+    ? { allowFailure: job.allowFailure }
+    : {}),
+  ...(job.config ? { config: job.config } : {}),
+  ...(job.configProfileId ? { configProfileId: job.configProfileId } : {}),
+});
+
 const JOB_HISTORY_SORTABLE_COLUMNS: string[] = [
   'id',
   'createdAt',
@@ -1305,10 +1327,16 @@ export class JobsRegistryService {
     }
   }
 
-  public async getJobHistoryDetail(
+  /**
+   * Loads a run with its workflow, proving workspace ownership. The check joins
+   * through the workflow: the previous path went jobs → asset → target, which
+   * returns nothing for histories whose jobs were all deleted (the empty join
+   * yields no rows), wrongly producing a 404 for a valid history.
+   */
+  private async loadJobHistoryInWorkspace(
     workspaceId: string,
     id: string,
-  ): Promise<JobHistoryDetailResponseDto> {
+  ): Promise<JobHistory> {
     const jobHistory = await this.jobHistoryRepo.findOne({
       where: {
         id,
@@ -1322,10 +1350,6 @@ export class JobsRegistryService {
       throw new NotFoundException('Job history not found');
     }
 
-    // Verify that the job history belongs to the workspace via its workflow.
-    // The previous check joined through jobs → asset → target, which returns
-    // nothing for histories whose jobs were all deleted (the empty join
-    // yields no rows), wrongly producing a 404 for a valid history.
     const belongsToWorkspace = await this.jobHistoryRepo
       .createQueryBuilder('jobHistory')
       .innerJoin('jobHistory.workflow', 'workflow')
@@ -1338,117 +1362,18 @@ export class JobsRegistryService {
       throw new NotFoundException('Job history not found in workspace');
     }
 
-    // Query tool statuses computed from actual jobs in this history
-    // Uses CASE/COUNT pattern from targets.service.ts L472-475
-    const rawToolStatuses = await this.repo
-      .createQueryBuilder('job')
-      .select([
-        'job.toolId as "toolId"',
-        `CASE
-          WHEN COUNT(CASE WHEN job.status = '${JobStatus.CANCELLED}' THEN 1 END) > 0
-               AND COUNT(CASE WHEN job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}') THEN 1 END) = 0 THEN '${JobStatus.CANCELLED}'
-          WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
-          WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
-          WHEN COUNT(CASE WHEN job.status = '${JobStatus.FAILED}' THEN 1 END) > 0 THEN '${JobStatus.FAILED}'
-          WHEN COUNT(CASE WHEN job.status = '${JobStatus.COMPLETED}' THEN 1 END) > 0 THEN '${JobStatus.COMPLETED}'
-          ELSE '${JobStatus.PENDING}'
-        END as "status"`,
-      ])
-      .where('job.jobHistoryId = :historyId', { historyId: id })
-      .groupBy('job.toolId')
-      .getRawMany<{ toolId: string; status: JobStatus }>();
+    return jobHistory;
+  }
 
-    // Build a lookup map: toolId → computed status
-    const toolStatusMap = new Map<string, JobStatus>();
-    rawToolStatuses.forEach((row) => toolStatusMap.set(row.toolId, row.status));
+  public async getJobHistoryDetail(
+    workspaceId: string,
+    id: string,
+  ): Promise<JobHistoryDetailResponseDto> {
+    const jobHistory = await this.loadJobHistoryInWorkspace(workspaceId, id);
 
-    // Map tools from workflow content with their computed status.
-    // Only id/name/logoUrl/status are exposed — the UI renders nothing else
-    // from these records, so the rest of the Tool entity is omitted to save
-    // bandwidth (the full entity is only resolved server-side for matching).
-    const instaledTools = await this.toolsService.getInstalledTools(
-      {},
-      workspaceId,
-    );
-    // Index installed tools by name once. The old `.find()` inside `.map()`
-    // rescanned the whole installed-tool list for every workflow step, making
-    // this O(steps x tools). First match wins, matching the previous behaviour.
-    const installedToolsByName = new Map<
-      string,
-      (typeof instaledTools.data)[number]
-    >();
-    for (const tool of instaledTools.data) {
-      if (!installedToolsByName.has(tool.name)) {
-        installedToolsByName.set(tool.name, tool);
-      }
-    }
-
-    // Dependency order, not stored order: `content` is jsonb and Postgres does
-    // not preserve the map's key order.
-    const workflowJobs = orderedJobEntries(jobHistory.workflow?.content.jobs);
-
-    const tools = workflowJobs
-      .map(([, job]) => installedToolsByName.get(job.run))
-      .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined)
-      .map((tool) => ({
-        id: tool.id,
-        name: tool.name,
-        logoUrl: tool.logoUrl,
-        // Undefined when the tool has no job rows in this history (e.g. all
-        // jobs deleted) — the UI renders no badge instead of a misleading
-        // "pending".
-        status: toolStatusMap.get(tool.id!),
-      }));
-
-    // Post-process: if a tool at a later index has completed, mark earlier
-    // pending tools as skipped — the workflow clearly moved past them.
-    let hasCompletedAhead = false;
-    for (let i = tools.length - 1; i >= 0; i--) {
-      if (tools[i].status === JobStatus.COMPLETED) {
-        hasCompletedAhead = true;
-      } else if (tools[i].status === JobStatus.PENDING && hasCompletedAhead) {
-        tools[i].status = JobStatus.SKIPPED;
-      }
-    }
-
-    // Steps as the workflow engine recorded them: which ones ran in parallel,
-    // which are waiting on `needs`, and why a step never ran. Runs created
-    // before the engine have no persisted state (`steps = {}`) and fall back to
-    // the status derived from their job rows so old run pages keep working.
-    const persistedSteps = jobHistory.steps ?? {};
-    const hasPersistedState = Object.keys(persistedSteps).length > 0;
-    const steps: WorkflowStepStatusDto[] = workflowJobs.map(([id, job]) => {
-      const tool = installedToolsByName.get(job.run);
-      const state = persistedSteps[id];
-      const derived = tool ? toolStatusMap.get(tool.id!) : undefined;
-      return {
-        id,
-        name: job.name ?? id,
-        run: job.run,
-        needs: normalizeNeeds(job.needs),
-        status: state?.status ?? this.toRunStepStatus(derived),
-        reason: state?.reason,
-        jobs: state?.jobs ?? 0,
-        failed: state?.failed,
-        toolId: tool?.id,
-        logoUrl: tool?.logoUrl,
-        dispatchedAt: state?.dispatchedAt
-          ? new Date(state.dispatchedAt)
-          : undefined,
-        finishedAt: state?.finishedAt ? new Date(state.finishedAt) : undefined,
-      };
-    });
-
-    if (!hasPersistedState) {
-      let completedAhead = false;
-      for (let i = steps.length - 1; i >= 0; i--) {
-        if (steps[i].status === 'done') {
-          completedAhead = true;
-        } else if (steps[i].status === 'pending' && completedAhead) {
-          steps[i].status = 'skipped';
-        }
-      }
-    }
+    // Tool badges and the DAG both come from the same job rows and workflow
+    // definition; the code view reuses them so the three views can never drift.
+    const { tools, steps } = await this.buildRunView(jobHistory, workspaceId);
     const {
       id: historyId,
       createdAt,
@@ -1473,6 +1398,173 @@ export class JobsRegistryService {
       tools,
       steps,
       activeJobsCount,
+    };
+  }
+
+  /**
+   * Everything a run's views need from its workflow definition and job rows:
+   * the tool badges and the DAG steps.
+   */
+  private async buildRunView(
+    jobHistory: JobHistory,
+    workspaceId: string,
+  ): Promise<{ tools: ToolWithStatusDto[]; steps: WorkflowStepStatusDto[] }> {
+  // Query tool statuses computed from actual jobs in this history
+  // Uses CASE/COUNT pattern from targets.service.ts L472-475
+  const rawToolStatuses = await this.repo
+    .createQueryBuilder('job')
+    .select([
+      'job.toolId as "toolId"',
+      `CASE
+        WHEN COUNT(CASE WHEN job.status = '${JobStatus.CANCELLED}' THEN 1 END) > 0
+             AND COUNT(CASE WHEN job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}') THEN 1 END) = 0 THEN '${JobStatus.CANCELLED}'
+        WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
+        WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
+        WHEN COUNT(CASE WHEN job.status = '${JobStatus.FAILED}' THEN 1 END) > 0 THEN '${JobStatus.FAILED}'
+        WHEN COUNT(CASE WHEN job.status = '${JobStatus.COMPLETED}' THEN 1 END) > 0 THEN '${JobStatus.COMPLETED}'
+        ELSE '${JobStatus.PENDING}'
+      END as "status"`,
+    ])
+    .where('job.jobHistoryId = :historyId', { historyId: jobHistory.id })
+    .groupBy('job.toolId')
+    .getRawMany<{ toolId: string; status: JobStatus }>();
+
+  // Build a lookup map: toolId → computed status
+  const toolStatusMap = new Map<string, JobStatus>();
+  rawToolStatuses.forEach((row) => toolStatusMap.set(row.toolId, row.status));
+
+  // Map tools from workflow content with their computed status.
+  // Only id/name/logoUrl/status are exposed — the UI renders nothing else
+  // from these records, so the rest of the Tool entity is omitted to save
+  // bandwidth (the full entity is only resolved server-side for matching).
+  const instaledTools = await this.toolsService.getInstalledTools(
+    {},
+    workspaceId,
+  );
+  // Index installed tools by name once. The old `.find()` inside `.map()`
+  // rescanned the whole installed-tool list for every workflow step, making
+  // this O(steps x tools). First match wins, matching the previous behaviour.
+  const installedToolsByName = new Map<
+    string,
+    (typeof instaledTools.data)[number]
+  >();
+  for (const tool of instaledTools.data) {
+    if (!installedToolsByName.has(tool.name)) {
+      installedToolsByName.set(tool.name, tool);
+    }
+  }
+
+  // Dependency order, not stored order: `content` is jsonb and Postgres does
+  // not preserve the map's key order.
+  const workflowJobs = orderedJobEntries(jobHistory.workflow?.content.jobs);
+
+  const tools = workflowJobs
+    .map(([, job]) => installedToolsByName.get(job.run))
+    .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined)
+    .map((tool) => ({
+      id: tool.id,
+      name: tool.name,
+      logoUrl: tool.logoUrl,
+      // Undefined when the tool has no job rows in this history (e.g. all
+      // jobs deleted) — the UI renders no badge instead of a misleading
+      // "pending".
+      status: toolStatusMap.get(tool.id!),
+    }));
+
+  // Post-process: if a tool at a later index has completed, mark earlier
+  // pending tools as skipped — the workflow clearly moved past them.
+  let hasCompletedAhead = false;
+  for (let i = tools.length - 1; i >= 0; i--) {
+    if (tools[i].status === JobStatus.COMPLETED) {
+      hasCompletedAhead = true;
+    } else if (tools[i].status === JobStatus.PENDING && hasCompletedAhead) {
+      tools[i].status = JobStatus.SKIPPED;
+    }
+  }
+
+  // Steps as the workflow engine recorded them: which ones ran in parallel,
+  // which are waiting on `needs`, and why a step never ran. Runs created
+  // before the engine have no persisted state (`steps = {}`) and fall back to
+  // the status derived from their job rows so old run pages keep working.
+  const persistedSteps = jobHistory.steps ?? {};
+  const hasPersistedState = Object.keys(persistedSteps).length > 0;
+  const steps: WorkflowStepStatusDto[] = workflowJobs.map(([id, job]) => {
+    const tool = installedToolsByName.get(job.run);
+    const state = persistedSteps[id];
+    const derived = tool ? toolStatusMap.get(tool.id!) : undefined;
+    return {
+      id,
+      name: job.name ?? id,
+      run: job.run,
+      needs: normalizeNeeds(job.needs),
+      status: state?.status ?? this.toRunStepStatus(derived),
+      reason: state?.reason,
+      jobs: state?.jobs ?? 0,
+      failed: state?.failed,
+      toolId: tool?.id,
+      logoUrl: tool?.logoUrl,
+      dispatchedAt: state?.dispatchedAt
+        ? new Date(state.dispatchedAt)
+        : undefined,
+      finishedAt: state?.finishedAt ? new Date(state.finishedAt) : undefined,
+    };
+  });
+
+  if (!hasPersistedState) {
+    let completedAhead = false;
+    for (let i = steps.length - 1; i >= 0; i--) {
+      if (steps[i].status === 'done') {
+        completedAhead = true;
+      } else if (steps[i].status === 'pending' && completedAhead) {
+        steps[i].status = 'skipped';
+      }
+    }
+  }
+
+    return { tools, steps };
+  }
+
+  /**
+   * The definition in the order every workflow template is written in: name,
+   * on, jobs — jobs by dependency order, each job by name/run/needs/config.
+   * Postgres jsonb does not preserve key order (nor does the map it is
+   * written from), so the code view would otherwise print them shuffled.
+   * ponytail: hand-rolled key lists; add a key here when the templates grow one.
+   */
+  private orderWorkflowContent(content?: WorkflowContent): WorkflowContent | undefined {
+    if (!content) return undefined;
+
+    const jobs: [string, WorkflowJob][] = orderedJobEntries(
+      content.jobs,
+    ).map(([id, job]) => [id, orderJob(job)]);
+
+    return {
+      name: content.name,
+      ...(content.on ? { on: content.on } : {}),
+      jobs: Object.fromEntries(jobs),
+    };
+  }
+
+  /**
+   * The workflow definition of one run, as stored when the run was created:
+   * the jsonb content for machines, the same content serialized to YAML for
+   * the code view, plus the step state of this particular run.
+   */
+  public async getJobHistoryWorkflow(
+    workspaceId: string,
+    id: string,
+  ): Promise<JobHistoryWorkflowResponseDto> {
+    const jobHistory = await this.loadJobHistoryInWorkspace(workspaceId, id);
+    const { steps } = await this.buildRunView(jobHistory, workspaceId);
+    const content = this.orderWorkflowContent(jobHistory.workflow?.content);
+
+    return {
+      id: jobHistory.id,
+      jobHistoryName: jobHistory.jobHistoryName,
+      workflowId: jobHistory.workflow?.id,
+      workflowName: jobHistory.workflow?.name,
+      content,
+      steps,
     };
   }
 

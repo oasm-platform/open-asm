@@ -17,7 +17,7 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { format } from 'date-fns';
 import { Calendar } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { DateRange } from 'react-day-picker';
 import {
   RunStatusFilter,
@@ -114,7 +114,7 @@ const JobsRegistryPage = () => {
     },
   );
 
-  const columns: ColumnDef<JobHistoryResponseDto>[] = [
+  const columns: ColumnDef<JobHistoryResponseDto>[] = useMemo(() => [
     {
       accessorKey: 'status',
       header: 'Status',
@@ -174,7 +174,9 @@ const JobsRegistryPage = () => {
         );
       },
     },
-  ];
+    // Nothing in the cells closes over render state, so the definitions are
+    // built once instead of on every keystroke in the search box.
+  ], []);
 
   if (isError) {
     return (
