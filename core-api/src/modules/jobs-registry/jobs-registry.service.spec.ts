@@ -1086,6 +1086,83 @@ describe('JobsRegistryService', () => {
     });
   });
 
+
+  describe('getJobHistoryWorkflow', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+    const mockHistoryId = 'history-uuid';
+    const mockJobHistory = {
+      id: mockHistoryId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      steps: {},
+      jobHistoryName: 'test-job-history',
+      workflow: {
+        id: 'workflow-uuid',
+        name: 'test-workflow',
+        content: {
+          name: 'test-workflow',
+          jobs: { test_step: { name: 'Test Step', run: 'test-tool' } },
+        },
+      },
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({ data: [] });
+    });
+
+    it('should return the workflow definition of the run as stored', async () => {
+      // Scrambled on purpose: jsonb returns object keys in its own order.
+      mockJobHistory.workflow.content = {
+        jobs: { test_step: { name: 'Test Step', run: 'test-tool' } },
+        name: 'test-workflow',
+      };
+      const result = await service.getJobHistoryWorkflow(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(result.workflowId).toBe('workflow-uuid');
+      expect(result.workflowName).toBe('test-workflow');
+      expect(result.content).toEqual(mockJobHistory.workflow.content);
+      // Regression: jsonb does not keep key order, so the code view used to
+      // print `jobs` before `name` — the opposite of every workflow template.
+      expect(Object.keys(result.content!)).toEqual(['name', 'jobs']);
+    });
+
+    it('should include the run steps so the page can show state next to the definition', async () => {
+      const result = await service.getJobHistoryWorkflow(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(result.steps).toEqual([
+        expect.objectContaining({ id: 'test_step', run: 'test-tool' }),
+      ]);
+    });
+
+    it('should throw NotFoundException when the run is not in the workspace', async () => {
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(false),
+      });
+
+      await expect(
+        service.getJobHistoryWorkflow(mockWorkspaceId, mockHistoryId),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('getManyJobs', () => {
     const mockWorkspaceId = 'workspace-uuid';
 
