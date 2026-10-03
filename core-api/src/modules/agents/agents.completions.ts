@@ -6,15 +6,27 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { LanguageModel, ToolSet, UIMessageChunk } from 'ai';
-import { generateText, stepCountIs, streamText } from 'ai';
+import {
+  generateText,
+  isStepCount,
+  streamText,
+  toUIMessageStream,
+} from 'ai';
 import * as fs from 'fs';
 import * as Mustache from 'mustache';
 import { EventEmitter } from 'node:events';
 import * as path from 'path';
 import { Repository } from 'typeorm';
 
-import { AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
+import {
+  APPROVAL_TIMEOUT_MS,
+  AgentsApprovalsService,
+  type ApprovalRequestEvent,
+  type ApprovalResolvedEvent,
+  type ApprovalSettings,
+} from './agents.approvals';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentsSkillsService } from './agents.skills';
@@ -34,6 +46,40 @@ import {
 } from './llm-provider-supported';
 import { ContextBudgetManager } from './shared/context-budget-manager';
 import { TokenCounter } from './shared/token-counter';
+
+/**
+ * Whether this run may plan. Only PLAN mode makes plans (`create`). After a
+ * plan is approved the conversation runs in AUTO or MANUAL, which never plan,
+ * but may still have to `finish` the steps that plan left; otherwise `off`.
+ */
+export type PlanningState = 'create' | 'finish' | 'off';
+
+export function planningState(
+  mode: AgentApprovalMode,
+  todos: Pick<AgentTodoItem, 'status'>[],
+): PlanningState {
+  if (mode === AgentApprovalMode.PLAN) return 'create';
+  const unfinished = todos.some(
+    (t) => t.status === 'pending' || t.status === 'in_progress',
+  );
+  return unfinished ? 'finish' : 'off';
+}
+
+/** What is left of the plan tools while an approved plan is finished */
+const FINISH_PLAN_TOOLS = new Set(['transition_step', 'scrap_plan']);
+
+const PLAN_MODE_CONTEXT =
+  '# PLAN MODE IS ON (overrides any instruction above about not planning)\n' +
+  'The user turned on plan mode. For any request that needs one or more tool calls (reading assets, vulnerabilities, targets, issues, statistics, running commands, ...), ' +
+  'your FIRST tool call must be formulate_plan with the steps you will take. ' +
+  'The user reviews and approves the plan (choosing whether it runs automatically or asks per command) before any other tool can run; ' +
+  'tool calls made before that are refused. Put data gathering into the plan steps instead of doing it first. ' +
+  'Only a question you can fully answer from general knowledge, with no tool at all, needs no plan.';
+
+const FINISH_PLAN_CONTEXT =
+  '# AN APPROVED PLAN IS UNFINISHED\n' +
+  'The user approved the CURRENT EXECUTION PLAN above earlier. Finish its remaining steps with transition_step, or call scrap_plan if the user wants something else. ' +
+  'You cannot create a new plan or add steps: plan mode is off.';
 
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
@@ -69,6 +115,10 @@ interface StreamTextOptions {
   abortSignal?: AbortSignal;
   /** Agent mode determines maxOutputTokens and continuation behavior */
   agentMode?: AgentMode;
+  /** Whether tool calls may block waiting for the user's approval */
+  approvalMode?: AgentApprovalMode;
+  /** Whether this run may make (or must finish) a plan */
+  planning?: PlanningState;
 }
 
 @Injectable()
@@ -99,6 +149,7 @@ export class AgentsCompletionsService {
     private readonly agentsMcpService: AgentsMcpService,
     private readonly agentsSkillsService: AgentsSkillsService,
     private readonly workspaceEncryption: WorkspaceEncryptionService,
+    private readonly approvals: AgentsApprovalsService,
   ) {
     this.loadAllPrompts();
   }
@@ -351,15 +402,19 @@ export class AgentsCompletionsService {
   }
 
   /**
-   * Auto-completes any todos that the LLM left in "in_progress" state
-   * after producing a response. This is a safety net when the LLM forgets
-   * to call transition_step(id, "completed") after finishing work.
+   * Auto-completes todos the LLM left "in_progress" after producing a
+   * response — a safety net for when it forgets transition_step(id,
+   * "completed") on the last step. Skipped while pending steps remain: the
+   * run stopped early then, and marking unfinished work as done would lie to
+   * the user and make the next turn skip it.
    */
   private async autoCompleteStuckTodos(conversationId: string): Promise<void> {
     try {
-      const stuckTodos = await this.todoRepository.find({
-        where: { conversationId, status: 'in_progress' as const },
+      const todos = await this.todoRepository.find({
+        where: { conversationId },
       });
+      if (todos.some((t) => t.status === 'pending')) return;
+      const stuckTodos = todos.filter((t) => t.status === 'in_progress');
 
       if (stuckTodos.length === 0) return;
 
@@ -441,7 +496,7 @@ export class AgentsCompletionsService {
         model,
         messages: [{ role: 'user', content: prompt }],
         tools,
-        stopWhen: stepCountIs(20),
+        stopWhen: isStepCount(20),
         ...(() => {
           const opts = getReasoningProviderOptions(llmConfig.provider);
           return opts ? { providerOptions: opts } : {};
@@ -511,6 +566,7 @@ export class AgentsCompletionsService {
       title: dto.question.slice(0, 500),
       createdBy: userId,
       agentMode: dto.agentMode,
+      approvalMode: dto.approvalMode ?? AgentApprovalMode.MANUAL,
       workerId: dto.workerId,
     });
     return this.conversationRepository.save(newConversation);
@@ -573,9 +629,9 @@ export class AgentsCompletionsService {
     }
 
     // If user switched to a different provider, resolve the correct config
-    if (dto.provider && (dto.provider as LLMProvider) !== llmConfig.provider) {
+    if (dto.provider && dto.provider !== llmConfig.provider) {
       const switchedConfig = await this.llmConfigRepository.findOne({
-        where: { workspaceId, userId, provider: dto.provider as LLMProvider },
+        where: { workspaceId, userId, provider: dto.provider },
       });
       if (switchedConfig) {
         llmConfig = switchedConfig;
@@ -584,7 +640,7 @@ export class AgentsCompletionsService {
 
     // If user changed model within the same provider, override in memory only
     // (Avoids writing to DB which would affect other conversations)
-    if (dto.model && (dto.provider as LLMProvider) === llmConfig.provider) {
+    if (dto.model && dto.provider === llmConfig.provider) {
       llmConfig = this.llmConfigRepository.create({
         ...llmConfig,
         model: dto.model,
@@ -804,6 +860,42 @@ export class AgentsCompletionsService {
   }
 
   /**
+   * Plan tools for this run: none when planning is off, and only the tools
+   * that finish or drop an approved plan when one is left over.
+   */
+  private getPlanTools(
+    planning: PlanningState,
+    conversationId: string,
+    emitter: EventEmitter,
+    plan: { workspaceId: string; approval: ApprovalSettings },
+  ): ToolSet {
+    if (planning === 'off') return {};
+    const tools = this.agentTool.getTodoTools(
+      conversationId,
+      emitter,
+      plan,
+    ) as ToolSet;
+    if (planning === 'create') return tools;
+    return Object.fromEntries(
+      Object.entries(tools).filter(([name]) => FINISH_PLAN_TOOLS.has(name)),
+    );
+  }
+
+  private async loadTodoItems(conversationId: string): Promise<AgentTodoItem[]> {
+    const entities = await this.todoRepository.find({
+      where: { conversationId },
+      order: { sortOrder: 'ASC' },
+    });
+    return entities.map((t) => ({
+      id: t.id,
+      content: t.content,
+      status: t.status,
+      sortOrder: t.sortOrder,
+      updatedAt: t.updatedAt.toISOString(),
+    }));
+  }
+
+  /**
    * Builds the system context for the model by combining multiple sources:
    * - Mode prompt (ASK, AGENT, VUL_ANALYZE, ...)
    * - Default system prompt
@@ -835,18 +927,19 @@ export class AgentsCompletionsService {
         : Promise.resolve(''),
     ]);
 
-    const todoEntities = await this.todoRepository.find({
-      where: { conversationId: conversation.id },
-      order: { sortOrder: 'ASC' },
-    });
-    const todos = todoEntities.map((t) => ({
-      id: t.id,
-      content: t.content,
-      status: t.status,
-      sortOrder: t.sortOrder,
-      updatedAt: t.updatedAt.toISOString(),
-    }));
-    const todosContext = formatTodosToPrompt(todos);
+    const todos = await this.loadTodoItems(conversation.id);
+    const planning = planningState(conversation.approvalMode, todos);
+    // AUTO and MANUAL never plan, so they get no plan prompt and no old plan.
+    // Plan mode applies in every agent mode: it overrides ASK.md's "answer
+    // directly", since the user explicitly asked to see a plan first
+    const todosContext = planning === 'off' ? '' : formatTodosToPrompt(todos);
+    const planContext =
+      planning === 'off'
+        ? ''
+        : [
+            this.getPrompt('PLAN.md'),
+            planning === 'create' ? PLAN_MODE_CONTEXT : FINISH_PLAN_CONTEXT,
+          ].join('\n\n');
 
     // Inject conversation summary if available (from auto-compaction)
     const summaryContext = conversation.summary
@@ -862,6 +955,7 @@ export class AgentsCompletionsService {
       ltmContext,
       stmContext,
       todosContext,
+      planContext,
     ].filter(Boolean);
   }
 
@@ -1084,15 +1178,26 @@ export class AgentsCompletionsService {
       // System context passed via dedicated option (avoids prompt injection risk)
       system: contextParts.join('\n\n'),
       messages: modelMessages,
+      // History may contain persisted system-role messages; v7 rejects them by default
+      allowSystemInMessages: true,
       // Retry transient provider errors (429 rate-limit, 500/502/503 server errors)
       maxRetries: 3,
-      // Detect stuck streams: abort if no chunk arrives within 30 seconds
-      timeout: { chunkMs: 30_000 },
+      // Detect stuck streams: abort if no chunk arrives within 30 seconds.
+      // A tool call may sit waiting for the user's approval (in any agent
+      // mode unless approvals are off), which emits no chunks, so allow for
+      // the approval window.
+      timeout: {
+        chunkMs:
+          options.agentMode === AgentMode.AGENT ||
+          options.approvalMode !== AgentApprovalMode.AUTO
+            ? APPROVAL_TIMEOUT_MS + 60_000
+            : 30_000,
+      },
       // Only include tools if available (models without tool support will error here)
       ...(tools
         ? {
             tools,
-            stopWhen: stepCountIs(llmConfig.maxSteps ?? 20),
+            stopWhen: isStepCount(llmConfig.maxSteps ?? 20),
           }
         : {}),
       // Enable reasoning/thinking via provider-specific options
@@ -1146,7 +1251,7 @@ export class AgentsCompletionsService {
       // When streaming completes, persist accumulated text to DB
       // persist tool call data (for history rendering on page reload),
       // auto-complete stuck todos, and trigger compaction check
-      onFinish: (event) => {
+      onEnd: (event) => {
         const isAborted = () => abortSignal?.aborted ?? false;
 
         this.logger.log(
@@ -1220,7 +1325,7 @@ export class AgentsCompletionsService {
             let hasReasoningPart = false;
             for (const step of event.steps) {
               const stepReasoning =
-                typeof step.reasoning === 'string' ? step.reasoning : '';
+                step.reasoningText ?? '';
               if (stepReasoning.trim()) {
                 parts.push({ type: 'reasoning', text: stepReasoning.trim() });
                 hasReasoningPart = true;
@@ -1299,7 +1404,7 @@ export class AgentsCompletionsService {
     });
 
     // Convert the result stream to a UIMessageStream consumable by the frontend
-    const aiStream = result.toUIMessageStream();
+    const aiStream = toUIMessageStream({ stream: result.stream, tools });
 
     return { aiStream, conversationId, todosEmitter, finishPromise };
   }
@@ -1341,7 +1446,33 @@ export class AgentsCompletionsService {
     } = options;
 
     const MAX_SAFETY_ITERATIONS = 50; // Safety net — budget-based termination is primary
+    const MAX_STALLED_ITERATIONS = 2;
+    const MAX_CONSECUTIVE_ERRORS = 3;
     const isAgentMode = agentMode === AgentMode.AGENT;
+    // Keep running an approved plan to its end, in Ask mode too
+    const continuesPlan =
+      isAgentMode ||
+      options.approvalMode === AgentApprovalMode.PLAN ||
+      options.planning === 'finish';
+    let stalledIterations = 0;
+    let consecutiveErrors = 0;
+    let lastFingerprint: string | undefined;
+
+    const planFingerprint = (todos: AgentTodoItem[]) =>
+      todos.map((t) => `${t.id}:${t.status}`).join(',');
+
+    const rebuildContext = async (
+      conversation: AgentConversation,
+    ): Promise<string[]> => {
+      const parts = await this.buildSystemContext(
+        conversation,
+        workspaceId,
+        agentMode || AgentMode.ASK,
+        userId,
+      );
+      if (skillsContext) parts.push(skillsContext);
+      return parts;
+    };
 
     let currentModelMessages = [...options.modelMessages];
     let currentAssistantMessageId = options.assistantMessageId;
@@ -1391,6 +1522,37 @@ export class AgentsCompletionsService {
         };
         todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
 
+        // Subscribe to approval-required events (human-in-the-loop dialog)
+        const onApprovalRequired = (data: ApprovalRequestEvent) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'data-approval-required',
+            data,
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('approval-required', onApprovalRequired);
+
+        // A prompt no longer needs an answer (allowed by "allow all" or
+        // "allow tool", timed out, ...): the UI drops it from its queue
+        const onApprovalResolved = (data: ApprovalResolvedEvent) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'data-approval-resolved',
+            data,
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('approval-resolved', onApprovalResolved);
+
+        // The user approved a plan and picked how it runs: sync the selector
+        const onApprovalModeChanged = (data: { mode: AgentApprovalMode }) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'data-approval-mode-changed',
+            data,
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('approval-mode-changed', onApprovalModeChanged);
+
         // Subscribe to stream-error events (provider errors propagated to frontend)
         const onStreamError = (data: { message: string }) => {
           if (controllerClosed) return;
@@ -1408,6 +1570,12 @@ export class AgentsCompletionsService {
         });
 
         try {
+          if (continuesPlan) {
+            lastFingerprint = planFingerprint(
+              await this.loadTodoItems(conversationId),
+            );
+          }
+
           for (
             let iteration = 0;
             iteration < MAX_SAFETY_ITERATIONS;
@@ -1416,7 +1584,7 @@ export class AgentsCompletionsService {
             if (abortSignal?.aborted || controllerClosed) break;
 
             // Mid-loop compaction: check budget before each iteration
-            if (isAgentMode && iteration > 0) {
+            if (continuesPlan && iteration > 0) {
               const compacted = await this.checkAndCompactMidLoop(
                 conversationId,
                 llmConfig,
@@ -1430,53 +1598,9 @@ export class AgentsCompletionsService {
                     where: { id: conversationId },
                   });
                 if (postCompactConversation?.summary) {
-                  // Refresh context with updated summary
-                  const agentModeVal = agentMode || AgentMode.ASK;
-                  const modePrompt = this.getPrompt(
-                    `${agentModeVal.toUpperCase()}.md`,
+                  currentContextParts = await rebuildContext(
+                    postCompactConversation,
                   );
-                  const systemPrompt = this.getPrompt('SYSTEM.md');
-                  const now = new Date();
-                  const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
-                  const [stmCtx, ltmCtx] = await Promise.all([
-                    this.agentsMemories.stmFormatForPrompt(conversationId),
-                    userId
-                      ? this.agentsMemories.ltmFormatForPrompt(
-                          workspaceId,
-                          userId,
-                        )
-                      : Promise.resolve(''),
-                  ]);
-                  const postCompactTodos = await this.todoRepository.find({
-                    where: { conversationId },
-                    order: { sortOrder: 'ASC' },
-                  });
-                  const todosCtx = formatTodosToPrompt(
-                    postCompactTodos.map((t) => ({
-                      id: t.id,
-                      content: t.content,
-                      status: t.status,
-                      sortOrder: t.sortOrder,
-                      updatedAt: t.updatedAt.toISOString(),
-                    })),
-                  );
-                  const summaryCtx = postCompactConversation.summary
-                    ? `[PREVIOUS CONVERSATION SUMMARY]:\n${postCompactConversation.summary}`
-                    : '';
-
-                  currentContextParts = [
-                    modePrompt,
-                    systemPrompt,
-                    summaryCtx,
-                    currentTimeContext,
-                    ltmCtx,
-                    stmCtx,
-                    todosCtx,
-                  ].filter(Boolean);
-
-                  if (skillsContext) {
-                    currentContextParts.push(skillsContext);
-                  }
                 }
               }
             }
@@ -1495,6 +1619,7 @@ export class AgentsCompletionsService {
                 todosEmitter,
                 abortSignal,
                 agentMode,
+                approvalMode: options.approvalMode,
               });
 
               // Pump chunks from this iteration's stream
@@ -1514,6 +1639,7 @@ export class AgentsCompletionsService {
               // the continuation loop reads stale data because onFinish DB writes
               // are async and may not have committed yet when the reader drains.
               await finishPromise;
+              consecutiveErrors = 0;
             } catch (iterationError) {
               this.logger.error(
                 `[Continuation] Error in iteration ${iteration} for ${conversationId}`,
@@ -1527,33 +1653,39 @@ export class AgentsCompletionsService {
               // the loop reads stale data.
               const updatedTodos = await this.resetTodosOnError(conversationId);
               todosEmitter.emit('todos-updated', updatedTodos);
+              if (++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) break;
               continue;
             }
 
             if (abortSignal?.aborted || controllerClosed) break;
 
-            // Check if we should auto-continue (AGENT mode + pending steps)
-            if (!isAgentMode) break;
+            // Auto-continue while a plan has pending steps (Agent or Plan mode)
+            if (!continuesPlan) break;
 
             const conversation = await this.conversationRepository.findOne({
               where: { id: conversationId },
             });
 
-            const todoEntities = await this.todoRepository.find({
-              where: { conversationId },
-              order: { sortOrder: 'ASC' },
-            });
-            const todos = todoEntities.map((t) => ({
-              id: t.id,
-              content: t.content,
-              status: t.status,
-              updatedAt: t.updatedAt.toISOString(),
-            }));
+            const todos = await this.loadTodoItems(conversationId);
             const hasPending = todos.some(
               (t) => t.status === 'pending' || t.status === 'in_progress',
             );
 
             if (!hasPending) break;
+
+            // Stop when the plan stops moving: the model is waiting on the
+            // user, keeps failing, or ignores the plan. Without this a stuck
+            // run re-prompts until MAX_SAFETY_ITERATIONS, burning tokens.
+            const fingerprint = planFingerprint(todos);
+            stalledIterations =
+              fingerprint === lastFingerprint ? stalledIterations + 1 : 0;
+            lastFingerprint = fingerprint;
+            if (stalledIterations >= MAX_STALLED_ITERATIONS) {
+              this.logger.warn(
+                `[Auto-continuation] Plan made no progress in ${stalledIterations} iterations for ${conversationId}; stopping`,
+              );
+              break;
+            }
 
             // Prepare next iteration context with smart pruning
             const contextWindow = this.getModelContextWindow(llmConfig);
@@ -1600,54 +1732,8 @@ export class AgentsCompletionsService {
             currentAssistantMetadata = newAssistant.metadata;
 
             // Rebuild context to reflect updated todos
-            const updatedConversation =
-              await this.conversationRepository.findOne({
-                where: { id: conversationId },
-              });
-            if (updatedConversation) {
-              // Build system context fresh
-              const agentModeVal = agentMode || AgentMode.ASK;
-              const modePrompt = this.getPrompt(
-                `${agentModeVal.toUpperCase()}.md`,
-              );
-              const systemPrompt = this.getPrompt('SYSTEM.md');
-              const now = new Date();
-              const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
-              const [stmContext, ltmContext] = await Promise.all([
-                this.agentsMemories.stmFormatForPrompt(conversationId),
-                userId
-                  ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId)
-                  : Promise.resolve(''),
-              ]);
-              const updatedTodoEntities = await this.todoRepository.find({
-                where: { conversationId },
-                order: { sortOrder: 'ASC' },
-              });
-              const updatedTodos = updatedTodoEntities.map((t) => ({
-                id: t.id,
-                content: t.content,
-                status: t.status,
-                sortOrder: t.sortOrder,
-                updatedAt: t.updatedAt.toISOString(),
-              }));
-              const todosContext = formatTodosToPrompt(updatedTodos);
-              const summaryContext = updatedConversation.summary
-                ? `[PREVIOUS CONVERSATION SUMMARY]:\n${updatedConversation.summary}`
-                : '';
-
-              currentContextParts = [
-                modePrompt,
-                systemPrompt,
-                summaryContext,
-                currentTimeContext,
-                ltmContext,
-                stmContext,
-                todosContext,
-              ].filter(Boolean);
-
-              if (skillsContext) {
-                currentContextParts.push(skillsContext);
-              }
+            if (conversation) {
+              currentContextParts = await rebuildContext(conversation);
             }
 
             this.logger.log(
@@ -1661,6 +1747,9 @@ export class AgentsCompletionsService {
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
           todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+          todosEmitter.off('approval-required', onApprovalRequired);
+          todosEmitter.off('approval-resolved', onApprovalResolved);
+          todosEmitter.off('approval-mode-changed', onApprovalModeChanged);
           todosEmitter.off('stream-error', onStreamError);
 
           // Auto-complete stuck in_progress todos AFTER all continuation
@@ -1668,7 +1757,7 @@ export class AgentsCompletionsService {
           // autoCompleteStuckTodos (previously called per-iteration in
           // onFinish) would mark todos as completed before the continuation
           // loop could detect them as still pending.
-          if (isAgentMode && !abortSignal?.aborted) {
+          if (continuesPlan && !abortSignal?.aborted) {
             this.autoCompleteStuckTodos(conversationId).catch((err) =>
               this.logger.error('Error in autoCompleteStuckTodos', err),
             );
@@ -1725,6 +1814,15 @@ export class AgentsCompletionsService {
       workspaceId,
       userId,
     );
+
+    // Step 1.5: Apply a changed approval mode and drop any approved plan
+    if (dto.approvalMode && dto.approvalMode !== conversation.approvalMode) {
+      await this.approvals.resetConversation(conversation.id);
+      conversation.approvalMode = dto.approvalMode;
+      await this.conversationRepository.update(conversation.id, {
+        approvalMode: dto.approvalMode,
+      });
+    }
 
     // Step 2: Save the user's message to DB
     await this.saveUserMessage(conversation.id, dto.question);
@@ -1802,18 +1900,43 @@ export class AgentsCompletionsService {
     // Step 11: Create a shared event emitter for broadcasting todo updates to the stream
     const todosEmitter = new EventEmitter();
 
+    const planning = planningState(
+      conversation.approvalMode,
+      await this.loadTodoItems(conversation.id),
+    );
+
+    // Shared by every tool of this run: approving a plan switches its mode
+    const approval: ApprovalSettings = {
+      userId,
+      mode: conversation.approvalMode,
+      // In PLAN mode nothing runs before the user has seen and approved a plan
+      planFirst: true,
+    };
+
+    const externalMcpTools = this.agentTool.wrapExternalToolsWithApproval(
+      (await this.agentsMcpService.getTools(workspaceId)) as ToolSet,
+      workspaceId,
+      conversation.id,
+      approval,
+      todosEmitter,
+    );
+
     // Get tools for the current agent mode
     const tools = {
+      // Built-in tools below take precedence over colliding external names.
+      ...externalMcpTools,
       ...(this.agentTool.getTools(
         workspaceId,
         agentMode,
         todosEmitter,
         conversation.id,
+        false,
+        approval,
       ) as ToolSet),
-      ...(this.agentTool.getTodoTools(
-        conversation.id,
-        todosEmitter,
-      ) as ToolSet),
+      ...this.getPlanTools(planning, conversation.id, todosEmitter, {
+        workspaceId,
+        approval,
+      }),
       ...(loadSkillTool ? { load_skill: loadSkillTool } : {}),
       // Add memory tools
       ...(this.agentTool.getMemoryTools(
@@ -1839,6 +1962,8 @@ export class AgentsCompletionsService {
       todosEmitter,
       abortSignal,
       agentMode,
+      approvalMode: conversation.approvalMode,
+      planning,
       workspaceId,
       userId,
       skillsContext,

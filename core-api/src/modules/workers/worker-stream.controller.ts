@@ -11,6 +11,12 @@ import { WorkerStreamRegistry } from './worker-stream-registry.service';
 /** Liveness cadence advertised to the worker; mirrors the legacy Alive RPC. */
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000;
 
+/** A worker → core frame: exactly one of these oneof fields is set. */
+interface InboundFrame {
+  register?: unknown;
+  heartbeat?: unknown;
+}
+
 /**
  * Bidirectional `WorkersService.Connect`.
  *
@@ -40,7 +46,7 @@ export class WorkerStreamController {
 
   @GrpcStreamMethod('WorkersService', 'Connect')
   connect(
-    frames$: Observable<Record<string, any>>,
+    frames$: Observable<InboundFrame>,
     metadata: Metadata,
   ): Observable<Record<string, unknown>> {
     // ReplaySubject, not Subject: the token lookup below is async, so the
@@ -50,7 +56,7 @@ export class WorkerStreamController {
     // accepted. Only the frames emitted before the first subscriber attach are
     // retained.
     const outbound$ = new ReplaySubject<Record<string, unknown>>();
-    const queued: Record<string, any>[] = [];
+    const queued: InboundFrame[] = [];
     let authenticated = false;
     let closed = false;
     // The inbound stream can complete before the async token lookup settles
@@ -76,7 +82,7 @@ export class WorkerStreamController {
       outbound$.complete();
     };
 
-    const handleFrame = (frame: Record<string, any>): void => {
+    const handleFrame = (frame: InboundFrame | undefined): void => {
       if (!frame) return;
       if (frame.register) {
         emit({
@@ -120,7 +126,7 @@ export class WorkerStreamController {
           `[worker-stream] stream opened for worker ${workerId}`,
         );
         while (queued.length > 0) {
-          handleFrame(queued.shift() as Record<string, any>);
+          handleFrame(queued.shift());
         }
         if (inboundClosed) {
           finalize();

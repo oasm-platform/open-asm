@@ -1,66 +1,167 @@
-import { AgentMode } from '@/common/enums/enum';
-import type { AgentTodoItem } from '../agents.todo';
-import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsDate,
+  IsDateString,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+
+export class AgentTodoItemDto {
+  @ApiProperty({
+    description: 'Unique identifier of the plan item',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsUUID()
+  id: string;
+
+  @ApiProperty({
+    description: 'Action described by this plan item',
+    example: 'Inspect the target configuration',
+  })
+  @IsString()
+  content: string;
+
+  @ApiProperty({
+    description: 'Current execution status of the plan item',
+    enum: ['pending', 'in_progress', 'completed', 'failed'],
+    example: 'pending',
+  })
+  @IsIn(['pending', 'in_progress', 'completed', 'failed'])
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+
+  @ApiProperty({
+    description: 'Zero-based display order of the plan item',
+    example: 0,
+  })
+  @IsInt()
+  @Min(0)
+  sortOrder: number;
+
+  @ApiProperty({
+    description: 'ISO timestamp of the most recent plan item update',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  @IsDateString()
+  updatedAt: string;
+}
 
 export class CreateConversationDto {
-  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  @ApiProperty({
+    description: 'LLM configuration used by the conversation',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @IsUUID()
   llmConfigId: string;
 
-  @ApiProperty({ example: 'My conversation', required: false })
+  @ApiPropertyOptional({
+    description: 'Optional conversation title',
+    example: 'My conversation',
+    maxLength: 500,
+  })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   title?: string;
 }
 
 export class UpdateConversationDto {
-  @ApiProperty({ example: 'Updated title', required: false })
+  @ApiPropertyOptional({
+    description: 'Replacement conversation title',
+    example: 'Updated title',
+    maxLength: 500,
+  })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   title?: string;
 }
 
 export class ConversationResponseDto {
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Unique conversation identifier',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsUUID()
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'LLM configuration used by the conversation',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsUUID()
   llmConfigId: string;
 
-  @ApiProperty({ required: false })
-  title?: string;
+  @ApiPropertyOptional({
+    description: 'Conversation title',
+    example: 'My conversation',
+    maxLength: 500,
+    nullable: true,
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  title?: string | null;
 
-  @ApiProperty({ enum: AgentMode, example: AgentMode.ASK })
+  @ApiProperty({
+    description: 'Interaction mode used by the conversation',
+    enum: AgentMode,
+    example: AgentMode.ASK,
+  })
   @IsEnum(AgentMode)
   agentMode: AgentMode;
 
-  @ApiProperty()
-  createdAt: Date;
-
-  @ApiProperty()
-  updatedAt: Date;
+  @ApiProperty({
+    description: 'Approval policy used for agent tool requests',
+    enum: AgentApprovalMode,
+    example: AgentApprovalMode.MANUAL,
+  })
+  @IsEnum(AgentApprovalMode)
+  approvalMode: AgentApprovalMode;
 
   @ApiProperty({
-    description: 'Agent execution plan (todo list)',
-    required: false,
-    isArray: true,
+    description: 'Timestamp when the conversation was created',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  @IsDate()
+  createdAt: Date;
+
+  @ApiProperty({
+    description: 'Timestamp when the conversation was last updated',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  @IsDate()
+  updatedAt: Date;
+
+  @ApiPropertyOptional({
+    description: 'Ordered execution plan for the agent',
+    type: [AgentTodoItemDto],
   })
   @IsOptional()
   @IsArray()
-  todos?: AgentTodoItem[];
+  @ValidateNested({ each: true })
+  @Type(() => AgentTodoItemDto)
+  todos?: AgentTodoItemDto[];
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Summarized context of previous conversation turns',
-    required: false,
   })
   @IsOptional()
   @IsString()
   summary?: string;
 
-  @ApiProperty({
-    required: false,
-    description: 'The worker ID currently assigned to this conversation',
+  @ApiPropertyOptional({
+    description: 'Worker currently assigned to remote tool execution',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @IsOptional()
@@ -69,9 +170,20 @@ export class ConversationResponseDto {
 }
 
 export class GetConversationsResponseDto {
-  @ApiProperty({ type: [ConversationResponseDto] })
+  @ApiProperty({
+    description: 'Conversations visible to the current user',
+    type: [ConversationResponseDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ConversationResponseDto)
   conversations: ConversationResponseDto[];
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Total number of conversations matching the query',
+    example: 12,
+  })
+  @IsInt()
+  @Min(0)
   totalCount: number;
 }
