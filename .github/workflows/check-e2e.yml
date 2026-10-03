@@ -105,11 +105,10 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_PORT: '5432'
           POSTGRES_SSL: 'false'
+          # example.env points at a password-protected Redis; the CI service
+          # container runs without --requirepass, so override the URL.
           REDIS_URL: redis://localhost:6379/0
           E2E_DROP_DB: '1'
           # Placeholder KEK from example.env is fine locally but shared across
           # the fleet; give the runner its own so ciphertext is not reused.
           ENCRYPTION_KEYS: 'e2e-e2e-e2e-e2e-e2e-e2e-e2e-e2e'
-          # example.env points at a password-protected Redis; the CI service
-          # container runs without --requirepass, so override the URL.
-          REDIS_URL: redis://localhost:6379/0
