@@ -20,7 +20,14 @@ import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilitie
 import { WorkersService } from '@/modules/workers/workers.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { AgentMode } from '@/common/enums/enum';
+import {
+  AgentsApprovalsService,
+  type ApprovalContext,
+  type ApprovalDecision,
+  type ApprovalSettings,
+  type PlanRunMode,
+} from './agents.approvals';
+import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -49,6 +56,81 @@ const webFetchSchema = z.object({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolType = any;
+
+function rejectionMessage(what: string, feedback?: string): string {
+  const base = `${what} was not approved by the user and was not executed.`;
+  return feedback ? `${base} The user says: ${feedback}` : base;
+}
+
+/** Matched by the console (chat-helpers.tsx) to show the call as "Needs plan" */
+const PLAN_REQUIRED_MESSAGE =
+  'Not executed: this conversation needs an approved plan first. Call formulate_plan with the full plan (put this work in its steps) and wait for the user to approve it before calling other tools.';
+
+/** Plans exist only in PLAN mode; AUTO and MANUAL just do the work. */
+const PLANNING_OFF_MESSAGE =
+  'Not executed: planning is off in this conversation (only plan mode makes plans). Do the work directly with the other tools, without a plan.';
+
+function deniedMessage(what: string, decision: ApprovalDecision): string {
+  return decision.planRequired
+    ? PLAN_REQUIRED_MESSAGE
+    : rejectionMessage(what, decision.feedback);
+}
+
+/** Tools that gate themselves (on the raw command) instead of via withApproval. */
+const SELF_GATED_TOOLS = new Set(['execute_remote_command']);
+
+/**
+ * Built-in tools that only read OASM data, so MANUAL runs them without
+ * asking. Not retrieve_web_page: a URL it fetches can carry data out.
+ */
+const READ_ONLY_TOOLS = new Set([
+  'enumerate_assets',
+  'discover_vulnerabilities',
+  'retrieve_targets',
+  'gather_statistics',
+  'inspect_asset',
+  'examine_target_assets',
+  'investigate_vulnerability',
+  'list_network_ports',
+  'fingerprint_technologies',
+  'verify_tls_settings',
+  'enumerate_open_issues',
+  'inspect_issue',
+  'display_available_tools',
+  'list_active_workers',
+  'review_jobs',
+]);
+
+/**
+ * An MCP tool counts as read-only when its server says so and does not say
+ * it reaches the outside world (same reason as retrieve_web_page).
+ */
+function isReadOnlyMcpTool(metadata: unknown): boolean {
+  const annotations = (metadata as { annotations?: Record<string, unknown> })
+    ?.annotations;
+  return (
+    annotations?.readOnlyHint === true && annotations.openWorldHint !== true
+  );
+}
+
+/**
+ * JSON with object keys sorted at every level, so the same arguments match
+ * the same approval whatever order the model wrote them in.
+ */
+export function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.entries(v as Record<string, unknown>).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        )
+      : v,
+  );
+}
+
+/** Longer plans are rarely followed through and bloat every system prompt. */
+const MAX_PLAN_STEPS = 20;
 
 function isPrivateIp(ip: string): boolean {
   const parts = ip.split('.').map(Number);
@@ -88,6 +170,7 @@ export class AgentTool {
     @InjectRepository(AgentConversationTodo)
     private readonly todoRepository: Repository<AgentConversationTodo>,
     private readonly agentsMemories: AgentsMemoriesService,
+    private readonly approvals: AgentsApprovalsService,
   ) {}
 
   get getAssetsTool(): (workspaceId: string) => any {
@@ -489,6 +572,7 @@ export class AgentTool {
     workspaceId: string,
     conversationId: string,
     emitter?: EventEmitter,
+    approval?: ApprovalSettings,
   ): ToolType {
     const toolConfig: any = {
       description: [
@@ -496,17 +580,45 @@ export class AgentTool {
         'Params: command (required shell command string).',
         'Output: stdout, stderr, exitCode, error, timedOut.',
         'Warning: OS-level permissions, no PTY, strict timeout.',
+        'The user may reject a command; if so, do not retry it and propose an alternative.',
       ].join('\n'),
       inputSchema: z.object({
         command: z.string().min(1).describe('Shell command to execute'),
       }),
       execute: async (
         params: { command: string },
-        options: { toolCallId: string },
+        options: { toolCallId: string; abortSignal?: AbortSignal },
       ) => {
         const { command } = params;
         const { toolCallId } = options;
         const sessionId = randomUUID();
+
+        // Without an approval context (e.g. system-driven runs) nobody can
+        // approve, so refuse rather than run unreviewed commands.
+        const decision = approval
+          ? await this.approvals.authorize(
+              command,
+              toolCallId,
+              { ...approval, workspaceId, conversationId },
+              emitter,
+              {
+                tool: 'execute_remote_command',
+                description: 'Run a shell command on a connected worker',
+              },
+              options.abortSignal,
+            )
+          : ({ allowed: false } satisfies ApprovalDecision);
+        if (!decision.allowed) {
+          return {
+            id: sessionId,
+            command,
+            stdout: '',
+            stderr: '',
+            exitCode: null,
+            error: deniedMessage('Command', decision),
+            timedOut: false,
+          };
+        }
 
         return this.remoteExecuteService.waitForResult(
           command,
@@ -524,9 +636,17 @@ export class AgentTool {
     return tool(toolConfig);
   }
 
+  /**
+   * Plan tools. With `plan.approval` in PLAN mode, formulate_plan shows the
+   * new plan to the user and waits for them to approve it, choosing whether
+   * the rest of the run asks per command (MANUAL) or not (AUTO). Outside
+   * PLAN mode formulate_plan and append_step refuse: only transition_step and
+   * scrap_plan remain, to finish or drop a plan approved earlier.
+   */
   getTodoTools(
     conversationId: string,
     emitter?: EventEmitter,
+    plan?: { workspaceId: string; approval: ApprovalSettings },
   ): Record<string, ToolType> {
     const todoRepo = this.todoRepository;
 
@@ -629,13 +749,24 @@ export class AgentTool {
       }
     };
 
+    // Read at call time: approving a plan switches the run out of PLAN mode,
+    // and the plan it approved is the last one this run may make
+    const planningAllowed = () =>
+      !plan || plan.approval.mode === AgentApprovalMode.PLAN;
+
     const setPlanTool: any = {
       description:
         'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
       inputSchema: z.object({
         steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
       }),
-      execute: async (params: { steps: string[] }) => {
+      execute: async (
+        params: { steps: string[] },
+        options?: { toolCallId?: string; abortSignal?: AbortSignal },
+      ) => {
+        if (!planningAllowed()) {
+          return { success: false, message: PLANNING_OFF_MESSAGE };
+        }
         try {
           // Guard: reject if there are active (pending/in_progress) todos
           const existingTodos = await todoRepo.find({
@@ -662,8 +793,9 @@ export class AgentTool {
             };
           }
 
-          // Log raw params for debugging
-          this.logger.log('[formulate_plan] Raw params: ' + JSON.stringify(params, null, 2));
+          this.logger.debug(
+            '[formulate_plan] Raw params: ' + JSON.stringify(params),
+          );
 
           // Normalize steps: handle various formats AI might send
           let normalizedSteps: string[] = [];
@@ -692,7 +824,7 @@ export class AgentTool {
             const parsed = tryParseJsonArray(rawSteps);
             if (parsed) {
               stepsArray = parsed;
-              this.logger.log('[formulate_plan] Parsed from JSON string');
+              this.logger.debug('[formulate_plan] Parsed from JSON string');
             } else {
               stepsArray = [rawSteps];
             }
@@ -701,7 +833,9 @@ export class AgentTool {
               const parsed = tryParseJsonArray(rawSteps[0]!);
               if (parsed) {
                 stepsArray = parsed;
-                this.logger.log('[formulate_plan] Parsed from nested JSON string');
+                this.logger.debug(
+                  '[formulate_plan] Parsed from nested JSON string',
+                );
               } else {
                 stepsArray = rawSteps;
               }
@@ -710,7 +844,6 @@ export class AgentTool {
             }
           }
 
-          this.logger.log('[formulate_plan] Steps array: ' + JSON.stringify(stepsArray));
 
           // Clean each step
           for (const s of stepsArray) {
@@ -736,29 +869,79 @@ export class AgentTool {
             }
           }
 
-          this.logger.log('[formulate_plan] Normalized steps: ' + JSON.stringify(normalizedSteps));
-          this.logger.log('[formulate_plan] Normalized count: ' + normalizedSteps.length);
-
           if (normalizedSteps.length === 0) {
             return { success: false, message: 'No valid steps provided.' };
           }
+          if (normalizedSteps.length > MAX_PLAN_STEPS) {
+            return {
+              success: false,
+              message: `Too many steps (${normalizedSteps.length}). Keep the plan to at most ${MAX_PLAN_STEPS} steps by merging related work.`,
+            };
+          }
 
-          await todoRepo.delete({ conversationId });
-
-          const entities = normalizedSteps.map((step, index) =>
-            todoRepo.create({
-              conversationId,
-              content: step,
-              status: 'pending' as const,
-              sortOrder: index,
-            }),
-          );
-          await todoRepo.save(entities);
+          // Replace the old plan atomically: a failed insert must not leave
+          // the conversation with no plan at all
+          await todoRepo.manager.transaction(async (manager) => {
+            const repo = manager.getRepository(AgentConversationTodo);
+            await repo.delete({ conversationId });
+            await repo.save(
+              normalizedSteps.map((step, index) =>
+                repo.create({
+                  conversationId,
+                  content: step,
+                  status: 'pending' as const,
+                  sortOrder: index,
+                }),
+              ),
+            );
+          });
 
           const todos = await getAllTodos();
-          this.logger.log('[formulate_plan] Final todos: ' + JSON.stringify(todos, null, 2));
+          this.logger.debug(
+            `[formulate_plan] Plan set with ${todos.length} steps for ${conversationId}`,
+          );
 
+          // Show the plan right away, also while the user reviews it
           await emitTodos();
+
+          if (plan?.approval.mode === AgentApprovalMode.PLAN) {
+            const decision = await this.approvals.requestPlanApproval(
+              normalizedSteps,
+              options?.toolCallId ?? '',
+              { ...plan.approval, workspaceId: plan.workspaceId, conversationId },
+              emitter,
+              options?.abortSignal,
+            );
+            if (!decision.allowed) {
+              await todoRepo.delete({ conversationId });
+              await emitTodos();
+              return {
+                success: false,
+                error: rejectionMessage('The plan', decision.feedback),
+                message: decision.feedback
+                  ? 'The plan was discarded. Revise it following what the user said, then call formulate_plan again.'
+                  : 'The plan was discarded. Do not run it; ask the user how they want to proceed.',
+              };
+            }
+            const mode = decision.mode ?? AgentApprovalMode.MANUAL;
+            await this.switchApprovalMode(
+              conversationId,
+              plan.approval,
+              mode,
+              emitter,
+            );
+            return {
+              success: true,
+              message:
+                `The user approved this ${todos.length}-step plan` +
+                (mode === AgentApprovalMode.AUTO
+                  ? ' and lets it run without asking.'
+                  : '; each command still asks for approval.') +
+                ' Start with step 1 now.',
+              todos,
+            };
+          }
+
           return {
             success: true,
             message: `Plan set with ${todos.length} steps.`,
@@ -767,7 +950,7 @@ export class AgentTool {
         } catch (error) {
           const message =
             error instanceof Error ? error.message : String(error);
-          this.logger.error('[formulate_plan] Error: ' + (error instanceof Error ? error.message : String(error)));
+          this.logger.error(`[formulate_plan] Error: ${message}`);
           return { success: false, message: `Failed to set plan: ${message}` };
         }
       },
@@ -858,6 +1041,10 @@ export class AgentTool {
         content: z.string().min(1).describe('Todo content'),
       }),
       execute: async (params: { content: string }) => {
+        // An approved plan is a contract: no unreviewed steps after the fact
+        if (!planningAllowed()) {
+          return { success: false, message: PLANNING_OFF_MESSAGE };
+        }
         try {
           const existingTodos = await todoRepo.find({
             where: { conversationId },
@@ -888,7 +1075,6 @@ export class AgentTool {
           });
           await todoRepo.save(newEntity);
 
-          await getAllTodos();
           await emitTodos();
           return {
             success: true,
@@ -935,6 +1121,26 @@ export class AgentTool {
       append_step: tool(addTodoTool),
       scrap_plan: tool(clearPlanTool),
     };
+  }
+
+  /**
+   * Apply the approval mode the user picked for an approved plan: to the
+   * running tools (they read `approval` at call time), the conversation
+   * (later turns) and the client's mode selector.
+   */
+  private async switchApprovalMode(
+    conversationId: string,
+    approval: ApprovalSettings,
+    mode: PlanRunMode,
+    emitter?: EventEmitter,
+  ): Promise<void> {
+    // "allow all" belonged to the previous mode
+    await this.approvals.resetConversation(conversationId);
+    await this.conversationRepository.update(conversationId, {
+      approvalMode: mode,
+    });
+    approval.mode = mode;
+    emitter?.emit('approval-mode-changed', { mode });
   }
 
   getMemoryTools(
@@ -1125,6 +1331,7 @@ export class AgentTool {
     emitter?: EventEmitter,
     conversationId?: string,
     mcpOnly = false,
+    approval?: ApprovalSettings,
   ): Record<string, ToolType> {
     const { AGENT, ASK } = AgentMode;
     const tools: Record<
@@ -1216,6 +1423,7 @@ export class AgentTool {
           workspaceId,
           conversationId ?? '',
           emitter,
+          approval,
         ),
         permissions: [AGENT],
         mcp: false,
@@ -1226,7 +1434,98 @@ export class AgentTool {
       Object.entries(tools)
         .filter(([, config]) => config.permissions.includes(agentMode))
         .filter(([, config]) => (mcpOnly ? config.mcp : true))
-        .map(([key, config]) => [key, config.method]),
+        .map(([key, config]) => [
+          key,
+          approval && !SELF_GATED_TOOLS.has(key)
+            ? this.withApproval(
+                key,
+                config.method,
+                // Read at call time: approving a plan switches the mode mid-run
+                () => ({
+                  ...approval,
+                  workspaceId,
+                  conversationId: conversationId ?? '',
+                }),
+                emitter,
+                READ_ONLY_TOOLS.has(key),
+              )
+            : config.method,
+        ]),
     ) as Record<string, ToolType>;
+  }
+
+  /** Applies the same approval gate to dynamically discovered MCP tools. */
+  wrapExternalToolsWithApproval(
+    tools: Record<string, ToolType>,
+    workspaceId: string,
+    conversationId: string,
+    approval: ApprovalSettings,
+    emitter?: EventEmitter,
+  ): Record<string, ToolType> {
+    return Object.fromEntries(
+      Object.entries(tools).map(([name, toolDef]) => [
+        name,
+        this.withApproval(
+          name,
+          toolDef,
+          () => ({
+            ...approval,
+            workspaceId,
+            conversationId,
+          }),
+          emitter,
+          isReadOnlyMcpTool(toolDef.metadata),
+        ),
+      ]),
+    ) as Record<string, ToolType>;
+  }
+
+  /**
+   * Wraps a tool so each call goes through the approval flow first, in any
+   * agent mode. (SELF_GATED_TOOLS gate themselves on the raw command.)
+   */
+  private withApproval(
+    name: string,
+    toolDef: ToolType,
+    ctx: () => ApprovalContext,
+    emitter?: EventEmitter,
+    readOnly = false,
+  ): ToolType {
+    const original = toolDef.execute as (
+      params: unknown,
+      options: { toolCallId: string; abortSignal?: AbortSignal },
+    ) => Promise<unknown>;
+    return {
+      ...toolDef,
+      execute: async (
+        params: unknown,
+        options: { toolCallId: string; abortSignal?: AbortSignal },
+      ) => {
+        const decision = await this.approvals.authorize(
+          `${name} ${stableStringify(params)}`,
+          options.toolCallId,
+          ctx(),
+          emitter,
+          {
+            tool: name,
+            description:
+              typeof toolDef.description === 'string'
+                ? toolDef.description
+                : undefined,
+            toolMetadata:
+              typeof toolDef.metadata === 'object' && toolDef.metadata !== null
+                ? (toolDef.metadata as Record<string, unknown>)
+                : undefined,
+            input: params,
+            readOnly,
+          },
+          options.abortSignal,
+        );
+        if (!decision.allowed) {
+          return { error: deniedMessage('Tool call', decision) };
+        }
+        return original(params, options);
+      },
+    };
   }
 }

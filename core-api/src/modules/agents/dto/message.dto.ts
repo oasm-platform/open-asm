@@ -1,24 +1,33 @@
-import { AgentMode } from '@/common/enums/enum';
-import { ApiProperty } from '@nestjs/swagger';
+import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
+  IsBoolean,
+  IsDate,
   IsEnum,
+  IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MessageRole, MessageType } from '../enums/agent.enums';
+import { LLMProvider, MessageRole, MessageType } from '../enums/agent.enums';
 
 export class SendMessageDto {
-  @ApiProperty({ example: 'Hello, how can you help me?' })
+  @ApiProperty({
+    description: 'User message to send to the agent',
+    example: 'Hello, how can you help me?',
+  })
   @IsString()
+  @IsNotEmpty()
+  @Matches(/\S/, { message: 'question must contain a non-whitespace character' })
   question: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '550e8400-e29b-41d4-a716-446655440000',
-    required: false,
     description:
       'Continue existing conversation. If not provided, a new conversation is created.',
   })
@@ -26,31 +35,45 @@ export class SendMessageDto {
   @IsUUID()
   conversationId?: string;
 
-  @ApiProperty({
-    required: false,
+  @ApiPropertyOptional({
     description: 'Override model name for new conversations',
+    example: 'gpt-5',
   })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   model?: string;
 
-  @ApiProperty({
-    required: false,
+  @ApiPropertyOptional({
     description: 'Override provider for new conversations',
+    enum: LLMProvider,
+    example: LLMProvider.OPENAI,
   })
   @IsOptional()
-  @IsString()
-  provider?: string;
+  @IsEnum(LLMProvider)
+  provider?: LLMProvider;
 
-  @ApiProperty({ enum: AgentMode, required: false })
+  @ApiPropertyOptional({
+    description: 'Interaction mode for a new or existing conversation',
+    enum: AgentMode,
+    example: AgentMode.ASK,
+  })
   @IsOptional()
   @IsEnum(AgentMode)
-  agentMode: AgentMode;
+  agentMode?: AgentMode;
 
-  @ApiProperty({
-    required: false,
+  @ApiPropertyOptional({
+    enum: AgentApprovalMode,
+    description: 'Approval policy for agent tool requests',
+    example: AgentApprovalMode.MANUAL,
+  })
+  @IsOptional()
+  @IsEnum(AgentApprovalMode)
+  approvalMode?: AgentApprovalMode;
+
+  @ApiPropertyOptional({
     description:
-      'Preferred worker ID for remote command execution. Only respected when agentMode is "agent".',
+      'Preferred worker for remote execution when agent mode is selected',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @IsOptional()
@@ -59,43 +82,97 @@ export class SendMessageDto {
 }
 
 export class ToolCallResponseDto {
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Identifier assigned to this tool invocation',
+    example: 'call_123',
+  })
+  @IsString()
+  @IsNotEmpty()
   toolCallId: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Registered name of the invoked tool',
+    example: 'execute_command',
+  })
+  @IsString()
+  @IsNotEmpty()
   toolName: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Arguments supplied to the tool invocation',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsObject()
   args: Record<string, unknown>;
 
-  @ApiProperty({ required: false })
+  @ApiPropertyOptional({
+    description: 'Structured result returned by the tool, when available',
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsObject()
   result?: Record<string, unknown> | null;
 
-  @ApiProperty({ required: false, default: false })
+  @ApiPropertyOptional({
+    description: 'Whether the tool invocation finished with an error',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
   isError?: boolean;
 }
 
 export class MessageResponseDto {
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Unique message identifier',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsUUID()
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Conversation containing this message',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsUUID()
   conversationId: string;
 
-  @ApiProperty({ enum: MessageRole })
+  @ApiProperty({
+    description: 'Participant that produced the message',
+    enum: MessageRole,
+    example: MessageRole.ASSISTANT,
+  })
+  @IsEnum(MessageRole)
   role: MessageRole;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Plain-text message content',
+    example: 'I found three relevant assets.',
+  })
+  @IsString()
   content: string;
 
-  @ApiProperty({ enum: MessageType })
+  @ApiProperty({
+    description: 'Rendering category of the message',
+    enum: MessageType,
+    example: MessageType.TEXT,
+  })
+  @IsEnum(MessageType)
   messageType: MessageType;
 
-  @ApiProperty({ required: false })
+  @ApiPropertyOptional({
+    description: 'Additional structured message metadata',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
   metadata?: Record<string, unknown>;
 
-  @ApiProperty({
-    required: false,
+  @ApiPropertyOptional({
     description:
       'Chronological parts array preserving the real order of reasoning, tool calls, and text.',
     type: 'array',
@@ -103,20 +180,34 @@ export class MessageResponseDto {
   })
   @IsOptional()
   @IsArray()
+  @IsObject({ each: true })
   parts?: Record<string, unknown>[];
 
-  @ApiProperty({ required: false, type: [ToolCallResponseDto] })
+  @ApiPropertyOptional({
+    description: 'Tool invocations associated with this message',
+    type: [ToolCallResponseDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ToolCallResponseDto)
   toolCalls?: ToolCallResponseDto[];
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Timestamp when the message was created',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  @IsDate()
   createdAt: Date;
 }
 
 export class GetMessagesResponseDto {
-  @ApiProperty({ type: [MessageResponseDto] })
+  @ApiProperty({
+    description: 'Messages in chronological conversation order',
+    type: [MessageResponseDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MessageResponseDto)
   messages: MessageResponseDto[];
 }

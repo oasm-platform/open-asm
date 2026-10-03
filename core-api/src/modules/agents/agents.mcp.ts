@@ -1,10 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { jsonSchema } from 'ai';
+import { jsonSchema, tool } from 'ai';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { AgentsService } from './agents.service';
 import { MCPServerResponseDto } from './dto/mcp-config.dto';
+
+export function getMcpToolMetadata(serverName: string, mcpTool: McpTool) {
+  const title = mcpTool.title ?? mcpTool.annotations?.title;
+
+  return {
+    source: 'mcp' as const,
+    server: serverName,
+    name: mcpTool.name,
+    ...(title ? { title } : {}),
+    ...(mcpTool.annotations ? { annotations: mcpTool.annotations } : {}),
+  };
+}
 
 @Injectable()
 export class AgentsMcpService {
@@ -79,19 +92,26 @@ export class AgentsMcpService {
       const { tools } = await client.listTools();
 
       const mcpTools: Record<string, unknown> = {};
+      const allowedTools = server.allowed_tools
+        ? new Set(server.allowed_tools)
+        : null;
 
       for (const t of tools) {
+        if (allowedTools && !allowedTools.has(t.name)) continue;
+
         // Prefix tool name with server name to avoid collisions
         const toolName = `${server.name}_${t.name}`;
+        const title = t.title ?? t.annotations?.title;
 
-        mcpTools[toolName] = {
-          description:
-            t.description || `MCP tool ${t.name} from ${server.name}`,
+        mcpTools[toolName] = tool({
+          ...(title ? { title } : {}),
+          description: t.description,
+          metadata: getMcpToolMetadata(server.name, t),
           inputSchema: jsonSchema(t.inputSchema as Parameters<typeof jsonSchema>[0]),
           execute: async (params: unknown) => {
             return this.callMcpTool(server, t.name, params);
           },
-        };
+        });
       }
 
       return mcpTools;

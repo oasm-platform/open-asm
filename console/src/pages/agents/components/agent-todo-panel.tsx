@@ -118,12 +118,17 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
             )}
           </span>
           <span className="flex items-center gap-2 shrink-0">
-            {activeCount > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
-                <Loader2 className="size-3 animate-spin" />
-                {activeCount} active
-              </span>
-            )}
+            {activeCount > 0 &&
+              (counts.in_progress > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                  <Loader2 className="size-3 animate-spin" />
+                  {activeCount} left
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                  {activeCount} left
+                </span>
+              ))}
             {counts.completed > 0 && counts.completed === todos.length && (
               <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400">
                 <CheckCircle2 className="size-3" />

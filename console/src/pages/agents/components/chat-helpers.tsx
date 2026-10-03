@@ -10,9 +10,27 @@ import { MessageAction } from '@/components/ai-elements/message';
 // Tool call status
 // ---------------------------------------------------------------------------
 
-export function getToolStatus(state?: string): ToolCallState['status'] {
+// Match rejectionMessage() / PLAN_REQUIRED_MESSAGE in core-api agents.tools.ts
+const REJECTED_MARKER = 'was not approved by the user';
+const PLAN_REQUIRED_MARKER = 'needs an approved plan first';
+
+function outputError(output: unknown): string {
+  if (!output || typeof output !== 'object') return '';
+  const error = (output as { error?: unknown }).error;
+  return typeof error === 'string' ? error : '';
+}
+
+export function getToolStatus(
+  state?: string,
+  output?: unknown,
+): ToolCallState['status'] {
   if (!state) return 'pending';
-  if (state === 'output-available' || state === 'result') return 'completed';
+  if (state === 'output-available' || state === 'result') {
+    const error = outputError(output);
+    if (error.includes(REJECTED_MARKER)) return 'rejected';
+    if (error.includes(PLAN_REQUIRED_MARKER)) return 'needs-plan';
+    return 'completed';
+  }
   if (state === 'output-error') return 'error';
   if (
     state === 'call' ||

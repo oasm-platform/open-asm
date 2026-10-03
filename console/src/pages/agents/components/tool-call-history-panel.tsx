@@ -1,13 +1,16 @@
 import { cn } from '@/lib/utils';
 import type { UIMessage } from 'ai';
 import {
+  Ban,
   CheckCircle2,
   Circle,
+  ListChecks,
   Loader2,
   Terminal,
   XCircle,
 } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef } from 'react';
+import type { ToolCallState } from '@/components/common/tool-call-display';
 import { getToolStatus } from './chat-helpers';
 
 // ---------------------------------------------------------------------------
@@ -17,7 +20,7 @@ import { getToolStatus } from './chat-helpers';
 interface ToolCallEntry {
   toolCallId: string;
   toolName: string;
-  status: 'pending' | 'executing' | 'completed' | 'error';
+  status: ToolCallState['status'];
   input?: unknown;
   output?: unknown;
 }
@@ -50,7 +53,7 @@ function extractToolCalls(messages: UIMessage[]): ToolCallEntry[] {
           if (idx >= 0) {
             entries[idx] = {
               ...entries[idx],
-              status: getToolStatus(tp.state),
+              status: getToolStatus(tp.state, tp.output),
               output: tp.output,
             };
           }
@@ -66,7 +69,7 @@ function extractToolCalls(messages: UIMessage[]): ToolCallEntry[] {
         entries.push({
           toolCallId: tp.toolCallId,
           toolName: effectiveToolName,
-          status: getToolStatus(tp.state),
+          status: getToolStatus(tp.state, tp.output),
           input: tp.input,
           output: tp.output,
         });
@@ -90,6 +93,8 @@ const STATUS_CONFIG = {
   executing: { icon: Loader2, className: 'text-blue-500' },
   completed: { icon: CheckCircle2, className: 'text-green-500' },
   error: { icon: XCircle, className: 'text-red-500' },
+  rejected: { icon: Ban, className: 'text-amber-500' },
+  'needs-plan': { icon: ListChecks, className: 'text-amber-500' },
 } as const;
 
 function ToolStatusIcon({ status }: { status: ToolCallEntry['status'] }) {
