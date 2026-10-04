@@ -621,7 +621,7 @@ export type On = {
 export type WorkflowContentJobs = { [key: string]: WorkflowJob };
 
 export type WorkflowContent = {
-  on: On;
+  on?: On;
   /** Jobs keyed by a unique job id; `needs` references those same ids */
   jobs: WorkflowContentJobs;
   name: string;
@@ -1341,6 +1341,15 @@ export type JobHistoryDetailResponseDto = {
   activeJobsCount: number;
 };
 
+export type JobHistoryWorkflowResponseDto = {
+  id: string;
+  jobHistoryName: string;
+  workflowId?: string;
+  workflowName?: string;
+  content?: WorkflowContent;
+  steps: WorkflowStepStatusDto[];
+};
+
 export type PickToolIdName = {
   id: string;
   name: string;
@@ -2003,15 +2012,11 @@ export type WorkspaceTool = {
 };
 
 export type AddToolToWorkspaceDto = {
-  /** The ID of the workspace */
-  workspaceId: string;
   /** The ID of the tool */
   toolId: string;
 };
 
 export type InstallToolDto = {
-  /** The ID of the workspace */
-  workspaceId: string;
   /** The ID of the tool */
   toolId: string;
 };
@@ -2764,53 +2769,6 @@ export type GetManyNotificationResponseDtoDto = {
 };
 
 /**
- * Type of the notification
- */
-export type CreateNotificationDtoScope =
-  (typeof CreateNotificationDtoScope)[keyof typeof CreateNotificationDtoScope];
-
-export const CreateNotificationDtoScope = {
-  SYSTEM: 'SYSTEM',
-  USER: 'USER',
-  GROUP: 'GROUP',
-} as const;
-
-/**
- * Type of the notification
- */
-export type CreateNotificationDtoType =
-  (typeof CreateNotificationDtoType)[keyof typeof CreateNotificationDtoType];
-
-export const CreateNotificationDtoType = {
-  WORKSPACE_CREATED: 'WORKSPACE_CREATED',
-  VULNERABILITY_ANALYSIS_COMPLETED: 'VULNERABILITY_ANALYSIS_COMPLETED',
-  ASSET_NEW_DETECT: 'ASSET_NEW_DETECT',
-  SCAN_INCOMPLETE: 'SCAN_INCOMPLETE',
-  NEW_VULNERABILITY_FOUND: 'NEW_VULNERABILITY_FOUND',
-  WORKSPACE_INVITATION: 'WORKSPACE_INVITATION',
-} as const;
-
-/**
- * Metadata for the notification content (variables for translation)
- */
-export type CreateNotificationDtoMetadata = { [key: string]: unknown };
-
-export type CreateNotificationDto = {
-  /** List of user IDs to receive the notification */
-  recipients: string[];
-  /** Type of the notification */
-  scope: CreateNotificationDtoScope;
-  /** Type of the notification */
-  type: CreateNotificationDtoType;
-  /** Metadata for the notification content (variables for translation) */
-  metadata?: CreateNotificationDtoMetadata;
-  /** Name of the feature this notification belongs to (e.g. "target"), used with refId to delete related notifications once the work is done */
-  ref?: string;
-  /** Identifier of the related feature record (e.g. "1234") */
-  refId?: string;
-};
-
-/**
  * JSON Schema (Draft 2020-12) with oneOf discriminated union by app_type + category
  */
 export type SchemasResponseDtoSchema = { [key: string]: unknown };
@@ -3042,13 +3000,13 @@ export type CreateTemplateDTO = {
   fileName: string;
 };
 
-export type UploadTemplateResponseDTO = {
+export type PresignUploadResponseDto = {
+  uploadUrl: string;
+  key: string;
   path: string;
-};
-
-export type UploadTemplateDTO = {
-  templateId: string;
-  fileContent: string;
+  contentType: string;
+  /** Lifetime of the presigned URL in seconds */
+  expiresIn: number;
 };
 
 export type RenameTemplateDTO = {
@@ -3277,8 +3235,10 @@ export type ReportResponseDto = {
   fileName: string;
   type: ReportResponseDtoType;
   createdAt: string;
-  /** Presigned download URL (expires in 15 minutes) */
+  /** Presigned S3 download URL (short-lived, default 15 minutes) */
   downloadUrl: string;
+  /** Presigned URL lifetime in seconds */
+  downloadExpiresIn: number;
 };
 
 export type GetManyReportResponseDtoDto = {
@@ -3324,6 +3284,39 @@ export type GenerateVulReportBodyDto = {
   vulnIds?: string[];
   /** Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO) */
   minSeverity?: GenerateVulReportBodyDtoMinSeverity;
+};
+
+export type LogoPresignRequestDto = {
+  /** Original file name of the logo image */
+  fileName: string;
+  /** Defaults to the image type derived from the file extension */
+  contentType?: string;
+};
+
+export type LogoPresignResponseDto = {
+  uploadUrl: string;
+  key: string;
+  path: string;
+  /** Lifetime of the presigned URL in seconds */
+  expiresIn: number;
+};
+
+export type ConfirmLogoRequestDto = {
+  /** Object key returned by the logo presign endpoint */
+  key: string;
+};
+
+export type PresignUploadRequestDto = {
+  /** Original file name of the object */
+  fileName: string;
+  bucket?: string;
+  contentType?: string;
+};
+
+export type PresignDownloadResponseDto = {
+  downloadUrl: string;
+  /** Lifetime of the presigned URL in seconds */
+  expiresIn: number;
 };
 
 export type Session = {
@@ -4086,27 +4079,13 @@ export const ReportsControllerPreviewVulReportMinSeverity = {
   INFO: 'INFO',
 } as const;
 
-export type StorageControllerUploadLogoBody = {
-  file: Blob;
-};
-
-export type StorageControllerUploadFileBody = {
-  file: Blob;
-  /** Bucket name (default: "default") */
-  bucket?: string;
-};
-
-export type StorageControllerUploadFile200 = {
-  path?: string;
-  bucket?: string;
-  fullPath?: string;
-};
-
-export type StorageControllerDownloadFileParams = {
+export type StorageControllerPresignDownloadParams = {
+  bucket: string;
+  path: string;
   /**
-   * Time-limited download token
+   * Suggested download file name
    */
-  token: string;
+  fileName?: string;
 };
 
 export type SocialSignInBodyIdTokenUserName = {
@@ -14673,6 +14652,201 @@ export function useJobsRegistryControllerGetJobHistoryDetail<
     id,
     options,
   );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the workflow definition a run was created from, as JSON and as YAML, with the step state of that run.
+ * @summary Get Job History Workflow
+ */
+export const jobsRegistryControllerGetJobHistoryWorkflow = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<JobHistoryWorkflowResponseDto>(
+    {
+      url: `/api/jobs-registry/histories/${id}/workflow`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getJobsRegistryControllerGetJobHistoryWorkflowQueryKey = (
+  id: string,
+) => {
+  return [`/api/jobs-registry/histories/${id}/workflow`] as const;
+};
+
+export const getJobsRegistryControllerGetJobHistoryWorkflowQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getJobsRegistryControllerGetJobHistoryWorkflowQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>
+  > = ({ signal }) =>
+    jobsRegistryControllerGetJobHistoryWorkflow(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type JobsRegistryControllerGetJobHistoryWorkflowQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>
+  >;
+export type JobsRegistryControllerGetJobHistoryWorkflowQueryError = unknown;
+
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get Job History Workflow
+ */
+
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getJobsRegistryControllerGetJobHistoryWorkflowQueryOptions(id, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -30122,102 +30296,6 @@ export function useNotificationsControllerGetNotifications<
 }
 
 /**
- * Create a new notification for a specific user or group of users
- * @summary Create a notification
- */
-export const notificationsControllerCreateNotification = (
-  createNotificationDto: CreateNotificationDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/notifications`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createNotificationDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getNotificationsControllerCreateNotificationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-    TError,
-    { data: CreateNotificationDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-  TError,
-  { data: CreateNotificationDto },
-  TContext
-> => {
-  const mutationKey = ['notificationsControllerCreateNotification'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-    { data: CreateNotificationDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return notificationsControllerCreateNotification(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type NotificationsControllerCreateNotificationMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>
-  >;
-export type NotificationsControllerCreateNotificationMutationBody =
-  CreateNotificationDto;
-export type NotificationsControllerCreateNotificationMutationError = unknown;
-
-/**
- * @summary Create a notification
- */
-export const useNotificationsControllerCreateNotification = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-      TError,
-      { data: CreateNotificationDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-  TError,
-  { data: CreateNotificationDto },
-  TContext
-> => {
-  return useMutation(
-    getNotificationsControllerCreateNotificationMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
  * Subscribe to a Server-Sent Events (SSE) stream for real-time notifications
  * @summary Subscribe to notifications stream
  */
@@ -34309,44 +34387,38 @@ export function useTemplatesControllerGetAllTemplates<
 }
 
 /**
- * Upload a template to the storage
- * @summary Template upload
+ * Create a presigned URL the client PUTs the template YAML to directly
+ * @summary Presign a template upload
  */
-export const templatesControllerUploadFile = (
-  uploadTemplateDTO: UploadTemplateDTO,
+export const templatesControllerPresignTemplate = (
+  templateId: string,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<UploadTemplateResponseDTO>(
-    {
-      url: `/api/templates/upload`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: uploadTemplateDTO,
-      signal,
-    },
+  return orvalClient<PresignUploadResponseDto>(
+    { url: `/api/templates/${templateId}/presign`, method: 'POST', signal },
     options,
   );
 };
 
-export const getTemplatesControllerUploadFileMutationOptions = <
+export const getTemplatesControllerPresignTemplateMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+    Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
     TError,
-    { data: UploadTemplateDTO },
+    { templateId: string },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+  Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
   TError,
-  { data: UploadTemplateDTO },
+  { templateId: string },
   TContext
 > => {
-  const mutationKey = ['templatesControllerUploadFile'];
+  const mutationKey = ['templatesControllerPresignTemplate'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -34356,48 +34428,48 @@ export const getTemplatesControllerUploadFileMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-    { data: UploadTemplateDTO }
+    Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
+    { templateId: string }
   > = (props) => {
-    const { data } = props ?? {};
+    const { templateId } = props ?? {};
 
-    return templatesControllerUploadFile(data, requestOptions);
+    return templatesControllerPresignTemplate(templateId, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type TemplatesControllerUploadFileMutationResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerUploadFile>>
+export type TemplatesControllerPresignTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerPresignTemplate>>
 >;
-export type TemplatesControllerUploadFileMutationBody = UploadTemplateDTO;
-export type TemplatesControllerUploadFileMutationError = unknown;
+
+export type TemplatesControllerPresignTemplateMutationError = unknown;
 
 /**
- * @summary Template upload
+ * @summary Presign a template upload
  */
-export const useTemplatesControllerUploadFile = <
+export const useTemplatesControllerPresignTemplate = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+      Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
       TError,
-      { data: UploadTemplateDTO },
+      { templateId: string },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+  Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
   TError,
-  { data: UploadTemplateDTO },
+  { templateId: string },
   TContext
 > => {
   return useMutation(
-    getTemplatesControllerUploadFileMutationOptions(options),
+    getTemplatesControllerPresignTemplateMutationOptions(options),
     queryClient,
   );
 };
@@ -39619,46 +39691,137 @@ export const useReportsControllerDeleteReport = <
 };
 
 /**
- * @summary Upload app logo to system bucket
+ * @summary Create a presigned URL for direct app-logo upload
  */
-export const storageControllerUploadLogo = (
-  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
+export const storageControllerPresignLogoUpload = (
+  logoPresignRequestDto: LogoPresignRequestDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  const formData = new FormData();
-  formData.append(`file`, storageControllerUploadLogoBody.file);
+  return orvalClient<LogoPresignResponseDto>(
+    {
+      url: `/api/storage/logo/presign`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: logoPresignRequestDto,
+      signal,
+    },
+    options,
+  );
+};
 
+export const getStorageControllerPresignLogoUploadMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+    TError,
+    { data: LogoPresignRequestDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+  TError,
+  { data: LogoPresignRequestDto },
+  TContext
+> => {
+  const mutationKey = ['storageControllerPresignLogoUpload'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+    { data: LogoPresignRequestDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerPresignLogoUpload(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StorageControllerPresignLogoUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>
+>;
+export type StorageControllerPresignLogoUploadMutationBody =
+  LogoPresignRequestDto;
+export type StorageControllerPresignLogoUploadMutationError = void;
+
+/**
+ * @summary Create a presigned URL for direct app-logo upload
+ */
+export const useStorageControllerPresignLogoUpload = <
+  TError = void,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+      TError,
+      { data: LogoPresignRequestDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+  TError,
+  { data: LogoPresignRequestDto },
+  TContext
+> => {
+  return useMutation(
+    getStorageControllerPresignLogoUploadMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Confirm a directly-uploaded app logo and activate it
+ */
+export const storageControllerConfirmLogoUpload = (
+  confirmLogoRequestDto: ConfirmLogoRequestDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
   return orvalClient<DefaultMessageResponseDto>(
     {
-      url: `/api/storage/logo`,
+      url: `/api/storage/logo/confirm`,
       method: 'POST',
-      headers: { 'Content-Type': 'multipart/form-data' },
-      data: formData,
+      headers: { 'Content-Type': 'application/json' },
+      data: confirmLogoRequestDto,
       signal,
     },
     options,
   );
 };
 
-export const getStorageControllerUploadLogoMutationOptions = <
+export const getStorageControllerConfirmLogoUploadMutationOptions = <
   TError = void,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
     TError,
-    { data: StorageControllerUploadLogoBody },
+    { data: ConfirmLogoRequestDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
   TError,
-  { data: StorageControllerUploadLogoBody },
+  { data: ConfirmLogoRequestDto },
   TContext
 > => {
-  const mutationKey = ['storageControllerUploadLogo'];
+  const mutationKey = ['storageControllerConfirmLogoUpload'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -39668,97 +39831,91 @@ export const getStorageControllerUploadLogoMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-    { data: StorageControllerUploadLogoBody }
+    Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
+    { data: ConfirmLogoRequestDto }
   > = (props) => {
     const { data } = props ?? {};
 
-    return storageControllerUploadLogo(data, requestOptions);
+    return storageControllerConfirmLogoUpload(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type StorageControllerUploadLogoMutationResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerUploadLogo>>
+export type StorageControllerConfirmLogoUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>
 >;
-export type StorageControllerUploadLogoMutationBody =
-  StorageControllerUploadLogoBody;
-export type StorageControllerUploadLogoMutationError = void;
+export type StorageControllerConfirmLogoUploadMutationBody =
+  ConfirmLogoRequestDto;
+export type StorageControllerConfirmLogoUploadMutationError = void;
 
 /**
- * @summary Upload app logo to system bucket
+ * @summary Confirm a directly-uploaded app logo and activate it
  */
-export const useStorageControllerUploadLogo = <
+export const useStorageControllerConfirmLogoUpload = <
   TError = void,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+      Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
       TError,
-      { data: StorageControllerUploadLogoBody },
+      { data: ConfirmLogoRequestDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
   TError,
-  { data: StorageControllerUploadLogoBody },
+  { data: ConfirmLogoRequestDto },
   TContext
 > => {
   return useMutation(
-    getStorageControllerUploadLogoMutationOptions(options),
+    getStorageControllerConfirmLogoUploadMutationOptions(options),
     queryClient,
   );
 };
 
 /**
- * @summary Upload a file to storage
+ * @summary Create a presigned URL for direct-to-storage upload
  */
-export const storageControllerUploadFile = (
-  storageControllerUploadFileBody: StorageControllerUploadFileBody,
+export const storageControllerPresignUpload = (
+  presignUploadRequestDto: PresignUploadRequestDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  const formData = new FormData();
-  formData.append(`file`, storageControllerUploadFileBody.file);
-  if (storageControllerUploadFileBody.bucket !== undefined) {
-    formData.append(`bucket`, storageControllerUploadFileBody.bucket);
-  }
-
-  return orvalClient<StorageControllerUploadFile200>(
+  return orvalClient<PresignUploadResponseDto>(
     {
-      url: `/api/storage/upload`,
+      url: `/api/storage/presign/upload`,
       method: 'POST',
-      headers: { 'Content-Type': 'multipart/form-data' },
-      data: formData,
+      headers: { 'Content-Type': 'application/json' },
+      data: presignUploadRequestDto,
       signal,
     },
     options,
   );
 };
 
-export const getStorageControllerUploadFileMutationOptions = <
-  TError = unknown,
+export const getStorageControllerPresignUploadMutationOptions = <
+  TError = void,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof storageControllerUploadFile>>,
+    Awaited<ReturnType<typeof storageControllerPresignUpload>>,
     TError,
-    { data: StorageControllerUploadFileBody },
+    { data: PresignUploadRequestDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof storageControllerUploadFile>>,
+  Awaited<ReturnType<typeof storageControllerPresignUpload>>,
   TError,
-  { data: StorageControllerUploadFileBody },
+  { data: PresignUploadRequestDto },
   TContext
 > => {
-  const mutationKey = ['storageControllerUploadFile'];
+  const mutationKey = ['storageControllerPresignUpload'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -39768,97 +39925,85 @@ export const getStorageControllerUploadFileMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof storageControllerUploadFile>>,
-    { data: StorageControllerUploadFileBody }
+    Awaited<ReturnType<typeof storageControllerPresignUpload>>,
+    { data: PresignUploadRequestDto }
   > = (props) => {
     const { data } = props ?? {};
 
-    return storageControllerUploadFile(data, requestOptions);
+    return storageControllerPresignUpload(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type StorageControllerUploadFileMutationResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerUploadFile>>
+export type StorageControllerPresignUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerPresignUpload>>
 >;
-export type StorageControllerUploadFileMutationBody =
-  StorageControllerUploadFileBody;
-export type StorageControllerUploadFileMutationError = unknown;
+export type StorageControllerPresignUploadMutationBody =
+  PresignUploadRequestDto;
+export type StorageControllerPresignUploadMutationError = void;
 
 /**
- * @summary Upload a file to storage
+ * @summary Create a presigned URL for direct-to-storage upload
  */
-export const useStorageControllerUploadFile = <
-  TError = unknown,
+export const useStorageControllerPresignUpload = <
+  TError = void,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof storageControllerUploadFile>>,
+      Awaited<ReturnType<typeof storageControllerPresignUpload>>,
       TError,
-      { data: StorageControllerUploadFileBody },
+      { data: PresignUploadRequestDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof storageControllerUploadFile>>,
+  Awaited<ReturnType<typeof storageControllerPresignUpload>>,
   TError,
-  { data: StorageControllerUploadFileBody },
+  { data: PresignUploadRequestDto },
   TContext
 > => {
   return useMutation(
-    getStorageControllerUploadFileMutationOptions(options),
+    getStorageControllerPresignUploadMutationOptions(options),
     queryClient,
   );
 };
 
 /**
- * @summary Download a file with time-limited token
+ * @summary Create a presigned URL for direct-from-storage download
  */
-export const storageControllerDownloadFile = (
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+export const storageControllerPresignDownload = (
+  params: StorageControllerPresignDownloadParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<Blob>(
-    {
-      url: `/api/storage/${bucket}/${path}/download`,
-      method: 'GET',
-      params,
-      responseType: 'blob',
-      signal,
-    },
+  return orvalClient<PresignDownloadResponseDto>(
+    { url: `/api/storage/presign/download`, method: 'GET', params, signal },
     options,
   );
 };
 
-export const getStorageControllerDownloadFileQueryKey = (
-  bucket: string,
-  path: string,
-  params?: StorageControllerDownloadFileParams,
+export const getStorageControllerPresignDownloadQueryKey = (
+  params?: StorageControllerPresignDownloadParams,
 ) => {
   return [
-    `/api/storage/${bucket}/${path}/download`,
+    `/api/storage/presign/download`,
     ...(params ? [params] : []),
   ] as const;
 };
 
-export const getStorageControllerDownloadFileQueryOptions = <
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export const getStorageControllerPresignDownloadQueryOptions = <
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
@@ -39870,54 +40015,43 @@ export const getStorageControllerDownloadFileQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getStorageControllerDownloadFileQueryKey(bucket, path, params);
+    getStorageControllerPresignDownloadQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof storageControllerDownloadFile>>
+    Awaited<ReturnType<typeof storageControllerPresignDownload>>
   > = ({ signal }) =>
-    storageControllerDownloadFile(bucket, path, params, requestOptions, signal);
+    storageControllerPresignDownload(params, requestOptions, signal);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled:
-      bucket !== null &&
-      bucket !== undefined &&
-      path !== null &&
-      path !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof storageControllerPresignDownload>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type StorageControllerDownloadFileQueryResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerDownloadFile>>
+export type StorageControllerPresignDownloadQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerPresignDownload>>
 >;
-export type StorageControllerDownloadFileQueryError = void;
+export type StorageControllerPresignDownloadQueryError = void;
 
-export function useStorageControllerDownloadFile<
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>,
           TError,
-          Awaited<ReturnType<typeof storageControllerDownloadFile>>
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>
         >,
         'initialData'
       >;
@@ -39927,26 +40061,24 @@ export function useStorageControllerDownloadFile<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useStorageControllerDownloadFile<
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>,
           TError,
-          Awaited<ReturnType<typeof storageControllerDownloadFile>>
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>
         >,
         'initialData'
       >;
@@ -39956,17 +40088,15 @@ export function useStorageControllerDownloadFile<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useStorageControllerDownloadFile<
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
@@ -39978,20 +40108,18 @@ export function useStorageControllerDownloadFile<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Download a file with time-limited token
+ * @summary Create a presigned URL for direct-from-storage download
  */
 
-export function useStorageControllerDownloadFile<
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
@@ -40002,9 +40130,7 @@ export function useStorageControllerDownloadFile<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getStorageControllerDownloadFileQueryOptions(
-    bucket,
-    path,
+  const queryOptions = getStorageControllerPresignDownloadQueryOptions(
     params,
     options,
   );
