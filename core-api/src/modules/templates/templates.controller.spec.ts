@@ -7,7 +7,7 @@ describe('TemplatesController workspace permission guards', () => {
 
   const cases: Array<[string, string, string[]]> = [
     ['createTemplate', 'POST /', ['template.write']],
-    ['uploadFile', 'POST /upload', ['template.write']],
+    ['presignTemplate', 'POST /:templateId/presign', ['template.write']],
     ['renameFile', 'PATCH /:templateId/rename', ['template.write']],
     ['getTemplateById', 'GET /:templateId', ['template.read']],
     ['getAllTemplates', 'GET /', ['template.read']],
