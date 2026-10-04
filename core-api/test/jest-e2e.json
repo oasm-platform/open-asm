@@ -11,7 +11,7 @@
     "^@react-pdf/renderer$": "<rootDir>/stubs/react-pdf-renderer.js"
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!(?:.pnpm/[^/]+/node_modules/)?(?:better-auth|better-call|@better-auth|@better-fetch|@noble|@opentelemetry|@standard-schema|@formatjs|@nestjs|intl-messageformat|rou3|set-cookie-parser|kysely|nanostores|zod|defu|jose|file-type|load-esm|uid|react|react-dom)(?:/|$))"
+    "node_modules/(?!(?:.pnpm/[^/]+/node_modules/)?(?:better-auth|better-call|@better-auth|@better-fetch|@noble|@opentelemetry|@standard-schema|@formatjs|@nestjs|intl-messageformat|rou3|set-cookie-parser|kysely|nanostores|zod|defu|jose|file-type|load-esm|uid|react|react-dom|ai|@ai-sdk|@workflow|eventsource-parser)(?:/|$))"
   ],
   "setupFiles": ["<rootDir>/setup-env.ts"],
   "globalSetup": "<rootDir>/global-setup.ts",

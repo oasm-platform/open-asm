@@ -20,7 +20,14 @@ import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilitie
 import { WorkersService } from '@/modules/workers/workers.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { AgentMode } from '@/common/enums/enum';
+import {
+  AgentsApprovalsService,
+  type ApprovalContext,
+  type ApprovalDecision,
+  type ApprovalSettings,
+  type PlanRunMode,
+} from './agents.approvals';
+import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -49,6 +56,81 @@ const webFetchSchema = z.object({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolType = any;
+
+function rejectionMessage(what: string, feedback?: string): string {
+  const base = `${what} was not approved by the user and was not executed.`;
+  return feedback ? `${base} The user says: ${feedback}` : base;
+}
+
+/** Matched by the console (chat-helpers.tsx) to show the call as "Needs plan" */
+const PLAN_REQUIRED_MESSAGE =
+  'Not executed: this conversation needs an approved plan first. Call formulate_plan with the full plan (put this work in its steps) and wait for the user to approve it before calling other tools.';
+
+/** Plans exist only in PLAN mode; AUTO and MANUAL just do the work. */
+const PLANNING_OFF_MESSAGE =
+  'Not executed: planning is off in this conversation (only plan mode makes plans). Do the work directly with the other tools, without a plan.';
+
+function deniedMessage(what: string, decision: ApprovalDecision): string {
+  return decision.planRequired
+    ? PLAN_REQUIRED_MESSAGE
+    : rejectionMessage(what, decision.feedback);
+}
+
+/** Tools that gate themselves (on the raw command) instead of via withApproval. */
+const SELF_GATED_TOOLS = new Set(['execute_remote_command']);
+
+/**
+ * Built-in tools that only read OASM data, so MANUAL runs them without
+ * asking. Not retrieve_web_page: a URL it fetches can carry data out.
+ */
+const READ_ONLY_TOOLS = new Set([
+  'enumerate_assets',
+  'discover_vulnerabilities',
+  'retrieve_targets',
+  'gather_statistics',
+  'inspect_asset',
+  'examine_target_assets',
+  'investigate_vulnerability',
+  'list_network_ports',
+  'fingerprint_technologies',
+  'verify_tls_settings',
+  'enumerate_open_issues',
+  'inspect_issue',
+  'display_available_tools',
+  'list_active_workers',
+  'review_jobs',
+]);
+
+/**
+ * An MCP tool counts as read-only when its server says so and does not say
+ * it reaches the outside world (same reason as retrieve_web_page).
+ */
+function isReadOnlyMcpTool(metadata: unknown): boolean {
+  const annotations = (metadata as { annotations?: Record<string, unknown> })
+    ?.annotations;
+  return (
+    annotations?.readOnlyHint === true && annotations.openWorldHint !== true
+  );
+}
+
+/**
+ * JSON with object keys sorted at every level, so the same arguments match
+ * the same approval whatever order the model wrote them in.
+ */
+export function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.entries(v as Record<string, unknown>).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        )
+      : v,
+  );
+}
+
+/** Longer plans are rarely followed through and bloat every system prompt. */
+const MAX_PLAN_STEPS = 20;
 
 function isPrivateIp(ip: string): boolean {
   const parts = ip.split('.').map(Number);
@@ -88,6 +170,7 @@ export class AgentTool {
     @InjectRepository(AgentConversationTodo)
     private readonly todoRepository: Repository<AgentConversationTodo>,
     private readonly agentsMemories: AgentsMemoriesService,
+    private readonly approvals: AgentsApprovalsService,
   ) {}
 
   get getAssetsTool(): (workspaceId: string) => any {
@@ -95,7 +178,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List discovered assets (domains, IPs, URLs) in the workspace. Params: page, limit, value (filter text).',
-        parameters: getAssetsSchema,
+        inputSchema: getAssetsSchema,
         execute: async (params: z.infer<typeof getAssetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.assetsService.getManyAsssetServices(
@@ -123,7 +206,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List security vulnerabilities with severity. Params: page, limit, q (search e.g. "XSS", "CVE-2024").',
-        parameters: getVulnerabilitiesSchema,
+        inputSchema: getVulnerabilitiesSchema,
         execute: async (params: z.infer<typeof getVulnerabilitiesSchema>) => {
           const { page, limit, q } = params;
           const response = await this.vulnerabilitiesService.getVulnerabilities(
@@ -155,7 +238,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Show scanning scope (root domains, IP ranges added by user). Params: page, limit, value (filter text).',
-        parameters: getTargetsSchema,
+        inputSchema: getTargetsSchema,
         execute: async (params: z.infer<typeof getTargetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.targetsService.getTargetsInWorkspace(
@@ -183,7 +266,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Return security dashboard summary: asset/vulnerability counts, severity breakdown, security score. No params.',
-        parameters: z.object({}),
+        inputSchema: z.object({}),
         execute: async () =>
           this.statisticService.getStatistics({ workspaceId }),
       };
@@ -195,7 +278,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description: 'Get full technical details of a single asset by assetId.',
-        parameters: detailAssetSchema,
+        inputSchema: detailAssetSchema,
         execute: async (params: z.infer<typeof detailAssetSchema>) => {
           const { assetId } = params;
           return this.assetsService.getAssetById(assetId, workspaceId);
@@ -210,7 +293,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter).',
-        parameters: listAssetsInTargetSchema,
+        inputSchema: listAssetsInTargetSchema,
         execute: async (params: z.infer<typeof listAssetsInTargetSchema>) => {
           const { targetId, limit, page, value } = params;
           return this.assetsService.getManyAsssetServices(
@@ -235,7 +318,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Get full vulnerability report with CVSS, PoC, remediation steps. Params: vulnId.',
-        parameters: detailVulnSchema,
+        inputSchema: detailVulnSchema,
         execute: async (params: z.infer<typeof detailVulnSchema>) => {
           const vulnId: string = (params.vulnId ?? params.id) as string;
           return this.vulnerabilitiesService.getVulnerability(
@@ -253,7 +336,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List open network ports with asset counts. Params: page, limit, value (port number filter).',
-        parameters: getPortsSchema,
+        inputSchema: getPortsSchema,
         execute: async (params: z.infer<typeof getPortsSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getPortAssets(
@@ -277,7 +360,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List detected technologies (software, frameworks, servers). Params: page, limit, value (filter by name).',
-        parameters: getTechnologiesSchema,
+        inputSchema: getTechnologiesSchema,
         execute: async (params: z.infer<typeof getTechnologiesSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getTechnologyAssets(
@@ -301,7 +384,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List TLS/SSL certificates with issuer, subject, expiry. Params: page, limit, search (host name filter).',
-        parameters: getTlsSchema,
+        inputSchema: getTlsSchema,
         execute: async (params: z.infer<typeof getTlsSchema>) => {
           const { page, limit, search } = params;
           return this.assetsService.getManyTls(
@@ -325,7 +408,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'HTTP GET to any public URL. Returns statusCode + body. Params: url.',
-        parameters: webFetchSchema,
+        inputSchema: webFetchSchema,
         execute: async (params: z.infer<typeof webFetchSchema>) => {
           const { url: rawUrl } = params;
           try {
@@ -361,7 +444,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List security issues with status. Params: page, limit, search, status (OPEN/IN_PROGRESS/RESOLVED).',
-        parameters: listIssuesSchema,
+        inputSchema: listIssuesSchema,
         execute: async (params: z.infer<typeof listIssuesSchema>) => {
           const { page, limit, search, status } = params;
           const response = await this.issuesService.getMany(
@@ -394,7 +477,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description: 'Get full details of a single issue by issueId.',
-        parameters: detailIssueSchema,
+        inputSchema: detailIssueSchema,
         execute: async (params: z.infer<typeof detailIssueSchema>) => {
           const { issueId } = params;
           return this.issuesService.getById(issueId, workspaceId);
@@ -409,7 +492,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List installed security tools/scanners. Params: page, limit, q (search filter).',
-        parameters: listToolsSchema,
+        inputSchema: listToolsSchema,
         execute: async (params: z.infer<typeof listToolsSchema>) => {
           const { page, limit, q } = params;
           const response = await this.toolsService.getManyTools({
@@ -434,7 +517,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List connected worker nodes. Params: page, limit, q (search query).',
-        parameters: listWorkersSchema,
+        inputSchema: listWorkersSchema,
         execute: async (params: z.infer<typeof listWorkersSchema>) => {
           const { page, limit, q } = params;
           const response = await this.workersService.getWorkers({
@@ -461,7 +544,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List background scan jobs with status. Params: page, limit, jobHistoryId, jobStatus (completed/failed/active).',
-        parameters: listJobsSchema,
+        inputSchema: listJobsSchema,
         execute: async (params: z.infer<typeof listJobsSchema>) => {
           const { page, limit, jobHistoryId, jobStatus } = params;
           const response = await this.jobsRegistryService.getManyJobs(
@@ -489,6 +572,7 @@ export class AgentTool {
     workspaceId: string,
     conversationId: string,
     emitter?: EventEmitter,
+    approval?: ApprovalSettings,
   ): ToolType {
     const toolConfig: any = {
       description: [
@@ -496,17 +580,45 @@ export class AgentTool {
         'Params: command (required shell command string).',
         'Output: stdout, stderr, exitCode, error, timedOut.',
         'Warning: OS-level permissions, no PTY, strict timeout.',
+        'The user may reject a command; if so, do not retry it and propose an alternative.',
       ].join('\n'),
-      parameters: z.object({
+      inputSchema: z.object({
         command: z.string().min(1).describe('Shell command to execute'),
       }),
       execute: async (
         params: { command: string },
-        options: { toolCallId: string },
+        options: { toolCallId: string; abortSignal?: AbortSignal },
       ) => {
         const { command } = params;
         const { toolCallId } = options;
         const sessionId = randomUUID();
+
+        // Without an approval context (e.g. system-driven runs) nobody can
+        // approve, so refuse rather than run unreviewed commands.
+        const decision = approval
+          ? await this.approvals.authorize(
+              command,
+              toolCallId,
+              { ...approval, workspaceId, conversationId },
+              emitter,
+              {
+                tool: 'execute_remote_command',
+                description: 'Run a shell command on a connected worker',
+              },
+              options.abortSignal,
+            )
+          : ({ allowed: false } satisfies ApprovalDecision);
+        if (!decision.allowed) {
+          return {
+            id: sessionId,
+            command,
+            stdout: '',
+            stderr: '',
+            exitCode: null,
+            error: deniedMessage('Command', decision),
+            timedOut: false,
+          };
+        }
 
         return this.remoteExecuteService.waitForResult(
           command,
@@ -524,9 +636,17 @@ export class AgentTool {
     return tool(toolConfig);
   }
 
+  /**
+   * Plan tools. With `plan.approval` in PLAN mode, formulate_plan shows the
+   * new plan to the user and waits for them to approve it, choosing whether
+   * the rest of the run asks per command (MANUAL) or not (AUTO). Outside
+   * PLAN mode formulate_plan and append_step refuse: only transition_step and
+   * scrap_plan remain, to finish or drop a plan approved earlier.
+   */
   getTodoTools(
     conversationId: string,
     emitter?: EventEmitter,
+    plan?: { workspaceId: string; approval: ApprovalSettings },
   ): Record<string, ToolType> {
     const todoRepo = this.todoRepository;
 
@@ -629,13 +749,24 @@ export class AgentTool {
       }
     };
 
+    // Read at call time: approving a plan switches the run out of PLAN mode,
+    // and the plan it approved is the last one this run may make
+    const planningAllowed = () =>
+      !plan || plan.approval.mode === AgentApprovalMode.PLAN;
+
     const setPlanTool: any = {
       description:
         'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
-      parameters: z.object({
+      inputSchema: z.object({
         steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
       }),
-      execute: async (params: { steps: string[] }) => {
+      execute: async (
+        params: { steps: string[] },
+        options?: { toolCallId?: string; abortSignal?: AbortSignal },
+      ) => {
+        if (!planningAllowed()) {
+          return { success: false, message: PLANNING_OFF_MESSAGE };
+        }
         try {
           // Guard: reject if there are active (pending/in_progress) todos
           const existingTodos = await todoRepo.find({
@@ -662,8 +793,9 @@ export class AgentTool {
             };
           }
 
-          // Log raw params for debugging
-          this.logger.log('[formulate_plan] Raw params: ' + JSON.stringify(params, null, 2));
+          this.logger.debug(
+            '[formulate_plan] Raw params: ' + JSON.stringify(params),
+          );
 
           // Normalize steps: handle various formats AI might send
           let normalizedSteps: string[] = [];
@@ -692,7 +824,7 @@ export class AgentTool {
             const parsed = tryParseJsonArray(rawSteps);
             if (parsed) {
               stepsArray = parsed;
-              this.logger.log('[formulate_plan] Parsed from JSON string');
+              this.logger.debug('[formulate_plan] Parsed from JSON string');
             } else {
               stepsArray = [rawSteps];
             }
@@ -701,7 +833,9 @@ export class AgentTool {
               const parsed = tryParseJsonArray(rawSteps[0]!);
               if (parsed) {
                 stepsArray = parsed;
-                this.logger.log('[formulate_plan] Parsed from nested JSON string');
+                this.logger.debug(
+                  '[formulate_plan] Parsed from nested JSON string',
+                );
               } else {
                 stepsArray = rawSteps;
               }
@@ -710,7 +844,6 @@ export class AgentTool {
             }
           }
 
-          this.logger.log('[formulate_plan] Steps array: ' + JSON.stringify(stepsArray));
 
           // Clean each step
           for (const s of stepsArray) {
@@ -736,29 +869,79 @@ export class AgentTool {
             }
           }
 
-          this.logger.log('[formulate_plan] Normalized steps: ' + JSON.stringify(normalizedSteps));
-          this.logger.log('[formulate_plan] Normalized count: ' + normalizedSteps.length);
-
           if (normalizedSteps.length === 0) {
             return { success: false, message: 'No valid steps provided.' };
           }
+          if (normalizedSteps.length > MAX_PLAN_STEPS) {
+            return {
+              success: false,
+              message: `Too many steps (${normalizedSteps.length}). Keep the plan to at most ${MAX_PLAN_STEPS} steps by merging related work.`,
+            };
+          }
 
-          await todoRepo.delete({ conversationId });
-
-          const entities = normalizedSteps.map((step, index) =>
-            todoRepo.create({
-              conversationId,
-              content: step,
-              status: 'pending' as const,
-              sortOrder: index,
-            }),
-          );
-          await todoRepo.save(entities);
+          // Replace the old plan atomically: a failed insert must not leave
+          // the conversation with no plan at all
+          await todoRepo.manager.transaction(async (manager) => {
+            const repo = manager.getRepository(AgentConversationTodo);
+            await repo.delete({ conversationId });
+            await repo.save(
+              normalizedSteps.map((step, index) =>
+                repo.create({
+                  conversationId,
+                  content: step,
+                  status: 'pending' as const,
+                  sortOrder: index,
+                }),
+              ),
+            );
+          });
 
           const todos = await getAllTodos();
-          this.logger.log('[formulate_plan] Final todos: ' + JSON.stringify(todos, null, 2));
+          this.logger.debug(
+            `[formulate_plan] Plan set with ${todos.length} steps for ${conversationId}`,
+          );
 
+          // Show the plan right away, also while the user reviews it
           await emitTodos();
+
+          if (plan?.approval.mode === AgentApprovalMode.PLAN) {
+            const decision = await this.approvals.requestPlanApproval(
+              normalizedSteps,
+              options?.toolCallId ?? '',
+              { ...plan.approval, workspaceId: plan.workspaceId, conversationId },
+              emitter,
+              options?.abortSignal,
+            );
+            if (!decision.allowed) {
+              await todoRepo.delete({ conversationId });
+              await emitTodos();
+              return {
+                success: false,
+                error: rejectionMessage('The plan', decision.feedback),
+                message: decision.feedback
+                  ? 'The plan was discarded. Revise it following what the user said, then call formulate_plan again.'
+                  : 'The plan was discarded. Do not run it; ask the user how they want to proceed.',
+              };
+            }
+            const mode = decision.mode ?? AgentApprovalMode.MANUAL;
+            await this.switchApprovalMode(
+              conversationId,
+              plan.approval,
+              mode,
+              emitter,
+            );
+            return {
+              success: true,
+              message:
+                `The user approved this ${todos.length}-step plan` +
+                (mode === AgentApprovalMode.AUTO
+                  ? ' and lets it run without asking.'
+                  : '; each command still asks for approval.') +
+                ' Start with step 1 now.',
+              todos,
+            };
+          }
+
           return {
             success: true,
             message: `Plan set with ${todos.length} steps.`,
@@ -767,7 +950,7 @@ export class AgentTool {
         } catch (error) {
           const message =
             error instanceof Error ? error.message : String(error);
-          this.logger.error('[formulate_plan] Error: ' + (error instanceof Error ? error.message : String(error)));
+          this.logger.error(`[formulate_plan] Error: ${message}`);
           return { success: false, message: `Failed to set plan: ${message}` };
         }
       },
@@ -776,7 +959,7 @@ export class AgentTool {
     const updateTodoStatusTool: any = {
       description:
         'Update the status of a specific step in the execution plan. You MUST call this at two points: (1) BEFORE starting work on a step — call transition_step(id, "in_progress"), and (2) AFTER finishing work on a step — call transition_step(id, "completed") or transition_step(id, "failed"). ALWAYS transition the current step before moving to the next sequential step. NEVER skip steps. NEVER call this for a step that is not your current step. Params: id (UUID of the step), status (pending/in_progress/completed/failed).',
-      parameters: z.object({
+      inputSchema: z.object({
         id: z.string().uuid().describe('Todo item ID'),
         status: z
           .enum(['pending', 'in_progress', 'completed', 'failed'])
@@ -854,10 +1037,14 @@ export class AgentTool {
     const addTodoTool: any = {
       description:
         'Append a new step to the plan. Params: content (string). ONLY use when you genuinely discover a new requirement during execution that was not part of the original plan. Do NOT use to re-create steps you forgot to add earlier — finish the current step first.',
-      parameters: z.object({
+      inputSchema: z.object({
         content: z.string().min(1).describe('Todo content'),
       }),
       execute: async (params: { content: string }) => {
+        // An approved plan is a contract: no unreviewed steps after the fact
+        if (!planningAllowed()) {
+          return { success: false, message: PLANNING_OFF_MESSAGE };
+        }
         try {
           const existingTodos = await todoRepo.find({
             where: { conversationId },
@@ -888,7 +1075,6 @@ export class AgentTool {
           });
           await todoRepo.save(newEntity);
 
-          await getAllTodos();
           await emitTodos();
           return {
             success: true,
@@ -912,7 +1098,7 @@ export class AgentTool {
     const clearPlanTool: any = {
       description:
         'Clear entire plan (irreversible). Then call formulate_plan to create a new one.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         try {
           await todoRepo.delete({ conversationId });
@@ -937,6 +1123,26 @@ export class AgentTool {
     };
   }
 
+  /**
+   * Apply the approval mode the user picked for an approved plan: to the
+   * running tools (they read `approval` at call time), the conversation
+   * (later turns) and the client's mode selector.
+   */
+  private async switchApprovalMode(
+    conversationId: string,
+    approval: ApprovalSettings,
+    mode: PlanRunMode,
+    emitter?: EventEmitter,
+  ): Promise<void> {
+    // "allow all" belonged to the previous mode
+    await this.approvals.resetConversation(conversationId);
+    await this.conversationRepository.update(conversationId, {
+      approvalMode: mode,
+    });
+    approval.mode = mode;
+    emitter?.emit('approval-mode-changed', { mode });
+  }
+
   getMemoryTools(
     workspaceId: string,
     userId: string,
@@ -948,7 +1154,7 @@ export class AgentTool {
       description:
         'Save a key-value pair to short-term memory (conversation scope). ' +
         'Use this to remember important findings during execution (e.g., discovered IPs, scan results, target info).',
-      parameters: z.object({
+      inputSchema: z.object({
         key: z
           .string()
           .min(1)
@@ -981,7 +1187,7 @@ export class AgentTool {
 
     const stmReadTool: any = {
       description: 'Read a value from short-term memory by key.',
-      parameters: z.object({
+      inputSchema: z.object({
         key: z.string().describe('Memory key to read'),
       }),
       execute: async (params: { key: string }) => {
@@ -1015,7 +1221,7 @@ export class AgentTool {
 
     const stmListTool: any = {
       description: 'List all short-term memory entries for this conversation.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         try {
           const entries = await memoriesService.stmGetAll(conversationId);
@@ -1042,7 +1248,7 @@ export class AgentTool {
       description:
         'Save important information to long-term memory (workspace scope, persists across conversations). ' +
         'Use this for persistent knowledge like target profiles, known vulnerabilities, organizational policies.',
-      parameters: z.object({
+      inputSchema: z.object({
         content: z
           .string()
           .min(1)
@@ -1066,7 +1272,7 @@ export class AgentTool {
     const ltmAppendTool: any = {
       description:
         'Append information to existing long-term memory (keeps previous content).',
-      parameters: z.object({
+      inputSchema: z.object({
         content: z
           .string()
           .min(1)
@@ -1096,7 +1302,7 @@ export class AgentTool {
 
     const ltmReadTool: any = {
       description: 'Read the current long-term memory content.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         try {
           const record = await memoriesService.ltmGet(workspaceId, userId);
@@ -1125,6 +1331,7 @@ export class AgentTool {
     emitter?: EventEmitter,
     conversationId?: string,
     mcpOnly = false,
+    approval?: ApprovalSettings,
   ): Record<string, ToolType> {
     const { AGENT, ASK } = AgentMode;
     const tools: Record<
@@ -1216,6 +1423,7 @@ export class AgentTool {
           workspaceId,
           conversationId ?? '',
           emitter,
+          approval,
         ),
         permissions: [AGENT],
         mcp: false,
@@ -1226,7 +1434,98 @@ export class AgentTool {
       Object.entries(tools)
         .filter(([, config]) => config.permissions.includes(agentMode))
         .filter(([, config]) => (mcpOnly ? config.mcp : true))
-        .map(([key, config]) => [key, config.method]),
+        .map(([key, config]) => [
+          key,
+          approval && !SELF_GATED_TOOLS.has(key)
+            ? this.withApproval(
+                key,
+                config.method,
+                // Read at call time: approving a plan switches the mode mid-run
+                () => ({
+                  ...approval,
+                  workspaceId,
+                  conversationId: conversationId ?? '',
+                }),
+                emitter,
+                READ_ONLY_TOOLS.has(key),
+              )
+            : config.method,
+        ]),
     ) as Record<string, ToolType>;
+  }
+
+  /** Applies the same approval gate to dynamically discovered MCP tools. */
+  wrapExternalToolsWithApproval(
+    tools: Record<string, ToolType>,
+    workspaceId: string,
+    conversationId: string,
+    approval: ApprovalSettings,
+    emitter?: EventEmitter,
+  ): Record<string, ToolType> {
+    return Object.fromEntries(
+      Object.entries(tools).map(([name, toolDef]) => [
+        name,
+        this.withApproval(
+          name,
+          toolDef,
+          () => ({
+            ...approval,
+            workspaceId,
+            conversationId,
+          }),
+          emitter,
+          isReadOnlyMcpTool(toolDef.metadata),
+        ),
+      ]),
+    ) as Record<string, ToolType>;
+  }
+
+  /**
+   * Wraps a tool so each call goes through the approval flow first, in any
+   * agent mode. (SELF_GATED_TOOLS gate themselves on the raw command.)
+   */
+  private withApproval(
+    name: string,
+    toolDef: ToolType,
+    ctx: () => ApprovalContext,
+    emitter?: EventEmitter,
+    readOnly = false,
+  ): ToolType {
+    const original = toolDef.execute as (
+      params: unknown,
+      options: { toolCallId: string; abortSignal?: AbortSignal },
+    ) => Promise<unknown>;
+    return {
+      ...toolDef,
+      execute: async (
+        params: unknown,
+        options: { toolCallId: string; abortSignal?: AbortSignal },
+      ) => {
+        const decision = await this.approvals.authorize(
+          `${name} ${stableStringify(params)}`,
+          options.toolCallId,
+          ctx(),
+          emitter,
+          {
+            tool: name,
+            description:
+              typeof toolDef.description === 'string'
+                ? toolDef.description
+                : undefined,
+            toolMetadata:
+              typeof toolDef.metadata === 'object' && toolDef.metadata !== null
+                ? (toolDef.metadata as Record<string, unknown>)
+                : undefined,
+            input: params,
+            readOnly,
+          },
+          options.abortSignal,
+        );
+        if (!decision.allowed) {
+          return { error: deniedMessage('Tool call', decision) };
+        }
+        return original(params, options);
+      },
+    };
   }
 }

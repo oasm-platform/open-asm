@@ -621,7 +621,7 @@ export type On = {
 export type WorkflowContentJobs = { [key: string]: WorkflowJob };
 
 export type WorkflowContent = {
-  on: On;
+  on?: On;
   /** Jobs keyed by a unique job id; `needs` references those same ids */
   jobs: WorkflowContentJobs;
   name: string;
@@ -1341,6 +1341,15 @@ export type JobHistoryDetailResponseDto = {
   activeJobsCount: number;
 };
 
+export type JobHistoryWorkflowResponseDto = {
+  id: string;
+  jobHistoryName: string;
+  workflowId?: string;
+  workflowName?: string;
+  content?: WorkflowContent;
+  steps: WorkflowStepStatusDto[];
+};
+
 export type PickToolIdName = {
   id: string;
   name: string;
@@ -2003,15 +2012,11 @@ export type WorkspaceTool = {
 };
 
 export type AddToolToWorkspaceDto = {
-  /** The ID of the workspace */
-  workspaceId: string;
   /** The ID of the tool */
   toolId: string;
 };
 
 export type InstallToolDto = {
-  /** The ID of the workspace */
-  workspaceId: string;
   /** The ID of the tool */
   toolId: string;
 };
@@ -2319,18 +2324,147 @@ export type BulkReopenVulnerabilitiesDto = {
 };
 
 export type AgentModeDto = {
+  /** Stable identifier used to select the agent mode */
   id: string;
+  /** Display name of the agent mode */
   name: string;
+  /** User-facing summary of the mode behavior */
   description: string;
+  /** Hex color used to represent the mode in the console */
   color: string;
+  /** Whether the current workspace can use this mode */
   isAvailable: boolean;
 };
 
 export type GetAgentModesResponseDto = {
+  /** Agent modes available to the current workspace */
   modes: AgentModeDto[];
+  /** Workers that can execute agent tools */
   workers: WorkerInstance[];
 };
 
+export type CommandApprovalResponseDtoStatus =
+  (typeof CommandApprovalResponseDtoStatus)[keyof typeof CommandApprovalResponseDtoStatus];
+
+export const CommandApprovalResponseDtoStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export type CommandApprovalResponseDto = {
+  id: string;
+  /** @nullable */
+  conversationId?: string | null;
+  /** @nullable */
+  toolCallId?: string | null;
+  /** The command, cut to 2000 characters (ending in …) */
+  command: string;
+  /** Whether `command` was cut short */
+  commandTruncated: boolean;
+  status: CommandApprovalResponseDtoStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GetManyCommandApprovalResponseDtoDto = {
+  data: CommandApprovalResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type AgentCommandApprovalConversationId = { [key: string]: unknown };
+
+export type AgentCommandApprovalToolCallId = { [key: string]: unknown };
+
+export type AgentCommandApprovalStatus =
+  (typeof AgentCommandApprovalStatus)[keyof typeof AgentCommandApprovalStatus];
+
+export const AgentCommandApprovalStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export type AgentCommandApproval = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  userId: string;
+  workspaceId: string;
+  conversationId?: AgentCommandApprovalConversationId;
+  toolCallId?: AgentCommandApprovalToolCallId;
+  command: string;
+  /** SHA-256 of the normalized command */
+  hash: string;
+  status: AgentCommandApprovalStatus;
+};
+
+/**
+ * Decision for the pending tool execution request
+ */
+export type DecideCommandApprovalDtoStatus =
+  (typeof DecideCommandApprovalDtoStatus)[keyof typeof DecideCommandApprovalDtoStatus];
+
+export const DecideCommandApprovalDtoStatus = {
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export type DecideCommandApprovalDto = {
+  /** Decision for the pending tool execution request */
+  status: DecideCommandApprovalDtoStatus;
+  /** Whether all later tool requests in this conversation should also be approved */
+  allowConversation?: boolean;
+  /** Whether later calls of the same tool in this conversation should also be approved, whatever their input */
+  allowTool?: boolean;
+  /**
+   * Feedback describing what the agent should do after rejection
+   * @maxLength 1000
+   */
+  feedback?: string;
+};
+
+/**
+ * Decision for the proposed agent plan
+ */
+export type DecidePlanApprovalDtoStatus =
+  (typeof DecidePlanApprovalDtoStatus)[keyof typeof DecidePlanApprovalDtoStatus];
+
+export const DecidePlanApprovalDtoStatus = {
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+/**
+ * How an approved plan runs: automatically or with approval for each tool request
+ */
+export type DecidePlanApprovalDtoMode =
+  (typeof DecidePlanApprovalDtoMode)[keyof typeof DecidePlanApprovalDtoMode];
+
+export const DecidePlanApprovalDtoMode = {
+  auto: 'auto',
+  manual: 'manual',
+} as const;
+
+export type DecidePlanApprovalDto = {
+  /** Decision for the proposed agent plan */
+  status: DecidePlanApprovalDtoStatus;
+  /** How an approved plan runs: automatically or with approval for each tool request */
+  mode?: DecidePlanApprovalDtoMode;
+  /**
+   * Feedback describing how the agent should revise a rejected plan
+   * @maxLength 1000
+   */
+  feedback?: string;
+};
+
+/**
+ * Configured provider identifier
+ */
 export type LLMConfigResponseDtoProvider =
   (typeof LLMConfigResponseDtoProvider)[keyof typeof LLMConfigResponseDtoProvider];
 
@@ -2347,19 +2481,46 @@ export const LLMConfigResponseDtoProvider = {
 } as const;
 
 export type LLMConfigResponseDto = {
+  /** Unique LLM configuration identifier */
   id: string;
+  /** Configured provider identifier */
   provider: LLMConfigResponseDtoProvider;
-  name?: string;
+  /**
+   * User-defined label for the configuration
+   * @maxLength 255
+   * @nullable
+   */
+  name?: string | null;
+  /**
+   * Default model identifier
+   * @maxLength 255
+   */
   model: string;
-  apiUrl?: string;
-  contextWindow?: number;
+  /**
+   * Custom provider API base URL
+   * @maxLength 500
+   * @nullable
+   */
+  apiUrl?: string | null;
+  /**
+   * Custom context window size in tokens
+   * @minimum 1
+   * @nullable
+   */
+  contextWindow?: number | null;
+  /** Whether this is the preferred configuration */
   isPreferred: boolean;
-  /** Masked API key (shows last 4 chars) */
+  /** Masked API key showing only its final characters */
   apiKeyMasked: string;
+  /** Timestamp when the configuration was created */
   createdAt: string;
+  /** Timestamp when the configuration was last updated */
   updatedAt: string;
 };
 
+/**
+ * Provider to configure
+ */
 export type CreateLLMConfigDtoProvider =
   (typeof CreateLLMConfigDtoProvider)[keyof typeof CreateLLMConfigDtoProvider];
 
@@ -2376,17 +2537,34 @@ export const CreateLLMConfigDtoProvider = {
 } as const;
 
 export type CreateLLMConfigDto = {
+  /** Provider to configure */
   provider: CreateLLMConfigDtoProvider;
+  /**
+   * User-defined label for the configuration
+   * @maxLength 255
+   */
   name?: string;
+  /** Provider API key used to authenticate model requests */
   apiKey: string;
+  /**
+   * Default model identifier; the first available model is used when omitted
+   * @maxLength 255
+   */
   model?: string;
+  /**
+   * Custom provider API base URL
+   * @maxLength 500
+   */
   apiUrl?: string;
-  /** Custom context window size in tokens. Overrides API-provided value. */
+  /**
+   * Custom context window size in tokens
+   * @minimum 1
+   */
   contextWindow?: number;
 };
 
 /**
- * Provider identifier
+ * Stable provider identifier
  */
 export type LLMProviderSupportedDtoId =
   (typeof LLMProviderSupportedDtoId)[keyof typeof LLMProviderSupportedDtoId];
@@ -2404,18 +2582,18 @@ export const LLMProviderSupportedDtoId = {
 } as const;
 
 export type LLMProviderSupportedDto = {
-  /** Provider identifier */
+  /** Stable provider identifier */
   id: LLMProviderSupportedDtoId;
-  /** Provider display name */
+  /** Human-readable provider name */
   name: string;
-  /** Provider logo path */
+  /** Path or URL of the provider logo */
   logo: string;
-  /** Whether provider accepts custom API URL */
+  /** Whether the provider accepts a custom API base URL */
   isAcceptCustomApiUrl?: boolean;
 };
 
 /**
- * Provider identifier
+ * Stable provider identifier
  */
 export type LLMConfigWithProviderDtoProviderId =
   (typeof LLMConfigWithProviderDtoProviderId)[keyof typeof LLMConfigWithProviderDtoProviderId];
@@ -2433,41 +2611,44 @@ export const LLMConfigWithProviderDtoProviderId = {
 } as const;
 
 export type LLMConfigWithProviderDto = {
-  /** Provider identifier */
+  /** Stable provider identifier */
   providerId: LLMConfigWithProviderDtoProviderId;
-  /** Provider display name */
+  /** Human-readable provider name */
   providerName: string;
-  /** Provider logo path */
+  /** Path or URL of the provider logo */
   logo?: string;
-  /** Connection status */
+  /** Whether the user has configured this provider */
   isConnected: boolean;
-  /** Whether provider accepts custom API URL */
-  isAcceptCustomApiUrl: boolean;
-  /** LLM config ID if connected */
+  /** Whether the provider accepts a custom API base URL */
+  isAcceptCustomApiUrl?: boolean;
+  /** LLM configuration identifier when connected */
   configId?: string;
-  /** User-defined label for this config */
+  /** User-defined configuration label */
   name?: string;
-  /** Model name if connected */
+  /** Configured model identifier */
   model?: string;
-  /** API URL if connected */
+  /** Configured custom API base URL */
   apiUrl?: string;
-  /** Is preferred config if connected */
+  /** Whether this is the preferred configuration */
   isPreferred?: boolean;
-  /** Masked API key if connected */
+  /** Masked provider API key */
   apiKeyMasked?: string;
-  /** Created at if connected */
+  /** Timestamp when the configuration was created */
   createdAt?: string;
-  /** Updated at if connected */
+  /** Timestamp when the configuration was last updated */
   updatedAt?: string;
 };
 
 export type ProviderModelDto = {
-  /** Model identifier for API calls */
+  /** Model identifier used for provider API calls */
   id: string;
   /** Human-readable model name */
   name: string;
 };
 
+/**
+ * Provider to configure
+ */
 export type UpdateLLMConfigDtoProvider =
   (typeof UpdateLLMConfigDtoProvider)[keyof typeof UpdateLLMConfigDtoProvider];
 
@@ -2484,16 +2665,63 @@ export const UpdateLLMConfigDtoProvider = {
 } as const;
 
 export type UpdateLLMConfigDto = {
+  /** Provider to configure */
   provider?: UpdateLLMConfigDtoProvider;
+  /**
+   * User-defined label for the configuration
+   * @maxLength 255
+   */
   name?: string;
+  /** Provider API key used to authenticate model requests */
   apiKey?: string;
+  /**
+   * Default model identifier; the first available model is used when omitted
+   * @maxLength 255
+   */
   model?: string;
+  /**
+   * Custom provider API base URL
+   * @maxLength 500
+   */
   apiUrl?: string;
-  /** Custom context window size in tokens. Overrides API-provided value. */
+  /**
+   * Custom context window size in tokens
+   * @minimum 1
+   */
   contextWindow?: number;
+  /** Whether this is the preferred configuration for new conversations */
   isPreferred?: boolean;
 };
 
+/**
+ * Current execution status of the plan item
+ */
+export type AgentTodoItemDtoStatus =
+  (typeof AgentTodoItemDtoStatus)[keyof typeof AgentTodoItemDtoStatus];
+
+export const AgentTodoItemDtoStatus = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export type AgentTodoItemDto = {
+  /** Unique identifier of the plan item */
+  id: string;
+  /** Action described by this plan item */
+  content: string;
+  /** Current execution status of the plan item */
+  status: AgentTodoItemDtoStatus;
+  /** Zero-based display order of the plan item */
+  sortOrder: number;
+  /** ISO timestamp of the most recent plan item update */
+  updatedAt: string;
+};
+
+/**
+ * Interaction mode used by the conversation
+ */
 export type ConversationResponseDtoAgentMode =
   (typeof ConversationResponseDtoAgentMode)[keyof typeof ConversationResponseDtoAgentMode];
 
@@ -2502,18 +2730,42 @@ export const ConversationResponseDtoAgentMode = {
   agent: 'agent',
 } as const;
 
+/**
+ * Approval policy used for agent tool requests
+ */
+export type ConversationResponseDtoApprovalMode =
+  (typeof ConversationResponseDtoApprovalMode)[keyof typeof ConversationResponseDtoApprovalMode];
+
+export const ConversationResponseDtoApprovalMode = {
+  auto: 'auto',
+  plan: 'plan',
+  manual: 'manual',
+} as const;
+
 export type ConversationResponseDto = {
+  /** Unique conversation identifier */
   id: string;
+  /** LLM configuration used by the conversation */
   llmConfigId: string;
-  title?: string;
+  /**
+   * Conversation title
+   * @maxLength 500
+   * @nullable
+   */
+  title?: string | null;
+  /** Interaction mode used by the conversation */
   agentMode: ConversationResponseDtoAgentMode;
+  /** Approval policy used for agent tool requests */
+  approvalMode: ConversationResponseDtoApprovalMode;
+  /** Timestamp when the conversation was created */
   createdAt: string;
+  /** Timestamp when the conversation was last updated */
   updatedAt: string;
-  /** Agent execution plan (todo list) */
-  todos?: unknown[][];
+  /** Ordered execution plan for the agent */
+  todos?: AgentTodoItemDto[];
   /** Summarized context of previous conversation turns */
   summary?: string;
-  /** The worker ID currently assigned to this conversation */
+  /** Worker currently assigned to remote tool execution */
   workerId?: string;
 };
 
@@ -2527,21 +2779,43 @@ export type GetManyConversationResponseDtoDto = {
 };
 
 export type UpdateConversationDto = {
+  /**
+   * Replacement conversation title
+   * @maxLength 500
+   */
   title?: string;
 };
 
+/**
+ * Arguments supplied to the tool invocation
+ */
 export type ToolCallResponseDtoArgs = { [key: string]: unknown };
 
-export type ToolCallResponseDtoResult = { [key: string]: unknown };
+/**
+ * Structured result returned by the tool, when available
+ * @nullable
+ */
+export type ToolCallResponseDtoResult = { [key: string]: unknown } | null;
 
 export type ToolCallResponseDto = {
+  /** Identifier assigned to this tool invocation */
   toolCallId: string;
+  /** Registered name of the invoked tool */
   toolName: string;
+  /** Arguments supplied to the tool invocation */
   args: ToolCallResponseDtoArgs;
+  /**
+   * Structured result returned by the tool, when available
+   * @nullable
+   */
   result?: ToolCallResponseDtoResult;
+  /** Whether the tool invocation finished with an error */
   isError?: boolean;
 };
 
+/**
+ * Participant that produced the message
+ */
 export type MessageResponseDtoRole =
   (typeof MessageResponseDtoRole)[keyof typeof MessageResponseDtoRole];
 
@@ -2551,6 +2825,9 @@ export const MessageResponseDtoRole = {
   system: 'system',
 } as const;
 
+/**
+ * Rendering category of the message
+ */
 export type MessageResponseDtoMessageType =
   (typeof MessageResponseDtoMessageType)[keyof typeof MessageResponseDtoMessageType];
 
@@ -2560,20 +2837,31 @@ export const MessageResponseDtoMessageType = {
   error: 'error',
 } as const;
 
+/**
+ * Additional structured message metadata
+ */
 export type MessageResponseDtoMetadata = { [key: string]: unknown };
 
 export type MessageResponseDtoPartsItem = { [key: string]: unknown };
 
 export type MessageResponseDto = {
+  /** Unique message identifier */
   id: string;
+  /** Conversation containing this message */
   conversationId: string;
+  /** Participant that produced the message */
   role: MessageResponseDtoRole;
+  /** Plain-text message content */
   content: string;
+  /** Rendering category of the message */
   messageType: MessageResponseDtoMessageType;
+  /** Additional structured message metadata */
   metadata?: MessageResponseDtoMetadata;
   /** Chronological parts array preserving the real order of reasoning, tool calls, and text. */
   parts?: MessageResponseDtoPartsItem[];
+  /** Tool invocations associated with this message */
   toolCalls?: ToolCallResponseDto[];
+  /** Timestamp when the message was created */
   createdAt: string;
 };
 
@@ -2586,6 +2874,27 @@ export type GetManyMessageResponseDtoDto = {
   pageCount: number;
 };
 
+/**
+ * Override provider for new conversations
+ */
+export type SendMessageDtoProvider =
+  (typeof SendMessageDtoProvider)[keyof typeof SendMessageDtoProvider];
+
+export const SendMessageDtoProvider = {
+  openai: 'openai',
+  anthropic: 'anthropic',
+  gemini: 'gemini',
+  openrouter: 'openrouter',
+  vercel: 'vercel',
+  deepseek: 'deepseek',
+  kilo_code: 'kilo_code',
+  opencode_go: 'opencode_go',
+  custom: 'custom',
+} as const;
+
+/**
+ * Interaction mode for a new or existing conversation
+ */
 export type SendMessageDtoAgentMode =
   (typeof SendMessageDtoAgentMode)[keyof typeof SendMessageDtoAgentMode];
 
@@ -2594,19 +2903,38 @@ export const SendMessageDtoAgentMode = {
   agent: 'agent',
 } as const;
 
+/**
+ * Approval policy for agent tool requests
+ */
+export type SendMessageDtoApprovalMode =
+  (typeof SendMessageDtoApprovalMode)[keyof typeof SendMessageDtoApprovalMode];
+
+export const SendMessageDtoApprovalMode = {
+  auto: 'auto',
+  plan: 'plan',
+  manual: 'manual',
+} as const;
+
 export type SendMessageDto = {
+  /** User message to send to the agent */
   question: string;
   /** Continue existing conversation. If not provided, a new conversation is created. */
   conversationId?: string;
   /** Override model name for new conversations */
   model?: string;
   /** Override provider for new conversations */
-  provider?: string;
+  provider?: SendMessageDtoProvider;
+  /** Interaction mode for a new or existing conversation */
   agentMode?: SendMessageDtoAgentMode;
-  /** Preferred worker ID for remote command execution. Only respected when agentMode is "agent". */
+  /** Approval policy for agent tool requests */
+  approvalMode?: SendMessageDtoApprovalMode;
+  /** Preferred worker for remote execution when agent mode is selected */
   workerId?: string;
 };
 
+/**
+ * Transport protocol used to connect to the MCP server
+ */
 export type MCPServerResponseDtoTransport =
   (typeof MCPServerResponseDtoTransport)[keyof typeof MCPServerResponseDtoTransport];
 
@@ -2615,32 +2943,47 @@ export const MCPServerResponseDtoTransport = {
   'streamable-http': 'streamable-http',
 } as const;
 
-export type MCPServerResponseDtoHeaders = { [key: string]: unknown };
-
 /**
- * @nullable
+ * HTTP headers included with MCP server requests
  */
-export type MCPServerResponseDtoAllowedTools = {
-  [key: string]: unknown;
-} | null;
+export type MCPServerResponseDtoHeaders = { [key: string]: string };
 
 export type MCPServerResponseDto = {
+  /** HTTP endpoint exposed by the MCP server */
   url?: string;
+  /** Transport protocol used to connect to the MCP server */
   transport?: MCPServerResponseDtoTransport;
+  /** HTTP headers included with MCP server requests */
   headers?: MCPServerResponseDtoHeaders;
+  /** Whether this MCP server is disabled */
   disabled?: boolean;
-  /** @nullable */
-  allowed_tools?: MCPServerResponseDtoAllowedTools;
+  /**
+   * Allowlist of exposed tool names; null allows every tool
+   * @nullable
+   */
+  allowed_tools?: string[] | null;
+  /**
+   * Connection and request timeout in seconds
+   * @minimum 1
+   */
   timeout?: number;
-  /** SSE read timeout in seconds */
+  /**
+   * Maximum time to wait for an SSE event in seconds
+   * @minimum 1
+   */
   sse_read_timeout?: number;
+  /** Unique configured name of the MCP server */
   name: string;
 };
 
 export type MCPConfigResponseDto = {
+  /** Configured MCP servers in the current workspace */
   servers: MCPServerResponseDto[];
 };
 
+/**
+ * Transport protocol used to connect to the MCP server
+ */
 export type MCPServerConfigDtoTransport =
   (typeof MCPServerConfigDtoTransport)[keyof typeof MCPServerConfigDtoTransport];
 
@@ -2649,29 +2992,45 @@ export const MCPServerConfigDtoTransport = {
   'streamable-http': 'streamable-http',
 } as const;
 
-export type MCPServerConfigDtoHeaders = { [key: string]: unknown };
-
 /**
- * @nullable
+ * HTTP headers included with MCP server requests
  */
-export type MCPServerConfigDtoAllowedTools = { [key: string]: unknown } | null;
+export type MCPServerConfigDtoHeaders = { [key: string]: string };
 
 export type MCPServerConfigDto = {
+  /** HTTP endpoint exposed by the MCP server */
   url?: string;
+  /** Transport protocol used to connect to the MCP server */
   transport?: MCPServerConfigDtoTransport;
+  /** HTTP headers included with MCP server requests */
   headers?: MCPServerConfigDtoHeaders;
+  /** Whether this MCP server is disabled */
   disabled?: boolean;
-  /** @nullable */
-  allowed_tools?: MCPServerConfigDtoAllowedTools;
+  /**
+   * Allowlist of exposed tool names; null allows every tool
+   * @nullable
+   */
+  allowed_tools?: string[] | null;
+  /**
+   * Connection and request timeout in seconds
+   * @minimum 1
+   */
   timeout?: number;
-  /** SSE read timeout in seconds */
+  /**
+   * Maximum time to wait for an SSE event in seconds
+   * @minimum 1
+   */
   sse_read_timeout?: number;
 };
 
 export type ToggleMCPServerDto = {
+  /** Whether the MCP server should be disabled */
   disabled: boolean;
 };
 
+/**
+ * Observed connectivity state of the MCP server
+ */
 export type MCPServerPingResponseDtoStatus =
   (typeof MCPServerPingResponseDtoStatus)[keyof typeof MCPServerPingResponseDtoStatus];
 
@@ -2682,17 +3041,27 @@ export const MCPServerPingResponseDtoStatus = {
 } as const;
 
 export type MCPServerPingResponseDto = {
+  /** Observed connectivity state of the MCP server */
   status: MCPServerPingResponseDtoStatus;
-  /** Latency in ms */
+  /**
+   * Round-trip latency in milliseconds when measured
+   * @minimum 0
+   */
   latency?: number;
 };
 
 export type WorkspaceMemoryResponseDto = {
+  /** Unique workspace memory identifier */
   id: string;
+  /** Workspace that owns the memory */
   workspaceId: string;
+  /** User whose conversations share this memory */
   userId: string;
+  /** Long-term agent memory stored as Markdown */
   content: string;
+  /** Timestamp when the workspace memory was created */
   createdAt: string;
+  /** Timestamp when the workspace memory was last updated */
   updatedAt: string;
 };
 
@@ -2706,31 +3075,55 @@ export type GetManyWorkspaceMemoryResponseDtoDto = {
 };
 
 export type SkillResponseDto = {
+  /** Unique skill identifier */
   id: string;
+  /** Unique skill name within the workspace */
   name: string;
+  /** Short explanation of the skill purpose */
   description: string;
+  /** Markdown instructions supplied to the agent */
   content: string;
+  /** Whether the skill is available to the agent */
   isEnabled: boolean;
+  /** Whether the skill is provided by the application */
   isBuiltin: boolean;
+  /** Timestamp when the skill was created */
   createdAt: string;
+  /** Timestamp when the skill was last updated */
   updatedAt: string;
-  /** @nullable */
-  createdBy: string | null;
+  /**
+   * User that created the skill; null for built-in skills
+   * @nullable
+   */
+  createdBy?: string | null;
 };
 
 export type CreateSkillDto = {
+  /**
+   * Unique skill name within the workspace
+   * @maxLength 255
+   */
   name: string;
+  /** Short explanation of the skill purpose */
   description: string;
+  /** Markdown instructions supplied to the agent when the skill is active */
   content: string;
 };
 
 export type UpdateSkillDto = {
+  /**
+   * Replacement skill name, unique within the workspace
+   * @maxLength 255
+   */
   name?: string;
+  /** Replacement summary of the skill purpose */
   description?: string;
+  /** Replacement Markdown instructions supplied to the agent */
   content?: string;
 };
 
 export type ToggleSkillDto = {
+  /** Whether the skill should be available to the agent */
   isEnabled: boolean;
 };
 
@@ -2761,53 +3154,6 @@ export type GetManyNotificationResponseDtoDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-};
-
-/**
- * Type of the notification
- */
-export type CreateNotificationDtoScope =
-  (typeof CreateNotificationDtoScope)[keyof typeof CreateNotificationDtoScope];
-
-export const CreateNotificationDtoScope = {
-  SYSTEM: 'SYSTEM',
-  USER: 'USER',
-  GROUP: 'GROUP',
-} as const;
-
-/**
- * Type of the notification
- */
-export type CreateNotificationDtoType =
-  (typeof CreateNotificationDtoType)[keyof typeof CreateNotificationDtoType];
-
-export const CreateNotificationDtoType = {
-  WORKSPACE_CREATED: 'WORKSPACE_CREATED',
-  VULNERABILITY_ANALYSIS_COMPLETED: 'VULNERABILITY_ANALYSIS_COMPLETED',
-  ASSET_NEW_DETECT: 'ASSET_NEW_DETECT',
-  SCAN_INCOMPLETE: 'SCAN_INCOMPLETE',
-  NEW_VULNERABILITY_FOUND: 'NEW_VULNERABILITY_FOUND',
-  WORKSPACE_INVITATION: 'WORKSPACE_INVITATION',
-} as const;
-
-/**
- * Metadata for the notification content (variables for translation)
- */
-export type CreateNotificationDtoMetadata = { [key: string]: unknown };
-
-export type CreateNotificationDto = {
-  /** List of user IDs to receive the notification */
-  recipients: string[];
-  /** Type of the notification */
-  scope: CreateNotificationDtoScope;
-  /** Type of the notification */
-  type: CreateNotificationDtoType;
-  /** Metadata for the notification content (variables for translation) */
-  metadata?: CreateNotificationDtoMetadata;
-  /** Name of the feature this notification belongs to (e.g. "target"), used with refId to delete related notifications once the work is done */
-  ref?: string;
-  /** Identifier of the related feature record (e.g. "1234") */
-  refId?: string;
 };
 
 /**
@@ -3890,6 +4236,43 @@ export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
   workspaceId: string;
   targetIds?: string[];
 };
+
+export type AgentsControllerListCommandApprovalsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: AgentsControllerListCommandApprovalsSortBy;
+  sortOrder?: AgentsControllerListCommandApprovalsSortOrder;
+  /**
+   * Only return approvals in this status
+   */
+  status?: AgentsControllerListCommandApprovalsStatus;
+};
+
+export type AgentsControllerListCommandApprovalsSortBy =
+  (typeof AgentsControllerListCommandApprovalsSortBy)[keyof typeof AgentsControllerListCommandApprovalsSortBy];
+
+export const AgentsControllerListCommandApprovalsSortBy = {
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+} as const;
+
+export type AgentsControllerListCommandApprovalsSortOrder =
+  (typeof AgentsControllerListCommandApprovalsSortOrder)[keyof typeof AgentsControllerListCommandApprovalsSortOrder];
+
+export const AgentsControllerListCommandApprovalsSortOrder = {
+  ASC: 'ASC',
+  DESC: 'DESC',
+} as const;
+
+export type AgentsControllerListCommandApprovalsStatus =
+  (typeof AgentsControllerListCommandApprovalsStatus)[keyof typeof AgentsControllerListCommandApprovalsStatus];
+
+export const AgentsControllerListCommandApprovalsStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
 
 export type AgentsControllerGetConversationsParams = {
   search?: string;
@@ -14673,6 +15056,201 @@ export function useJobsRegistryControllerGetJobHistoryDetail<
     id,
     options,
   );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the workflow definition a run was created from, as JSON and as YAML, with the step state of that run.
+ * @summary Get Job History Workflow
+ */
+export const jobsRegistryControllerGetJobHistoryWorkflow = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<JobHistoryWorkflowResponseDto>(
+    {
+      url: `/api/jobs-registry/histories/${id}/workflow`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getJobsRegistryControllerGetJobHistoryWorkflowQueryKey = (
+  id: string,
+) => {
+  return [`/api/jobs-registry/histories/${id}/workflow`] as const;
+};
+
+export const getJobsRegistryControllerGetJobHistoryWorkflowQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getJobsRegistryControllerGetJobHistoryWorkflowQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>
+  > = ({ signal }) =>
+    jobsRegistryControllerGetJobHistoryWorkflow(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type JobsRegistryControllerGetJobHistoryWorkflowQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>
+  >;
+export type JobsRegistryControllerGetJobHistoryWorkflowQueryError = unknown;
+
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get Job History Workflow
+ */
+
+export function useJobsRegistryControllerGetJobHistoryWorkflow<
+  TData = Awaited<
+    ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getJobsRegistryControllerGetJobHistoryWorkflowQueryOptions(id, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -25937,6 +26515,653 @@ export function useAgentsControllerGetAgentModes<
 }
 
 /**
+ * Paginated history of commands the current user approved or rejected, newest first
+ * @summary List command approvals
+ */
+export const agentsControllerListCommandApprovals = (
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyCommandApprovalResponseDtoDto>(
+    { url: `/api/agents/command-approvals`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAgentsControllerListCommandApprovalsInfiniteQueryKey = (
+  params?: AgentsControllerListCommandApprovalsParams,
+) => {
+  return [
+    'infinite',
+    `/api/agents/command-approvals`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAgentsControllerListCommandApprovalsQueryKey = (
+  params?: AgentsControllerListCommandApprovalsParams,
+) => {
+  return [
+    `/api/agents/command-approvals`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAgentsControllerListCommandApprovalsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerListCommandApprovalsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    QueryKey,
+    AgentsControllerListCommandApprovalsParams['page']
+  > = ({ signal, pageParam }) =>
+    agentsControllerListCommandApprovals(
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    TError,
+    TData,
+    QueryKey,
+    AgentsControllerListCommandApprovalsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerListCommandApprovalsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>>;
+export type AgentsControllerListCommandApprovalsInfiniteQueryError = unknown;
+
+export function useAgentsControllerListCommandApprovalsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AgentsControllerListCommandApprovalsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerListCommandApprovalsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerListCommandApprovalsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List command approvals
+ */
+
+export function useAgentsControllerListCommandApprovalsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    AgentsControllerListCommandApprovalsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerListCommandApprovalsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAgentsControllerListCommandApprovalsInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getAgentsControllerListCommandApprovalsQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerListCommandApprovalsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>
+  > = ({ signal }) =>
+    agentsControllerListCommandApprovals(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerListCommandApprovalsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>
+>;
+export type AgentsControllerListCommandApprovalsQueryError = unknown;
+
+export function useAgentsControllerListCommandApprovals<
+  TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+  TError = unknown,
+>(
+  params: undefined | AgentsControllerListCommandApprovalsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerListCommandApprovals<
+  TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerListCommandApprovals<
+  TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List command approvals
+ */
+
+export function useAgentsControllerListCommandApprovals<
+  TData = Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerListCommandApprovalsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerListCommandApprovals>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerListCommandApprovalsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Decide a pending agent command; unblocks the running agent
+ * @summary Approve or reject a command
+ */
+export const agentsControllerDecideCommandApproval = (
+  id: string,
+  decideCommandApprovalDto: DecideCommandApprovalDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentCommandApproval>(
+    {
+      url: `/api/agents/command-approvals/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: decideCommandApprovalDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerDecideCommandApprovalMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDecideCommandApproval>>,
+    TError,
+    { id: string; data: DecideCommandApprovalDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDecideCommandApproval>>,
+  TError,
+  { id: string; data: DecideCommandApprovalDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDecideCommandApproval'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDecideCommandApproval>>,
+    { id: string; data: DecideCommandApprovalDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerDecideCommandApproval(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDecideCommandApprovalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDecideCommandApproval>>
+>;
+export type AgentsControllerDecideCommandApprovalMutationBody =
+  DecideCommandApprovalDto;
+export type AgentsControllerDecideCommandApprovalMutationError = unknown;
+
+/**
+ * @summary Approve or reject a command
+ */
+export const useAgentsControllerDecideCommandApproval = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDecideCommandApproval>>,
+      TError,
+      { id: string; data: DecideCommandApprovalDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDecideCommandApproval>>,
+  TError,
+  { id: string; data: DecideCommandApprovalDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDecideCommandApprovalMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Forget a remembered decision so the command asks again
+ * @summary Revoke a command approval
+ */
+export const agentsControllerRevokeCommandApproval = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/command-approvals/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerRevokeCommandApprovalMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerRevokeCommandApproval>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerRevokeCommandApproval>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerRevokeCommandApproval'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerRevokeCommandApproval>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerRevokeCommandApproval(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerRevokeCommandApprovalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerRevokeCommandApproval>>
+>;
+
+export type AgentsControllerRevokeCommandApprovalMutationError = unknown;
+
+/**
+ * @summary Revoke a command approval
+ */
+export const useAgentsControllerRevokeCommandApproval = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerRevokeCommandApproval>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerRevokeCommandApproval>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerRevokeCommandApprovalMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Decide a plan the agent is waiting on (PLAN approval mode); approving picks whether it runs in auto or manual mode
+ * @summary Approve or reject a plan
+ */
+export const agentsControllerDecidePlanApproval = (
+  id: string,
+  decidePlanApprovalDto: DecidePlanApprovalDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/agents/plan-approvals/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: decidePlanApprovalDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerDecidePlanApprovalMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDecidePlanApproval>>,
+    TError,
+    { id: string; data: DecidePlanApprovalDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDecidePlanApproval>>,
+  TError,
+  { id: string; data: DecidePlanApprovalDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDecidePlanApproval'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDecidePlanApproval>>,
+    { id: string; data: DecidePlanApprovalDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerDecidePlanApproval(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDecidePlanApprovalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDecidePlanApproval>>
+>;
+export type AgentsControllerDecidePlanApprovalMutationBody =
+  DecidePlanApprovalDto;
+export type AgentsControllerDecidePlanApprovalMutationError = unknown;
+
+/**
+ * @summary Approve or reject a plan
+ */
+export const useAgentsControllerDecidePlanApproval = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDecidePlanApproval>>,
+      TError,
+      { id: string; data: DecidePlanApprovalDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDecidePlanApproval>>,
+  TError,
+  { id: string; data: DecidePlanApprovalDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDecidePlanApprovalMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Create a new LLM provider configuration
  * @summary Create LLM config
  */
@@ -30120,102 +31345,6 @@ export function useNotificationsControllerGetNotifications<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-/**
- * Create a new notification for a specific user or group of users
- * @summary Create a notification
- */
-export const notificationsControllerCreateNotification = (
-  createNotificationDto: CreateNotificationDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/notifications`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createNotificationDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getNotificationsControllerCreateNotificationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-    TError,
-    { data: CreateNotificationDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-  TError,
-  { data: CreateNotificationDto },
-  TContext
-> => {
-  const mutationKey = ['notificationsControllerCreateNotification'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-    { data: CreateNotificationDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return notificationsControllerCreateNotification(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type NotificationsControllerCreateNotificationMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof notificationsControllerCreateNotification>>
-  >;
-export type NotificationsControllerCreateNotificationMutationBody =
-  CreateNotificationDto;
-export type NotificationsControllerCreateNotificationMutationError = unknown;
-
-/**
- * @summary Create a notification
- */
-export const useNotificationsControllerCreateNotification = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-      TError,
-      { data: CreateNotificationDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof notificationsControllerCreateNotification>>,
-  TError,
-  { data: CreateNotificationDto },
-  TContext
-> => {
-  return useMutation(
-    getNotificationsControllerCreateNotificationMutationOptions(options),
-    queryClient,
-  );
-};
 
 /**
  * Subscribe to a Server-Sent Events (SSE) stream for real-time notifications
