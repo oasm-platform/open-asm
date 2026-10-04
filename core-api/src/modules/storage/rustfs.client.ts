@@ -1,5 +1,5 @@
 import { S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   DEFAULT_RUSTFS_ENDPOINT,
@@ -9,7 +9,6 @@ import {
 
 @Injectable()
 export class RustFsClient {
-  private readonly logger = new Logger(RustFsClient.name);
   private readonly client: S3Client;
   private readonly presignClient: S3Client;
 
@@ -17,13 +16,15 @@ export class RustFsClient {
     const storageConfig = parseStorageConfig(configService);
 
     // Server-side client: never point it at the browser-facing endpoint.
+    // Region/addressing style must not be pinned here — signing with the wrong
+    // region gets a 301 from real S3.
     this.client = this.buildClient(storageConfig, {
       endpoint: this.configService.get<string>(
         'RUSTFS_ENDPOINT',
         DEFAULT_RUSTFS_ENDPOINT,
       ),
-      region: 'us-east-1',
-      forcePathStyle: true,
+      region: storageConfig.region,
+      forcePathStyle: storageConfig.forcePathStyle,
       checksum: false,
     });
 

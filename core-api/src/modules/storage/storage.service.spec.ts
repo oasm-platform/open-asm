@@ -532,4 +532,36 @@ describe('RustFsClient credentials', () => {
     expect(mockS3ClientConfigs).toHaveLength(2);
     expect(mockS3ClientConfigs[1].endpoint).toBe('http://internal:9000');
   });
+
+  it('should apply S3_REGION/S3_FORCE_PATH_STYLE to both clients', () => {
+    buildRustFsClient({
+      RUSTFS_ENDPOINT: 'https://s3.eu-central-1.amazonaws.com',
+      S3_PUBLIC_ENDPOINT: 'https://cdn.example.com',
+      S3_REGION: 'eu-west-1',
+      S3_FORCE_PATH_STYLE: 'false',
+    });
+
+    expect(mockS3ClientConfigs).toHaveLength(2);
+    const [internal, presign] = mockS3ClientConfigs;
+
+    expect(internal.region).toBe('eu-west-1');
+    expect(internal.forcePathStyle).toBe(false);
+    expect(presign.region).toBe('eu-west-1');
+    expect(presign.forcePathStyle).toBe(false);
+
+    expect(internal.endpoint).toBe('https://s3.eu-central-1.amazonaws.com');
+    expect(presign.endpoint).toBe('https://cdn.example.com');
+    expect(internal.endpoint).not.toBe('https://cdn.example.com');
+  });
+
+  it('should keep us-east-1 and path-style addressing by default', () => {
+    buildRustFsClient({});
+
+    expect(mockS3ClientConfigs).toHaveLength(2);
+    for (const config of mockS3ClientConfigs) {
+      expect(config.region).toBe('us-east-1');
+      expect(config.forcePathStyle).toBe(true);
+    }
+    expect(mockS3ClientConfigs[0].endpoint).toBe('http://localhost:9000');
+  });
 });

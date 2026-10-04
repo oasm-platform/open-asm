@@ -417,6 +417,10 @@ storage.
 | `getClient()` | `RUSTFS_ENDPOINT` (default `http://localhost:9000`) | Internal server-side work: bucket creation, `PutBucketCors`, tool archives, worker reads. |
 | `getPresignClient()` | `S3_PUBLIC_ENDPOINT`, falling back to `RUSTFS_ENDPOINT` | Signing URLs that a browser will call. |
 
+`S3_REGION` and `S3_FORCE_PATH_STYLE` apply to **both** clients — they are read
+once in `parseStorageConfig` and handed to each. Only the endpoint differs. The
+internal client is still forbidden from using `S3_PUBLIC_ENDPOINT`.
+
 Read this before touching either one. SigV4 signs the `host` header and the
 request path. A URL signed against `localhost:9000` is rejected by a browser
 reaching `https://app.example.com`, because the signed host no longer matches
@@ -470,9 +474,10 @@ No code change. Set in `core-api/.env`:
 
 | Variable | Value |
 | --- | --- |
-| `S3_PUBLIC_ENDPOINT` | Endpoint the browser can reach, e.g. `https://s3.eu-central-1.amazonaws.com` |
-| `S3_REGION` | The bucket's region |
-| `S3_FORCE_PATH_STYLE` | `false` |
+| `RUSTFS_ENDPOINT` | Endpoint the **API** reaches (e.g. the in-network or VPC endpoint). Required in the cloud — it is the internal ops endpoint, and it is deliberately never read from `S3_PUBLIC_ENDPOINT`. |
+| `S3_PUBLIC_ENDPOINT` | Endpoint the browser can reach, e.g. `https://s3.eu-central-1.amazonaws.com`. Presign only. |
+| `S3_REGION` | The bucket's region. Signs **both** clients — the internal client is not pinned to `us-east-1`. |
+| `S3_FORCE_PATH_STYLE` | `false`. Applies to **both** clients. |
 | `S3_USE_DEFAULT_CREDENTIALS` | `true` for IAM roles / instance profiles; otherwise leave `false` and set `S3_ACCESS_KEY` + `S3_SECRET_KEY` |
 | `S3_CORS_ALLOWED_ORIGINS` | Comma-separated console origins |
 
