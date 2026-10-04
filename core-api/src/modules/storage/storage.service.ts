@@ -15,6 +15,7 @@ import {
   HeadBucketCommand,
   ListObjectsV2Command,
   PutObjectCommand,
+  PutBucketCorsCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
 import { createHmac, randomBytes, randomUUID } from 'crypto';
@@ -71,6 +72,39 @@ export class StorageService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureBucketsExist();
+    await this.applyBucketCors();
+  }
+
+  private async applyBucketCors() {
+    const origins = this.storageConfig.corsAllowedOrigins;
+    if (origins.length === 0) {
+      return;
+    }
+    const client = this.rustFsClient.getClient();
+    for (const bucket of this.buckets) {
+      try {
+        await client.send(
+          new PutBucketCorsCommand({
+            Bucket: bucket,
+            CORSConfiguration: {
+              CORSRules: [
+                {
+                  AllowedHeaders: ['*'],
+                  AllowedMethods: ['GET', 'PUT', 'POST', 'HEAD'],
+                  AllowedOrigins: origins,
+                  MaxAgeSeconds: 3000,
+                  ExposeHeaders: ['ETag'],
+                },
+              ],
+            },
+          }),
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to apply CORS to bucket ${bucket}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    }
   }
 
   public isPrivateBucket(bucket: string): boolean {
