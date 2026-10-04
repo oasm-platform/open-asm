@@ -30,6 +30,8 @@ import {
 import { randomUUID } from 'crypto';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
 import {
+  PresignDownloadQueryDto,
+  PresignDownloadResponseDto,
   PresignUploadRequestDto,
   PresignUploadResponseDto,
 } from './dto/presign-storage.dto';
@@ -223,6 +225,42 @@ export class StorageController {
       contentType: dto.contentType ?? 'application/octet-stream',
       expiresIn,
     };
+  }
+
+  // NOTE: declared before the ':bucket/:path*' wildcards on purpose — Nest/Express
+  // matches routes in declaration order, otherwise this literal path is swallowed.
+  @Get('presign/download')
+  @ApiOperation({
+    summary: 'Create a presigned URL for direct-from-storage download',
+  })
+  @ApiQuery({ name: 'bucket', type: String, required: true })
+  @ApiQuery({ name: 'path', type: String, required: true })
+  @ApiQuery({
+    name: 'fileName',
+    type: String,
+    required: false,
+    description: 'Suggested download file name',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Presigned download URL created successfully',
+    type: PresignDownloadResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid path or bucket' })
+  @ApiResponse({ status: 403, description: 'Bucket is not accessible' })
+  async presignDownload(
+    @Query() query: PresignDownloadQueryDto,
+  ): Promise<PresignDownloadResponseDto> {
+    this.storageService.assertBucketAllowed(query.bucket);
+    this.storageService.assertBucketNotPrivate(query.bucket);
+
+    const { url, expiresIn } = await this.storageService.getPresignedDownloadUrl({
+      bucket: query.bucket,
+      key: query.path,
+      fileName: query.fileName,
+    });
+
+    return { downloadUrl: url, expiresIn };
   }
 
   @Public()
