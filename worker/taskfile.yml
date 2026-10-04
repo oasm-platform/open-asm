@@ -2,8 +2,8 @@ version: '3'
 
 vars:
   replicas: '{{.replicas | default 1}}'
-  apiKey: '{{.apiKey | default .API_KEY}}'
-  maxJobs: '{{.maxJobs | default .MAX_JOBS}}'
+  apiKey: '{{.apiKey | default .WORKER_API_KEY}}'
+  maxJobs: '{{.maxJobs | default .WORKER_MAX_CONCURRENCY}}'
   network: '{{.network | default ""}}'
 
 tasks:
@@ -18,12 +18,13 @@ tasks:
           # WORKER_CONNECTOR_ADDR locally) instead of failing fast.
           # maxJobs is optional: unset lets the worker auto-size concurrency
           # from the available CPU/RAM.
-          exec env WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 go run ./cmd/cli --api-key {{.apiKey}} --mode node{{if .maxJobs}} --max-concurrency {{.maxJobs}}{{end}}{{if .network}} --network {{.network}}{{end}}
+          export WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1; exec go run ./cmd/cli --api-key {{.apiKey}} --mode node{{if .maxJobs}} --max-concurrency {{.maxJobs}}{{end}}{{if .network}} --network {{.network}}{{end}}
         else
           trap 'wait; exit 0' INT TERM
+          export WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1
           for i in $(seq 1 {{.replicas}}); do
             echo "Starting CLI worker instance $i"
-            CMD="env WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 go run ./cmd/cli --api-key {{.apiKey}}{{if .maxJobs}} --max-concurrency {{.maxJobs}}{{end}}"
+            CMD="go run ./cmd/cli --api-key {{.apiKey}}{{if .maxJobs}} --max-concurrency {{.maxJobs}}{{end}}"
             {{- if .network}}
             CMD="$CMD --network {{.network}}"
             {{- end}}
@@ -40,7 +41,7 @@ tasks:
           # Dev-only: connector auto-detect opt-in (see dev task above).
           # maxJobs is optional: unset lets the worker auto-size concurrency.
           ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1{{if .maxJobs}} WORKER_MAX_CONCURRENCY={{.maxJobs}}{{end}}{{if .network}} WORKER_NETWORK={{.network}}{{end}}"
-          exec env $ENV_VARS go run ./cmd/app
+          export $ENV_VARS; exec go run ./cmd/app
         else
           trap 'wait; exit 0' INT TERM
           for i in $(seq 1 {{.replicas}}); do
@@ -49,7 +50,7 @@ tasks:
             {{- if .network}}
             ENV_VARS="$ENV_VARS WORKER_NETWORK={{.network}}"
             {{- end}}
-            env $ENV_VARS go run ./cmd/app &
+            (export $ENV_VARS; go run ./cmd/app) &
           done
           wait
         fi

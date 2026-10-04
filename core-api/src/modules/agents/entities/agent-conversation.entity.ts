@@ -1,5 +1,5 @@
 // import { BaseEntity } from '@/common/entities/base.entity';
-import { AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import {
@@ -61,6 +61,11 @@ export class AgentConversation {
   @IsEnum(AgentMode)
   @Column({ type: 'varchar', default: AgentMode.ASK })
   agentMode: AgentMode;
+
+  @ApiProperty({ enum: AgentApprovalMode, example: AgentApprovalMode.MANUAL })
+  @IsEnum(AgentApprovalMode)
+  @Column({ type: 'varchar', default: AgentApprovalMode.MANUAL })
+  approvalMode: AgentApprovalMode;
 
   @ApiProperty({
     description: 'Summarized context of previous conversation turns',
