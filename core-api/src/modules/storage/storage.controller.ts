@@ -29,6 +29,10 @@ import {
 } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
+import {
+  PresignUploadRequestDto,
+  PresignUploadResponseDto,
+} from './dto/presign-storage.dto';
 import { StorageService } from './storage.service';
 
 @Controller('storage')
@@ -178,6 +182,46 @@ export class StorageController {
       path: result.path,
       bucket: bucket,
       fullPath: `/${bucket}/${filename}`,
+    };
+  }
+
+  @Post('presign/upload')
+  @ApiOperation({
+    summary: 'Create a presigned URL for direct-to-storage upload',
+  })
+  @ApiBody({ type: PresignUploadRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Presigned upload URL created successfully',
+    type: PresignUploadResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file name, extension, or bucket',
+  })
+  @ApiResponse({ status: 403, description: 'Bucket is not accessible' })
+  @Roles(Role.ADMIN)
+  async presignUpload(
+    @Body() dto: PresignUploadRequestDto,
+  ): Promise<PresignUploadResponseDto> {
+    const bucket = dto.bucket ?? 'default';
+
+    this.storageService.assertBucketAllowed(bucket);
+    this.storageService.assertBucketNotPrivate(bucket);
+
+    const key = this.storageService.generateObjectKey(dto.fileName);
+    const { url, expiresIn } = await this.storageService.getPresignedUploadUrl({
+      bucket,
+      key,
+      contentType: dto.contentType,
+    });
+
+    return {
+      uploadUrl: url,
+      key,
+      path: `${bucket}/${key}`,
+      contentType: dto.contentType ?? 'application/octet-stream',
+      expiresIn,
     };
   }
 
