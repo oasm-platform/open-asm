@@ -27,8 +27,17 @@ export class ReportResponseDto {
   @ApiProperty()
   createdAt: Date;
 
-  @ApiProperty({ description: 'Presigned download URL (expires in 15 minutes)' })
+  @ApiProperty({
+    description:
+      'Presigned S3 download URL (short-lived, default 15 minutes)',
+  })
   downloadUrl: string;
+
+  @ApiProperty({
+    example: 900,
+    description: 'Presigned URL lifetime in seconds',
+  })
+  downloadExpiresIn: number;
 }
 
 export class GenerateSummaryReportBodyDto {

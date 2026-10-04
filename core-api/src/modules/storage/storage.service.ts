@@ -19,8 +19,7 @@ import {
   PutBucketCorsCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
-import { createHmac, randomBytes, randomUUID } from 'crypto';
-import { DEFAULT_ENCRYPTION_KEY } from '@/common/constants/app.constants';
+import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { RustFsClient } from './rustfs.client';
@@ -60,14 +59,12 @@ export class StorageService implements OnModuleInit {
     'jar',
   ];
 
-  private readonly downloadSecret: string;
   private readonly storageConfig: StorageConfig;
 
   constructor(
     private readonly rustFsClient: RustFsClient,
     private readonly configService: ConfigService,
   ) {
-    this.downloadSecret = this.configService.get<string>('DEFAULT_ENCRYPTION_KEY', DEFAULT_ENCRYPTION_KEY);
     this.storageConfig = parseStorageConfig(this.configService);
   }
 
@@ -405,64 +402,6 @@ export class StorageService implements OnModuleInit {
       throw new InternalServerErrorException(
         `Failed to stat file: ${errorMessage}`,
       );
-    }
-  }
-
-  // ponytail: token helpers are now orphaned from the HTTP layer (the
-  // `GET :bucket/:path/download` endpoint was removed). `reports.service.ts` is
-  // the last caller — delete generateDownloadToken, verifyDownloadToken and the
-  // downloadSecret field (plus the DEFAULT_ENCRYPTION_KEY / createHmac /
-  // randomBytes imports) once reports are rewired to presigned downloads.
-  public generateDownloadToken(
-    filePath: string,
-    bucket: string = 'default',
-    expiresIn: number = 900,
-  ): string {
-    const cleanPath = filePath.replace(/^[./\s]+/, '');
-
-    if (!cleanPath || cleanPath.includes('..')) {
-      throw new BadRequestException('Invalid file path');
-    }
-
-    const exp = Math.floor(Date.now() / 1000) + expiresIn;
-    const nonce = randomBytes(16).toString('hex');
-    const payload = `${bucket}:${cleanPath}:${exp}:${nonce}`;
-    const signature = createHmac('sha256', this.downloadSecret)
-      .update(payload)
-      .digest('hex');
-
-    return Buffer.from(`${payload}:${signature}`).toString('base64url');
-  }
-
-  public verifyDownloadToken(
-    token: string,
-  ): { bucket: string; filePath: string } {
-    try {
-      const decoded = Buffer.from(token, 'base64url').toString('utf8');
-      const parts = decoded.split(':');
-      if (parts.length !== 5) {
-        throw new Error('Invalid token format');
-      }
-
-      const [bucket, filePath, expStr, nonce, signature] = parts;
-      const exp = parseInt(expStr, 10);
-
-      if (Math.floor(Date.now() / 1000) > exp) {
-        throw new Error('Token expired');
-      }
-
-      const payload = `${bucket}:${filePath}:${expStr}:${nonce}`;
-      const expectedSignature = createHmac('sha256', this.downloadSecret)
-        .update(payload)
-        .digest('hex');
-
-      if (signature !== expectedSignature) {
-        throw new Error('Invalid signature');
-      }
-
-      return { bucket, filePath };
-    } catch {
-      throw new BadRequestException('Invalid or expired download token');
     }
   }
 
