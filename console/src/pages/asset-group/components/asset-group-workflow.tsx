@@ -121,30 +121,49 @@ export default function AssetGroupWorkflow({
     [nextRun],
   );
 
-  // ---- Pipeline value derived from workflow jobs[] order ----
-  // jobs[] order IS the execution order (scheduler runs jobs[0], chain uses
-  // index). The builder's value array preserves that order 1:1, and every
-  // mutation below writes the array back with the same ordering.
+  // ---- Pipeline value derived from the workflow jobs map ----
+  // `jobs` is keyed by a unique job id (the tool name for group workflows) and
+  // a job without `needs` runs in parallel, so the map order is presentation
+  // only. Every mutation below writes the map back.
   const jobs = useMemo(
-    () => currentWorkflow?.workflow.content?.jobs ?? [],
+    () => currentWorkflow?.workflow.content?.jobs ?? {},
     [currentWorkflow],
   );
   const jobsJson = useMemo(() => JSON.stringify(jobs), [jobs]);
   const pipeline: PipelineToolEntry[] = useMemo(() => {
-    const jobs = currentWorkflow?.workflow.content?.jobs ?? [];
-    return jobs.map((job) => {
-      const tool = toolByName.get(job.run);
-      return {
-        toolId: tool?.id ?? job.run,
-        ...(job.config ? { config: job.config as Record<string, unknown> } : {}),
-        ...(job.configProfileId
-          ? { configProfileId: job.configProfileId }
-          : {}),
-      };
-    });
-    // jobsJson captures order + per-job config changes; toolByName covers id mapping.
+    // `Object.values`, not `Object.entries`: a workflow created before the
+    // map switch still stores `jobs` as an array, which the API still serves —
+    // its values are the job definitions either way.
+    const jobs = (currentWorkflow?.workflow.content?.jobs ?? {}) as Record<
+      string,
+      {
+        run?: string;
+        config?: Record<string, unknown>;
+        configProfileId?: string;
+      }
+    >;
+    const nameOf = (toolId: string) => toolById.get(toolId)?.name ?? toolId;
+    return Object.values(jobs)
+      .map((job) => {
+        const tool = job.run ? toolByName.get(job.run) : undefined;
+        return {
+          toolId: tool?.id ?? job.run ?? '',
+          ...(job.config
+            ? { config: job.config as Record<string, unknown> }
+            : {}),
+          ...(job.configProfileId
+            ? { configProfileId: job.configProfileId }
+            : {}),
+        };
+      })
+      // Sorted by tool name so the grid stays stable: `content` is stored as
+      // jsonb, which does not preserve the map's key order. Sorting on the tool
+      // name (not the map key) also keeps a legacy array-shaped `jobs` from
+      // sorting its index keys lexically, which puts "10" before "2".
+      .sort((a, b) => nameOf(a.toolId).localeCompare(nameOf(b.toolId)));
+    // jobsJson captures per-job config changes; the tool maps cover id mapping.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobsJson, toolByName]);
+  }, [jobsJson, toolByName, toolById]);
 
   const toolNameOf = useCallback(
     (entry: PipelineToolEntry): string =>
@@ -152,24 +171,28 @@ export default function AssetGroupWorkflow({
     [toolById],
   );
 
-  /** Persist the full ordered pipeline as jobs[] (append/update, order preserved). */
+  /** Persist the full pipeline as a jobs map keyed by tool name (no needs → parallel). */
   const persistPipeline = useCallback(async (next: PipelineToolEntry[]) => {
     const existingWorkflow = currentWorkflow?.workflow ?? null;
     try {
       setIsProcessing(true);
-      const jobs = next.map((entry) => {
-        const name = toolNameOf(entry);
-        return {
-          name,
-          run: name,
-          ...(entry.config ? { config: entry.config } : {}),
-          ...(entry.configProfileId
-            ? { configProfileId: entry.configProfileId }
-            : {}),
-        };
-      });
+      const jobs = Object.fromEntries(
+        next.map((entry) => {
+          const name = toolNameOf(entry);
+          return [
+            name,
+            {
+              run: name,
+              ...(entry.config ? { config: entry.config } : {}),
+              ...(entry.configProfileId
+                ? { configProfileId: entry.configProfileId }
+                : {}),
+            },
+          ];
+        }),
+      );
       if (existingWorkflow) {
-        if (jobs.length === 0) {
+        if (next.length === 0) {
           await removeWorkflowsMutation.mutateAsync({
             groupId: assetGroupId,
             data: { workflowIds: [existingWorkflow.id] },
@@ -187,7 +210,7 @@ export default function AssetGroupWorkflow({
           });
           toast.success('Pipeline saved successfully!');
         }
-      } else if (jobs.length > 0) {
+      } else if (next.length > 0) {
         const createdWorkflow = await createWorkflowMutation.mutateAsync({
           data: {
             name: `Group Workflow - ${assetGroupId}`,
@@ -223,7 +246,6 @@ export default function AssetGroupWorkflow({
     assetGroupId,
     onRefetch,
   ]);
-
   const handleOpenSchedule = useCallback(() => {
     setIsSetScheduleOpen(true);
   }, []);

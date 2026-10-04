@@ -21,6 +21,7 @@ import {
 import { ToolsService } from '../tools/tools.service';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
+import { normalizeWorkflowContent } from '../workflows/workflow-graph';
 import { AssetGroupToolInput, CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { UpdateAssetGroupDto } from './dto/update-asset-group.dto';
@@ -274,6 +275,7 @@ export class AssetGroupService {
           await this.assetAssetService.addManyAssets(
             savedAssetGroup.id,
             createAssetGroupDto.hostIds,
+            workspaceId,
           );
         }
 
@@ -411,28 +413,34 @@ export class AssetGroupService {
     const workflowName = `Group Workflow - ${groupId}`;
     const workflow = this.workflowRepo.create({
       name: workflowName,
-      content: {
+      // Canonicalized on write: `jobs` is a map keyed by tool name with no
+      // `needs`, so every selected tool is a root and they run in parallel.
+      content: normalizeWorkflowContent({
         on: { schedule, target: [] },
-        jobs: tools.map((tool) => {
-          const input = inputByToolId.get(tool.id!);
-          let config = input?.config;
-          if (config && tool.type === WorkerType.CONNECTOR) {
-            const entry = this.connectorRegistry.getConnector(tool.name);
-            const schema = entry?.configSchema ?? entry?.inputsSchema;
-            const sensitiveFields = getSensitiveFields(schema);
-            config = encryptInlineConfig(config, sensitiveFields, dek);
-          }
-          return {
-            name: tool.name,
-            run: tool.name,
-            ...(config ? { config } : {}),
-            ...(input?.configProfileId
-              ? { configProfileId: input.configProfileId }
-              : {}),
-          };
-        }),
+        jobs: Object.fromEntries(
+          tools.map((tool) => {
+            const input = inputByToolId.get(tool.id!);
+            let config = input?.config;
+            if (config && tool.type === WorkerType.CONNECTOR) {
+              const entry = this.connectorRegistry.getConnector(tool.name);
+              const schema = entry?.configSchema ?? entry?.inputsSchema;
+              const sensitiveFields = getSensitiveFields(schema);
+              config = encryptInlineConfig(config, sensitiveFields, dek);
+            }
+            return [
+              tool.name,
+              {
+                run: tool.name,
+                ...(config ? { config } : {}),
+                ...(input?.configProfileId
+                  ? { configProfileId: input.configProfileId }
+                  : {}),
+              },
+            ];
+          }),
+        ),
         name: workflowName,
-      },
+      }),
       filePath: `group-${groupId}.yaml`,
       workspace: { id: workspaceId },
     });
@@ -445,10 +453,13 @@ export class AssetGroupService {
   /**
    * Permanently removes an asset group
    */
-  async delete(id: string): Promise<DefaultMessageResponseDto> {
+  async delete(
+    id: string,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
-        where: { id },
+        where: { id, workspace: { id: workspaceId } },
         relations: { assetGroupWorkflows: { workflow: true } },
       });
 

@@ -34,20 +34,38 @@ const dependencyTransformer = createTransformer({
   module: { type: 'commonjs' },
 });
 
+// Application entry-style modules that default-import CommonJS packages
+// (compression, cookie-parser) must keep SWC's interop helpers, or
+// `import compression from 'compression'` compiles to a bare `.default`
+// access that no longer exists under `noInterop`. These files are still
+// application code (TypeScript parser) but need the dependency-style module
+// transform for those imports.
+const appConfigInteropTransformer = createTransformer({
+  jsc: {
+    parser: { syntax: 'typescript', decorators: true },
+    target: 'es5',
+    transform: { legacyDecorator: true, decoratorMetadata: true },
+  },
+  module: { type: 'commonjs' },
+});
+
 const isDependency = (filename) => /[\\/]node_modules[\\/]/.test(filename);
+
+const needsAppConfigInterop = (filename) =>
+  /[\\/]src[\\/]bootstrap[\\/]configure-app\.ts$/.test(filename);
+
+const resolveTransformer = (filename) => {
+  if (isDependency(filename)) return dependencyTransformer;
+  if (needsAppConfigInterop(filename)) return appConfigInteropTransformer;
+  return appTransformer;
+};
 
 module.exports = {
   canInstrument: false,
   process(sourceText, sourcePath, jestOptions) {
-    const transformer = isDependency(sourcePath)
-      ? dependencyTransformer
-      : appTransformer;
-    return transformer.process(sourceText, sourcePath, jestOptions);
+    return resolveTransformer(sourcePath).process(sourceText, sourcePath, jestOptions);
   },
   getCacheKey(sourceText, sourcePath, ...rest) {
-    const transformer = isDependency(sourcePath)
-      ? dependencyTransformer
-      : appTransformer;
-    return transformer.getCacheKey(sourceText, sourcePath, ...rest);
+    return resolveTransformer(sourcePath).getCacheKey(sourceText, sourcePath, ...rest);
   },
 };

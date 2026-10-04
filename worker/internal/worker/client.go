@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
+	pb "oasm-worker/internal/gen/jobs_registry"
 	"oasm-worker/internal/gen/workers"
 
 	"oasm-worker/internal/grpcclient"
@@ -165,16 +166,70 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			timer.Reset(d)
 		}
 
-		// dispatch acquires one free concurrency slot and starts a job pull/run.
-		// Returns false when every slot is busy.
-		dispatch := func() bool {
-			select {
-			case semaphore <- struct{}{}:
+		// releaseSlots gives back concurrency slots that were reserved for a
+		// claim but never filled (the queue ran dry mid-claim).
+		releaseSlots := func(n int) {
+			for i := 0; i < n; i++ {
+				<-semaphore
+			}
+		}
+
+		// reserveSlots takes up to n free concurrency slots and reports how many
+		// it actually got. Only the poller ever acquires, so this normally
+		// returns n; the default branch keeps it from ever blocking.
+		reserveSlots := func(n int) int {
+			reserved := 0
+			for reserved < n {
+				select {
+				case semaphore <- struct{}{}:
+					reserved++
+				default:
+					return reserved
+				}
+			}
+			return reserved
+		}
+
+		// dispatchBatch fills every free concurrency slot from ONE batched
+		// claim: one round-trip and one claim transaction per cycle instead of
+		// one per slot. Returns how many jobs it started.
+		//
+		// Slots are reserved BEFORE the claim so every job that comes back can
+		// start immediately. A claimed job with no slot to run in would sit
+		// IN_PROGRESS on Core with nothing executing it, so the reservation is
+		// what makes the batch safe.
+		dispatchBatch := func() int {
+			free := cap(semaphore) - len(semaphore)
+			if free <= 0 {
+				return 0
+			}
+
+			reserved := reserveSlots(free)
+			if reserved == 0 {
+				return 0
+			}
+
+			jobs, err := grpcClient.NextJobs(sessionCtx, reserved)
+			if err != nil {
+				NewTuiLogger(events, "Jobs").ErrorE("Failed to pull jobs", err)
+				releaseSlots(reserved)
+				return 0
+			}
+
+			started := 0
+			for _, job := range jobs {
+				if started >= reserved {
+					// Core must never return more than the caller asked for.
+					// If it ever does, the surplus cannot be run without a
+					// slot, so stop instead of blocking the poller.
+					break
+				}
+				started++
 				wg.Add(1)
-				go func(sc context.Context) {
+				go func(sc context.Context, j *pb.Job) {
 					defer wg.Done()
 					releaseSem := func() { <-semaphore }
-					hadJob, usedAsync := processJob(sc, grpcClient, getBrowser, toolPath, events, mgr, proxy, releaseSem)
+					hadJob, usedAsync := processJob(sc, j, grpcClient, getBrowser, toolPath, events, mgr, proxy, releaseSem)
 					if !usedAsync {
 						releaseSem() // Legacy: release at return
 					}
@@ -183,11 +238,12 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 					case hadJobCh <- hadJob:
 					default:
 					}
-				}(sessionCtx)
-				return true
-			default:
-				return false
+				}(sessionCtx, job)
 			}
+
+			// Slots reserved for jobs that never arrived go straight back.
+			releaseSlots(reserved - started)
+			return started
 		}
 
 		// drainFeedback applies every completed poll's result so a burst of
@@ -223,14 +279,12 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 					resetTimer(pollMaxBackoff)
 					continue
 				}
-				// Fill EVERY free slot, not one job per backoff tick: the old
-				// cadence left most of the configured concurrency idle while
-				// jobs sat pending in the registry.
-				dispatched := 0
-				for dispatched < policy.maxDispatch(cfg.MaxConcurrency) && dispatch() {
-					dispatched++
-				}
-				resetTimer(policy.nextDelay(dispatched))
+				// One batched claim fills EVERY free slot. The old cadence
+				// dispatched one job per backoff tick, which left most of the
+				// configured concurrency idle while jobs sat pending in the
+				// registry — and cost one round-trip plus one claim
+				// transaction per slot to do it.
+				resetTimer(policy.nextDelay(dispatchBatch()))
 			}
 		}
 	}

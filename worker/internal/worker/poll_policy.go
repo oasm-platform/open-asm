@@ -19,10 +19,11 @@ const (
 // The poller must fill ALL free concurrency slots each cycle: dispatching a
 // single job per backoff tick left the configured concurrency mostly idle while
 // jobs sat pending in the registry (short jobs finishing in ~1s ran ~1–2
-// concurrent out of 12). While jobs are flowing the policy polls again quickly
-// to refill freed slots; once polls come back empty it backs off so an idle
-// worker does not hammer Core, and it then probes with a single dispatch instead
-// of a burst.
+// concurrent out of 12). A cycle now makes ONE batched claim sized to the free
+// slots, so the same "fill everything" behaviour costs a single round-trip.
+// While jobs are flowing the policy polls again quickly to refill freed slots;
+// once polls come back empty it backs off so an idle worker does not hammer
+// Core.
 type pollPolicy struct {
 	backoff time.Duration
 }
@@ -47,18 +48,6 @@ func (p *pollPolicy) feedback(foundJob bool) {
 // every free slot rather than probing with a single dispatch.
 func (p *pollPolicy) flowing() bool {
 	return p.backoff <= pollIdleBackoff
-}
-
-// maxDispatch caps how many jobs one cycle may dispatch. When idle it probes
-// with a single pull so an empty queue is not hit by a burst of N calls.
-func (p *pollPolicy) maxDispatch(concurrency int) int {
-	if !p.flowing() {
-		return 1
-	}
-	if concurrency < 1 {
-		return 1
-	}
-	return concurrency
 }
 
 // nextDelay returns how long to wait before the next cycle.

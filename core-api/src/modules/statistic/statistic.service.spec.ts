@@ -1,5 +1,7 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
+import { DefaultWorkflow, NotificationScope, NotificationType } from '@/common/enums/enum';
+import type { Job } from '../jobs-registry/entities/job.entity';
 import { StatisticService } from './statistic.service';
 import { DataSource } from 'typeorm';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
@@ -163,6 +165,136 @@ describe('StatisticService', () => {
         wontExpireAnytimeSoon: 0,
         newCertificatesDiscovered: 4,
       });
+    });
+  });
+
+  describe('handleWorkflowEnd', () => {
+    interface SnapshotLike {
+      hosts: number;
+      ports: number;
+      services: number;
+      techs: number;
+    }
+
+    const targetJob = (steps: Record<string, unknown>): Job =>
+      ({
+        id: 'job-1',
+        asset: { target: { id: 'target-1', value: 'cline.bot' } },
+        jobHistory: {
+          workflow: { filePath: DefaultWorkflow.DOMAIN_DISCOVERY },
+          steps,
+        },
+      }) as unknown as Job;
+
+    const snapshotSpy = () =>
+      jest.spyOn(
+        service as unknown as {
+          takeSnapshotStatisticTarget: (id: string) => Promise<SnapshotLike>;
+        },
+        'takeSnapshotStatisticTarget',
+      );
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockRedisService.get.mockResolvedValue(null);
+      mockRedisService.del.mockResolvedValue(undefined);
+      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([
+        { user: { id: 'user-1' }, workspace: { id: 'workspace-1' } },
+      ]);
+    });
+
+    it('reports an incomplete run alongside the discovery report', async () => {
+      snapshotSpy().mockResolvedValue({
+        hosts: 1,
+        ports: 0,
+        services: 3,
+        techs: 0,
+      });
+
+      await service.handleWorkflowEnd(
+        targetJob({
+          scan_subdomain: { status: 'done' },
+          port_scan: { status: 'failed' },
+          http_probe: { status: 'skipped', reason: 'blocked-by-failure' },
+        }),
+      );
+
+      // The discovery message keeps its original arguments: notifications
+      // stored before this change have no `incomplete` key, and a missing ICU
+      // variable makes the renderer fall back to raw template text.
+      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.ASSET_NEW_DETECT,
+          scope: NotificationScope.GROUP,
+          metadata: expect.objectContaining({ services: '3' }),
+        }),
+      );
+      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.ASSET_NEW_DETECT,
+          metadata: expect.not.objectContaining({
+            incomplete: expect.anything(),
+          }),
+        }),
+      );
+      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.SCAN_INCOMPLETE,
+          metadata: expect.objectContaining({
+            targetValue: 'cline.bot',
+            details: 'port_scan failed; http_probe skipped after a failure',
+          }),
+        }),
+      );
+    });
+
+    it('reports a run that died without discovering anything', async () => {
+      snapshotSpy().mockResolvedValue({
+        hosts: 0,
+        ports: 0,
+        services: 0,
+        techs: 0,
+      });
+
+      await service.handleWorkflowEnd(
+        targetJob({ port_scan: { status: 'failed' } }),
+      );
+
+      const types = mockNotificationsService.createNotification.mock.calls.map(
+        ([dto]) => (dto as { type: NotificationType }).type,
+      );
+      expect(types).toEqual([NotificationType.SCAN_INCOMPLETE]);
+    });
+
+    it('leaves a run that finished its whole graph unflagged', async () => {
+      snapshotSpy().mockResolvedValue({
+        hosts: 2,
+        ports: 4,
+        services: 4,
+        techs: 1,
+      });
+
+      await service.handleWorkflowEnd(
+        targetJob({
+          scan_subdomain: { status: 'done' },
+          port_scan: { status: 'done' },
+          http_probe: { status: 'done' },
+          take_screenshot: { status: 'done' },
+        }),
+      );
+
+      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.ASSET_NEW_DETECT,
+          metadata: expect.not.objectContaining({
+            incomplete: expect.anything(),
+          }),
+        }),
+      );
+      const types = mockNotificationsService.createNotification.mock.calls.map(
+        ([dto]) => (dto as { type: NotificationType }).type,
+      );
+      expect(types).not.toContain(NotificationType.SCAN_INCOMPLETE);
     });
   });
 });

@@ -24,6 +24,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
 import { In, Repository } from 'typeorm';
+import { AgentsApprovalsService } from './agents.approvals';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentModeDto, GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
@@ -80,6 +81,7 @@ export class AgentsService {
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly httpService: HttpService,
     private readonly workersService: WorkersService,
+    private readonly approvals: AgentsApprovalsService,
   ) {}
 
   private maskApiKey(apiKey: string): string {
@@ -429,6 +431,7 @@ export class AgentsService {
       llmConfigId: conversation.llmConfigId,
       title: conversation.title,
       agentMode: conversation.agentMode,
+      approvalMode: conversation.approvalMode,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       todos,
@@ -471,6 +474,7 @@ export class AgentsService {
         llmConfigId: c.llmConfigId,
         title: c.title,
         agentMode: c.agentMode,
+        approvalMode: c.approvalMode,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
       })),
@@ -502,6 +506,7 @@ export class AgentsService {
       llmConfigId: saved.llmConfigId,
       title: saved.title,
       agentMode: saved.agentMode,
+      approvalMode: saved.approvalMode,
       createdAt: saved.createdAt,
       updatedAt: saved.updatedAt,
     };
@@ -522,6 +527,7 @@ export class AgentsService {
 
     await this.conversationRepository.remove(conversation);
     await this.agentsMemories.stmClear(id);
+    await this.approvals.forgetConversations([id], workspaceId, userId);
   }
 
   async deleteAllConversations(
@@ -538,6 +544,11 @@ export class AgentsService {
     });
     await Promise.all(
       conversations.map((c) => this.agentsMemories.stmClear(c.id)),
+    );
+    await this.approvals.forgetConversations(
+      conversations.map((c) => c.id),
+      workspaceId,
+      userId,
     );
   }
 

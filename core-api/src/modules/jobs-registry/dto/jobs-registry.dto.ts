@@ -200,6 +200,12 @@ export class CreateJobs extends PickType(Job, [
   tool: Tool;
   targetIds?: string[];
   assetIds?: string[];
+  /**
+   * Narrows an asset-service fan-out to specific services. Lets a workflow
+   * advance from one asset-service job to the next step for that SAME service,
+   * instead of re-creating the step for every live service of the asset.
+   */
+  assetServiceIds?: string[];
   workspaceId: string;
   workflow: Workflow;
   jobHistory?: JobHistory;

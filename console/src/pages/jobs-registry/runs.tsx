@@ -15,10 +15,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import JobStatusBadge from '@/components/ui/job-status';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import ToolLogo from '@/components/ui/tool-logo';
+import RunWorkflowGraph from './components/run-workflow-graph';
 import { usePermission } from '@/hooks/usePermission';
+import { useRunWorkflow } from '@/hooks/use-run-workflow';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import type { JobListItemDto } from '@/services/apis/gen/queries';
+import type {
+  JobListItemDto,
+  WorkflowStepStatusDto,
+} from '@/services/apis/gen/queries';
 import {
   JobStatus,
   getJobsRegistryControllerGetJobHistoryDetailQueryKey,
@@ -37,9 +51,19 @@ import {
   ChevronRight,
   Clock,
   MoreHorizontal,
+  Code2,
   TriangleAlert,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+
+const NO_STEPS: WorkflowStepStatusDto[] = [];
 
 const formatDate = (value?: string) =>
   value && dayjs(value).isValid()
@@ -97,8 +121,13 @@ function Field({
   );
 }
 
-/** Inline detail panel revealed by expanding a job row. */
-function JobDetailPanel({ job }: { job: JobListItemDto }) {
+/** Inline detail panel revealed by expanding a job row. Memoized because the
+ * page re-renders on every one-second poll and the rows keep their identity. */
+const JobDetailPanel = memo(function JobDetailPanel({
+  job,
+}: {
+  job: JobListItemDto;
+}) {
   const duration = formatDuration(job);
   const hasConfig = !!job.config && Object.keys(job.config).length > 0;
 
@@ -185,7 +214,7 @@ function JobDetailPanel({ job }: { job: JobListItemDto }) {
       )}
     </div>
   );
-}
+});
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams({ strict: false });
@@ -208,6 +237,13 @@ export default function Runs() {
   });
 
   const hasActiveJobsRef = useRef(false);
+  const [isCodeOpen, setCodeOpen] = useState(false);
+  // Fetched only while the sheet is open: the YAML view is a one-off peek at
+  // the definition, not something the run page needs while it is closed.
+  const { data: runWorkflow, isLoading: isLoadingWorkflow } = useRunWorkflow(
+    jobHistoryId || '',
+    { enabled: isCodeOpen },
+  );
 
   const { data: jobHistoryDetail } =
     useJobsRegistryControllerGetJobHistoryDetail(jobHistoryId || '', {
@@ -219,15 +255,22 @@ export default function Runs() {
       },
     });
 
-  // Check if any tools are still active via API status
+  // Check if any tools are still active via API status. Workflow runs carry
+  // their own per-step state; runs created before the engine only have tools.
   const hasActiveJobs = useMemo(() => {
+    const steps = jobHistoryDetail?.steps ?? [];
+    if (steps.length > 0) {
+      return steps.some(
+        (step) => step.status === 'pending' || step.status === 'dispatched',
+      );
+    }
     const tools = jobHistoryDetail?.tools || [];
     return tools.some(
       (tool) =>
         tool.status === JobStatus.pending ||
         tool.status === JobStatus.in_progress,
     );
-  }, [jobHistoryDetail?.tools]);
+  }, [jobHistoryDetail?.steps, jobHistoryDetail?.tools]);
 
   useEffect(() => {
     hasActiveJobsRef.current = hasActiveJobs;
@@ -254,18 +297,25 @@ export default function Runs() {
   );
 
   /** Re-reads both the run summary (active job count) and the job table. */
-  const refresh = () => {
+  const refresh = useCallback(() => {
     queryClient.invalidateQueries({
       queryKey: getJobsRegistryControllerGetJobHistoryDetailQueryKey(
         jobHistoryId || '',
       ),
     });
     queryClient.invalidateQueries({ queryKey: paginatedJobsQueryKey });
-  };
+  }, [jobHistoryId, paginatedJobsQueryKey, queryClient]);
 
   const activeJobsCount = jobHistoryDetail?.activeJobsCount ?? 0;
+  // Stable identity: a fresh `[]` on every render would re-render the graph and
+  // the table once per poll tick for no reason.
+  const steps = useMemo(
+    () => jobHistoryDetail?.steps ?? NO_STEPS,
+    [jobHistoryDetail?.steps],
+  );
 
-  const columns: ColumnDef<JobListItemDto>[] = [
+  const columns: ColumnDef<JobListItemDto>[] = useMemo(
+    () => [
     {
       accessorKey: 'status',
       cell: ({ row }) => {
@@ -399,7 +449,9 @@ export default function Runs() {
         );
       },
     },
-  ];
+    ],
+    [cancelJobMutate, deleteJobMutate, refresh],
+  );
 
   return (
     <Page
@@ -431,38 +483,80 @@ export default function Runs() {
         )
       }
     >
-      {/* Tools Section */}
-      {!!jobHistoryDetail?.tools?.length && (
+      {/* Workflow steps (DAG) — falls back to the tool list for runs created
+          before the workflow engine existed. */}
+      {steps.length ? (
         <Card className="mb-6 py-2">
           <CardContent className="px-2 py-2 md:px-4">
-            <CardTitle className="mb-3">Tools</CardTitle>
-            <div className="flex flex-wrap items-center gap-4">
-              {jobHistoryDetail.tools.map((tool, index) => (
-                <div key={tool.id} className="flex items-center gap-2">
-                  <Link
-                    to="/tools/$id"
-                    params={{ id: tool.id }}
-                    className="flex items-center gap-2 hover:opacity-80"
-                  >
-                    <ToolLogo
-                      name={tool.name}
-                      logoUrl={tool.logoUrl}
-                      size={40}
-                      className="rounded-full border"
-                    />
-                    <span className="text-sm font-medium">{tool.name}</span>
-                    {tool.status && (
-                      <JobStatusBadge status={tool.status} onlyIcon />
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <CardTitle>Workflow</CardTitle>
+              <Sheet open={isCodeOpen} onOpenChange={setCodeOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Code2 className="h-4 w-4" />
+                    View workflow
+                  </Button>
+                </SheetTrigger>
+                <SheetContent
+                  side="right"
+                  className="w-full gap-0 overflow-y-auto sm:max-w-2xl"
+                >
+                  <SheetHeader>
+                    <SheetTitle>Workflow definition</SheetTitle>
+                    <SheetDescription>
+                      The workflow this run was created from.
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="px-4 pb-4">
+                    {isLoadingWorkflow ? (
+                      <Skeleton className="h-72 w-full" />
+                    ) : runWorkflow?.yaml ? (
+                      <CodeBlock language="yaml" showLine value={runWorkflow.yaml} />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        This run has no workflow attached.
+                      </p>
                     )}
-                  </Link>
-                  {index < jobHistoryDetail.tools.length - 1 && (
-                    <ArrowRight className="text-muted-foreground" size={16} />
-                  )}
-                </div>
-              ))}
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
+            <RunWorkflowGraph steps={steps} />
           </CardContent>
         </Card>
+      ) : (
+        !!jobHistoryDetail?.tools?.length && (
+          <Card className="mb-6 py-2">
+            <CardContent className="px-2 py-2 md:px-4">
+              <CardTitle className="mb-3">Tools</CardTitle>
+              <div className="flex flex-wrap items-center gap-4">
+                {jobHistoryDetail.tools.map((tool, index) => (
+                  <div key={tool.id} className="flex items-center gap-2">
+                    <Link
+                      to="/tools/$id"
+                      params={{ id: tool.id }}
+                      className="flex items-center gap-2 hover:opacity-80"
+                    >
+                      <ToolLogo
+                        name={tool.name}
+                        logoUrl={tool.logoUrl}
+                        size={40}
+                        className="rounded-full border"
+                      />
+                      <span className="text-sm font-medium">{tool.name}</span>
+                      {tool.status && (
+                        <JobStatusBadge status={tool.status} onlyIcon />
+                      )}
+                    </Link>
+                    {index < jobHistoryDetail.tools.length - 1 && (
+                      <ArrowRight className="text-muted-foreground" size={16} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )
       )}
 
       <CollapsibleDataTable

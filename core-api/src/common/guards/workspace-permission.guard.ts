@@ -1,15 +1,16 @@
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, CanActivate, ExecutionContext, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { WorkspacePermissions } from '../decorators/workspace-permissions.decorator';
 import { getWorkspaceIdFromRequest } from '../decorators/workspace-id.decorator';
 import { RequestWithMetadata } from '../interfaces/app.interface';
+import { isUUID } from 'class-validator';
+
+// Same check `WorkspaceId` uses, applied here so a malformed header is a 400
+// instead of a Postgres UUID-cast 500 from the membership lookup.
+function isUUIDFormat(value: string): boolean {
+  return isUUID(value);
+}
 
 /**
  * Metadata key for the per-route override declaring which route param holds the
@@ -60,6 +61,13 @@ export class WorkspacePermissionGuard implements CanActivate {
       (request.params?.id as string | undefined);
     if (!workspaceId) {
       throw new ForbiddenException('Workspace ID not provided in headers');
+    }
+    // The workspace id reaches the membership lookup right after this. If it
+    // is not a UUID, Postgres fails the comparison with a 500 deep inside the
+    // query. Validate it here and surface the same 400 the `@WorkspaceId()`
+    // parameter decorator already produces for the UUID route params.
+    if (!isUUIDFormat(workspaceId)) {
+      throw new BadRequestException('Workspace id null or invalid');
     }
 
     // Publish the resolved id so downstream interceptors (audit log) can

@@ -59,5 +59,15 @@ export class CreateNotificationDto {
   @IsString()
   refId?: string;
 
+  /**
+   * Tenant the notification belongs to.
+   *
+   * This type doubles as the BullMQ JOB_RESULT payload contract, so it stays a
+   * field — every internal caller (workspaces, data-adapter, statistic,
+   * vulnerability processor) sets it server-side. It is NOT client-settable:
+   * the `POST /notifications` route that used to pass a request body straight
+   * into this shape has been removed, since the `notification` permission
+   * resource has no `write` action to gate it with.
+   */
   workspaceId?: string;
 }

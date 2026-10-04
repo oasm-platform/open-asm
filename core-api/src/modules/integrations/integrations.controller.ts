@@ -8,11 +8,13 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   Param,
   Patch,
   Post,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -32,7 +34,10 @@ import { SchemasResponseDto } from './dto/schemas-response.dto';
 import { TelegramConnectDto } from './dto/telegram-connect.dto';
 import { TestIntegrationDto } from './dto/test-integration.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
-import { IntegrationsService } from './integrations.service';
+import {
+  IntegrationsService,
+  verifyTelegramWebhookSecret,
+} from './integrations.service';
 import { TelegramConnectService } from './telegram-connect.service';
 import { TelegramWebhookService } from './telegram-webhook.service';
 import { AwsSsoService } from './connectors/aws/aws-sso.service';
@@ -408,6 +413,7 @@ export class IntegrationsController {
   async telegramWebhook(
     @Param('integrationId') integrationId: string,
     @Body() update: unknown,
+    @Headers('x-telegram-bot-api-secret-token') secretToken?: string,
   ) {
     // Resolve bot token so /start without token can reply with instructions
     let botToken: string | undefined;
@@ -419,6 +425,13 @@ export class IntegrationsController {
       botToken = decryptedConfig.botToken as string | undefined;
     } catch {
       // Integration not found or decryption failed — proceed without botToken
+    }
+
+    // Telegram only sends this header when the webhook was registered with a
+    // secret_token. Without it the route is an unauthenticated way to drive the
+    // tenant's bot, so reject rather than act.
+    if (!botToken || !verifyTelegramWebhookSecret(secretToken, botToken)) {
+      throw new UnauthorizedException('Invalid Telegram webhook secret');
     }
 
     await this.telegramWebhookService.processUpdate(

@@ -140,13 +140,13 @@ func splitLogChunk(chunk []byte) []string {
 	return out
 }
 
-func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
-	job, err := grpcClient.NextJob(ctx)
-	if err != nil {
-		NewTuiLogger(events, "Jobs").ErrorE("Failed to pull job", err)
-		return false, false
-	}
-	if job == nil || job.Id == "" {
+// processJob runs one already-claimed job.
+//
+// The caller owns the claim: the poll loop claims a batch up front so it can
+// fill every free concurrency slot with a single round-trip, and passing the
+// job in keeps this function free of any transport concern.
+func processJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
+	if job == nil || job.GetId() == "" {
 		return false, false
 	}
 
@@ -230,21 +230,52 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 		}
 		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
 		if err != nil {
+			// A page that will not render is the TARGET's condition, not the
+			// tool's failure, so this must not fail the job. Report an empty
+			// screenshot and let it complete: core's screenshot adapter returns
+			// early on an empty image, so nothing is written. The reason stays
+			// on the worker's activity log for diagnosis.
 			completed = true
 			Emit(events, TuiEvent{
 				Type:          EventActivity,
 				Source:        "Jobs",
 				ActivityLevel: "warning",
-				Message:       fmt.Sprintf("Screenshot failed: %v", err),
+				Message:       fmt.Sprintf("Screenshot skipped (%s): %s", formatURL(url), trimRodStack(err.Error())),
 			})
+
+			emptyPayload, marshalErr := emptyScreenshotPayload(url)
+			if marshalErr != nil {
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: fmt.Sprintf("Screenshot error: %v", marshalErr),
+					Duration: time.Since(startTime),
+				})
+				submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", marshalErr))
+				return true, false
+			}
+
+			if submitErr := submitCategoryResult(ctx, grpcClient, job.Id, category, false, emptyPayload); submitErr != nil {
+				// Reporting the empty result is an infrastructure concern — if
+				// the submission itself fails the job genuinely did not finish.
+				NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit empty screenshot result", job.Id), submitErr)
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: submitErr.Error(),
+					Duration: time.Since(startTime),
+				})
+				return true, false
+			}
+
 			Emit(events, TuiEvent{
 				Type:     EventJobCompleted,
 				JobID:    job.Id,
-				Success:  false,
-				ErrorMsg: fmt.Sprintf("Screenshot error: %v", err),
+				Success:  true,
 				Duration: time.Since(startTime),
 			})
-			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", err))
 			return true, false
 		}
 
@@ -542,7 +573,17 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	// of creating another replica. Back off and retry — the job is NOT
 	// failed to Core, the semaphore slot stays held, and imageBackoff is NOT
 	// penalized (quota pressure is not an image failure).
+	// poolRetryDelay is how often a queued job re-asks for a container slot.
 	const poolRetryDelay = 2 * time.Second
+
+	// poolWaitBudget caps how long one job waits for a free container slot of its
+	// image before it is reported back to Core. Queue pressure is normal, but a slot
+	// held by a wedged container must not hold a worker concurrency slot forever.
+	// The deadline is armed once per job — re-arming it per submit attempt would
+	// double the real bound (attempt 0 could burn the whole budget, then attempt 1
+	// would start a fresh one).
+	var poolWaitBudget = 10 * time.Minute
+	poolWaitUntil := time.Now().Add(poolWaitBudget)
 
 	// The ExecuteJob payload is identical across retries, so build it once.
 	inputs := make(map[string]string, len(spec.Inputs))
@@ -572,6 +613,33 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	for attempt := 0; attempt < 2; attempt++ {
 		execID, err = mgr.Submit(ctx, spec)
 		for err != nil && errors.Is(err, execution.ErrPoolExhausted) {
+			if time.Now().After(poolWaitUntil) {
+				// Local scheduling gave up on this job: report it so Core can
+				// requeue it, and leave the image alone (a full pool is not an
+				// image defect).
+				msg := fmt.Sprintf(
+					"Submit failed: no free container slot for %s after %s",
+					spec.Image,
+					poolWaitBudget,
+				)
+				log.ErrorE(fmt.Sprintf("[%s] %s", job.Id, msg), err)
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: msg,
+					Duration: time.Since(startTime),
+				})
+				// Reported on a DETACHED context, like failBackoff above: this
+				// branch is reached after the queue stayed full, which is exactly
+				// when a worker reconnect has cancelled the session ctx. Reporting
+				// on a cancelled ctx silently fails and leaves the job
+				// IN_PROGRESS in Core although the semaphore slot was released.
+				cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+				submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
+				cleanupCancel()
+				return true, false // hadJob=true (job was pulled), caller releases semaphore
+			}
 			// Quota pressure is normal queueing, not an incident: the job stays
 			// queued in the TUI jobs table and retries silently. Logging it per
 			// retry produced one line every 2s per waiting job, which drowned
@@ -591,7 +659,12 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 					ErrorMsg: msg,
 					Duration: time.Since(startTime),
 				})
-				submitCategoryError(ctx, grpcClient, events, job.Id, category, msg)
+				// Detached: ctx is already cancelled in this branch, so reporting
+				// on it can never reach Core and the job would stay
+				// IN_PROGRESS after the semaphore was released.
+				cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+				submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
+				cleanupCancel()
 				return true, false // hadJob=true (job was pulled), caller releases semaphore
 			case <-time.After(poolRetryDelay):
 			}

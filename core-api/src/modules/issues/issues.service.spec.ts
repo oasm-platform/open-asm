@@ -417,14 +417,7 @@ describe('IssuesService', () => {
   });
 
   describe('getById', () => {
-    it('should return an issue by id without workspaceId check', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-
-      const result = await service.getById('1');
-      expect(result).toEqual(mockIssue);
-    });
-
-    it('should return an issue when workspaceId matches', async () => {
+    it('should return an issue by id when workspaceId matches', async () => {
       jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
 
       const result = await service.getById(mockIssue.id, mockIssue.workspaceId);
@@ -442,9 +435,9 @@ describe('IssuesService', () => {
     it('should throw NotFoundException if issue not found', async () => {
       jest.spyOn(repository, 'findOne').mockResolvedValue(null);
 
-      await expect(service.getById('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.getById('non-existent', mockIssue.workspaceId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -463,6 +456,7 @@ describe('IssuesService', () => {
         '123e4567-e89b-12d3-a456-426614174000',
         updateIssueDto,
         userId,
+        mockIssue.workspaceId,
       );
       expect(result.title).toBe('Updated Title');
     });
@@ -488,6 +482,7 @@ describe('IssuesService', () => {
         '123e4567-e89b-12d3-a456-426614174000',
         updateIssueDto,
         userId,
+        mockIssue.workspaceId,
       );
       expect(result.tags).toEqual(['new-tag1', 'new-tag2']);
     });
@@ -517,6 +512,7 @@ describe('IssuesService', () => {
         '123e4567-e89b-12d3-a456-426614174000',
         updateIssueDto,
         userId,
+        mockIssue.workspaceId,
       );
       expect(result.title).toBe('Updated Title');
       expect(result.tags).toEqual(['updated-tag1', 'updated-tag2']);
@@ -533,6 +529,7 @@ describe('IssuesService', () => {
           '123e4567-e89b-12d3-a456-426614174000',
           updateIssueDto,
           userId,
+          mockIssue.workspaceId,
         ),
       ).rejects.toThrow(ForbiddenException);
     });
@@ -553,6 +550,7 @@ describe('IssuesService', () => {
         '123e4567-e89b-12d3-a456-426614174000',
         changeIssueStatusDto,
         userId,
+        mockIssue.workspaceId,
       );
       expect(result.status).toBe(IssueStatus.CLOSED);
     });
@@ -568,6 +566,7 @@ describe('IssuesService', () => {
           '123e4567-e89b-12d3-a456-426614174000',
           changeIssueStatusDto,
           userId,
+          mockIssue.workspaceId,
         ),
       ).rejects.toThrow(ForbiddenException);
     });
@@ -594,6 +593,7 @@ describe('IssuesService', () => {
         '123e4567-e89b-12d3-a456-426614174000',
         changeIssueStatusDto,
         userId,
+        issueWithSource.workspaceId,
       );
 
       // expect(vulnerabilityHandler.onStatusChange).toHaveBeenCalledWith(
@@ -608,7 +608,7 @@ describe('IssuesService', () => {
       jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
       jest.spyOn(repository, 'remove').mockResolvedValue(mockIssue as Issue);
 
-      const result = await service.delete('1');
+      const result = await service.delete('1', mockIssue.workspaceId);
       expect(result.message).toBe('Issue deleted successfully');
     });
   });
@@ -619,6 +619,8 @@ describe('IssuesService', () => {
       const issueId = '1';
       const userId = 'user-1';
 
+      // createComment loads the parent issue first to enforce the tenant boundary
+      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
       jest
         .spyOn(commentRepository, 'create')
         .mockReturnValue(mockIssueComment as IssueComment);
@@ -630,8 +632,26 @@ describe('IssuesService', () => {
         createCommentDto,
         issueId,
         userId,
+        mockIssue.workspaceId,
       );
       expect(result).toEqual(mockIssueComment);
+    });
+
+    it('should refuse to comment on an issue in another workspace', async () => {
+      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
+      jest.spyOn(commentRepository, 'save').mockResolvedValue(
+        mockIssueComment as IssueComment,
+      );
+
+      await expect(
+        service.createComment(
+          { content: 'x' },
+          mockIssue.id,
+          'user-1',
+          'a-different-workspace',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(commentRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -649,6 +669,7 @@ describe('IssuesService', () => {
         withDeleted: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoin: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
@@ -658,8 +679,42 @@ describe('IssuesService', () => {
         getManyAndCount: jest.fn().mockResolvedValue([[mockIssueComment], 1]),
       } as any);
 
-      const result = await service.getCommentsByIssueId(issueId, query);
+      const result = await service.getCommentsByIssueId(
+        issueId,
+        query,
+        mockIssue.workspaceId,
+      );
       expect(result.data.length).toBe(1);
+    });
+
+    it('should scope the comment query to the caller workspace', async () => {
+      const andWhere = jest.fn().mockReturnThis();
+      jest.spyOn(commentRepository, 'createQueryBuilder').mockReturnValue({
+        withDeleted: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere,
+        select: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockIssueComment], 1]),
+      } as any);
+
+      await service.getCommentsByIssueId(
+        mockIssue.id,
+        { limit: 10, page: 1 },
+        mockIssue.workspaceId,
+      );
+
+      // The tenant predicate must be present — without it the endpoint reads
+      // every issue's comments platform-wide.
+      expect(andWhere).toHaveBeenCalledWith(
+        'issue.workspaceId = :workspaceId',
+        { workspaceId: mockIssue.workspaceId },
+      );
     });
   });
 
@@ -681,11 +736,12 @@ describe('IssuesService', () => {
         '1',
         updateCommentDto,
         userId,
+        mockIssue.workspaceId,
       );
       expect(result.content).toBe('Updated Comment');
     });
 
-    it('should throw error when user is not the creator of the comment', async () => {
+    it('should throw ForbiddenException when user is not the creator of the comment', async () => {
       const updateCommentDto = { content: 'Updated Comment' };
       const userId = 'different-user';
 
@@ -695,8 +751,13 @@ describe('IssuesService', () => {
       } as IssueComment);
 
       await expect(
-        service.updateCommentById('1', updateCommentDto, userId),
-      ).rejects.toThrow(Error);
+        service.updateCommentById(
+          '1',
+          updateCommentDto,
+          userId,
+          mockIssue.workspaceId,
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -710,7 +771,11 @@ describe('IssuesService', () => {
       } as IssueComment);
       jest.spyOn(commentRepository, 'softDelete').mockResolvedValue({} as any);
 
-      const result = await service.deleteCommentById('1', userId);
+      const result = await service.deleteCommentById(
+        '1',
+        userId,
+        mockIssue.workspaceId,
+      );
       expect(result.message).toBe('Comment deleted successfully');
     });
 
@@ -722,9 +787,9 @@ describe('IssuesService', () => {
         createdBy: { id: 'another-user' },
       } as IssueComment);
 
-      await expect(service.deleteCommentById('1', userId)).rejects.toThrow(
-        Error,
-      );
+      await expect(
+        service.deleteCommentById('1', userId, mockIssue.workspaceId),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

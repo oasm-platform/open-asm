@@ -1,15 +1,10 @@
-import { AUTH_INSTANCE_KEY } from '@/common/constants/app.constants';
-import { AuthGuard } from '@/common/guards/auth.guard';
-import type { INestApplication } from '@nestjs/common';
-import { ValidationPipe } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import type { TestingModule } from '@nestjs/testing';
-import { Test } from '@nestjs/testing';
+import { AssetsService } from './../src/modules/assets/assets.service';
+import type { DataSource } from 'typeorm';
+import { closeTestApp, createTestApp } from './helpers/app';
+import { signUp } from './helpers/auth';
 import * as request from 'supertest';
 import type { App } from 'supertest/types';
-import { DataSource } from 'typeorm';
-import { AppModule } from './../src/app.module';
-import { AssetsService } from './../src/modules/assets/assets.service';
+import type { INestApplication } from '@nestjs/common';
 
 /**
  * Real-surface e2e for GET /api/assets/url against real Postgres.
@@ -50,34 +45,16 @@ describe('GET /api/assets/url (e2e)', () => {
   let server: App;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    // Mirror production bootstrap: global 'api' prefix + the global AuthGuard
-    // + the ValidationPipe that transforms scalar query params into arrays.
-    app.setGlobalPrefix('api');
-    app.useGlobalGuards(
-      new AuthGuard(app.get(Reflector), app.get(AUTH_INSTANCE_KEY)),
-    );
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    await app.init();
-    server = app.getHttpServer();
-
-    dataSource = app.get(DataSource);
+    const created = await createTestApp();
+    app = created.app as INestApplication<App>;
+    server = created.server;
+    dataSource = created.dataSource;
     assetsService = app.get(AssetsService);
 
     // ── Sign up over real HTTP, capture the session cookie ──────────────
-    const signUp = await request(server)
-      .post('/api/auth/sign-up/email')
-      .send({ email, password, name: 'E2E URL' })
-      .expect(200);
-    userId = (signUp.body as { user: { id: string } }).user.id;
-    const setCookie = signUp.headers['set-cookie'] as unknown as
-      | string[]
-      | undefined;
-    cookie = (setCookie ?? []).map((c) => c.split(';')[0]).join('; ');
+    const signedUp = await signUp(created.server, { email, password, name: 'E2E URL' });
+    userId = signedUp.userId;
+    cookie = signedUp.cookie;
 
     // ── Create the workspace over real HTTP (seeds '*' permission group) ─
     const ws = await request(server)
@@ -180,7 +157,7 @@ describe('GET /api/assets/url (e2e)', () => {
       );
     expect(residue[0].discovered).toBe('0');
     expect(residue[0].http).toBe('0');
-    await app?.close();
+    await closeTestApp(app);
   });
 
   it('returns 401 for unauthenticated requests (guard active)', async () => {

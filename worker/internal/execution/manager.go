@@ -160,6 +160,31 @@ func (m *Manager) logInfo(msg string, args ...any) {
 	l.Info(msg, args...)
 }
 
+// poolExhaustedLogInterval rate-limits the per-image "no free slot" report.
+const poolExhaustedLogInterval = 30 * time.Second
+
+var (
+	poolExhaustedLogMu sync.Mutex
+	poolExhaustedLogAt = map[string]time.Time{}
+)
+
+// logPoolExhausted reports a full container pool at most once per interval per
+// image. Waiting behind a busy replica is expected queueing, and the submit path
+// retries every couple of seconds — one line per attempt (measured: 7,000+ lines
+// in twenty minutes) drowned the activity feed for no added information.
+func (m *Manager) logPoolExhausted(poolKey, line string) {
+	poolExhaustedLogMu.Lock()
+	now := time.Now()
+	last, seen := poolExhaustedLogAt[poolKey]
+	if seen && now.Sub(last) < poolExhaustedLogInterval {
+		poolExhaustedLogMu.Unlock()
+		return
+	}
+	poolExhaustedLogAt[poolKey] = now
+	poolExhaustedLogMu.Unlock()
+	m.logInfo("%s", line)
+}
+
 // generateExecToken mints the per-execution single-use connector auth token:
 // 32 random bytes encoded as 64 hex chars. crypto/rand is used so container
 // dial-backs cannot guess or replay another execution's token.
@@ -316,8 +341,8 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 				// and retries; no container is created, no Core failure is
 				// recorded.
 				busy, max := p.busyCount(poolKey), p.maxReplicasPerImage
-				poolLogs = append(poolLogs, fmt.Sprintf("pool exhausted: pool_key=%s busy=%d max=%d (node budget cpu=%dm mem=%dB, request cpu=%dm mem=%dB)",
-					poolKey, busy, max, p.cpuBudgetMillis, p.memBudgetBytes, cpuRequestMillis, memRequestBytes))
+				line := fmt.Sprintf("pool exhausted: pool_key=%s busy=%d max=%d (node budget cpu=%dm mem=%dB, request cpu=%dm mem=%dB)",
+					poolKey, busy, max, p.cpuBudgetMillis, p.memBudgetBytes, cpuRequestMillis, memRequestBytes)
 				// No execution was created — drop the token so a stray
 				// connector can never authenticate against a ghost execution,
 				// and release the reserved concurrency slot.
@@ -326,9 +351,13 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 				delete(m.tokens, id)
 				m.tokenMu.Unlock()
 				m.mu.Unlock()
-				for _, line := range poolLogs {
-					m.logInfo("%s", line)
+				for _, logLine := range poolLogs {
+					m.logInfo("%s", logLine)
 				}
+				// Waiting for a free slot is normal queueing, not an incident:
+				// the retry loop asks again every couple of seconds, so this is
+				// rate-limited per image instead of flooding the activity feed.
+				m.logPoolExhausted(poolKey, line)
 				return "", fmt.Errorf("%w: %s", ErrPoolExhausted, poolKey)
 			}
 			reserved = true

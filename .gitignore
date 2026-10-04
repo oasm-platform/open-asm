@@ -46,6 +46,7 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+core-api/src/modules/agents/temps
 
 # Runtime data
 pids

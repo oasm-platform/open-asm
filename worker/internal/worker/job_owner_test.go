@@ -43,7 +43,7 @@ func TestProcessConnectorJobStampsOwnerWorkerID(t *testing.T) {
 	releaseCh := make(chan struct{}, 1)
 	releaseSem := func() { releaseCh <- struct{}{} }
 
-	hadJob, _ := processJob(context.Background(), client, nil, "", events, mgr, proxy, releaseSem)
+	hadJob, _ := processJob(context.Background(), pullJob(t, client), client, nil, "", events, mgr, proxy, releaseSem)
 	if !hadJob {
 		t.Fatal("expected hadJob=true")
 	}
