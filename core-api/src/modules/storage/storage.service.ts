@@ -19,7 +19,14 @@ import {
 import { createHmac, randomBytes } from 'crypto';
 import { DEFAULT_ENCRYPTION_KEY } from '@/common/constants/app.constants';
 import { ConfigService } from '@nestjs/config';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { RustFsClient } from './rustfs.client';
+import {
+  MAX_S3_PRESIGN_TTL_SECONDS,
+  MIN_S3_PRESIGN_TTL_SECONDS,
+  parseStorageConfig,
+  StorageConfig,
+} from './storage.config';
 import { Readable } from 'stream';
 
 @Injectable()
@@ -38,12 +45,14 @@ export class StorageService implements OnModuleInit {
   private readonly privateBuckets = ['reports', 'job-results'];
 
   private readonly downloadSecret: string;
+  private readonly storageConfig: StorageConfig;
 
   constructor(
     private readonly rustFsClient: RustFsClient,
     private readonly configService: ConfigService,
   ) {
     this.downloadSecret = this.configService.get<string>('DEFAULT_ENCRYPTION_KEY', DEFAULT_ENCRYPTION_KEY);
+    this.storageConfig = parseStorageConfig(this.configService);
   }
 
   async onModuleInit() {
@@ -125,6 +134,50 @@ export class StorageService implements OnModuleInit {
     }
 
     return { path: `${bucket}/${fileName}` };
+  }
+
+  public async getPresignedUploadUrl(opts: {
+    bucket: string;
+    key: string;
+    contentType?: string;
+    expiresIn?: number;
+  }): Promise<{ url: string; key: string; path: string; expiresIn: number }> {
+    const { bucket, key, contentType, expiresIn } = opts;
+
+    if (!bucket || bucket.trim() === '') {
+      throw new BadRequestException('bucket is required');
+    }
+    if (
+      !key ||
+      key.trim() === '' ||
+      key.startsWith('/') ||
+      key.startsWith('.') ||
+      key.startsWith(' ') ||
+      key.includes('..')
+    ) {
+      throw new BadRequestException('Invalid key');
+    }
+
+    const requestedTtl = expiresIn ?? this.storageConfig.presignTtlSeconds;
+    const clampedTtl = Math.min(
+      MAX_S3_PRESIGN_TTL_SECONDS,
+      Math.max(MIN_S3_PRESIGN_TTL_SECONDS, Math.trunc(requestedTtl)),
+    );
+    this.logger.log(`Resolved presign TTL: ${clampedTtl}s`);
+
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ...(contentType ? { ContentType: contentType } : {}),
+    });
+
+    // ponytail: presigner@3.1048 vs client-s3@3.1097 ship mismatched @smithy/types; cast until versions align.
+    const url = await getSignedUrl(this.rustFsClient.getPresignClient() as never, command as never, {
+      expiresIn: clampedTtl,
+      ...(contentType ? { signableHeaders: new Set(['content-type']) } : {}),
+    });
+
+    return { url, key, path: `${bucket}/${key}`, expiresIn: clampedTtl };
   }
 
   private isNoSuchBucket(error: unknown): boolean {

@@ -14,9 +14,10 @@ describe('StorageService', () => {
   let service: StorageService;
   let sendMock: jest.Mock;
 
-  const mockRustFsClient = {
-    getClient: jest.fn(),
-  };
+const mockRustFsClient = {
+  getClient: jest.fn(),
+  getPresignClient: jest.fn().mockReturnValue({ send: jest.fn() }),
+};
 
   const mockConfigService = {
     get: jest.fn().mockReturnValue('test-secret'),
