@@ -5,7 +5,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { LanguageModel, ToolSet, UIMessageChunk } from 'ai';
+import type {
+  LanguageModel,
+  TextStreamPart,
+  ToolSet,
+  UIMessageChunk,
+} from 'ai';
 import {
   generateText,
   isStepCount,
@@ -501,7 +506,7 @@ export class AgentsCompletionsService {
           const opts = getReasoningProviderOptions(llmConfig.provider);
           return opts ? { providerOptions: opts } : {};
         })(),
-        onChunk: ({ chunk }) => {
+        onChunk: ({ chunk }: { chunk: TextStreamPart<ToolSet> }) => {
           if (chunk.type === 'text-delta') {
             accumulatedText += chunk.text;
           }
