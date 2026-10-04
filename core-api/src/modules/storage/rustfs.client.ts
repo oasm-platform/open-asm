@@ -1,6 +1,11 @@
 import { S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  DEFAULT_RUSTFS_ENDPOINT,
+  parseStorageConfig,
+  StorageConfig,
+} from './storage.config';
 
 @Injectable()
 export class RustFsClient {
@@ -9,29 +14,23 @@ export class RustFsClient {
   private readonly presignClient: S3Client;
 
   constructor(private readonly configService: ConfigService) {
-    this.client = this.buildClient({
+    const storageConfig = parseStorageConfig(configService);
+
+    // Server-side client: never point it at the browser-facing endpoint.
+    this.client = this.buildClient(storageConfig, {
       endpoint: this.configService.get<string>(
         'RUSTFS_ENDPOINT',
-        'http://localhost:9000',
+        DEFAULT_RUSTFS_ENDPOINT,
       ),
       region: 'us-east-1',
       forcePathStyle: true,
       checksum: false,
     });
 
-    this.presignClient = this.buildClient({
-      endpoint: this.configService.get<string>(
-        'S3_PUBLIC_ENDPOINT',
-        this.configService.get<string>(
-          'RUSTFS_ENDPOINT',
-          'http://localhost:9000',
-        ),
-      ),
-      region: this.configService.get<string>('S3_REGION', 'us-east-1'),
-      forcePathStyle:
-        this.configService
-          .get<string>('S3_FORCE_PATH_STYLE', 'true')
-          .toLowerCase() === 'true',
+    this.presignClient = this.buildClient(storageConfig, {
+      endpoint: storageConfig.publicEndpoint,
+      region: storageConfig.region,
+      forcePathStyle: storageConfig.forcePathStyle,
       checksum: true,
     });
   }
@@ -44,20 +43,15 @@ export class RustFsClient {
     return this.presignClient;
   }
 
-  private buildClient(options: {
-    endpoint: string;
-    region: string;
-    forcePathStyle: boolean;
-    checksum: boolean;
-  }): S3Client {
-    const useDefaultCredentials =
-      this.configService
-        .get<string>('S3_USE_DEFAULT_CREDENTIALS', 'false')
-        .toLowerCase() === 'true';
-
-    const s3AccessKey = this.configService.get<string>('S3_ACCESS_KEY');
-    const s3SecretKey = this.configService.get<string>('S3_SECRET_KEY');
-
+  private buildClient(
+    storageConfig: StorageConfig,
+    options: {
+      endpoint: string;
+      region: string;
+      forcePathStyle: boolean;
+      checksum: boolean;
+    },
+  ): S3Client {
     const config: S3ClientConfig = {
       endpoint: options.endpoint,
       region: options.region,
@@ -70,10 +64,13 @@ export class RustFsClient {
         : {}),
     };
 
-    if (!useDefaultCredentials) {
+    if (!storageConfig.useDefaultCredentials) {
       config.credentials =
-        s3AccessKey && s3SecretKey
-          ? { accessKeyId: s3AccessKey, secretAccessKey: s3SecretKey }
+        storageConfig.accessKey && storageConfig.secretKey
+          ? {
+              accessKeyId: storageConfig.accessKey,
+              secretAccessKey: storageConfig.secretKey,
+            }
           : {
               accessKeyId: this.configService.get<string>(
                 'RUSTFS_ACCESS_KEY',

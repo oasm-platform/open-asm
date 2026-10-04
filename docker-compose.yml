@@ -46,9 +46,14 @@ services:
       - GEO_IP_URL=geo-ip:4360
       - OASM_CLOUD_APIKEY=change_me
       - RUSTFS_ENDPOINT=http://rustfs:9000
-      # Presign host MUST match the origin the browser actually requests:
-      # console nginx (:3000) proxies /object-storage to rustfs while preserving
-      # Host, so the SigV4 signature validates. Never point this at rustfs:9000.
+      # Presign host MUST match the origin the browser actually requests.
+      # console/nginx.conf routes on the QUERY STRING, not on a path: `map $args
+      # $is_presigned` flags any request carrying X-Amz-Signature, and those
+      # locations `return 418`, which `error_page 418 = @object_storage` hands to
+      # rustfs with `Host $http_host` preserved so SigV4 validates. Every other
+      # request is served by the SPA. Never point this at rustfs:9000, and never
+      # introduce a path prefix (e.g. /s3/) to separate storage traffic — SigV4
+      # signs the path too, so a rewrite yields SignatureDoesNotMatch.
       - S3_PUBLIC_ENDPOINT=http://localhost:3000
       # Origins allowed to PUT/GET with the presigned headers: the compose
       # console origin plus the vite dev server on :5173.

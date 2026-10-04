@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  fetchPresignedBlob,
   fetchPresignedText,
   uploadToPresignedUrl,
 } from './storage';
@@ -94,24 +93,5 @@ describe('fetchPresignedText', () => {
     await expect(fetchPresignedText('https://s3.test/get?sig=1')).rejects.toThrow(
       /404.*NoSuchKey/s,
     );
-  });
-});
-
-describe('fetchPresignedBlob', () => {
-  it('returns the response body as a Blob', async () => {
-    mockFetch(new Response('pdf-bytes', { status: 200 }));
-
-    const blob = await fetchPresignedBlob('https://s3.test/get?sig=1');
-    expect(blob).toBeInstanceOf(Blob);
-    // jsdom's Blob has no `.text()`, so assert the carried payload by size.
-    expect(blob.size).toBe('pdf-bytes'.length);
-  });
-
-  it('throws on a non-2xx response', async () => {
-    mockFetch(new Response('denied', { status: 403, statusText: 'Forbidden' }));
-
-    await expect(
-      fetchPresignedBlob('https://s3.test/get?sig=1'),
-    ).rejects.toThrow(/403/);
   });
 });

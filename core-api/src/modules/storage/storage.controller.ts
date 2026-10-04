@@ -8,6 +8,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Logger,
   NotFoundException,
   Param,
   Post,
@@ -44,6 +45,8 @@ export class StorageController {
     private readonly storageService: StorageService,
     private readonly systemConfigsService: SystemConfigsService,
   ) {}
+
+  private readonly logger = new Logger(StorageController.name);
 
   private readonly allowedImageExtensions = [
     'jpg',
@@ -116,7 +119,7 @@ export class StorageController {
       key,
     );
 
-    if (!contentType?.startsWith('image/')) {
+    if (!this.isAllowedImageContentType(key, contentType)) {
       throw new BadRequestException('Only image files are supported');
     }
     if (contentLength > LOGO_MAX_SIZE_BYTES) {
@@ -135,8 +138,10 @@ export class StorageController {
     if (previousKey && previousKey !== key) {
       try {
         await this.storageService.deleteFile(previousKey, previousBucket);
-      } catch {
-        // A stale object must never fail the confirmation.
+      } catch (error) {
+        this.logger.warn(
+          `Failed to delete previous logo ${previousKey} in bucket ${previousBucket}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
     }
 
@@ -269,6 +274,24 @@ export class StorageController {
     }
 
     return file;
+  }
+
+  /**
+   * Acceptance rule for an uploaded logo: the stored `ContentType` must be
+   * exactly the MIME type that the key's own extension maps to, and that
+   * extension must be in the image allow-list. A bare `image/` prefix is not
+   * enough, so an `image/svg+xml` object behind a `.png` key is rejected.
+   */
+  private isAllowedImageContentType(
+    key: string,
+    contentType: string | null | undefined,
+  ): boolean {
+    const extension = key.slice(key.lastIndexOf('.') + 1).toLowerCase();
+    if (!this.allowedImageExtensions.includes(extension)) {
+      return false;
+    }
+
+    return contentType === this.getMimeType(extension);
   }
 
   private getMimeType(extension?: string): string | undefined {

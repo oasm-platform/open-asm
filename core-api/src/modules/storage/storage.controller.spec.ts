@@ -4,6 +4,8 @@ import {
 } from '@/common/constants/app.constants';
 import { Role } from '@/common/enums/enum';
 import type { ConfigService } from '@nestjs/config';
+import type {
+  Logger } from '@nestjs/common';
 import {
   BadRequestException,
   ForbiddenException,
@@ -454,6 +456,29 @@ describe('StorageController', () => {
       });
     });
 
+    it('logs why a stale object could not be deleted', async () => {
+      systemConfigsService.getConfig.mockResolvedValue({
+        name: 'OASM',
+        logoPath: `${STORAGE_BASE_PATH}/system/old-logo.png`,
+      });
+      jest
+        .spyOn(storageService, 'deleteFile')
+        .mockRejectedValue(new Error('NoSuchKey'));
+      const warn = jest
+        .spyOn(
+          (controller as unknown as { logger: Logger }).logger,
+          'warn',
+        )
+        .mockImplementation(() => undefined);
+
+      await controller.confirmLogoUpload({ key });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('old-logo.png'),
+      );
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('NoSuchKey'));
+    });
+
     it('propagates a missing object as NotFound', async () => {
       jest
         .spyOn(storageService, 'headObject')
@@ -478,6 +503,59 @@ describe('StorageController', () => {
         ).rejects.toBeInstanceOf(BadRequestException);
 
         expect(systemConfigsService.updateConfig).not.toHaveBeenCalled();
+      },
+    );
+
+    /**
+     * Acceptance rule: the stored `ContentType` must be exactly the MIME type
+     * that the key's own extension maps to, and that extension must be in the
+     * image allow-list. A bare `image/` prefix is not enough — an
+     * `image/svg+xml` object behind a `.png` key is rejected, as is any
+     * `image/*` type outside the six derived from the allow-list.
+     */
+    it.each([
+      ['logo-1a2b3c.png', 'image/svg+xml'],
+      ['logo-1a2b3c.png', 'image/gif'],
+      ['logo-1a2b3c.png', 'image/x-icon'],
+      ['logo-1a2b3c.png', 'image/vnd.microsoft.icon'],
+      ['logo-1a2b3c.txt', 'text/plain'],
+      ['logo-1a2b3c', 'image/png'],
+    ])(
+      'rejects %p stored as %p because it is not its extension image MIME',
+      async (objectKey, contentType) => {
+        jest
+          .spyOn(storageService, 'headObject')
+          .mockResolvedValue({ contentType, contentLength: 1024 });
+
+        await expect(
+          controller.confirmLogoUpload({ key: objectKey }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(systemConfigsService.updateConfig).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ['logo-1a2b3c.jpg', 'image/jpeg'],
+      ['logo-1a2b3c.jpeg', 'image/jpeg'],
+      ['logo-1a2b3c.png', 'image/png'],
+      ['logo-1a2b3c.gif', 'image/gif'],
+      ['logo-1a2b3c.webp', 'image/webp'],
+      ['logo-1a2b3c.svg', 'image/svg+xml'],
+    ])(
+      'accepts %p stored as %p',
+      async (objectKey, contentType) => {
+        jest
+          .spyOn(storageService, 'headObject')
+          .mockResolvedValue({ contentType, contentLength: 1024 });
+
+        await expect(controller.confirmLogoUpload({ key: objectKey })).resolves.toEqual({
+          message: 'Logo uploaded successfully',
+        });
+
+        expect(systemConfigsService.updateConfig).toHaveBeenCalledWith({
+          logoPath: `system/${objectKey}`,
+        });
       },
     );
 

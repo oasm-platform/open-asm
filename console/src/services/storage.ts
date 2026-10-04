@@ -56,16 +56,3 @@ export async function fetchPresignedText(url: string): Promise<string> {
   await throwIfNotOk(res, 'Download');
   return res.text();
 }
-
-/**
- * Download an object with a presigned GET URL as a Blob (binary-safe, e.g. for
- * a PDF preview in the editor).
- *
- * @param url Absolute presigned GET URL.
- * @returns The object body as a Blob.
- */
-export async function fetchPresignedBlob(url: string): Promise<Blob> {
-  const res = await fetch(url);
-  await throwIfNotOk(res, 'Download');
-  return res.blob();
-}
