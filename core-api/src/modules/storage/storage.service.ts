@@ -47,7 +47,7 @@ export class StorageService implements OnModuleInit {
 
   private readonly privateBuckets = ['reports', 'job-results'];
 
-  public readonly restrictedExtensions = [
+  private readonly restrictedExtensions = [
     'exe',
     'dll',
     'bat',
@@ -408,6 +408,11 @@ export class StorageService implements OnModuleInit {
     }
   }
 
+  // ponytail: token helpers are now orphaned from the HTTP layer (the
+  // `GET :bucket/:path/download` endpoint was removed). `reports.service.ts` is
+  // the last caller — delete generateDownloadToken, verifyDownloadToken and the
+  // downloadSecret field (plus the DEFAULT_ENCRYPTION_KEY / createHmac /
+  // randomBytes imports) once reports are rewired to presigned downloads.
   public generateDownloadToken(
     filePath: string,
     bucket: string = 'default',

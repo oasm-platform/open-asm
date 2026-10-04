@@ -14,20 +14,15 @@ import {
   Query,
   Res,
   StreamableFile,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
-  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { randomUUID } from 'crypto';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
 import {
   ConfirmLogoRequestDto,
@@ -148,78 +143,6 @@ export class StorageController {
     return { message: 'Logo uploaded successfully' };
   }
 
-  @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload a file to storage' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
-        bucket: {
-          type: 'string',
-          description: 'Bucket name (default: "default")',
-          example: 'default',
-        },
-      },
-      required: ['file'],
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'File uploaded successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        path: {
-          type: 'string',
-          example: 'default/9bea7ee3-ddc3-4215-a9e6-74fa7b5be92f.png',
-        },
-        bucket: {
-          type: 'string',
-          example: 'default',
-        },
-        fullPath: {
-          type: 'string',
-          example: '/default/9bea7ee3-ddc3-4215-a9e6-74fa7b5be92f.png',
-        },
-      },
-    },
-  })
-  @Roles(Role.ADMIN)
-  async uploadFile(
-    @UploadedFile() file: Express.Multer.File,
-    @Body('bucket') bucket: string = 'default',
-  ) {
-    // Get file extension
-    const extension = file.originalname.split('.').pop()?.toLowerCase();
-    if (!extension) {
-      throw new BadRequestException('Invalid file extension');
-    }
-
-    // Check if extension is restricted
-    if (this.storageService.restrictedExtensions.includes(extension)) {
-      throw new BadRequestException(`File type .${extension} is not allowed`);
-    }
-
-    const filename = `${randomUUID()}.${extension}`;
-    const result = await this.storageService.uploadFile(
-      filename,
-      file.buffer,
-      bucket,
-    );
-
-    return {
-      path: result.path,
-      bucket: bucket,
-      fullPath: `/${bucket}/${filename}`,
-    };
-  }
-
   @Post('presign/upload')
   @ApiOperation({
     summary: 'Create a presigned URL for direct-to-storage upload',
@@ -294,66 +217,6 @@ export class StorageController {
     });
 
     return { downloadUrl: url, expiresIn };
-  }
-
-  @Public()
-  @Get(':bucket/:path/download')
-  @ApiOperation({ summary: 'Download a file with time-limited token' })
-  @ApiParam({ name: 'bucket', type: String, required: true })
-  @ApiParam({ name: 'path', type: String, required: true })
-  @ApiQuery({
-    name: 'token',
-    type: String,
-    required: true,
-    description: 'Time-limited download token',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'File downloaded successfully',
-    content: {
-      'application/octet-stream': {
-        schema: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
-  @ApiResponse({ status: 404, description: 'File not found' })
-  async downloadFile(
-    @Param('bucket') bucket: string,
-    @Param('path') path: string,
-    @Query('token') token: string,
-    @Res({ passthrough: true })
-    res: { set: (headers: Record<string, string>) => void },
-  ): Promise<StreamableFile> {
-    if (!token) {
-      throw new BadRequestException('Download token is required');
-    }
-
-    // Verify token and extract bucket/path from it (not from URL params)
-    const verified = this.storageService.verifyDownloadToken(token);
-
-    // Token-embedded values take precedence over URL params
-    const cleanPath = verified.filePath;
-    const fileBucket = verified.bucket;
-
-    const file = await this.storageService.getFile(cleanPath, fileBucket);
-
-    const extension = cleanPath.split('.').pop()?.toLowerCase();
-    if (extension) {
-      const mimeType = this.getMimeType(extension);
-      if (mimeType) {
-        res.set({
-          'Content-Type': mimeType,
-          'Content-Disposition': `attachment; filename="${cleanPath.split('/').pop()}"`,
-          'Cache-Control': 'no-store',
-        });
-      }
-    }
-
-    return file;
   }
 
   @Public()
