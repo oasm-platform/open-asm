@@ -20,6 +20,12 @@ This guide provides detailed instructions for setting up your local development 
   - [API Client Generation](#api-client-generation)
   - [gRPC Stub Generation](#grpc-stub-generation)
   - [Connector Catalog Sync](#connector-catalog-sync)
+- [Presigned Direct Storage Access](#presigned-direct-storage-access)
+  - [Why there are two S3 clients](#why-there-are-two-s3-clients)
+  - [Browser PUT requirements](#browser-put-requirements)
+  - [nginx pass-through](#nginx-pass-through-self-hosted-only)
+  - [Switching to real S3](#switching-to-real-s3-configuration-only)
+  - [Deferred and still open](#deferred-and-still-open)
 - [Using Docker Compose](#using-docker-compose)
 - [Local CI Testing](#local-ci-testing)
 - [Contributing](#contributing)
@@ -370,6 +376,134 @@ This writes `core-api/resources/connectors/manifest.json`, which core-api reads
 to resolve connector images and input schemas. Set
 `MANIFEST_PATH=<path>/manifest.json` to sync from a local `oasm-connectors`
 checkout instead of the `main` branch.
+
+## Presigned Direct Storage Access
+
+Object-storage bytes no longer stream through core-api. The console asks
+core-api for a short-lived presigned URL, then talks to S3 / RustFS directly, so
+upload and download traffic bypasses the API process.
+
+### Flow
+
+1. The console calls a presign endpoint on core-api
+   (`core-api/src/modules/storage/storage.controller.ts`).
+2. core-api validates bucket and key, signs with SigV4, returns an absolute URL.
+3. The console `fetch`es that URL via `console/src/services/storage.ts`:
+   `PUT` for uploads, plain `GET` for downloads.
+4. The browser talks to object storage, not to core-api.
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/api/storage/presign/upload` | POST | Presigned `PUT` into any non-private bucket. `@Roles(Role.ADMIN)`. |
+| `/api/storage/presign/download` | GET | Presigned `GET`; optional `fileName` becomes `Content-Disposition`. Declared before the `:bucket/:path` wildcard on purpose, otherwise Express swallows the literal path. |
+| `/api/storage/logo/presign` | POST | Presigned `PUT` for the app logo: `system` bucket, `logo-` prefix, image extensions only. `@Roles(Role.ADMIN)`. |
+| `/api/storage/logo/confirm` | POST | `HeadObject` on the uploaded key, validates content type and size, then activates the logo. `@Roles(Role.ADMIN)`. |
+| `/api/templates/:templateId/presign` | POST | Presigned `PUT` for a template YAML. Requires workspace permission `template.write`. |
+
+Buckets come from `StorageService.buckets`; `privateBuckets = ['reports',
+'job-results']` are rejected by every presign endpoint.
+
+`logo/confirm` is the only server-side check in the flow. It heads the object
+and rejects non-images and anything above `LOGO_MAX_SIZE_BYTES` (5 MB,
+`storage.controller.ts:38`), and it runs *after* the bytes are already in
+storage.
+
+### Why there are two S3 clients
+
+`core-api/src/modules/storage/rustfs.client.ts` builds two `S3Client` instances:
+
+| Accessor | Endpoint | Used for |
+| --- | --- | --- |
+| `getClient()` | `RUSTFS_ENDPOINT` (default `http://localhost:9000`) | Internal server-side work: bucket creation, `PutBucketCors`, tool archives, worker reads. |
+| `getPresignClient()` | `S3_PUBLIC_ENDPOINT`, falling back to `RUSTFS_ENDPOINT` | Signing URLs that a browser will call. |
+
+Read this before touching either one. SigV4 signs the `host` header and the
+request path. A URL signed against `localhost:9000` is rejected by a browser
+reaching `https://app.example.com`, because the signed host no longer matches
+the one presented. One client cannot serve both roles, hence two.
+
+The clients differ in a second, less obvious way: `getClient()` is built with
+`checksum: false`, `getPresignClient()` with `checksum: true`, which expands to
+`requestChecksumCalculation: 'WHEN_REQUIRED'` and
+`responseChecksumValidation: 'WHEN_REQUIRED'`. The SDK default is
+`WHEN_SUPPORTED`, which appends `x-amz-checksum-*` query parameters that the
+signature was not computed over, so a presigned browser `PUT` fails with
+`SignatureDoesNotMatch`. Do not "restore" the defaults.
+
+### Browser PUT requirements
+
+- **Send the exact signed `Content-Type`.** When a content type was signed,
+  `getPresignedUploadUrl` passes `signableHeaders: new Set(['content-type'])`
+  (`storage.service.ts:268`). Any drift, including a browser default, is a 403
+  `SignatureDoesNotMatch`. `console/src/services/storage.ts` is the single place
+  that echoes the header, and callers must pass through the `contentType` the
+  presign response returned.
+- **Use plain `fetch`, not the shared axios client.** A presigned URL is
+  absolute (its own baseURL must not be prefixed) and the signature covers the
+  exact request; the axios instance would attach auth headers, cookies and
+  param serialisation and perturb the signature into a 403.
+
+### nginx pass-through (self-hosted only)
+
+In the Docker deployment the browser hits the console origin, so
+`console/nginx.conf` hands signed requests to the storage backend:
+
+- `map $args $is_presigned` matches `(^|&)X-Amz-Signature=`. nginx cannot build
+  a variable name containing hyphens (`$arg_X-Amz-Signature` parses as
+  `$arg_X` plus literal text and is always truthy), so the query string is
+  matched instead.
+- The signed request leaves through `error_page 418 = @object_storage`, so the
+  rewrite phase runs before `try_files`.
+- Both `location /` and the static-asset location must `return 418` when
+  `$is_presigned`. Without the guard a presigned key ending in
+  `.webp`/`.jpg`/`.gif` is answered by the static location, which 404s into
+  `index.html` instead of reaching storage.
+- Inside `@object_storage` the path must **not** be rewritten (SigV4 signs the
+  path), and `Host` is forwarded as `$http_host`, not `$host`: the signature
+  covers `host:port` and `$host` strips the port.
+- Adding a `/s3/` prefix, or any other path rewrite, produces
+  `SignatureDoesNotMatch` on every upload and download.
+
+### Switching to real S3 (configuration only)
+
+No code change. Set in `core-api/.env`:
+
+| Variable | Value |
+| --- | --- |
+| `S3_PUBLIC_ENDPOINT` | Endpoint the browser can reach, e.g. `https://s3.eu-central-1.amazonaws.com` |
+| `S3_REGION` | The bucket's region |
+| `S3_FORCE_PATH_STYLE` | `false` |
+| `S3_USE_DEFAULT_CREDENTIALS` | `true` for IAM roles / instance profiles; otherwise leave `false` and set `S3_ACCESS_KEY` + `S3_SECRET_KEY` |
+| `S3_CORS_ALLOWED_ORIGINS` | Comma-separated console origins |
+
+`StorageService.onModuleInit` applies the CORS rule to every bucket on boot
+(`GET, PUT, POST, HEAD`, `AllowedHeaders: *`, exposes `ETag`), and skips it
+entirely when the origins list is empty.
+
+The nginx pass-through above is path-style, same-origin, self-hosted storage
+only. AWS S3 rejects an arbitrary `Host`, so a cloud deployment drops the proxy
+and relies on the direct endpoint plus that bucket CORS.
+
+Defaults, clamping and parsing for every variable above live in
+`core-api/src/modules/storage/storage.config.ts`. `S3_PRESIGN_TTL` defaults to
+900 s and is clamped to 60 s ... 604800 s. Treat that file as the source of
+truth, not this section.
+
+### Deferred and still open
+
+- **Security finding AE-02 is *not* fixed by this change.**
+  `GET /api/storage/:bucket/:path` is still `@Public()`
+  (`storage.controller.ts:222`) and still only blocks `reports` and
+  `job-results`, so `screenshot` and `default` stay world-readable. It has to
+  stay public because the login page renders the logo from the `system` bucket
+  before a session exists. See AE-02 in
+  [`docs/security-audit-report.md`](docs/security-audit-report.md).
+- **No server-side max size on a presigned `PUT`.** A signed `PUT` is accepted
+  by the storage backend for whatever body the client sends. The only cap in the
+  self-hosted deployment is `client_max_body_size 100m` in
+  `console/nginx.conf`. Enforce a real limit at the storage layer.
+- **Deliberately absent:** presigned POST, CloudFront signing, multipart and
+  resumable uploads. They do not exist.
 
 ## Using Docker Compose
 
