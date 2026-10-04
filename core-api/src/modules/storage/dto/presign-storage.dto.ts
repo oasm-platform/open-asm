@@ -37,6 +37,47 @@ export class PresignUploadResponseDto {
   expiresIn: number;
 }
 
+export class LogoPresignRequestDto {
+  @ApiProperty({ example: 'logo.png', description: 'Original file name of the logo image' })
+  @IsString()
+  @IsNotEmpty()
+  fileName: string;
+
+  @ApiProperty({
+    example: 'image/png',
+    required: false,
+    description: 'Defaults to the image type derived from the file extension',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  contentType?: string;
+}
+
+export class LogoPresignResponseDto {
+  @ApiProperty({ example: 'https://rustfs.internal/system/logo-1a2b3c.png?X-Amz-Signature=...' })
+  uploadUrl: string;
+
+  @ApiProperty({ example: 'logo-1a2b3c.png' })
+  key: string;
+
+  @ApiProperty({ example: 'system/logo-1a2b3c.png' })
+  path: string;
+
+  @ApiProperty({ example: 900, description: 'Lifetime of the presigned URL in seconds' })
+  expiresIn: number;
+}
+
+export class ConfirmLogoRequestDto {
+  @ApiProperty({
+    example: 'logo-1a2b3c.png',
+    description: 'Object key returned by the logo presign endpoint',
+  })
+  @IsString()
+  @IsNotEmpty()
+  key: string;
+}
+
 export class PresignDownloadQueryDto {
   @ApiProperty({ example: 'default' })
   @IsString()

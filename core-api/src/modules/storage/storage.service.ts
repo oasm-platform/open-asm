@@ -13,6 +13,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   PutBucketCorsCommand,
@@ -370,6 +371,39 @@ export class StorageService implements OnModuleInit {
         error instanceof Error ? error.message : 'Unknown error occurred';
       throw new InternalServerErrorException(
         `Failed to get file: ${errorMessage}`,
+      );
+    }
+  }
+
+  public async headObject(
+    bucket: string,
+    key: string,
+  ): Promise<{ contentType: string | null; contentLength: number }> {
+    try {
+      const response = await this.rustFsClient.getClient().send(
+        new HeadObjectCommand({
+          Bucket: bucket,
+          Key: key,
+        }),
+      );
+
+      return {
+        contentType: response.ContentType ?? null,
+        contentLength: response.ContentLength ?? 0,
+      };
+    } catch (error: unknown) {
+      if (
+        error instanceof S3ServiceException &&
+        (error.name === 'NoSuchKey' ||
+          error.name === 'NotFound' ||
+          error.$metadata.httpStatusCode === 404)
+      ) {
+        throw new NotFoundException('File not found');
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new InternalServerErrorException(
+        `Failed to stat file: ${errorMessage}`,
       );
     }
   }

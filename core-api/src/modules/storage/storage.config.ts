@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type { ConfigService } from '@nestjs/config';
 
 /**
  * Minimal shape of `ConfigService` the helper depends on. Accepting a callback

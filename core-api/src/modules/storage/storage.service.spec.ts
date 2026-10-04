@@ -13,6 +13,7 @@ import {
   S3ServiceException,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type * as S3Module from '@aws-sdk/client-s3';
 import { RustFsClient } from './rustfs.client';
 import { StorageService } from './storage.service';
 
@@ -25,7 +26,7 @@ jest.mock('@aws-sdk/s3-request-presigner', () => ({
 const mockS3ClientConfigs: Array<Record<string, unknown>> = [];
 
 jest.mock('@aws-sdk/client-s3', () => {
-  const actual = jest.requireActual('@aws-sdk/client-s3');
+  const actual = jest.requireActual<typeof S3Module>('@aws-sdk/client-s3');
   return {
     ...actual,
     S3Client: jest.fn(function (this: unknown, config: Record<string, unknown>) {
@@ -41,10 +42,10 @@ describe('StorageService', () => {
   let service: StorageService;
   let sendMock: jest.Mock;
 
-const mockRustFsClient = {
-  getClient: jest.fn(),
-  getPresignClient: jest.fn().mockReturnValue({ send: jest.fn() }),
-};
+  const mockRustFsClient = {
+    getClient: jest.fn(),
+    getPresignClient: jest.fn().mockReturnValue({ send: jest.fn() }),
+  };
 
   let configValues: Record<string, string>;
 

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type { ConfigService } from '@nestjs/config';
 import {
   DEFAULT_RUSTFS_ENDPOINT,
   DEFAULT_S3_PRESIGN_TTL_SECONDS,

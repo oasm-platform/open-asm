@@ -30,12 +30,17 @@ import {
 import { randomUUID } from 'crypto';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
 import {
+  ConfirmLogoRequestDto,
+  LogoPresignRequestDto,
+  LogoPresignResponseDto,
   PresignDownloadQueryDto,
   PresignDownloadResponseDto,
   PresignUploadRequestDto,
   PresignUploadResponseDto,
 } from './dto/presign-storage.dto';
 import { StorageService } from './storage.service';
+
+const LOGO_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
 @Controller('storage')
 @ApiTags('Storage')
@@ -54,63 +59,91 @@ export class StorageController {
     'svg',
   ];
 
-  @Post('logo')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload app logo to system bucket' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-      required: ['file'],
-    },
+  @Post('logo/presign')
+  @ApiOperation({
+    summary: 'Create a presigned URL for direct app-logo upload',
   })
+  @ApiBody({ type: LogoPresignRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Presigned logo upload URL created successfully',
+    type: LogoPresignResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file name or extension' })
+  @Roles(Role.ADMIN)
+  async presignLogoUpload(
+    @Body() dto: LogoPresignRequestDto,
+  ): Promise<LogoPresignResponseDto> {
+    const bucket = 'system';
+    const key = this.storageService.generateObjectKey(dto.fileName, {
+      prefix: 'logo',
+      allowedExtensions: this.allowedImageExtensions,
+    });
+
+    const extension = key.slice(key.lastIndexOf('.') + 1).toLowerCase();
+    const contentType =
+      dto.contentType ?? this.getMimeType(extension) ?? `image/${extension}`;
+
+    const { url, path, expiresIn } =
+      await this.storageService.getPresignedUploadUrl({
+        bucket,
+        key,
+        contentType,
+      });
+
+    return { uploadUrl: url, key, path, expiresIn };
+  }
+
+  @Post('logo/confirm')
+  @ApiOperation({
+    summary: 'Confirm a directly-uploaded app logo and activate it',
+  })
+  @ApiBody({ type: ConfirmLogoRequestDto })
   @ApiResponse({
     status: 200,
     description: 'Logo uploaded successfully',
     type: DefaultMessageResponseDto,
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid file type or extension',
-  })
+  @ApiResponse({ status: 400, description: 'Invalid key, content type, or size' })
+  @ApiResponse({ status: 404, description: 'Uploaded object not found' })
   @Roles(Role.ADMIN)
-  async uploadLogo(
-    @UploadedFile() file: Express.Multer.File,
+  async confirmLogoUpload(
+    @Body() dto: ConfirmLogoRequestDto,
   ): Promise<DefaultMessageResponseDto> {
-    // Get file extension
-    const lastDotIndex = file.originalname.lastIndexOf('.');
-    if (lastDotIndex === -1 || lastDotIndex === file.originalname.length - 1) {
-      throw new BadRequestException('Invalid file extension');
+    const key = dto.key?.trim();
+    if (!key || key.includes('/') || key.includes('\\') || key.includes('..')) {
+      throw new BadRequestException('Invalid key');
     }
 
-    const extension = file.originalname.slice(lastDotIndex + 1).toLowerCase();
+    const bucket = 'system';
+    const { contentType, contentLength } = await this.storageService.headObject(
+      bucket,
+      key,
+    );
 
-    // Check if extension is allowed (only images)
-    if (!this.allowedImageExtensions.includes(extension)) {
+    if (!contentType?.startsWith('image/')) {
+      throw new BadRequestException('Only image files are supported');
+    }
+    if (contentLength > LOGO_MAX_SIZE_BYTES) {
       throw new BadRequestException(
-        `File type .${extension} is not allowed. Only image files are supported.`,
+        `File size exceeds the ${LOGO_MAX_SIZE_BYTES / (1024 * 1024)}MB limit`,
       );
     }
 
-    // Upload file with fixed filename "logo.{extension}" to "system" bucket
-    const filename = `logo-${randomUUID()}.${extension}`;
-    const bucket = 'system';
-    const result = await this.storageService.uploadFile(
-      filename,
-      file.buffer,
-      bucket,
-    );
+    const path = `${bucket}/${key}`;
+    const previous = await this.systemConfigsService.getConfig();
+    await this.systemConfigsService.updateConfig({ logoPath: path });
 
-    // Update system config with new logo path
-    await this.systemConfigsService.updateConfig({
-      logoPath: result.path,
-    });
+    const previousSegments = previous.logoPath?.split('/') ?? [];
+    const previousKey = previousSegments.at(-1);
+    const previousBucket = previousSegments.at(-2) ?? bucket;
+    if (previousKey && previousKey !== key) {
+      try {
+        await this.storageService.deleteFile(previousKey, previousBucket);
+      } catch {
+        // A stale object must never fail the confirmation.
+      }
+    }
 
     return { message: 'Logo uploaded successfully' };
   }
