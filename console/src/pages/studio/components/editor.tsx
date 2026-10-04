@@ -19,11 +19,15 @@ import { Input } from '@/components/ui/input';
 import { defaultTemplate, useStudioTemplate } from '@/hooks/useStudioTemplate';
 import {
   getTemplatesControllerGetAllTemplatesQueryKey,
-  useStorageControllerGetFile,
+  useStorageControllerPresignDownload,
   useTemplatesControllerCreateTemplate,
   useTemplatesControllerGetTemplateById,
-  useTemplatesControllerUploadFile,
+  useTemplatesControllerPresignTemplate,
 } from '@/services/apis/gen/queries';
+import {
+  fetchPresignedText,
+  uploadToPresignedUrl,
+} from '@/services/storage';
 import { yaml } from '@codemirror/lang-yaml';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
@@ -47,7 +51,8 @@ export default function Editor() {
   const queryClient = useQueryClient();
 
   const { activeTemplate, setActiveTemplate } = useStudioTemplate();
-  const { mutate: uploadTemplate } = useTemplatesControllerUploadFile();
+  const { mutateAsync: presignTemplate } =
+    useTemplatesControllerPresignTemplate();
   const { mutate: createTemplate } = useTemplatesControllerCreateTemplate();
 
   const [open, setOpen] = React.useState(false);
@@ -64,26 +69,36 @@ export default function Editor() {
     { query: { enabled: !activeTemplate?.isCreate } },
   );
 
-  const [bucket, path] = useMemo(() => data?.path?.split('/') || [], [data]);
+  // Split on the FIRST `/` only — the object key may contain slashes.
+  const [bucket, objectKey] = useMemo(() => {
+    const raw = data?.path;
+    if (!raw) return [undefined, undefined] as const;
+    const sep = raw.indexOf('/');
+    if (sep < 1) return [undefined, undefined] as const;
+    return [raw.slice(0, sep), raw.slice(sep + 1)] as const;
+  }, [data]);
 
-  const { data: fileData, refetch } = useStorageControllerGetFile(
-    bucket,
-    path,
-    { query: { enabled: bucket !== undefined && path !== undefined } },
+  const { data: presignData, refetch } = useStorageControllerPresignDownload(
+    { bucket: bucket ?? '', path: objectKey ?? '' },
+    { query: { enabled: bucket !== undefined && objectKey !== undefined } },
   );
 
   const contentSaved = useRef('');
 
   useEffect(() => {
     const readFile = async () => {
-      if (fileData instanceof Blob) {
-        const content = await fileData.text();
+      if (!presignData?.downloadUrl) return;
+      try {
+        const content = await fetchPresignedText(presignData.downloadUrl);
         contentSaved.current = content;
         setActiveTemplate({ content, isSaved: true });
+      } catch (error) {
+        console.error('Failed to load template content:', error);
+        toast.error('Failed to load template content', { closeButton: true });
       }
     };
     readFile();
-  }, [fileData, setActiveTemplate]);
+  }, [presignData, setActiveTemplate]);
 
   const formatYAML = useCallback(async () => {
     if (!activeTemplate?.content) {
@@ -128,23 +143,24 @@ export default function Editor() {
   );
 
   const handleUpload = useCallback(
-    (content: string, id: string) => {
-      uploadTemplate(
-        {
-          data: {
-            fileContent: content,
-            templateId: id,
-          },
-        },
-        {
-          onSuccess: () => {
-            refetch();
-            toast.success('Template is saved successfully');
-          },
-        },
-      );
+    async (content: string, id: string) => {
+      try {
+        const presigned = await presignTemplate({ templateId: id });
+        // The PUT signature covers Content-Type, so echo the signed value back
+        // byte-for-byte instead of letting fetch pick a default.
+        await uploadToPresignedUrl(
+          presigned.uploadUrl,
+          content,
+          presigned.contentType,
+        );
+        refetch();
+        toast.success('Template is saved successfully');
+      } catch (error) {
+        console.error('Failed to save template:', error);
+        toast.error('Failed to save template', { closeButton: true });
+      }
     },
-    [refetch, uploadTemplate],
+    [presignTemplate, refetch],
   );
 
   const handleCreate = (formData: z.infer<typeof createFileNameSchema>) => {
@@ -210,7 +226,7 @@ export default function Editor() {
         return;
       }
 
-      handleUpload(activeTemplate.content, activeTemplate.id);
+      await handleUpload(activeTemplate.content, activeTemplate.id);
     },
 
     { enableOnContentEditable: true },
