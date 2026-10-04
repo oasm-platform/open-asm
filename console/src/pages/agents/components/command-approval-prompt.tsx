@@ -3,6 +3,7 @@ import type {
   PendingApproval,
 } from '@/hooks/use-agent-chat';
 import { cn } from '@/lib/utils';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { useEffect, useRef, useState } from 'react';
 
 interface CommandApprovalPromptProps {
@@ -22,16 +23,8 @@ const VALUE_PREVIEW_LENGTH = 300;
 // The prompt replaces the chat input, so a click or keystroke aimed at the
 // input can land on it the moment it appears; ignore input until then.
 const ARM_DELAY_MS = 500;
-
-function isOtherEditable(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement
-  );
-}
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 function humanize(name: string): string {
   return name
@@ -101,10 +94,27 @@ export function CommandApprovalPrompt({
       ? Object.entries(input).filter(([k]) => !(isCommand && k === 'command'))
       : [];
 
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState(-1);
   const [feedback, setFeedback] = useState('');
+  const promptRef = useRef<HTMLDivElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const feedbackRef = useRef<HTMLInputElement>(null);
   const armedRef = useRef(false);
+
+  useEffect(() => {
+    const prompt = promptRef.current;
+    if (!prompt) return;
+
+    const keepFocusInside = (event: FocusEvent) => {
+      if (event.target instanceof Node && !prompt.contains(event.target)) {
+        prompt.focus();
+      }
+    };
+
+    document.addEventListener('focusin', keepFocusInside);
+    prompt.focus();
+    return () => document.removeEventListener('focusin', keepFocusInside);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -160,53 +170,90 @@ export function CommandApprovalPrompt({
 
   useEffect(() => {
     if (selected === feedbackIndex) feedbackRef.current?.focus();
-    else feedbackRef.current?.blur();
+    else if (selected >= 0) optionRefs.current[selected]?.focus();
   }, [selected, feedbackIndex]);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (isSubmitting || e.defaultPrevented || e.isComposing || e.repeat) return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const typing = e.target === feedbackRef.current;
-      // Keys typed into some other field (search box, dialog) are not answers
-      if (!typing && isOtherEditable(e.target)) return;
+  /** Handles shortcuts and traps Tab only while focus is within the prompt. */
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (
+      isSubmitting ||
+      e.defaultPrevented ||
+      e.nativeEvent.isComposing ||
+      e.repeat
+    )
+      return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-      if (e.key === 'Escape') {
+    const typing = e.target === feedbackRef.current;
+
+    if (e.key === 'Tab') {
+      const prompt = promptRef.current;
+      if (!prompt) return;
+      const focusable = Array.from(
+        prompt.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      );
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      const active = document.activeElement;
+
+      if (e.shiftKey && (active === prompt || active === first)) {
         e.preventDefault();
-        decide('rejected');
-      } else if (e.key === 'ArrowDown') {
+        last?.focus();
+      } else if (!e.shiftKey && (active === prompt || active === last)) {
         e.preventDefault();
-        setSelected((i) => Math.min(i + 1, feedbackIndex));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelected((i) => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (typing || selected === feedbackIndex) submitFeedback();
-        else options[selected]?.run();
-      } else if (!typing && /^[1-9]$/.test(e.key) && options[Number(e.key) - 1]) {
-        e.preventDefault();
-        options[Number(e.key) - 1].run();
+        first?.focus();
       }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  });
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelected((i) => Math.min(i + 1, feedbackIndex));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelected((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      if (typing || selected === feedbackIndex) {
+        e.preventDefault();
+        submitFeedback();
+      } else if (!(e.target instanceof HTMLButtonElement) && selected >= 0) {
+        e.preventDefault();
+        options[selected]?.run();
+      }
+    } else if (!typing && /^[1-9]$/.test(e.key) && options[Number(e.key) - 1]) {
+      e.preventDefault();
+      options[Number(e.key) - 1].run();
+    }
+  };
 
   return (
-    <div
-      role="alertdialog"
-      aria-label={isPlan ? 'Plan approval' : 'Permission request'}
-      className="rounded-xl border bg-card p-4 shadow-sm"
-    >
+    <DialogPrimitive.Root open>
+      <DialogPrimitive.Content
+        ref={promptRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={isPlan ? 'Plan approval' : 'Permission request'}
+        aria-labelledby={undefined}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          promptRef.current?.focus();
+        }}
+        onInteractOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => {
+          event.preventDefault();
+          decide('rejected');
+        }}
+        className="rounded-xl border bg-card p-4 shadow-sm"
+      >
       <div className="flex items-baseline gap-2">
-        <h3 className="text-base font-semibold">
-          {isPlan
-            ? 'Run this plan?'
-            : isCommand
-              ? 'Run this command?'
-              : `Allow ${toolTitle}?`}
-        </h3>
+        <DialogPrimitive.Title asChild>
+          <h3 className="text-base font-semibold">
+            {isPlan
+              ? 'Run this plan?'
+              : isCommand
+                ? 'Run this command?'
+                : `Allow ${toolTitle}?`}
+          </h3>
+        </DialogPrimitive.Title>
         {queueSize > 1 && (
           <span className="ml-auto text-xs text-muted-foreground">
             +{queueSize - 1} more waiting
@@ -258,10 +305,13 @@ export function CommandApprovalPrompt({
         {options.map((option, index) => (
           <button
             key={option.label}
+            ref={(element) => {
+              optionRefs.current[index] = element;
+            }}
             type="button"
             disabled={isSubmitting}
             onClick={option.run}
-            onMouseEnter={() => setSelected(index)}
+            onFocus={() => setSelected(index)}
             className={cn(
               'flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors disabled:opacity-50',
               selected === index
@@ -300,6 +350,7 @@ export function CommandApprovalPrompt({
       </div>
 
       <p className="mt-2 text-xs text-muted-foreground">Esc to cancel</p>
-    </div>
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Root>
   );
 }

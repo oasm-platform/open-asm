@@ -59,6 +59,88 @@ describe('CommandApprovalPrompt', () => {
     expect(onDecide).toHaveBeenCalledWith('approved', { allowConversation: true });
   });
 
+  it('does not handle Enter when focus is outside the prompt', () => {
+    const onDecide = renderPrompt(approval());
+
+    fireEvent.keyDown(window, { key: 'Enter' });
+
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  it('moves focus into a modal alert dialog without approving by default', () => {
+    const onDecide = renderPrompt(approval());
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Permission request',
+    });
+
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Enter' });
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  it('keeps Tab focus inside the approval prompt', () => {
+    renderPrompt(approval());
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Permission request',
+    });
+    const feedback = screen.getByPlaceholderText(
+      'Tell the agent what to do instead',
+    );
+    const firstOption = screen.getByRole('button', { name: '1 Yes' });
+
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+    expect(feedback).toHaveFocus();
+
+    fireEvent.keyDown(feedback, { key: 'Tab' });
+    expect(firstOption).toHaveFocus();
+  });
+
+  it('does not move keyboard focus when an option is hovered', () => {
+    const onDecide = renderPrompt(approval());
+    const feedback = screen.getByPlaceholderText(
+      'Tell the agent what to do instead',
+    );
+    const yes = screen.getByRole('button', { name: '1 Yes' });
+
+    fireEvent.focus(feedback);
+    fireEvent.change(feedback, { target: { value: 'use a safer command' } });
+    fireEvent.mouseEnter(yes);
+
+    expect(feedback).toHaveFocus();
+    fireEvent.keyDown(feedback, { key: 'Enter' });
+    expect(onDecide).toHaveBeenCalledWith('rejected', {
+      feedback: 'use a safer command',
+    });
+  });
+
+  it('prevents pointer focus from leaving the modal prompt', () => {
+    const onDecide = vi.fn();
+    render(
+      <>
+        <button type="button" data-testid="outside-control">
+          Outside control
+        </button>
+        <CommandApprovalPrompt
+          approval={approval()}
+          queueSize={1}
+          isSubmitting={false}
+          onDecide={onDecide}
+        />
+      </>,
+    );
+    const outside = screen.getByTestId('outside-control');
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Permission request',
+    });
+
+    fireEvent.pointerDown(outside);
+    outside.focus();
+
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
   it('shows MCP title, source, description, and annotations', () => {
     renderPrompt(
       approval({
@@ -104,7 +186,10 @@ describe('CommandApprovalPrompt', () => {
 
     it('numbers every option, so 3 is "allow all"', () => {
       const onDecide = renderPrompt(toolApproval());
-      fireEvent.keyDown(window, { key: '3' });
+      fireEvent.keyDown(
+        screen.getByRole('alertdialog', { name: 'Permission request' }),
+        { key: '3' },
+      );
       expect(onDecide).toHaveBeenCalledWith('approved', { allowConversation: true });
     });
 
@@ -143,7 +228,10 @@ describe('CommandApprovalPrompt', () => {
 
     it('approves it in manual mode from the keyboard', () => {
       const onDecide = renderPrompt(planApproval());
-      fireEvent.keyDown(window, { key: '2' });
+      fireEvent.keyDown(
+        screen.getByRole('alertdialog', { name: 'Plan approval' }),
+        { key: '2' },
+      );
       expect(onDecide).toHaveBeenCalledWith('approved', { mode: 'manual' });
     });
 
@@ -158,8 +246,12 @@ describe('CommandApprovalPrompt', () => {
 
     it('rejects it on Escape', () => {
       const onDecide = renderPrompt(planApproval());
-      fireEvent.keyDown(window, { key: 'Escape' });
+      fireEvent.keyDown(
+        screen.getByRole('alertdialog', { name: 'Plan approval' }),
+        { key: 'Escape' },
+      );
       expect(onDecide).toHaveBeenCalledWith('rejected', undefined);
+      expect(onDecide).toHaveBeenCalledTimes(1);
     });
   });
 });
