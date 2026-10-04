@@ -34,19 +34,6 @@ import { StorageService } from './storage.service';
 @Controller('storage')
 @ApiTags('Storage')
 export class StorageController {
-  private readonly restrictedExtensions = [
-    'exe',
-    'dll',
-    'bat',
-    'sh',
-    'js',
-    'php',
-    'py',
-    'pl',
-    'rb',
-    'jar',
-  ];
-
   constructor(
     private readonly storageService: StorageService,
     private readonly systemConfigsService: SystemConfigsService,
@@ -176,7 +163,7 @@ export class StorageController {
     }
 
     // Check if extension is restricted
-    if (this.restrictedExtensions.includes(extension)) {
+    if (this.storageService.restrictedExtensions.includes(extension)) {
       throw new BadRequestException(`File type .${extension} is not allowed`);
     }
 

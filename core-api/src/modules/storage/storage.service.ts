@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -16,7 +17,7 @@ import {
   PutObjectCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
-import { createHmac, randomBytes } from 'crypto';
+import { createHmac, randomBytes, randomUUID } from 'crypto';
 import { DEFAULT_ENCRYPTION_KEY } from '@/common/constants/app.constants';
 import { ConfigService } from '@nestjs/config';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -44,6 +45,19 @@ export class StorageService implements OnModuleInit {
 
   private readonly privateBuckets = ['reports', 'job-results'];
 
+  public readonly restrictedExtensions = [
+    'exe',
+    'dll',
+    'bat',
+    'sh',
+    'js',
+    'php',
+    'py',
+    'pl',
+    'rb',
+    'jar',
+  ];
+
   private readonly downloadSecret: string;
   private readonly storageConfig: StorageConfig;
 
@@ -61,6 +75,51 @@ export class StorageService implements OnModuleInit {
 
   public isPrivateBucket(bucket: string): boolean {
     return this.privateBuckets.includes(bucket);
+  }
+
+  public assertBucketAllowed(bucket: string): void {
+    if (!bucket || bucket.trim() === '') {
+      throw new BadRequestException('bucket is required');
+    }
+    if (!this.buckets.includes(bucket)) {
+      throw new BadRequestException(
+        `Invalid bucket: ${bucket}. Allowed buckets: ${this.buckets.join(', ')}`,
+      );
+    }
+  }
+
+  public assertBucketNotPrivate(bucket: string): void {
+    if (this.privateBuckets.includes(bucket)) {
+      throw new ForbiddenException(`Bucket '${bucket}' is private`);
+    }
+  }
+
+  public generateObjectKey(
+    fileName: string,
+    opts?: { bucket?: string; allowedExtensions?: string[]; prefix?: string },
+  ): string {
+    const dotIndex = fileName.lastIndexOf('.');
+    const ext =
+      dotIndex > 0 && dotIndex < fileName.length - 1
+        ? fileName.slice(dotIndex + 1).toLowerCase()
+        : '';
+
+    if (!ext) {
+      throw new BadRequestException('File must have an extension');
+    }
+    if (this.restrictedExtensions.includes(ext)) {
+      throw new BadRequestException(`File extension '.${ext}' is restricted`);
+    }
+    if (
+      opts?.allowedExtensions &&
+      !opts.allowedExtensions.map((e) => e.toLowerCase()).includes(ext)
+    ) {
+      throw new BadRequestException(
+        `File extension '.${ext}' is not allowed. Allowed extensions: ${opts.allowedExtensions.join(', ')}`,
+      );
+    }
+
+    return `${opts?.prefix ? opts.prefix + '-' : ''}${randomUUID()}.${ext}`;
   }
 
   private async ensureBucketsExist() {
