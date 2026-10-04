@@ -180,6 +180,51 @@ export class StorageService implements OnModuleInit {
     return { url, key, path: `${bucket}/${key}`, expiresIn: clampedTtl };
   }
 
+  public async getPresignedDownloadUrl(opts: {
+    bucket: string;
+    key: string;
+    expiresIn?: number;
+    fileName?: string;
+    contentType?: string;
+  }): Promise<{ url: string; expiresIn: number }> {
+    const { bucket, key, expiresIn, fileName, contentType } = opts;
+
+    if (!bucket || bucket.trim() === '') {
+      throw new BadRequestException('bucket is required');
+    }
+    if (
+      !key ||
+      key.trim() === '' ||
+      key.startsWith('/') ||
+      key.startsWith('.') ||
+      key.startsWith(' ') ||
+      key.includes('..')
+    ) {
+      throw new BadRequestException('Invalid key');
+    }
+
+    const requestedTtl = expiresIn ?? this.storageConfig.presignTtlSeconds;
+    const clampedTtl = Math.min(
+      MAX_S3_PRESIGN_TTL_SECONDS,
+      Math.max(MIN_S3_PRESIGN_TTL_SECONDS, Math.trunc(requestedTtl)),
+    );
+    this.logger.log(`Resolved presign TTL: ${clampedTtl}s`);
+
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ResponseContentDisposition: fileName ? 'attachment; filename="' + fileName + '"' : undefined,
+      ResponseContentType: contentType || undefined,
+    });
+
+    // ponytail: presigner@3.1048 vs client-s3@3.1097 ship mismatched @smithy/types; cast until versions align.
+    const url = await getSignedUrl(this.rustFsClient.getPresignClient() as never, command as never, {
+      expiresIn: clampedTtl,
+    });
+
+    return { url, expiresIn: clampedTtl };
+  }
+
   private isNoSuchBucket(error: unknown): boolean {
     return (
       error instanceof S3ServiceException &&
