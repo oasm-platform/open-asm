@@ -805,10 +805,11 @@ describe('StorageController', () => {
 
   describe('getFile', () => {
     const user = { id: 'user-1' } as UserContextPayload;
-    const res = { set: jest.fn() };
+    const res = { set: jest.fn(), status: jest.fn() };
 
     beforeEach(() => {
       res.set.mockClear();
+      res.status.mockClear();
       jest
         .spyOn(storageService, 'resolveObjectWorkspaceIds')
         .mockResolvedValue([]);
@@ -987,15 +988,248 @@ describe('StorageController', () => {
     it('strips the leading slash and sets the image content type', async () => {
       const set = jest.fn();
 
-      await controller.getFile('system', '/images/logo.png', { set }, undefined);
+      await controller.getFile(
+        'system',
+        '/images/logo.png',
+        { set, status: jest.fn() },
+        undefined,
+      );
 
       expect(storageService.getFile).toHaveBeenCalledWith(
         'images/logo.png',
         'system',
       );
-      expect(set).toHaveBeenCalledWith({
-        'Content-Type': 'image/png',
-        'Cache-Control': expect.stringContaining('max-age='),
+      expect(set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Content-Type': 'image/png',
+          'Cache-Control': expect.stringContaining('max-age='),
+        }),
+      );
+    });
+
+    describe('conditional GET', () => {
+      const etag = '"image-etag"';
+      const lastModified = new Date('2026-01-01T00:00:00Z');
+      const makeRes = () => ({ set: jest.fn(), status: jest.fn() });
+
+      it('returns 304 with an empty body when If-None-Match matches', async () => {
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          etag,
+        );
+
+        expect(res.status).toHaveBeenCalledWith(304);
+        expect(result).toBeUndefined();
+        expect(res.set).toHaveBeenCalledWith(
+          expect.objectContaining({ ETag: etag }),
+        );
+      });
+
+      it('returns 200 when If-None-Match does not match', async () => {
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          '"bogus"',
+        );
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(result).toBeInstanceOf(StreamableFile);
+      });
+
+      it('returns 304 for If-None-Match: *', async () => {
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          '*',
+        );
+
+        expect(res.status).toHaveBeenCalledWith(304);
+        expect(result).toBeUndefined();
+      });
+
+      it('matches a weak entity-tag against a strong one', async () => {
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          'W/"image-etag"',
+        );
+
+        expect(res.status).toHaveBeenCalledWith(304);
+        expect(result).toBeUndefined();
+      });
+
+      it('matches a multi-value If-None-Match list', async () => {
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          '"other", "image-etag"',
+        );
+
+        expect(res.status).toHaveBeenCalledWith(304);
+        expect(result).toBeUndefined();
+      });
+
+      it('never returns 304 when storage provides no ETag', async () => {
+        jest.spyOn(storageService, 'getFile').mockResolvedValueOnce({
+          file: new StreamableFile(Buffer.from('image-bytes')),
+          etag: null,
+          lastModified,
+        });
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          '*',
+        );
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(result).toBeInstanceOf(StreamableFile);
+      });
+
+      it('destroys the opened body stream instead of holding the socket on 304', async () => {
+        const file = new StreamableFile(Buffer.from('image-bytes'));
+        const destroy = jest.spyOn(file.getStream(), 'destroy');
+        jest.spyOn(storageService, 'getFile').mockResolvedValueOnce({
+          file,
+          etag,
+          lastModified,
+        });
+        const res = makeRes();
+
+        await controller.getFile('system', 'logo/a.png', res, undefined, etag);
+
+        expect(destroy).toHaveBeenCalled();
+      });
+
+      it('uses the public cache matrix for the system bucket', async () => {
+        const res = makeRes();
+
+        await controller.getFile('system', 'logo/a.png', res, undefined);
+
+        expect(res.set).toHaveBeenCalledWith(
+          expect.objectContaining({
+            'Cache-Control': expect.stringContaining('public'),
+          }),
+        );
+      });
+
+      it('uses the private cache matrix for a screenshot read', async () => {
+        jest
+          .spyOn(storageService, 'resolveObjectWorkspaceIds')
+          .mockResolvedValue(['ws-a']);
+        workspacesService.getMembershipWithPermissions.mockResolvedValue({
+          membership: {},
+          permissionKeys: [],
+        } as never);
+        const res = makeRes();
+
+        await controller.getFile('screenshot', 'abc.png', res, user);
+
+        expect(res.set).toHaveBeenCalledWith(
+          expect.objectContaining({
+            'Cache-Control': expect.stringContaining('private'),
+          }),
+        );
+      });
+
+      it('always sets Last-Modified when storage provides one', async () => {
+        const res = makeRes();
+
+        await controller.getFile('system', 'logo/a.png', res, undefined);
+
+        expect(res.set).toHaveBeenCalledWith(
+          expect.objectContaining({
+            'Last-Modified': lastModified.toUTCString(),
+          }),
+        );
+      });
+
+      it('lets a matching ETag win over a stale If-Modified-Since', async () => {
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          etag,
+          new Date('2020-01-01T00:00:00Z').toUTCString(),
+        );
+
+        expect(res.status).toHaveBeenCalledWith(304);
+        expect(result).toBeUndefined();
+      });
+
+      it('lets a mismatching ETag win over a fresh If-Modified-Since', async () => {
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          '"bogus"',
+          new Date('2026-06-01T00:00:00Z').toUTCString(),
+        );
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(result).toBeInstanceOf(StreamableFile);
+      });
+
+      it('returns 304 for a fresh If-Modified-Since when If-None-Match is absent', async () => {
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          undefined,
+          new Date('2026-06-01T00:00:00Z').toUTCString(),
+        );
+
+        expect(res.status).toHaveBeenCalledWith(304);
+        expect(result).toBeUndefined();
+      });
+
+      it('returns 200 for a stale If-Modified-Since when If-None-Match is absent', async () => {
+        const res = makeRes();
+
+        const result = await controller.getFile(
+          'system',
+          'logo/a.png',
+          res,
+          undefined,
+          undefined,
+          new Date('2020-01-01T00:00:00Z').toUTCString(),
+        );
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(result).toBeInstanceOf(StreamableFile);
       });
     });
   });

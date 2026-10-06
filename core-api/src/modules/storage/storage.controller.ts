@@ -9,6 +9,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Headers,
   Logger,
   NotFoundException,
   Param,
@@ -255,33 +256,60 @@ export class StorageController {
     @Param('bucket') bucket: string,
     @Param('path') path: string,
     @Res({ passthrough: true })
-    res: { set: (headers: Record<string, string>) => void },
+    res: {
+      set: (headers: Record<string, string>) => void;
+      status: (code: number) => void;
+    },
     @UserContext() user?: UserContextPayload,
-  ): Promise<StreamableFile> {
+    @Headers('if-none-match') ifNoneMatch?: string,
+    @Headers('if-modified-since') ifModifiedSince?: string,
+  ): Promise<StreamableFile | undefined> {
     if (!path) {
       throw new NotFoundException('File path is required');
     }
 
     const cleanPath = path.replace(/^\/+/, '');
     await this.authorizeRead(bucket, cleanPath, user);
-    const { file } = await this.storageService.getFile(cleanPath, bucket);
+    const {
+      file,
+      etag,
+      lastModified,
+    } = await this.storageService.getFile(cleanPath, bucket);
+
+    const headers: Record<string, string> = {};
+    if (etag) {
+      headers['ETag'] = etag;
+    }
+    if (lastModified) {
+      headers['Last-Modified'] = lastModified.toUTCString();
+    }
+    headers['Cache-Control'] =
+      this.storageService.getBucketAccess(bucket) === 'public'
+        ? `public, max-age=${CACHE_STATIC_RESOURCE}, no-transform`
+        : 'private, no-cache';
 
     const extension = cleanPath.split('.').pop()?.toLowerCase();
     if (extension) {
       const mimeType = this.getMimeType(extension);
       if (mimeType) {
-        res.set({
-          'Content-Type': mimeType,
-          'Cache-Control': `max-age=${CACHE_STATIC_RESOURCE}, no-transform`,
-        });
+        headers['Content-Type'] = mimeType;
       }
+    }
+    res.set(headers);
+
+    if (this.isNotModified(etag, lastModified, ifNoneMatch, ifModifiedSince)) {
+      // The GetObjectCommand body stream is already open — destroy it so no
+      // socket is held while Nest sends the empty 304.
+      file.getStream().destroy();
+      res.status(304);
+      return undefined;
     }
 
     return file;
   }
 
   /**
-   * Shared read authorization for `getFile` and (later) `presignDownload`.
+   * Shared read authorization for `getFile` and `presignDownload`.
    * Bucket classes come from `StorageService.getBucketAccess`; tenant objects
    * authorize membership of ANY owning workspace because screenshot keys can
    * collide across workspaces.
@@ -329,6 +357,35 @@ export class StorageController {
         throw new ForbiddenException('Access denied');
       }
     }
+  }
+
+  private isNotModified(
+    etag: string | null,
+    lastModified: Date | null,
+    ifNoneMatch: string | undefined,
+    ifModifiedSince: string | undefined,
+  ): boolean {
+    if (ifNoneMatch !== undefined) {
+      if (!etag) {
+        return false;
+      }
+      const candidates = ifNoneMatch.split(',').map((tag) => {
+        const trimmed = tag.trim().replace(/^W\//, '');
+        return trimmed.replace(/^"|"$/g, '');
+      });
+      const current = etag
+        .trim()
+        .replace(/^W\//, '')
+        .replace(/^"|"$/g, '');
+      return candidates.some(
+        (candidate) => candidate === '*' || candidate === current,
+      );
+    }
+    if (ifModifiedSince === undefined || !lastModified) {
+      return false;
+    }
+    const since = Date.parse(ifModifiedSince);
+    return !Number.isNaN(since) && lastModified.getTime() <= since;
   }
 
   /**
