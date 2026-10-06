@@ -1,7 +1,8 @@
 import { CACHE_STATIC_RESOURCE } from '@/common/constants/app.constants';
-import { Public, Roles } from '@/common/decorators/app.decorator';
+import { Optional, Roles, UserContext } from '@/common/decorators/app.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Role } from '@/common/enums/enum';
+import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import {
   BadRequestException,
   Body,
@@ -15,6 +16,7 @@ import {
   Query,
   Res,
   StreamableFile,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -25,6 +27,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   ConfirmLogoRequestDto,
   LogoPresignRequestDto,
@@ -44,6 +47,7 @@ export class StorageController {
   constructor(
     private readonly storageService: StorageService,
     private readonly systemConfigsService: SystemConfigsService,
+    private readonly workspacesService: WorkspacesService,
   ) {}
 
   private readonly logger = new Logger(StorageController.name);
@@ -224,9 +228,9 @@ export class StorageController {
     return { downloadUrl: url, expiresIn };
   }
 
-  @Public()
+  @Optional()
   @Get(':bucket/:path')
-  @ApiOperation({ summary: 'Get a file from storage (public)' })
+  @ApiOperation({ summary: 'Get a file from storage' })
   @ApiParam({ name: 'bucket', type: String, required: true })
   @ApiParam({ name: 'path', type: String, required: true })
   @ApiResponse({
@@ -250,16 +254,14 @@ export class StorageController {
     @Param('path') path: string,
     @Res({ passthrough: true })
     res: { set: (headers: Record<string, string>) => void },
+    @UserContext() user?: UserContextPayload,
   ): Promise<StreamableFile> {
     if (!path) {
       throw new NotFoundException('File path is required');
     }
 
-    if (this.storageService.isPrivateBucket(bucket)) {
-      throw new ForbiddenException('Access denied');
-    }
-
     const cleanPath = path.replace(/^\/+/, '');
+    await this.authorizeRead(bucket, cleanPath, user);
     const file = await this.storageService.getFile(cleanPath, bucket);
 
     const extension = cleanPath.split('.').pop()?.toLowerCase();
@@ -274,6 +276,57 @@ export class StorageController {
     }
 
     return file;
+  }
+
+  /**
+   * Shared read authorization for `getFile` and (later) `presignDownload`.
+   * Bucket classes come from `StorageService.getBucketAccess`; tenant objects
+   * authorize membership of ANY owning workspace because screenshot keys can
+   * collide across workspaces.
+   */
+  private async authorizeRead(
+    bucket: string,
+    key: string,
+    user?: UserContextPayload,
+  ): Promise<void> {
+    const access = this.storageService.getBucketAccess(bucket);
+    switch (access) {
+      case 'public':
+        return;
+      case 'private':
+        throw new ForbiddenException('Access denied');
+      case 'blocked':
+        throw new NotFoundException('File not found');
+      case 'authenticated':
+        if (!user) {
+          throw new UnauthorizedException();
+        }
+        return;
+      case 'tenant': {
+        if (!user) {
+          throw new UnauthorizedException();
+        }
+        const workspaceIds =
+          await this.storageService.resolveObjectWorkspaceIds(bucket, key);
+        if (workspaceIds.length === 0) {
+          throw new NotFoundException('File not found');
+        }
+        for (const workspaceId of workspaceIds) {
+          try {
+            await this.workspacesService.getMembershipWithPermissions(
+              workspaceId,
+              user.id,
+            );
+            return;
+          } catch (error) {
+            if (!(error instanceof NotFoundException)) {
+              throw error;
+            }
+          }
+        }
+        throw new ForbiddenException('Access denied');
+      }
+    }
   }
 
   /**

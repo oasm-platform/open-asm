@@ -12,12 +12,15 @@ import {
   NotFoundException,
   RequestMethod,
   StreamableFile,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import type { DataSource } from 'typeorm';
+import type { UserContextPayload } from '@/common/interfaces/app.interface';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
 import type { RustFsClient } from './rustfs.client';
 import { StorageController } from './storage.controller';
@@ -25,6 +28,7 @@ import { StorageService } from './storage.service';
 
 const LOGO_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const PUBLIC_METADATA_KEY = 'PUBLIC'; // matches Public() in app.decorator.ts
+const OPTIONAL_METADATA_KEY = 'OPTIONAL'; // matches Optional() in app.decorator.ts
 const reflector = new Reflector();
 
 const rolesOf = (handler: object) =>
@@ -43,6 +47,9 @@ describe('StorageController', () => {
   let storageService: StorageService;
   let systemConfigsService: jest.Mocked<
     Pick<SystemConfigsService, 'getConfig' | 'updateConfig'>
+  >;
+  let workspacesService: jest.Mocked<
+    Pick<WorkspacesService, 'getMembershipWithPermissions'>
   >;
 
   beforeEach(async () => {
@@ -83,12 +90,16 @@ describe('StorageController', () => {
         .fn()
         .mockResolvedValue({ message: 'System configuration updated' }),
     };
+    workspacesService = {
+      getMembershipWithPermissions: jest.fn(),
+    };
 
     module = await Test.createTestingModule({
       controllers: [StorageController],
       providers: [
         { provide: StorageService, useValue: storageService },
         { provide: SystemConfigsService, useValue: systemConfigsService },
+        { provide: WorkspacesService, useValue: workspacesService },
       ],
     }).compile();
 
@@ -612,13 +623,29 @@ describe('StorageController', () => {
   });
 
   describe('getFile', () => {
-    it('is the only public route', () => {
+    const user = { id: 'user-1' } as UserContextPayload;
+    const res = { set: jest.fn() };
+
+    beforeEach(() => {
+      res.set.mockClear();
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue([]);
+    });
+
+    it('is optional-auth (not public), presignDownload is neither', () => {
+      expect(
+        Reflect.getMetadata(
+          OPTIONAL_METADATA_KEY,
+          StorageController.prototype.getFile,
+        ),
+      ).toBe(true);
       expect(
         Reflect.getMetadata(
           PUBLIC_METADATA_KEY,
           StorageController.prototype.getFile,
         ),
-      ).toBe(true);
+      ).toBeUndefined();
 
       for (const handler of [
         'presignUpload',
@@ -637,10 +664,141 @@ describe('StorageController', () => {
       }
     });
 
+    it('lets anonymous reads of the system bucket through', async () => {
+      const file = await controller.getFile('system', 'logo/a.png', res, undefined);
+
+      expect(storageService.getFile).toHaveBeenCalledWith('logo/a.png', 'system');
+      expect(file).toBeInstanceOf(StreamableFile);
+    });
+
+    it('rejects anonymous reads of cached-static with 401', async () => {
+      await expect(
+        controller.getFile('cached-static', 'a/b.js', res, undefined),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(storageService.getFile).not.toHaveBeenCalled();
+    });
+
+    it('lets authenticated reads of cached-static through', async () => {
+      const file = await controller.getFile('cached-static', 'a/b.js', res, user);
+
+      expect(storageService.getFile).toHaveBeenCalledWith('a/b.js', 'cached-static');
+      expect(file).toBeInstanceOf(StreamableFile);
+    });
+
+    it('rejects anonymous reads of a tenant bucket with 401', async () => {
+      await expect(
+        controller.getFile('screenshot', 'abc.png', res, undefined),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(storageService.getFile).not.toHaveBeenCalled();
+    });
+
+    it('lets an owning-workspace member read a screenshot', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a']);
+      workspacesService.getMembershipWithPermissions.mockResolvedValue({
+        membership: {},
+        permissionKeys: [],
+      } as never);
+
+      const file = await controller.getFile('screenshot', 'abc.png', res, user);
+
+      expect(workspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(
+        'ws-a',
+        'user-1',
+      );
+      expect(storageService.getFile).toHaveBeenCalledWith('abc.png', 'screenshot');
+      expect(file).toBeInstanceOf(StreamableFile);
+    });
+
+    it('authorizes membership of ANY owning workspace on a shared key', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a', 'ws-b']);
+      workspacesService.getMembershipWithPermissions
+        .mockRejectedValueOnce(new NotFoundException('Workspace member not found'))
+        .mockResolvedValueOnce({ membership: {}, permissionKeys: [] } as never);
+
+      await controller.getFile('screenshot', 'shared.png', res, user);
+
+      expect(workspacesService.getMembershipWithPermissions).toHaveBeenNthCalledWith(
+        1,
+        'ws-a',
+        'user-1',
+      );
+      expect(workspacesService.getMembershipWithPermissions).toHaveBeenNthCalledWith(
+        2,
+        'ws-b',
+        'user-1',
+      );
+      expect(storageService.getFile).toHaveBeenCalledWith('shared.png', 'screenshot');
+    });
+
+    it('rejects a member of an unrelated workspace with 403', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a']);
+      workspacesService.getMembershipWithPermissions.mockRejectedValue(
+        new NotFoundException('Workspace member not found'),
+      );
+
+      await expect(
+        controller.getFile('screenshot', 'abc.png', res, user),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(storageService.getFile).not.toHaveBeenCalled();
+    });
+
+    it('maps an unowned tenant key to 404 for an authenticated user', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue([]);
+
+      await expect(
+        controller.getFile('screenshot', 'missing.png', res, user),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(workspacesService.getMembershipWithPermissions).not.toHaveBeenCalled();
+      expect(storageService.getFile).not.toHaveBeenCalled();
+    });
+
+    it('maps the default bucket to 404', async () => {
+      await expect(
+        controller.getFile('default', 'images/logo.png', res, user),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(storageService.getFile).not.toHaveBeenCalled();
+    });
+
+    it('maps an unknown bucket to 404', async () => {
+      await expect(
+        controller.getFile('nope', 'a/b.pdf', res, user),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(storageService.getFile).not.toHaveBeenCalled();
+    });
+
     it('refuses a private bucket', async () => {
       await expect(
-        controller.getFile('reports', 'a/b.pdf', { set: jest.fn() }),
+        controller.getFile('reports', 'a/b.pdf', res, user),
       ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(storageService.getFile).not.toHaveBeenCalled();
+    });
+
+    it('rethrows a membership lookup failure instead of mapping it', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a']);
+      workspacesService.getMembershipWithPermissions.mockRejectedValue(
+        new Error('db down'),
+      );
+
+      await expect(
+        controller.getFile('screenshot', 'abc.png', res, user),
+      ).rejects.toThrow('db down');
 
       expect(storageService.getFile).not.toHaveBeenCalled();
     });
@@ -648,11 +806,11 @@ describe('StorageController', () => {
     it('strips the leading slash and sets the image content type', async () => {
       const set = jest.fn();
 
-      await controller.getFile('default', '/images/logo.png', { set });
+      await controller.getFile('system', '/images/logo.png', { set }, undefined);
 
       expect(storageService.getFile).toHaveBeenCalledWith(
         'images/logo.png',
-        'default',
+        'system',
       );
       expect(set).toHaveBeenCalledWith({
         'Content-Type': 'image/png',
