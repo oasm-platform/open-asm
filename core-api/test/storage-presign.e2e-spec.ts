@@ -50,7 +50,7 @@ describe('Presigned storage access (e2e)', () => {
   let presignOrigin: string;
   /** Key of the object written by the happy path, deleted in `afterAll`. */
   let uploadedKey = '';
-  const uploadedBucket = 'default';
+  const uploadedBucket = 'system';
 
   const payload = Buffer.from('oasm presigned storage e2e round-trip\n', 'utf8');
   const payloadSha256 = createHash('sha256').update(payload).digest('hex');
