@@ -1,6 +1,7 @@
-import { ValidationError } from 'cloudevents';
 import type { RedisService } from '@/services/redis/redis.service';
-import { EVENT_CATALOG } from './event';import {
+import { ValidationError } from 'cloudevents';
+import { EVENT_CATALOG } from '../connectors/event';
+import {
   EVENT_BRIDGE_SOURCE,
   EVENT_BRIDGE_STREAM,
   EventBridgeService,
@@ -111,9 +112,13 @@ describe('EventBridgeService', () => {
     });
 
     it('passes subject through when the caller knows the resource', async () => {
-      await service.publish(EVENT_CATALOG.job.completed, {}, {
-        subject: 'job:8f3c',
-      });
+      await service.publish(
+        EVENT_CATALOG.job.completed,
+        {},
+        {
+          subject: 'job:8f3c',
+        },
+      );
       expect(lastFields().subject).toBe('job:8f3c');
     });
   });
@@ -139,9 +144,9 @@ describe('EventBridgeService', () => {
     });
 
     it('returns the stream id so a caller can trace the write', async () => {
-      await expect(service.publish(EVENT_CATALOG.job.completed, {})).resolves.toBe(
-        '1700000000000-0',
-      );
+      await expect(
+        service.publish(EVENT_CATALOG.job.completed, {}),
+      ).resolves.toBe('1700000000000-0');
     });
   });
 
@@ -150,9 +155,9 @@ describe('EventBridgeService', () => {
       // publish() is the honest path: a caller inside a transaction must be
       // able to see that the event was not recorded.
       xadd.mockRejectedValue(new Error('ECONNREFUSED'));
-      await expect(service.publish(EVENT_CATALOG.job.completed, {})).rejects.toThrow(
-        'ECONNREFUSED',
-      );
+      await expect(
+        service.publish(EVENT_CATALOG.job.completed, {}),
+      ).rejects.toThrow('ECONNREFUSED');
     });
 
     it('never throws from publishSafely', async () => {

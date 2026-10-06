@@ -1,9 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { CloudEvent } from 'cloudevents';
 import { RedisService } from '@/services/redis/redis.service';
-import type { CatalogEvent, EventName } from './event';
-import { EVENT_CATALOG_TOKEN, resolveEventName } from './event';
-import { Inject } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CloudEvent } from 'cloudevents';
+import type { CatalogEvent, EventName } from '../connectors/event';
+import { EVENT_CATALOG_TOKEN, resolveEventName } from '../connectors/event';
 
 /**
  * Single stream every event lands on.

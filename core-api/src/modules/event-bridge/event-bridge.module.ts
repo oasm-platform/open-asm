@@ -1,6 +1,6 @@
-import { Global, Module } from '@nestjs/common';
 import { ServicesModule } from '@/services/services.module';
-import { EVENT_CATALOG, EVENT_CATALOG_TOKEN } from './event';
+import { Global, Module } from '@nestjs/common';
+import { EVENT_CATALOG, EVENT_CATALOG_TOKEN } from '../connectors/event';
 import { EventBridgeService } from './event-bridge.service';
 
 /**

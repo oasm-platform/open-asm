@@ -5,11 +5,11 @@ import {
   EVENT_DEFINITIONS,
   EVENT_NAMES,
   EVENT_SCHEMA_VERSION,
-  type CatalogEvent,
   getEventDefinition,
   isEventName,
   resolveEventName,
-} from './event';
+  type CatalogEvent,
+} from '../connectors/event';
 
 /**
  * The catalog is hand-maintained, so the risks are (a) it drifts from the audit
@@ -150,9 +150,7 @@ describe('event catalog', () => {
     });
 
     it('derives the domain as the first path segment', () => {
-      const domains = new Set(
-        EVENT_NAMES.map((name) => name.split('.')[0]),
-      );
+      const domains = new Set(EVENT_NAMES.map((name) => name.split('.')[0]));
       // 19 domains: workspace, member, permission_group, target, asset,
       // asset_group, network, vulnerability, report, job, workflow,
       // integration, api_key, audit, worker, scan, issue, statistics,
@@ -181,7 +179,11 @@ describe('event catalog', () => {
     // The two shapes `publish` must accept, and the one it must refuse.
     it.each([
       ['a catalog leaf', EVENT_CATALOG.job.completed, 'job.completed'],
-      ['a catalog leaf at depth 3', EVENT_CATALOG.workspace.config.updated, 'workspace.config.updated'],
+      [
+        'a catalog leaf at depth 3',
+        EVENT_CATALOG.workspace.config.updated,
+        'workspace.config.updated',
+      ],
       ['a bare name', 'job.completed', 'job.completed'],
     ] as const)('resolves %s to its wire name', (_label, event, expected) => {
       expect(resolveEventName(event)).toBe(expected);
