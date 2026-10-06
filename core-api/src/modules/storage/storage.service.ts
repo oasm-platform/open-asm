@@ -22,6 +22,7 @@ import {
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { DataSource } from 'typeorm';
 import { RustFsClient } from './rustfs.client';
 import {
   MAX_S3_PRESIGN_TTL_SECONDS,
@@ -93,6 +94,7 @@ export class StorageService implements OnModuleInit {
   constructor(
     private readonly rustFsClient: RustFsClient,
     private readonly configService: ConfigService,
+    private readonly dataSource: DataSource,
   ) {
     this.storageConfig = parseStorageConfig(this.configService);
   }
@@ -153,6 +155,41 @@ export class StorageService implements OnModuleInit {
     if (this.privateBuckets.includes(bucket)) {
       throw new ForbiddenException(`Bucket '${bucket}' is private`);
     }
+  }
+
+  /**
+   * Resolves ALL workspaces that own a tenant-bucket object. Screenshot
+   * object keys are `md5(asset.value)` and can collide across workspaces,
+   * so a single arbitrary row is never enough — every distinct owner is
+   * returned and the caller authorizes membership of ANY of them.
+   */
+  public async resolveObjectWorkspaceIds(
+    bucket: string,
+    key: string,
+  ): Promise<string[]> {
+    if (bucket === 'screenshot') {
+      const rows: Array<{ workspaceId: string }> = await this.dataSource.query(
+        `SELECT DISTINCT targets."workspaceId" AS "workspaceId"
+         FROM asset_services
+         INNER JOIN assets ON assets.id = asset_services."assetId"
+         INNER JOIN targets ON targets.id = assets."targetId"
+         WHERE asset_services."screenshotPath" = $1`,
+        [`screenshot/${key}`],
+      );
+      return [...new Set(rows.map((row) => row.workspaceId))];
+    }
+    if (bucket === 'nuclei-templates') {
+      const dotIndex = key.lastIndexOf('.');
+      const templateId = dotIndex > 0 ? key.slice(0, dotIndex) : key;
+      const rows: Array<{ workspaceId: string }> = await this.dataSource.query(
+        `SELECT templates."workspaceId" AS "workspaceId"
+         FROM templates
+         WHERE templates.id = $1`,
+        [templateId],
+      );
+      return [...new Set(rows.map((row) => row.workspaceId))];
+    }
+    return [];
   }
 
   public generateObjectKey(

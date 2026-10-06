@@ -14,6 +14,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type * as S3Module from '@aws-sdk/client-s3';
+import { DataSource } from 'typeorm';
 import { RustFsClient } from './rustfs.client';
 import { StorageService } from './storage.service';
 
@@ -41,6 +42,7 @@ const mockGetSignedUrl = getSignedUrl as jest.Mock;
 describe('StorageService', () => {
   let service: StorageService;
   let sendMock: jest.Mock;
+  let dataSourceQuery: jest.Mock;
 
   const mockRustFsClient = {
     getClient: jest.fn(),
@@ -63,6 +65,7 @@ describe('StorageService', () => {
     configValues = {};
     sendMock = jest.fn();
     mockRustFsClient.getClient.mockReturnValue({ send: sendMock });
+    dataSourceQuery = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -74,6 +77,10 @@ describe('StorageService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: DataSource,
+          useValue: { query: dataSourceQuery },
         },
       ],
     }).compile();
@@ -477,6 +484,105 @@ describe('StorageService', () => {
       ['nope', 'blocked'],
     ])('should classify %p as %p', (bucket, expected) => {
       expect(service.getBucketAccess(bucket)).toBe(expected);
+    });
+  });
+
+  describe('resolveObjectWorkspaceIds', () => {
+    it('should return both owners for a screenshot key shared by two workspaces', async () => {
+      dataSourceQuery.mockResolvedValue([
+        { workspaceId: '11111111-1111-4111-8111-111111111111' },
+        { workspaceId: '22222222-2222-4222-8222-222222222222' },
+        { workspaceId: '11111111-1111-4111-8111-111111111111' },
+      ]);
+
+      const ids = await service.resolveObjectWorkspaceIds(
+        'screenshot',
+        'abc123.png',
+      );
+
+      expect(ids.sort()).toEqual(
+        [
+          '11111111-1111-4111-8111-111111111111',
+          '22222222-2222-4222-8222-222222222222',
+        ].sort(),
+      );
+      expect(dataSourceQuery).toHaveBeenCalledTimes(1);
+      expect(dataSourceQuery.mock.calls[0][1]).toEqual([
+        'screenshot/abc123.png',
+      ]);
+    });
+
+    it('should return the single owner for a single-owner screenshot key', async () => {
+      dataSourceQuery.mockResolvedValue([
+        { workspaceId: '11111111-1111-4111-8111-111111111111' },
+      ]);
+
+      const ids = await service.resolveObjectWorkspaceIds(
+        'screenshot',
+        'solo.png',
+      );
+
+      expect(ids).toEqual(['11111111-1111-4111-8111-111111111111']);
+    });
+
+    it('should return [] for an unknown screenshot key', async () => {
+      dataSourceQuery.mockResolvedValue([]);
+
+      const ids = await service.resolveObjectWorkspaceIds(
+        'screenshot',
+        'missing.png',
+      );
+
+      expect(ids).toEqual([]);
+    });
+
+    it('should resolve the owning workspace of a nuclei template by id', async () => {
+      dataSourceQuery.mockResolvedValue([
+        { workspaceId: '33333333-3333-4333-8333-333333333333' },
+      ]);
+
+      const ids = await service.resolveObjectWorkspaceIds(
+        'nuclei-templates',
+        '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d.yaml',
+      );
+
+      expect(ids).toEqual(['33333333-3333-4333-8333-333333333333']);
+      expect(dataSourceQuery).toHaveBeenCalledTimes(1);
+      expect(dataSourceQuery.mock.calls[0][1]).toEqual([
+        '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+      ]);
+    });
+
+    it('should strip only the final extension of a nuclei template key', async () => {
+      dataSourceQuery.mockResolvedValue([]);
+
+      await service.resolveObjectWorkspaceIds(
+        'nuclei-templates',
+        'my.template.yaml',
+      );
+
+      expect(dataSourceQuery.mock.calls[0][1]).toEqual(['my.template']);
+    });
+
+    it('should return [] when the nuclei template row is missing', async () => {
+      dataSourceQuery.mockResolvedValue([]);
+
+      const ids = await service.resolveObjectWorkspaceIds(
+        'nuclei-templates',
+        'd0d0d0d0-d0d0-4d0d-8d0d-d0d0d0d0d0d0.yaml',
+      );
+
+      expect(ids).toEqual([]);
+    });
+
+    it('should return [] without querying for a non-tenant bucket', async () => {
+      const ids = await service.resolveObjectWorkspaceIds(
+        'system',
+        'logo.png',
+      );
+
+      expect(ids).toEqual([]);
+      expect(dataSourceQuery).not.toHaveBeenCalled();
     });
   });
 });

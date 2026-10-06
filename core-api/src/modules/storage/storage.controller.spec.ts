@@ -17,6 +17,7 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
+import type { DataSource } from 'typeorm';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
 import type { RustFsClient } from './rustfs.client';
 import { StorageController } from './storage.controller';
@@ -47,10 +48,12 @@ describe('StorageController', () => {
   beforeEach(async () => {
     const rustFsClient = { getClient: jest.fn(), getPresignClient: jest.fn() };
     const configService = { get: jest.fn() };
+    const dataSource = { query: jest.fn() };
 
     storageService = new StorageService(
       rustFsClient as unknown as RustFsClient,
       configService as unknown as ConfigService,
+      dataSource as unknown as DataSource,
     );
 
     generateObjectKey = jest
