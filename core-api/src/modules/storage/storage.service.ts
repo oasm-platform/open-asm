@@ -405,7 +405,14 @@ export class StorageService implements OnModuleInit {
     return new InternalServerErrorException(`Failed to save file: ${errorMessage}`);
   }
 
-  public async getFile(filePath: string, bucket: string = 'default'): Promise<StreamableFile> {
+  public async getFile(
+    filePath: string,
+    bucket: string = 'default',
+  ): Promise<{
+    file: StreamableFile;
+    etag: string | null;
+    lastModified: Date | null;
+  }> {
     const cleanPath = filePath.replace(/^[./\s]+/, '');
 
     if (!cleanPath || cleanPath.includes('..')) {
@@ -425,7 +432,11 @@ export class StorageService implements OnModuleInit {
       }
 
       const body = response.Body as Readable;
-      return new StreamableFile(body);
+      return {
+        file: new StreamableFile(body),
+        etag: response.ETag ?? null,
+        lastModified: response.LastModified ?? null,
+      };
     } catch (error: unknown) {
       if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)) {
         throw new NotFoundException('File not found');

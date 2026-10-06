@@ -80,9 +80,11 @@ describe('StorageController', () => {
       .spyOn(storageService, 'headObject')
       .mockResolvedValue({ contentType: 'image/png', contentLength: 1024 });
     jest.spyOn(storageService, 'deleteFile').mockResolvedValue(undefined);
-    jest
-      .spyOn(storageService, 'getFile')
-      .mockResolvedValue(new StreamableFile(Buffer.from('image-bytes')));
+    jest.spyOn(storageService, 'getFile').mockResolvedValue({
+      file: new StreamableFile(Buffer.from('image-bytes')),
+      etag: '"image-etag"',
+      lastModified: new Date('2026-01-01T00:00:00Z'),
+    });
 
     systemConfigsService = {
       getConfig: jest.fn().mockResolvedValue({ name: 'OASM', logoPath: null }),

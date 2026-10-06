@@ -264,7 +264,7 @@ export class StorageController {
 
     const cleanPath = path.replace(/^\/+/, '');
     await this.authorizeRead(bucket, cleanPath, user);
-    const file = await this.storageService.getFile(cleanPath, bucket);
+    const { file } = await this.storageService.getFile(cleanPath, bucket);
 
     const extension = cleanPath.split('.').pop()?.toLowerCase();
     if (extension) {

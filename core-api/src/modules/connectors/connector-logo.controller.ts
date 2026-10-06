@@ -19,7 +19,7 @@ export class ConnectorLogoController {
   ): Promise<StreamableFile> {
     // file is like nuclei.png — stored as connectors/nuclei.png in system bucket
     const key = `connectors/${file}`;
-    const stream = await this.storageService.getFile(key, 'system');
+    const { file: stream } = await this.storageService.getFile(key, 'system');
     const extension = file.split('.').pop()?.toLowerCase();
     if (extension === 'png') {
       res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'max-age=1209600, no-transform' });

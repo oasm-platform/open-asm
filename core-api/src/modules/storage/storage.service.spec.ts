@@ -3,8 +3,10 @@ import {
   ForbiddenException,
   InternalServerErrorException,
   NotFoundException,
+  StreamableFile,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Readable } from 'stream';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import {
@@ -583,6 +585,65 @@ describe('StorageService', () => {
 
       expect(ids).toEqual([]);
       expect(dataSourceQuery).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getFile', () => {
+    const lastModified = new Date('2026-01-01T00:00:00Z');
+
+    it('should return the stream with the etag and last-modified from the same request', async () => {
+      sendMock.mockResolvedValue({
+        Body: Readable.from(Buffer.from('file-bytes')),
+        ETag: '"abc123"',
+        LastModified: lastModified,
+      });
+
+      const result = await service.getFile('images/logo.png', 'system');
+
+      expect(result.file).toBeInstanceOf(StreamableFile);
+      expect(result.etag).toBe('"abc123"');
+      expect(result.lastModified).toEqual(lastModified);
+      // One GetObject round-trip — the metadata rides the same response.
+      expect(sendMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should propagate a missing etag or last-modified as null', async () => {
+      sendMock.mockResolvedValue({
+        Body: Readable.from(Buffer.from('file-bytes')),
+      });
+
+      const result = await service.getFile('images/logo.png', 'system');
+
+      expect(result.etag).toBeNull();
+      expect(result.lastModified).toBeNull();
+    });
+
+    it('should map NoSuchKey to NotFoundException', async () => {
+      sendMock.mockRejectedValue(
+        new S3ServiceException({
+          name: 'NoSuchKey',
+          message: 'The specified key does not exist',
+          $metadata: { httpStatusCode: 404 },
+        }),
+      );
+
+      await expect(service.getFile('missing.png', 'system')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should map any other error to InternalServerErrorException', async () => {
+      sendMock.mockRejectedValue(
+        new S3ServiceException({
+          name: 'AccessDenied',
+          message: 'Access Denied',
+          $metadata: { httpStatusCode: 403 },
+        }),
+      );
+
+      await expect(service.getFile('secret.png', 'system')).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
 });
