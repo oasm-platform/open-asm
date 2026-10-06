@@ -395,7 +395,7 @@ upload and download traffic bypasses the API process.
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
 | `/api/storage/presign/upload` | POST | Presigned `PUT` into any non-private bucket. `@Roles(Role.ADMIN)`. |
-| `/api/storage/presign/download` | GET | Presigned `GET`; optional `fileName` becomes `Content-Disposition`. Declared before the `:bucket/:path` wildcard on purpose, otherwise Express swallows the literal path. |
+| `/api/storage/presign/download` | GET | Presigned `GET`; optional `fileName` becomes `Content-Disposition`. Authorized by the same `authorizeRead` classes as direct reads (see below), so a URL for another workspace's screenshot or template is refused with 403 before signing. Declared before the `:bucket/:path` wildcard on purpose, otherwise Express swallows the literal path. |
 | `/api/storage/logo/presign` | POST | Presigned `PUT` for the app logo: `system` bucket, `logo-` prefix, image extensions only. `@Roles(Role.ADMIN)`. |
 | `/api/storage/logo/confirm` | POST | `HeadObject` on the uploaded key, validates content type and size, then activates the logo. `@Roles(Role.ADMIN)`. |
 | `/api/templates/:templateId/presign` | POST | Presigned `PUT` for a template YAML. Requires workspace permission `template.write`. |
@@ -494,15 +494,64 @@ Defaults, clamping and parsing for every variable above live in
 900 s and is clamped to 60 s ... 604800 s. Treat that file as the source of
 truth, not this section.
 
+### Direct-read authorization (`GET /api/storage/:bucket/:path`)
+
+Direct reads are authorized, not world-readable. The handler is `@Optional()`
+(`storage.controller.ts:234`): the global `AuthGuard` still runs and populates
+`request.user`, while unauthenticated requests pass through so the login page
+can render the logo from the `system` bucket before a session exists. Both
+direct reads and `presign/download` share one helper, `authorizeRead`
+(`storage.controller.ts:317`), over the bucket classes from
+`StorageService.getBucketAccess` (`storage.service.ts:58`):
+
+| Class | Buckets | Rule |
+| --- | --- | --- |
+| `public` | `system` | Anonymous reads allowed. |
+| `authenticated` | `cached-static` | Any session allowed; anonymous gets 401. |
+| `tenant` | `screenshot`, `nuclei-templates` | Anonymous gets 401; ownership resolved via `resolveObjectWorkspaceIds` (`storage.service.ts:166`), membership of ANY owning workspace required, otherwise 403; unknown keys return 404 so the endpoint is not a workspace-existence oracle. |
+| `private` | `reports`, `job-results` | Never served over HTTP: 403. |
+| `blocked` | `default` and anything unknown | 404 as if the object did not exist. |
+
+Status semantics: 401 means no session on an `authenticated`/`tenant` bucket;
+403 means a session without membership (or a `private` bucket); 404 means
+`blocked`, or a tenant key with no owner row. `presign/download` applies the
+same helper after `assertBucketAllowed` (400) and `assertBucketNotPrivate`
+(403), so its guard order is 400, 403, then 401/403/404 from `authorizeRead`.
+
+This deliberately deviates from the audit allow-list, which recommended
+`system`, `nuclei-templates` and `cached-static` as public. The console sits
+behind auth, so no anonymous consumer needs those two buckets:
+`cached-static` is session-gated and `nuclei-templates` is tenant-gated with
+no anonymous path lost.
+
+Conditional GET: authorized reads return `ETag`/`Last-Modified` from the same
+`GetObjectCommand` and answer `If-None-Match`/`If-Modified-Since` with 304
+(`isNotModified`, `storage.controller.ts:362`); the 304 destroys the already
+opened S3 stream so no socket is held. `Cache-Control` is `public,
+max-age=1209600, no-transform` on `system` only (14 days via
+`CACHE_STATIC_RESOURCE`) and `private, no-cache` on every authorized bucket.
+
+Residual risk: screenshot keys are `md5(asset.value)`
+(`data-adapter.service.ts:641`), a flat key with no workspace prefix, so two
+workspaces scanning the same hostname share one key. md5 is not collision
+resistant, so a crafted value could alias another tenant's key; the mitigation
+is that authorization checks membership of ANY owning workspace
+(`resolveObjectWorkspaceIds` returns every distinct owner, never one
+arbitrary row), and finding or guessing a key still requires a session in at
+least one owning workspace. `nuclei-templates` keys are `<templateId>.yaml`
+and resolve by exact template id, so no cross-workspace aliasing there.
+
+Accepted cost: `@Optional()` still performs a `getSession` lookup
+(`auth.guard.ts:96`) even on anonymous `system` reads, before `authorizeRead`
+short-circuits. One session lookup per logo fetch on the login page is the
+price of keeping that page working without a public bypass.
+
+Finding AE-02 in [`docs/security-audit-report.md`](docs/security-audit-report.md)
+is closed by this model; the previous "still `@Public()`" note below is
+superseded by this section.
+
 ### Deferred and still open
 
-- **Security finding AE-02 is *not* fixed by this change.**
-  `GET /api/storage/:bucket/:path` is still `@Public()`
-  (`storage.controller.ts:222`) and still only blocks `reports` and
-  `job-results`, so `screenshot` and `default` stay world-readable. It has to
-  stay public because the login page renders the logo from the `system` bucket
-  before a session exists. See AE-02 in
-  [`docs/security-audit-report.md`](docs/security-audit-report.md).
 - **No server-side max size on a presigned `PUT`.** A signed `PUT` is accepted
   by the storage backend for whatever body the client sends. The only cap in the
   self-hosted deployment is `client_max_body_size 100m` in
