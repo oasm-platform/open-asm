@@ -464,6 +464,21 @@ describe('StorageService', () => {
       );
     });
   });
+
+  describe('getBucketAccess', () => {
+    it.each([
+      ['system', 'public'],
+      ['cached-static', 'authenticated'],
+      ['screenshot', 'tenant'],
+      ['nuclei-templates', 'tenant'],
+      ['reports', 'private'],
+      ['job-results', 'private'],
+      ['default', 'blocked'],
+      ['nope', 'blocked'],
+    ])('should classify %p as %p', (bucket, expected) => {
+      expect(service.getBucketAccess(bucket)).toBe(expected);
+    });
+  });
 });
 
 describe('RustFsClient credentials', () => {

@@ -46,6 +46,35 @@ export class StorageService implements OnModuleInit {
 
   private readonly privateBuckets = ['reports', 'job-results'];
 
+  private readonly publicBuckets = ['system'];
+
+  private readonly authenticatedBuckets = ['cached-static'];
+
+  private readonly tenantBuckets = ['screenshot', 'nuclei-templates'];
+
+  private readonly blockedBuckets = ['default'];
+
+  public getBucketAccess(
+    bucket: string,
+  ): 'public' | 'authenticated' | 'tenant' | 'private' | 'blocked' {
+    if (this.publicBuckets.includes(bucket)) {
+      return 'public';
+    }
+    if (this.authenticatedBuckets.includes(bucket)) {
+      return 'authenticated';
+    }
+    if (this.tenantBuckets.includes(bucket)) {
+      return 'tenant';
+    }
+    if (this.privateBuckets.includes(bucket)) {
+      return 'private';
+    }
+    if (this.blockedBuckets.includes(bucket)) {
+      return 'blocked';
+    }
+    return 'blocked';
+  }
+
   private readonly restrictedExtensions = [
     'exe',
     'dll',
