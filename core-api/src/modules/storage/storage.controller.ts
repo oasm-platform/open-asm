@@ -215,9 +215,11 @@ export class StorageController {
   @ApiResponse({ status: 403, description: 'Bucket is not accessible' })
   async presignDownload(
     @Query() query: PresignDownloadQueryDto,
+    @UserContext() user?: UserContextPayload,
   ): Promise<PresignDownloadResponseDto> {
     this.storageService.assertBucketAllowed(query.bucket);
     this.storageService.assertBucketNotPrivate(query.bucket);
+    await this.authorizeRead(query.bucket, query.path, user);
 
     const { url, expiresIn } = await this.storageService.getPresignedDownloadUrl({
       bucket: query.bucket,

@@ -218,33 +218,47 @@ describe('StorageController', () => {
   });
 
   describe('presignDownload', () => {
+    const user = { id: 'user-1' } as UserContextPayload;
+
+    beforeEach(() => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue([]);
+    });
+
     it('carries no role restriction', () => {
       expect(rolesOf(StorageController.prototype.presignDownload)).toBeUndefined();
     });
 
     it('returns the download URL keyed by the requested path', async () => {
-      const result = await controller.presignDownload({
-        bucket: 'default',
-        path: '2024/report.pdf',
-        fileName: 'quarterly-report.pdf',
-      });
+      const result = await controller.presignDownload(
+        {
+          bucket: 'system',
+          path: '2024/report.pdf',
+          fileName: 'quarterly-report.pdf',
+        },
+        user,
+      );
 
       expect(result).toEqual({
         downloadUrl: 'https://storage.test/download?sig=1',
         expiresIn: 600,
       });
       expect(storageService.getPresignedDownloadUrl).toHaveBeenCalledWith({
-        bucket: 'default',
+        bucket: 'system',
         key: '2024/report.pdf',
         fileName: 'quarterly-report.pdf',
       });
     });
 
     it('passes an absent file name through as undefined', async () => {
-      await controller.presignDownload({ bucket: 'default', path: 'a/b.pdf' });
+      await controller.presignDownload(
+        { bucket: 'system', path: 'a/b.pdf' },
+        user,
+      );
 
       expect(storageService.getPresignedDownloadUrl).toHaveBeenCalledWith({
-        bucket: 'default',
+        bucket: 'system',
         key: 'a/b.pdf',
         fileName: undefined,
       });
@@ -263,14 +277,17 @@ describe('StorageController', () => {
           order.push('notPrivate');
         });
 
-      await controller.presignDownload({ bucket: 'default', path: 'a/b.pdf' });
+      await controller.presignDownload(
+        { bucket: 'system', path: 'a/b.pdf' },
+        user,
+      );
 
       expect(order).toEqual(['allowed', 'notPrivate']);
     });
 
     it('rejects an empty bucket before signing', async () => {
       await expect(
-        controller.presignDownload({ bucket: '  ', path: 'a/b.pdf' }),
+        controller.presignDownload({ bucket: '  ', path: 'a/b.pdf' }, user),
       ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
@@ -278,9 +295,171 @@ describe('StorageController', () => {
 
     it('rejects a private bucket before signing', async () => {
       await expect(
-        controller.presignDownload({ bucket: 'job-results', path: 'a/b.pdf' }),
+        controller.presignDownload(
+          { bucket: 'job-results', path: 'a/b.pdf' },
+          user,
+        ),
       ).rejects.toBeInstanceOf(ForbiddenException);
 
+      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('lets an owning-workspace member presign a screenshot', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a']);
+      workspacesService.getMembershipWithPermissions.mockResolvedValue({
+        membership: {},
+        permissionKeys: [],
+      } as never);
+
+      const result = await controller.presignDownload(
+        { bucket: 'screenshot', path: 'abc.png' },
+        user,
+      );
+
+      expect(result).toEqual({
+        downloadUrl: 'https://storage.test/download?sig=1',
+        expiresIn: 600,
+      });
+      expect(workspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(
+        'ws-a',
+        'user-1',
+      );
+      expect(storageService.getPresignedDownloadUrl).toHaveBeenCalledWith({
+        bucket: 'screenshot',
+        key: 'abc.png',
+        fileName: undefined,
+      });
+    });
+
+    it('rejects a presign of another workspace screenshot with 403', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a']);
+      workspacesService.getMembershipWithPermissions.mockRejectedValue(
+        new NotFoundException('Workspace member not found'),
+      );
+
+      await expect(
+        controller.presignDownload(
+          { bucket: 'screenshot', path: 'abc.png' },
+          user,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('lets a member presign their workspace nuclei-template', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a']);
+      workspacesService.getMembershipWithPermissions.mockResolvedValue({
+        membership: {},
+        permissionKeys: [],
+      } as never);
+
+      const result = await controller.presignDownload(
+        { bucket: 'nuclei-templates', path: 'tpl-1.yaml' },
+        user,
+      );
+
+      expect(result).toEqual({
+        downloadUrl: 'https://storage.test/download?sig=1',
+        expiresIn: 600,
+      });
+      expect(storageService.getPresignedDownloadUrl).toHaveBeenCalledWith({
+        bucket: 'nuclei-templates',
+        key: 'tpl-1.yaml',
+        fileName: undefined,
+      });
+    });
+
+    it('rejects a presign of another workspace template with 403', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a']);
+      workspacesService.getMembershipWithPermissions.mockRejectedValue(
+        new NotFoundException('Workspace member not found'),
+      );
+
+      await expect(
+        controller.presignDownload(
+          { bucket: 'nuclei-templates', path: 'tpl-1.yaml' },
+          user,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('rejects an anonymous presign of a tenant bucket with 401', async () => {
+      await expect(
+        controller.presignDownload(
+          { bucket: 'screenshot', path: 'abc.png' },
+          undefined,
+        ),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('rejects an anonymous presign of cached-static with 401', async () => {
+      await expect(
+        controller.presignDownload(
+          { bucket: 'cached-static', path: 'a/b.js' },
+          undefined,
+        ),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('lets an authenticated user presign cached-static', async () => {
+      const result = await controller.presignDownload(
+        { bucket: 'cached-static', path: 'a/b.js' },
+        user,
+      );
+
+      expect(result).toEqual({
+        downloadUrl: 'https://storage.test/download?sig=1',
+        expiresIn: 600,
+      });
+    });
+
+    it('maps the default bucket to 404', async () => {
+      await expect(
+        controller.presignDownload(
+          { bucket: 'default', path: '2024/report.pdf' },
+          user,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unknown bucket with 400 before authorizing', async () => {
+      await expect(
+        controller.presignDownload({ bucket: 'nope', path: 'a/b.pdf' }, user),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('maps an unowned tenant key to 404 for an authenticated user', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue([]);
+
+      await expect(
+        controller.presignDownload(
+          { bucket: 'screenshot', path: 'missing.png' },
+          user,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(workspacesService.getMembershipWithPermissions).not.toHaveBeenCalled();
       expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
     });
   });
