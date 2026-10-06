@@ -288,4 +288,39 @@ describe('Storage read authorization (e2e)', () => {
       .set('Cookie', userC.cookie)
       .expect(403);
   });
+
+  describe('conditional GET (304)', () => {
+    it('returns an ETag and a private cache header on authenticated reads', async () => {
+      const res = await request(server)
+        .get(`/api/storage/cached-static/${staticKey}`)
+        .set('Cookie', userB.cookie)
+        .expect(200);
+      expect(res.headers['etag']).toBeTruthy();
+      expect(res.headers['cache-control']).toBe('private, no-cache');
+    });
+
+    it('returns 304 with an empty body on an ETag match', async () => {
+      const first = await request(server)
+        .get(`/api/storage/cached-static/${staticKey}`)
+        .set('Cookie', userB.cookie)
+        .expect(200);
+      const etag = first.headers['etag'];
+      expect(etag).toBeTruthy();
+      const res = await request(server)
+        .get(`/api/storage/cached-static/${staticKey}`)
+        .set('Cookie', userB.cookie)
+        .set('If-None-Match', etag)
+        .expect(304);
+      expect(res.text).toBe('');
+    });
+
+    it('returns 200 with bytes on a stale ETag', async () => {
+      const res = await request(server)
+        .get(`/api/storage/cached-static/${staticKey}`)
+        .set('Cookie', userB.cookie)
+        .set('If-None-Match', '"stale-etag-that-never-matches"')
+        .expect(200);
+      expect(res.text).toBe(textPayload);
+    });
+  });
 });
