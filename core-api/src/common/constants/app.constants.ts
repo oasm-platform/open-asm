@@ -36,6 +36,11 @@ export const BOT_ID = '019b3ae4-189e-7dfe-b10e-20d847717733';
 export const BOT_EMAIL = 'bot@oasm.local';
 export const BOT_NAME = 'Cai';
 export const STORAGE_BASE_PATH = '/api/storage';
+/**
+ * Client-facing base for direct object reads via nginx (`/files/<bucket>/<key>`).
+ * STORAGE_BASE_PATH stays the proxy route / internal callers.
+ */
+export const STORAGE_FILES_BASE_PATH = '/files';
 export const GITHUB_REPO = 'oasm-platform/open-asm';
 export const DEFAULT_ENCRYPTION_KEY = 'OASM_DEFAULT_ENCRYPTION_KEY';
 

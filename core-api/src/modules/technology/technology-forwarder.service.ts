@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { createHash } from 'crypto';
 import {
-  STORAGE_BASE_PATH,
+  STORAGE_FILES_BASE_PATH,
   WEBAPP_ANALYZER_SRC_URL,
 } from '../../common/constants/app.constants';
 import { RedisService } from '../../services/redis/redis.service';
@@ -575,7 +575,7 @@ export class TechnologyForwarderService implements OnModuleInit {
     // (CACHE_TTL) serves all workspaces and all viewers. The key never
     // includes the workspace id, so it cannot collide with the
     // workspace-scoped `technology:` cache.
-    const iconCacheKey = `icon:${iconName}`;
+    const iconCacheKey = `icon:v2:${iconName}`;
 
     // Redis is a cache, never a dependency: a read failure degrades to a
     // direct forward + upload (uncached), so icons keep working while Redis
@@ -601,7 +601,7 @@ export class TechnologyForwarderService implements OnModuleInit {
         buffer,
         this.ICONS_BUCKET,
       );
-      const iconPath = `${STORAGE_BASE_PATH}/${uploadResult.path}`;
+      const iconPath = `${STORAGE_FILES_BASE_PATH}/${uploadResult.path}`;
 
       // Miss: persist the resulting path so the remote fetch + upload happen
       // once per icon instead of on every graph poll. A failed write is

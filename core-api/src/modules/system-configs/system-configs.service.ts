@@ -1,6 +1,6 @@
 import {
   GITHUB_REPO,
-  STORAGE_BASE_PATH,
+  STORAGE_FILES_BASE_PATH,
 } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { ReleaseVersion } from '@/common/interfaces/app.interface';
@@ -48,7 +48,7 @@ export class SystemConfigsService implements OnModuleInit {
     return {
       name: config.name,
       logoPath: config.logoPath
-        ? `${STORAGE_BASE_PATH}/${config.logoPath}`
+        ? `${STORAGE_FILES_BASE_PATH}/${config.logoPath}`
         : null,
     };
   }

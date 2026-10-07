@@ -1,6 +1,6 @@
 import {
   ROLE_METADATA_KEY,
-  STORAGE_BASE_PATH,
+  STORAGE_FILES_BASE_PATH,
 } from '@/common/constants/app.constants';
 import { Role } from '@/common/enums/enum';
 import type { ConfigService } from '@nestjs/config';
@@ -721,7 +721,7 @@ describe('StorageController', () => {
     it('activates the logo and removes the previous one', async () => {
       systemConfigsService.getConfig.mockResolvedValue({
         name: 'OASM',
-        logoPath: `${STORAGE_BASE_PATH}/system/old-logo.png`,
+        logoPath: `${STORAGE_FILES_BASE_PATH}/system/old-logo.png`,
       });
 
       const result = await controller.confirmLogoUpload({ key });
@@ -740,7 +740,7 @@ describe('StorageController', () => {
     it('skips the delete when the previous logo is the object being confirmed', async () => {
       systemConfigsService.getConfig.mockResolvedValue({
         name: 'OASM',
-        logoPath: `${STORAGE_BASE_PATH}/system/${key}`,
+        logoPath: `${STORAGE_FILES_BASE_PATH}/system/${key}`,
       });
 
       await controller.confirmLogoUpload({ key });
@@ -763,7 +763,7 @@ describe('StorageController', () => {
     it('still confirms when the stale object cannot be deleted', async () => {
       systemConfigsService.getConfig.mockResolvedValue({
         name: 'OASM',
-        logoPath: `${STORAGE_BASE_PATH}/system/old-logo.png`,
+        logoPath: `${STORAGE_FILES_BASE_PATH}/system/old-logo.png`,
       });
       jest
         .spyOn(storageService, 'deleteFile')
@@ -780,7 +780,7 @@ describe('StorageController', () => {
     it('logs why a stale object could not be deleted', async () => {
       systemConfigsService.getConfig.mockResolvedValue({
         name: 'OASM',
-        logoPath: `${STORAGE_BASE_PATH}/system/old-logo.png`,
+        logoPath: `${STORAGE_FILES_BASE_PATH}/system/old-logo.png`,
       });
       jest
         .spyOn(storageService, 'deleteFile')

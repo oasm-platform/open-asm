@@ -57,7 +57,7 @@ describe('TechnologyForwarderService', () => {
       { name: 'Frontend', groups: [2], priority: 2 },
     ],
     categoryNames: ['JavaScript Framework', 'Frontend'],
-    iconUrl: '/api/storage/cached-static/react.svg',
+    iconUrl: '/files/cached-static/react.svg',
   };
 
   beforeEach(async () => {
@@ -223,7 +223,7 @@ describe('TechnologyForwarderService', () => {
 
       const result = await service.getIconUrl(iconName);
 
-      expect(result).toBe('/api/storage/cached-static/react.svg');
+      expect(result).toBe('/files/cached-static/react.svg');
       expect(mockStorageService.forwardImage).toHaveBeenCalled();
       expect(mockStorageService.uploadFile).toHaveBeenCalled();
     });
@@ -251,21 +251,21 @@ describe('TechnologyForwarderService', () => {
 
     it('getIconUrl returns cached path without calling storageService', async () => {
       const iconName = 'react.svg';
-      const cachedPath = '/api/storage/cached-static/react.svg';
+      const cachedPath = '/files/cached-static/react.svg';
 
       mockRedisClient.get.mockResolvedValue(cachedPath);
 
       const result = await service.getIconUrl(iconName);
 
       expect(result).toBe(cachedPath);
-      expect(mockRedisClient.get).toHaveBeenCalledWith(`icon:${iconName}`);
+      expect(mockRedisClient.get).toHaveBeenCalledWith(`icon:v2:${iconName}`);
       expect(mockStorageService.forwardImage).not.toHaveBeenCalled();
       expect(mockStorageService.uploadFile).not.toHaveBeenCalled();
     });
 
     it('getIconUrl caches the forwarded path on miss', async () => {
       const iconName = 'react.svg';
-      const forwardedPath = '/api/storage/cached-static/react.svg';
+      const forwardedPath = '/files/cached-static/react.svg';
 
       mockRedisClient.get.mockResolvedValue(null);
       mockStorageService.forwardImage.mockResolvedValue({
@@ -279,9 +279,9 @@ describe('TechnologyForwarderService', () => {
       const result = await service.getIconUrl(iconName);
 
       expect(result).toBe(forwardedPath);
-      expect(mockRedisClient.get).toHaveBeenCalledWith(`icon:${iconName}`);
+      expect(mockRedisClient.get).toHaveBeenCalledWith(`icon:v2:${iconName}`);
       expect(mockRedisClient.setex).toHaveBeenCalledWith(
-        `icon:${iconName}`,
+        `icon:v2:${iconName}`,
         2592000,
         forwardedPath,
       );
@@ -289,7 +289,7 @@ describe('TechnologyForwarderService', () => {
 
     it('getIconUrl still serves the icon when Redis is unavailable', async () => {
       const iconName = 'react.svg';
-      const forwardedPath = '/api/storage/cached-static/react.svg';
+      const forwardedPath = '/files/cached-static/react.svg';
 
       // Redis read fails — must degrade to forward+upload instead of
       // returning an empty icon (icons must not hard-depend on Redis).
@@ -311,7 +311,7 @@ describe('TechnologyForwarderService', () => {
 
     it('getIconUrl still serves the icon when the Redis write fails after upload', async () => {
       const iconName = 'react.svg';
-      const forwardedPath = '/api/storage/cached-static/react.svg';
+      const forwardedPath = '/files/cached-static/react.svg';
 
       mockRedisClient.get.mockResolvedValue(null);
       mockStorageService.forwardImage.mockResolvedValue({
@@ -339,7 +339,7 @@ describe('TechnologyForwarderService', () => {
       const result = await service.getIconUrl(iconName);
 
       expect(result).toBe('');
-      expect(mockRedisClient.get).toHaveBeenCalledWith(`icon:${iconName}`);
+      expect(mockRedisClient.get).toHaveBeenCalledWith(`icon:v2:${iconName}`);
       expect(mockRedisClient.setex).not.toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalled();
     });

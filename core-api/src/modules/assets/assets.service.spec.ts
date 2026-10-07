@@ -161,6 +161,72 @@ describe('AssetsService', () => {
   });
 
   describe('getManyAsssetServices', () => {
+    it('exposes screenshotPath under the /files base for direct reads', async () => {
+      const row = {
+        id: 'svc-1',
+        value: 'example.com',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        screenshotPath: 'screenshot/abc.png',
+        asset: { targetId: 't-1', dnsRecords: [], isEnabled: true },
+      };
+      (mockAssetServiceRepository as any).metadata = { columns: [] };
+      (mockAssetServiceRepository as any).orderBy = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).addOrderBy = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).skip = jest.fn().mockReturnThis();
+      (mockAssetServiceRepository as any).take = jest.fn().mockReturnThis();
+      (mockAssetServiceRepository as any).getManyAndCount = jest
+        .fn()
+        .mockResolvedValue([[row], 1]);
+
+      const result = await service.getManyAsssetServices(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'ASC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(result.data[0].screenshotPath).toBe(
+        '/files/screenshot/abc.png',
+      );
+    });
+
+    it('exposes a single-asset screenshotPath under the /files base', async () => {
+      const row = {
+        id: 'svc-1',
+        value: 'example.com',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        port: 443,
+        screenshotPath: 'screenshot/abc.png',
+        asset: { targetId: 't-1', dnsRecords: [], isEnabled: true },
+      };
+      (mockAssetServiceRepository as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue({
+          leftJoinAndSelect: jest.fn().mockReturnThis(),
+          leftJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOneOrFail: jest.fn().mockResolvedValue(row),
+        });
+      (mockDataSource as any).createQueryBuilder = jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      });
+
+      const result = await service.getAssetById('svc-1', 'workspace-uuid');
+
+      expect(result.screenshotPath).toBe('/files/screenshot/abc.png');
+    });
+
     beforeEach(() => {
       jest.clearAllMocks();
       (mockAssetServiceRepository as any).metadata = { columns: [] };

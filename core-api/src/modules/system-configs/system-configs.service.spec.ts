@@ -53,6 +53,35 @@ describe('SystemConfigsService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('getConfig', () => {
+    it('exposes the logo under the /files base for direct reads', async () => {
+      (mockSystemConfigRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        name: 'OASM',
+        logoPath: 'system/logo.png',
+      });
+
+      const result = await service.getConfig();
+
+      expect(result).toEqual({
+        name: 'OASM',
+        logoPath: '/files/system/logo.png',
+      });
+    });
+
+    it('returns null logoPath when no logo is configured', async () => {
+      (mockSystemConfigRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        name: 'OASM',
+        logoPath: null,
+      });
+
+      const result = await service.getConfig();
+
+      expect(result).toEqual({ name: 'OASM', logoPath: null });
+    });
+  });
+
   describe('removeLogo', () => {
     it('should remove logo and set logoPath to null', async () => {
       const mockConfig = {

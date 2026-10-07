@@ -1,4 +1,4 @@
-import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
+import { STORAGE_FILES_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import * as fs from 'fs';
@@ -349,7 +349,8 @@ export class AssetsService {
       asset.dnsRecords = item.asset?.dnsRecords;
       asset.isEnabled = item.asset?.isEnabled;
       asset.screenshotPath =
-        item.screenshotPath && `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
+        item.screenshotPath &&
+        `${STORAGE_FILES_BASE_PATH}/${item.screenshotPath}`;
       // asset.tags = item.asset.tags || [];
       asset.ipAddresses = item.asset?.ipAssets
         ? item.asset.ipAssets.map((e) => e.ipAddress)
@@ -489,7 +490,7 @@ export class AssetsService {
     asset.isEnabled = item.asset?.isEnabled;
     asset.port = item.port;
     asset.screenshotPath = item.screenshotPath
-      ? `${STORAGE_BASE_PATH}/${item.screenshotPath}`
+      ? `${STORAGE_FILES_BASE_PATH}/${item.screenshotPath}`
       : null;
 
     // Load tags separately - tags belong to AssetService, not Asset
