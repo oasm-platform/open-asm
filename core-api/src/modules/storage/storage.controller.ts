@@ -21,6 +21,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBody,
+  ApiExcludeEndpoint,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -229,6 +230,42 @@ export class StorageController {
     });
 
     return { downloadUrl: url, expiresIn };
+  }
+
+  // NOTE: declared before the ':bucket/:path' wildcard on purpose — see the
+  // route-order note above; otherwise this literal path is swallowed.
+  // Internal gate for the nginx `auth_request` in front of `/files/`: bucket/key
+  // come from nginx headers, and ONLY 200/401/403 may leave this handler
+  // (nginx turns anything else into 500).
+  @Optional()
+  @Get('authz')
+  @ApiExcludeEndpoint()
+  async authz(
+    @Headers('x-files-bucket') bucket: string | undefined,
+    @Headers('x-files-key') key: string | undefined,
+    @UserContext() user?: UserContextPayload,
+  ): Promise<void> {
+    if (!bucket || !key) {
+      throw new ForbiddenException('Access denied');
+    }
+    for (const value of [bucket, key]) {
+      for (const segment of value.split('/')) {
+        if (segment === '.' || segment === '..') {
+          throw new ForbiddenException('Access denied');
+        }
+      }
+    }
+
+    try {
+      await this.authorizeRead(bucket, key, user);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new ForbiddenException('Access denied');
+      }
+      throw error;
+    }
+
+    return undefined;
   }
 
   @Optional()

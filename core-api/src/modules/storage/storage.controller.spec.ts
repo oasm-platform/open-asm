@@ -466,6 +466,132 @@ describe('StorageController', () => {
     });
   });
 
+  describe('authz', () => {
+    const user = { id: 'user-1' } as UserContextPayload;
+
+    beforeEach(() => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue([]);
+    });
+
+    it('is optional-auth (not public)', () => {
+      expect(
+        Reflect.getMetadata(
+          OPTIONAL_METADATA_KEY,
+          StorageController.prototype.authz,
+        ),
+      ).toBe(true);
+      expect(
+        Reflect.getMetadata(
+          PUBLIC_METADATA_KEY,
+          StorageController.prototype.authz,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('returns an empty 200 for an owning-workspace member', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a']);
+      workspacesService.getMembershipWithPermissions.mockResolvedValue({
+        membership: {},
+        permissionKeys: [],
+      } as never);
+
+      await expect(
+        controller.authz('screenshot', 'abc.png', user),
+      ).resolves.toBeUndefined();
+    });
+
+    it('lets anonymous reads of the system bucket through', async () => {
+      await expect(
+        controller.authz('system', 'logo/a.png', undefined),
+      ).resolves.toBeUndefined();
+    });
+
+    it('lets an authenticated user read cached-static', async () => {
+      await expect(
+        controller.authz('cached-static', 'a/b.js', user),
+      ).resolves.toBeUndefined();
+    });
+
+    it('rejects anonymous reads of cached-static with 401', async () => {
+      await expect(
+        controller.authz('cached-static', 'a/b.js', undefined),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects anonymous reads of a tenant bucket with 401', async () => {
+      await expect(
+        controller.authz('screenshot', 'abc.png', undefined),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects a member of an unrelated workspace with 403', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue(['ws-a']);
+      workspacesService.getMembershipWithPermissions.mockRejectedValue(
+        new NotFoundException('Workspace member not found'),
+      );
+
+      await expect(
+        controller.authz('screenshot', 'abc.png', user),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('maps the blocked default bucket to 403, not 404', async () => {
+      const error = await controller
+        .authz('default', '2024/report.pdf', user)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect(error).not.toBeInstanceOf(NotFoundException);
+    });
+
+    it('maps an unknown bucket to 403, not 400 or 404', async () => {
+      const error = await controller
+        .authz('nope', 'a/b.pdf', user)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect(error).not.toBeInstanceOf(BadRequestException);
+      expect(error).not.toBeInstanceOf(NotFoundException);
+    });
+
+    it('maps an unknown screenshot key to 403', async () => {
+      jest
+        .spyOn(storageService, 'resolveObjectWorkspaceIds')
+        .mockResolvedValue([]);
+
+      await expect(
+        controller.authz('screenshot', 'missing.png', user),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it.each([
+      [undefined, 'abc.png'],
+      ['screenshot', undefined],
+      [undefined, undefined],
+      ['', 'abc.png'],
+      ['screenshot', ''],
+    ])('rejects the (%p, %p) headers with 403', async (bucket, key) => {
+      await expect(
+        controller.authz(bucket, key, user),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it.each(['..', '.', '../secret.png', 'a/../../b.png', 'a/./b.png'])(
+      'rejects the %p key with 403',
+      async (key) => {
+        await expect(
+          controller.authz('screenshot', key, user),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      },
+    );
+  });
+
   describe('presignLogoUpload', () => {
     beforeEach(() => {
       generateObjectKey.mockReturnValue('logo-abc.png');
@@ -1276,8 +1402,19 @@ describe('StorageController', () => {
         { name: 'confirmLogoUpload', route: 'POST /logo/confirm' },
         { name: 'presignUpload', route: 'POST /presign/upload' },
         { name: 'presignDownload', route: 'GET /presign/download' },
+        { name: 'authz', route: 'GET /authz' },
         { name: 'getFile', route: 'GET /:bucket/:path' },
       ]);
+    });
+
+    it('declares GET authz before the GET wildcard', () => {
+      const routes = declaredRoutes().map((entry) => entry.route);
+      const authzIndex = routes.indexOf('GET /authz');
+      const wildcardIndex = routes.indexOf('GET /:bucket/:path');
+
+      expect(authzIndex).toBeGreaterThanOrEqual(0);
+      expect(wildcardIndex).toBeGreaterThanOrEqual(0);
+      expect(authzIndex).toBeLessThan(wildcardIndex);
     });
 
     it('declares GET presign/download before the GET wildcard', () => {
