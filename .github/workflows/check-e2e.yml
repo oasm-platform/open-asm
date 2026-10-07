@@ -84,6 +84,17 @@ jobs:
         image: ghcr.io/l1ttps/geoip-proxy:latest
         ports:
           - 4360:4360
+      # The storage e2e suites prove presigned PUT/GET and read authorization
+      # against a REAL S3 backend, so RustFS must be up. Same image and default
+      # credentials as docker-compose's `rustfs` service; example.env already
+      # points RUSTFS_ENDPOINT/S3_PUBLIC_ENDPOINT at http://localhost:9000.
+      rustfs:
+        image: rustfs/rustfs:latest
+        env:
+          RUSTFS_ACCESS_KEY: rustfsadmin
+          RUSTFS_SECRET_KEY: rustfssecret
+        ports:
+          - 9000:9000
 
     defaults:
       run:
@@ -115,6 +126,17 @@ jobs:
       # down every spec. Individual values below override the placeholders.
       - name: Seed env from example
         run: cp example.env .env
+
+      - name: Wait for object storage port
+        run: |
+          for attempt in $(seq 1 30); do
+            if (echo > /dev/tcp/localhost/9000) >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "RustFS did not open :9000 within 30s" >&2
+          exit 1
 
       - name: Run e2e tests
         run: pnpm run test:e2e:ci
