@@ -9,6 +9,13 @@ services:
       - oasm
     env_file:
       - ./console/.env
+    environment:
+      # njs SigV4 signing creds (runtime only, never baked into the image).
+      # Interpolated from the compose --env-file (core-api/.env); safe defaults
+      # so empty env cannot produce empty creds.
+      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:-rustfssecret}
+      - S3_REGION=${S3_REGION:-us-east-1}
     ports:
       - '3000:80'
     restart: 'always'
@@ -227,8 +234,8 @@ services:
       - '9000:9000'
       - '9001:9001'
     environment:
-      - RUSTFS_ACCESS_KEY=rustfsadmin
-      - RUSTFS_SECRET_KEY=rustfssecret
+      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:-rustfssecret}
     volumes:
       - rustfs-data:/data:rw
     restart: 'always'

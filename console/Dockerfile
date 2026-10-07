@@ -32,6 +32,8 @@ RUN pnpm --filter console run build && \
 FROM nginx:stable-alpine
 
 COPY --from=builder /app/console/dist /usr/share/nginx/html
+COPY console/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY console/nginx/aws-sigv4.js console/nginx/s3auth.js /etc/nginx/njs/
 COPY console/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
