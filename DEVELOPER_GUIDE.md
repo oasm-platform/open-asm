@@ -559,6 +559,118 @@ superseded by this section.
 - **Deliberately absent:** presigned POST, CloudFront signing, multipart and
   resumable uploads. They do not exist.
 
+### Direct object reads through nginx (`/files/`)
+
+Self-hosted deployments stream object bytes without waking core-api. The browser
+asks the console origin for `/files/<bucket>/<key>`; nginx authorizes the
+request against core-api and then proxies the object straight from RustFS,
+signing each upstream read with njs SigV4. core-api carries no bytes on this
+path.
+
+```
+browser -> nginx (auth_request -> core /api/storage/authz) -> RustFS
+```
+
+1. nginx derives `<bucket>`/`<key>` from `$request_uri` with njs
+   (`console/nginx/s3auth.js`) and runs `auth_request` against an internal
+   location that proxies to `GET /api/storage/authz` (`console/nginx.conf:58`).
+   The handler (`storage.controller.ts:241`) runs the same `authorizeRead`
+   (`storage.controller.ts:354`) as the direct-read endpoint and may answer only
+   200, 401 or 403; nginx turns anything else into 500, so the handler maps a
+   missing object to 403. The session cookie is forwarded on the subrequest
+   (`Cookie $http_cookie`).
+2. On 200 the `^~ /files/` location (`console/nginx.conf:70`) proxies
+   `/files/<bucket>/<key>` to `http://rustfs:9000` with the `Authorization`,
+   `x-amz-date` and `x-amz-content-sha256` headers the wrapper produces. `^~`
+   makes this prefix win over the static-asset regex, so a stored `.webp` or
+   `.jpg` object is streamed from storage instead of being answered by the SPA.
+
+The bucket stays private. Every upstream read is signed, whatever its authz
+class, so RustFS needs no public bucket policy: an anonymous
+`curl http://localhost:9000/<bucket>/<key>` still returns 403.
+
+#### Deriving bucket and key
+
+`$files_bucket` and `$files_key` come from `$request_uri`, not `$uri`. An
+`auth_request` subrequest has its own `$uri` (`/_files_auth`), so `$uri` would
+yield garbage here and deny every read. One parse feeds the authz headers, the
+proxied path and the SigV4 canonical URI alike, so bucket and key cannot diverge
+between them.
+
+Each slash-separated segment must match `[0-9A-Za-z._-]+` (the full key charset
+is `[0-9A-Za-z._/-]`). Empty segments, `.`, `..` and a malformed percent-escape
+are rejected in njs, and the authz handler re-checks `.`/`..` as defence in
+depth. Current keys keep this invariant without a key change: screenshot keys
+are `md5(asset.value)` and template keys are `<templateId>.yaml`.
+
+#### Signing
+
+`console/nginx/s3auth.js` builds the SigV4 headers. It pins `Host rustfs:9000`
+for both signing and the proxied request, because the default upstream `Host`
+would be the block name (`object_storage`) and break the signature. It memoizes
+one timestamp per request so `x-amz-date` and `Authorization` cannot straddle a
+second boundary. The signing credentials are the RustFS access and secret keys
+injected into the console container by compose (`env RUSTFS_ACCESS_KEY;` in
+`console/nginx/nginx.conf`), never baked into the image. Without them `$s3auth`
+is empty and the location guard rejects the request rather than forwarding it
+unsigned.
+
+`proxy_pass_request_headers off` keeps the signature intact but also strips
+`If-None-Match`, `If-Modified-Since` and `Range`, so the `/files/` location
+re-adds them explicitly. Conditional GET then returns 304 and range requests
+return partial content straight from RustFS.
+
+#### Caching
+
+The location sends `Cache-Control` from a `map $files_bucket
+$files_cache_control` that lives in the main `console/nginx/nginx.conf` (`map`
+is http-context only). `system` is `public, max-age=1209600, no-transform` (14
+days, the same TTL as `CACHE_STATIC_RESOURCE`); every tenant bucket is `private,
+no-cache`. There is deliberately no `proxy_cache` on `/files/`: tenant objects
+must never land in a shared cache.
+
+#### Who can read what
+
+The direct buckets are `screenshot`, `cached-static` and `system`
+(`console/nginx.conf:74`). Any other bucket is refused at the location guard
+before the auth subrequest runs. `system` is public. `cached-static` is readable
+by any logged-in user, since it holds shared global assets with no
+per-workspace rule. `screenshot` stays tenant-scoped through `authorizeRead`
+(ownership by any workspace that scans the key). `reports` and `job-results`
+are never served this way, and `nuclei-templates` stays on the presigned flow.
+
+#### Cloud and IAM deployments
+
+The nginx path is self-hosted only. AWS S3, and any backend reached through a
+public endpoint, rejects an arbitrary `Host`, so a cloud deployment drops the
+proxy and keeps the existing direct/presigned flow. The signer also needs static
+credentials: with `S3_USE_DEFAULT_CREDENTIALS=true` (IAM roles, instance
+profiles) there is no secret for njs to sign with. In that case keep the direct
+endpoint plus bucket CORS and do not enable `/files/`.
+
+`GET /api/storage/authz` is also reachable through the existing `/api/` proxy
+(`console/nginx.conf:146`) and returns 200, 401 or 403 with an empty body. That
+makes it a read-only oracle for whether a bucket/key exists and whether a
+session may read it, exposing no object data. It is the same class of disclosure
+as the `/api/storage/:bucket/:path` proxy it sits beside, so it is accepted;
+gate it later if you want to remove it.
+
+#### Development
+
+`task console:dev` works because Vite proxies `/files` to core-api with a
+rewrite to `/api/storage` (`console/vite.config.ts:87`), which preserves the
+same authz semantics. Caveat: that rewrite targets `GET /api/storage/:bucket/:path`
+(`storage.controller.ts:272`), whose `:path` matches a single segment, so only
+single-segment keys resolve in dev. Nested keys 404 in dev only; production
+nginx has no such limit.
+
+#### Rollback
+
+Reverting the API-side base switch and the nginx `/files/` locations (plan todos
+2 and 4) restores the previous behaviour. Cached `/files/` URLs 404 until the
+console refetches the API-emitted base; the `/api/storage/:bucket/:path` proxy
+and the presigned flow remain, so nothing is lost.
+
 ## Using Docker Compose
 
 To run the entire stack using Docker Compose:
