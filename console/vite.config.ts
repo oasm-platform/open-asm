@@ -84,6 +84,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           logLevel: 'silent',
         },
+        '/files': {
+          target: env.VITE_API_URL,
+          changeOrigin: true,
+          logLevel: 'silent',
+          rewrite: (p) => p.replace(/^\/files/, '/api/storage'),
+        },
       },
     },
   };
