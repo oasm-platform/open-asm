@@ -1,4 +1,8 @@
 import { AUTH_IGNORE_ROUTERS } from '@/common/constants/app.constants';
+import {
+  DEFAULT_CORS_ALLOWED_ORIGINS,
+  parseAllowedOrigins,
+} from '@/common/config/allowed-origins';
 import { Role } from '@/common/enums/enum';
 import { databaseConnectionConfig } from '@/database/database-config';
 import { betterAuth } from 'better-auth';
@@ -19,7 +23,10 @@ export const auth: unknown = betterAuth({
       path: '/docs',
     }),
   ],
-  trustedOrigins: ['*'],
+  trustedOrigins: parseAllowedOrigins(
+    process.env.CORS_ALLOWED_ORIGINS,
+    DEFAULT_CORS_ALLOWED_ORIGINS,
+  ),
   advanced: {
     database: {
       generateId: () => randomUUID(),

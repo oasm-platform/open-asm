@@ -419,7 +419,10 @@ storage.
 
 `S3_REGION` and `S3_FORCE_PATH_STYLE` apply to **both** clients — they are read
 once in `parseStorageConfig` and handed to each. Only the endpoint differs. The
-internal client is still forbidden from using `S3_PUBLIC_ENDPOINT`.
+internal client is still forbidden from using `S3_PUBLIC_ENDPOINT`. Credentials
+for both clients are the canonical `S3_ACCESS_KEY`/`S3_SECRET_KEY` pair;
+`RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY` survive only as deprecated aliases
+(see Renamed env vars below).
 
 Read this before touching either one. SigV4 signs the `host` header and the
 request path. A URL signed against `localhost:9000` is rejected by a browser
@@ -479,7 +482,7 @@ No code change. Set in `core-api/.env`:
 | `S3_REGION` | The bucket's region. Signs **both** clients — the internal client is not pinned to `us-east-1`. |
 | `S3_FORCE_PATH_STYLE` | `false`. Applies to **both** clients. |
 | `S3_USE_DEFAULT_CREDENTIALS` | `true` for IAM roles / instance profiles; otherwise leave `false` and set `S3_ACCESS_KEY` + `S3_SECRET_KEY` |
-| `S3_CORS_ALLOWED_ORIGINS` | Comma-separated console origins |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated console origins. Single origin source: also drives API CORS and better-auth trusted origins (see Renamed env vars below) |
 
 `StorageService.onModuleInit` applies the CORS rule to every bucket on boot
 (`GET, PUT, POST, HEAD`, `AllowedHeaders: *`, exposes `ETag`), and skips it
@@ -493,6 +496,16 @@ Defaults, clamping and parsing for every variable above live in
 `core-api/src/modules/storage/storage.config.ts`. `S3_PRESIGN_TTL` defaults to
 900 s and is clamped to 60 s ... 604800 s. Treat that file as the source of
 truth, not this section.
+
+#### Renamed env vars
+
+| Canonical (set this) | Deprecated alias (still read, one release) | Removal |
+| --- | --- | --- |
+| `CORS_ALLOWED_ORIGINS` | `S3_CORS_ALLOWED_ORIGINS` | Alias removed in the next release after this consolidation; set the canonical name now |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` (pair only, never mixed) | Alias pair removed in the next release; the vendor names remain only where compose injects them into the RustFS container and the nginx signer |
+
+When both names are set, the canonical one wins and the alias logs a one-time
+deprecation warning.
 
 ### Direct-read authorization (`GET /api/storage/:bucket/:path`)
 

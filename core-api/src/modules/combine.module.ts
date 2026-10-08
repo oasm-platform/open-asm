@@ -31,6 +31,7 @@ import { ReportsModule } from './reports/reports.module';
   imports: [
     AuthModule.forRoot({
       disableExceptionFilter: true,
+      disableTrustedOriginsCors: true,
     }),
     TargetsModule,
     WorkspacesModule,
