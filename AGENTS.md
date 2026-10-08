@@ -135,7 +135,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 
 | File | Key vars |
 |---|---|
-| `core-api/.env` (from `example.env`) | `POSTGRES_*`, `REDIS_URL`, `PORT=6276`, `GRPC_PORT=16276`, `GEO_IP_URL`, `OASM_CLOUD_APIKEY`, `ENCRYPTION_KEYS` (comma-separated KEKs, **last = active**), `RUSTFS_ENDPOINT/ACCESS_KEY/SECRET_KEY`, `AUDIT_ARCHIVE_DIR` |
+| `core-api/.env` (from `example.env`) | `POSTGRES_*`, `REDIS_URL`, `PORT=6276`, `GRPC_PORT=16276`, `GEO_IP_URL`, `OASM_CLOUD_APIKEY`, `ENCRYPTION_KEYS` (comma-separated KEKs, **last = active**), `CORS_ALLOWED_ORIGINS`, `S3_ACCESS_KEY`/`S3_SECRET_KEY` (canonical; compose maps these into the vendor `RUSTFS_*` names), `RUSTFS_ENDPOINT`, `AUDIT_ARCHIVE_DIR` |
 | `console/.env` (from `example.env`) | `VITE_API_URL` (dev `http://localhost:6276`) |
 | `worker/.env` (from `.example.env`) | `WORKER_API_KEY`, `WORKER_MAX_CONCURRENCY`, `WORKER_GRPC_HOST/PORT`, plus `WORKER_MODE`, `WORKER_TOOL_PATH`, `WORKER_TOKEN_FILE`, `WORKER_CONNECTOR_ADDR`, `WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT`, `WORKER_NETWORK` |
 
@@ -204,6 +204,6 @@ Volumes worth knowing: `pgdata`, `redis-data`, `geoip-data`, `rustfs-data`, `wor
 8. **Lint autofixes.** `task api:lint` runs with `--fix`; re-read files after linting instead of assuming your version survived.
 9. **`ENCRYPTION_KEYS` is order-sensitive** — the last key is the only one that encrypts.
 10. **`task lint` is sequential by design** (two type-aware ESLint processes exhaust RAM). Never run `api:lint` and `console:lint` in parallel/background.
-11. **RustFS/S3 (`RUSTFS_*`) is not optional** — it backs storage, PDF reports, *and* the worker tool registry (`BuiltinToolRegistry` serves the tool archives). Compose only waits for `rustfs` to be *started*, not healthy, so a slow first boot can fail the first worker tool download.
+11. **S3-compatible storage (`S3_ACCESS_KEY`/`S3_SECRET_KEY`) is not optional** — it backs storage, PDF reports, *and* the worker tool registry (`BuiltinToolRegistry` serves the tool archives). Compose maps the canonical `S3_*` credentials into the vendor `RUSTFS_*` names the RustFS container and nginx signer consume. Compose only waits for `rustfs` to be *started*, not healthy, so a slow first boot can fail the first worker tool download.
 12. **The worker needs the Docker socket**; without the right group id the daemon returns "permission denied" and API-version negotiation silently falls back to 1.24.
 13. **CI is Node 22 / pnpm 10.33.2 / Go 1.26** — mismatched local versions produce failures that look like code bugs.

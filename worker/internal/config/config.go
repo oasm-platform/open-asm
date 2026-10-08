@@ -7,26 +7,17 @@ import (
 	"github.com/spf13/viper"
 )
 
-type TLSConfig struct {
-	Enabled    bool   `mapstructure:"tls_enabled"`
-	CAFile     string `mapstructure:"tls_ca_file"`
-	CertFile   string `mapstructure:"tls_cert_file"`
-	KeyFile    string `mapstructure:"tls_key_file"`
-	ServerName string `mapstructure:"tls_server_name"`
-}
-
 type Config struct {
 	ApiKey string `mapstructure:"api_key"`
 	// MaxConcurrency is the max number of concurrent jobs. 0 (default) = auto:
 	// ResolveMaxConcurrency sizes it from the CPU/RAM available to the worker.
 	// A positive value is an explicit operator override.
-	MaxConcurrency int       `mapstructure:"max_concurrency"`
-	GrpcHost       string    `mapstructure:"grpc_host"`
-	GrpcPort       int       `mapstructure:"grpc_port"`
-	ToolPath       string    `mapstructure:"tool_path"`
-	Network        string    `mapstructure:"network"`
-	WorkspaceRoot  string    `mapstructure:"workspace_root"`
-	TLS            TLSConfig `mapstructure:",squash"`
+	MaxConcurrency int    `mapstructure:"max_concurrency"`
+	GrpcHost       string `mapstructure:"grpc_host"`
+	GrpcPort       int    `mapstructure:"grpc_port"`
+	ToolPath       string `mapstructure:"tool_path"`
+	Network        string `mapstructure:"network"`
+	WorkspaceRoot  string `mapstructure:"workspace_root"`
 
 	// Connector server — Docker containers connect back to the worker via this gRPC endpoint.
 	ConnectorPort                int    `mapstructure:"connector_port"`                  // gRPC port for connectors, default 26276

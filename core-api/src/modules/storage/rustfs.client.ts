@@ -73,14 +73,8 @@ export class RustFsClient {
               secretAccessKey: storageConfig.secretKey,
             }
           : {
-              accessKeyId: this.configService.get<string>(
-                'RUSTFS_ACCESS_KEY',
-                'rustfsadmin',
-              ),
-              secretAccessKey: this.configService.get<string>(
-                'RUSTFS_SECRET_KEY',
-                'rustfssecret',
-              ),
+              accessKeyId: 'rustfsadmin',
+              secretAccessKey: 'rustfssecret',
             };
     }
 

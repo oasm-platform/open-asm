@@ -697,6 +697,68 @@ describe('RustFsClient credentials', () => {
     }
   });
 
+  it('should use RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY when only the legacy pair is set', () => {
+    buildRustFsClient({
+      RUSTFS_ACCESS_KEY: 'rk',
+      RUSTFS_SECRET_KEY: 'rs',
+    });
+
+    expect(mockS3ClientConfigs).toHaveLength(2);
+    for (const config of mockS3ClientConfigs) {
+      expect(config.credentials).toEqual({
+        accessKeyId: 'rk',
+        secretAccessKey: 'rs',
+      });
+    }
+  });
+
+  it('should prefer S3_* over RUSTFS_* when both pairs are set', () => {
+    buildRustFsClient({
+      S3_ACCESS_KEY: 'ak',
+      S3_SECRET_KEY: 'sk',
+      RUSTFS_ACCESS_KEY: 'rk',
+      RUSTFS_SECRET_KEY: 'rs',
+    });
+
+    expect(mockS3ClientConfigs).toHaveLength(2);
+    for (const config of mockS3ClientConfigs) {
+      expect(config.credentials).toEqual({
+        accessKeyId: 'ak',
+        secretAccessKey: 'sk',
+      });
+    }
+  });
+
+  it('should fall through a half-set S3 pair to the full RUSTFS pair without mixing', () => {
+    buildRustFsClient({
+      S3_ACCESS_KEY: 'ak',
+      RUSTFS_ACCESS_KEY: 'rk',
+      RUSTFS_SECRET_KEY: 'rs',
+    });
+
+    expect(mockS3ClientConfigs).toHaveLength(2);
+    for (const config of mockS3ClientConfigs) {
+      expect(config.credentials).toEqual({
+        accessKeyId: 'rk',
+        secretAccessKey: 'rs',
+      });
+    }
+  });
+
+  it('should fall back to defaults when neither pair is fully set', () => {
+    buildRustFsClient({
+      S3_ACCESS_KEY: 'ak',
+    });
+
+    expect(mockS3ClientConfigs).toHaveLength(2);
+    for (const config of mockS3ClientConfigs) {
+      expect(config.credentials).toEqual({
+        accessKeyId: 'rustfsadmin',
+        secretAccessKey: 'rustfssecret',
+      });
+    }
+  });
+
   it('should point the presign client at the public endpoint', () => {
     buildRustFsClient({
       RUSTFS_ENDPOINT: 'http://internal:9000',

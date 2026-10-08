@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
+import { parseAllowedOrigins } from '@/common/config/allowed-origins';
 
 /**
  * Minimal shape of `ConfigService` the helper depends on. Accepting a callback
@@ -82,10 +83,43 @@ function parsePresignTtl(source: StorageConfigSource): number {
 }
 
 function parseCorsOrigins(source: StorageConfigSource): string[] {
-  return (source.get<string>('S3_CORS_ALLOWED_ORIGINS') ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter((origin) => origin.length > 0);
+  const canonical = source.get<string>('CORS_ALLOWED_ORIGINS');
+  const legacy = source.get<string>('S3_CORS_ALLOWED_ORIGINS');
+  const parsed = parseAllowedOrigins(
+    canonical ?? undefined,
+    parseAllowedOrigins(legacy ?? undefined, []),
+  );
+  if (!canonical?.trim() && legacy?.trim()) {
+    logger.warn(
+      'S3_CORS_ALLOWED_ORIGINS is deprecated, use CORS_ALLOWED_ORIGINS',
+    );
+  }
+  return parsed;
+}
+
+/**
+ * Resolves credentials as an atomic pair: full S3 pair wins silently, else a
+ * full legacy RUSTFS pair wins with one deprecation warning, else empty.
+ * Half-set pairs fall through — never mixed.
+ */
+function parseCredentials(source: StorageConfigSource): {
+  accessKey: string;
+  secretKey: string;
+} {
+  const s3AccessKey = readString(source, 'S3_ACCESS_KEY');
+  const s3SecretKey = readString(source, 'S3_SECRET_KEY');
+  if (s3AccessKey && s3SecretKey) {
+    return { accessKey: s3AccessKey, secretKey: s3SecretKey };
+  }
+  const rustfsAccessKey = readString(source, 'RUSTFS_ACCESS_KEY');
+  const rustfsSecretKey = readString(source, 'RUSTFS_SECRET_KEY');
+  if (rustfsAccessKey && rustfsSecretKey) {
+    logger.warn(
+      'RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY are deprecated, use S3_ACCESS_KEY/S3_SECRET_KEY',
+    );
+    return { accessKey: rustfsAccessKey, secretKey: rustfsSecretKey };
+  }
+  return { accessKey: '', secretKey: '' };
 }
 
 /**
@@ -96,6 +130,7 @@ function parseCorsOrigins(source: StorageConfigSource): string[] {
 export function parseStorageConfig(
   source: ConfigService | StorageConfigSource,
 ): StorageConfig {
+  const { accessKey, secretKey } = parseCredentials(source);
   return {
     publicEndpoint:
       readString(source, 'S3_PUBLIC_ENDPOINT') ||
@@ -109,8 +144,8 @@ export function parseStorageConfig(
     ),
     presignTtlSeconds: parsePresignTtl(source),
     corsAllowedOrigins: parseCorsOrigins(source),
-    accessKey: readString(source, 'S3_ACCESS_KEY'),
-    secretKey: readString(source, 'S3_SECRET_KEY'),
+    accessKey,
+    secretKey,
     useDefaultCredentials: parseBoolean(
       source,
       'S3_USE_DEFAULT_CREDENTIALS',

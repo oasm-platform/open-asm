@@ -12,9 +12,10 @@ services:
     environment:
       # njs SigV4 signing creds (runtime only, never baked into the image).
       # Interpolated from the compose --env-file (core-api/.env); safe defaults
-      # so empty env cannot produce empty creds.
-      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-rustfsadmin}
-      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:-rustfssecret}
+      # so empty env cannot produce empty creds. Canonical S3_* wins, legacy
+      # RUSTFS_* kept as a one-release deprecated alias.
+      - RUSTFS_ACCESS_KEY=${S3_ACCESS_KEY:-${RUSTFS_ACCESS_KEY:-rustfsadmin}}
+      - RUSTFS_SECRET_KEY=${S3_SECRET_KEY:-${RUSTFS_SECRET_KEY:-rustfssecret}}
       - S3_REGION=${S3_REGION:-us-east-1}
     ports:
       - '3000:80'
@@ -63,8 +64,9 @@ services:
       # signs the path too, so a rewrite yields SignatureDoesNotMatch.
       - S3_PUBLIC_ENDPOINT=http://localhost:3000
       # Origins allowed to PUT/GET with the presigned headers: the compose
-      # console origin plus the vite dev server on :5173.
-      - S3_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      # console origin plus the vite dev server on :5173. Canonical CORS list;
+      # the API reads CORS_ALLOWED_ORIGINS (S3_CORS_* alias is deprecated).
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
     restart: 'always'
     logging:
       driver: json-file
@@ -234,8 +236,10 @@ services:
       - '9000:9000'
       - '9001:9001'
     environment:
-      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-rustfsadmin}
-      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:-rustfssecret}
+      # Canonical S3_* wins, legacy RUSTFS_* kept as a one-release
+      # deprecated alias; safe defaults so empty env cannot produce empty creds.
+      - RUSTFS_ACCESS_KEY=${S3_ACCESS_KEY:-${RUSTFS_ACCESS_KEY:-rustfsadmin}}
+      - RUSTFS_SECRET_KEY=${S3_SECRET_KEY:-${RUSTFS_SECRET_KEY:-rustfssecret}}
     volumes:
       - rustfs-data:/data:rw
     restart: 'always'
