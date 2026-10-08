@@ -20,6 +20,7 @@ import {
   useSystemConfigsControllerUpdateConfig,
 } from '@/services/apis/gen/queries';
 import { uploadToPresignedUrl } from '@/services/storage';
+import { resolveClientUrl } from '@/utils/storage-url';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
@@ -108,10 +109,10 @@ export default function BrandNameAndLogoSettings() {
       }
 
       // Set initial logo preview if logo exists
-      // logoPath is a string like "/api/storage/system/logo.png" or null
+      // logoPath is an absolute public/presigned URL; legacy relative
+      // "/..." values still get the app origin prepended.
       if (config.logoPath && typeof config.logoPath === 'string') {
-        const fullUrl = `${window.location.origin}${config.logoPath}`;
-        setLogoPreview(fullUrl);
+        setLogoPreview(resolveClientUrl(config.logoPath));
       } else if (config.logoPath === null) {
         // If logoPath is null, no logo exists
         setLogoPreview(null);

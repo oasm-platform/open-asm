@@ -1,5 +1,4 @@
-import { CACHE_STATIC_RESOURCE } from '@/common/constants/app.constants';
-import { Optional, Roles, UserContext } from '@/common/decorators/app.decorator';
+import { Roles, UserContext } from '@/common/decorators/app.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Role } from '@/common/enums/enum';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
@@ -9,20 +8,15 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  Headers,
   Logger,
   NotFoundException,
-  Param,
   Post,
   Query,
-  Res,
-  StreamableFile,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiBody,
   ApiOperation,
-  ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
@@ -134,10 +128,11 @@ export class StorageController {
     }
 
     const path = `${bucket}/${key}`;
-    const previous = await this.systemConfigsService.getConfig();
+    const previousLogoPath =
+      await this.systemConfigsService.getRawLogoPath();
     await this.systemConfigsService.updateConfig({ logoPath: path });
 
-    const previousSegments = previous.logoPath?.split('/') ?? [];
+    const previousSegments = previousLogoPath?.split('/') ?? [];
     const previousKey = previousSegments.at(-1);
     const previousBucket = previousSegments.at(-2) ?? bucket;
     if (previousKey && previousKey !== key) {
@@ -193,8 +188,6 @@ export class StorageController {
     };
   }
 
-  // NOTE: declared before the ':bucket/:path*' wildcards on purpose — Nest/Express
-  // matches routes in declaration order, otherwise this literal path is swallowed.
   @Get('presign/download')
   @ApiOperation({
     summary: 'Create a presigned URL for direct-from-storage download',
@@ -231,85 +224,8 @@ export class StorageController {
     return { downloadUrl: url, expiresIn };
   }
 
-  @Optional()
-  @Get(':bucket/:path')
-  @ApiOperation({ summary: 'Get a file from storage' })
-  @ApiParam({ name: 'bucket', type: String, required: true })
-  @ApiParam({ name: 'path', type: String, required: true })
-  @ApiResponse({
-    status: 200,
-    description: 'File retrieved successfully',
-    content: {
-      'application/octet-stream': {
-        schema: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'File not found',
-  })
-  async getFile(
-    @Param('bucket') bucket: string,
-    @Param('path') path: string,
-    @Res({ passthrough: true })
-    res: {
-      set: (headers: Record<string, string>) => void;
-      status: (code: number) => void;
-    },
-    @UserContext() user?: UserContextPayload,
-    @Headers('if-none-match') ifNoneMatch?: string,
-    @Headers('if-modified-since') ifModifiedSince?: string,
-  ): Promise<StreamableFile | undefined> {
-    if (!path) {
-      throw new NotFoundException('File path is required');
-    }
-
-    const cleanPath = path.replace(/^\/+/, '');
-    await this.authorizeRead(bucket, cleanPath, user);
-    const {
-      file,
-      etag,
-      lastModified,
-    } = await this.storageService.getFile(cleanPath, bucket);
-
-    const headers: Record<string, string> = {};
-    if (etag) {
-      headers['ETag'] = etag;
-    }
-    if (lastModified) {
-      headers['Last-Modified'] = lastModified.toUTCString();
-    }
-    headers['Cache-Control'] =
-      this.storageService.getBucketAccess(bucket) === 'public'
-        ? `public, max-age=${CACHE_STATIC_RESOURCE}, no-transform`
-        : 'private, no-cache';
-
-    const extension = cleanPath.split('.').pop()?.toLowerCase();
-    if (extension) {
-      const mimeType = this.getMimeType(extension);
-      if (mimeType) {
-        headers['Content-Type'] = mimeType;
-      }
-    }
-    res.set(headers);
-
-    if (this.isNotModified(etag, lastModified, ifNoneMatch, ifModifiedSince)) {
-      // The GetObjectCommand body stream is already open — destroy it so no
-      // socket is held while Nest sends the empty 304.
-      file.getStream().destroy();
-      res.status(304);
-      return undefined;
-    }
-
-    return file;
-  }
-
   /**
-   * Shared read authorization for `getFile` and `presignDownload`.
+   * Shared read authorization for `presignDownload`.
    * Bucket classes come from `StorageService.getBucketAccess`; tenant objects
    * authorize membership of ANY owning workspace because screenshot keys can
    * collide across workspaces.
@@ -357,35 +273,6 @@ export class StorageController {
         throw new ForbiddenException('Access denied');
       }
     }
-  }
-
-  private isNotModified(
-    etag: string | null,
-    lastModified: Date | null,
-    ifNoneMatch: string | undefined,
-    ifModifiedSince: string | undefined,
-  ): boolean {
-    if (ifNoneMatch !== undefined) {
-      if (!etag) {
-        return false;
-      }
-      const candidates = ifNoneMatch.split(',').map((tag) => {
-        const trimmed = tag.trim().replace(/^W\//, '');
-        return trimmed.replace(/^"|"$/g, '');
-      });
-      const current = etag
-        .trim()
-        .replace(/^W\//, '')
-        .replace(/^"|"$/g, '');
-      return candidates.some(
-        (candidate) => candidate === '*' || candidate === current,
-      );
-    }
-    if (ifModifiedSince === undefined || !lastModified) {
-      return false;
-    }
-    const since = Date.parse(ifModifiedSince);
-    return !Number.isNaN(since) && lastModified.getTime() <= since;
   }
 
   /**

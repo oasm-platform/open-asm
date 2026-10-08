@@ -33,7 +33,7 @@ export class PresignUploadResponseDto {
   @ApiProperty({ example: 'application/pdf' })
   contentType: string;
 
-  @ApiProperty({ example: 900, description: 'Lifetime of the presigned URL in seconds' })
+  @ApiProperty({ example: 172800, description: 'Lifetime of the presigned URL in seconds' })
   expiresIn: number;
 }
 
@@ -64,7 +64,7 @@ export class LogoPresignResponseDto {
   @ApiProperty({ example: 'system/logo-1a2b3c.png' })
   path: string;
 
-  @ApiProperty({ example: 900, description: 'Lifetime of the presigned URL in seconds' })
+  @ApiProperty({ example: 172800, description: 'Lifetime of the presigned URL in seconds' })
   expiresIn: number;
 }
 
@@ -100,6 +100,6 @@ export class PresignDownloadResponseDto {
   @ApiProperty({ example: 'https://rustfs.internal/default/2024/report.pdf?X-Amz-Signature=...' })
   downloadUrl: string;
 
-  @ApiProperty({ example: 900, description: 'Lifetime of the presigned URL in seconds' })
+  @ApiProperty({ example: 172800, description: 'Lifetime of the presigned URL in seconds' })
   expiresIn: number;
 }

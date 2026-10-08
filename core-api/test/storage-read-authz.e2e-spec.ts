@@ -11,25 +11,31 @@ import {
 } from './helpers/workspace';
 
 /**
- * Storage read authorization, proven against real Postgres + real RustFS.
+ * Storage presign + public-read matrix, proven against real Postgres + real RustFS.
  *
- * Both read paths share one helper (`authorizeRead`): `GET
- * /api/storage/:bucket/:path` and `GET /api/storage/presign/download`.
- * Bucket classes: `system` is anonymous, `cached-static` needs a session,
- * `screenshot`/`nuclei-templates` need a session AND membership of ANY
- * workspace that owns the object (screenshot keys are `md5(asset.value)` and
- * can collide across workspaces), `default` 404s, `reports` stays 403.
+ * The byte-streaming read route (`GET /api/storage/:bucket/:path`) is gone, so
+ * every read flows through `GET /api/storage/presign/download` (`authorizeRead`)
+ * or an unsigned direct-to-storage fetch of a helper-emitted plain URL.
+ *
+ * Bucket classes (`StorageService.getBucketAccess`): `system` is public,
+ * `cached-static` needs a session, `screenshot`/`nuclei-templates` need a
+ * session AND membership of ANY workspace that owns the object (screenshot keys
+ * are `md5(asset.value)` and can collide across workspaces), `reports`/
+ * `job-results` are private (403), `default` is blocked (404).
  *
  * Proofs:
- *  1. `GET` matrix: anon `system`→200; anon `screenshot`→401; owner→200;
- *     foreign-workspace member→403; authed unknown screenshot→404;
- *     `default`→404; `reports`→403; anon `cached-static`→401, authed→200.
- *  2. Presign matrix (the bypass that kept AE-02 open): anon→401; owner
- *     presigns own template/screenshot→200; foreign member presigns→403.
- *  3. Collision: the same `screenshotPath` seeded in workspace A and B is
- *     readable by members of BOTH, but 403 for a third workspace.
+ *  1. Presign AE-02 matrix: public/authed-tenant/private/blocked classes incl.
+ *     foreign-workspace screenshot -> 403; fetched presigned URLs return the
+ *     object bytes with an `image/*` `Content-Type` (never bare statuses).
+ *  2. Anonymous public-read over unsigned direct-to-storage fetches: public
+ *     object 200 image with correct `Content-Type` (body is the object, not
+ *     HTML); tenant 403 anonymous; blocked 403 anonymous; anonymous PUT/DELETE
+ *     403 (Get-only policy) with no object created.
+ *  3. Flag-off fallback: with `publicReadApplied` cleared, the helper emits a
+ *     presigned URL that still loads (200 + bytes).
+ *  4. The removed byte route stays gone (404).
  */
-describe('Storage read authorization (e2e)', () => {
+describe('Storage presign + public-read matrix (e2e)', () => {
   jest.setTimeout(60_000);
 
   let app: TestApp;
@@ -50,10 +56,12 @@ describe('Storage read authorization (e2e)', () => {
   let templateId = '';
   /** `system` object key, readable without a session. */
   let logoKey = '';
-  /** `cached-static` object key, session-only. */
+  /** `cached-static` object key, session-only on the presign route. */
   let staticKey = '';
   /** `screenshot/<key>` owned by BOTH workspace A and B (the collision). */
   let collisionKey = '';
+  /** Storage origin unsigned fetches go to (RUSTFS_ENDPOINT in e2e). */
+  let storageOrigin = '';
   /** Objects written to RustFS, deleted in `afterAll`. */
   const uploaded: Array<{ key: string; bucket: string }> = [];
 
@@ -83,6 +91,23 @@ describe('Storage read authorization (e2e)', () => {
       `INSERT INTO asset_services (id, value, port, "assetId", "screenshotPath") VALUES ($1, $2, $3, $4, $5)`,
       [randomUUID(), hostname, 443, assetId, screenshotPath],
     );
+  }
+
+  /** Presigns over the API and fetches the issued URL like a browser would. */
+  async function fetchPresigned(
+    bucket: string,
+    path: string,
+    cookie?: string,
+  ): Promise<Response> {
+    const req = request(server)
+      .get('/api/storage/presign/download')
+      .query({ bucket, path });
+    if (cookie) req.set('Cookie', cookie);
+    const res = await req.expect(200);
+    const body = res.body as { downloadUrl: string; expiresIn: number };
+    expect(body.expiresIn).toBeGreaterThan(0);
+    expect(body.downloadUrl).toContain('X-Amz-Signature');
+    return fetch(body.downloadUrl);
   }
 
   beforeAll(async () => {
@@ -154,6 +179,22 @@ describe('Storage read authorization (e2e)', () => {
     );
     await storage.uploadFile(collisionKey, png, 'screenshot');
     uploaded.push({ key: collisionKey, bucket: 'screenshot' });
+
+    // Boot-time verification (`GetBucketPolicyStatus`) is unimplemented on
+    // RustFS, so `publicReadApplied` stays empty in-boot even though the
+    // `PutBucketPolicy` applied and anonymous reads work (proved by the
+    // unsigned fetches below). Mark both public buckets verified-applied so
+    // the helper emits plain URLs; the flag-off test clears them again.
+    const internals = storage as unknown as {
+      publicReadApplied: Set<string>;
+    };
+    internals.publicReadApplied.add('system');
+    internals.publicReadApplied.add('cached-static');
+
+    // Plain helper URL for the public bucket; its origin is the unsigned target.
+    const plain = await storage.getClientUrlForPath(`system/${logoKey}`);
+    expect(plain.expiresIn).toBeNull();
+    storageOrigin = new URL(plain.url).origin;
   });
 
   afterAll(async () => {
@@ -167,160 +208,206 @@ describe('Storage read authorization (e2e)', () => {
     await closeTestApp(app.app);
   });
 
-  it('lets anonymous reads of the system bucket through (login logo)', async () => {
+  describe('presign AE-02 bucket matrix', () => {
+    it('presigns the public system object and the URL loads the png bytes', async () => {
+      const fetched = await fetchPresigned('system', logoKey, userA.cookie);
+      expect(fetched.status).toBe(200);
+      expect(fetched.headers.get('content-type')).toMatch(/image\/png/);
+      expect(Buffer.from(await fetched.arrayBuffer()).equals(png)).toBe(true);
+    });
+
+    it('rejects anonymous presigns of the public bucket with 401', async () => {
+      await request(server)
+        .get('/api/storage/presign/download')
+        .query({ bucket: 'system', path: logoKey })
+        .expect(401);
+    });
+
+    it('presigns cached-static for any authenticated user and the URL loads the text', async () => {
+      const fetched = await fetchPresigned('cached-static', staticKey, userB.cookie);
+      expect(fetched.status).toBe(200);
+      expect(fetched.headers.get('content-type')).toMatch(/text\/plain/);
+      expect(await fetched.text()).toBe(textPayload);
+    });
+
+    it('rejects anonymous presigns of cached-static with 401', async () => {
+      await request(server)
+        .get('/api/storage/presign/download')
+        .query({ bucket: 'cached-static', path: staticKey })
+        .expect(401);
+    });
+
+    it('lets the owner presign their own screenshot with an image Content-Type', async () => {
+      const fetched = await fetchPresigned('screenshot', ownedKey, userA.cookie);
+      expect(fetched.status).toBe(200);
+      expect(fetched.headers.get('content-type')).toMatch(/image\/png/);
+      expect(Buffer.from(await fetched.arrayBuffer()).equals(png)).toBe(true);
+    });
+
+    it('rejects a foreign-workspace presign of the screenshot with 403', async () => {
+      await request(server)
+        .get('/api/storage/presign/download')
+        .query({ bucket: 'screenshot', path: ownedKey })
+        .set('Cookie', userB.cookie)
+        .expect(403);
+    });
+
+    it('rejects anonymous presigns of the screenshot with 401', async () => {
+      await request(server)
+        .get('/api/storage/presign/download')
+        .query({ bucket: 'screenshot', path: ownedKey })
+        .expect(401);
+    });
+
+    it('returns 404 for an authenticated presign of an unowned screenshot key', async () => {
+      const unknown = `${createHash('md5').update(`e2e-read-authz-missing-${Date.now()}`).digest('hex')}.png`;
+      await request(server)
+        .get('/api/storage/presign/download')
+        .query({ bucket: 'screenshot', path: unknown })
+        .set('Cookie', userA.cookie)
+        .expect(404);
+    });
+
+    it('lets the owner presign their own template with the yaml bytes', async () => {
+      const fetched = await fetchPresigned(
+        'nuclei-templates',
+        `${templateId}.yaml`,
+        userA.cookie,
+      );
+      expect(fetched.status).toBe(200);
+      expect(await fetched.text()).toBe(yamlPayload);
+    });
+
+    it('rejects a foreign-workspace presign of the template with 403', async () => {
+      await request(server)
+        .get('/api/storage/presign/download')
+        .query({ bucket: 'nuclei-templates', path: `${templateId}.yaml` })
+        .set('Cookie', userB.cookie)
+        .expect(403);
+    });
+
+    it('lets both colliding workspaces presign the shared screenshot', async () => {
+      for (const cookie of [userA.cookie, userB.cookie]) {
+        const fetched = await fetchPresigned('screenshot', collisionKey, cookie);
+        expect(fetched.status).toBe(200);
+        expect(fetched.headers.get('content-type')).toMatch(/image\/png/);
+        expect(Buffer.from(await fetched.arrayBuffer()).equals(png)).toBe(true);
+      }
+    });
+
+    it('rejects the collided screenshot presign for a third workspace with 403', async () => {
+      await request(server)
+        .get('/api/storage/presign/download')
+        .query({ bucket: 'screenshot', path: collisionKey })
+        .set('Cookie', userC.cookie)
+        .expect(403);
+    });
+
+    it('returns 404 for the blocked default bucket', async () => {
+      await request(server)
+        .get('/api/storage/presign/download')
+        .query({ bucket: 'default', path: 'anything.txt' })
+        .set('Cookie', userA.cookie)
+        .expect(404);
+    });
+
+    it.each(['reports', 'job-results'])(
+      'rejects the private %s bucket with 403',
+      async (bucket) => {
+        await request(server)
+          .get('/api/storage/presign/download')
+          .query({ bucket, path: 'anything.pdf' })
+          .set('Cookie', userA.cookie)
+          .expect(403);
+      },
+    );
+  });
+
+  describe('anonymous public-read (unsigned, direct to storage)', () => {
+    it('serves the public system object as an image, not HTML', async () => {
+      const plain = await storage.getClientUrlForPath(`system/${logoKey}`);
+      expect(plain.expiresIn).toBeNull();
+      expect(plain.url).not.toContain('X-Amz-Signature');
+
+      const fetched = await fetch(plain.url);
+      expect(fetched.status).toBe(200);
+      const contentType = fetched.headers.get('content-type') ?? '';
+      expect(contentType).toMatch(/image\/png/);
+      expect(contentType).not.toMatch(/text\/html/);
+      expect(Buffer.from(await fetched.arrayBuffer()).equals(png)).toBe(true);
+    });
+
+    it('serves the public cached-static object with its stored Content-Type', async () => {
+      const plain = await storage.getClientUrlForPath(`cached-static/${staticKey}`);
+      expect(plain.expiresIn).toBeNull();
+
+      const fetched = await fetch(plain.url);
+      expect(fetched.status).toBe(200);
+      expect(fetched.headers.get('content-type')).toMatch(/text\/plain/);
+      expect(await fetched.text()).toBe(textPayload);
+    });
+
+    it('denies anonymous reads of the tenant screenshot bucket with 403', async () => {
+      const fetched = await fetch(`${storageOrigin}/screenshot/${ownedKey}`);
+      expect(fetched.status).toBe(403);
+    });
+
+    it('denies anonymous reads of the blocked default bucket with 403', async () => {
+      const fetched = await fetch(`${storageOrigin}/default/anything.txt`);
+      expect(fetched.status).toBe(403);
+    });
+
+    it('denies anonymous PUT with 403 and stores nothing', async () => {
+      const probeKey = `e2e-anon-put-${Date.now()}.png`;
+      const put = await fetch(`${storageOrigin}/system/${probeKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/png' },
+        body: png,
+      });
+      expect(put.status).toBe(403);
+
+      // A denied write must leave no object behind: a missing public key 404s.
+      const missing = await fetch(`${storageOrigin}/system/${probeKey}`);
+      expect(missing.status).toBe(404);
+    });
+
+    it('denies anonymous DELETE with 403', async () => {
+      const deleted = await fetch(`${storageOrigin}/system/${logoKey}`, {
+        method: 'DELETE',
+      });
+      expect(deleted.status).toBe(403);
+    });
+  });
+
+  describe('flag-off fallback', () => {
+    it('emits a presigned URL that still loads when public-read is not applied', async () => {
+      const fallbackInternals = storage as unknown as {
+        publicReadApplied: Set<string>;
+      };
+      const hadSystem = fallbackInternals.publicReadApplied.has('system');
+      const hadStatic = fallbackInternals.publicReadApplied.has('cached-static');
+      fallbackInternals.publicReadApplied.delete('system');
+      fallbackInternals.publicReadApplied.delete('cached-static');
+      try {
+        const fallback = await storage.getClientUrlForPath(`system/${logoKey}`);
+        expect(fallback.expiresIn).toBeGreaterThan(0);
+        expect(fallback.url).toContain('X-Amz-Signature');
+
+        const fetched = await fetch(fallback.url);
+        expect(fetched.status).toBe(200);
+        expect(fetched.headers.get('content-type')).toMatch(/image\/png/);
+        expect(Buffer.from(await fetched.arrayBuffer()).equals(png)).toBe(true);
+      } finally {
+        if (hadSystem) fallbackInternals.publicReadApplied.add('system');
+        if (hadStatic) fallbackInternals.publicReadApplied.add('cached-static');
+      }
+    });
+  });
+
+  it('404s the removed byte-streaming read route', async () => {
     await request(server)
       .get(`/api/storage/system/${logoKey}`)
-      .expect(200)
-      .expect('Content-Type', /image\/png/);
-  });
-
-  it('rejects anonymous screenshot reads with 401', async () => {
-    await request(server).get(`/api/storage/screenshot/${ownedKey}`).expect(401);
-  });
-
-  it('serves the owned screenshot to its workspace member', async () => {
-    await request(server)
-      .get(`/api/storage/screenshot/${ownedKey}`)
-      .set('Cookie', userA.cookie)
-      .expect(200)
-      .expect('Content-Type', /image\/png/);
-  });
-
-  it('rejects the owned screenshot for a foreign-workspace member with 403', async () => {
-    await request(server)
-      .get(`/api/storage/screenshot/${ownedKey}`)
-      .set('Cookie', userB.cookie)
-      .expect(403);
-  });
-
-  it('returns 404 for an authenticated read of an unowned screenshot key', async () => {
-    const unknown = `${createHash('md5').update(`e2e-read-authz-missing-${Date.now()}`).digest('hex')}.png`;
-    await request(server)
-      .get(`/api/storage/screenshot/${unknown}`)
       .set('Cookie', userA.cookie)
       .expect(404);
-  });
-
-  it('returns 404 for the blocked default bucket', async () => {
-    await request(server)
-      .get('/api/storage/default/anything.txt')
-      .set('Cookie', userA.cookie)
-      .expect(404);
-  });
-
-  it('rejects the private reports bucket with 403', async () => {
-    await request(server)
-      .get('/api/storage/reports/anything.pdf')
-      .set('Cookie', userA.cookie)
-      .expect(403);
-  });
-
-  it('rejects anonymous cached-static reads with 401', async () => {
-    await request(server).get(`/api/storage/cached-static/${staticKey}`).expect(401);
-  });
-
-  it('serves cached-static objects to any authenticated user', async () => {
-    const res = await request(server)
-      .get(`/api/storage/cached-static/${staticKey}`)
-      .set('Cookie', userB.cookie)
-      .expect(200);
-    expect(res.text).toBe(textPayload);
-  });
-
-  it('rejects anonymous presign downloads with 401', async () => {
-    await request(server)
-      .get('/api/storage/presign/download')
-      .query({ bucket: 'screenshot', path: ownedKey })
-      .expect(401);
-  });
-
-  it('lets the owner presign their own template', async () => {
-    const res = await request(server)
-      .get('/api/storage/presign/download')
-      .query({ bucket: 'nuclei-templates', path: `${templateId}.yaml` })
-      .set('Cookie', userA.cookie)
-      .expect(200);
-    expect((res.body as { downloadUrl: string }).downloadUrl).toBeTruthy();
-  });
-
-  it('rejects a foreign-workspace presign of the template with 403', async () => {
-    await request(server)
-      .get('/api/storage/presign/download')
-      .query({ bucket: 'nuclei-templates', path: `${templateId}.yaml` })
-      .set('Cookie', userB.cookie)
-      .expect(403);
-  });
-
-  it('lets the owner presign their own screenshot', async () => {
-    const res = await request(server)
-      .get('/api/storage/presign/download')
-      .query({ bucket: 'screenshot', path: ownedKey })
-      .set('Cookie', userA.cookie)
-      .expect(200);
-    expect((res.body as { downloadUrl: string }).downloadUrl).toBeTruthy();
-  });
-
-  it('rejects a foreign-workspace presign of the screenshot with 403', async () => {
-    await request(server)
-      .get('/api/storage/presign/download')
-      .query({ bucket: 'screenshot', path: ownedKey })
-      .set('Cookie', userB.cookie)
-      .expect(403);
-  });
-
-  it('serves the collided screenshot to workspace A', async () => {
-    await request(server)
-      .get(`/api/storage/screenshot/${collisionKey}`)
-      .set('Cookie', userA.cookie)
-      .expect(200);
-  });
-
-  it('serves the collided screenshot to workspace B', async () => {
-    await request(server)
-      .get(`/api/storage/screenshot/${collisionKey}`)
-      .set('Cookie', userB.cookie)
-      .expect(200);
-  });
-
-  it('rejects the collided screenshot for a third workspace with 403', async () => {
-    await request(server)
-      .get(`/api/storage/screenshot/${collisionKey}`)
-      .set('Cookie', userC.cookie)
-      .expect(403);
-  });
-
-  describe('conditional GET (304)', () => {
-    it('returns an ETag and a private cache header on authenticated reads', async () => {
-      const res = await request(server)
-        .get(`/api/storage/cached-static/${staticKey}`)
-        .set('Cookie', userB.cookie)
-        .expect(200);
-      expect(res.headers['etag']).toBeTruthy();
-      expect(res.headers['cache-control']).toBe('private, no-cache');
-    });
-
-    it('returns 304 with an empty body on an ETag match', async () => {
-      const first = await request(server)
-        .get(`/api/storage/cached-static/${staticKey}`)
-        .set('Cookie', userB.cookie)
-        .expect(200);
-      const etag = first.headers['etag'];
-      expect(etag).toBeTruthy();
-      const res = await request(server)
-        .get(`/api/storage/cached-static/${staticKey}`)
-        .set('Cookie', userB.cookie)
-        .set('If-None-Match', etag)
-        .expect(304);
-      expect(res.text).toBe('');
-    });
-
-    it('returns 200 with bytes on a stale ETag', async () => {
-      const res = await request(server)
-        .get(`/api/storage/cached-static/${staticKey}`)
-        .set('Cookie', userB.cookie)
-        .set('If-None-Match', '"stale-etag-that-never-matches"')
-        .expect(200);
-      expect(res.text).toBe(textPayload);
-    });
   });
 });

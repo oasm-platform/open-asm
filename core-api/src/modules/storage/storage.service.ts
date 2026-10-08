@@ -11,12 +11,15 @@ import {
 import {
   CreateBucketCommand,
   DeleteObjectCommand,
+  GetBucketPolicyStatusCommand,
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
-  PutObjectCommand,
   PutBucketCorsCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+  PutPublicAccessBlockCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
@@ -31,6 +34,67 @@ import {
   StorageConfig,
 } from './storage.config';
 import { Readable } from 'stream';
+
+export const PUBLIC_READ_BUCKETS = ['system', 'cached-static'];
+
+/**
+ * Start of the current UTC hour. Passed as `signingDate` to `getSignedUrl`
+ * (supported via `RequestPresigningArguments` in the installed
+ * `@smithy/types@4.19`) so repeated presigns within the same hour emit
+ * byte-identical URLs; the URL changes after the hour rolls over. Never in
+ * the future — flooring `now` can only move backwards within the hour.
+ *
+ * Only safe when the TTL absorbs the worst-case 59:59 intra-hour offset
+ * (SigV4 expiry = X-Amz-Date + X-Amz-Expires). Both presign helpers gate on
+ * `HOUR_BUCKET_MIN_TTL_SECONDS` and sign `new Date()` below it.
+ */
+export function getHourBucketedSigningDate(now: Date = new Date()): Date {
+  const bucketed = new Date(now);
+  bucketed.setUTCMinutes(0, 0, 0);
+  return bucketed;
+}
+
+/** Minimum clamped TTL that may use the hour-bucketed signing date (2h). */
+export const HOUR_BUCKET_MIN_TTL_SECONDS = 7200;
+
+const EXTENSION_TO_MIME: Record<string, string> = {
+  // Images
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+
+  // Documents
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt: 'text/plain',
+
+  // Archives
+  zip: 'application/zip',
+  rar: 'application/x-rar-compressed',
+  '7z': 'application/x-7z-compressed',
+
+  // Audio/Video
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+
+  // Code
+  json: 'application/json',
+  xml: 'application/xml',
+  html: 'text/html',
+  css: 'text/css',
+  js: 'application/javascript',
+  ts: 'application/typescript',
+};
 
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -55,6 +119,8 @@ export class StorageService implements OnModuleInit {
 
   private readonly blockedBuckets = ['default'];
 
+  private readonly publicReadApplied = new Set<string>();
+
   public getBucketAccess(
     bucket: string,
   ): 'public' | 'authenticated' | 'tenant' | 'private' | 'blocked' {
@@ -74,6 +140,10 @@ export class StorageService implements OnModuleInit {
       return 'blocked';
     }
     return 'blocked';
+  }
+
+  public getPresignTtlSeconds(): number {
+    return this.storageConfig.presignTtlSeconds;
   }
 
   private readonly restrictedExtensions = [
@@ -99,9 +169,18 @@ export class StorageService implements OnModuleInit {
     this.storageConfig = parseStorageConfig(this.configService);
   }
 
+  private toBrowserUrl(absolute: string): string {
+    if (this.storageConfig.urlBase === '') {
+      return absolute;
+    }
+    const u = new URL(absolute);
+    return `${this.storageConfig.urlBase}${u.pathname}${u.search}`;
+  }
+
   async onModuleInit() {
     await this.ensureBucketsExist();
     await this.applyBucketCors();
+    await this.applyPublicReadPolicy();
   }
 
   private async applyBucketCors() {
@@ -131,6 +210,86 @@ export class StorageService implements OnModuleInit {
       } catch (error) {
         this.logger.warn(
           `Failed to apply CORS to bucket ${bucket}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Grants anonymous `s3:GetObject` on the public buckets (`system`,
+   * `cached-static`) and records each bucket in `publicReadApplied` ONLY after
+   * a mandatory verification gate — fail-closed, Todo 3 presigns otherwise.
+   *
+   * Per bucket: (1) best-effort `PutPublicAccessBlock` with all four flags
+   * `false` — a `NotImplemented`/error here MUST NOT disable the feature
+   * (RustFS may not implement it); (2) `PutBucketPolicy` granting GetObject-only
+   * on `arn:aws:s3:::<bucket>/*` to `Principal: "*"` (never Put/Delete/List).
+   * The flag is set only after `GetBucketPolicyStatus` reports `IsPublic`
+   * (object-independent proof; fresh buckets may be empty so an unsigned
+   * HEAD probe has no known key to hit). Any failure → `Logger.warn`, flag
+   * stays off, boot continues.
+   *
+   * Required IAM: `s3:PutBucketPolicy` (+ `s3:PutBucketPublicAccessBlock` when
+   * the account enforces Block Public Access).
+   */
+  private async applyPublicReadPolicy() {
+    const client = this.rustFsClient.getClient();
+    for (const bucket of PUBLIC_READ_BUCKETS) {
+      try {
+        try {
+          await client.send(
+            new PutPublicAccessBlockCommand({
+              Bucket: bucket,
+              PublicAccessBlockConfiguration: {
+                BlockPublicAcls: false,
+                IgnorePublicAcls: false,
+                BlockPublicPolicy: false,
+                RestrictPublicBuckets: false,
+              },
+            }),
+          );
+        } catch {
+          this.logger.debug(
+            `Public access block not applied to bucket ${bucket}; continuing with bucket policy`,
+          );
+        }
+        await client.send(
+          new PutBucketPolicyCommand({
+            Bucket: bucket,
+            Policy: JSON.stringify({
+              Version: '2012-10-17',
+              Statement: [
+                {
+                  Sid: 'PublicReadGetObject',
+                  Effect: 'Allow',
+                  Principal: '*',
+                  Action: 's3:GetObject',
+                  Resource: `arn:aws:s3:::${bucket}/*`,
+                },
+              ],
+            }),
+          }),
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to apply public-read policy to bucket ${bucket}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+        continue;
+      }
+      try {
+        const status = await client.send(
+          new GetBucketPolicyStatusCommand({ Bucket: bucket }),
+        );
+        if (status.PolicyStatus?.IsPublic === true) {
+          this.publicReadApplied.add(bucket);
+        } else {
+          this.logger.warn(
+            `Public-read verification failed for bucket ${bucket}: policy not reported public`,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Public-read verification failed for bucket ${bucket}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
     }
@@ -248,14 +407,23 @@ export class StorageService implements OnModuleInit {
     fileName: string,
     buffer: Buffer,
     bucket: string = 'default',
+    contentType?: string,
   ) {
     const client = this.rustFsClient.getClient();
+    const dotIndex = fileName.lastIndexOf('.');
+    const derivedType =
+      dotIndex > 0 && dotIndex < fileName.length - 1
+        ? this.resolveMimeType(fileName.slice(dotIndex + 1))
+        : undefined;
+    const resolvedContentType =
+      contentType ?? derivedType ?? 'application/octet-stream';
     const putObject = () =>
       client.send(
         new PutObjectCommand({
           Bucket: bucket,
           Key: fileName,
           Body: buffer,
+          ContentType: resolvedContentType,
         }),
       );
 
@@ -331,10 +499,14 @@ export class StorageService implements OnModuleInit {
     // ponytail: presigner@3.1048 vs client-s3@3.1097 ship mismatched @smithy/types; cast until versions align.
     const url = await getSignedUrl(this.rustFsClient.getPresignClient() as never, command as never, {
       expiresIn: clampedTtl,
+      signingDate:
+        clampedTtl >= HOUR_BUCKET_MIN_TTL_SECONDS
+          ? getHourBucketedSigningDate()
+          : new Date(),
       ...(contentType ? { signableHeaders: new Set(['content-type']) } : {}),
     });
 
-    return { url, key, path: `${bucket}/${key}`, expiresIn: clampedTtl };
+    return { url: this.toBrowserUrl(url), key, path: `${bucket}/${key}`, expiresIn: clampedTtl };
   }
 
   public async getPresignedDownloadUrl(opts: {
@@ -377,9 +549,176 @@ export class StorageService implements OnModuleInit {
     // ponytail: presigner@3.1048 vs client-s3@3.1097 ship mismatched @smithy/types; cast until versions align.
     const url = await getSignedUrl(this.rustFsClient.getPresignClient() as never, command as never, {
       expiresIn: clampedTtl,
+      signingDate:
+        clampedTtl >= HOUR_BUCKET_MIN_TTL_SECONDS
+          ? getHourBucketedSigningDate()
+          : new Date(),
     });
 
-    return { url, expiresIn: clampedTtl };
+    return { url: this.toBrowserUrl(url), expiresIn: clampedTtl };
+  }
+
+  public resolveMimeType(extension?: string): string | undefined {
+    if (!extension) return undefined;
+    return EXTENSION_TO_MIME[extension.toLowerCase()];
+  }
+
+  /**
+   * Browser-consumable URL for a stored `bucket/key` path. Pure async with no
+   * shared mutable reads beyond the applied-flag set, so per-item calls on list
+   * endpoints stay `Promise.all`-safe. Never stores the returned URL.
+   */
+  public async getClientUrlForPath(
+    path: string,
+    opts?: { expiresIn?: number },
+  ): Promise<{ url: string; expiresIn: number | null }> {
+    const slashIndex = path.indexOf('/');
+    if (slashIndex <= 0 || slashIndex === path.length - 1) {
+      throw new BadRequestException('Invalid path');
+    }
+    const bucket = path.slice(0, slashIndex);
+    const key = path.slice(slashIndex + 1);
+
+    this.assertBucketAllowed(bucket);
+    if (
+      this.privateBuckets.includes(bucket) ||
+      this.blockedBuckets.includes(bucket)
+    ) {
+      throw new BadRequestException(`Bucket '${bucket}' is private`);
+    }
+
+    if (
+      PUBLIC_READ_BUCKETS.includes(bucket) &&
+      this.publicReadApplied.has(bucket)
+    ) {
+      const encodedKey = key
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
+      if (this.storageConfig.urlBase !== '') {
+        return {
+          url: `${this.storageConfig.urlBase}/${bucket}/${encodedKey}`,
+          expiresIn: null,
+        };
+      }
+      const endpoint = this.storageConfig.publicEndpoint.replace(/\/+$/, '');
+      if (this.storageConfig.forcePathStyle) {
+        return { url: `${endpoint}/${bucket}/${encodedKey}`, expiresIn: null };
+      }
+      // ponytail: virtual-hosted style needs scheme + host split; URL parse ceiling is malformed-endpoint throw.
+      const parsed = new URL(endpoint);
+      return {
+        url: `${parsed.protocol}//${bucket}.${parsed.host}/${encodedKey}`,
+        expiresIn: null,
+      };
+    }
+
+    const contentType = this.deriveContentTypeFromKey(key);
+    return this.getPresignedDownloadUrl({
+      bucket,
+      key,
+      expiresIn: opts?.expiresIn,
+      ...(contentType ? { contentType } : {}),
+    });
+  }
+
+  /**
+   * Batched signing helper. Thin orchestrator over the existing per-path
+   * logic — no duplicated signing code. `Promise.all`-safe (pure async, no
+   * shared mutable state beyond `publicReadApplied` reads) and preserves
+   * output order. Private/blocked items reject with 400 (never silently
+   * skipped); malformed stored rows (no `/`, leading `/`, empty key) resolve
+   * to `null` so one bad row never fails a whole list — direct invalid input
+   * still throws via `getClientUrlForPath`.
+   *
+   * Items with `downloadFileName` (reports/downloads) presign via
+   * `getPresignedDownloadUrl` with derived `ResponseContentType` +
+   * `ResponseContentDisposition=attachment`; all other items delegate to
+   * `getClientUrlForPath` verbatim.
+   */
+  public async signStoragePaths(
+    items: Array<{ bucket: string; path: string; downloadFileName?: string }>,
+    expiresIn?: number,
+  ): Promise<Array<string | null>> {
+    return Promise.all(
+      items.map(async (item): Promise<string | null> => {
+        if (item.downloadFileName) {
+          const key = this.extractKeyForBatch(item.bucket, item.path);
+          this.assertBucketAllowed(item.bucket);
+          if (this.getBucketAccess(item.bucket) === 'blocked') {
+            throw new BadRequestException(
+              `Bucket '${item.bucket}' is private`,
+            );
+          }
+          const contentType = this.deriveContentTypeFromKey(key);
+          const { url } = await this.getPresignedDownloadUrl({
+            bucket: item.bucket,
+            key,
+            expiresIn,
+            fileName: item.downloadFileName,
+            ...(contentType ? { contentType } : {}),
+          });
+          return url;
+        }
+        const fullPath = item.path.includes('/')
+          ? item.path
+          : `${item.bucket}/${item.path}`;
+        const slashIndex = fullPath.indexOf('/');
+        if (
+          slashIndex <= 0 ||
+          slashIndex === fullPath.length - 1 ||
+          fullPath.startsWith('/')
+        ) {
+          return null;
+        }
+        const { url } = await this.getClientUrlForPath(
+          fullPath,
+          expiresIn !== undefined ? { expiresIn } : undefined,
+        );
+        return url;
+      }),
+    );
+  }
+
+  /**
+   * Single-path wrapper over `signStoragePaths`. Parses `bucket/key`,
+   * delegates, returns the single URL (or `null` for a malformed stored
+   * path instead of throwing, so detail views degrade to "no image").
+   */
+  public async signStoragePath(
+    path: string,
+    opts?: { expiresIn?: number; downloadFileName?: string },
+  ): Promise<string | null> {
+    const slashIndex = path.indexOf('/');
+    const bucket = slashIndex > 0 ? path.slice(0, slashIndex) : '';
+    const [url] = await this.signStoragePaths(
+      [
+        {
+          bucket,
+          path,
+          ...(opts?.downloadFileName
+            ? { downloadFileName: opts.downloadFileName }
+            : {}),
+        },
+      ],
+      opts?.expiresIn,
+    );
+    return url ?? null;
+  }
+
+  private deriveContentTypeFromKey(key: string): string | undefined {
+    const dotIndex = key.lastIndexOf('.');
+    return dotIndex > 0 && dotIndex < key.length - 1
+      ? this.resolveMimeType(key.slice(dotIndex + 1))
+      : undefined;
+  }
+
+  private extractKeyForBatch(bucket: string, path: string): string {
+    const prefix = `${bucket}/`;
+    if (path.startsWith(prefix)) {
+      return path.slice(prefix.length);
+    }
+    return path.replace(/^\/+/, '');
   }
 
   private isNoSuchBucket(error: unknown): boolean {

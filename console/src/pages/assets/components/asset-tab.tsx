@@ -4,6 +4,7 @@ import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
 import { useState } from 'react';
 import { useAsset } from '../context/asset-context';
+import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options';
 import { assetColumns } from './asset-column';
 import AssetDetailSheet from './asset-detail-sheet';
 
@@ -18,11 +19,14 @@ export default function AssetTab() {
     queryOptions,
   } = useAsset();
 
+  const screenshotOptions = useScreenshotQueryOptions();
+
   const { data, isLoading, refetch } = useAssetsControllerGetAssetsInWorkspace(
     queryParams,
     {
       query: {
         ...queryOptions.query,
+        ...screenshotOptions,
         queryKey: ['assets', ...queryOptions.query.queryKey],
       },
     },

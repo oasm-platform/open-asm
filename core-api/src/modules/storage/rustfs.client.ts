@@ -14,24 +14,32 @@ export class RustFsClient {
 
   constructor(private readonly configService: ConfigService) {
     const storageConfig = parseStorageConfig(configService);
+    const serverEndpoint = this.configService.get<string>(
+      'RUSTFS_ENDPOINT',
+      DEFAULT_RUSTFS_ENDPOINT,
+    );
 
     // Server-side client: never point it at the browser-facing endpoint.
     // Region/addressing style must not be pinned here — signing with the wrong
     // region gets a 301 from real S3.
     this.client = this.buildClient(storageConfig, {
-      endpoint: this.configService.get<string>(
-        'RUSTFS_ENDPOINT',
-        DEFAULT_RUSTFS_ENDPOINT,
-      ),
+      endpoint: serverEndpoint,
       region: storageConfig.region,
       forcePathStyle: storageConfig.forcePathStyle,
       checksum: false,
     });
 
+    // Relative mode: the browser calls the same-origin proxy, which forwards to
+    // RUSTFS_ENDPOINT preserving Host, so the SigV4 `host` (and path-style
+    // layout) must equal the server client's endpoint — signing against
+    // publicEndpoint would emit a host the proxy never presents, breaking the
+    // signature with SignatureDoesNotMatch. Absolute mode keeps the historic
+    // publicEndpoint + configured addressing.
+    const relativeMode = storageConfig.urlBase !== '';
     this.presignClient = this.buildClient(storageConfig, {
-      endpoint: storageConfig.publicEndpoint,
+      endpoint: relativeMode ? serverEndpoint : storageConfig.publicEndpoint,
       region: storageConfig.region,
-      forcePathStyle: storageConfig.forcePathStyle,
+      forcePathStyle: relativeMode ? true : storageConfig.forcePathStyle,
       checksum: true,
     });
   }

@@ -21,10 +21,13 @@ This guide provides detailed instructions for setting up your local development 
   - [gRPC Stub Generation](#grpc-stub-generation)
   - [Connector Catalog Sync](#connector-catalog-sync)
 - [Presigned Direct Storage Access](#presigned-direct-storage-access)
+  - [Flow](#flow)
+  - [Public-read vs presigned](#public-read-vs-presigned)
   - [Why there are two S3 clients](#why-there-are-two-s3-clients)
   - [Browser PUT requirements](#browser-put-requirements)
-  - [nginx pass-through](#nginx-pass-through-self-hosted-only)
+  - [nginx public prefixes and presigned pass-through](#nginx-public-prefixes-and-presigned-pass-through-self-hosted-only)
   - [Switching to real S3](#switching-to-real-s3-configuration-only)
+  - [Read authorization on presign/download](#read-authorization-on-presigndownload)
   - [Deferred and still open](#deferred-and-still-open)
 - [Using Docker Compose](#using-docker-compose)
 - [Local CI Testing](#local-ci-testing)
@@ -379,23 +382,27 @@ checkout instead of the `main` branch.
 
 ## Presigned Direct Storage Access
 
-Object-storage bytes no longer stream through core-api. The console asks
-core-api for a short-lived presigned URL, then talks to S3 / RustFS directly, so
-upload and download traffic bypasses the API process.
+Object-storage bytes never stream through core-api. The console asks
+core-api for a URL via `getClientUrlForPath`
+(`core-api/src/modules/storage/storage.service.ts`), then talks to S3 / RustFS
+directly, so upload and download traffic bypasses the API process.
 
 ### Flow
 
 1. The console calls a presign endpoint on core-api
-   (`core-api/src/modules/storage/storage.controller.ts`).
-2. core-api validates bucket and key, signs with SigV4, returns an absolute URL.
+   (`core-api/src/modules/storage/storage.controller.ts`), or reads a `url`
+   field (logo, screenshot, icon) the API already resolved.
+2. core-api validates bucket and key, then returns either a plain public URL
+   or a short-lived SigV4 presigned URL (see Public-read vs presigned below).
 3. The console `fetch`es that URL via `console/src/services/storage.ts`:
-   `PUT` for uploads, plain `GET` for downloads.
+   `PUT` for uploads, plain `GET` for downloads. Render paths use the value
+   verbatim via `resolveClientUrl` (`console/src/utils/storage-url.ts`).
 4. The browser talks to object storage, not to core-api.
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
 | `/api/storage/presign/upload` | POST | Presigned `PUT` into any non-private bucket. `@Roles(Role.ADMIN)`. |
-| `/api/storage/presign/download` | GET | Presigned `GET`; optional `fileName` becomes `Content-Disposition`. Authorized by the same `authorizeRead` classes as direct reads (see below), so a URL for another workspace's screenshot or template is refused with 403 before signing. Declared before the `:bucket/:path` wildcard on purpose, otherwise Express swallows the literal path. |
+| `/api/storage/presign/download` | GET | Presigned `GET`; optional `fileName` becomes `Content-Disposition`. Gated by `authorizeRead` (see Read authorization below), so a URL for another workspace's screenshot or template is refused with 403 before signing. |
 | `/api/storage/logo/presign` | POST | Presigned `PUT` for the app logo: `system` bucket, `logo-` prefix, image extensions only. `@Roles(Role.ADMIN)`. |
 | `/api/storage/logo/confirm` | POST | `HeadObject` on the uploaded key, validates content type and size, then activates the logo. `@Roles(Role.ADMIN)`. |
 | `/api/templates/:templateId/presign` | POST | Presigned `PUT` for a template YAML. Requires workspace permission `template.write`. |
@@ -405,8 +412,64 @@ Buckets come from `StorageService.buckets`; `privateBuckets = ['reports',
 
 `logo/confirm` is the only server-side check in the flow. It heads the object
 and rejects non-images and anything above `LOGO_MAX_SIZE_BYTES` (5 MB,
-`storage.controller.ts:38`), and it runs *after* the bytes are already in
+`storage.controller.ts:37`), and it runs *after* the bytes are already in
 storage.
+
+### Public-read vs presigned
+
+`getClientUrlForPath` (`storage.service.ts:535`) splits every read into two
+cases. No client URL is ever persisted: the DB holds the raw `bucket/key`
+(`screenshot/screenshot/...` in `asset_services.screenshotPath`,
+`system/<file>` in the system-config row, `<templateId>.yaml` for templates),
+and Redis holds the raw `cached-static/...` path under `icon:v2:` /
+`technology:` keys. The URL is derived per response and thrown away.
+
+- **Public-read.** Buckets in `PUBLIC_READ_BUCKETS` (`storage.service.ts:38`):
+  `system`, `cached-static`. When the boot policy flag for that bucket is set
+  (see below), the helper returns a plain, unsigned URL built from
+  `S3_PUBLIC_ENDPOINT` (`storageConfig.publicEndpoint`), path-style
+  `${endpoint}/${bucket}/${key}` when `S3_FORCE_PATH_STYLE` is true, else
+  virtual-hosted `${scheme}://${bucket}.${host}/${key}` split via `new URL()`.
+  `expiresIn` is `null`. The MIME type is derived from the key extension via
+  `resolveMimeType` (`storage.service.ts:525`) and passed as
+  `ResponseContentType` only on the presigned path.
+- **Presigned fallback.** Anything else (tenant/private buckets, or a public
+  bucket whose flag is off) returns `getPresignedDownloadUrl`
+  (`storage.service.ts:480`): a SigV4 `GET` with derived
+  `ResponseContentType`, optional `ResponseContentDisposition`
+  (`attachment; filename="..."` when `fileName` was passed), TTL clamped from
+  `S3_PRESIGN_TTL` to 60 s ... 604800 s.
+
+The flag (`publicReadApplied`, `storage.service.ts:102`) is set per bucket at
+boot by `applyPublicReadPolicy` (`storage.service.ts:207`), gated on proof:
+
+1. Best-effort `PutPublicAccessBlock` with all four flags `false` (a
+   `NotImplemented` from RustFS is swallowed with `Logger.debug` and never
+   disables the feature).
+2. `PutBucketPolicy` granting **Get-only** `s3:GetObject` on
+   `arn:aws:s3:::<bucket>/*` to `Principal: "*"` (never Put/Delete/List).
+3. Verification via `GetBucketPolicyStatus`: the flag is added **only** after
+   the bucket reports `IsPublic`. Any failure logs `Logger.warn` and the flag
+   stays off, so reads presign instead. Boot never crashes.
+
+Required IAM: `s3:PutBucketPolicy` (+ `s3:PutBucketPublicAccessBlock` when the
+account enforces Block Public Access).
+
+Consumers: system-configs `getConfig` resolves the raw logo path to `{ url }`
+(`core-api/src/modules/system-configs/system-configs.service.ts:49`) and
+deletes by the raw path from `getRawLogoPath`, never by splitting a signed
+URL; assets list/detail resolve `screenshotPath` the same way
+(`core-api/src/modules/assets/assets.service.ts:354,495`); the
+technology-forwarder caches the raw `cached-static/...` path under `icon:v2:`
+and emits the resolved `iconUrl`
+(`core-api/src/modules/technology/technology-forwarder.service.ts:577,593`).
+The login page reads the presign TTL from
+`GetMetadataDto.storagePresignTtlSeconds`
+(`core-api/src/modules/root/dto/root.dto.ts:36`, served by
+`core-api/src/modules/root/root.service.ts:82`) and the console bounds its
+signed-screenshot query cache with `deriveScreenshotStaleTime`
+(`min(60s, ttl * 0.8)`); public `logoPath`/`iconUrl` queries are
+deliberately uncached by TTL.
 
 ### Why there are two S3 clients
 
@@ -437,11 +500,35 @@ The clients differ in a second, less obvious way: `getClient()` is built with
 signature was not computed over, so a presigned browser `PUT` fails with
 `SignatureDoesNotMatch`. Do not "restore" the defaults.
 
+### Relative vs absolute browser URLs (`STORAGE_URL_BASE`)
+
+`STORAGE_URL_BASE` (`storage.config.ts`) selects how browser-facing storage URLs
+are shaped; `StorageService.toBrowserUrl` and the public-read branch of
+`getClientUrlForPath` apply it.
+
+- **Empty (absolute mode, cloud).** Unchanged historic behavior: presigned URLs
+  point at `S3_PUBLIC_ENDPOINT` and the plain public URL is built from it. Cloud
+  sets `S3_PUBLIC_ENDPOINT` + `S3_FORCE_PATH_STYLE` and leaves this empty. The
+  presign client signs against `publicEndpoint` with the configured addressing.
+- **Non-empty, e.g. `/api/storage` (relative mode, dev/docker).** Browser URLs
+  are same-origin: public buckets -> `${STORAGE_URL_BASE}/<bucket>/<key>`
+  (no query, no signature, path-style regardless of `S3_FORCE_PATH_STYLE`);
+  tenant/private buckets -> `${STORAGE_URL_BASE}/<bucket>/<key>?<X-Amz-...>`,
+  where the signature is produced against `RUSTFS_ENDPOINT` with path-style
+  addressing so the SigV4 `host` equals the `RUSTFS_ENDPOINT` host (dev
+  `localhost:9000`, docker `rustfs:9000`).
+
+The proxy (nginx or the Vite dev proxy) sits in front of core-api for the
+prefix: it MUST strip the `STORAGE_URL_BASE` prefix before forwarding to
+`RUSTFS_ENDPOINT`, and MUST preserve the original `Host` so it equals the
+`RUSTFS_ENDPOINT` host the request was signed for. A wrong host or a rewritten
+path is a `SignatureDoesNotMatch` 403 on every upload and download.
+
 ### Browser PUT requirements
 
 - **Send the exact signed `Content-Type`.** When a content type was signed,
   `getPresignedUploadUrl` passes `signableHeaders: new Set(['content-type'])`
-  (`storage.service.ts:268`). Any drift, including a browser default, is a 403
+  (`storage.service.ts:474`). Any drift, including a browser default, is a 403
   `SignatureDoesNotMatch`. `console/src/services/storage.ts` is the single place
   that echoes the header, and callers must pass through the `contentType` the
   presign response returned.
@@ -450,21 +537,33 @@ signature was not computed over, so a presigned browser `PUT` fails with
   exact request; the axios instance would attach auth headers, cookies and
   param serialisation and perturb the signature into a 403.
 
-### nginx pass-through (self-hosted only)
+### nginx public prefixes and presigned pass-through (self-hosted only)
 
 In the Docker deployment the browser hits the console origin, so
-`console/nginx.conf` hands signed requests to the storage backend:
+`console/nginx.conf` serves both plain public reads and signed requests:
 
+- **Unsigned public prefixes.** `location ^~ /system/` and
+  `location ^~ /cached-static/` (`console/nginx.conf:47,56`) proxy plain
+  `GET`s straight to `http://object_storage` (rustfs:9000) with
+  `Host $http_host` (not `$host`). The buckets behind them are Get-only
+  public via the boot policy above, so no signature is needed.
+  `^~` beats the static-asset extension regex below, so `/system/*.webp`
+  lands here instead of 404ing into `index.html`.
 - `map $args $is_presigned` matches `(^|&)X-Amz-Signature=`. nginx cannot build
   a variable name containing hyphens (`$arg_X-Amz-Signature` parses as
   `$arg_X` plus literal text and is always truthy), so the query string is
   matched instead.
 - The signed request leaves through `error_page 418 = @object_storage`, so the
   rewrite phase runs before `try_files`.
-- Both `location /` and the static-asset location must `return 418` when
-  `$is_presigned`. Without the guard a presigned key ending in
-  `.webp`/`.jpg`/`.gif` is answered by the static location, which 404s into
-  `index.html` instead of reaching storage.
+- The `/`, `/system/`, `/cached-static/`, and static-asset locations each
+  `return 418` when `$is_presigned`, so a presigned key keeps server-level
+  418 routing instead of being answered as a static file or marked public.
+  **No `error_page` inside the new `^~` locations**: a location-level
+  `error_page` shadows the server-level `error_page 418 = @object_storage`
+  and breaks presigned fallback with a bare 418. No
+  `proxy_intercept_errors`, so a missing key returns the real upstream 404,
+  and `add_header` without `always` applies to 2xx/3xx only, so errors are
+  never marked public.
 - Inside `@object_storage` the path must **not** be rewritten (SigV4 signs the
   path), and `Host` is forwarded as `$http_host`, not `$host`: the signature
   covers `host:port` and `$host` strips the port.
@@ -473,24 +572,29 @@ In the Docker deployment the browser hits the console origin, so
 
 ### Switching to real S3 (configuration only)
 
-No code change. Set in `core-api/.env`:
+No code change. Profiles live in `core-api/example.env:42-73` and the
+compose overrides in `docker-compose.yml:43-61`. Set in `core-api/.env`:
 
 | Variable | Value |
 | --- | --- |
 | `RUSTFS_ENDPOINT` | Endpoint the **API** reaches (e.g. the in-network or VPC endpoint). Required in the cloud — it is the internal ops endpoint, and it is deliberately never read from `S3_PUBLIC_ENDPOINT`. |
-| `S3_PUBLIC_ENDPOINT` | Endpoint the browser can reach, e.g. `https://s3.eu-central-1.amazonaws.com`. Presign only. |
+| `S3_PUBLIC_ENDPOINT` | **Profile A (self-hosted, same-origin nginx proxy):** must equal the console origin (compose sets `http://localhost:3000` in `docker-compose.yml:57`), or the unsigned `location ^~ /system/` and `location ^~ /cached-static/` prefixes in `console/nginx.conf` are bypassed and plain public GETs fall through to the SPA. **Profile B (cloud, AWS S3):** `https://s3.<region>.amazonaws.com`, so signed URLs are virtual-hosted (`https://<bucket>.s3.<region>.amazonaws.com/<key>`). |
 | `S3_REGION` | The bucket's region. Signs **both** clients — the internal client is not pinned to `us-east-1`. |
-| `S3_FORCE_PATH_STYLE` | `false`. Applies to **both** clients. |
+| `S3_FORCE_PATH_STYLE` | `true` for RustFS/MinIO (Profile A), `false` for AWS S3 (Profile B). Applies to **both** clients, including the plain-URL builder. Ignored for public-read plain URLs when `STORAGE_URL_BASE` is set. |
+| `STORAGE_URL_BASE` | Empty (default in cloud) => absolute URLs. Set (e.g. `/api/storage`, dev/docker) => same-origin relative URLs; the proxy must strip the prefix and forward `Host` == `RUSTFS_ENDPOINT` host (see Relative vs absolute browser URLs). |
 | `S3_USE_DEFAULT_CREDENTIALS` | `true` for IAM roles / instance profiles; otherwise leave `false` and set `S3_ACCESS_KEY` + `S3_SECRET_KEY` |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated console origins. Single origin source: also drives API CORS and better-auth trusted origins (see Renamed env vars below) |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated console origins. Single origin source: also drives API CORS and better-auth trusted origins (see Renamed env vars below). Cross-origin direct fetches of public objects need their origin listed here |
 
 `StorageService.onModuleInit` applies the CORS rule to every bucket on boot
 (`GET, PUT, POST, HEAD`, `AllowedHeaders: *`, exposes `ETag`), and skips it
 entirely when the origins list is empty.
 
-The nginx pass-through above is path-style, same-origin, self-hosted storage
-only. AWS S3 rejects an arbitrary `Host`, so a cloud deployment drops the proxy
-and relies on the direct endpoint plus that bucket CORS.
+The nginx public prefixes above are self-hosted, same-origin storage
+only. For Profile B (cloud) the operator must additionally disable S3 Block
+Public Access on the public buckets (`system`, `cached-static`), or the app
+applies `PutPublicAccessBlock` itself at boot (best-effort); AWS S3 rejects
+an arbitrary `Host`, so a cloud deployment drops the proxy and relies on the
+direct endpoint plus that bucket CORS.
 
 Defaults, clamping and parsing for every variable above live in
 `core-api/src/modules/storage/storage.config.ts`. `S3_PRESIGN_TTL` defaults to
@@ -507,29 +611,36 @@ truth, not this section.
 When both names are set, the canonical one wins and the alias logs a one-time
 deprecation warning.
 
-### Direct-read authorization (`GET /api/storage/:bucket/:path`)
+### Read authorization on `presign/download`
 
-Direct reads are authorized, not world-readable. The handler is `@Optional()`
-(`storage.controller.ts:234`): the global `AuthGuard` still runs and populates
-`request.user`, while unauthenticated requests pass through so the login page
-can render the logo from the `system` bucket before a session exists. Both
-direct reads and `presign/download` share one helper, `authorizeRead`
-(`storage.controller.ts:317`), over the bucket classes from
-`StorageService.getBucketAccess` (`storage.service.ts:58`):
+There is no byte-streaming read route: object bytes are served only by
+storage itself (plain public URL or presigned URL). The only read gate is
+`presign/download` (`storage.controller.ts:210`), which keeps authorization
+via `authorizeRead` (`storage.controller.ts:233`) over the bucket classes
+from `StorageService.getBucketAccess` (`storage.service.ts:104`). This is
+the AE-02 posture: finding AE-02 in
+[`docs/security-audit-report.md`](docs/security-audit-report.md) is closed
+by this model.
 
 | Class | Buckets | Rule |
 | --- | --- | --- |
-| `public` | `system` | Anonymous reads allowed. |
+| `public` | `system` | Allowed without a session (login page renders the logo anonymously). |
 | `authenticated` | `cached-static` | Any session allowed; anonymous gets 401. |
-| `tenant` | `screenshot`, `nuclei-templates` | Anonymous gets 401; ownership resolved via `resolveObjectWorkspaceIds` (`storage.service.ts:166`), membership of ANY owning workspace required, otherwise 403; unknown keys return 404 so the endpoint is not a workspace-existence oracle. |
-| `private` | `reports`, `job-results` | Never served over HTTP: 403. |
+| `tenant` | `screenshot`, `nuclei-templates` | Anonymous gets 401; ownership resolved via `resolveObjectWorkspaceIds` (`storage.service.ts:297`), membership of ANY owning workspace required, otherwise 403; unknown keys return 404 so the endpoint is not a workspace-existence oracle. |
+| `private` | `reports`, `job-results` | Never signed: 403 via `assertBucketNotPrivate` before auth. |
 | `blocked` | `default` and anything unknown | 404 as if the object did not exist. |
 
 Status semantics: 401 means no session on an `authenticated`/`tenant` bucket;
 403 means a session without membership (or a `private` bucket); 404 means
-`blocked`, or a tenant key with no owner row. `presign/download` applies the
-same helper after `assertBucketAllowed` (400) and `assertBucketNotPrivate`
-(403), so its guard order is 400, 403, then 401/403/404 from `authorizeRead`.
+`blocked`, or a tenant key with no owner row. `presign/download` applies
+`assertBucketAllowed` (400) and `assertBucketNotPrivate` (403) first, so its
+guard order is 400, 403, then 401/403/404 from `authorizeRead`.
+
+Note the split between the two public-ish classes: `PUBLIC_READ_BUCKETS`
+(`storage.service.ts:38`) covers both `system` and `cached-static` for the
+boot bucket policy and plain URLs, while `getBucketAccess` keeps `system`
+`public` (anonymous signing allowed) and `cached-static` `authenticated`
+(session required to mint even a signed URL).
 
 This deliberately deviates from the audit allow-list, which recommended
 `system`, `nuclei-templates` and `cached-static` as public. The console sits
@@ -537,15 +648,8 @@ behind auth, so no anonymous consumer needs those two buckets:
 `cached-static` is session-gated and `nuclei-templates` is tenant-gated with
 no anonymous path lost.
 
-Conditional GET: authorized reads return `ETag`/`Last-Modified` from the same
-`GetObjectCommand` and answer `If-None-Match`/`If-Modified-Since` with 304
-(`isNotModified`, `storage.controller.ts:362`); the 304 destroys the already
-opened S3 stream so no socket is held. `Cache-Control` is `public,
-max-age=1209600, no-transform` on `system` only (14 days via
-`CACHE_STATIC_RESOURCE`) and `private, no-cache` on every authorized bucket.
-
 Residual risk: screenshot keys are `md5(asset.value)`
-(`data-adapter.service.ts:641`), a flat key with no workspace prefix, so two
+(`core-api/src/modules/data-adapter/data-adapter.service.ts:641`), a flat key with no workspace prefix, so two
 workspaces scanning the same hostname share one key. md5 is not collision
 resistant, so a crafted value could alias another tenant's key; the mitigation
 is that authorization checks membership of ANY owning workspace
@@ -553,15 +657,6 @@ is that authorization checks membership of ANY owning workspace
 arbitrary row), and finding or guessing a key still requires a session in at
 least one owning workspace. `nuclei-templates` keys are `<templateId>.yaml`
 and resolve by exact template id, so no cross-workspace aliasing there.
-
-Accepted cost: `@Optional()` still performs a `getSession` lookup
-(`auth.guard.ts:96`) even on anonymous `system` reads, before `authorizeRead`
-short-circuits. One session lookup per logo fetch on the login page is the
-price of keeping that page working without a public bypass.
-
-Finding AE-02 in [`docs/security-audit-report.md`](docs/security-audit-report.md)
-is closed by this model; the previous "still `@Public()`" note below is
-superseded by this section.
 
 ### Deferred and still open
 

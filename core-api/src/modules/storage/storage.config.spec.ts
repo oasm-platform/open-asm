@@ -32,6 +32,7 @@ describe('parseStorageConfig', () => {
 
     expect(config).toEqual({
       publicEndpoint: DEFAULT_RUSTFS_ENDPOINT,
+      urlBase: '',
       region: 'us-east-1',
       forcePathStyle: true,
       presignTtlSeconds: DEFAULT_S3_PRESIGN_TTL_SECONDS,
@@ -39,6 +40,27 @@ describe('parseStorageConfig', () => {
       accessKey: '',
       secretKey: '',
       useDefaultCredentials: false,
+    });
+  });
+
+  describe('urlBase', () => {
+    it('defaults to empty (absolute mode) when STORAGE_URL_BASE is unset', () => {
+      expect(parseStorageConfig(configFrom({})).urlBase).toBe('');
+    });
+
+    it('keeps a non-empty base verbatim', () => {
+      expect(
+        parseStorageConfig(configFrom({ STORAGE_URL_BASE: '/api/storage' }))
+          .urlBase,
+      ).toBe('/api/storage');
+    });
+
+    it('trims and strips trailing slashes', () => {
+      expect(
+        parseStorageConfig(
+          configFrom({ STORAGE_URL_BASE: '  /api/storage/  ' }),
+        ).urlBase,
+      ).toBe('/api/storage');
     });
   });
 
@@ -69,7 +91,7 @@ describe('parseStorageConfig', () => {
       ).toBe(MIN_S3_PRESIGN_TTL_SECONDS);
     });
 
-    it('clamps values above the maximum to 604800', () => {
+    it('clamps values above the maximum to 172800', () => {
       expect(
         parseStorageConfig(configFrom({ S3_PRESIGN_TTL: '999999999' }))
           .presignTtlSeconds,

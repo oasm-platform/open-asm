@@ -11,7 +11,12 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import {
   CreateBucketCommand,
+  GetBucketPolicyStatusCommand,
+  HeadBucketCommand,
+  PutBucketCorsCommand,
+  PutBucketPolicyCommand,
   PutObjectCommand,
+  PutPublicAccessBlockCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -64,7 +69,7 @@ describe('StorageService', () => {
   };
 
   beforeEach(async () => {
-    configValues = {};
+    configValues = { STORAGE_URL_BASE: '' };
     sendMock = jest.fn();
     mockRustFsClient.getClient.mockReturnValue({ send: sendMock });
     dataSourceQuery = jest.fn();
@@ -291,10 +296,71 @@ describe('StorageService', () => {
         sendMock.mock.calls.filter(([cmd]) => cmd instanceof CreateBucketCommand),
       ).toHaveLength(0);
     });
+
+    it('should store .svg with image/svg+xml Content-Type', async () => {
+      sendMock.mockResolvedValue({});
+
+      await service.uploadFile(
+        'connectors/logo.svg',
+        Buffer.from('<svg/>'),
+        'system',
+      );
+
+      expect(sendMock.mock.calls[0][0]).toBeInstanceOf(PutObjectCommand);
+      expect(sendMock.mock.calls[0][0].input).toMatchObject({
+        Bucket: 'system',
+        Key: 'connectors/logo.svg',
+        ContentType: 'image/svg+xml',
+      });
+    });
+
+    it('should store .png with image/png Content-Type', async () => {
+      sendMock.mockResolvedValue({});
+
+      await service.uploadFile(
+        'connectors/nuclei.png',
+        Buffer.from('png-bytes'),
+        'system',
+      );
+
+      expect(sendMock.mock.calls[0][0].input).toMatchObject({
+        ContentType: 'image/png',
+      });
+    });
+
+    it('should prefer the explicit contentType param over the extension derivation', async () => {
+      sendMock.mockResolvedValue({});
+
+      await service.uploadFile(
+        'connectors/logo.svg',
+        Buffer.from('<svg/>'),
+        'system',
+        'image/png',
+      );
+
+      expect(sendMock.mock.calls[0][0].input).toMatchObject({
+        ContentType: 'image/png',
+      });
+    });
+
+    it('should fall back to application/octet-stream for an unknown extension without throwing', async () => {
+      sendMock.mockResolvedValue({});
+
+      const result = await service.uploadFile(
+        'connectors/blob.unknownext',
+        Buffer.from('bytes'),
+        'system',
+      );
+
+      expect(result).toEqual({ path: 'system/connectors/blob.unknownext' });
+      expect(sendMock.mock.calls[0][0].input).toMatchObject({
+        ContentType: 'application/octet-stream',
+      });
+    });
   });
 
   describe('getPresignedUploadUrl', () => {
-    it('should default to 900s TTL and return the mocked url', async () => {
+    it('should default to 172800s TTL and return the mocked url', async () => {
       const result = await service.getPresignedUploadUrl({
         bucket: 'default',
         key: 'b/k',
@@ -304,14 +370,17 @@ describe('StorageService', () => {
         url: 'https://public-example/b/k?X-Amz-Signature=abc',
         key: 'b/k',
         path: 'default/b/k',
-        expiresIn: 900,
+        expiresIn: 172800,
       });
       expect(mockGetSignedUrl).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
           input: { Bucket: 'default', Key: 'b/k' },
         }),
-        { expiresIn: 900 },
+        expect.objectContaining({
+          expiresIn: 172800,
+          signingDate: expect.any(Date),
+        }),
       );
     });
 
@@ -326,22 +395,22 @@ describe('StorageService', () => {
       expect(mockGetSignedUrl).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        { expiresIn: 60 },
+        expect.objectContaining({ expiresIn: 60 }),
       );
     });
 
-    it('should clamp expiresIn above the maximum down to 604800', async () => {
+    it('should clamp expiresIn above the maximum down to 172800', async () => {
       const result = await service.getPresignedUploadUrl({
         bucket: 'default',
         key: 'b/k',
         expiresIn: 999999999,
       });
 
-      expect(result.expiresIn).toBe(604800);
+      expect(result.expiresIn).toBe(172800);
       expect(mockGetSignedUrl).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        { expiresIn: 604800 },
+        expect.objectContaining({ expiresIn: 172800 }),
       );
     });
 
@@ -357,10 +426,10 @@ describe('StorageService', () => {
         expect.objectContaining({
           input: { Bucket: 'default', Key: 'b/k', ContentType: 'image/png' },
         }),
-        {
-          expiresIn: 900,
+        expect.objectContaining({
+          expiresIn: 172800,
           signableHeaders: new Set(['content-type']),
-        },
+        }),
       );
     });
 
@@ -401,7 +470,7 @@ describe('StorageService', () => {
 
       expect(result).toEqual({
         url: 'https://public-example/b/k?X-Amz-Signature=abc',
-        expiresIn: 900,
+        expiresIn: 172800,
       });
       const command = mockGetSignedUrl.mock.calls[0][1] as {
         input: Record<string, unknown>;
@@ -415,7 +484,10 @@ describe('StorageService', () => {
       expect(mockGetSignedUrl).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        { expiresIn: 900 },
+        expect.objectContaining({
+          expiresIn: 172800,
+          signingDate: expect.any(Date),
+        }),
       );
     });
 
@@ -423,6 +495,503 @@ describe('StorageService', () => {
       await expect(
         service.getPresignedDownloadUrl({ bucket: 'default', key: '../a' }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('hour-bucketed signingDate', () => {
+    const lastSigningDate = () =>
+      (mockGetSignedUrl.mock.calls.at(-1)?.[2] as { signingDate: Date })
+        .signingDate;
+
+    it('should bucket signingDate to the start of the current UTC hour for uploads', async () => {
+      await service.getPresignedUploadUrl({ bucket: 'default', key: 'b/k' });
+
+      const signingDate = lastSigningDate();
+      const now = new Date();
+      expect(signingDate.getUTCMinutes()).toBe(0);
+      expect(signingDate.getUTCSeconds()).toBe(0);
+      expect(signingDate.getUTCMilliseconds()).toBe(0);
+      expect(signingDate.getUTCFullYear()).toBe(now.getUTCFullYear());
+      expect(signingDate.getUTCMonth()).toBe(now.getUTCMonth());
+      expect(signingDate.getUTCDate()).toBe(now.getUTCDate());
+      expect(signingDate.getUTCHours()).toBe(now.getUTCHours());
+    });
+
+    it('should bucket signingDate to the start of the current UTC hour for downloads', async () => {
+      await service.getPresignedDownloadUrl({ bucket: 'default', key: 'b/k' });
+
+      const signingDate = lastSigningDate();
+      expect(signingDate.getUTCMinutes()).toBe(0);
+      expect(signingDate.getUTCSeconds()).toBe(0);
+      expect(signingDate.getUTCMilliseconds()).toBe(0);
+    });
+
+    it('should emit an identical signingDate for repeated calls within the same hour', async () => {
+      await service.getPresignedDownloadUrl({ bucket: 'default', key: 'b/k' });
+      const first = lastSigningDate().getTime();
+      await service.getPresignedUploadUrl({ bucket: 'default', key: 'b/k' });
+      const second = lastSigningDate().getTime();
+
+      expect(second).toBe(first);
+    });
+
+    it('should never sign a future date', async () => {
+      await service.getPresignedDownloadUrl({ bucket: 'default', key: 'b/k' });
+
+      expect(lastSigningDate().getTime()).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('should produce a different signingDate after the hour rolls over', async () => {
+      jest.useFakeTimers();
+      try {
+        jest.setSystemTime(new Date('2026-01-01T10:30:00Z'));
+        await service.getPresignedDownloadUrl({ bucket: 'default', key: 'b/k' });
+        const first = lastSigningDate().getTime();
+        jest.setSystemTime(new Date('2026-01-01T11:05:00Z'));
+        await service.getPresignedDownloadUrl({ bucket: 'default', key: 'b/k' });
+        const second = lastSigningDate().getTime();
+
+        expect(second - first).toBe(3600000);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('should NOT bucket signingDate for short-TTL downloads so the URL is not already expired (F-1)', async () => {
+      jest.useFakeTimers();
+      try {
+        const now = new Date('2026-01-01T10:59:59.000Z');
+        jest.setSystemTime(now);
+        await service.getPresignedDownloadUrl({
+          bucket: 'screenshot',
+          key: 'a.png',
+          expiresIn: 900,
+        });
+        const opts = mockGetSignedUrl.mock.calls.at(-1)?.[2] as {
+          signingDate: Date;
+          expiresIn: number;
+        };
+        expect(opts.signingDate.getTime()).toBe(now.getTime());
+        expect(opts.signingDate.getTime() + opts.expiresIn * 1000).toBeGreaterThan(
+          now.getTime(),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('should NOT bucket signingDate for short-TTL uploads either (F-1)', async () => {
+      jest.useFakeTimers();
+      try {
+        const now = new Date('2026-01-01T10:59:59.000Z');
+        jest.setSystemTime(now);
+        await service.getPresignedUploadUrl({
+          bucket: 'screenshot',
+          key: 'a.png',
+          expiresIn: 900,
+        });
+        const opts = mockGetSignedUrl.mock.calls.at(-1)?.[2] as {
+          signingDate: Date;
+          expiresIn: number;
+        };
+        expect(opts.signingDate.getTime()).toBe(now.getTime());
+        expect(opts.signingDate.getTime() + opts.expiresIn * 1000).toBeGreaterThan(
+          now.getTime(),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('should still bucket signingDate for long TTLs (172800) at HH:59:59', async () => {
+      jest.useFakeTimers();
+      try {
+        const now = new Date('2026-01-01T10:59:59.000Z');
+        jest.setSystemTime(now);
+        await service.getPresignedDownloadUrl({
+          bucket: 'screenshot',
+          key: 'a.png',
+        });
+        const opts = mockGetSignedUrl.mock.calls.at(-1)?.[2] as {
+          signingDate: Date;
+          expiresIn: number;
+        };
+        expect(opts.expiresIn).toBe(172800);
+        expect(opts.signingDate.getTime()).toBe(
+          new Date('2026-01-01T10:00:00.000Z').getTime(),
+        );
+        expect(opts.signingDate.getTime() + opts.expiresIn * 1000).toBeGreaterThan(
+          now.getTime(),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  describe('getClientUrlForPath', () => {
+    const markApplied = (bucket: string) => {
+      const internals = service as unknown as {
+        publicReadApplied: Set<string>;
+      };
+      internals.publicReadApplied.add(bucket);
+    };
+
+    const setAddressing = (endpoint: string, forcePathStyle: boolean) => {
+      const internals = service as unknown as {
+        storageConfig: { publicEndpoint: string; forcePathStyle: boolean };
+      };
+      internals.storageConfig.publicEndpoint = endpoint;
+      internals.storageConfig.forcePathStyle = forcePathStyle;
+    };
+
+    const lastPresignInput = () =>
+      (mockGetSignedUrl.mock.calls.at(-1)?.[1] as { input: Record<string, unknown> })
+        .input;
+
+    it('should return a plain path-style URL for public+applied bucket', async () => {
+      markApplied('system');
+      setAddressing('http://localhost:9000', true);
+
+      const result = await service.getClientUrlForPath('system/logo.png');
+
+      expect(result).toEqual({
+        url: 'http://localhost:9000/system/logo.png',
+        expiresIn: null,
+      });
+      expect(mockGetSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('should return a virtual-hosted URL when forcePathStyle is false', async () => {
+      markApplied('cached-static');
+      setAddressing('https://s3.example.com', false);
+
+      const result = await service.getClientUrlForPath(
+        'cached-static/app.js',
+      );
+
+      expect(result).toEqual({
+        url: 'https://cached-static.s3.example.com/app.js',
+        expiresIn: null,
+      });
+      expect(mockGetSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('should fall back to signed for public+NOT-applied bucket', async () => {
+      const result = await service.getClientUrlForPath('system/logo.png');
+
+      expect(result).toEqual({
+        url: 'https://public-example/b/k?X-Amz-Signature=abc',
+        expiresIn: 172800,
+      });
+      expect(mockGetSignedUrl).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return signed not plain for system path when flag is off', async () => {
+      const result = await service.getClientUrlForPath('system/logo.png');
+
+      expect(result.expiresIn).toBe(172800);
+      expect(result.url).toContain('X-Amz-Signature');
+    });
+
+    it('should sign tenant screenshot key with derived ResponseContentType', async () => {
+      const result = await service.getClientUrlForPath('screenshot/abc123.png');
+
+      expect(result.expiresIn).toBe(172800);
+      expect(lastPresignInput()).toMatchObject({
+        Bucket: 'screenshot',
+        Key: 'abc123.png',
+        ResponseContentType: 'image/png',
+      });
+    });
+
+    it.each(['reports/x', 'job-results/x'])(
+      'should reject private path %p',
+      async (path) => {
+        await expect(service.getClientUrlForPath(path)).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(mockGetSignedUrl).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['default/x'])(
+      'should reject blocked path %p (F-2)',
+      async (path) => {
+        await expect(service.getClientUrlForPath(path)).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(mockGetSignedUrl).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['noslash', 'bogus/x'])(
+      'should reject malformed path %p',
+      async (path) => {
+        await expect(service.getClientUrlForPath(path)).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(mockGetSignedUrl).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should stay Promise.all-safe across mixed paths', async () => {
+      markApplied('system');
+
+      const [plain, signed] = await Promise.all([
+        service.getClientUrlForPath('system/a.png'),
+        service.getClientUrlForPath('screenshot/b.png'),
+      ]);
+
+      expect(plain.expiresIn).toBeNull();
+      expect(signed.expiresIn).toBe(172800);
+    });
+  });
+
+  describe('signStoragePaths', () => {
+    const markApplied = (bucket: string) => {
+      const internals = service as unknown as {
+        publicReadApplied: Set<string>;
+      };
+      internals.publicReadApplied.add(bucket);
+    };
+
+    const lastPresignInput = () =>
+      (mockGetSignedUrl.mock.calls.at(-1)?.[1] as { input: Record<string, unknown> })
+        .input;
+
+    it('should preserve order across mixed buckets with public plain and tenant signed', async () => {
+      markApplied('system');
+      markApplied('cached-static');
+
+      const urls = await service.signStoragePaths([
+        { bucket: 'system', path: 'system/logo.png' },
+        { bucket: 'screenshot', path: 'screenshot/abc123.png' },
+        { bucket: 'cached-static', path: 'cached-static/app.js' },
+      ]);
+
+      expect(urls).toHaveLength(3);
+      expect(urls[0]).toContain('/system/logo.png');
+      expect(urls[0]).not.toContain('X-Amz-Signature');
+      expect(urls[1]).toContain('X-Amz-Signature');
+      expect(urls[2]).toContain('/cached-static/app.js');
+      expect(lastPresignInput()).toMatchObject({
+        Bucket: 'screenshot',
+        Key: 'abc123.png',
+        ResponseContentType: 'image/png',
+      });
+    });
+
+    it('should delegate single-path wrapper with identical behaviour', async () => {
+      markApplied('system');
+
+      const plain = await service.signStoragePath('system/logo.png');
+      expect(plain).toContain('/system/logo.png');
+
+      const signed = await service.signStoragePath('screenshot/abc123.png');
+      expect(signed).toContain('X-Amz-Signature');
+    });
+
+    it('should map downloadFileName to attachment disposition', async () => {
+      const urls = await service.signStoragePaths([
+        {
+          bucket: 'reports',
+          path: 'report.pdf',
+          downloadFileName: 'final.pdf',
+        },
+      ]);
+
+      expect(urls[0]).toContain('X-Amz-Signature');
+      expect(lastPresignInput()).toMatchObject({
+        Bucket: 'reports',
+        Key: 'report.pdf',
+        ResponseContentDisposition: 'attachment; filename="final.pdf"',
+      });
+    });
+
+    it('should reject private/malformed items with 400', async () => {
+      await expect(
+        service.signStoragePaths([{ bucket: 'reports', path: 'reports/x' }]),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject blocked-bucket items with 400 (F-2)', async () => {
+      await expect(
+        service.signStoragePaths([{ bucket: 'default', path: 'default/x' }]),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.signStoragePaths([
+          {
+            bucket: 'default',
+            path: 'x.pdf',
+            downloadFileName: 'final.pdf',
+          },
+        ]),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should resolve null for malformed stored rows instead of throwing (F-5)', async () => {
+      const urls = await service.signStoragePaths([
+        { bucket: '', path: 'noslash' },
+        { bucket: '', path: '/leading-slash.png' },
+        { bucket: 'screenshot', path: 'screenshot/a.png' },
+      ]);
+      expect(urls[0]).toBeNull();
+      expect(urls[1]).toBeNull();
+      expect(urls[2]).toContain('X-Amz-Signature');
+      expect(mockGetSignedUrl).toHaveBeenCalledTimes(1);
+    });
+
+    it('should resolve null from the single-path wrapper for malformed input (F-5)', async () => {
+      await expect(service.signStoragePath('noslash')).resolves.toBeNull();
+      await expect(service.signStoragePath('/x.png')).resolves.toBeNull();
+      expect(mockGetSignedUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applyPublicReadPolicy', () => {
+    const appliedBuckets = () =>
+      (
+        service as unknown as {
+          publicReadApplied: Set<string>;
+        }
+      ).publicReadApplied;
+
+    const runInit = (
+      policyStatus: (bucket: string) => unknown,
+      opts?: { policyFailsOn?: string; accessBlockFails?: boolean },
+    ) => {
+      sendMock.mockImplementation((cmd: { input?: Record<string, unknown> }) => {
+        if (cmd instanceof HeadBucketCommand) return Promise.resolve({});
+        if (cmd instanceof PutBucketCorsCommand) return Promise.resolve({});
+        if (cmd instanceof PutPublicAccessBlockCommand) {
+          return opts?.accessBlockFails
+            ? Promise.reject(
+                new S3ServiceException({
+                  name: 'NotImplemented',
+                  message: 'Not implemented',
+                  $metadata: { httpStatusCode: 501 },
+                }),
+              )
+            : Promise.resolve({});
+        }
+        if (cmd instanceof PutBucketPolicyCommand) {
+          return (cmd.input?.Bucket as string) === opts?.policyFailsOn
+            ? Promise.reject(
+                new S3ServiceException({
+                  name: 'AccessDenied',
+                  message: 'Access Denied',
+                  $metadata: { httpStatusCode: 403 },
+                }),
+              )
+            : Promise.resolve({});
+        }
+        if (cmd instanceof GetBucketPolicyStatusCommand) {
+          return Promise.resolve(policyStatus(cmd.input?.Bucket as string));
+        }
+        return Promise.resolve({});
+      });
+      return service.onModuleInit();
+    };
+
+    it('should set the flag for both buckets when policy + verify succeed', async () => {
+      await runInit(() => ({ PolicyStatus: { IsPublic: true } }));
+
+      expect([...appliedBuckets()].sort()).toEqual([
+        'cached-static',
+        'system',
+      ]);
+      const result = await service.getClientUrlForPath('system/logo.png');
+      expect(result.expiresIn).toBeNull();
+      expect(mockGetSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('should grant GetObject-only to Principal * on the bucket ARN', async () => {
+      await runInit(() => ({ PolicyStatus: { IsPublic: true } }));
+
+      const policies = sendMock.mock.calls
+        .map(([cmd]: [object]) => cmd)
+        .filter(
+          (cmd): cmd is PutBucketPolicyCommand =>
+            cmd instanceof PutBucketPolicyCommand,
+        );
+      expect(policies).toHaveLength(2);
+      for (const cmd of policies as Array<{ input: Record<string, unknown> }>) {
+        const policy = JSON.parse(cmd.input.Policy as string) as {
+          Statement: Array<{
+            Effect: string;
+            Principal: string;
+            Action: string;
+            Resource: string;
+          }>;
+        };
+        expect(policy.Statement).toHaveLength(1);
+        expect(policy.Statement[0]).toMatchObject({
+          Effect: 'Allow',
+          Principal: '*',
+          Action: 's3:GetObject',
+          Resource: `arn:aws:s3:::${cmd.input.Bucket as string}/*`,
+        });
+      }
+    });
+
+    it('should leave the flag off and presign when PutBucketPolicy fails, without crashing boot', async () => {
+      await expect(
+        runInit(() => ({ PolicyStatus: { IsPublic: true } }), {
+          policyFailsOn: 'system',
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(appliedBuckets().has('system')).toBe(false);
+      expect(appliedBuckets().has('cached-static')).toBe(true);
+      const result = await service.getClientUrlForPath('system/logo.png');
+      expect(result.expiresIn).toBe(172800);
+      expect(result.url).toContain('X-Amz-Signature');
+    });
+
+    it('should leave the flag off when verification reports not public', async () => {
+      await expect(
+        runInit(() => ({ PolicyStatus: { IsPublic: false } })),
+      ).resolves.toBeUndefined();
+
+      expect(appliedBuckets().size).toBe(0);
+      const result = await service.getClientUrlForPath(
+        'cached-static/app.js',
+      );
+      expect(result.expiresIn).toBe(172800);
+    });
+
+    it('should leave the flag off when verification throws, without crashing boot', async () => {
+      sendMock.mockImplementation((cmd: object) => {
+        if (cmd instanceof HeadBucketCommand) return Promise.resolve({});
+        if (cmd instanceof PutBucketCorsCommand) return Promise.resolve({});
+        if (cmd instanceof PutPublicAccessBlockCommand)
+          return Promise.resolve({});
+        if (cmd instanceof PutBucketPolicyCommand) return Promise.resolve({});
+        if (cmd instanceof GetBucketPolicyStatusCommand)
+          return Promise.reject(
+            new S3ServiceException({
+              name: 'NotImplemented',
+              message: 'Not implemented',
+              $metadata: { httpStatusCode: 501 },
+            }),
+          );
+        return Promise.resolve({});
+      });
+
+      await expect(service.onModuleInit()).resolves.toBeUndefined();
+      expect(appliedBuckets().size).toBe(0);
+    });
+
+    it('should still set the flag when PutPublicAccessBlock is not implemented', async () => {
+      await runInit(() => ({ PolicyStatus: { IsPublic: true } }), {
+        accessBlockFails: true,
+      });
+
+      expect([...appliedBuckets()].sort()).toEqual([
+        'cached-static',
+        'system',
+      ]);
     });
   });
 
@@ -486,6 +1055,68 @@ describe('StorageService', () => {
       ['nope', 'blocked'],
     ])('should classify %p as %p', (bucket, expected) => {
       expect(service.getBucketAccess(bucket)).toBe(expected);
+    });
+  });
+
+  describe('getPresignTtlSeconds', () => {
+    it('should return the default 172800 when no env is set', () => {
+      expect(service.getPresignTtlSeconds()).toBe(172800);
+    });
+
+    it('should honor S3_PRESIGN_TTL within range', async () => {
+      configValues = { S3_PRESIGN_TTL: '1800' };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          StorageService,
+          { provide: RustFsClient, useValue: mockRustFsClient },
+          { provide: ConfigService, useValue: mockConfigService },
+          { provide: DataSource, useValue: { query: dataSourceQuery } },
+        ],
+      }).compile();
+
+      expect(module.get<StorageService>(StorageService).getPresignTtlSeconds()).toBe(
+        1800,
+      );
+    });
+
+    it('should clamp out-of-range S3_PRESIGN_TTL and fall back on garbage', async () => {
+      const build = async (ttl: string) => {
+        configValues = { S3_PRESIGN_TTL: ttl };
+        const module: TestingModule = await Test.createTestingModule({
+          providers: [
+            StorageService,
+            { provide: RustFsClient, useValue: mockRustFsClient },
+            { provide: ConfigService, useValue: mockConfigService },
+            { provide: DataSource, useValue: { query: dataSourceQuery } },
+          ],
+        }).compile();
+        return module.get<StorageService>(StorageService).getPresignTtlSeconds();
+      };
+
+      await expect(build('30')).resolves.toBe(60);
+      await expect(build('999999999')).resolves.toBe(172800);
+      await expect(build('not-a-number')).resolves.toBe(172800);
+    });
+
+    it('should surface the same TTL the presign helpers sign with', async () => {
+      configValues = { S3_PRESIGN_TTL: '1800' };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          StorageService,
+          { provide: RustFsClient, useValue: mockRustFsClient },
+          { provide: ConfigService, useValue: mockConfigService },
+          { provide: DataSource, useValue: { query: dataSourceQuery } },
+        ],
+      }).compile();
+      const ttlService = module.get<StorageService>(StorageService);
+
+      const result = await ttlService.getPresignedDownloadUrl({
+        bucket: 'system',
+        key: 'a/b.pdf',
+      });
+
+      expect(ttlService.getPresignTtlSeconds()).toBe(1800);
+      expect(result.expiresIn).toBe(1800);
     });
   });
 
@@ -646,6 +1277,79 @@ describe('StorageService', () => {
       );
     });
   });
+
+  describe('STORAGE_URL_BASE browser URL base', () => {
+    const setUrlBase = (base: string) => {
+      const internals = service as unknown as {
+        storageConfig: { urlBase: string };
+      };
+      internals.storageConfig.urlBase = base;
+    };
+
+    const markApplied = (bucket: string) => {
+      const internals = service as unknown as {
+        publicReadApplied: Set<string>;
+      };
+      internals.publicReadApplied.add(bucket);
+    };
+
+    it('relative mode: public+applied bucket returns a base-prefixed unsigned URL', async () => {
+      markApplied('system');
+      setUrlBase('/api/storage');
+
+      const result = await service.getClientUrlForPath('system/logo.png');
+
+      expect(result).toEqual({
+        url: '/api/storage/system/logo.png',
+        expiresIn: null,
+      });
+      expect(mockGetSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('relative mode: tenant signed URL is base-prefixed and keeps the signature', async () => {
+      setUrlBase('/api/storage');
+      mockGetSignedUrl.mockResolvedValueOnce(
+        'http://localhost:9000/screenshot/abc123.png?X-Amz-Signature=abc&X-Amz-Date=20260101T000000Z',
+      );
+
+      const result = await service.getClientUrlForPath(
+        'screenshot/abc123.png',
+      );
+
+      expect(result.expiresIn).toBe(172800);
+      expect(result.url.startsWith('/api/storage/screenshot/')).toBe(true);
+      expect(result.url).toContain('X-Amz-Signature');
+    });
+
+    it('relative mode: upload URL is base-prefixed', async () => {
+      setUrlBase('/api/storage');
+      mockGetSignedUrl.mockResolvedValueOnce(
+        'http://localhost:9000/default/u.png?X-Amz-Signature=abc',
+      );
+
+      const result = await service.getPresignedUploadUrl({
+        bucket: 'default',
+        key: 'u.png',
+      });
+
+      expect(result.url).toBe(
+        '/api/storage/default/u.png?X-Amz-Signature=abc',
+      );
+    });
+
+    it('absolute mode: URL is returned verbatim', async () => {
+      setUrlBase('');
+
+      const result = await service.getPresignedDownloadUrl({
+        bucket: 'default',
+        key: 'b/k',
+      });
+
+      expect(result.url).toBe(
+        'https://public-example/b/k?X-Amz-Signature=abc',
+      );
+    });
+  });
 });
 
 describe('RustFsClient credentials', () => {
@@ -775,6 +1479,21 @@ describe('RustFsClient credentials', () => {
 
     expect(mockS3ClientConfigs).toHaveLength(2);
     expect(mockS3ClientConfigs[1].endpoint).toBe('http://internal:9000');
+  });
+
+  it('should sign against RUSTFS_ENDPOINT path-style in relative mode', () => {
+    buildRustFsClient({
+      RUSTFS_ENDPOINT: 'http://internal:9000',
+      S3_PUBLIC_ENDPOINT: 'https://cdn.example.com',
+      S3_FORCE_PATH_STYLE: 'false',
+      STORAGE_URL_BASE: '/api/storage',
+    });
+
+    expect(mockS3ClientConfigs).toHaveLength(2);
+    const [internal, presign] = mockS3ClientConfigs;
+    expect(internal.endpoint).toBe('http://internal:9000');
+    expect(presign.endpoint).toBe('http://internal:9000');
+    expect(presign.forcePathStyle).toBe(true);
   });
 
   it('should apply S3_REGION/S3_FORCE_PATH_STYLE to both clients', () => {

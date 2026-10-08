@@ -1,7 +1,4 @@
-import {
-  ROLE_METADATA_KEY,
-  STORAGE_BASE_PATH,
-} from '@/common/constants/app.constants';
+import { ROLE_METADATA_KEY } from '@/common/constants/app.constants';
 import { Role } from '@/common/enums/enum';
 import type { ConfigService } from '@nestjs/config';
 import type {
@@ -11,7 +8,6 @@ import {
   ForbiddenException,
   NotFoundException,
   RequestMethod,
-  StreamableFile,
   UnauthorizedException,
 } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
@@ -27,8 +23,6 @@ import { StorageController } from './storage.controller';
 import { StorageService } from './storage.service';
 
 const LOGO_MAX_SIZE_BYTES = 5 * 1024 * 1024;
-const PUBLIC_METADATA_KEY = 'PUBLIC'; // matches Public() in app.decorator.ts
-const OPTIONAL_METADATA_KEY = 'OPTIONAL'; // matches Optional() in app.decorator.ts
 const reflector = new Reflector();
 
 const rolesOf = (handler: object) =>
@@ -46,7 +40,7 @@ describe('StorageController', () => {
   // not be re-implemented inside the mock. Only the S3 round-trips are stubbed.
   let storageService: StorageService;
   let systemConfigsService: jest.Mocked<
-    Pick<SystemConfigsService, 'getConfig' | 'updateConfig'>
+    Pick<SystemConfigsService, 'getConfig' | 'getRawLogoPath' | 'updateConfig'>
   >;
   let workspacesService: jest.Mocked<
     Pick<WorkspacesService, 'getMembershipWithPermissions'>
@@ -80,14 +74,10 @@ describe('StorageController', () => {
       .spyOn(storageService, 'headObject')
       .mockResolvedValue({ contentType: 'image/png', contentLength: 1024 });
     jest.spyOn(storageService, 'deleteFile').mockResolvedValue(undefined);
-    jest.spyOn(storageService, 'getFile').mockResolvedValue({
-      file: new StreamableFile(Buffer.from('image-bytes')),
-      etag: '"image-etag"',
-      lastModified: new Date('2026-01-01T00:00:00Z'),
-    });
 
     systemConfigsService = {
       getConfig: jest.fn().mockResolvedValue({ name: 'OASM', logoPath: null }),
+      getRawLogoPath: jest.fn().mockResolvedValue(null),
       updateConfig: jest
         .fn()
         .mockResolvedValue({ message: 'System configuration updated' }),
@@ -593,10 +583,9 @@ describe('StorageController', () => {
     });
 
     it('activates the logo and removes the previous one', async () => {
-      systemConfigsService.getConfig.mockResolvedValue({
-        name: 'OASM',
-        logoPath: `${STORAGE_BASE_PATH}/system/old-logo.png`,
-      });
+      systemConfigsService.getRawLogoPath.mockResolvedValue(
+        'system/old-logo.png',
+      );
 
       const result = await controller.confirmLogoUpload({ key });
 
@@ -611,11 +600,44 @@ describe('StorageController', () => {
       expect(result).toEqual({ message: 'Logo uploaded successfully' });
     });
 
-    it('skips the delete when the previous logo is the object being confirmed', async () => {
+    it('deletes by the raw path even when the DTO logoPath is an absolute signed URL', async () => {
+      systemConfigsService.getRawLogoPath.mockResolvedValue(
+        'system/old-logo.png',
+      );
       systemConfigsService.getConfig.mockResolvedValue({
         name: 'OASM',
-        logoPath: `${STORAGE_BASE_PATH}/system/${key}`,
+        logoPath:
+          'http://localhost:9000/system/old-logo.png?X-Amz-Signature=abc&X-Amz-Expires=900',
       });
+
+      await controller.confirmLogoUpload({ key });
+
+      expect(systemConfigsService.getRawLogoPath).toHaveBeenCalled();
+      expect(storageService.deleteFile).toHaveBeenCalledWith(
+        'old-logo.png',
+        'system',
+      );
+    });
+
+    it('deletes by the raw path even when the DTO logoPath is a virtual-hosted URL', async () => {
+      systemConfigsService.getRawLogoPath.mockResolvedValue(
+        'system/old-logo.png',
+      );
+      systemConfigsService.getConfig.mockResolvedValue({
+        name: 'OASM',
+        logoPath: 'http://system.localhost:9000/old-logo.png',
+      });
+
+      await controller.confirmLogoUpload({ key });
+
+      expect(storageService.deleteFile).toHaveBeenCalledWith(
+        'old-logo.png',
+        'system',
+      );
+    });
+
+    it('skips the delete when the previous logo is the object being confirmed', async () => {
+      systemConfigsService.getRawLogoPath.mockResolvedValue(`system/${key}`);
 
       await controller.confirmLogoUpload({ key });
 
@@ -635,10 +657,9 @@ describe('StorageController', () => {
     });
 
     it('still confirms when the stale object cannot be deleted', async () => {
-      systemConfigsService.getConfig.mockResolvedValue({
-        name: 'OASM',
-        logoPath: `${STORAGE_BASE_PATH}/system/old-logo.png`,
-      });
+      systemConfigsService.getRawLogoPath.mockResolvedValue(
+        'system/old-logo.png',
+      );
       jest
         .spyOn(storageService, 'deleteFile')
         .mockRejectedValue(new Error('NoSuchKey'));
@@ -652,10 +673,9 @@ describe('StorageController', () => {
     });
 
     it('logs why a stale object could not be deleted', async () => {
-      systemConfigsService.getConfig.mockResolvedValue({
-        name: 'OASM',
-        logoPath: `${STORAGE_BASE_PATH}/system/old-logo.png`,
-      });
+      systemConfigsService.getRawLogoPath.mockResolvedValue(
+        'system/old-logo.png',
+      );
       jest
         .spyOn(storageService, 'deleteFile')
         .mockRejectedValue(new Error('NoSuchKey'));
@@ -803,442 +823,6 @@ describe('StorageController', () => {
     });
   });
 
-  describe('getFile', () => {
-    const user = { id: 'user-1' } as UserContextPayload;
-    const res = { set: jest.fn(), status: jest.fn() };
-
-    beforeEach(() => {
-      res.set.mockClear();
-      res.status.mockClear();
-      jest
-        .spyOn(storageService, 'resolveObjectWorkspaceIds')
-        .mockResolvedValue([]);
-    });
-
-    it('is optional-auth (not public), presignDownload is neither', () => {
-      expect(
-        Reflect.getMetadata(
-          OPTIONAL_METADATA_KEY,
-          StorageController.prototype.getFile,
-        ),
-      ).toBe(true);
-      expect(
-        Reflect.getMetadata(
-          PUBLIC_METADATA_KEY,
-          StorageController.prototype.getFile,
-        ),
-      ).toBeUndefined();
-
-      for (const handler of [
-        'presignUpload',
-        'presignDownload',
-        'presignLogoUpload',
-        'confirmLogoUpload',
-      ]) {
-        expect(
-          Reflect.getMetadata(
-            PUBLIC_METADATA_KEY,
-            (
-              StorageController.prototype as unknown as Record<string, object>
-            )[handler],
-          ),
-        ).toBeUndefined();
-      }
-    });
-
-    it('lets anonymous reads of the system bucket through', async () => {
-      const file = await controller.getFile('system', 'logo/a.png', res, undefined);
-
-      expect(storageService.getFile).toHaveBeenCalledWith('logo/a.png', 'system');
-      expect(file).toBeInstanceOf(StreamableFile);
-    });
-
-    it('rejects anonymous reads of cached-static with 401', async () => {
-      await expect(
-        controller.getFile('cached-static', 'a/b.js', res, undefined),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
-
-      expect(storageService.getFile).not.toHaveBeenCalled();
-    });
-
-    it('lets authenticated reads of cached-static through', async () => {
-      const file = await controller.getFile('cached-static', 'a/b.js', res, user);
-
-      expect(storageService.getFile).toHaveBeenCalledWith('a/b.js', 'cached-static');
-      expect(file).toBeInstanceOf(StreamableFile);
-    });
-
-    it('rejects anonymous reads of a tenant bucket with 401', async () => {
-      await expect(
-        controller.getFile('screenshot', 'abc.png', res, undefined),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
-
-      expect(storageService.getFile).not.toHaveBeenCalled();
-    });
-
-    it('lets an owning-workspace member read a screenshot', async () => {
-      jest
-        .spyOn(storageService, 'resolveObjectWorkspaceIds')
-        .mockResolvedValue(['ws-a']);
-      workspacesService.getMembershipWithPermissions.mockResolvedValue({
-        membership: {},
-        permissionKeys: [],
-      } as never);
-
-      const file = await controller.getFile('screenshot', 'abc.png', res, user);
-
-      expect(workspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(
-        'ws-a',
-        'user-1',
-      );
-      expect(storageService.getFile).toHaveBeenCalledWith('abc.png', 'screenshot');
-      expect(file).toBeInstanceOf(StreamableFile);
-    });
-
-    it('authorizes membership of ANY owning workspace on a shared key', async () => {
-      jest
-        .spyOn(storageService, 'resolveObjectWorkspaceIds')
-        .mockResolvedValue(['ws-a', 'ws-b']);
-      workspacesService.getMembershipWithPermissions
-        .mockRejectedValueOnce(new NotFoundException('Workspace member not found'))
-        .mockResolvedValueOnce({ membership: {}, permissionKeys: [] } as never);
-
-      await controller.getFile('screenshot', 'shared.png', res, user);
-
-      expect(workspacesService.getMembershipWithPermissions).toHaveBeenNthCalledWith(
-        1,
-        'ws-a',
-        'user-1',
-      );
-      expect(workspacesService.getMembershipWithPermissions).toHaveBeenNthCalledWith(
-        2,
-        'ws-b',
-        'user-1',
-      );
-      expect(storageService.getFile).toHaveBeenCalledWith('shared.png', 'screenshot');
-    });
-
-    it('rejects a member of an unrelated workspace with 403', async () => {
-      jest
-        .spyOn(storageService, 'resolveObjectWorkspaceIds')
-        .mockResolvedValue(['ws-a']);
-      workspacesService.getMembershipWithPermissions.mockRejectedValue(
-        new NotFoundException('Workspace member not found'),
-      );
-
-      await expect(
-        controller.getFile('screenshot', 'abc.png', res, user),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-
-      expect(storageService.getFile).not.toHaveBeenCalled();
-    });
-
-    it('maps an unowned tenant key to 404 for an authenticated user', async () => {
-      jest
-        .spyOn(storageService, 'resolveObjectWorkspaceIds')
-        .mockResolvedValue([]);
-
-      await expect(
-        controller.getFile('screenshot', 'missing.png', res, user),
-      ).rejects.toBeInstanceOf(NotFoundException);
-
-      expect(workspacesService.getMembershipWithPermissions).not.toHaveBeenCalled();
-      expect(storageService.getFile).not.toHaveBeenCalled();
-    });
-
-    it('maps the default bucket to 404', async () => {
-      await expect(
-        controller.getFile('default', 'images/logo.png', res, user),
-      ).rejects.toBeInstanceOf(NotFoundException);
-
-      expect(storageService.getFile).not.toHaveBeenCalled();
-    });
-
-    it('maps an unknown bucket to 404', async () => {
-      await expect(
-        controller.getFile('nope', 'a/b.pdf', res, user),
-      ).rejects.toBeInstanceOf(NotFoundException);
-
-      expect(storageService.getFile).not.toHaveBeenCalled();
-    });
-
-    it('refuses a private bucket', async () => {
-      await expect(
-        controller.getFile('reports', 'a/b.pdf', res, user),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-
-      expect(storageService.getFile).not.toHaveBeenCalled();
-    });
-
-    it('rethrows a membership lookup failure instead of mapping it', async () => {
-      jest
-        .spyOn(storageService, 'resolveObjectWorkspaceIds')
-        .mockResolvedValue(['ws-a']);
-      workspacesService.getMembershipWithPermissions.mockRejectedValue(
-        new Error('db down'),
-      );
-
-      await expect(
-        controller.getFile('screenshot', 'abc.png', res, user),
-      ).rejects.toThrow('db down');
-
-      expect(storageService.getFile).not.toHaveBeenCalled();
-    });
-
-    it('strips the leading slash and sets the image content type', async () => {
-      const set = jest.fn();
-
-      await controller.getFile(
-        'system',
-        '/images/logo.png',
-        { set, status: jest.fn() },
-        undefined,
-      );
-
-      expect(storageService.getFile).toHaveBeenCalledWith(
-        'images/logo.png',
-        'system',
-      );
-      expect(set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          'Content-Type': 'image/png',
-          'Cache-Control': expect.stringContaining('max-age='),
-        }),
-      );
-    });
-
-    describe('conditional GET', () => {
-      const etag = '"image-etag"';
-      const lastModified = new Date('2026-01-01T00:00:00Z');
-      const makeRes = () => ({ set: jest.fn(), status: jest.fn() });
-
-      it('returns 304 with an empty body when If-None-Match matches', async () => {
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          etag,
-        );
-
-        expect(res.status).toHaveBeenCalledWith(304);
-        expect(result).toBeUndefined();
-        expect(res.set).toHaveBeenCalledWith(
-          expect.objectContaining({ ETag: etag }),
-        );
-      });
-
-      it('returns 200 when If-None-Match does not match', async () => {
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          '"bogus"',
-        );
-
-        expect(res.status).not.toHaveBeenCalled();
-        expect(result).toBeInstanceOf(StreamableFile);
-      });
-
-      it('returns 304 for If-None-Match: *', async () => {
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          '*',
-        );
-
-        expect(res.status).toHaveBeenCalledWith(304);
-        expect(result).toBeUndefined();
-      });
-
-      it('matches a weak entity-tag against a strong one', async () => {
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          'W/"image-etag"',
-        );
-
-        expect(res.status).toHaveBeenCalledWith(304);
-        expect(result).toBeUndefined();
-      });
-
-      it('matches a multi-value If-None-Match list', async () => {
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          '"other", "image-etag"',
-        );
-
-        expect(res.status).toHaveBeenCalledWith(304);
-        expect(result).toBeUndefined();
-      });
-
-      it('never returns 304 when storage provides no ETag', async () => {
-        jest.spyOn(storageService, 'getFile').mockResolvedValueOnce({
-          file: new StreamableFile(Buffer.from('image-bytes')),
-          etag: null,
-          lastModified,
-        });
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          '*',
-        );
-
-        expect(res.status).not.toHaveBeenCalled();
-        expect(result).toBeInstanceOf(StreamableFile);
-      });
-
-      it('destroys the opened body stream instead of holding the socket on 304', async () => {
-        const file = new StreamableFile(Buffer.from('image-bytes'));
-        const destroy = jest.spyOn(file.getStream(), 'destroy');
-        jest.spyOn(storageService, 'getFile').mockResolvedValueOnce({
-          file,
-          etag,
-          lastModified,
-        });
-        const res = makeRes();
-
-        await controller.getFile('system', 'logo/a.png', res, undefined, etag);
-
-        expect(destroy).toHaveBeenCalled();
-      });
-
-      it('uses the public cache matrix for the system bucket', async () => {
-        const res = makeRes();
-
-        await controller.getFile('system', 'logo/a.png', res, undefined);
-
-        expect(res.set).toHaveBeenCalledWith(
-          expect.objectContaining({
-            'Cache-Control': expect.stringContaining('public'),
-          }),
-        );
-      });
-
-      it('uses the private cache matrix for a screenshot read', async () => {
-        jest
-          .spyOn(storageService, 'resolveObjectWorkspaceIds')
-          .mockResolvedValue(['ws-a']);
-        workspacesService.getMembershipWithPermissions.mockResolvedValue({
-          membership: {},
-          permissionKeys: [],
-        } as never);
-        const res = makeRes();
-
-        await controller.getFile('screenshot', 'abc.png', res, user);
-
-        expect(res.set).toHaveBeenCalledWith(
-          expect.objectContaining({
-            'Cache-Control': expect.stringContaining('private'),
-          }),
-        );
-      });
-
-      it('always sets Last-Modified when storage provides one', async () => {
-        const res = makeRes();
-
-        await controller.getFile('system', 'logo/a.png', res, undefined);
-
-        expect(res.set).toHaveBeenCalledWith(
-          expect.objectContaining({
-            'Last-Modified': lastModified.toUTCString(),
-          }),
-        );
-      });
-
-      it('lets a matching ETag win over a stale If-Modified-Since', async () => {
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          etag,
-          new Date('2020-01-01T00:00:00Z').toUTCString(),
-        );
-
-        expect(res.status).toHaveBeenCalledWith(304);
-        expect(result).toBeUndefined();
-      });
-
-      it('lets a mismatching ETag win over a fresh If-Modified-Since', async () => {
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          '"bogus"',
-          new Date('2026-06-01T00:00:00Z').toUTCString(),
-        );
-
-        expect(res.status).not.toHaveBeenCalled();
-        expect(result).toBeInstanceOf(StreamableFile);
-      });
-
-      it('returns 304 for a fresh If-Modified-Since when If-None-Match is absent', async () => {
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          undefined,
-          new Date('2026-06-01T00:00:00Z').toUTCString(),
-        );
-
-        expect(res.status).toHaveBeenCalledWith(304);
-        expect(result).toBeUndefined();
-      });
-
-      it('returns 200 for a stale If-Modified-Since when If-None-Match is absent', async () => {
-        const res = makeRes();
-
-        const result = await controller.getFile(
-          'system',
-          'logo/a.png',
-          res,
-          undefined,
-          undefined,
-          new Date('2020-01-01T00:00:00Z').toUTCString(),
-        );
-
-        expect(res.status).not.toHaveBeenCalled();
-        expect(result).toBeInstanceOf(StreamableFile);
-      });
-    });
-  });
-
-  /**
-   * Route-ordering regression guard. Nest/Express matches routes in declaration
-   * order, so a literal route declared after a `:param` wildcard is unreachable.
-   * Reordering the handlers below silently breaks the presign endpoints.
-   */
   describe('route declarations', () => {
     const declaredRoutes = () =>
       Object.getOwnPropertyNames(StorageController.prototype)
@@ -1270,24 +854,13 @@ describe('StorageController', () => {
       );
     });
 
-    it('keeps the literal presign routes ahead of the :bucket/:path wildcard', () => {
+    it('exposes only presign and logo routes (no byte-streaming wildcard)', () => {
       expect(declaredRoutes()).toEqual([
         { name: 'presignLogoUpload', route: 'POST /logo/presign' },
         { name: 'confirmLogoUpload', route: 'POST /logo/confirm' },
         { name: 'presignUpload', route: 'POST /presign/upload' },
         { name: 'presignDownload', route: 'GET /presign/download' },
-        { name: 'getFile', route: 'GET /:bucket/:path' },
       ]);
-    });
-
-    it('declares GET presign/download before the GET wildcard', () => {
-      const routes = declaredRoutes().map((entry) => entry.route);
-      const downloadIndex = routes.indexOf('GET /presign/download');
-      const wildcardIndex = routes.indexOf('GET /:bucket/:path');
-
-      expect(downloadIndex).toBeGreaterThanOrEqual(0);
-      expect(wildcardIndex).toBeGreaterThanOrEqual(0);
-      expect(downloadIndex).toBeLessThan(wildcardIndex);
     });
   });
 });

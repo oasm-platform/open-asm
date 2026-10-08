@@ -14,6 +14,13 @@ export interface StorageConfigSource {
 export interface StorageConfig {
   /** Browser-reachable storage origin used to sign presigned URLs. */
   publicEndpoint: string;
+  /**
+   * Same-origin prefix the browser hits for storage, e.g. `/api/storage`.
+   * Empty => absolute mode (URLs point at `publicEndpoint`); non-empty =>
+   * relative mode (dev/docker: presign against `RUSTFS_ENDPOINT` path-style and
+   * prefix the path with this base). Trailing slashes stripped.
+   */
+  urlBase: string;
   region: string;
   forcePathStyle: boolean;
   /** Clamped into [MIN_S3_PRESIGN_TTL_SECONDS, MAX_S3_PRESIGN_TTL_SECONDS]. */
@@ -28,9 +35,9 @@ export interface StorageConfig {
 export const DEFAULT_RUSTFS_ENDPOINT = 'http://localhost:9000';
 export const DEFAULT_S3_REGION = 'us-east-1';
 export const DEFAULT_S3_FORCE_PATH_STYLE = true;
-export const DEFAULT_S3_PRESIGN_TTL_SECONDS = 900;
+export const DEFAULT_S3_PRESIGN_TTL_SECONDS = 172800;
 export const MIN_S3_PRESIGN_TTL_SECONDS = 60;
-export const MAX_S3_PRESIGN_TTL_SECONDS = 604800;
+export const MAX_S3_PRESIGN_TTL_SECONDS = 172800;
 export const DEFAULT_S3_USE_DEFAULT_CREDENTIALS = false;
 
 const logger = new Logger('StorageConfig');
@@ -136,6 +143,7 @@ export function parseStorageConfig(
       readString(source, 'S3_PUBLIC_ENDPOINT') ||
       readString(source, 'RUSTFS_ENDPOINT') ||
       DEFAULT_RUSTFS_ENDPOINT,
+    urlBase: readString(source, 'STORAGE_URL_BASE').replace(/\/+$/, ''),
     region: readString(source, 'S3_REGION') || DEFAULT_S3_REGION,
     forcePathStyle: parseBoolean(
       source,
