@@ -8,7 +8,8 @@ import {
   UserContextPayload,
 } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { AuditLog } from '../audit/audit-log.decorator';
+import { EVENT_CATALOG } from '../connectors/event';
+import { PublishEvent } from '../event-bridge/publish-event.decorator';
 import { AuditService } from '../audit/audit.service';
 import {
   Body,
@@ -52,7 +53,7 @@ export class TargetsController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('target.created', {
+  @PublishEvent(EVENT_CATALOG.target.created, {
     // Best-effort changes from the body — record the requested target values,
     // never echo back the full created entities.
     changes: (body) => {
@@ -228,7 +229,7 @@ export class TargetsController {
       serialization: Target,
     },
   })
-  @AuditLog('target.updated', {
+  @PublishEvent(EVENT_CATALOG.target.updated, {
     // Best-effort changes from the body — only fields present in the request.
     changes: (body) => {
       const dto = body as UpdateTargetDto | undefined;

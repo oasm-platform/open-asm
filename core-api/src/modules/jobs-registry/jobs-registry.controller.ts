@@ -21,7 +21,8 @@ import {
 } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { plainToInstance } from 'class-transformer';
-import { AuditLog } from '../audit/audit-log.decorator';
+import { EVENT_CATALOG } from '../connectors/event';
+import { PublishEvent } from '../event-bridge/publish-event.decorator';
 import { Asset } from '../assets/entities/assets.entity';
 import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
@@ -363,7 +364,7 @@ export class JobsRegistryController {
     return this.jobsRegistryService.reRunJob(workspaceId, params.id);
   }
 
-  @AuditLog('job.cancelled')
+  @PublishEvent(EVENT_CATALOG.job.cancelled)
   @WorkspaceAccess('job.write')
   @Doc({
     summary: 'Cancel a job',
@@ -383,7 +384,7 @@ export class JobsRegistryController {
     return this.jobsRegistryService.cancelJob(workspaceId, params.id);
   }
 
-  @AuditLog('job.cancelled')
+  @PublishEvent(EVENT_CATALOG.job.cancelled)
   @WorkspaceAccess('job.write')
   @Doc({
     summary: 'Cancel a job history',

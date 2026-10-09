@@ -11,7 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { AuditLog } from '../audit/audit-log.decorator';
+import { EVENT_CATALOG } from '../connectors/event';
+import { PublishEvent } from '../event-bridge/publish-event.decorator';
 import {
   UserContext,
   WorkspaceId,
@@ -82,7 +83,7 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('workflow.created', {
+  @PublishEvent(EVENT_CATALOG.workflow.created, {
     resourceId: (result) => (result as Workflow | undefined)?.id,
     changes: (body) => ({
       name: { after: (body as CreateWorkflowDto | undefined)?.name ?? '' },
@@ -134,7 +135,7 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('workflow.updated', {
+  @PublishEvent(EVENT_CATALOG.workflow.updated, {
     resourceId: (result) => (result as Workflow | undefined)?.id,
     changes: (body) => {
       const dto = body as UpdateWorkflowDto | undefined;
@@ -165,7 +166,7 @@ export class WorkflowsController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('workflow.deleted')
+  @PublishEvent(EVENT_CATALOG.workflow.deleted)
   @WorkspaceAccess('workflow.write')
   @Delete(':id')
   async deleteWorkflow(

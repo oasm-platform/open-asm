@@ -3,16 +3,13 @@ import { Test } from '@nestjs/testing';
 import * as crypto from 'crypto';
 import type { InsertResult } from 'typeorm';
 import { DataSource } from 'typeorm';
-import {
-  NotificationType,
-  Severity,
-  ToolCategory,
-} from '../../common/enums/enum';
+import { Severity, ToolCategory } from '../../common/enums/enum';
 import type { Asset } from '../assets/entities/assets.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
 import { IssuesService } from '../issues/issues.service';
 import type { Job } from '../jobs-registry/entities/job.entity';
-import { NotificationsService } from '../notifications/notifications.service';
+import { EventBridgeService } from '../event-bridge/event-bridge.service';
+import { EVENT_CATALOG } from '../connectors/event';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -23,7 +20,7 @@ describe('DataAdapterService', () => {
   let mockQueryRunner: any;
   let mockDataSource: any;
   let mockWorkspacesService: any;
-  let mockNotificationsService: any;
+  let mockEventBridge: any;
 
   beforeEach(async () => {
     mockQueryRunner = {
@@ -107,16 +104,16 @@ describe('DataAdapterService', () => {
           },
         },
         {
-          provide: NotificationsService,
+          provide: EventBridgeService,
           useValue: {
-            createNotification: jest.fn(),
+            publishSafely: jest.fn(),
           },
         },
       ],
     }).compile();
 
     service = module.get<DataAdapterService>(DataAdapterService);
-    mockNotificationsService = module.get(NotificationsService);
+    mockEventBridge = module.get(EventBridgeService);
 
     // Mock validateData method to return true for valid data and false for invalid data
     jest.spyOn(service, 'validateData').mockImplementation((data, cls) => {
@@ -1422,12 +1419,13 @@ describe('DataAdapterService', () => {
         job: mockJob,
       });
 
-      // Should have called createNotification with count=1 (only new vuln)
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+      // Should publish vulnerability.detected with count=1 (only the new vuln)
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.vulnerability.detected,
         expect.objectContaining({
-          type: NotificationType.NEW_VULNERABILITY_FOUND,
-          metadata: expect.objectContaining({
-            count: '1',
+          workspaceId: 'workspace-id',
+          payload: expect.objectContaining({
+            count: 1,
           }),
         }),
       );
@@ -1481,7 +1479,7 @@ describe('DataAdapterService', () => {
 
       // Should NOT have called createNotification
       expect(
-        mockNotificationsService.createNotification,
+        mockEventBridge.publishSafely,
       ).not.toHaveBeenCalled();
     });
 
@@ -1530,14 +1528,12 @@ describe('DataAdapterService', () => {
         job: mockJob,
       });
 
-      // Should have called createNotification (low severity now triggers notification)
-      expect(
-        mockNotificationsService.createNotification,
-      ).toHaveBeenCalledWith(
+      // Should publish the event (low severity now triggers it)
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.vulnerability.detected,
         expect.objectContaining({
-          type: NotificationType.NEW_VULNERABILITY_FOUND,
-          metadata: expect.objectContaining({
-            count: '1',
+          payload: expect.objectContaining({
+            count: 1,
           }),
         }),
       );

@@ -1,13 +1,12 @@
-import { BullMQName, NotificationStatus } from '@/common/enums/enum';
-import { InjectQueue } from '@nestjs/bullmq';
+import { NotificationStatus } from '@/common/enums/enum';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Queue } from 'bullmq';
 import { In, Repository } from 'typeorm';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
 import { Notification } from './entities/notification.entity';
 
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { NotificationsSinkService } from '../event-bridge/notifications.sink.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { I18nService } from 'nestjs-i18n';
@@ -17,18 +16,41 @@ import { NotificationResponseDto } from './dto/notification.dto';
 @Injectable()
 export class NotificationsService {
   constructor(
-    @InjectQueue(BullMQName.NOTIFICATION)
-    private notificationQueue: Queue,
     @InjectRepository(NotificationRecipient)
     private notificationRecipientRepo: Repository<NotificationRecipient>,
     @InjectRepository(Notification)
     private notificationRepo: Repository<Notification>,
     private readonly i18n: I18nService,
     private readonly redisService: RedisService,
+    private readonly sink: NotificationsSinkService,
   ) {}
 
+  /**
+   * Delivers a notification to an EXPLICIT recipient list, inline.
+   *
+   * This is the path for notifications addressed to specific people rather than
+   * to a workspace's membership — today only the workspace invitation, which
+   * goes to the user who raised it. Its recipient set is a function of who was
+   * invited, so it cannot be derived from a domain event, and defaulting to
+   * "all members" would send invitations to people who were never involved.
+   *
+   * Everything addressed to a workspace goes through the `notifications`
+   * consumer group instead, so this is no longer the general path — it is the
+   * exception that needs a hand-picked audience.
+   *
+   * It writes inline rather than through a queue because the volume is a
+   * handful per invitation, and the delivery path (`sink.deliver`) is shared
+   * with the consumer lane — leaving exactly one implementation of what a
+   * notification row looks like.
+   */
   async createNotification(body: CreateNotificationDto) {
-    await this.notificationQueue.add(BullMQName.NOTIFICATION, body);
+    await this.sink.deliver(
+      body.workspaceId,
+      { type: body.type, scope: body.scope },
+      body.recipients,
+      body.metadata ?? {},
+      body.ref && body.refId ? { name: body.ref, id: body.refId } : undefined,
+    );
   }
 
   subscribeToStream(userId: string) {

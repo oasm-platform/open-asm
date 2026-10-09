@@ -3,11 +3,13 @@ import { MCP_API_KEY_HEADER } from '@/common/constants/app.constants';
 import type { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 import type { AuditAction } from './constants/audit-events';
 import type { GetAuditEventsQueryDto } from './dto/audit.dto';
 import { AuditEvent } from './entities/audit-event.entity';
+import { redactSecrets } from '../event-bridge/redact-secrets';
 
 /** Separator between the occurredAt ISO and the id inside a keyset cursor. */
 const CURSOR_SEPARATOR = '|';
@@ -78,6 +80,11 @@ export type AuditMetadataValue = string | number | boolean | string[];
 
 export interface AuditEventInput {
   workspaceId?: string;
+  /**
+   * CloudEvents id of the originating stream entry, when the row came from the
+   * audit sink. Omitted by explicit in-transaction writes, which mint their own.
+   */
+  eventId?: string;
   actorId?: string;
   actorType?: AuditActorType;
   actorName?: string | null;
@@ -110,30 +117,6 @@ export interface AuditContext {
   requestId?: string;
 }
 
-/**
- * Key names whose values must never reach the audit JSONB payloads. Matches
- * key names (case-insensitive), applied recursively by `redactSecrets`.
- */
-const SECRET_KEY_RE =
-  /(secret|token|password|credential|api.?key|private.?key|access.?key|authorization|bearer|passphrase|cert|ssh.?key)/i;
-
-/** Prefixes that mark a VALUE as a credential (OpenAI sk-, AWS AKIA, PEM). */
-const SECRET_VALUE_PREFIX_RE = /^(sk-|AKIA|-----BEGIN)/i;
-/**
- * Long, delimiter-free strings are almost certainly keys or tokens. The
- * threshold (40) is above UUID length (36) to avoid over-redacting resource
- * identifiers while still catching the bulk of real-world API tokens
- * (GitHub 'ghp_', Slack 'xoxb-', PATs, etc.).
- */
-const SECRET_VALUE_LONG_RE = /^[A-Za-z0-9+/=_-]+$/;
-
-const looksLikeSecretValue = (value: string): boolean =>
-  SECRET_VALUE_PREFIX_RE.test(value) ||
-  (value.length >= 40 && SECRET_VALUE_LONG_RE.test(value));
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
@@ -145,9 +128,24 @@ export class AuditService {
   ) {}
 
   /**
-   * Writes one audit row on the caller's transaction manager — the explicit
-   * path used for critical events that must commit atomically with the
-   * mutation (workspace.deleted, member.removed, permission groups, ...).
+   * Writes one audit row on the caller's transaction manager.
+   *
+   * This is the SECOND of the two audit write paths, and it exists for a
+   * specific reason. Most audited actions go through `@PublishEvent` and reach
+   * the table asynchronously via the stream consumer. A handful cannot: they
+   * must commit ATOMICALLY with the mutation, and they need a BEFORE state the
+   * decorator cannot see (the row is already deleted, or the previous
+   * permissions are only in hand inside the service).
+   *
+   * Those callers live in `WorkspacesService` — workspace.deleted,
+   * member.removed, member.permissions.updated and the three permission_group
+   * actions — and none of them is also decorated, so no action is written twice.
+   * `audit-wiring` specs assert that absence; if you decorate one of those
+   * handlers, the action gets a second row with a different `eventId`.
+   *
+   * `audit.exported` self-logs here too, for the same reason: it must be
+   * recorded before the CSV starts streaming.
+   *
    * Never catches: errors propagate so the surrounding transaction rolls back.
    */
   async recordInTx(
@@ -155,6 +153,11 @@ export class AuditService {
     input: AuditEventInput,
   ): Promise<AuditEvent> {
     const entity = manager.create(AuditEvent, {
+      // Not every row comes from the stream: the explicit in-transaction writes
+      // (workspace.deleted, member.removed, permission groups) still mint their
+      // own id so the UNIQUE column is always populated. The sink path supplies
+      // the CloudEvents id instead, which is what makes ITS writes idempotent.
+      eventId: input.eventId ?? randomUUID(),
       workspaceId: input.workspaceId,
       actorId: input.actorId,
       actorType: input.actorType ?? AuditActorType.User,
@@ -235,35 +238,16 @@ export class AuditService {
 
   /**
    * Deep copy that (a) drops any key matching a secret pattern and (b)
-   * replaces values that look like credentials (sk-/AKIA/-----BEGIN prefixes,
-   * long delimiter-free strings) with '***' — recursively, including inside
-   * arrays of objects, so plaintext credentials never reach the audit JSONB
-   * payloads even when their key name is innocuous.
+   * replaces values that look like credentials with '***', recursively.
+   *
+   * Delegates to the event bus's shared {@link redactSecrets} so the audit
+   * table and the event stream cannot drift into two different definitions of
+   * what a secret is — a rule that differs between the two would mean data
+   * scrubbed on one path and not the other. Kept as a method because the
+   * in-transaction audit writes below call it through `this`.
    */
   redactSecrets<T extends Record<string, unknown>>(obj: T): T {
-    const copy: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (SECRET_KEY_RE.test(key)) {
-        continue;
-      }
-      if (Array.isArray(value)) {
-        copy[key] = value.map((item: unknown) => {
-          if (isPlainObject(item)) {
-            return this.redactSecrets(item);
-          }
-          return typeof item === 'string' && looksLikeSecretValue(item)
-            ? '***'
-            : item;
-        });
-      } else if (isPlainObject(value)) {
-        copy[key] = this.redactSecrets(value);
-      } else if (typeof value === 'string' && looksLikeSecretValue(value)) {
-        copy[key] = '***';
-      } else {
-        copy[key] = value;
-      }
-    }
-    return copy as T;
+    return redactSecrets(obj);
   }
 
   /**
