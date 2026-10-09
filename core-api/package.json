@@ -58,7 +58,7 @@
     "ai": "^7.0.127",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
-    "axios": "^1.18.1",
+    "axios": "^1.20.0",
     "better-auth": "1.6.23",
     "bullmq": "^5.65.1",
     "class-transformer": "^0.5.1",
