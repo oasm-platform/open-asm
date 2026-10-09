@@ -40,7 +40,7 @@
     "@aws-sdk/credential-providers": "^3.1048.0",
     "@grpc/grpc-js": "^1.14.2",
     "@grpc/reflection": "^1.0.4",
-    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@nestjs/axios": "^12.0.1",
     "@nestjs/bullmq": "^12.0.0",
     "@nestjs/common": "^12.1.0",
