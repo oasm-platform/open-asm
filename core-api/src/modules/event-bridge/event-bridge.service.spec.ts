@@ -1,18 +1,22 @@
 import type { RedisService } from '@/services/redis/redis.service';
+import {
+  EVENT_BUS_SOURCE,
+  EVENT_BUS_TTL_SECONDS,
+  EVENT_BUS_STREAM,
+} from '@/common/constants/app.constants';
 import { ValidationError } from 'cloudevents';
 import { EVENT_CATALOG } from '../connectors/event';
-import {
-  EVENT_BRIDGE_SOURCE,
-  EVENT_BRIDGE_STREAM,
-  EventBridgeService,
-} from './event-bridge.service';
+import { EventBridgeService } from './event-bridge.service';
 
 /**
  * Arranged: a fake RedisService exposing only `xadd`, so the suite asserts the
  * exact field map the bridge writes rather than a live Redis round trip.
  */
 describe('EventBridgeService', () => {
-  const xadd = jest.fn<Promise<string>, [string, Record<string, string>]>();
+  const xadd = jest.fn<
+    Promise<string>,
+    [string, Record<string, string>, unknown?]
+  >();
   const redis = { xadd } as unknown as RedisService;
   let service: EventBridgeService;
 
@@ -79,7 +83,7 @@ describe('EventBridgeService', () => {
       // specversion is the CloudEvents spec version, NOT our payload version.
       expect(fields.specversion).toBe('1.0');
       expect(fields.type).toBe('job.completed');
-      expect(fields.source).toBe(EVENT_BRIDGE_SOURCE);
+      expect(fields.source).toBe(EVENT_BUS_SOURCE);
       expect(fields.id).toBeTruthy();
     });
 
@@ -126,7 +130,19 @@ describe('EventBridgeService', () => {
   describe('stream shape', () => {
     it('writes to the configured stream', async () => {
       await service.publish(EVENT_CATALOG.job.completed, {});
-      expect(xadd.mock.calls[0][0]).toBe(EVENT_BRIDGE_STREAM);
+      expect(xadd.mock.calls[0][0]).toBe(EVENT_BUS_STREAM);
+    });
+
+    it('applies retention on every write, not on a periodic sweep', async () => {
+      // A sweep-only trim leaves the stream unbounded between runs, and an idle
+      // stream would hold entries past their TTL indefinitely.
+      await service.publish(EVENT_CATALOG.job.completed, {});
+      const options = xadd.mock.calls[0][2] as {
+        maxLen?: number;
+        ttlSeconds?: number;
+      };
+      expect(options.maxLen).toBeGreaterThan(0);
+      expect(options.ttlSeconds).toBe(EVENT_BUS_TTL_SECONDS);
     });
 
     it('flattens every context attribute into its own field', async () => {

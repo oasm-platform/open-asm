@@ -31,6 +31,18 @@ export class AuditEvent {
   @Generated('uuid')
   id: string;
 
+  /**
+   * CloudEvents `id` of the stream entry this row was materialized from.
+   *
+   * NOT NULL + UNIQUE is what makes the audit sink idempotent: the consumer
+   * upserts with `ON CONFLICT (event_id) DO NOTHING`, so a redelivery after a
+   * crash between the write and the XACK cannot produce a second row. Rows
+   * written before the event bus existed were backfilled with random UUIDs —
+   * they are real audit rows that simply predate the stream, so they are kept.
+   */
+  @Column({ type: 'uuid', unique: true })
+  eventId: string;
+
   /** NULL = platform/global event (auth events, deferred to v1.1). */
   @Column({ type: 'uuid', nullable: true })
   workspaceId?: string;

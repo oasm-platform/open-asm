@@ -6,6 +6,18 @@ import { Redis } from 'ioredis';
 type MessageCallback = (channel: string, message: string) => void;
 
 /**
+ * One Redis Stream entry as the event bus sees it: the entry id (which orders
+ * the entry and is what a consumer group acknowledges) plus its flattened
+ * field map. Redis returns fields as a flat `[field, value, …]` array; the
+ * stream helpers below fold it back into an object so a consumer never has to
+ * deal with the positional encoding.
+ */
+export interface StreamEntry {
+  id: string;
+  fields: Record<string, string>;
+}
+
+/**
  * RedisService provides a wrapper around ioredis
  * to simplify publishing, subscribing, and key management.
  */
@@ -36,6 +48,27 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Track callbacks per channel so they can be properly removed on unsubscribe.
    */
   private readonly channelCallbacks = new Map<string, Set<MessageCallback>>();
+
+  /**
+   * Dedicated connections for BLOCKING commands, keyed by consumer group.
+   *
+   * WHY A SEPARATE CONNECTION IS REQUIRED, NOT A NICETY: a blocking Redis
+   * command (`XREADGROUP ... BLOCK`) parks the socket until data arrives or the
+   * timeout expires. Every other command multiplexed onto that same socket waits
+   * in the queue behind it. Sharing the general-purpose connection therefore
+   * does not merely slow the bus down — it stalls the WHOLE application's Redis
+   * traffic (sessions, cache, rate limits, locks, and the producer's own XADD)
+   * for the duration of every block.
+   *
+   * Measured with four consumer lanes at a 5s block, that surfaced as audit
+   * rows landing 4-29 seconds after the request that caused them.
+   *
+   * Keyed by group because that is exactly what distinguishes one blocked
+   * reader from another: two lanes sharing a connection would simply move the
+   * same queueing from the application's traffic onto the bus's traffic. The map
+   * is bounded by the number of lanes (4), not by traffic, so it cannot grow.
+   */
+  private readonly blockingClients = new Map<string, Redis>();
 
   constructor(private readonly configService: ConfigService) {
     try {
@@ -107,6 +140,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         this.cacheClient?.disconnect(),
         this.publisher?.disconnect(),
         this.subscriber?.disconnect(),
+        // Lazily created blocking readers: a disconnected one would otherwise
+        // leak a socket for the lifetime of the process.
+        ...[...this.blockingClients.values()].map((c) => c.disconnect()),
       ]);
     } catch (error: unknown) {
       // Log error but don't throw to avoid blocking shutdown
@@ -416,23 +452,213 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * `*` lets Redis assign the id, which is what orders the entry and lets a
    * consumer group acknowledge it by id.
    *
+   * Retention is applied HERE, on every write, rather than by a periodic
+   * sweep: an unbounded stream evicts by MAXLEN only when the trim runs, so a
+   * quiet stream would hold entries past their TTL. Passing both keeps the
+   * stream bounded between sweeps.
+   *
    * @param stream - Redis stream key
    * @param fields - Flat field→value map; every value must be a string
+   * @param options - `maxLen` (approximate trim) and `ttlSeconds` (key expiry)
    * @returns The stream entry id
    */
   public async xadd(
     stream: string,
     fields: Record<string, string>,
+    options: { maxLen?: number; ttlSeconds?: number } = {},
   ): Promise<string> {
     const pairs: string[] = [];
     for (const [field, value] of Object.entries(fields)) {
       pairs.push(field, value);
     }
-    const id = await this.client.xadd(stream, '*', ...pairs);
+
+    const { maxLen, ttlSeconds } = options;
+    // Argument ORDER is part of the XADD grammar, not a style choice:
+    //   XADD key [MAXLEN [~|=] count] <* | id> field value [field value ...]
+    // The trim clause precedes the id, and the fields follow it. Appending
+    // MAXLEN after the fields is not a slower trim — Redis rejects the whole
+    // command with "ERR wrong number of arguments", so the event is never
+    // written at all.
+    const id = maxLen
+      ? await this.client.xadd(
+          stream,
+          'MAXLEN',
+          '~',
+          String(maxLen),
+          '*',
+          ...pairs,
+        )
+      : await this.client.xadd(stream, '*', ...pairs);
+
     if (id === null) {
       throw new Error(`XADD to ${stream} returned no entry id`);
     }
+
+    // EXPIRE after XADD so a stream that just received its first entry gets a
+    // full TTL window; setting it before would leave the newest entry with a
+    // nearly-expired key.
+    if (ttlSeconds) {
+      await this.client.expire(stream, ttlSeconds);
+    }
     return id;
+  }
+
+  /**
+   * Creates a consumer group, ignoring the error when it already exists.
+   *
+   * BUSYGROUP is the normal path on every boot after the first (the group is
+   * durable Redis state that outlives the process), so swallowing exactly that
+   * error is what makes this idempotent rather than a boot-time failure.
+   */
+  public async xgroupCreate(
+    stream: string,
+    group: string,
+    id: string,
+  ): Promise<void> {
+    try {
+      await this.client.xgroup('CREATE', stream, group, id, 'MKSTREAM');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('BUSYGROUP')) {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Reads entries never delivered to this group.
+   *
+   * `id: '>'` reads only NEW entries, which is the distinction that makes a
+   * consumer group durable: entries the previous consumer received but died
+   * before acknowledging are NOT returned here — they sit in the group's
+   * pending list until {@link xautoclaim} hands them over.
+   */
+  /**
+   * Connection reserved for a given consumer group's blocking reads.
+   *
+   * Created lazily and cached: ioredis queues commands issued before the socket
+   * is ready, so there is no need to await readiness here, and `onModuleDestroy`
+   * disconnects everything that was handed out.
+   */
+  private blockingClientFor(group: string): Redis {
+    const existing = this.blockingClients.get(group);
+    if (existing) return existing;
+    const client = this.client.duplicate();
+    this.blockingClients.set(group, client);
+    return client;
+  }
+
+  public async xreadgroup(
+    stream: string,
+    group: string,
+    consumer: string,
+    count: number,
+    blockMs: number,
+  ): Promise<StreamEntry[]> {
+    // Deliberately NOT `this.client` — see `blockingClients`.
+    const response = (await this.blockingClientFor(group).xreadgroup(
+      'GROUP',
+      group,
+      consumer,
+      'COUNT',
+      String(count),
+      'BLOCK',
+      String(blockMs),
+      'STREAMS',
+      stream,
+      '>',
+    )) as [string, [string, string[]][]][] | null;
+
+    const entries = response?.[0]?.[1] ?? [];
+    return entries.map(([entryId, values]) => {
+      const fields: Record<string, string> = {};
+      // Redis returns a flat [field, value, field, value, …] array.
+      for (let i = 0; i < values.length; i += 2) {
+        fields[values[i]] = values[i + 1];
+      }
+      return { id: entryId, fields };
+    });
+  }
+
+  /**
+   * Claims entries idle for at least `minIdleMs` and hands them to `consumer`.
+   *
+   * This is the retry path: an entry whose handler threw stays in the group's
+   * PEL, and this is what moves it to a live consumer so the attempt counter
+   * can advance toward the DLQ.
+   */
+  public async xautoclaim(
+    stream: string,
+    group: string,
+    consumer: string,
+    minIdleMs: number,
+    count: number,
+  ): Promise<StreamEntry[]> {
+    const [, entries] = (await this.client.xautoclaim(
+      stream,
+      group,
+      consumer,
+      String(minIdleMs),
+      '0-0',
+      'COUNT',
+      String(count),
+    )) as [string, [string, string[]][]];
+
+    return entries.map(([entryId, values]) => {
+      const fields: Record<string, string> = {};
+      for (let i = 0; i < values.length; i += 2) {
+        fields[values[i]] = values[i + 1];
+      }
+      return { id: entryId, fields };
+    });
+  }
+
+  /**
+   * How many times a pending entry has already been delivered, 0 when the id
+   * is not in the group's PEL. Drives the DLQ decision — an entry delivered
+   * EVENT_BUS_MAX_ATTEMPTS times is not retried again.
+   *
+   * Reply SHAPE matters here: with an explicit range, XPENDING answers with a
+   * flat list of `[entryId, consumerName, idleMs, deliveryCount]` rows — NOT the
+   * `[count, minId, maxId, consumers]` of the summary form. Reading [3][0][1]
+   * silently yields 0, which looks like "first attempt" forever and means the
+   * DLQ threshold is never reached.
+   */
+  public async xpendingCount(
+    stream: string,
+    group: string,
+    entryId: string,
+  ): Promise<number> {
+    const entries = (await this.client.xpending(
+      stream,
+      group,
+      entryId,
+      entryId,
+      1,
+    )) as [string, string, number, number][] | null;
+
+    return entries?.[0]?.[3] ?? 0;
+  }
+
+  /** Acknowledges an entry, removing it from the group's pending list. */
+  public async xack(
+    stream: string,
+    group: string,
+    entryId: string,
+  ): Promise<number> {
+    return this.client.xack(stream, group, entryId);
+  }
+
+  /**
+   * `SET key value NX` — sets only when absent, returning whether it won.
+   *
+   * The primitive idempotency needs on a transport that delivers at-least-once:
+   * exactly one caller observes `true` for a given key, whoever gets there
+   * first, with no read-then-write race.
+   */
+  public async setIfAbsent(key: string, value: string): Promise<boolean> {
+    const result = await this.client.set(key, value, 'NX');
+    return result === 'OK';
   }
 
   /**

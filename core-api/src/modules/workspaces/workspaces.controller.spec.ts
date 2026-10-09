@@ -2,7 +2,7 @@ import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
-import { AUDIT_LOG_KEY, type AuditLogConfig } from '../audit/audit-log.decorator';
+import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publish-event.decorator';
 import type { AuditContext, AuditService } from '../audit/audit.service';
 import { WorkspacesController } from './workspaces.controller';
 import type { WorkspacesService } from './workspaces.service';
@@ -64,9 +64,9 @@ describe('WorkspacesController audit wiring (M4.1 decorator events)', () => {
 
   const auditConfig = (method: () => unknown) =>
     reflector.getAllAndOverride<{
-      action: string;
-      changes?: AuditLogConfig['changes'];
-    }>(AUDIT_LOG_KEY, [method, WorkspacesController]);
+      event: unknown;
+      changes?: PublishEventConfig['changes'];
+    }>(PUBLISH_EVENT_KEY, [method, WorkspacesController]);
 
   it.each([
     ['createWorkspace', 'workspace.created'],
@@ -78,7 +78,9 @@ describe('WorkspacesController audit wiring (M4.1 decorator events)', () => {
     ['makeArchived', 'workspace.updated'],
   ])('%s is wired to the %s event', (method, action) => {
     expect(auditConfig(WorkspacesController.prototype[method])).toEqual(
-      expect.objectContaining({ action }),
+      expect.objectContaining({
+        event: expect.objectContaining({ name: action }),
+      }),
     );
   });
 

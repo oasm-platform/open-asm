@@ -1,6 +1,5 @@
-import { BullMQName, NotificationStatus } from '@/common/enums/enum';
+import { NotificationStatus } from '@/common/enums/enum';
 import { RedisService } from '@/services/redis/redis.service';
-import { getQueueToken } from '@nestjs/bullmq';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -8,6 +7,7 @@ import { I18nService } from 'nestjs-i18n';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
 import { Notification } from './entities/notification.entity';
 import { NotificationsService } from './notifications.service';
+import { NotificationsSinkService } from '../event-bridge/notifications.sink.service';
 
 function buildQueryBuilderMock() {
   const qb: Record<string, jest.Mock> = {
@@ -66,16 +66,16 @@ describe('NotificationsService', () => {
           },
         },
         {
-          provide: getQueueToken(BullMQName.NOTIFICATION),
-          useValue: { add: jest.fn() },
-        },
-        {
           provide: I18nService,
           useValue: { translate: jest.fn().mockReturnValue('msg') },
         },
         {
           provide: RedisService,
           useValue: {},
+        },
+        {
+          provide: NotificationsSinkService,
+          useValue: { deliver: jest.fn() },
         },
       ],
     }).compile();

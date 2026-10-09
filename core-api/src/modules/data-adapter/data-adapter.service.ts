@@ -5,19 +5,15 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { DataSource, InsertResult } from 'typeorm';
-import {
-  NotificationScope,
-  NotificationType,
-  Severity,
-  ToolCategory,
-} from '../../common/enums/enum';
+import { Severity, ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { IssuesService } from '../issues/issues.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { EVENT_CATALOG } from '../connectors/event';
+import { EventBridgeService } from '../event-bridge/event-bridge.service';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -133,7 +129,7 @@ export class DataAdapterService {
     private workspaceService: WorkspacesService,
     private issuesService: IssuesService,
     private storageService: StorageService,
-    private readonly notificationsService: NotificationsService,
+    private readonly eventBridge: EventBridgeService,
   ) {}
 
   public async validateData<T extends object>(
@@ -584,7 +580,7 @@ export class DataAdapterService {
 
       if (vulsForAlert.length > 0) {
         this.logger.log(
-          `Found ${vulsForAlert.length} new vulns for job ${job.id}, looking up workspace members`,
+          `Found ${vulsForAlert.length} new vulns for job ${job.id}, looking up workspace`,
         );
 
         const members =
@@ -592,34 +588,36 @@ export class DataAdapterService {
 
         if (members.length === 0) {
           this.logger.warn(
-            `No workspace members found for job ${job.id}, skipping notification`,
+            `No workspace resolved for job ${job.id}, skipping the event`,
           );
           return;
         }
 
-        this.logger.log(
-          `Found ${members.length} workspace members for job ${job.id}, creating notification`,
-        );
-
-        const recipientIds = members.map((m) => m.user.id);
         const workspaceId = members[0].workspace.id;
 
-        await this.notificationsService.createNotification({
-          recipients: recipientIds,
-          scope: NotificationScope.GROUP,
-          type: NotificationType.NEW_VULNERABILITY_FOUND,
-          metadata: {
-            count: String(vulsForAlert.length),
-            assetValue: job.asset.value,
-            targetId: job.asset.target.id,
-            assetId: job.asset.id,
-          },
-          workspaceId,
-        });
-
         this.logger.log(
-          `Notification created for ${vulsForAlert.length} vulns in workspace ${workspaceId}`,
+          `Publishing vulnerability.detected for ${vulsForAlert.length} vulns in workspace ${workspaceId}`,
         );
+
+        // Report the FINDING, not a notification decision: who is told about
+        // it (and in what wording) belongs to the `notifications` consumer. The
+        // count and the asset identity travel as payload because the consumer
+        // cannot re-derive them from the workspace alone.
+        //
+        // One event for the whole batch, not one per vulnerability: a scan that
+        // finds 200 issues must not push 200 notifications.
+        await this.eventBridge.publishSafely(EVENT_CATALOG.vulnerability.detected, {
+          workspaceId,
+          outcome: 'success',
+          resourceType: 'vulnerability',
+          payload: {
+            count: vulsForAlert.length,
+            jobId: job.id,
+            assetValue: job.asset.value,
+            assetId: job.asset.id,
+            targetId: job.asset.target.id,
+          },
+        });
       } else {
         this.logger.log(
           `No new vulns to alert for job ${job.id} (${uniqueValues.length} total deduped, ${existingFingerprints.size} already existed)`,

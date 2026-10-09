@@ -16,7 +16,7 @@
  * that is deliberate rather than redundant. Once the leaf is passed to
  * `publish()`, the runtime has no way to recover the path it came from, so the
  * name has to travel inside the value. `event.spec.ts` asserts the two copies
- * agree for all 86 events, so the duplication cannot rot.
+ * agree for all 85 events, so the duplication cannot rot.
  *
  * Naming contract: `<domain>.<action>` (or `<domain>.<sub_resource>.<action>`,
  * e.g. `workspace.config.updated`), lowercase, snake_case, past tense for
@@ -330,10 +330,15 @@ export const EVENT_CATALOG = {
     },
   },
 
-  // ─── Runtime events (51) ────────────────────────────────────────────────
+  // ─── Runtime events (50) ────────────────────────────────────────────────
+  // NOTE: there is deliberately NO `worker.alive` leaf. Worker liveness is not
+  // a state transition — it is a heartbeat, read from `workers.lastSeenAt` and
+  // `AliveStreamManager`, and pushed over `POST /workers/alive` + the gRPC
+  // stream, both of which only update a timestamp. Publishing it would put a
+  // per-worker-per-minute event on the same stream as the audit trail, where
+  // MAXLEN makes it the entry most likely to evict the events that matter.
   worker: {
     joined: { name: 'worker.joined', summary: 'Worker joined the cluster' },
-    alive: { name: 'worker.alive', summary: 'Worker heartbeat' },
     disconnected: {
       name: 'worker.disconnected',
       summary: 'Worker gRPC stream dropped',
@@ -481,7 +486,7 @@ function collect(
 
 /**
  * The catalog flattened to name+summary pairs, in declaration order. Built once
- * at module load (86 leaves — a single cheap pass) and shared by every lookup.
+ * at module load (85 leaves — a single cheap pass) and shared by every lookup.
  *
  * Names come from the PATH, never from `leaf.name`, so this list stays correct
  * even if a leaf's own name were ever mistyped — `event.spec.ts` is what

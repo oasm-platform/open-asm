@@ -29,7 +29,8 @@ import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
-import { AuditLog } from '../audit/audit-log.decorator';
+import { EVENT_CATALOG } from '../connectors/event';
+import { PublishEvent } from '../event-bridge/publish-event.decorator';
 import { VulnerabilitiesService } from './vulnerabilities.service';
 
 @Controller('vulnerabilities')
@@ -174,7 +175,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('vulnerability.status.updated', {
+  @PublishEvent(EVENT_CATALOG.vulnerability.status.updated, {
     // No before/after status is derivable decorator-only — the row carries the
     // bulk action and the affected count (plan §4 row 21: high-evidence event).
     metadata: (body) => {
@@ -205,7 +206,7 @@ export class VulnerabilitiesController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('vulnerability.bulk_updated', {
+  @PublishEvent(EVENT_CATALOG.vulnerability.bulk_updated, {
     metadata: (body) => {
       const ids = (body as { ids?: string[] })?.ids;
       return { action: 'reopen', count: ids?.length ?? 0 };

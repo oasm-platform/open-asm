@@ -27,7 +27,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
-import { AuditLog } from '../audit/audit-log.decorator';
+import { EVENT_CATALOG } from '../connectors/event';
+import { PublishEvent } from '../event-bridge/publish-event.decorator';
 import { AuditService } from '../audit/audit.service';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
@@ -72,7 +73,7 @@ export class WorkspacesController {
       serialization: Workspace,
     },
   })
-  @AuditLog('workspace.created', {
+  @PublishEvent(EVENT_CATALOG.workspace.created, {
     // No request workspaceId exists yet — the new workspace comes from the result.
     workspaceId: (result) => (result as { id?: string } | undefined)?.id,
     resourceId: (result) => (result as { id?: string } | undefined)?.id,
@@ -139,7 +140,7 @@ export class WorkspacesController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('workspace.config.updated')
+  @PublishEvent(EVENT_CATALOG.workspace.config.updated)
   @WorkspaceAccess('workspace.config')
   @Patch('configs')
   updateWorkspaceConfigs(
@@ -377,7 +378,7 @@ export class WorkspacesController {
     response: { serialization: CreateInvitationsResponseDto },
     request: { getWorkspaceId: true },
   })
-  @AuditLog('member.invited', {
+  @PublishEvent(EVENT_CATALOG.member.invited, {
     resourceType: 'invitation',
     // NEVER log raw emails — only the count. The response carries no ids,
     // so invitationIds are omitted here (see M4.1 report).
@@ -419,7 +420,7 @@ export class WorkspacesController {
     response: { serialization: DefaultMessageResponseDto },
     request: { getWorkspaceId: true },
   })
-  @AuditLog('member.invitation.cancelled', {
+  @PublishEvent(EVENT_CATALOG.member.invitation.cancelled, {
     resourceType: 'invitation',
     // invitationId lives in the route param, which is NOT exposed to the
     // decorator callbacks (body/result only) — omit + document (M4.1 report).
@@ -509,7 +510,7 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @AuditLog('workspace.updated', {
+  @PublishEvent(EVENT_CATALOG.workspace.updated, {
     // Best-effort changes from the body — never echo back the full workspace.
     changes: (body) => {
       const dto = body as {
@@ -568,7 +569,7 @@ export class WorkspacesController {
       serialization: GetApiKeyResponseDto,
     },
   })
-  @AuditLog('workspace.api_key.rotated')
+  @PublishEvent(EVENT_CATALOG.workspace.api_key.rotated)
   @WorkspaceAccess('workspace.apikey', { workspaceParam: 'id' })
   @Post(':id/api-key/rotate')
   rotateApiKey(
@@ -586,7 +587,7 @@ export class WorkspacesController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @AuditLog('workspace.updated', {
+  @PublishEvent(EVENT_CATALOG.workspace.updated, {
     changes: (body) => ({
       isArchived: {
         after: (body as { isArchived?: boolean })?.isArchived ?? true,

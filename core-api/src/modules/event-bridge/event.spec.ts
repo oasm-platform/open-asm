@@ -9,6 +9,7 @@ import {
   isEventName,
   resolveEventName,
   type CatalogEvent,
+  type EventName,
 } from '../connectors/event';
 
 /**
@@ -77,8 +78,17 @@ describe('event catalog', () => {
     // The tree is the authored source; EVENT_DEFINITIONS is derived. If the
     // walk ever stops matching the shape, these fail rather than the bridge
     // publishing half a catalog.
-    it('exposes 86 leaves', () => {
-      expect(EVENT_DEFINITIONS).toHaveLength(86);
+    it('exposes 85 leaves', () => {
+      // 85 = 86 minus `worker.alive`, which was removed: a heartbeat is read
+      // from `workers.lastSeenAt`, not streamed, and on the shared stream it
+      // would be the entry MAXLEN evicts first. Asserting the count means the
+      // removal cannot be half-reverted without failing here.
+      expect(EVENT_DEFINITIONS).toHaveLength(85);
+    });
+
+    it('has no worker.alive leaf, so nothing can publish a heartbeat', () => {
+      expect(isEventName('worker.alive')).toBe(false);
+      expect(EVENT_CATALOG.worker).not.toHaveProperty('alive');
     });
 
     // The load-bearing guarantee of the dot-path call shape. `publish` reads

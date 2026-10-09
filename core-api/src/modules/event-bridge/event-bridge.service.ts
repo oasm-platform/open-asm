@@ -1,3 +1,9 @@
+import {
+  EVENT_BUS_MAXLEN,
+  EVENT_BUS_SOURCE,
+  EVENT_BUS_STREAM,
+  EVENT_BUS_TTL_SECONDS,
+} from '@/common/constants/app.constants';
 import { RedisService } from '@/services/redis/redis.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CloudEvent } from 'cloudevents';
@@ -5,26 +11,11 @@ import type { CatalogEvent, EventName } from '../connectors/event';
 import { EVENT_CATALOG_TOKEN, resolveEventName } from '../connectors/event';
 
 /**
- * Single stream every event lands on.
- *
- * Kept as a constant rather than a per-domain stream map: the audit mirror is
- * useless if a consumer has to open 21 streams to read one workspace's
- * history, and one stream keeps XTRIM/retention a single policy. Split by
- * domain later if consumer lag on `worker.alive` ever threatens retention of
- * the audit events.
+ * Writes domain events onto the single Redis Stream. The stream key and the
+ * CloudEvents `source` live in `app.constants.ts` (§11) so every part of the
+ * bus — producers, consumers, DLQ, tests — reads one definition; this service
+ * no longer re-exports them under their old names.
  */
-export const EVENT_BRIDGE_STREAM = 'oasm:events';
-
-/**
- * CloudEvents `source` — the context the occurrence happened in. Absolute URI
- * because the spec RECOMMENDS it. Fixed for the core-api process: `source`+`id`
- * stays unique because `id` is a fresh UUID per event, so a per-workspace
- * source is unnecessary.
- *
- * NOTE: this is unrelated to `EVENT_SCHEMA_VERSION`, which versions the
- * payload shape. CloudEvents `specversion` is always the literal "1.0".
- */
-export const EVENT_BRIDGE_SOURCE = 'oasm://core-api';
 
 /** Per-call overrides for the optional CloudEvents context attributes. */
 export interface PublishOptions {
@@ -95,15 +86,18 @@ export class EventBridgeService {
 
     const cloudEvent = new CloudEvent({
       type: options.type ?? name,
-      source: EVENT_BRIDGE_SOURCE,
+      source: EVENT_BUS_SOURCE,
       ...(options.subject ? { subject: options.subject } : {}),
       ...(options.dataschema ? { dataschema: options.dataschema } : {}),
       ...(data === undefined ? {} : { data }),
     });
 
+    // Retention rides along on every write: MAXLEN bounds the stream between
+    // trims, EXPIRE clears it entirely once no consumer needs to replay.
     return this.redis.xadd(
-      EVENT_BRIDGE_STREAM,
+      EVENT_BUS_STREAM,
       toStreamFields(cloudEvent.toJSON()),
+      { maxLen: EVENT_BUS_MAXLEN, ttlSeconds: EVENT_BUS_TTL_SECONDS },
     );
   }
 
