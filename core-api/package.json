@@ -38,7 +38,7 @@
     "@aws-sdk/client-sso-oidc": "^3.1048.0",
     "@aws-sdk/client-sts": "^3.1048.0",
     "@aws-sdk/credential-providers": "^3.1048.0",
-    "@grpc/grpc-js": "^1.14.2",
+    "@grpc/grpc-js": "^1.14.5",
     "@grpc/reflection": "^1.0.4",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@nestjs/axios": "^12.0.1",
