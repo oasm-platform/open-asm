@@ -1,5 +1,6 @@
 interface StatusCodeProps {
     code?: string;
+    size?: "sm" | "md";
 }
 
 const getStyles = (
@@ -33,7 +34,7 @@ const getStyles = (
     }
 };
 
-const StatusCode = ({ code }: StatusCodeProps) => {
+const StatusCode = ({ code, size = "sm" }: StatusCodeProps) => {
     if (!code) return <></>;
     const codeStr = code.toString();
 
@@ -43,13 +44,16 @@ const StatusCode = ({ code }: StatusCodeProps) => {
     else if (codeStr.startsWith("4") || codeStr.startsWith("5")) variant = "destructive";
 
     const style = getStyles(variant);
+    const isMd = size === "md";
 
     return (
         <div
             style={{
-                display: "inline-block",
-                padding: "1px 5px",
-                fontSize: "0.7rem",
+                display: "inline-flex",
+                alignItems: "center",
+                padding: isMd ? "1px 8px" : "1px 5px",
+                fontSize: isMd ? "0.75rem" : "0.7rem",
+                lineHeight: isMd ? "1.25rem" : undefined,
                 fontWeight: 500,
                 borderRadius: "0.375rem",
                 border: `1px solid ${style.borderColor}`,

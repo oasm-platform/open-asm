@@ -339,7 +339,7 @@ export default function GraphDetailSheet({ open, setOpen, node }: Props) {
     const nodeType = (node.type.split('|')[0] ?? node.id.split('|')[0]) as NodeType;
     const metadata = node.data.metadata ?? {};
     if (nodeType === 'asset') {
-      navigate({ to: `/assets/${metadata.id as string}` });
+      navigate({ to: `/assets/services/${metadata.id as string}` });
     } else if (nodeType === 'target') {
       navigate({ to: `/targets/${metadata.id as string}` });
     }

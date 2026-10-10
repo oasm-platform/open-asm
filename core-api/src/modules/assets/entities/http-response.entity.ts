@@ -1,53 +1,20 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
-import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  Relation,
+} from 'typeorm';
 import { AssetService } from './asset-services.entity';
-
-class TlsInfo {
-  @ApiProperty()
-  @IsString()
-  host: string;
-  @ApiProperty()
-  port: string;
-  @ApiProperty()
-  probe_status: boolean;
-  @ApiProperty()
-  tls_version: string;
-  @ApiProperty()
-  cipher: string;
-  @ApiProperty()
-  not_before: string;
-  @ApiProperty()
-  not_after: string;
-  @ApiProperty()
-  subject_dn: string;
-  @ApiProperty()
-  subject_cn: string;
-  @ApiProperty()
-  subject_an: string[];
-  @ApiProperty()
-  serial: string;
-  @ApiProperty()
-  issuer_dn: string;
-  @ApiProperty()
-  issuer_cn: string;
-  @ApiProperty()
-  issuer_org: string[];
-  @ApiProperty()
-  fingerprint_hash: {
-    md5: string;
-    sha1: string;
-    sha256: string;
-  };
-  @ApiProperty()
-  wildcard_certificate: boolean;
-  @ApiProperty()
-  tls_connection: string;
-  @ApiProperty()
-  sni: string;
-}
+import { HttpResponseTechnology } from './http-response-technology.entity';
+import { HttpStatusCode } from './http-status-code.entity';
+import { IpObservation } from './ip-observation.entity';
+import { TlsCertificate } from './tls-certificate.entity';
 
 // Interface cho Header information
 interface HeaderInfo {
@@ -64,14 +31,16 @@ class KnowledgebaseInfo {
 @Entity('http_responses')
 @Index('IDX_http_jobHistoryId', ['jobHistory'])
 @Index('IDX_http_host', ['host'])
+// "Latest response per service" lookups (ORDER BY createdAt DESC LIMIT 1);
+// its assetServiceId prefix also serves the FK.
+@Index('IDX_http_responses_assetServiceId_createdAt', [
+  'assetServiceId',
+  'createdAt',
+])
 export class HttpResponse extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'timestamp with time zone', nullable: true })
   timestamp?: Date;
-
-  @ApiProperty()
-  @Column({ type: 'jsonb', nullable: true })
-  tls: TlsInfo;
 
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })
@@ -146,15 +115,6 @@ export class HttpResponse extends BaseEntity {
   time: string;
 
   @ApiProperty()
-  @Column({ array: true, type: 'varchar', nullable: true })
-  a: string[];
-
-  @ApiProperty()
-  @Index({ fulltext: true }) // For GIN index on array
-  @Column({ array: true, type: 'varchar', nullable: true })
-  tech: string[];
-
-  @ApiProperty()
   @Column({ type: 'integer', nullable: true })
   words: number;
 
@@ -178,16 +138,29 @@ export class HttpResponse extends BaseEntity {
   @Column({ type: 'jsonb', nullable: true })
   knowledgebase: KnowledgebaseInfo;
 
-  @ApiProperty()
-  @Column({ array: true, type: 'varchar', nullable: true })
-  resolvers: string[];
+  /**
+   * Ingest-only compat fields — accepted from the httpx worker payload but
+   * NOT persisted here. DataAdapterService splits them into child tables
+   * (tls_certificates, http_response_technologies, ip_observations,
+   * http_status_codes). No @Column decorator on purpose so TypeORM and
+   * migration:generate ignore them, while Swagger/OpenAPI shape stays stable.
+   */
+  @ApiProperty({ required: false })
+  tls?: Record<string, unknown> | null;
+
+  @ApiProperty({ required: false, type: [String] })
+  tech?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  a?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  resolvers?: string[];
+
+  @ApiProperty({ required: false, type: [String] })
+  chain_status_codes?: string[];
 
   @ApiProperty()
-  @Column({ array: true, type: 'varchar', nullable: true })
-  chain_status_codes: string[];
-
-  @ApiProperty()
-  @Index(['assetServiceId', 'createdAt'])
   @Column({ type: 'varchar', nullable: true })
   assetServiceId: string;
 
@@ -206,4 +179,24 @@ export class HttpResponse extends BaseEntity {
   })
   @JoinColumn({ name: 'jobHistoryId' })
   jobHistory: Relation<JobHistory>;
+
+  @OneToMany(() => TlsCertificate, (tls) => tls.httpResponse, {
+    onDelete: 'CASCADE',
+  })
+  tlsCertificates?: Relation<TlsCertificate[]>;
+
+  @OneToMany(() => HttpResponseTechnology, (tech) => tech.httpResponse, {
+    onDelete: 'CASCADE',
+  })
+  technologies?: Relation<HttpResponseTechnology[]>;
+
+  @OneToMany(() => IpObservation, (ip) => ip.httpResponse, {
+    onDelete: 'CASCADE',
+  })
+  ipObservations?: Relation<IpObservation[]>;
+
+  @OneToMany(() => HttpStatusCode, (sc) => sc.httpResponse, {
+    onDelete: 'CASCADE',
+  })
+  statusCodes?: Relation<HttpStatusCode[]>;
 }
