@@ -169,7 +169,7 @@ export function toTlsCertificateRow(
   const arr = (key: string): string[] | undefined => {
     const v = tls[key];
     return Array.isArray(v) && v.every((e) => typeof e === 'string')
-      ? (v as string[])
+      ? (v)
       : undefined;
   };
   return {
@@ -471,7 +471,7 @@ export class DataAdapterService {
       const tasks: Promise<unknown>[] = [];
 
       const tlsRow = toTlsCertificateRow(
-        data.tls as Record<string, unknown> | null | undefined,
+        data.tls,
         { httpResponseId, assetServiceId, jobHistoryId },
       );
       if (tlsRow) {

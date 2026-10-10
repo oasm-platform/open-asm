@@ -431,9 +431,9 @@ export class AssetsService {
         asset.httpResponses.tech = await this.getTechStringsForHttpResponse(
           latestId,
         );
-        asset.httpResponses.tls = (await this.getTlsForHttpResponse(
+        asset.httpResponses.tls = await this.getTlsForHttpResponse(
           latestId,
-        )) as unknown as typeof asset.httpResponses.tls;
+        );
         if (asset.httpResponses?.tech?.length) {
           const techList = (
             await this.technologyForwarderService.enrichTechnologies(
@@ -591,9 +591,9 @@ export class AssetsService {
       asset.httpResponses.tech = await this.getTechStringsForHttpResponse(
         latestId,
       );
-      asset.httpResponses.tls = (await this.getTlsForHttpResponse(
+      asset.httpResponses.tls = await this.getTlsForHttpResponse(
         latestId,
-      )) as unknown as typeof asset.httpResponses.tls;
+      );
       if (asset.httpResponses?.tech?.length) {
         const techList = (
           await this.technologyForwarderService.enrichTechnologies(
@@ -1242,11 +1242,11 @@ export class AssetsService {
       obj.not_after =
         item.not_after instanceof Date
           ? item.not_after.toISOString()
-          : (item.not_after as unknown as string);
+          : (item.not_after);
       obj.not_before =
         item.not_before instanceof Date
           ? item.not_before.toISOString()
-          : (item.not_before as unknown as string);
+          : (item.not_before);
       obj.tls_version = item.tls_version;
       obj.cipher = item.cipher;
       obj.tls_connection = item.tls_connection;
