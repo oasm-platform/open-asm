@@ -1,11 +1,7 @@
 import { API_GLOBAL_PREFIX, AUTH_INSTANCE_KEY, CACHE_STATIC_RESOURCE } from '@/common/constants/app.constants';
-import {
-  DEFAULT_CORS_ALLOWED_ORIGINS,
-  parseAllowedOrigins,
-} from '@/common/config/allowed-origins';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { requestIdMiddleware } from '@/common/middleware/request-id.middleware';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
@@ -47,16 +43,8 @@ export function configureApp(app: NestExpressApplication): void {
   });
 
   // Configure CORS
-  if (!process.env.CORS_ALLOWED_ORIGINS) {
-    new Logger('CorsConfig').warn(
-      'CORS_ALLOWED_ORIGINS is unset, falling back to localhost defaults',
-    );
-  }
   app.enableCors({
-    origin: parseAllowedOrigins(
-      process.env.CORS_ALLOWED_ORIGINS,
-      DEFAULT_CORS_ALLOWED_ORIGINS,
-    ),
+    origin: true,
     credentials: true,
   });
 

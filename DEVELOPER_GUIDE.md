@@ -583,7 +583,7 @@ compose overrides in `docker-compose.yml:43-61`. Set in `core-api/.env`:
 | `S3_FORCE_PATH_STYLE` | `true` for RustFS/MinIO (Profile A), `false` for AWS S3 (Profile B). Applies to **both** clients, including the plain-URL builder. Ignored for public-read plain URLs when `STORAGE_URL_BASE` is set. |
 | `STORAGE_URL_BASE` | Empty (default in cloud) => absolute URLs. Set (e.g. `/api/storage`, dev/docker) => same-origin relative URLs; the proxy must strip the prefix and forward `Host` == `RUSTFS_ENDPOINT` host (see Relative vs absolute browser URLs). |
 | `S3_USE_DEFAULT_CREDENTIALS` | `true` for IAM roles / instance profiles; otherwise leave `false` and set `S3_ACCESS_KEY` + `S3_SECRET_KEY` |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated console origins. Single origin source: also drives API CORS and better-auth trusted origins (see Renamed env vars below). Cross-origin direct fetches of public objects need their origin listed here |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated console origins applied as S3 bucket CORS (see Renamed env vars below). Cross-origin direct fetches of public objects need their origin listed here |
 
 `StorageService.onModuleInit` applies the CORS rule to every bucket on boot
 (`GET, PUT, POST, HEAD`, `AllowedHeaders: *`, exposes `ETag`), and skips it
