@@ -16,6 +16,7 @@ import { HttpResponse } from './http-response.entity';
 @Unique(['httpResponseId', 'name', 'version'])
 @Index('IDX_http_response_technologies_assetServiceId', ['assetServiceId'])
 @Index('IDX_http_response_technologies_name', ['name'])
+@Index('IDX_http_response_technologies_httpResponseId', ['httpResponseId'])
 export class HttpResponseTechnology extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'uuid' })

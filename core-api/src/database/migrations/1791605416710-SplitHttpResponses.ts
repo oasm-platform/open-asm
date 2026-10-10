@@ -58,9 +58,11 @@ export class SplitHttpResponses1791605416710 implements MigrationInterface {
         // ── 2. CREATE the 5 facet tables ─────────────────────────────────
         await queryRunner.query(`CREATE TABLE "http_response_technologies" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "httpResponseId" uuid NOT NULL, "assetServiceId" uuid, "name" character varying NOT NULL, "version" character varying, CONSTRAINT "UQ_41a52e7b86eddc6dafdfe464d66" UNIQUE ("httpResponseId", "name", "version"), CONSTRAINT "PK_d80d8a3434e0bfa8bf6dec0b23f" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_http_response_technologies_name" ON "http_response_technologies" ("name") `);
+        await queryRunner.query(`CREATE INDEX "IDX_http_response_technologies_httpResponseId" ON "http_response_technologies" ("httpResponseId") `);
         await queryRunner.query(`CREATE INDEX "IDX_http_response_technologies_assetServiceId" ON "http_response_technologies" ("assetServiceId") `);
         await queryRunner.query(`CREATE TABLE "http_status_codes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "httpResponseId" uuid NOT NULL, "assetServiceId" uuid, "statusCode" integer NOT NULL, "isPrimary" boolean NOT NULL DEFAULT false, "chainIndex" integer, CONSTRAINT "PK_1020bffa295a2b726df1cdae6f0" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_http_status_codes_assetServiceId" ON "http_status_codes" ("assetServiceId", "statusCode") `);
+        await queryRunner.query(`CREATE INDEX "IDX_http_status_codes_httpResponseId" ON "http_status_codes" ("httpResponseId") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_http_status_codes_chain" ON "http_status_codes" ("httpResponseId", "chainIndex") WHERE NOT "isPrimary"`);
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_http_status_codes_primary" ON "http_status_codes" ("httpResponseId") WHERE "isPrimary"`);
         await queryRunner.query(`CREATE TABLE "ip_observations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "httpResponseId" uuid, "assetServiceId" uuid, "assetId" uuid, "ip" inet NOT NULL, "source" character varying NOT NULL, "jobHistoryId" character varying, CONSTRAINT "PK_3bbaba66ad7474c9bd8236ed3e9" PRIMARY KEY ("id"))`);
@@ -159,7 +161,15 @@ export class SplitHttpResponses1791605416710 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "dns_records" VALIDATE CONSTRAINT "FK_d4ca3f09c0968f25a8028e60b1f"`);
 
         // ── 6. Drop the 3 legacy views (+ metadata) ──────────────────────
-        await queryRunner.query(`DELETE FROM "typeorm_metadata" WHERE "type" = 'VIEW' AND "schema" = 'public' AND "name" IN ('tls_assets_view','status_code_asset_services_view','ip_assets_view')`);
+        // typeorm_metadata may not exist on a fresh DB (created lazily by
+        // TypeORM), so only clean it when present — a failed DELETE would
+        // abort the surrounding transaction on Postgres.
+        const metadataExists = await queryRunner.query(
+          `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'typeorm_metadata'`,
+        );
+        if (metadataExists?.length) {
+          await queryRunner.query(`DELETE FROM "typeorm_metadata" WHERE "type" = 'VIEW' AND "schema" = 'public' AND "name" IN ('tls_assets_view','status_code_asset_services_view','ip_assets_view')`);
+        }
         await queryRunner.query(`DROP VIEW IF EXISTS "tls_assets_view"`);
         await queryRunner.query(`DROP VIEW IF EXISTS "status_code_asset_services_view"`);
         await queryRunner.query(`DROP VIEW IF EXISTS "ip_assets_view"`);
@@ -243,8 +253,10 @@ export class SplitHttpResponses1791605416710 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "ip_observations"`);
         await queryRunner.query(`DROP INDEX "public"."UQ_http_status_codes_primary"`);
         await queryRunner.query(`DROP INDEX "public"."UQ_http_status_codes_chain"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_http_status_codes_httpResponseId"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_http_status_codes_assetServiceId"`);
         await queryRunner.query(`DROP TABLE "http_status_codes"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_http_response_technologies_httpResponseId"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_http_response_technologies_assetServiceId"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_http_response_technologies_name"`);
         await queryRunner.query(`DROP TABLE "http_response_technologies"`);

@@ -21,6 +21,7 @@ import { HttpResponse } from './http-response.entity';
   where: 'NOT "isPrimary"',
 })
 @Index('IDX_http_status_codes_assetServiceId', ['assetServiceId', 'statusCode'])
+@Index('IDX_http_status_codes_httpResponseId', ['httpResponseId'])
 export class HttpStatusCode extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'uuid' })
