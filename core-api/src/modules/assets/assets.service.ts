@@ -17,7 +17,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 import { LLMProvider } from '../agents/enums/agent.enums';
 import {
@@ -27,7 +27,11 @@ import { Target } from '../targets/entities/target.entity';
 
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
+import {
+  GetAssetsQueryDto,
+  GetAssetsResponseDto,
+  PickTechnologyDetailDTO,
+} from './dto/assets.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
@@ -48,24 +52,42 @@ import { Asset } from './entities/assets.entity';
 import { DnsRecord } from './entities/dns-record.entity';
 import { HttpResponseTechnology } from './entities/http-response-technology.entity';
 import { HttpStatusCode } from './entities/http-status-code.entity';
-import { IpObservation } from './entities/ip-observation.entity';
+import {
+  IpObservation,
+  IpObservationSource,
+} from './entities/ip-observation.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
 
-// Type cho raw database response từ TLS query
-// interface TlsRawData {
-//   host: string;
-//   sni: string;
-//   subject_dn: string;
-//   subject_an: string[];
-//   not_after: string;
-//   not_before: string;
-//   tls_connection: string;
-// }
+/** IP sources that belong to an asset (its DNS A/AAAA records). */
+const DNS_IP_SOURCES: IpObservationSource[] = ['dns_a', 'dns_aaaa'];
 
-// Type cho item từ raw query result
-// interface TlsRawQueryItem {
-//   tls: TlsRawData;
-// }
+/** A tls_certificates row in the legacy HttpResponse.tls payload shape. */
+function toLegacyTls(cert: TlsCertificate): Record<string, unknown> {
+  return {
+    host: cert.host,
+    port: cert.port,
+    probe_status: cert.probeStatus,
+    tls_version: cert.tlsVersion,
+    cipher: cert.cipher,
+    not_before: cert.notBefore?.toISOString() ?? null,
+    not_after: cert.notAfter?.toISOString() ?? null,
+    subject_dn: cert.subjectDn,
+    subject_cn: cert.subjectCn,
+    subject_an: cert.subjectAn ?? [],
+    serial: cert.serial,
+    issuer_dn: cert.issuerDn,
+    issuer_cn: cert.issuerCn,
+    issuer_org: cert.issuerOrg ?? [],
+    fingerprint_hash: {
+      md5: cert.fingerprintMd5,
+      sha1: cert.fingerprintSha1,
+      sha256: cert.fingerprintSha256,
+    },
+    wildcard_certificate: cert.wildcardCertificate,
+    tls_connection: cert.tlsConnection,
+    sni: cert.sni,
+  };
+}
 
 @Injectable()
 export class AssetsService {
@@ -215,63 +237,149 @@ export class AssetsService {
     });
   }
 
-  /** IP strings for one asset — A/AAAA only (matches legacy ip_assets_view). */
-  private async getIpAddressesForAsset(assetId: string): Promise<string[]> {
-    const rows = await this.dnsRecordRepo.find({
-      select: ['value'],
-      where: [
-        { assetId, recordType: 'A' },
-        { assetId, recordType: 'AAAA' },
-      ],
+  /**
+   * Batch-loads the facets the asset list renders, one query per facet:
+   * asset IPs (DNS A/AAAA, same source as the IP tab and the IP filter),
+   * tech strings and TLS of the given http responses.
+   */
+  private async loadFacets(
+    assetIds: string[],
+    httpResponseIds: string[],
+  ): Promise<{
+    ipsByAsset: Map<string, string[]>;
+    techByResponse: Map<string, string[]>;
+    tlsByResponse: Map<string, Record<string, unknown>>;
+  }> {
+    const [ipRows, techRows, certs] = await Promise.all([
+      assetIds.length
+        ? this.ipObservationRepo.find({
+            select: ['assetId', 'ip'],
+            where: { assetId: In(assetIds), source: In(DNS_IP_SOURCES) },
+            order: { ip: 'ASC' },
+          })
+        : [],
+      httpResponseIds.length
+        ? this.httpResponseTechnologyRepo.find({
+            select: ['httpResponseId', 'name', 'version'],
+            where: { httpResponseId: In(httpResponseIds) },
+          })
+        : [],
+      httpResponseIds.length
+        ? this.tlsCertificateRepo.find({
+            where: { httpResponseId: In(httpResponseIds) },
+          })
+        : [],
+    ]);
+
+    const ipsByAsset = new Map<string, string[]>();
+    for (const row of ipRows ?? []) {
+      if (!row.assetId) continue;
+      const list = ipsByAsset.get(row.assetId) ?? [];
+      if (!list.includes(row.ip)) list.push(row.ip);
+      ipsByAsset.set(row.assetId, list);
+    }
+    const techByResponse = new Map<string, string[]>();
+    for (const row of techRows ?? []) {
+      const list = techByResponse.get(row.httpResponseId) ?? [];
+      list.push(row.version ? `${row.name}:${row.version}` : row.name);
+      techByResponse.set(row.httpResponseId, list);
+    }
+    const tlsByResponse = new Map<string, Record<string, unknown>>();
+    for (const cert of (certs ?? []) as TlsCertificate[]) {
+      tlsByResponse.set(cert.httpResponseId, toLegacyTls(cert));
+    }
+    return { ipsByAsset, techByResponse, tlsByResponse };
+  }
+
+  /** Enriches every distinct tech string once; returns tech → details. */
+  private async enrichTechStrings(
+    techs: string[],
+  ): Promise<Map<string, PickTechnologyDetailDTO & { website?: string }>> {
+    const unique = [...new Set(techs)];
+    const enriched =
+      (await this.technologyForwarderService.enrichTechnologies(unique)) ?? [];
+    const byTech = new Map<
+      string,
+      PickTechnologyDetailDTO & { website?: string }
+    >();
+    unique.forEach((tech, i) => {
+      const e = enriched[i];
+      if (e?.name === undefined) return;
+      byTech.set(tech, {
+        name: e.name,
+        description: e.description,
+        iconUrl: e.iconUrl,
+        categoryNames: e.categoryNames,
+        website: e.website,
+      });
     });
-    return rows.map((r) => r.value);
+    return byTech;
+  }
+
+  /**
+   * Maps asset-service rows (from buildBaseQuery) to the list/detail DTO,
+   * batching every facet lookup across the page.
+   */
+  private async toAssetResponses(
+    items: AssetService[],
+  ): Promise<GetAssetsResponseDto[]> {
+    const assetIds = items
+      .map((item) => item.asset?.id)
+      .filter((id): id is string => !!id);
+    const latestIds = items
+      .map((item) => item.httpResponses?.[0]?.id)
+      .filter((id): id is string => !!id);
+    const { ipsByAsset, techByResponse, tlsByResponse } =
+      await this.loadFacets(assetIds, latestIds);
+    const techDetails = await this.enrichTechStrings(
+      [...techByResponse.values()].flat(),
+    );
+
+    return items.map((item) => {
+      const asset = new GetAssetsResponseDto();
+      asset.id = item.id;
+      asset.value = item.value;
+      asset.targetId = item.asset?.targetId;
+      asset.createdAt = item.createdAt;
+      asset.dnsRecords = item.asset?.dnsRecords;
+      asset.isEnabled = item.asset?.isEnabled;
+      asset.port = item.port;
+      asset.screenshotPath = item.screenshotPath
+        ? `${STORAGE_BASE_PATH}/${item.screenshotPath}`
+        : null;
+      asset.ipAddresses = item.asset?.id
+        ? (ipsByAsset.get(item.asset.id) ?? [])
+        : [];
+
+      const latest = item.httpResponses?.[0];
+      if (latest) {
+        asset.httpResponses = latest;
+        latest.tech = techByResponse.get(latest.id) ?? [];
+        latest.tls = tlsByResponse.get(latest.id) ?? null;
+        if (latest.tech.length) {
+          asset.httpResponses.techList = latest.tech
+            .map((tech) => techDetails.get(tech))
+            .filter((detail) => detail !== undefined);
+        }
+      }
+      return asset;
+    });
   }
 
   /** Tech strings ("name" or "name:version") for one http response. */
   private async getTechStringsForHttpResponse(
     httpResponseId: string,
   ): Promise<string[]> {
-    const rows = await this.httpResponseTechnologyRepo.find({
-      select: ['name', 'version'],
-      where: { httpResponseId },
-    });
-    return rows.map((r) =>
-      r.version ? `${r.name}:${r.version}` : r.name,
-    );
+    const { techByResponse } = await this.loadFacets([], [httpResponseId]);
+    return techByResponse.get(httpResponseId) ?? [];
   }
 
   /** TLS payload in the legacy HttpResponse.tls shape for one http response. */
   private async getTlsForHttpResponse(
     httpResponseId: string,
   ): Promise<Record<string, unknown> | null> {
-    const cert = await this.tlsCertificateRepo.findOne({
-      where: { httpResponseId },
-    });
-    if (!cert) return null;
-    return {
-      host: cert.host,
-      port: cert.port,
-      probe_status: cert.probeStatus,
-      tls_version: cert.tlsVersion,
-      cipher: cert.cipher,
-      not_before: cert.notBefore?.toISOString() ?? null,
-      not_after: cert.notAfter?.toISOString() ?? null,
-      subject_dn: cert.subjectDn,
-      subject_cn: cert.subjectCn,
-      subject_an: cert.subjectAn ?? [],
-      serial: cert.serial,
-      issuer_dn: cert.issuerDn,
-      issuer_cn: cert.issuerCn,
-      issuer_org: cert.issuerOrg ?? [],
-      fingerprint_hash: {
-        md5: cert.fingerprintMd5,
-        sha1: cert.fingerprintSha1,
-        sha256: cert.fingerprintSha256,
-      },
-      wildcard_certificate: cert.wildcardCertificate,
-      tls_connection: cert.tlsConnection,
-      sni: cert.sni,
-    };
+    const { tlsByResponse } = await this.loadFacets([], [httpResponseId]);
+    return tlsByResponse.get(httpResponseId) ?? null;
   }
 
   private buildBaseQuery(query: GetAssetsQueryDto, workspaceId: string) {
@@ -303,7 +411,9 @@ export class AssetsService {
       },
       ipAddresses: {
         value: ipAddresses,
-        whereClause: `EXISTS (SELECT 1 FROM ip_observations io WHERE io."assetServiceId" = asset_service.id AND host(io."ip") = ANY(:param))`,
+        // Asset IPs = its DNS A/AAAA records (same source as the IP tab).
+        // Bare inet column (no host()) so UQ_ip_observations_asset applies.
+        whereClause: `EXISTS (SELECT 1 FROM ip_observations io WHERE io."assetId" = asset.id AND io.source IN ('dns_a', 'dns_aaaa') AND io."ip" = ANY(CAST(:param AS inet[])))`,
       },
       ports: {
         value: ports,
@@ -410,54 +520,7 @@ export class AssetsService {
       .take(query.limit)
       .getManyAndCount();
 
-    const assets = list.map(async (item) => {
-      const asset = new GetAssetsResponseDto();
-      asset.id = item.id;
-      asset.value = item.value;
-      asset.targetId = item.asset?.targetId;
-      asset.createdAt = item.createdAt;
-      asset.dnsRecords = item.asset?.dnsRecords;
-      asset.isEnabled = item.asset?.isEnabled;
-      asset.screenshotPath =
-        item.screenshotPath && `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
-      // asset.tags = item.asset.tags || [];
-      asset.ipAddresses = item.asset?.id
-        ? await this.getIpAddressesForAsset(item.asset.id)
-        : [];
-
-      if (item.httpResponses && item.httpResponses.length > 0) {
-        asset.httpResponses = item.httpResponses[0];
-        const latestId = item.httpResponses[0].id;
-        asset.httpResponses.tech = await this.getTechStringsForHttpResponse(
-          latestId,
-        );
-        asset.httpResponses.tls = await this.getTlsForHttpResponse(
-          latestId,
-        );
-        if (asset.httpResponses?.tech?.length) {
-          const techList = (
-            await this.technologyForwarderService.enrichTechnologies(
-              asset.httpResponses.tech,
-            )
-          ).map((e) => {
-            return {
-              name: e.name,
-              description: e.description,
-              iconUrl: e.iconUrl,
-              categoryNames: e.categoryNames,
-              website: e.website,
-            };
-          });
-
-          asset.httpResponses.techList = techList.filter(
-            (e) => e.name !== undefined,
-          );
-        }
-      }
-      return asset;
-    });
-
-    const data = await Promise.all(assets);
+    const data = await this.toAssetResponses(list);
 
     return getManyResponse({ query, data, total });
   }
@@ -557,17 +620,7 @@ export class AssetsService {
 
     const item = await queryBuilder.getOneOrFail();
 
-    const asset = new GetAssetsResponseDto();
-    asset.id = item.id;
-    asset.value = item.value;
-    asset.targetId = item.asset?.targetId;
-    asset.createdAt = item.createdAt;
-    asset.dnsRecords = item.asset?.dnsRecords;
-    asset.isEnabled = item.asset?.isEnabled;
-    asset.port = item.port;
-    asset.screenshotPath = item.screenshotPath
-      ? `${STORAGE_BASE_PATH}/${item.screenshotPath}`
-      : null;
+    const [asset] = await this.toAssetResponses([item]);
 
     // Load tags separately - tags belong to AssetService, not Asset
     const tagsResult = await this.dataSource
@@ -580,39 +633,6 @@ export class AssetsService {
     asset.tags = tagsResult.map(
       (t) => ({ id: t.id, tag: t.tag }),
     ) as AssetTag[];
-
-    asset.ipAddresses = item.asset?.id
-      ? await this.getIpAddressesForAsset(item.asset.id)
-      : [];
-
-    if (item.httpResponses && item.httpResponses.length > 0) {
-      asset.httpResponses = item.httpResponses[0];
-      const latestId = item.httpResponses[0].id;
-      asset.httpResponses.tech = await this.getTechStringsForHttpResponse(
-        latestId,
-      );
-      asset.httpResponses.tls = await this.getTlsForHttpResponse(
-        latestId,
-      );
-      if (asset.httpResponses?.tech?.length) {
-        const techList = (
-          await this.technologyForwarderService.enrichTechnologies(
-            asset.httpResponses.tech,
-          )
-        ).map((e) => {
-          return {
-            name: e.name,
-            description: e.description,
-            iconUrl: e.iconUrl,
-            categoryNames: e.categoryNames,
-          };
-        });
-
-        asset.httpResponses.techList = techList.filter(
-          (e) => e.name !== undefined,
-        );
-      }
-    }
     return asset;
   }
 
@@ -631,10 +651,12 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const filteredServicesQuery = this.buildBaseQuery(
-      query,
-      workspaceId,
-    ).select('asset_service.id');
+    // Asset IPs are the DNS A/AAAA records of the asset (as in the legacy
+    // ip_assets_view); assetCount = distinct filtered services on those
+    // assets. httpx/resolver observations are excluded on purpose.
+    const filteredServicesQuery = this.buildBaseQuery(query, workspaceId)
+      .select('asset_service.id', 'serviceId')
+      .addSelect('asset_service."assetId"', 'assetId');
 
     const params: Record<string, unknown> = {
       ...filteredServicesQuery.getParameters(),
@@ -644,13 +666,13 @@ export class AssetsService {
     }
 
     const groupedSql = `
-      SELECT host(io."ip") AS ip, COUNT(DISTINCT io."assetServiceId") AS "assetCount"
-      FROM ip_observations io
-      WHERE io."ip" IS NOT NULL
-        AND io."assetServiceId" IN (${filteredServicesQuery.getQuery()})${
+      SELECT host(io."ip") AS ip, COUNT(DISTINCT fs."serviceId") AS "assetCount"
+      FROM (${filteredServicesQuery.getQuery()}) fs
+      INNER JOIN ip_observations io
+        ON io."assetId" = fs."assetId" AND io.source IN ('dns_a', 'dns_aaaa')${
           query.value ? ' AND host(io."ip") ILIKE :ipValue' : ''
         }
-      GROUP BY host(io."ip")
+      GROUP BY io."ip"
     `;
 
     const totalInDb = await this.dataSource
@@ -1137,9 +1159,11 @@ export class AssetsService {
 
     const offset = (query.page - 1) * query.limit;
 
+    // `hosts` is a cert-host filter, applied once on tc."host" below — not
+    // a service filter (that would also constrain on the latest response).
     const baseQuery: GetAssetsQueryDto = {
       ...query,
-      tlsHosts: query.hosts,
+      hosts: undefined,
       startDate: undefined,
       endDate: undefined,
     };

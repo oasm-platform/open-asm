@@ -4,8 +4,9 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * Split http_responses blob columns into 5 queryable facet tables + drop the
  * 3 legacy views. Single-file migration (no dual-write release).
  *
- * up():   CREATE 5 tables → FKs (NOT VALID) → BACKFILL → VALIDATE →
- *         DROP 3 views (+ typeorm_metadata) → DROP 5 blob columns.
+ * up():   swap http_responses(assetServiceId) for (assetServiceId,
+ *         createdAt) → CREATE 5 tables → FKs (NOT VALID) → BACKFILL →
+ *         VALIDATE → DROP 3 views (+ typeorm_metadata) → DROP 5 blob columns.
  * down(): restore columns → copy-back (best-effort) → restore 3 views +
  *         metadata + tech GIN index → drop FKs + 5 tables.
  */
@@ -54,11 +55,14 @@ export class SplitHttpResponses1791605416710 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         // ── 1. Drop the junk GIN index on tech (column goes away below) ──
         await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_cc7d157cf5de83c706e4b93c4f"`);
+        // Latest-response-per-service lookups; supersedes the single-column
+        // assetServiceId index (same prefix).
+        await queryRunner.query(`CREATE INDEX "IDX_http_responses_assetServiceId_createdAt" ON "http_responses" ("assetServiceId", "createdAt") `);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_27118f1a1f2a0b32462665b591"`);
 
         // ── 2. CREATE the 5 facet tables ─────────────────────────────────
-        await queryRunner.query(`CREATE TABLE "http_response_technologies" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "httpResponseId" uuid NOT NULL, "assetServiceId" uuid, "name" character varying NOT NULL, "version" character varying, CONSTRAINT "UQ_41a52e7b86eddc6dafdfe464d66" UNIQUE ("httpResponseId", "name", "version"), CONSTRAINT "PK_d80d8a3434e0bfa8bf6dec0b23f" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "http_response_technologies" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "httpResponseId" uuid NOT NULL, "assetServiceId" uuid, "name" character varying NOT NULL, "version" character varying, CONSTRAINT "UQ_41a52e7b86eddc6dafdfe464d66" UNIQUE NULLS NOT DISTINCT ("httpResponseId", "name", "version"), CONSTRAINT "PK_d80d8a3434e0bfa8bf6dec0b23f" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_http_response_technologies_name" ON "http_response_technologies" ("name") `);
-        await queryRunner.query(`CREATE INDEX "IDX_http_response_technologies_httpResponseId" ON "http_response_technologies" ("httpResponseId") `);
         await queryRunner.query(`CREATE INDEX "IDX_http_response_technologies_assetServiceId" ON "http_response_technologies" ("assetServiceId") `);
         await queryRunner.query(`CREATE TABLE "http_status_codes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "httpResponseId" uuid NOT NULL, "assetServiceId" uuid, "statusCode" integer NOT NULL, "isPrimary" boolean NOT NULL DEFAULT false, "chainIndex" integer, CONSTRAINT "PK_1020bffa295a2b726df1cdae6f0" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_http_status_codes_assetServiceId" ON "http_status_codes" ("assetServiceId", "statusCode") `);
@@ -74,8 +78,6 @@ export class SplitHttpResponses1791605416710 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_tls_certificates_host" ON "tls_certificates" ("host") `);
         await queryRunner.query(`CREATE INDEX "IDX_tls_certificates_assetServiceId" ON "tls_certificates" ("assetServiceId") `);
         await queryRunner.query(`CREATE TABLE "dns_records" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "assetId" uuid NOT NULL, "recordType" character varying NOT NULL, "value" text NOT NULL, "jobHistoryId" uuid, CONSTRAINT "UQ_620edcf2266cbbd7b8c378d6474" UNIQUE ("assetId", "recordType", "value"), CONSTRAINT "PK_b9d97eeaf996c468b2468839c05" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_dns_records_type" ON "dns_records" ("recordType") `);
-        await queryRunner.query(`CREATE INDEX "IDX_dns_records_assetId" ON "dns_records" ("assetId") `);
 
         // ── 3. FKs (NOT VALID first — validated after backfill) ──────────
         await queryRunner.query(`ALTER TABLE "http_response_technologies" ADD CONSTRAINT "FK_2a4f83acc56355c0f8f89e5e6dd" FOREIGN KEY ("httpResponseId") REFERENCES "http_responses"("id") ON DELETE CASCADE ON UPDATE NO ACTION NOT VALID`);
@@ -140,7 +142,7 @@ export class SplitHttpResponses1791605416710 implements MigrationInterface {
             FROM http_responses hr CROSS JOIN LATERAL unnest(hr.chain_status_codes) WITH ORDINALITY AS c(code, ord)
             WHERE hr.chain_status_codes IS NOT NULL AND c.code ~ '^\\d+$' ON CONFLICT DO NOTHING`);
         await queryRunner.query(`INSERT INTO "dns_records" ("assetId","recordType","value")
-            SELECT a.id, kv.key, e FROM assets a
+            SELECT a.id, upper(kv.key), e FROM assets a
             CROSS JOIN LATERAL jsonb_each_text(a."dnsRecords"::jsonb) AS kv(key, val)
             CROSS JOIN LATERAL jsonb_array_elements_text(kv.val::jsonb) AS e
             WHERE a."dnsRecords" IS NOT NULL
@@ -228,6 +230,8 @@ export class SplitHttpResponses1791605416710 implements MigrationInterface {
             );
         }
         await queryRunner.query(`CREATE INDEX "IDX_cc7d157cf5de83c706e4b93c4f" ON "http_responses" ("tech") `);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_27118f1a1f2a0b32462665b591" ON "http_responses" ("assetServiceId") `);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_http_responses_assetServiceId_createdAt"`);
 
         // ── 4. Drop FKs + the 5 facet tables ─────────────────────────────
         await queryRunner.query(`ALTER TABLE "dns_records" DROP CONSTRAINT "FK_d4ca3f09c0968f25a8028e60b1f"`);
@@ -240,25 +244,22 @@ export class SplitHttpResponses1791605416710 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "http_status_codes" DROP CONSTRAINT "FK_c8e0ef6905c388b86cebc59ca54"`);
         await queryRunner.query(`ALTER TABLE "http_response_technologies" DROP CONSTRAINT "FK_0196c5bcb03a029d41655498f90"`);
         await queryRunner.query(`ALTER TABLE "http_response_technologies" DROP CONSTRAINT "FK_2a4f83acc56355c0f8f89e5e6dd"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_dns_records_assetId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_dns_records_type"`);
         await queryRunner.query(`DROP TABLE "dns_records"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_tls_certificates_assetServiceId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_tls_certificates_host"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_tls_certificates_assetServiceId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_tls_certificates_host"`);
         await queryRunner.query(`DROP TABLE "tls_certificates"`);
-        await queryRunner.query(`DROP INDEX "public"."UQ_ip_observations_http"`);
-        await queryRunner.query(`DROP INDEX "public"."UQ_ip_observations_asset"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_ip_observations_ip"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_ip_observations_assetServiceId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."UQ_ip_observations_http"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."UQ_ip_observations_asset"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_ip_observations_ip"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_ip_observations_assetServiceId"`);
         await queryRunner.query(`DROP TABLE "ip_observations"`);
-        await queryRunner.query(`DROP INDEX "public"."UQ_http_status_codes_primary"`);
-        await queryRunner.query(`DROP INDEX "public"."UQ_http_status_codes_chain"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_http_status_codes_httpResponseId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_http_status_codes_assetServiceId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."UQ_http_status_codes_primary"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."UQ_http_status_codes_chain"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_http_status_codes_httpResponseId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_http_status_codes_assetServiceId"`);
         await queryRunner.query(`DROP TABLE "http_status_codes"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_http_response_technologies_httpResponseId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_http_response_technologies_assetServiceId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_http_response_technologies_name"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_http_response_technologies_assetServiceId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_http_response_technologies_name"`);
         await queryRunner.query(`DROP TABLE "http_response_technologies"`);
     }
 

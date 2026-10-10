@@ -31,6 +31,12 @@ class KnowledgebaseInfo {
 @Entity('http_responses')
 @Index('IDX_http_jobHistoryId', ['jobHistory'])
 @Index('IDX_http_host', ['host'])
+// "Latest response per service" lookups (ORDER BY createdAt DESC LIMIT 1);
+// its assetServiceId prefix also serves the FK.
+@Index('IDX_http_responses_assetServiceId_createdAt', [
+  'assetServiceId',
+  'createdAt',
+])
 export class HttpResponse extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'timestamp with time zone', nullable: true })
@@ -155,7 +161,6 @@ export class HttpResponse extends BaseEntity {
   chain_status_codes?: string[];
 
   @ApiProperty()
-  @Index(['assetServiceId', 'createdAt'])
   @Column({ type: 'varchar', nullable: true })
   assetServiceId: string;
 

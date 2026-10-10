@@ -250,6 +250,69 @@ describe('AssetsService', () => {
       ).toHaveBeenCalledWith('asset_service.id', 'ASC');
     });
 
+    it('loads facets with one batched query per facet, not per row', async () => {
+      const rows = [1, 2, 3].map((i) => ({
+        id: `svc-${i}`,
+        value: `s${i}.example.com`,
+        asset: { id: `asset-${i}`, targetId: 't' },
+        httpResponses: [{ id: `hr-${i}` }],
+      }));
+      (mockAssetServiceRepository as any).getManyAndCount = jest
+        .fn()
+        .mockResolvedValue([rows, 3]);
+      (mockIpObservationRepository.find as jest.Mock).mockResolvedValue([
+        { assetId: 'asset-1', ip: '192.0.2.1' },
+      ]);
+      (mockHttpResponseTechnologyRepository.find as jest.Mock).mockResolvedValue([
+        { httpResponseId: 'hr-1', name: 'Nginx', version: '1.25' },
+        { httpResponseId: 'hr-2', name: 'Nginx', version: '1.25' },
+      ]);
+      (mockTlsCertificateRepository.find as jest.Mock).mockResolvedValue([]);
+      (mockTechnologyForwarderService.enrichTechnologies as jest.Mock).mockResolvedValue([
+        { name: 'Nginx', description: 'web server', iconUrl: 'i', categoryNames: [] },
+      ]);
+
+      const res = await service.getManyAsssetServices(
+        { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' } as any,
+        'workspace-uuid',
+      );
+
+      expect(mockIpObservationRepository.find).toHaveBeenCalledTimes(1);
+      expect(mockHttpResponseTechnologyRepository.find).toHaveBeenCalledTimes(1);
+      expect(mockTlsCertificateRepository.find).toHaveBeenCalledTimes(1);
+      // Distinct tech strings are enriched once for the whole page.
+      expect(mockTechnologyForwarderService.enrichTechnologies).toHaveBeenCalledTimes(1);
+      expect(mockTechnologyForwarderService.enrichTechnologies).toHaveBeenCalledWith([
+        'Nginx:1.25',
+      ]);
+      expect(res.data.map((row) => row.ipAddresses)).toEqual([
+        ['192.0.2.1'],
+        [],
+        [],
+      ]);
+      expect(res.data[1].httpResponses?.techList?.[0]?.name).toBe('Nginx');
+      expect(res.data[2].httpResponses?.tech).toEqual([]);
+    });
+
+    it('filters IPs on the DNS-sourced inet column so the index applies', async () => {
+      await service.getManyAsssetServices(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+          ipAddresses: ['192.0.2.1'],
+        } as any,
+        'workspace-uuid',
+      );
+      const clause = (mockAssetServiceRepository.andWhere as jest.Mock).mock.calls
+        .map((call) => String(call[0]))
+        .find((c) => c.includes('ip_observations'));
+      expect(clause).toContain(`io.source IN ('dns_a', 'dns_aaaa')`);
+      expect(clause).toContain('io."ip" = ANY(CAST(:ipAddresses AS inet[]))');
+      expect(clause).not.toContain('host(');
+    });
+
     it('matches services by urls via EXISTS on discovered_urls only', async () => {
       await service.getManyAsssetServices(
         {

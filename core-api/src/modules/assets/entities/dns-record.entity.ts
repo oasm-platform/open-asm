@@ -3,7 +3,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
-  Index,
   JoinColumn,
   ManyToOne,
   Relation,
@@ -12,9 +11,8 @@ import {
 import { Asset } from './assets.entity';
 
 @Entity('dns_records')
+// The unique (assetId, …) prefix serves assetId lookups and the FK.
 @Unique(['assetId', 'recordType', 'value'])
-@Index('IDX_dns_records_assetId', ['assetId'])
-@Index('IDX_dns_records_type', ['recordType'])
 export class DnsRecord extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'uuid' })

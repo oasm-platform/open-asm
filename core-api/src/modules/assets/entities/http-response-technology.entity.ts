@@ -13,10 +13,11 @@ import { AssetService } from './asset-services.entity';
 import { HttpResponse } from './http-response.entity';
 
 @Entity('http_response_technologies')
+// NULLS NOT DISTINCT (set in the migration; TypeORM cannot express it) so a
+// version-less tech dedupes. Its httpResponseId prefix serves lookups + FK.
 @Unique(['httpResponseId', 'name', 'version'])
 @Index('IDX_http_response_technologies_assetServiceId', ['assetServiceId'])
 @Index('IDX_http_response_technologies_name', ['name'])
-@Index('IDX_http_response_technologies_httpResponseId', ['httpResponseId'])
 export class HttpResponseTechnology extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'uuid' })

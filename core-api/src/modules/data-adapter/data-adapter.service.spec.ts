@@ -23,6 +23,7 @@ import {
   DataAdapterService,
   mergeDnsRecords,
   splitTechString,
+  toDnsFacetRows,
   toTlsCertificateRow,
 } from './data-adapter.service';
 
@@ -53,10 +54,13 @@ describe('DataAdapterService', () => {
         orIgnore: jest.fn().mockReturnThis(),
         orUpdate: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
         getRawOne: jest.fn().mockResolvedValue({
           id: 'asset-id',
           value: 'example.com',
         }),
+        // id ↔ value lookup after the asset insert; default: none found.
+        getRawMany: jest.fn().mockResolvedValue([]),
         getRepository: jest.fn().mockReturnValue({
           save: jest.fn().mockResolvedValue({ id: 'hr-1' }),
         }),
@@ -470,11 +474,9 @@ describe('DataAdapterService', () => {
 
       // No apex value in the batch → primary dnsRecords must not be touched
       expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
-      // 2 identifiers → asset insert + DnsRecord fan-out + IpObservation
-      // fan-out (both A values are IPv4) = 3 executes.
-      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(3);
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
 
-      // Returned count = number of identifiers in the insert result
+      // Returned count = number of rows actually inserted
       expect(inserted).toBe(2);
     });
 
@@ -560,8 +562,7 @@ describe('DataAdapterService', () => {
 
       // No apex entry in the batch → primary update must not run (no NULL clobber)
       expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
-      // asset insert + DnsRecord fan-out + IpObservation fan-out = 3 executes.
-      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(3);
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
     });
 
     it('should merge apex dnsRecords when the primary existing dnsRecords are NULL', async () => {
@@ -786,21 +787,26 @@ describe('DataAdapterService', () => {
       });
     });
 
-    it('mirrors freshly inserted assets into dns_records + ip_observations, mapping identifiers by index', async () => {
+    it('mirrors inserted assets into dns_records + ip_observations, resolving ids by value', async () => {
+      // orIgnore skipped sub0 (already exists): RETURNING only has a1/a2, so
+      // identifiers no longer line up with the batch by index.
       const mockInsertResult = {
-        identifiers: [{ id: 'a1' }, { id: 'a2' }],
+        identifiers: [undefined, { id: 'a1' }, { id: 'a2' }],
         generatedMaps: [],
         raw: [],
       } as unknown as InsertResult;
       mockWorkspaceConfigs();
-
-      // Asset insert resolves; child inserts (DnsRecord, IpObservation)
-      // resolve too. Order: primary lookup getRawOne, then executes.
       mockQueryRunner.manager
         .createQueryBuilder()
         .execute.mockResolvedValue(mockInsertResult);
+      mockQueryRunner.manager.getRawMany.mockResolvedValueOnce([
+        { id: 'a0', value: 'sub0.example.com' },
+        { id: 'a1', value: 'sub1.example.com' },
+        { id: 'a2', value: 'sub2.example.com' },
+      ]);
 
       await service.upsertAssetsByTargetId(targetId, [
+        { value: 'sub0.example.com', dnsRecords: { A: ['192.0.2.9'] } },
         {
           value: 'sub1.example.com',
           dnsRecords: { A: ['192.0.2.1'], AAAA: ['2001:db8::1'], MX: ['10 mx.example.com'] },
@@ -819,26 +825,47 @@ describe('DataAdapterService', () => {
         >;
       };
 
-      // dns_records: one row per (assetId, recordType, value); the identifier
-      // id is mapped back to the asset by index of the deduped batch.
-      const dnsRows = valuesFor(DnsRecord);
-      expect(dnsRows).toEqual(
-        expect.arrayContaining([
-          { assetId: 'a1', recordType: 'A', value: '192.0.2.1' },
-          { assetId: 'a1', recordType: 'AAAA', value: '2001:db8::1' },
-          { assetId: 'a1', recordType: 'MX', value: '10 mx.example.com' },
-          { assetId: 'a2', recordType: 'A', value: '192.0.2.2' },
-        ]),
-      );
-
+      // Only the inserted assets, each with its own records; the skipped
+      // sub0 keeps its stored json, so its facets are untouched.
+      expect(valuesFor(DnsRecord)).toEqual([
+        { assetId: 'a1', recordType: 'A', value: '192.0.2.1' },
+        { assetId: 'a1', recordType: 'AAAA', value: '2001:db8::1' },
+        { assetId: 'a1', recordType: 'MX', value: '10 mx.example.com' },
+        { assetId: 'a2', recordType: 'A', value: '192.0.2.2' },
+      ]);
       // ip_observations only for A/AAAA rows that are real IPs.
-      expect(valuesFor(IpObservation)).toEqual(
-        expect.arrayContaining([
-          { assetId: 'a1', ip: '192.0.2.1', source: 'dns_a' },
-          { assetId: 'a1', ip: '2001:db8::1', source: 'dns_aaaa' },
-          { assetId: 'a2', ip: '192.0.2.2', source: 'dns_a' },
-        ]),
-      );
+      expect(valuesFor(IpObservation)).toEqual([
+        { assetId: 'a1', ip: '192.0.2.1', source: 'dns_a' },
+        { assetId: 'a1', ip: '2001:db8::1', source: 'dns_aaaa' },
+        { assetId: 'a2', ip: '192.0.2.2', source: 'dns_a' },
+      ]);
+      // Stale facet rows of the synced assets are cleared first.
+      expect(builder.delete).toHaveBeenCalledTimes(2);
+      expect(builder.where).toHaveBeenCalledWith('"assetId" IN (:...assetIds)', {
+        assetIds: ['a1', 'a2'],
+      });
+    });
+
+    it('toDnsFacetRows uppercases record types, dedupes values and keeps only valid IPs', () => {
+      expect(
+        toDnsFacetRows('x', {
+          a: ['192.0.2.1', '192.0.2.1', '999.1.1.1'],
+          aaaa: ['2001:db8::1'],
+          txt: ['v=spf1', ''],
+          bogus: 'not-an-array',
+        }),
+      ).toEqual({
+        dnsRows: [
+          { assetId: 'x', recordType: 'A', value: '192.0.2.1' },
+          { assetId: 'x', recordType: 'A', value: '999.1.1.1' },
+          { assetId: 'x', recordType: 'AAAA', value: '2001:db8::1' },
+          { assetId: 'x', recordType: 'TXT', value: 'v=spf1' },
+        ],
+        ipRows: [
+          { assetId: 'x', ip: '192.0.2.1', source: 'dns_a' },
+          { assetId: 'x', ip: '2001:db8::1', source: 'dns_aaaa' },
+        ],
+      });
     });
   });
 

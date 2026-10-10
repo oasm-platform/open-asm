@@ -315,8 +315,10 @@ export class StatisticService {
       `SELECT DISTINCT host(io."ip") AS "ip"
        FROM "assets" a
        INNER JOIN "targets" t ON t.id = a."targetId"
-       INNER JOIN "ip_observations" io ON io."assetId" = a.id
-       WHERE t."workspaceId" = $1 AND io."ip" IS NOT NULL`,
+       INNER JOIN "ip_observations" io
+         ON io."assetId" = a.id AND io.source IN ('dns_a', 'dns_aaaa')
+       WHERE t."workspaceId" = $1
+         AND EXISTS (SELECT 1 FROM "asset_services" s WHERE s."assetId" = a.id)`,
       [workspaceId],
     );
 
