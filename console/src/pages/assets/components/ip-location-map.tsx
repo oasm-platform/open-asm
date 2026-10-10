@@ -29,7 +29,7 @@ export default function IpLocationMap({ geoIp }: IpLocationMapProps) {
   }
 
   return (
-    <div className="h-20 w-40 rounded overflow-hidden border">
+    <div className="relative h-20 w-40 rounded overflow-hidden border">
       <MapContainer
         attributionControl={false}
         center={[geoIp!.lat, geoIp!.lon]}

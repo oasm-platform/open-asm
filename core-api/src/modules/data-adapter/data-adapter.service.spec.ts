@@ -5,6 +5,12 @@ import type { InsertResult } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { Severity, ToolCategory } from '../../common/enums/enum';
 import type { Asset } from '../assets/entities/assets.entity';
+import { AssetService } from '../assets/entities/asset-services.entity';
+import { DnsRecord } from '../assets/entities/dns-record.entity';
+import { HttpResponseTechnology } from '../assets/entities/http-response-technology.entity';
+import { HttpStatusCode } from '../assets/entities/http-status-code.entity';
+import { IpObservation } from '../assets/entities/ip-observation.entity';
+import { TlsCertificate } from '../assets/entities/tls-certificate.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
 import { IssuesService } from '../issues/issues.service';
 import type { Job } from '../jobs-registry/entities/job.entity';
@@ -13,7 +19,12 @@ import { EVENT_CATALOG } from '../connectors/event';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { DataAdapterService, mergeDnsRecords } from './data-adapter.service';
+import {
+  DataAdapterService,
+  mergeDnsRecords,
+  splitTechString,
+  toTlsCertificateRow,
+} from './data-adapter.service';
 
 describe('DataAdapterService', () => {
   let service: DataAdapterService;
@@ -45,6 +56,9 @@ describe('DataAdapterService', () => {
         getRawOne: jest.fn().mockResolvedValue({
           id: 'asset-id',
           value: 'example.com',
+        }),
+        getRepository: jest.fn().mockReturnValue({
+          save: jest.fn().mockResolvedValue({ id: 'hr-1' }),
         }),
       },
       commitTransaction: jest.fn(),
@@ -213,6 +227,92 @@ describe('DataAdapterService', () => {
     });
   });
 
+  describe('splitTechString', () => {
+    it('splits on the first colon into name + version', () => {
+      expect(splitTechString('nginx:1.21')).toEqual({
+        name: 'nginx',
+        version: '1.21',
+      });
+    });
+
+    it('returns a null version when there is no colon', () => {
+      expect(splitTechString('react')).toEqual({
+        name: 'react',
+        version: null,
+      });
+    });
+
+    it('returns null for empty or whitespace-only input', () => {
+      expect(splitTechString('')).toBeNull();
+      expect(splitTechString('   ')).toBeNull();
+    });
+
+    it('keeps extra colons in the version (only the first splits)', () => {
+      expect(splitTechString('foo:1:2')).toEqual({
+        name: 'foo',
+        version: '1:2',
+      });
+    });
+
+    it('treats a trailing colon as an empty version and drops a nameless tech', () => {
+      expect(splitTechString('nginx:')).toEqual({
+        name: 'nginx',
+        version: null,
+      });
+      expect(splitTechString(':1.21')).toBeNull();
+    });
+  });
+
+  describe('toTlsCertificateRow', () => {
+    const keys = {
+      httpResponseId: 'hr-1',
+      assetServiceId: 'svc-1',
+      jobHistoryId: 'jh-1',
+    };
+
+    it('flattens the fingerprint_hash object into fingerprintMd5/Sha1/Sha256', () => {
+      const row = toTlsCertificateRow(
+        {
+          host: 'example.com',
+          fingerprint_hash: {
+            md5: 'a',
+            sha1: 'b',
+            sha256: 'c',
+          },
+        },
+        keys,
+      );
+      expect(row).toMatchObject({
+        ...keys,
+        host: 'example.com',
+        fingerprintMd5: 'a',
+        fingerprintSha1: 'b',
+        fingerprintSha256: 'c',
+      });
+    });
+
+    it('turns a malformed date into null/undefined without throwing', () => {
+      let row: Record<string, unknown> | null = null;
+      expect(() => {
+        row = toTlsCertificateRow(
+          {
+            host: 'example.com',
+            not_before: '2024-01T0:00:00Z',
+            not_after: 'not-a-date',
+          },
+          keys,
+        );
+      }).not.toThrow();
+      expect(row!.notBefore).toBeUndefined();
+      expect(row!.notAfter).toBeUndefined();
+    });
+
+    it('returns null for null or non-object input', () => {
+      expect(toTlsCertificateRow(null, keys)).toBeNull();
+      expect(toTlsCertificateRow(undefined, keys)).toBeNull();
+    });
+  });
+
   describe('subdomains', () => {
     const mockJob = {
       asset: {
@@ -370,7 +470,9 @@ describe('DataAdapterService', () => {
 
       // No apex value in the batch → primary dnsRecords must not be touched
       expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
-      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(1);
+      // 2 identifiers → asset insert + DnsRecord fan-out + IpObservation
+      // fan-out (both A values are IPv4) = 3 executes.
+      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(3);
 
       // Returned count = number of identifiers in the insert result
       expect(inserted).toBe(2);
@@ -458,7 +560,8 @@ describe('DataAdapterService', () => {
 
       // No apex entry in the batch → primary update must not run (no NULL clobber)
       expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
-      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(1);
+      // asset insert + DnsRecord fan-out + IpObservation fan-out = 3 executes.
+      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(3);
     });
 
     it('should merge apex dnsRecords when the primary existing dnsRecords are NULL', async () => {
@@ -582,9 +685,10 @@ describe('DataAdapterService', () => {
         { replaceDnsRecords: true },
       );
 
-      // orUpdate replaces orIgnore: conflict on (value, targetId), overwrite
-      // dnsRecords only — isEnabled of the existing row is untouched.
-      expect(mockQueryRunner.manager.orIgnore).not.toHaveBeenCalled();
+      // The asset upsert switches from orIgnore to orUpdate: conflict on
+      // (value, targetId), overwrite dnsRecords only — isEnabled of the
+      // existing row is untouched. (orIgnore is still used by the DnsRecord /
+      // IpObservation facet fan-out, so it is NOT asserted absent here.)
       expect(mockQueryRunner.manager.orUpdate).toHaveBeenCalledWith(
         ['dnsRecords'],
         ['value', 'targetId'],
@@ -680,6 +784,61 @@ describe('DataAdapterService', () => {
         isPrimary: true,
         dnsRecords: { A: ['1.2.3.4', '9.9.9.9'], SOA: ['ns1.example.com'] },
       });
+    });
+
+    it('mirrors freshly inserted assets into dns_records + ip_observations, mapping identifiers by index', async () => {
+      const mockInsertResult = {
+        identifiers: [{ id: 'a1' }, { id: 'a2' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs();
+
+      // Asset insert resolves; child inserts (DnsRecord, IpObservation)
+      // resolve too. Order: primary lookup getRawOne, then executes.
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValue(mockInsertResult);
+
+      await service.upsertAssetsByTargetId(targetId, [
+        {
+          value: 'sub1.example.com',
+          dnsRecords: { A: ['192.0.2.1'], AAAA: ['2001:db8::1'], MX: ['10 mx.example.com'] },
+        },
+        { value: 'sub2.example.com', dnsRecords: { A: ['192.0.2.2'] } },
+      ]);
+
+      const builder = mockQueryRunner.manager;
+      const intoCalls = (builder.into.mock.calls as unknown[][]).map(
+        (call) => call[0],
+      );
+      const valuesFor = (entity: unknown): Array<Record<string, unknown>> => {
+        const idx = intoCalls.indexOf(entity);
+        return builder.values.mock.calls[idx][0] as Array<
+          Record<string, unknown>
+        >;
+      };
+
+      // dns_records: one row per (assetId, recordType, value); the identifier
+      // id is mapped back to the asset by index of the deduped batch.
+      const dnsRows = valuesFor(DnsRecord);
+      expect(dnsRows).toEqual(
+        expect.arrayContaining([
+          { assetId: 'a1', recordType: 'A', value: '192.0.2.1' },
+          { assetId: 'a1', recordType: 'AAAA', value: '2001:db8::1' },
+          { assetId: 'a1', recordType: 'MX', value: '10 mx.example.com' },
+          { assetId: 'a2', recordType: 'A', value: '192.0.2.2' },
+        ]),
+      );
+
+      // ip_observations only for A/AAAA rows that are real IPs.
+      expect(valuesFor(IpObservation)).toEqual(
+        expect.arrayContaining([
+          { assetId: 'a1', ip: '192.0.2.1', source: 'dns_a' },
+          { assetId: 'a1', ip: '2001:db8::1', source: 'dns_aaaa' },
+          { assetId: 'a2', ip: '192.0.2.2', source: 'dns_a' },
+        ]),
+      );
     });
   });
 
@@ -800,9 +959,12 @@ describe('DataAdapterService', () => {
         job: mockJob,
       });
 
-      expect(mockQueryRunner.manager.createQueryBuilder).toHaveBeenCalledTimes(
-        3,
-      );
+      // A failed probe flips AssetService.isErrorPage; the core row save and
+      // the facet splits still run inside the same transaction.
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(AssetService);
+      expect(mockQueryRunner.manager.set).toHaveBeenCalledWith({
+        isErrorPage: true,
+      });
     });
 
     it('should rollback transaction on error', async () => {
@@ -820,6 +982,118 @@ describe('DataAdapterService', () => {
 
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('saves a slim core row (no facet keys) and fans out tls/tech/ip/status child rows', async () => {
+      const response = {
+        ...mockHttpResponse,
+        tech: ['nginx:1.21', 'react'],
+        a: ['1.2.3.4', 'not-an-ip'],
+        resolvers: ['8.8.8.8'],
+        chain_status_codes: [301, 302],
+      } as unknown as HttpResponse;
+
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      const builder = mockQueryRunner.manager;
+      const saveMock = jest.fn().mockResolvedValue({ id: 'hr-1' });
+      builder.getRepository.mockReturnValue({ save: saveMock });
+      builder.createQueryBuilder().execute.mockResolvedValue(undefined);
+
+      await service.httpResponses({ data: response, job: mockJob });
+
+      // The core http_responses row must NOT carry the facet keys.
+      const savedCore = saveMock.mock.calls[0][0] as Record<string, unknown>;
+      for (const key of [
+        'tls',
+        'tech',
+        'a',
+        'resolvers',
+        'chain_status_codes',
+      ]) {
+        expect(savedCore).not.toHaveProperty(key);
+      }
+      expect(savedCore).toMatchObject({
+        assetServiceId: 'service-id',
+        jobHistoryId: 'history-id',
+      });
+
+      const intoCalls = (builder.into.mock.calls as unknown[][]).map(
+        (call) => call[0],
+      );
+      const valuesFor = (entity: unknown): unknown => {
+        const idx = intoCalls.indexOf(entity);
+        return builder.values.mock.calls[idx][0];
+      };
+
+      // TLS: one row via orUpdate on the unique httpResponseId.
+      expect(valuesFor(TlsCertificate)).toMatchObject({
+        httpResponseId: 'hr-1',
+        host: 'example.com',
+        tlsVersion: 'TLSv1.3',
+        fingerprintMd5: 'test-md5',
+      });
+      expect(builder.orUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ conflict_target: ['httpResponseId'] }),
+      );
+
+      // Tech: split name/version on the first colon.
+      expect(valuesFor(HttpResponseTechnology)).toEqual([
+        {
+          name: 'nginx',
+          version: '1.21',
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+        {
+          name: 'react',
+          version: undefined,
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+      ]);
+
+      // IP: only valid IPs survive, tagged by source.
+      expect(valuesFor(IpObservation)).toEqual([
+        {
+          ip: '1.2.3.4',
+          source: 'httpx_a',
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+        {
+          ip: '8.8.8.8',
+          source: 'resolver',
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+      ]);
+
+      // Status: primary row + chain rows.
+      expect(valuesFor(HttpStatusCode)).toEqual([
+        {
+          statusCode: 200,
+          isPrimary: true,
+          chainIndex: undefined,
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+        {
+          statusCode: 301,
+          isPrimary: false,
+          chainIndex: 0,
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+        {
+          statusCode: 302,
+          isPrimary: false,
+          chainIndex: 1,
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+      ]);
     });
   });
 

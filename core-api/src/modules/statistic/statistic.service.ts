@@ -312,12 +312,11 @@ export class StatisticService {
    */
   private async getAllWorkspaceIps(workspaceId: string): Promise<string[]> {
     const rawResults: { ip: string }[] = await this.dataSource.query(
-      `SELECT DISTINCT ipa."ip"
-       FROM "asset_services" assvc
-       INNER JOIN "assets" a ON a.id = assvc."assetId"
+      `SELECT DISTINCT host(io."ip") AS "ip"
+       FROM "assets" a
        INNER JOIN "targets" t ON t.id = a."targetId"
-       INNER JOIN "ip_assets_view" ipa ON ipa."assetId" = a.id
-       WHERE t."workspaceId" = $1 AND ipa."ip" IS NOT NULL`,
+       INNER JOIN "ip_observations" io ON io."assetId" = a.id
+       WHERE t."workspaceId" = $1 AND io."ip" IS NOT NULL`,
       [workspaceId],
     );
 
@@ -489,11 +488,15 @@ export class StatisticService {
    */
   async getTechCounts(filter: StatisticFilter) {
     const { workspaceIds, targetId, startDate, endDate } = filter;
-    // Subquery to unnest the 'tech' array from latest HttpResponse and link to workspaceId
+    // Subquery reads the normalized tech facet table, correlated to the
+    // latest HttpResponse per service.
     const subQuery = this.dataSource
       .createQueryBuilder()
       .select('target.workspaceId', 'workspaceId')
-      .addSelect('unnest(latest_http.tech)', 'tech') // Unnest the 'tech' array from latest response
+      .addSelect(
+        `hrt.name || CASE WHEN hrt.version IS NULL THEN '' ELSE ':' || hrt.version END`,
+        'tech',
+      )
       .from(AssetService, 'assetService')
       .innerJoin('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
@@ -502,8 +505,12 @@ export class StatisticService {
         'latest_http',
         'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
-      .where('1=1')
-      .andWhere('latest_http.tech IS NOT NULL');
+      .innerJoin(
+        'http_response_technologies',
+        'hrt',
+        'hrt."httpResponseId" = latest_http.id',
+      )
+      .where('1=1');
 
     if (workspaceIds?.length) {
       subQuery.andWhere('target.workspaceId IN (:...workspaceIds)', {
@@ -678,23 +685,23 @@ export class StatisticService {
     // once per port/service of the host.
     const rawSubQuery = `
       SELECT DISTINCT ON (
-        hr.tls->>'host', hr.tls->>'sni', hr.tls->>'subject_dn', hr.tls->>'subject_cn',
-        hr.tls->>'issuer_dn', hr.tls->>'not_before', hr.tls->>'not_after',
-        hr.tls->>'tls_version', hr.tls->>'cipher', hr.tls->>'tls_connection', hr.tls->>'subject_an'
+        tc."host", tc."sni", tc."subjectDn", tc."subjectCn",
+        tc."issuerDn", tc."notBefore", tc."notAfter",
+        tc."tlsVersion", tc."cipher", tc."tlsConnection", tc."subjectAn"
       )
-        NULLIF(hr.tls->>'not_after', '')::timestamp AS not_after,
-        hr."createdAt" AS created_at
-      FROM "http_responses" hr
-      INNER JOIN "asset_services" assvc ON assvc.id = hr."assetServiceId"
+        tc."notAfter" AS not_after,
+        tc."createdAt" AS created_at
+      FROM "tls_certificates" tc
+      INNER JOIN "asset_services" assvc ON assvc.id = tc."assetServiceId"
       INNER JOIN "assets" a ON a.id = assvc."assetId"
       INNER JOIN "targets" t ON t.id = a."targetId"
-      WHERE hr.tls IS NOT NULL
+      WHERE tc."host" IS NOT NULL
         AND t."workspaceId" = :workspaceId
       ORDER BY
-        hr.tls->>'host', hr.tls->>'sni', hr.tls->>'subject_dn', hr.tls->>'subject_cn',
-        hr.tls->>'issuer_dn', hr.tls->>'not_before', hr.tls->>'not_after',
-        hr.tls->>'tls_version', hr.tls->>'cipher', hr.tls->>'tls_connection', hr.tls->>'subject_an',
-        hr."createdAt" DESC
+        tc."host", tc."sni", tc."subjectDn", tc."subjectCn",
+        tc."issuerDn", tc."notBefore", tc."notAfter",
+        tc."tlsVersion", tc."cipher", tc."tlsConnection", tc."subjectAn",
+        tc."createdAt" DESC
     `;
 
     const result = await this.dataSource
@@ -794,7 +801,10 @@ export class StatisticService {
     const subQuery = this.dataSource
       .createQueryBuilder()
       .select('assetService.id', 'serviceId')
-      .addSelect('unnest(latest_http.tech)', 'tech')
+      .addSelect(
+        `hrt.name || CASE WHEN hrt.version IS NULL THEN '' ELSE ':' || hrt.version END`,
+        'tech',
+      )
       .from(AssetService, 'assetService')
       .innerJoin('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
@@ -803,8 +813,12 @@ export class StatisticService {
         'latest_http',
         'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
-      .where('target.workspaceId = :workspaceId', { workspaceId })
-      .andWhere('latest_http.tech IS NOT NULL');
+      .innerJoin(
+        'http_response_technologies',
+        'hrt',
+        'hrt."httpResponseId" = latest_http.id',
+      )
+      .where('target.workspaceId = :workspaceId', { workspaceId });
 
     const rawResults: { name: string; count: string }[] =
       await this.dataSource

@@ -9,6 +9,6 @@ test.describe('Assets', () => {
   test('asset detail shows services', async ({ adminPage: page }) => {
     await page.goto('/assets');
     await page.click('text=example.com');
-    await expect(page).toHaveURL(/\/assets\/[a-z0-9-]+/);
+    await expect(page).toHaveURL(/\/assets\/services\/[a-z0-9-]+/);
   });
 });

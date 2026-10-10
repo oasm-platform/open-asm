@@ -1,7 +1,14 @@
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import {
   useAssetsControllerGetAssetById,
@@ -10,23 +17,24 @@ import {
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {
-  ChartNoAxesGantt,
   Check,
   Copy,
   Globe,
-  Layers,
   Loader2,
   Lock,
-  Network,
-  ShieldCheck,
   Tag,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from '@tanstack/react-router';
+import ScreenshotCell from './components/screenshot-cell';
 import HTTPXStatusCode from './components/status-code';
 import { TechnologyTooltip } from './components/technology-tooltip';
 
 dayjs.extend(relativeTime);
+
+/** Shared label style so every field label in the page reads the same. */
+const fieldLabel =
+  'block mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -60,6 +68,17 @@ export default function DetailAsset() {
     id ?? '',
     {},
   );
+
+  const [faviconError, setFaviconError] = useState(false);
+
+  useEffect(() => {
+    const pageTitle = data?.httpResponses?.title || data?.value;
+    if (!pageTitle) return;
+    document.title = `${pageTitle} | OASM`;
+    return () => {
+      document.title = 'OASM';
+    };
+  }, [data?.httpResponses?.title, data?.value]);
 
   if (!id) return null;
 
@@ -110,231 +129,178 @@ export default function DetailAsset() {
     ? dayjs(certAgeStartDate).fromNow()
     : 'N/A';
 
-  return (
-    <Page title={value} isShowButtonGoBack>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-4 overflow-y-auto">
-        {/* Main Content - Left 2 Columns */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* General Card */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Globe className="h-5 w-5 text-blue-500" />
-                General
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                    Domain
-                  </h4>
-                  <span className="font-mono text-sm break-all">{value}</span>
-                </div>
+  const techs = (
+    (httpResponses?.techList as unknown as TechnologyDetailDTO[] | undefined) ??
+    []
+  ).filter((item) => item.name);
+  const hasNetwork =
+    !!ipAddresses?.length || !!tls?.host || !!tls?.port;
 
-                {httpResponses?.status_code && (
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                      HTTP Status
-                    </h4>
-                    <HTTPXStatusCode httpResponse={httpResponses} />
+  const sslTone =
+    daysLeft === undefined
+      ? null
+      : daysLeft < 0
+        ? 'text-red-500 border-red-500'
+        : daysLeft < 30
+          ? 'text-yellow-500 border-yellow-500'
+          : 'text-green-500 border-green-500';
+
+  const assetTitle = (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      {httpResponses?.favicon_url && !faviconError ? (
+        <img
+          src={httpResponses.favicon_url}
+          className="size-7 shrink-0 rounded-md"
+          alt=""
+          onError={() => setFaviconError(true)}
+        />
+      ) : (
+        <Globe className="size-7 shrink-0 text-muted-foreground" />
+      )}
+      <span className="truncate">{httpResponses?.title || value}</span>
+      {daysLeft !== undefined && (
+        <Badge variant="outline" className={cn('gap-1 shrink-0', sslTone)}>
+          <Lock className="size-3" />
+          {daysLeft < 0 ? 'Expired' : daysLeft < 30 ? 'Expiring Soon' : 'Valid'}
+        </Badge>
+      )}
+    </div>
+  );
+
+  const assetHeader = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {httpResponses?.status_code ? (
+        <HTTPXStatusCode httpResponse={httpResponses} size="md" />
+      ) : null}
+      {(tags ?? []).map((tag) => (
+        <Badge key={tag.id} variant="outline" className="gap-1 border-border/70">
+          <Tag className="size-3" />
+          {tag.tag}
+        </Badge>
+      ))}
+    </div>
+  );
+
+  return (
+    <Page
+      title={assetTitle}
+      header={assetHeader}
+      isShowButtonGoBack
+      permission="asset.read"
+    >
+      <div className="space-y-6">
+        <Card className="gap-0 overflow-hidden py-0" aria-label="Asset detail">
+
+          <section>
+            <CardHeader className="px-6 pt-6 pb-0">
+              <CardTitle>General</CardTitle>
+              <CardDescription>
+                Domain overview and page info.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-x-6 gap-y-4 px-6 pt-4 pb-6 md:grid-cols-[1fr_auto]">
+              <div className="space-y-4">
+                <div>
+                  <span className={fieldLabel}>Domain</span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono text-sm break-all">
+                      {value}
+                    </span>
+                    <CopyButton text={value} />
+                  </div>
+                </div>
+                {httpResponses?.title && (
+                  <div>
+                    <span className={fieldLabel}>Page Title</span>
+                    <p className="text-sm break-words">{httpResponses.title}</p>
                   </div>
                 )}
               </div>
-
-              {httpResponses?.title && (
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                    Page Title
-                  </h4>
-                  <p className="text-sm break-words">{httpResponses.title}</p>
-                </div>
-              )}
-
-              {/* Tags */}
-              <div className="flex flex-wrap gap-2 pt-2">
-                {(tags ?? []).map((tag) => (
-                  <Badge
-                    key={tag.id}
-                    variant="secondary"
-                    className="flex items-center gap-1"
-                  >
-                    <Tag size={12} /> {tag.tag}
-                  </Badge>
-                ))}
-              </div>
+              <ScreenshotCell asset={data} />
             </CardContent>
-          </Card>
+          </section>
 
-          {/* Network Card */}
-          {(ipAddresses?.length || tls?.host || tls?.port) && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Network className="h-5 w-5 text-indigo-500" />
-                  Network
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {hasNetwork && (
+            <>
+              <Separator />
+              <section>
+                <CardHeader className="px-6 pt-6 pb-0">
+                  <CardTitle>Network</CardTitle>
+                  <CardDescription>
+                    Resolved addresses and TLS endpoint.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-x-6 gap-y-4 px-6 pt-4 pb-6 md:grid-cols-2">
                   {ipAddresses && ipAddresses.length > 0 && (
-                    <div className="md:col-span-2 p-3 rounded-lg bg-muted/50">
-                      <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                        IP Addresses
-                      </h4>
-                      <div className="flex flex-wrap gap-1.5">
+                    <div className="md:col-span-2">
+                      <span className={fieldLabel}>IP Addresses</span>
+                      <div className="flex flex-col gap-1">
                         {ipAddresses.map((ip) => (
-                          <Badge
-                            key={ip}
-                            variant="outline"
-                            className="font-mono text-xs"
-                          >
-                            {ip}
-                          </Badge>
+                          <div key={ip} className="flex items-center gap-2">
+                            <span className="font-mono text-sm">{ip}</span>
+                            <CopyButton text={ip} />
+                          </div>
                         ))}
                       </div>
                     </div>
                   )}
                   {tls?.host && (
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                        Host
-                      </h4>
-                      <span className="font-mono text-sm">{tls.host}</span>
+                    <div>
+                      <span className={fieldLabel}>Host</span>
+                      <span className="font-mono text-sm break-all">
+                        {tls.host}
+                      </span>
                     </div>
                   )}
                   {tls?.port && (
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                        Port
-                      </h4>
+                    <div>
+                      <span className={fieldLabel}>Port</span>
                       <span className="font-mono text-sm">{tls.port}</span>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </section>
+            </>
           )}
 
-          {/* HTTP Response Card */}
-          {httpResponses?.raw_header && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <ChartNoAxesGantt className="h-5 w-5 text-slate-500" />
-                  HTTP Response
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="relative">
-                  <div className="bg-muted/50 rounded-lg p-4 border">
-                    <pre className="whitespace-pre-wrap leading-relaxed text-sm font-mono overflow-x-auto">
-                      {httpResponses.raw_header}
-                    </pre>
-                  </div>
-                  <div className="absolute top-2 right-2">
-                    <CopyButton text={httpResponses.raw_header} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Sidebar - Right Column */}
-        <div className="space-y-6">
-          {/* SSL/TLS Card */}
           {tls && (
-            <Card
-              className={cn(
-                daysLeft !== undefined &&
-                  (daysLeft < 0
-                    ? 'border-red-500/20'
-                    : daysLeft < 30
-                      ? 'border-yellow-500/20'
-                      : 'border-green-500/20'),
-              )}
-            >
-                <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <ShieldCheck className="h-5 w-5 text-green-500" />
-                  SSL/TLS Certificate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {daysLeft !== undefined && (
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                      <span className="text-sm text-muted-foreground">
-                        Status
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          'flex items-center gap-1',
-                          daysLeft < 0
-                            ? 'text-red-500 border-red-500'
-                            : daysLeft < 30
-                              ? 'text-yellow-500 border-yellow-500'
-                              : 'text-green-500 border-green-500',
-                        )}
-                      >
-                        <Lock size={14} />
-                        {daysLeft < 0
-                          ? 'Expired'
-                          : daysLeft < 30
-                            ? 'Expiring Soon'
-                            : 'Valid'}
-                      </Badge>
-                    </div>
-                  )}
-
+            <>
+              <Separator />
+              <section>
+                <CardHeader className="px-6 pt-6 pb-0">
+                  <CardTitle>SSL/TLS Certificate</CardTitle>
+                  <CardDescription>
+                    Issuer, validity period and alternate names.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-x-6 gap-y-4 px-6 pt-4 pb-6 md:grid-cols-2">
                   {tls.issuer_org?.[0] && (
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <h4 className="text-xs font-medium text-muted-foreground mb-1">
-                        Issuer
-                      </h4>
+                    <div>
+                      <span className={fieldLabel}>Issuer</span>
                       <p className="text-sm">{tls.issuer_org[0]}</p>
                     </div>
                   )}
-
                   {tls.subject_cn && (
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <h4 className="text-xs font-medium text-muted-foreground mb-1">
-                        Common Name
-                      </h4>
+                    <div>
+                      <span className={fieldLabel}>Common Name</span>
                       <p className="text-sm break-words">{tls.subject_cn}</p>
                     </div>
                   )}
-
                   {certAgeStartDate && (
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <h4 className="text-xs font-medium text-muted-foreground mb-1">
-                        Certificate Age
-                      </h4>
+                    <div>
+                      <span className={fieldLabel}>Certificate Age</span>
                       <p className="text-sm">
                         {certAgeDisplay} (
                         {dayjs(tls.not_before).format('DD MMM, YYYY')})
                       </p>
                     </div>
                   )}
-
                   {daysLeft !== undefined && (
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <h4 className="text-xs font-medium text-muted-foreground mb-1">
-                        Expires On
-                      </h4>
+                    <div>
+                      <span className={fieldLabel}>Expires On</span>
                       <p className="text-sm">
                         {dayjs(tls.not_after).format('DD MMM, YYYY')}{' '}
-                        <span
-                          className={cn(
-                            daysLeft < 0
-                              ? 'text-red-500'
-                              : daysLeft < 30
-                                ? 'text-yellow-500'
-                                : 'text-green-500',
-                          )}
-                        >
+                        <span className={cn(sslTone)}>
                           (
                           {daysLeft < 0
                             ? Math.abs(daysLeft) + ' days ago'
@@ -344,12 +310,9 @@ export default function DetailAsset() {
                       </p>
                     </div>
                   )}
-
                   {tls.subject_an && tls.subject_an.length > 1 && (
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                        Alternate Names
-                      </h4>
+                    <div className="md:col-span-2">
+                      <span className={fieldLabel}>Alternate Names</span>
                       <div className="flex flex-wrap gap-1.5">
                         {tls.subject_an.slice(0, 3).map((name) => (
                           <Badge
@@ -368,37 +331,56 @@ export default function DetailAsset() {
                       </div>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </section>
+            </>
           )}
 
-          {/* Technologies Card */}
-          {httpResponses?.techList &&
-            (httpResponses.techList as unknown as TechnologyDetailDTO[])
-              .length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Layers className="h-5 w-5 text-purple-500" />
-                    Technologies
-                  </CardTitle>
+          {techs.length > 0 && (
+            <>
+              <Separator />
+              <section>
+                <CardHeader className="px-6 pt-6 pb-0">
+                  <CardTitle>Technologies</CardTitle>
+                  <CardDescription>
+                    Detected stack on this asset.
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-6 pt-4 pb-6">
                   <div className="flex flex-wrap gap-2">
-                    {(
-                      httpResponses.techList as unknown as TechnologyDetailDTO[]
-                    ).map(
-                      (item) =>
-                        item.name && (
-                          <TechnologyTooltip tech={item} key={item.name} />
-                        ),
-                    )}
+                    {techs.map((item) => (
+                      <TechnologyTooltip tech={item} key={item.name} />
+                    ))}
                   </div>
                 </CardContent>
-              </Card>
-            )}
-        </div>
+              </section>
+            </>
+          )}
+
+          {httpResponses?.raw_header && (
+            <>
+              <Separator />
+              <section>
+                <CardHeader className="px-6 pt-6 pb-0">
+                  <CardTitle>HTTP Response</CardTitle>
+                  <CardDescription>Raw response header.</CardDescription>
+                </CardHeader>
+                <CardContent className="px-6 pt-4 pb-6">
+                  <div className="relative">
+                    <div className="bg-muted/50 rounded-lg p-4 border">
+                      <pre className="whitespace-pre-wrap leading-relaxed text-sm font-mono overflow-x-auto">
+                        {httpResponses.raw_header}
+                      </pre>
+                    </div>
+                    <div className="absolute top-2 right-2">
+                      <CopyButton text={httpResponses.raw_header} />
+                    </div>
+                  </div>
+                </CardContent>
+              </section>
+            </>
+          )}
+        </Card>
       </div>
     </Page>
   );

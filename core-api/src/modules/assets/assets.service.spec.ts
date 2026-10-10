@@ -12,7 +12,11 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import { AssetsService } from './assets.service';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
-import { TlsAssetsView } from './entities/tls-assets.entity';
+import { DnsRecord } from './entities/dns-record.entity';
+import { HttpResponseTechnology } from './entities/http-response-technology.entity';
+import { HttpStatusCode } from './entities/http-status-code.entity';
+import { IpObservation } from './entities/ip-observation.entity';
+import { TlsCertificate } from './entities/tls-certificate.entity';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 
 describe('AssetsService', () => {
@@ -27,7 +31,13 @@ describe('AssetsService', () => {
   let mockLlmConfigRepository: Partial<Repository<AgentLLMConfig>>;
   let mockWorkspaceEncryptionService: Partial<WorkspaceEncryptionService>;
   let mockDataSource: Partial<DataSource>;
-  let mockTlsAssetsViewRepository: Partial<Repository<TlsAssetsView>>;
+  let mockTlsCertificateRepository: Partial<Repository<TlsCertificate>>;
+  let mockHttpResponseTechnologyRepository: Partial<
+    Repository<HttpResponseTechnology>
+  >;
+  let mockHttpStatusCodeRepository: Partial<Repository<HttpStatusCode>>;
+  let mockIpObservationRepository: Partial<Repository<IpObservation>>;
+  let mockDnsRecordRepository: Partial<Repository<DnsRecord>>;
 
   beforeEach(async () => {
     mockAssetRepository = {
@@ -85,8 +95,34 @@ describe('AssetsService', () => {
       findOne: jest.fn(),
     };
 
-    mockTlsAssetsViewRepository = {
-      createQueryBuilder: jest.fn(),
+    mockTlsCertificateRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnThis(),
+    };
+
+    mockHttpResponseTechnologyRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnThis(),
+    };
+
+    mockHttpStatusCodeRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnThis(),
+    };
+
+    mockIpObservationRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnThis(),
+    };
+
+    mockDnsRecordRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnThis(),
     };
 
     mockDataSource = {
@@ -119,8 +155,24 @@ describe('AssetsService', () => {
           useValue: mockTargetRepository,
         },
         {
-          provide: getRepositoryToken(TlsAssetsView),
-          useValue: mockTlsAssetsViewRepository,
+          provide: getRepositoryToken(TlsCertificate),
+          useValue: mockTlsCertificateRepository,
+        },
+        {
+          provide: getRepositoryToken(HttpResponseTechnology),
+          useValue: mockHttpResponseTechnologyRepository,
+        },
+        {
+          provide: getRepositoryToken(HttpStatusCode),
+          useValue: mockHttpStatusCodeRepository,
+        },
+        {
+          provide: getRepositoryToken(IpObservation),
+          useValue: mockIpObservationRepository,
+        },
+        {
+          provide: getRepositoryToken(DnsRecord),
+          useValue: mockDnsRecordRepository,
         },
         {
           provide: getRepositoryToken(AgentLLMConfig),
@@ -517,6 +569,9 @@ describe('AssetsService', () => {
   describe('getManyTls', () => {
     beforeEach(() => {
       jest.clearAllMocks();
+      (mockAssetServiceRepository as any).select = jest
+        .fn()
+        .mockReturnThis();
       (mockAssetServiceRepository as any).groupBy = jest
         .fn()
         .mockReturnThis();
@@ -537,13 +592,18 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).getRawMany = jest
         .fn()
         .mockResolvedValue([]);
+      (mockDataSource as any).from = jest.fn().mockReturnThis();
+      (mockDataSource as any).orderBy = jest.fn().mockReturnThis();
+      (mockDataSource as any).limit = jest.fn().mockReturnThis();
+      (mockDataSource as any).offset = jest.fn().mockReturnThis();
       (mockDataSource as any).setParameters = jest.fn().mockReturnThis();
       (mockDataSource as any).getRawOne = jest
         .fn()
         .mockResolvedValue({ count: '0' });
+      (mockDataSource as any).getRawMany = jest.fn().mockResolvedValue([]);
     });
 
-    it('applies the date range to tls not_after only, never to asset_service.createdAt', async () => {
+    it('applies the date range to the certificate notAfter column, never to asset_service.createdAt', async () => {
       await service.getManyTls(
         {
           page: 1,
@@ -556,20 +616,27 @@ describe('AssetsService', () => {
         'workspace-uuid',
       );
 
-      const andWhere = mockAssetServiceRepository.andWhere as jest.Mock;
-      // Range filters land on the cert expiry column (DTO contract).
-      expect(andWhere).toHaveBeenCalledWith(
-        '"tlsAssets"."not_after"::timestamp >= :startDate',
-        { startDate: '2026-08-06' },
+      // The cert subquery filters the raw tls_certificates."notAfter" column
+      // (DTO contract); the asset-service view is gone.
+      const certSql = String(
+        ((mockDataSource as any).from as jest.Mock).mock.calls[0][0],
       );
-      expect(andWhere).toHaveBeenCalledWith(
-        '"tlsAssets"."not_after"::timestamp <= :endDate',
-        { endDate: '2026-08-06 23:59:59.999' },
-      );
+      expect(certSql).toContain('tc."notAfter" >= :tlsStartDate');
+      expect(certSql).toContain('tc."notAfter" <= :tlsEndDate');
+      expect(certSql).not.toContain('"tlsAssets"."not_after"::timestamp');
       // ...and must not leak onto when the asset service row was created.
-      for (const call of andWhere.mock.calls) {
-        expect(String(call[0])).not.toContain('asset_service."createdAt"');
-      }
+      expect(certSql).not.toContain('asset_service."createdAt"');
+
+      const setParamsCalls = (mockDataSource as any).setParameters.mock
+        .calls as Array<[Record<string, unknown>]>;
+      expect(
+        setParamsCalls.some((call) => call[0].tlsStartDate === '2026-08-06'),
+      ).toBe(true);
+      expect(
+        setParamsCalls.some(
+          (call) => call[0].tlsEndDate === '2026-08-06 23:59:59.999',
+        ),
+      ).toBe(true);
     });
   });
 
@@ -637,7 +704,7 @@ describe('AssetsService', () => {
           targetId: 'target-1',
           isEnabled: true,
           dnsRecords: ['a.example.com'],
-          ipAssets: [{ ipAddress: '1.2.3.4' }],
+          dnsRecordRows: [{ value: '1.2.3.4' }],
         },
         {
           id: 'asset-2',
@@ -645,7 +712,7 @@ describe('AssetsService', () => {
           targetId: 'target-1',
           isEnabled: true,
           dnsRecords: [],
-          ipAssets: [{ ipAddress: '5.6.7.8' }],
+          dnsRecordRows: [{ value: '5.6.7.8' }],
         },
       ];
       const services = [
@@ -660,11 +727,11 @@ describe('AssetsService', () => {
         {
           host: 'example.com',
           sni: 'example.com',
-          subject_dn: 'CN=example.com',
-          issuer_dn: 'CN=LE',
-          not_before: '2026-01-01',
-          not_after: '2026-12-31',
-          tls_version: 'TLSv1.3',
+          subjectDn: 'CN=example.com',
+          issuerDn: 'CN=LE',
+          notBefore: '2026-01-01',
+          notAfter: '2026-12-31',
+          tlsVersion: 'TLSv1.3',
           cipher: 'AES256',
           assetServiceId: 'svc-1',
         },
@@ -694,13 +761,11 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).createQueryBuilder = jest
         .fn()
         .mockReturnValue(createMockQb(services));
-      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
-        .fn()
-        .mockReturnValue(createMockQb(tlsRecords));
 
       mockDataSource.query = jest
         .fn()
         .mockResolvedValueOnce(techRows)
+        .mockResolvedValueOnce(tlsRecords)
         .mockResolvedValueOnce(statusRows);
 
       mockTechnologyForwarderService.enrichTechnologies = jest
@@ -791,12 +856,9 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).createQueryBuilder = jest
         .fn()
         .mockReturnValue(createMockQb([]));
-      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
-        .fn()
-        .mockReturnValue(createMockQb([]));
-
       mockDataSource.query = jest
         .fn()
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
@@ -817,7 +879,7 @@ describe('AssetsService', () => {
         targetId: 'target-1',
         isEnabled: true,
         dnsRecords: [],
-        ipAssets: [{ ipAddress: '1.2.3.4' }],
+        dnsRecordRows: [{ value: '1.2.3.4' }],
       };
 
       (mockTargetRepository as any).createQueryBuilder = jest
@@ -829,12 +891,9 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).createQueryBuilder = jest
         .fn()
         .mockReturnValue(createMockQb([]));
-      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
-        .fn()
-        .mockReturnValue(createMockQb([]));
-
       mockDataSource.query = jest
         .fn()
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
@@ -873,7 +932,7 @@ describe('AssetsService', () => {
         targetId: 't-big',
         isEnabled: true,
         dnsRecords: [],
-        ipAssets: [{ ipAddress: `10.0.0.${i}` }],
+        dnsRecordRows: [{ value: `10.0.0.${i}` }],
       }));
 
       (mockTargetRepository as any).createQueryBuilder = jest
@@ -885,12 +944,9 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).createQueryBuilder = jest
         .fn()
         .mockReturnValue(createMockQb([]));
-      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
-        .fn()
-        .mockReturnValue(createMockQb([]));
-
       mockDataSource.query = jest
         .fn()
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
@@ -937,7 +993,7 @@ describe('AssetsService', () => {
         targetId: 't-big',
         isEnabled: true,
         dnsRecords: [],
-        ipAssets: [{ ipAddress: `10.0.0.${i}` }],
+        dnsRecordRows: [{ value: `10.0.0.${i}` }],
       }));
       const services = Array.from({ length: assetCount }, (_, i) => ({
         id: `svc-${i}`,
@@ -952,11 +1008,11 @@ describe('AssetsService', () => {
       const tlsRecords = Array.from({ length: assetCount }, (_, i) => ({
         host: `h-${i}.example.com`,
         sni: `h-${i}.example.com`,
-        subject_dn: 'CN=x',
-        issuer_dn: 'CN=y',
-        not_before: '2026-01-01',
-        not_after: '2026-12-31',
-        tls_version: 'TLSv1.3',
+        subjectDn: 'CN=x',
+        issuerDn: 'CN=y',
+        notBefore: '2026-01-01',
+        notAfter: '2026-12-31',
+        tlsVersion: 'TLSv1.3',
         cipher: 'AES256',
         assetServiceId: `svc-${i}`,
       }));
@@ -980,13 +1036,11 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).createQueryBuilder = jest
         .fn()
         .mockReturnValue(createMockQb(services));
-      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
-        .fn()
-        .mockReturnValue(createMockQb(tlsRecords));
 
       mockDataSource.query = jest
         .fn()
         .mockResolvedValueOnce(techRows)
+        .mockResolvedValueOnce(tlsRecords)
         .mockResolvedValueOnce(statusRows);
 
       mockTechnologyForwarderService.enrichTechnologies = jest
@@ -1057,7 +1111,7 @@ describe('AssetsService', () => {
         targetId: 't1',
         isEnabled: true,
         dnsRecords: [],
-        ipAssets: [{ ipAddress: '1.2.3.4' }],
+        dnsRecordRows: [{ value: '1.2.3.4' }],
       };
       const svc = { id: 's1', value: 'http', port: 80, assetId: 'a1' };
 
@@ -1075,13 +1129,10 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).createQueryBuilder = jest
         .fn()
         .mockReturnValue(createMockQb([svc]));
-      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
-        .fn()
-        .mockReturnValue(createMockQb([]));
-
       mockDataSource.query = jest
         .fn()
         .mockResolvedValueOnce(techRows)
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
       mockTechnologyForwarderService.enrichTechnologies = jest
@@ -1110,7 +1161,7 @@ describe('AssetsService', () => {
         targetId: 't1',
         isEnabled: true,
         dnsRecords: [],
-        ipAssets: [{ ipAddress: '1.2.3.4' }],
+        dnsRecordRows: [{ value: '1.2.3.4' }],
       };
       const svc = { id: 's1', value: 'http', port: 80, assetId: 'a1' };
 
@@ -1131,12 +1182,9 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).createQueryBuilder = jest
         .fn()
         .mockReturnValue(createMockQb([svc]));
-      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
-        .fn()
-        .mockReturnValue(createMockQb([]));
-
       mockDataSource.query = jest
         .fn()
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce(statusRows);
 
@@ -1148,7 +1196,7 @@ describe('AssetsService', () => {
 
       // (a) SQL contract: the status query must correlate the latest
       // http_responses row per service instead of a membership-only subquery.
-      const statusSql = (mockDataSource.query as jest.Mock).mock.calls[1][0];
+      const statusSql = (mockDataSource.query as jest.Mock).mock.calls[2][0];
       expect(statusSql).toContain('ORDER BY hr2."createdAt" DESC LIMIT 1');
       expect(statusSql).toContain('hr2."assetServiceId" = hr."assetServiceId"');
 
@@ -1181,7 +1229,7 @@ describe('AssetsService', () => {
         targetId: 't1',
         isEnabled: true,
         dnsRecords: [],
-        ipAssets: [{ ipAddress: '1.2.3.4' }],
+        dnsRecordRows: [{ value: '1.2.3.4' }],
       };
       const services = [
         { id: 's1', value: 'http', port: 80, assetId: 'a1' },
@@ -1205,12 +1253,9 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).createQueryBuilder = jest
         .fn()
         .mockReturnValue(createMockQb(services));
-      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
-        .fn()
-        .mockReturnValue(createMockQb([]));
-
       mockDataSource.query = jest
         .fn()
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce(statusRows);
 
@@ -1239,7 +1284,7 @@ describe('AssetsService', () => {
         targetId: 't1',
         isEnabled: true,
         dnsRecords: [],
-        ipAssets: [{ ipAddress: '1.2.3.4' }],
+        dnsRecordRows: [{ value: '1.2.3.4' }],
       };
       const services = [
         { id: 's1', value: 'http', port: 80, assetId: 'a1' },
@@ -1266,12 +1311,9 @@ describe('AssetsService', () => {
       (mockAssetServiceRepository as any).createQueryBuilder = jest
         .fn()
         .mockReturnValue(createMockQb(services));
-      (mockTlsAssetsViewRepository as any).createQueryBuilder = jest
-        .fn()
-        .mockReturnValue(createMockQb([]));
-
       mockDataSource.query = jest
         .fn()
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce(statusRows);
 
