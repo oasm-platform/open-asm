@@ -8,8 +8,6 @@ import { TechnologyForwarderService } from '../technology/technology-forwarder.s
 import {
   DefaultWorkflow,
   EventTriggerType,
-  NotificationScope,
-  NotificationType,
   Severity,
 } from '@/common/enums/enum';
 import { GeoIp, GeoIpService } from '@/services/geo-ip/geo-ip.service';
@@ -21,7 +19,8 @@ import { Asset } from '../assets/entities/assets.entity';
 import { CreateJobs } from '../jobs-registry/dto/jobs-registry.dto';
 import { Job } from '../jobs-registry/entities/job.entity';
 import type { RunStepState } from '../workflows/workflow-graph';
-import { NotificationsService } from '../notifications/notifications.service';
+import { EVENT_CATALOG } from '../connectors/event';
+import { EventBridgeService } from '../event-bridge/event-bridge.service';
 import { Target } from '../targets/entities/target.entity';
 import { AssetLocationDto } from './dto/asset-location.dto';
 
@@ -78,7 +77,7 @@ export class StatisticService {
     private geoIpService: GeoIpService,
     private redisService: RedisService,
     private workspacesService: WorkspacesService,
-    private notificationsService: NotificationsService,
+    private eventBridge: EventBridgeService,
     private technologyForwarderService: TechnologyForwarderService,
   ) {}
 
@@ -1546,41 +1545,44 @@ export class StatisticService {
         job.id,
       );
 
+      // A run belongs to a workspace even when the job row carries no
+      // workspaceId of its own; the membership lookup is what resolves it. The
+      // event bus requires a workspace on every event, so this is also where an
+      // unresolvable run is dropped rather than published with a sentinel.
       if (members.length === 0) return;
 
-      const recipientIds = members.map((m) => m.user.id);
       const workspaceId = members[0].workspace.id;
 
-      if (Object.keys(diffs).length > 0) {
-        await this.notificationsService.createNotification({
-          recipients: recipientIds,
-          scope: NotificationScope.GROUP,
-          type: NotificationType.ASSET_NEW_DETECT,
-          metadata: {
-            hosts: String(diffs.hosts ?? 0),
-            ports: String(diffs.ports ?? 0),
-            services: String(diffs.services ?? 0),
-            tech: String(diffs.techs ?? 0),
+      // Publish the run's OUTCOME, not a notification decision. Who gets told
+      // what is the `notifications` consumer's call; this service only reports
+      // what happened. Recipients are resolved downstream, which is what lets a
+      // member who joins tomorrow start receiving them.
+      //
+      // `outcome: 'failure'` means "this run did not finish cleanly" — not "the
+      // publish failed" — so a partial run is still honest to every consumer.
+      await this.eventBridge.publishSafely(
+        EVENT_CATALOG.workflow.run.completed,
+        {
+          workspaceId,
+          outcome: incomplete ? 'failure' : 'success',
+          resourceType: 'workflow_run',
+          resourceId: job.jobHistory?.id,
+          payload: {
             targetValue: job.asset.target.value,
             targetId: job.asset.target.id,
+            hosts: diffs.hosts ?? 0,
+            ports: diffs.ports ?? 0,
+            services: diffs.services ?? 0,
+            techs: diffs.techs ?? 0,
+            hasNewAssets: Object.keys(diffs).length > 0,
+            // Present ONLY when the run did not complete its graph — the
+            // `notifications` sink uses its absence to decide whether the
+            // "scan stopped halfway" message is warranted at all.
+            ...(incomplete ? { incompleteDetails } : {}),
           },
-          workspaceId,
-        });
-      }
-
-      if (incomplete) {
-        await this.notificationsService.createNotification({
-          recipients: recipientIds,
-          scope: NotificationScope.GROUP,
-          type: NotificationType.SCAN_INCOMPLETE,
-          metadata: {
-            targetValue: job.asset.target.value,
-            targetId: job.asset.target.id,
-            details: incompleteDetails,
-          },
-          workspaceId,
-        });
-      }
+        },
+        { subject: `workspace:${workspaceId}/workflow_run:${job.id}` },
+      );
     }
   }
 }

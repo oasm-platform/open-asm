@@ -20,7 +20,8 @@ import { ApiTags } from '@nestjs/swagger';
 
 import { Public } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
-import { AuditLog } from '../audit/audit-log.decorator';
+import { EVENT_CATALOG } from '../connectors/event';
+import { PublishEvent } from '../event-bridge/publish-event.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import {
   AwsSsoCompleteDto,
@@ -81,7 +82,7 @@ export class IntegrationsController {
     },
   })
   @WorkspaceAccess('integration.write')
-  @AuditLog('integration.connected', {
+  @PublishEvent(EVENT_CATALOG.integration.connected, {
     resourceId: (result) => (result as GetIntegrationDto | undefined)?.id,
     changes: (body) => {
       const appType = (body as CreateIntegrationDto | undefined)?.appType;
@@ -160,7 +161,7 @@ export class IntegrationsController {
     },
   })
   @WorkspaceAccess('integration.write')
-  @AuditLog('integration.settings.updated', {
+  @PublishEvent(EVENT_CATALOG.integration.settings.updated, {
     resourceId: (result) => (result as GetIntegrationDto | undefined)?.id,
     changes: (body) => {
       const dto = body as UpdateIntegrationDto | undefined;
@@ -198,7 +199,7 @@ export class IntegrationsController {
     },
   })
   @WorkspaceAccess('integration.write')
-  @AuditLog('integration.disconnected')
+  @PublishEvent(EVENT_CATALOG.integration.disconnected)
   @Delete(':id')
   deleteIntegration(
     @Param() { id }: IdQueryParamDto,
@@ -342,7 +343,7 @@ export class IntegrationsController {
     },
   })
   @WorkspaceAccess('integration.write')
-  @AuditLog('integration.connected', {
+  @PublishEvent(EVENT_CATALOG.integration.connected, {
     resourceId: (result) => (result as GetIntegrationDto | undefined)?.id,
   })
   @Post('aws/sso/complete')

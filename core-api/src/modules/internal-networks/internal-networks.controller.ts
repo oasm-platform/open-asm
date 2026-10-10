@@ -27,7 +27,8 @@ import {
   GetManyNetworkInterfacesResponseDto,
 } from './dtos/get-many-network-interfaces.dto';
 import { UpdateInternalNetworkDto } from './dtos/update-internal-network.dto';
-import { AuditLog } from '../audit/audit-log.decorator';
+import { EVENT_CATALOG } from '../connectors/event';
+import { PublishEvent } from '../event-bridge/publish-event.decorator';
 import { InternalNetworksService } from './internal-networks.service';
 
 @Controller('internal-networks')
@@ -70,7 +71,7 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('network.created', {
+  @PublishEvent(EVENT_CATALOG.network.created, {
     // Best-effort changes from the body; the DTO carries only `name`.
     changes: (body) => ({
       name: { after: (body as { name?: string })?.name ?? '' },
@@ -186,7 +187,7 @@ export class InternalNetworksController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('network.deleted')
+  @PublishEvent(EVENT_CATALOG.network.deleted)
   @Delete(':id')
   @WorkspaceAccess('network.write')
   deleteInternalNetwork(

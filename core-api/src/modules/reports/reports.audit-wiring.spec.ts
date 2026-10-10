@@ -3,15 +3,15 @@ jest.mock('./renderer/pdf-renderer', () => ({
 }));
 
 import { Reflector } from '@nestjs/core';
-import { AUDIT_LOG_KEY, type AuditLogConfig } from '../audit/audit-log.decorator';
+import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publish-event.decorator';
 import { ReportsController } from './reports.controller';
 
 describe('ReportsController audit wiring (M4.4 decorator events)', () => {
   const reflector = new Reflector();
 
   const auditConfig = (method: () => unknown) =>
-    reflector.getAllAndOverride<AuditLogConfig & { action: string }>(
-      AUDIT_LOG_KEY,
+    reflector.getAllAndOverride<PublishEventConfig & { event: unknown }>(
+      PUBLISH_EVENT_KEY,
       [method, ReportsController],
     );
 
@@ -21,7 +21,9 @@ describe('ReportsController audit wiring (M4.4 decorator events)', () => {
     ['deleteReport', 'report.deleted'],
   ])('%s is wired to the %s event', (method, action) => {
     expect(auditConfig(ReportsController.prototype[method])).toEqual(
-      expect.objectContaining({ action }),
+      expect.objectContaining({
+        event: expect.objectContaining({ name: action }),
+      }),
     );
   });
 

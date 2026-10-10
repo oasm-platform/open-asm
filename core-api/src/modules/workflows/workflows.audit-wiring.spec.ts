@@ -1,13 +1,13 @@
 import { Reflector } from '@nestjs/core';
-import { AUDIT_LOG_KEY, type AuditLogConfig } from '../audit/audit-log.decorator';
+import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publish-event.decorator';
 import { WorkflowsController } from './workflows.controller';
 
 describe('WorkflowsController audit wiring (M4.4 decorator events)', () => {
   const reflector = new Reflector();
 
   const auditConfig = (method: () => unknown) =>
-    reflector.getAllAndOverride<AuditLogConfig & { action: string }>(
-      AUDIT_LOG_KEY,
+    reflector.getAllAndOverride<PublishEventConfig & { event: unknown }>(
+      PUBLISH_EVENT_KEY,
       [method, WorkflowsController],
     );
 
@@ -17,7 +17,9 @@ describe('WorkflowsController audit wiring (M4.4 decorator events)', () => {
     ['deleteWorkflow', 'workflow.deleted'],
   ])('%s is wired to the %s event', (method, action) => {
     expect(auditConfig(WorkflowsController.prototype[method])).toEqual(
-      expect.objectContaining({ action }),
+      expect.objectContaining({
+        event: expect.objectContaining({ name: action }),
+      }),
     );
   });
 

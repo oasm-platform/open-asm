@@ -1,26 +1,30 @@
 import { Reflector } from '@nestjs/core';
-import { AUDIT_LOG_KEY, type AuditLogConfig } from '../audit/audit-log.decorator';
+import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publish-event.decorator';
 import { JobsRegistryController } from './jobs-registry.controller';
 
 describe('JobsRegistryController audit wiring (M4.4 decorator events)', () => {
   const reflector = new Reflector();
 
   const auditConfig = (method: () => unknown) =>
-    reflector.getAllAndOverride<AuditLogConfig & { action: string }>(
-      AUDIT_LOG_KEY,
+    reflector.getAllAndOverride<PublishEventConfig & { event: unknown }>(
+      PUBLISH_EVENT_KEY,
       [method, JobsRegistryController],
     );
 
   it('cancelJob is wired to the job.cancelled event', () => {
     expect(auditConfig(JobsRegistryController.prototype.cancelJob)).toEqual(
-      expect.objectContaining({ action: 'job.cancelled' }),
+      expect.objectContaining({
+        event: expect.objectContaining({ name: 'job.cancelled' }),
+      }),
     );
   });
 
   it('cancelJobHistory is wired to the job.cancelled event', () => {
     expect(
       auditConfig(JobsRegistryController.prototype.cancelJobHistory),
-    ).toEqual(expect.objectContaining({ action: 'job.cancelled' }));
+    ).toEqual(expect.objectContaining({
+        event: expect.objectContaining({ name: 'job.cancelled' }),
+      }));
   });
 
   it('cancelJob is bare: jobId is not capturable from body/result, no changes or metadata', () => {

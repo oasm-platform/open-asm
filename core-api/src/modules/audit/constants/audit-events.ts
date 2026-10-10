@@ -79,7 +79,7 @@ export const AUDIT_ACTION_CATALOG = [
   { action: 'audit.exported', label: 'Exported audit log', controller: 'AuditEventsController', method: 'exportAuditEvents' },
 ] as const satisfies readonly AuditActionEntry[];
 
-/** Union of every catalog action key — the type for @AuditLog('...') and DTOs. */
+/** Union of every catalog action key — the type for the audit DTOs' `@IsIn`. */
 export type AuditAction = (typeof AUDIT_ACTION_CATALOG)[number]['action'];
 
 /**

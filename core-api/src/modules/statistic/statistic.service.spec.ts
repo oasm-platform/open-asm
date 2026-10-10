@@ -1,13 +1,14 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
-import { DefaultWorkflow, NotificationScope, NotificationType } from '@/common/enums/enum';
+import { DefaultWorkflow } from '@/common/enums/enum';
 import type { Job } from '../jobs-registry/entities/job.entity';
 import { StatisticService } from './statistic.service';
 import { DataSource } from 'typeorm';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { EventBridgeService } from '../event-bridge/event-bridge.service';
+import { EVENT_CATALOG } from '../connectors/event';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 
 describe('StatisticService', () => {
@@ -59,8 +60,8 @@ describe('StatisticService', () => {
     getMemberOfWorkspaceByJobId: jest.fn(),
   };
 
-  const mockNotificationsService = {
-    createNotification: jest.fn(),
+  const mockEventBridge = {
+    publishSafely: jest.fn(),
   };
 
   const mockTechnologyForwarderService = {
@@ -75,7 +76,7 @@ describe('StatisticService', () => {
         { provide: GeoIpService, useValue: mockGeoIpService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: WorkspacesService, useValue: mockWorkspacesService },
-        { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: EventBridgeService, useValue: mockEventBridge },
         {
           provide: TechnologyForwarderService,
           useValue: mockTechnologyForwarderService,
@@ -203,7 +204,17 @@ describe('StatisticService', () => {
       ]);
     });
 
-    it('reports an incomplete run alongside the discovery report', async () => {
+    /** The single `workflow.run.completed` publish the service made. */
+    const publishedPayload = () =>
+      mockEventBridge.publishSafely.mock.calls.at(-1)?.[1] as
+        | {
+            workspaceId: string;
+            outcome: string;
+            payload: Record<string, unknown>;
+          }
+        | undefined;
+
+    it('publishes the run outcome instead of deciding who is notified', async () => {
       snapshotSpy().mockResolvedValue({
         hosts: 1,
         ports: 0,
@@ -219,36 +230,23 @@ describe('StatisticService', () => {
         }),
       );
 
-      // The discovery message keeps its original arguments: notifications
-      // stored before this change have no `incomplete` key, and a missing ICU
-      // variable makes the renderer fall back to raw template text.
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: NotificationType.ASSET_NEW_DETECT,
-          scope: NotificationScope.GROUP,
-          metadata: expect.objectContaining({ services: '3' }),
-        }),
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledTimes(1);
+      expect(mockEventBridge.publishSafely.mock.calls[0][0]).toBe(
+        EVENT_CATALOG.workflow.run.completed,
       );
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: NotificationType.ASSET_NEW_DETECT,
-          metadata: expect.not.objectContaining({
-            incomplete: expect.anything(),
-          }),
-        }),
-      );
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: NotificationType.SCAN_INCOMPLETE,
-          metadata: expect.objectContaining({
-            targetValue: 'cline.bot',
-            details: 'port_scan failed; http_probe skipped after a failure',
-          }),
-        }),
-      );
+      const data = publishedPayload();
+      expect(data.workspaceId).toBe('workspace-1');
+      expect(data.payload).toMatchObject({
+        targetValue: 'cline.bot',
+        services: 3,
+        hosts: 1,
+      });
     });
 
-    it('reports a run that died without discovering anything', async () => {
+    it('marks a partial run as a failure outcome', async () => {
+      // The run did not finish its graph, so the envelope says so — that is how
+      // the `notifications` lane knows to send the "scan stopped halfway"
+      // message without having to re-derive the step states.
       snapshotSpy().mockResolvedValue({
         hosts: 0,
         ports: 0,
@@ -260,13 +258,35 @@ describe('StatisticService', () => {
         targetJob({ port_scan: { status: 'failed' } }),
       );
 
-      const types = mockNotificationsService.createNotification.mock.calls.map(
-        ([dto]) => (dto as { type: NotificationType }).type,
-      );
-      expect(types).toEqual([NotificationType.SCAN_INCOMPLETE]);
+      const data = publishedPayload();
+      expect(data.outcome).toBe('failure');
+      expect(data.payload.incompleteDetails).toBe('port_scan failed');
     });
 
-    it('leaves a run that finished its whole graph unflagged', async () => {
+    it('names what never ran, so the notice is actionable', async () => {
+      snapshotSpy().mockResolvedValue({
+        hosts: 0,
+        ports: 0,
+        services: 0,
+        techs: 0,
+      });
+
+      await service.handleWorkflowEnd(
+        targetJob({
+          scan_subdomain: { status: 'done' },
+          port_scan: { status: 'failed' },
+          http_probe: { status: 'skipped', reason: 'blocked-by-failure' },
+        }),
+      );
+
+      expect(publishedPayload()?.payload.incompleteDetails).toBe(
+        'port_scan failed; http_probe skipped after a failure',
+      );
+    });
+
+    it('omits the incomplete flag entirely for a clean run', async () => {
+      // Absent, not empty: the sink treats "present" as "send the notice", so
+      // an empty string would still produce one.
       snapshotSpy().mockResolvedValue({
         hosts: 2,
         ports: 4,
@@ -283,18 +303,21 @@ describe('StatisticService', () => {
         }),
       );
 
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: NotificationType.ASSET_NEW_DETECT,
-          metadata: expect.not.objectContaining({
-            incomplete: expect.anything(),
-          }),
-        }),
-      );
-      const types = mockNotificationsService.createNotification.mock.calls.map(
-        ([dto]) => (dto as { type: NotificationType }).type,
-      );
-      expect(types).not.toContain(NotificationType.SCAN_INCOMPLETE);
+      const data = publishedPayload();
+      expect(data.outcome).toBe('success');
+      expect(data.payload).not.toHaveProperty('incompleteDetails');
+      expect(data.payload.hasNewAssets).toBe(true);
+    });
+
+    it('publishes nothing when the workspace cannot be resolved', async () => {
+      // The event bus requires a workspace on every event; an unresolvable run
+      // is skipped rather than published with a sentinel workspace.
+      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([]);
+      snapshotSpy().mockResolvedValue({ hosts: 1, ports: 0, services: 0, techs: 0 });
+
+      await service.handleWorkflowEnd(targetJob({ port_scan: { status: 'done' } }));
+
+      expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
     });
   });
 });

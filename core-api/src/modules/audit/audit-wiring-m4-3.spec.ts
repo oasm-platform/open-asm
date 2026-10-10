@@ -3,11 +3,11 @@ import { AssetGroupController } from '../asset-group/asset-group.controller';
 import { InternalNetworksController } from '../internal-networks/internal-networks.controller';
 import { VulnerabilitiesController } from '../vulnerabilities/vulnerabilities.controller';
 import {
-  AUDIT_LOG_KEY,
-  type AuditLogConfig,
-} from './audit-log.decorator';
+  PUBLISH_EVENT_KEY,
+  type PublishEventConfig,
+} from '../event-bridge/publish-event.decorator';
 
-type AuditLogMetadata = { action: string } & AuditLogConfig;
+type PublishEventMetadata = { event: unknown } & PublishEventConfig;
 
 describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)', () => {
   const reflector = new Reflector();
@@ -16,7 +16,7 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
     controller: { prototype: Record<string, unknown> },
     method: string,
   ) =>
-    reflector.getAllAndOverride<AuditLogMetadata>(AUDIT_LOG_KEY, [
+    reflector.getAllAndOverride<PublishEventMetadata>(PUBLISH_EVENT_KEY, [
       controller.prototype[method] as () => unknown,
       controller,
     ]);
@@ -47,7 +47,9 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
       ],
     ] as const)('%s.%s is wired to the %s event', (controller, method, action) => {
       expect(auditConfig(controller, method)).toEqual(
-        expect.objectContaining({ action }),
+        expect.objectContaining({
+        event: expect.objectContaining({ name: action }),
+      }),
       );
     });
 
@@ -84,7 +86,10 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
   describe('asset_group.deleted (delete)', () => {
     it('is wired without changes (name is not available)', () => {
       const config = auditConfig(AssetGroupController, 'delete');
-      expect(config.action).toBe('asset_group.deleted');
+      expect(config.event).toEqual({
+        name: 'asset_group.deleted',
+        summary: expect.any(String),
+      });
       expect(config.changes).toBeUndefined();
     });
   });
@@ -107,7 +112,10 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
         InternalNetworksController,
         'deleteInternalNetwork',
       );
-      expect(config.action).toBe('network.deleted');
+      expect(config.event).toEqual({
+        name: 'network.deleted',
+        summary: expect.any(String),
+      });
       expect(config.changes).toBeUndefined();
     });
   });
