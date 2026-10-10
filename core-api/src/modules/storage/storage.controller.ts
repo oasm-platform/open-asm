@@ -79,7 +79,7 @@ export class StorageController {
 
     const extension = key.slice(key.lastIndexOf('.') + 1).toLowerCase();
     const contentType =
-      dto.contentType ?? this.getMimeType(extension) ?? `image/${extension}`;
+      dto.contentType ?? this.storageService.resolveMimeType(extension);
 
     const { url, path, expiresIn } =
       await this.storageService.getPresignedUploadUrl({
@@ -239,8 +239,6 @@ export class StorageController {
     switch (access) {
       case 'public':
         return;
-      case 'private':
-        throw new ForbiddenException('Access denied');
       case 'blocked':
         throw new NotFoundException('File not found');
       case 'authenticated':
@@ -272,6 +270,8 @@ export class StorageController {
         }
         throw new ForbiddenException('Access denied');
       }
+      default:
+        throw new ForbiddenException('Access denied');
     }
   }
 
@@ -290,51 +290,6 @@ export class StorageController {
       return false;
     }
 
-    return contentType === this.getMimeType(extension);
-  }
-
-  private getMimeType(extension?: string): string | undefined {
-    if (!extension) return undefined;
-
-    const mimeTypes: { [key: string]: string } = {
-      // Images
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      png: 'image/png',
-      gif: 'image/gif',
-      webp: 'image/webp',
-      svg: 'image/svg+xml',
-
-      // Documents
-      pdf: 'application/pdf',
-      doc: 'application/msword',
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      xls: 'application/vnd.ms-excel',
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      ppt: 'application/vnd.ms-powerpoint',
-      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      txt: 'text/plain',
-
-      // Archives
-      zip: 'application/zip',
-      rar: 'application/x-rar-compressed',
-      '7z': 'application/x-7z-compressed',
-
-      // Audio/Video
-      mp3: 'audio/mpeg',
-      wav: 'audio/wav',
-      mp4: 'video/mp4',
-      webm: 'video/webm',
-
-      // Code
-      json: 'application/json',
-      xml: 'application/xml',
-      html: 'text/html',
-      css: 'text/css',
-      js: 'application/javascript',
-      ts: 'application/typescript',
-    };
-
-    return mimeTypes[extension.toLowerCase()];
+    return contentType === this.storageService.resolveMimeType(extension);
   }
 }

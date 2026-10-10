@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class PresignUploadRequestDto {
@@ -37,36 +37,13 @@ export class PresignUploadResponseDto {
   expiresIn: number;
 }
 
-export class LogoPresignRequestDto {
-  @ApiProperty({ example: 'logo.png', description: 'Original file name of the logo image' })
-  @IsString()
-  @IsNotEmpty()
-  fileName: string;
+export class LogoPresignRequestDto extends OmitType(PresignUploadRequestDto, [
+  'bucket',
+] as const) {}
 
-  @ApiProperty({
-    example: 'image/png',
-    required: false,
-    description: 'Defaults to the image type derived from the file extension',
-  })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  contentType?: string;
-}
-
-export class LogoPresignResponseDto {
-  @ApiProperty({ example: 'https://rustfs.internal/system/logo-1a2b3c.png?X-Amz-Signature=...' })
-  uploadUrl: string;
-
-  @ApiProperty({ example: 'logo-1a2b3c.png' })
-  key: string;
-
-  @ApiProperty({ example: 'system/logo-1a2b3c.png' })
-  path: string;
-
-  @ApiProperty({ example: 172800, description: 'Lifetime of the presigned URL in seconds' })
-  expiresIn: number;
-}
+export class LogoPresignResponseDto extends OmitType(PresignUploadResponseDto, [
+  'contentType',
+] as const) {}
 
 export class ConfirmLogoRequestDto {
   @ApiProperty({

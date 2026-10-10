@@ -792,23 +792,6 @@ describe('StorageService', () => {
       expect(signed).toContain('X-Amz-Signature');
     });
 
-    it('should map downloadFileName to attachment disposition', async () => {
-      const urls = await service.signStoragePaths([
-        {
-          bucket: 'reports',
-          path: 'report.pdf',
-          downloadFileName: 'final.pdf',
-        },
-      ]);
-
-      expect(urls[0]).toContain('X-Amz-Signature');
-      expect(lastPresignInput()).toMatchObject({
-        Bucket: 'reports',
-        Key: 'report.pdf',
-        ResponseContentDisposition: 'attachment; filename="final.pdf"',
-      });
-    });
-
     it('should reject private/malformed items with 400', async () => {
       await expect(
         service.signStoragePaths([{ bucket: 'reports', path: 'reports/x' }]),
@@ -818,15 +801,6 @@ describe('StorageService', () => {
     it('should reject blocked-bucket items with 400 (F-2)', async () => {
       await expect(
         service.signStoragePaths([{ bucket: 'default', path: 'default/x' }]),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.signStoragePaths([
-          {
-            bucket: 'default',
-            path: 'x.pdf',
-            downloadFileName: 'final.pdf',
-          },
-        ]),
       ).rejects.toThrow(BadRequestException);
     });
 

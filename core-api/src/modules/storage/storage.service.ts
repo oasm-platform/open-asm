@@ -35,7 +35,19 @@ import {
 } from './storage.config';
 import { Readable } from 'stream';
 
-export const PUBLIC_READ_BUCKETS = ['system', 'cached-static'];
+type BucketAccess = 'public' | 'authenticated' | 'tenant' | 'private' | 'blocked';
+
+const BUCKET_ACCESS = {
+  system: 'public',
+  screenshot: 'tenant',
+  'nuclei-templates': 'tenant',
+  'job-results': 'private',
+  'cached-static': 'authenticated',
+  reports: 'private',
+  default: 'blocked',
+} as const satisfies Record<string, BucketAccess>;
+
+export const PUBLIC_READ_BUCKETS: string[] = ['system', 'cached-static'];
 
 /**
  * Start of the current UTC hour. Passed as `signingDate` to `getSignedUrl`
@@ -99,47 +111,12 @@ const EXTENSION_TO_MIME: Record<string, string> = {
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
-  private readonly buckets = [
-    'system',
-    'screenshot',
-    'nuclei-templates',
-    'job-results',
-    'cached-static',
-    'reports',
-    'default',
-  ];
-
-  private readonly privateBuckets = ['reports', 'job-results'];
-
-  private readonly publicBuckets = ['system'];
-
-  private readonly authenticatedBuckets = ['cached-static'];
-
-  private readonly tenantBuckets = ['screenshot', 'nuclei-templates'];
-
-  private readonly blockedBuckets = ['default'];
+  private readonly buckets = Object.keys(BUCKET_ACCESS);
 
   private readonly publicReadApplied = new Set<string>();
 
-  public getBucketAccess(
-    bucket: string,
-  ): 'public' | 'authenticated' | 'tenant' | 'private' | 'blocked' {
-    if (this.publicBuckets.includes(bucket)) {
-      return 'public';
-    }
-    if (this.authenticatedBuckets.includes(bucket)) {
-      return 'authenticated';
-    }
-    if (this.tenantBuckets.includes(bucket)) {
-      return 'tenant';
-    }
-    if (this.privateBuckets.includes(bucket)) {
-      return 'private';
-    }
-    if (this.blockedBuckets.includes(bucket)) {
-      return 'blocked';
-    }
-    return 'blocked';
+  public getBucketAccess(bucket: string): BucketAccess {
+    return (BUCKET_ACCESS as Record<string, BucketAccess>)[bucket] ?? 'blocked';
   }
 
   public getPresignTtlSeconds(): number {
@@ -295,10 +272,6 @@ export class StorageService implements OnModuleInit {
     }
   }
 
-  public isPrivateBucket(bucket: string): boolean {
-    return this.privateBuckets.includes(bucket);
-  }
-
   public assertBucketAllowed(bucket: string): void {
     if (!bucket || bucket.trim() === '') {
       throw new BadRequestException('bucket is required');
@@ -311,7 +284,7 @@ export class StorageService implements OnModuleInit {
   }
 
   public assertBucketNotPrivate(bucket: string): void {
-    if (this.privateBuckets.includes(bucket)) {
+    if (this.getBucketAccess(bucket) === 'private') {
       throw new ForbiddenException(`Bucket '${bucket}' is private`);
     }
   }
@@ -353,7 +326,7 @@ export class StorageService implements OnModuleInit {
 
   public generateObjectKey(
     fileName: string,
-    opts?: { bucket?: string; allowedExtensions?: string[]; prefix?: string },
+    opts?: { allowedExtensions?: string[]; prefix?: string },
   ): string {
     const dotIndex = fileName.lastIndexOf('.');
     const ext =
@@ -461,6 +434,35 @@ export class StorageService implements OnModuleInit {
     return { path: `${bucket}/${fileName}` };
   }
 
+  private clampPresignTtl(requestedTtl: number): number {
+    const clampedTtl = Math.min(
+      MAX_S3_PRESIGN_TTL_SECONDS,
+      Math.max(MIN_S3_PRESIGN_TTL_SECONDS, Math.trunc(requestedTtl)),
+    );
+    this.logger.log(`Resolved presign TTL: ${clampedTtl}s`);
+    return clampedTtl;
+  }
+
+  private async signCommand(
+    command: PutObjectCommand | GetObjectCommand,
+    ttl: number,
+    extra?: { signableHeaders?: Set<string> },
+  ): Promise<string> {
+    // ponytail: presigner@3.1048 vs client-s3@3.1097 ship mismatched @smithy/types; cast until versions align.
+    return getSignedUrl(
+      this.rustFsClient.getPresignClient() as never,
+      command as never,
+      {
+        expiresIn: ttl,
+        signingDate:
+          ttl >= HOUR_BUCKET_MIN_TTL_SECONDS
+            ? getHourBucketedSigningDate()
+            : new Date(),
+        ...(extra ?? {}),
+      },
+    );
+  }
+
   public async getPresignedUploadUrl(opts: {
     bucket: string;
     key: string;
@@ -483,12 +485,9 @@ export class StorageService implements OnModuleInit {
       throw new BadRequestException('Invalid key');
     }
 
-    const requestedTtl = expiresIn ?? this.storageConfig.presignTtlSeconds;
-    const clampedTtl = Math.min(
-      MAX_S3_PRESIGN_TTL_SECONDS,
-      Math.max(MIN_S3_PRESIGN_TTL_SECONDS, Math.trunc(requestedTtl)),
+    const clampedTtl = this.clampPresignTtl(
+      expiresIn ?? this.storageConfig.presignTtlSeconds,
     );
-    this.logger.log(`Resolved presign TTL: ${clampedTtl}s`);
 
     const command = new PutObjectCommand({
       Bucket: bucket,
@@ -496,15 +495,11 @@ export class StorageService implements OnModuleInit {
       ...(contentType ? { ContentType: contentType } : {}),
     });
 
-    // ponytail: presigner@3.1048 vs client-s3@3.1097 ship mismatched @smithy/types; cast until versions align.
-    const url = await getSignedUrl(this.rustFsClient.getPresignClient() as never, command as never, {
-      expiresIn: clampedTtl,
-      signingDate:
-        clampedTtl >= HOUR_BUCKET_MIN_TTL_SECONDS
-          ? getHourBucketedSigningDate()
-          : new Date(),
-      ...(contentType ? { signableHeaders: new Set(['content-type']) } : {}),
-    });
+    const url = await this.signCommand(
+      command,
+      clampedTtl,
+      contentType ? { signableHeaders: new Set(['content-type']) } : undefined,
+    );
 
     return { url: this.toBrowserUrl(url), key, path: `${bucket}/${key}`, expiresIn: clampedTtl };
   }
@@ -532,12 +527,9 @@ export class StorageService implements OnModuleInit {
       throw new BadRequestException('Invalid key');
     }
 
-    const requestedTtl = expiresIn ?? this.storageConfig.presignTtlSeconds;
-    const clampedTtl = Math.min(
-      MAX_S3_PRESIGN_TTL_SECONDS,
-      Math.max(MIN_S3_PRESIGN_TTL_SECONDS, Math.trunc(requestedTtl)),
+    const clampedTtl = this.clampPresignTtl(
+      expiresIn ?? this.storageConfig.presignTtlSeconds,
     );
-    this.logger.log(`Resolved presign TTL: ${clampedTtl}s`);
 
     const command = new GetObjectCommand({
       Bucket: bucket,
@@ -546,14 +538,7 @@ export class StorageService implements OnModuleInit {
       ResponseContentType: contentType || undefined,
     });
 
-    // ponytail: presigner@3.1048 vs client-s3@3.1097 ship mismatched @smithy/types; cast until versions align.
-    const url = await getSignedUrl(this.rustFsClient.getPresignClient() as never, command as never, {
-      expiresIn: clampedTtl,
-      signingDate:
-        clampedTtl >= HOUR_BUCKET_MIN_TTL_SECONDS
-          ? getHourBucketedSigningDate()
-          : new Date(),
-    });
+    const url = await this.signCommand(command, clampedTtl);
 
     return { url: this.toBrowserUrl(url), expiresIn: clampedTtl };
   }
@@ -580,10 +565,8 @@ export class StorageService implements OnModuleInit {
     const key = path.slice(slashIndex + 1);
 
     this.assertBucketAllowed(bucket);
-    if (
-      this.privateBuckets.includes(bucket) ||
-      this.blockedBuckets.includes(bucket)
-    ) {
+    const access = this.getBucketAccess(bucket);
+    if (access === 'private' || access === 'blocked') {
       throw new BadRequestException(`Bucket '${bucket}' is private`);
     }
 
@@ -630,36 +613,13 @@ export class StorageService implements OnModuleInit {
    * skipped); malformed stored rows (no `/`, leading `/`, empty key) resolve
    * to `null` so one bad row never fails a whole list — direct invalid input
    * still throws via `getClientUrlForPath`.
-   *
-   * Items with `downloadFileName` (reports/downloads) presign via
-   * `getPresignedDownloadUrl` with derived `ResponseContentType` +
-   * `ResponseContentDisposition=attachment`; all other items delegate to
-   * `getClientUrlForPath` verbatim.
    */
   public async signStoragePaths(
-    items: Array<{ bucket: string; path: string; downloadFileName?: string }>,
+    items: Array<{ bucket: string; path: string }>,
     expiresIn?: number,
   ): Promise<Array<string | null>> {
     return Promise.all(
       items.map(async (item): Promise<string | null> => {
-        if (item.downloadFileName) {
-          const key = this.extractKeyForBatch(item.bucket, item.path);
-          this.assertBucketAllowed(item.bucket);
-          if (this.getBucketAccess(item.bucket) === 'blocked') {
-            throw new BadRequestException(
-              `Bucket '${item.bucket}' is private`,
-            );
-          }
-          const contentType = this.deriveContentTypeFromKey(key);
-          const { url } = await this.getPresignedDownloadUrl({
-            bucket: item.bucket,
-            key,
-            expiresIn,
-            fileName: item.downloadFileName,
-            ...(contentType ? { contentType } : {}),
-          });
-          return url;
-        }
         const fullPath = item.path.includes('/')
           ? item.path
           : `${item.bucket}/${item.path}`;
@@ -687,7 +647,7 @@ export class StorageService implements OnModuleInit {
    */
   public async signStoragePath(
     path: string,
-    opts?: { expiresIn?: number; downloadFileName?: string },
+    opts?: { expiresIn?: number },
   ): Promise<string | null> {
     const slashIndex = path.indexOf('/');
     const bucket = slashIndex > 0 ? path.slice(0, slashIndex) : '';
@@ -696,9 +656,6 @@ export class StorageService implements OnModuleInit {
         {
           bucket,
           path,
-          ...(opts?.downloadFileName
-            ? { downloadFileName: opts.downloadFileName }
-            : {}),
         },
       ],
       opts?.expiresIn,
@@ -711,14 +668,6 @@ export class StorageService implements OnModuleInit {
     return dotIndex > 0 && dotIndex < key.length - 1
       ? this.resolveMimeType(key.slice(dotIndex + 1))
       : undefined;
-  }
-
-  private extractKeyForBatch(bucket: string, path: string): string {
-    const prefix = `${bucket}/`;
-    if (path.startsWith(prefix)) {
-      return path.slice(prefix.length);
-    }
-    return path.replace(/^\/+/, '');
   }
 
   private isNoSuchBucket(error: unknown): boolean {
