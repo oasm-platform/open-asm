@@ -119,19 +119,19 @@ export class SplitHttpResponses1791605416710 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "ip_observations" ("httpResponseId","assetServiceId","ip","source")
             SELECT hr.id, hr."assetServiceId"::uuid, x.ip::inet, 'httpx_a'
             FROM http_responses hr CROSS JOIN LATERAL unnest(hr.a) AS x(ip)
-            WHERE hr.a IS NOT NULL AND x.ip ~ '^([0-9]{1,3}\\.){3}[0-9]{1,3}$|^[0-9a-fA-F:]*:[0-9a-fA-F:]+$' ON CONFLICT DO NOTHING`);
+            WHERE hr.a IS NOT NULL AND x.ip ~ '^([0-9]{1,3}\\.){3}[0-9]{1,3}$|^[0-9a-fA-F:]*:[0-9a-fA-F:]+$' AND pg_input_is_valid(x.ip, 'inet') ON CONFLICT DO NOTHING`);
         await queryRunner.query(`INSERT INTO "ip_observations" ("httpResponseId","assetServiceId","ip","source")
             SELECT hr.id, hr."assetServiceId"::uuid, x.ip::inet, 'resolver'
             FROM http_responses hr CROSS JOIN LATERAL unnest(hr.resolvers) AS x(ip)
-            WHERE hr.resolvers IS NOT NULL AND x.ip ~ '^([0-9]{1,3}\\.){3}[0-9]{1,3}$|^[0-9a-fA-F:]*:[0-9a-fA-F:]+$' ON CONFLICT DO NOTHING`);
+            WHERE hr.resolvers IS NOT NULL AND x.ip ~ '^([0-9]{1,3}\\.){3}[0-9]{1,3}$|^[0-9a-fA-F:]*:[0-9a-fA-F:]+$' AND pg_input_is_valid(x.ip, 'inet') ON CONFLICT DO NOTHING`);
         await queryRunner.query(`INSERT INTO "ip_observations" ("assetId","ip","source")
             SELECT a.id, e::inet, 'dns_a' FROM assets a
             CROSS JOIN LATERAL jsonb_array_elements_text((a."dnsRecords"::jsonb)->'A') e
-            WHERE a."dnsRecords" IS NOT NULL AND e ~ '^([0-9]{1,3}\\.){3}[0-9]{1,3}$' ON CONFLICT DO NOTHING`);
+            WHERE a."dnsRecords" IS NOT NULL AND e ~ '^([0-9]{1,3}\\.){3}[0-9]{1,3}$' AND pg_input_is_valid(e, 'inet') ON CONFLICT DO NOTHING`);
         await queryRunner.query(`INSERT INTO "ip_observations" ("assetId","ip","source")
             SELECT a.id, e::inet, 'dns_aaaa' FROM assets a
             CROSS JOIN LATERAL jsonb_array_elements_text((a."dnsRecords"::jsonb)->'AAAA') e
-            WHERE a."dnsRecords" IS NOT NULL AND e ~ '^[0-9a-fA-F:]*:[0-9a-fA-F:]+$' ON CONFLICT DO NOTHING`);
+            WHERE a."dnsRecords" IS NOT NULL AND e ~ '^[0-9a-fA-F:]*:[0-9a-fA-F:]+$' AND pg_input_is_valid(e, 'inet') ON CONFLICT DO NOTHING`);
         await queryRunner.query(`INSERT INTO "http_status_codes" ("httpResponseId","assetServiceId","statusCode","isPrimary","chainIndex")
             SELECT hr.id, hr."assetServiceId"::uuid, hr.status_code, true, NULL FROM http_responses hr
             WHERE hr.status_code IS NOT NULL ON CONFLICT DO NOTHING`);
