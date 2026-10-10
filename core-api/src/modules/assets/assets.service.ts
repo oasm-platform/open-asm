@@ -1,4 +1,3 @@
-import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import * as fs from 'fs';
@@ -26,6 +25,7 @@ import {
 import { Target } from '../targets/entities/target.entity';
 
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
+import { StorageService } from '../storage/storage.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
@@ -84,6 +84,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
     private workspaceEncryption: WorkspaceEncryptionService,
     private geoIpService: GeoIpService,
+    private storageService: StorageService,
     private dataSource: DataSource,
   ) {
     this.loadPrompts();
@@ -340,6 +341,26 @@ export class AssetsService {
       .take(query.limit)
       .getManyAndCount();
 
+    const rawPaths = list.map((item) => item.screenshotPath);
+    const signedUrls = await this.storageService.signStoragePaths(
+      rawPaths
+        .filter((p): p is string => !!p)
+        .map((p) => {
+          const slashIndex = p.indexOf('/');
+          return {
+            bucket: slashIndex > 0 ? p.slice(0, slashIndex) : '',
+            path: p,
+          };
+        }),
+    );
+    let urlCursor = 0;
+    const urlByRaw = new Map<string, string | null>();
+    for (const raw of rawPaths) {
+      if (raw) {
+        urlByRaw.set(raw, signedUrls[urlCursor++]);
+      }
+    }
+
     const assets = list.map(async (item) => {
       const asset = new GetAssetsResponseDto();
       asset.id = item.id;
@@ -349,7 +370,7 @@ export class AssetsService {
       asset.dnsRecords = item.asset?.dnsRecords;
       asset.isEnabled = item.asset?.isEnabled;
       asset.screenshotPath =
-        item.screenshotPath && `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
+        item.screenshotPath && (urlByRaw.get(item.screenshotPath));
       // asset.tags = item.asset.tags || [];
       asset.ipAddresses = item.asset?.ipAssets
         ? item.asset.ipAssets.map((e) => e.ipAddress)
@@ -489,7 +510,7 @@ export class AssetsService {
     asset.isEnabled = item.asset?.isEnabled;
     asset.port = item.port;
     asset.screenshotPath = item.screenshotPath
-      ? `${STORAGE_BASE_PATH}/${item.screenshotPath}`
+      ? await this.storageService.signStoragePath(item.screenshotPath)
       : null;
 
     // Load tags separately - tags belong to AssetService, not Asset

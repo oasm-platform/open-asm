@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { Target } from '../targets/entities/target.entity';
+import { StorageService } from '../storage/storage.service';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { AssetsService } from './assets.service';
@@ -26,6 +27,7 @@ describe('AssetsService', () => {
   let mockGeoIpService: Partial<GeoIpService>;
   let mockLlmConfigRepository: Partial<Repository<AgentLLMConfig>>;
   let mockWorkspaceEncryptionService: Partial<WorkspaceEncryptionService>;
+  let mockStorageService: Partial<StorageService>;
   let mockDataSource: Partial<DataSource>;
   let mockTlsAssetsViewRepository: Partial<Repository<TlsAssetsView>>;
 
@@ -80,6 +82,11 @@ describe('AssetsService', () => {
     } as any;
 
     mockWorkspaceEncryptionService = {};
+
+    mockStorageService = {
+      signStoragePaths: jest.fn(),
+      signStoragePath: jest.fn(),
+    };
 
     mockLlmConfigRepository = {
       findOne: jest.fn(),
@@ -147,6 +154,10 @@ describe('AssetsService', () => {
           useValue: mockWorkspaceEncryptionService,
         },
         {
+          provide: StorageService,
+          useValue: mockStorageService,
+        },
+        {
           provide: DataSource,
           useValue: mockDataSource,
         },
@@ -198,6 +209,143 @@ describe('AssetsService', () => {
       ).toHaveBeenCalledWith('asset_service.id', 'ASC');
     });
 
+    it('emits a signed absolute screenshot URL per item via signStoragePaths batch', async () => {
+      const signedUrl =
+        'https://s3.example/screenshot/abc123.png?X-Amz-Signature=abc';
+      (mockAssetServiceRepository as any).getManyAndCount = jest
+        .fn()
+        .mockResolvedValue([
+          [
+            {
+              id: 'svc-1',
+              value: 'https',
+              screenshotPath: 'screenshot/abc123.png',
+              createdAt: new Date(),
+              asset: { targetId: 'target-1', ipAssets: [] },
+            },
+            {
+              id: 'svc-2',
+              value: 'http',
+              screenshotPath: '',
+              createdAt: new Date(),
+              asset: { targetId: 'target-1', ipAssets: [] },
+            },
+          ],
+          2,
+        ]);
+      (mockStorageService.signStoragePaths as jest.Mock).mockResolvedValue([
+        signedUrl,
+      ]);
+
+      const result = await service.getManyAsssetServices(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(mockStorageService.signStoragePaths).toHaveBeenCalledWith([
+        { bucket: 'screenshot', path: 'screenshot/abc123.png' },
+      ]);
+      expect(mockStorageService.signStoragePaths).toHaveBeenCalledTimes(1);
+      expect(result.data[0].screenshotPath).toBe(signedUrl);
+      expect(result.data[0].screenshotPath).toContain('X-Amz-Signature');
+      expect(result.data[1].screenshotPath).toBe('');
+    });
+
+    it('signs multiple screenshots in one batch call preserving order', async () => {      const first =
+        'https://s3.example/screenshot/aaa.png?X-Amz-Signature=aaa';
+      const second =
+        'https://s3.example/screenshot/bbb.png?X-Amz-Signature=bbb';
+      (mockAssetServiceRepository as any).getManyAndCount = jest
+        .fn()
+        .mockResolvedValue([
+          [
+            {
+              id: 'svc-1',
+              value: 'https',
+              screenshotPath: 'screenshot/aaa.png',
+              createdAt: new Date(),
+              asset: { targetId: 'target-1', ipAssets: [] },
+            },
+            {
+              id: 'svc-2',
+              value: 'http',
+              screenshotPath: 'screenshot/bbb.png',
+              createdAt: new Date(),
+              asset: { targetId: 'target-1', ipAssets: [] },
+            },
+          ],
+          2,
+        ]);
+      (mockStorageService.signStoragePaths as jest.Mock).mockResolvedValue([
+        first,
+        second,
+      ]);
+
+      const result = await service.getManyAsssetServices(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(mockStorageService.signStoragePaths).toHaveBeenCalledTimes(1);
+      expect(mockStorageService.signStoragePaths).toHaveBeenCalledWith([
+        { bucket: 'screenshot', path: 'screenshot/aaa.png' },
+        { bucket: 'screenshot', path: 'screenshot/bbb.png' },
+      ]);
+      expect(result.data[0].screenshotPath).toBe(first);
+      expect(result.data[1].screenshotPath).toBe(second);
+    });
+
+    it('yields null for a malformed stored path instead of failing the list (F-5)', async () => {
+      (mockAssetServiceRepository as any).getManyAndCount = jest
+        .fn()
+        .mockResolvedValue([
+          [
+            {
+              id: 'svc-1',
+              value: 'https',
+              screenshotPath: 'screenshot/aaa.png',
+              createdAt: new Date(),
+              asset: { targetId: 'target-1', ipAssets: [] },
+            },
+            {
+              id: 'svc-2',
+              value: 'http',
+              screenshotPath: 'noslash-legacy',
+              createdAt: new Date(),
+              asset: { targetId: 'target-1', ipAssets: [] },
+            },
+          ],
+          2,
+        ]);
+      (mockStorageService.signStoragePaths as jest.Mock).mockResolvedValue([
+        'https://s3.example/screenshot/aaa.png?X-Amz-Signature=aaa',
+        null,
+      ]);
+
+      const result = await service.getManyAsssetServices(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+        } as any,
+        'workspace-uuid',
+      );
+
+      expect(result.data[0].screenshotPath).toContain('X-Amz-Signature');
+      expect(result.data[1].screenshotPath).toBeNull();
+    });
+
     it('matches services by urls via EXISTS on discovered_urls only', async () => {
       await service.getManyAsssetServices(
         {
@@ -230,6 +378,59 @@ describe('AssetsService', () => {
         'asset_service.discoveredUrls',
         'discoveredUrls',
       );
+    });
+  });
+
+  describe('getAssetById', () => {
+    const signedUrl =
+      'https://s3.example/screenshot/abc123.png?X-Amz-Signature=abc';
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (mockAssetServiceRepository as any).andWhere = jest
+        .fn()
+        .mockReturnThis();
+      (mockAssetServiceRepository as any).getOneOrFail = jest.fn();
+      (mockDataSource as any).getRawMany = jest.fn().mockResolvedValue([]);
+    });
+
+    it('emits a signed absolute screenshot URL via signStoragePath', async () => {
+      (mockAssetServiceRepository as any).getOneOrFail.mockResolvedValue({
+        id: 'svc-1',
+        value: 'https',
+        port: 443,
+        screenshotPath: 'screenshot/abc123.png',
+        createdAt: new Date(),
+        asset: { targetId: 'target-1', ipAssets: [] },
+      });
+      (mockStorageService.signStoragePath as jest.Mock).mockResolvedValue(
+        signedUrl,
+      );
+
+      const result = await service.getAssetById('svc-1', 'workspace-uuid');
+
+      expect(mockStorageService.signStoragePath).toHaveBeenCalledWith(
+        'screenshot/abc123.png',
+      );
+      expect(result.screenshotPath).toBe(signedUrl);
+      expect(result.screenshotPath).toContain('X-Amz-Signature');
+    });
+
+    it('yields null with no helper call when screenshotPath is falsy', async () => {
+      (mockAssetServiceRepository as any).getOneOrFail.mockResolvedValue({
+        id: 'svc-1',
+        value: 'https',
+        port: 443,
+        screenshotPath: null,
+        createdAt: new Date(),
+        asset: { targetId: 'target-1', ipAssets: [] },
+      });
+
+      const result = await service.getAssetById('svc-1', 'workspace-uuid');
+
+      expect(result.screenshotPath).toBeNull();
+      expect(mockStorageService.signStoragePath).not.toHaveBeenCalled();
+      expect(mockStorageService.signStoragePaths).not.toHaveBeenCalled();
     });
   });
 

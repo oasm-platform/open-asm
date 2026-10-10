@@ -21,6 +21,7 @@ describe('SystemConfigsService', () => {
 
     mockStorageService = {
       deleteFile: jest.fn(),
+      signStoragePath: jest.fn(),
     };
 
     const mockRedisService = {
@@ -51,6 +52,70 @@ describe('SystemConfigsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('getConfig', () => {
+    it('emits logoPath via signStoragePath when raw path present', async () => {
+      const rawPath = 'system/logo-123.png';
+      const clientUrl = 'http://localhost:9000/system/logo-123.png';
+      (mockSystemConfigRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        name: 'Test System',
+        logoPath: rawPath,
+      });
+      (mockStorageService.signStoragePath as jest.Mock).mockResolvedValue(
+        clientUrl,
+      );
+
+      const result = await service.getConfig();
+
+      expect(
+        mockStorageService.signStoragePath as jest.Mock,
+      ).toHaveBeenCalledWith(rawPath);
+      expect(result).toEqual({ name: 'Test System', logoPath: clientUrl });
+    });
+
+    it('returns null logoPath without calling helper when absent', async () => {
+      (mockSystemConfigRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        name: 'OASM',
+        logoPath: null,
+      });
+
+      const result = await service.getConfig();
+
+      expect(
+        mockStorageService.signStoragePath as jest.Mock,
+      ).not.toHaveBeenCalled();
+      expect(result).toEqual({ name: 'OASM', logoPath: null });
+    });
+  });
+
+  describe('getRawLogoPath', () => {
+    it('returns the raw stored path without calling the client-URL helper', async () => {
+      (mockSystemConfigRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        name: 'Test System',
+        logoPath: 'system/logo-123.png',
+      });
+
+      const result = await service.getRawLogoPath();
+
+      expect(
+        mockStorageService.signStoragePath as jest.Mock,
+      ).not.toHaveBeenCalled();
+      expect(result).toBe('system/logo-123.png');
+    });
+
+    it('returns null when no logo is configured', async () => {
+      (mockSystemConfigRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        name: 'OASM',
+        logoPath: null,
+      });
+
+      await expect(service.getRawLogoPath()).resolves.toBeNull();
+    });
   });
 
   describe('removeLogo', () => {

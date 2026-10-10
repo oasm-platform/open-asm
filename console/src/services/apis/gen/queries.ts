@@ -676,6 +676,8 @@ export type GetMetadataDto = {
   logoPath: string | null;
   /** Current system version */
   currentVersion: GetMetadataDtoCurrentVersion;
+  /** TTL in seconds for storage presigned URLs */
+  storagePresignTtlSeconds: number;
 };
 
 export type GetVersionDto = {
@@ -3388,13 +3390,13 @@ export type CreateTemplateDTO = {
   fileName: string;
 };
 
-export type UploadTemplateResponseDTO = {
+export type PresignUploadResponseDto = {
+  uploadUrl: string;
+  key: string;
   path: string;
-};
-
-export type UploadTemplateDTO = {
-  templateId: string;
-  fileContent: string;
+  contentType: string;
+  /** Lifetime of the presigned URL in seconds */
+  expiresIn: number;
 };
 
 export type RenameTemplateDTO = {
@@ -3623,8 +3625,10 @@ export type ReportResponseDto = {
   fileName: string;
   type: ReportResponseDtoType;
   createdAt: string;
-  /** Presigned download URL (expires in 15 minutes) */
+  /** Presigned S3 download URL (short-lived, default 15 minutes) */
   downloadUrl: string;
+  /** Presigned URL lifetime in seconds */
+  downloadExpiresIn: number;
 };
 
 export type GetManyReportResponseDtoDto = {
@@ -3670,6 +3674,39 @@ export type GenerateVulReportBodyDto = {
   vulnIds?: string[];
   /** Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO) */
   minSeverity?: GenerateVulReportBodyDtoMinSeverity;
+};
+
+export type LogoPresignRequestDto = {
+  /** Original file name of the logo image */
+  fileName: string;
+  /** Defaults to the image type derived from the file extension */
+  contentType?: string;
+};
+
+export type LogoPresignResponseDto = {
+  uploadUrl: string;
+  key: string;
+  path: string;
+  /** Lifetime of the presigned URL in seconds */
+  expiresIn: number;
+};
+
+export type ConfirmLogoRequestDto = {
+  /** Object key returned by the logo presign endpoint */
+  key: string;
+};
+
+export type PresignUploadRequestDto = {
+  /** Original file name of the object */
+  fileName: string;
+  bucket?: string;
+  contentType?: string;
+};
+
+export type PresignDownloadResponseDto = {
+  downloadUrl: string;
+  /** Lifetime of the presigned URL in seconds */
+  expiresIn: number;
 };
 
 export type Session = {
@@ -4469,27 +4506,13 @@ export const ReportsControllerPreviewVulReportMinSeverity = {
   INFO: 'INFO',
 } as const;
 
-export type StorageControllerUploadLogoBody = {
-  file: Blob;
-};
-
-export type StorageControllerUploadFileBody = {
-  file: Blob;
-  /** Bucket name (default: "default") */
-  bucket?: string;
-};
-
-export type StorageControllerUploadFile200 = {
-  path?: string;
-  bucket?: string;
-  fullPath?: string;
-};
-
-export type StorageControllerDownloadFileParams = {
+export type StorageControllerPresignDownloadParams = {
+  bucket: string;
+  path: string;
   /**
-   * Time-limited download token
+   * Suggested download file name
    */
-  token: string;
+  fileName?: string;
 };
 
 export type SocialSignInBodyIdTokenUserName = {
@@ -35438,44 +35461,38 @@ export function useTemplatesControllerGetAllTemplates<
 }
 
 /**
- * Upload a template to the storage
- * @summary Template upload
+ * Create a presigned URL the client PUTs the template YAML to directly
+ * @summary Presign a template upload
  */
-export const templatesControllerUploadFile = (
-  uploadTemplateDTO: UploadTemplateDTO,
+export const templatesControllerPresignTemplate = (
+  templateId: string,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<UploadTemplateResponseDTO>(
-    {
-      url: `/api/templates/upload`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: uploadTemplateDTO,
-      signal,
-    },
+  return orvalClient<PresignUploadResponseDto>(
+    { url: `/api/templates/${templateId}/presign`, method: 'POST', signal },
     options,
   );
 };
 
-export const getTemplatesControllerUploadFileMutationOptions = <
+export const getTemplatesControllerPresignTemplateMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+    Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
     TError,
-    { data: UploadTemplateDTO },
+    { templateId: string },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+  Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
   TError,
-  { data: UploadTemplateDTO },
+  { templateId: string },
   TContext
 > => {
-  const mutationKey = ['templatesControllerUploadFile'];
+  const mutationKey = ['templatesControllerPresignTemplate'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -35485,48 +35502,48 @@ export const getTemplatesControllerUploadFileMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof templatesControllerUploadFile>>,
-    { data: UploadTemplateDTO }
+    Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
+    { templateId: string }
   > = (props) => {
-    const { data } = props ?? {};
+    const { templateId } = props ?? {};
 
-    return templatesControllerUploadFile(data, requestOptions);
+    return templatesControllerPresignTemplate(templateId, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type TemplatesControllerUploadFileMutationResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerUploadFile>>
+export type TemplatesControllerPresignTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerPresignTemplate>>
 >;
-export type TemplatesControllerUploadFileMutationBody = UploadTemplateDTO;
-export type TemplatesControllerUploadFileMutationError = unknown;
+
+export type TemplatesControllerPresignTemplateMutationError = unknown;
 
 /**
- * @summary Template upload
+ * @summary Presign a template upload
  */
-export const useTemplatesControllerUploadFile = <
+export const useTemplatesControllerPresignTemplate = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+      Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
       TError,
-      { data: UploadTemplateDTO },
+      { templateId: string },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+  Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
   TError,
-  { data: UploadTemplateDTO },
+  { templateId: string },
   TContext
 > => {
   return useMutation(
-    getTemplatesControllerUploadFileMutationOptions(options),
+    getTemplatesControllerPresignTemplateMutationOptions(options),
     queryClient,
   );
 };
@@ -40748,46 +40765,137 @@ export const useReportsControllerDeleteReport = <
 };
 
 /**
- * @summary Upload app logo to system bucket
+ * @summary Create a presigned URL for direct app-logo upload
  */
-export const storageControllerUploadLogo = (
-  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
+export const storageControllerPresignLogoUpload = (
+  logoPresignRequestDto: LogoPresignRequestDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  const formData = new FormData();
-  formData.append(`file`, storageControllerUploadLogoBody.file);
+  return orvalClient<LogoPresignResponseDto>(
+    {
+      url: `/api/storage/logo/presign`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: logoPresignRequestDto,
+      signal,
+    },
+    options,
+  );
+};
 
+export const getStorageControllerPresignLogoUploadMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+    TError,
+    { data: LogoPresignRequestDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+  TError,
+  { data: LogoPresignRequestDto },
+  TContext
+> => {
+  const mutationKey = ['storageControllerPresignLogoUpload'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+    { data: LogoPresignRequestDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerPresignLogoUpload(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StorageControllerPresignLogoUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>
+>;
+export type StorageControllerPresignLogoUploadMutationBody =
+  LogoPresignRequestDto;
+export type StorageControllerPresignLogoUploadMutationError = void;
+
+/**
+ * @summary Create a presigned URL for direct app-logo upload
+ */
+export const useStorageControllerPresignLogoUpload = <
+  TError = void,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+      TError,
+      { data: LogoPresignRequestDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
+  TError,
+  { data: LogoPresignRequestDto },
+  TContext
+> => {
+  return useMutation(
+    getStorageControllerPresignLogoUploadMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Confirm a directly-uploaded app logo and activate it
+ */
+export const storageControllerConfirmLogoUpload = (
+  confirmLogoRequestDto: ConfirmLogoRequestDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
   return orvalClient<DefaultMessageResponseDto>(
     {
-      url: `/api/storage/logo`,
+      url: `/api/storage/logo/confirm`,
       method: 'POST',
-      headers: { 'Content-Type': 'multipart/form-data' },
-      data: formData,
+      headers: { 'Content-Type': 'application/json' },
+      data: confirmLogoRequestDto,
       signal,
     },
     options,
   );
 };
 
-export const getStorageControllerUploadLogoMutationOptions = <
+export const getStorageControllerConfirmLogoUploadMutationOptions = <
   TError = void,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
     TError,
-    { data: StorageControllerUploadLogoBody },
+    { data: ConfirmLogoRequestDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
   TError,
-  { data: StorageControllerUploadLogoBody },
+  { data: ConfirmLogoRequestDto },
   TContext
 > => {
-  const mutationKey = ['storageControllerUploadLogo'];
+  const mutationKey = ['storageControllerConfirmLogoUpload'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -40797,97 +40905,91 @@ export const getStorageControllerUploadLogoMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
-    { data: StorageControllerUploadLogoBody }
+    Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
+    { data: ConfirmLogoRequestDto }
   > = (props) => {
     const { data } = props ?? {};
 
-    return storageControllerUploadLogo(data, requestOptions);
+    return storageControllerConfirmLogoUpload(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type StorageControllerUploadLogoMutationResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerUploadLogo>>
+export type StorageControllerConfirmLogoUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>
 >;
-export type StorageControllerUploadLogoMutationBody =
-  StorageControllerUploadLogoBody;
-export type StorageControllerUploadLogoMutationError = void;
+export type StorageControllerConfirmLogoUploadMutationBody =
+  ConfirmLogoRequestDto;
+export type StorageControllerConfirmLogoUploadMutationError = void;
 
 /**
- * @summary Upload app logo to system bucket
+ * @summary Confirm a directly-uploaded app logo and activate it
  */
-export const useStorageControllerUploadLogo = <
+export const useStorageControllerConfirmLogoUpload = <
   TError = void,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+      Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
       TError,
-      { data: StorageControllerUploadLogoBody },
+      { data: ConfirmLogoRequestDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
   TError,
-  { data: StorageControllerUploadLogoBody },
+  { data: ConfirmLogoRequestDto },
   TContext
 > => {
   return useMutation(
-    getStorageControllerUploadLogoMutationOptions(options),
+    getStorageControllerConfirmLogoUploadMutationOptions(options),
     queryClient,
   );
 };
 
 /**
- * @summary Upload a file to storage
+ * @summary Create a presigned URL for direct-to-storage upload
  */
-export const storageControllerUploadFile = (
-  storageControllerUploadFileBody: StorageControllerUploadFileBody,
+export const storageControllerPresignUpload = (
+  presignUploadRequestDto: PresignUploadRequestDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  const formData = new FormData();
-  formData.append(`file`, storageControllerUploadFileBody.file);
-  if (storageControllerUploadFileBody.bucket !== undefined) {
-    formData.append(`bucket`, storageControllerUploadFileBody.bucket);
-  }
-
-  return orvalClient<StorageControllerUploadFile200>(
+  return orvalClient<PresignUploadResponseDto>(
     {
-      url: `/api/storage/upload`,
+      url: `/api/storage/presign/upload`,
       method: 'POST',
-      headers: { 'Content-Type': 'multipart/form-data' },
-      data: formData,
+      headers: { 'Content-Type': 'application/json' },
+      data: presignUploadRequestDto,
       signal,
     },
     options,
   );
 };
 
-export const getStorageControllerUploadFileMutationOptions = <
-  TError = unknown,
+export const getStorageControllerPresignUploadMutationOptions = <
+  TError = void,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof storageControllerUploadFile>>,
+    Awaited<ReturnType<typeof storageControllerPresignUpload>>,
     TError,
-    { data: StorageControllerUploadFileBody },
+    { data: PresignUploadRequestDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof storageControllerUploadFile>>,
+  Awaited<ReturnType<typeof storageControllerPresignUpload>>,
   TError,
-  { data: StorageControllerUploadFileBody },
+  { data: PresignUploadRequestDto },
   TContext
 > => {
-  const mutationKey = ['storageControllerUploadFile'];
+  const mutationKey = ['storageControllerPresignUpload'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -40897,97 +40999,85 @@ export const getStorageControllerUploadFileMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof storageControllerUploadFile>>,
-    { data: StorageControllerUploadFileBody }
+    Awaited<ReturnType<typeof storageControllerPresignUpload>>,
+    { data: PresignUploadRequestDto }
   > = (props) => {
     const { data } = props ?? {};
 
-    return storageControllerUploadFile(data, requestOptions);
+    return storageControllerPresignUpload(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type StorageControllerUploadFileMutationResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerUploadFile>>
+export type StorageControllerPresignUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerPresignUpload>>
 >;
-export type StorageControllerUploadFileMutationBody =
-  StorageControllerUploadFileBody;
-export type StorageControllerUploadFileMutationError = unknown;
+export type StorageControllerPresignUploadMutationBody =
+  PresignUploadRequestDto;
+export type StorageControllerPresignUploadMutationError = void;
 
 /**
- * @summary Upload a file to storage
+ * @summary Create a presigned URL for direct-to-storage upload
  */
-export const useStorageControllerUploadFile = <
-  TError = unknown,
+export const useStorageControllerPresignUpload = <
+  TError = void,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof storageControllerUploadFile>>,
+      Awaited<ReturnType<typeof storageControllerPresignUpload>>,
       TError,
-      { data: StorageControllerUploadFileBody },
+      { data: PresignUploadRequestDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof storageControllerUploadFile>>,
+  Awaited<ReturnType<typeof storageControllerPresignUpload>>,
   TError,
-  { data: StorageControllerUploadFileBody },
+  { data: PresignUploadRequestDto },
   TContext
 > => {
   return useMutation(
-    getStorageControllerUploadFileMutationOptions(options),
+    getStorageControllerPresignUploadMutationOptions(options),
     queryClient,
   );
 };
 
 /**
- * @summary Download a file with time-limited token
+ * @summary Create a presigned URL for direct-from-storage download
  */
-export const storageControllerDownloadFile = (
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+export const storageControllerPresignDownload = (
+  params: StorageControllerPresignDownloadParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<Blob>(
-    {
-      url: `/api/storage/${bucket}/${path}/download`,
-      method: 'GET',
-      params,
-      responseType: 'blob',
-      signal,
-    },
+  return orvalClient<PresignDownloadResponseDto>(
+    { url: `/api/storage/presign/download`, method: 'GET', params, signal },
     options,
   );
 };
 
-export const getStorageControllerDownloadFileQueryKey = (
-  bucket: string,
-  path: string,
-  params?: StorageControllerDownloadFileParams,
+export const getStorageControllerPresignDownloadQueryKey = (
+  params?: StorageControllerPresignDownloadParams,
 ) => {
   return [
-    `/api/storage/${bucket}/${path}/download`,
+    `/api/storage/presign/download`,
     ...(params ? [params] : []),
   ] as const;
 };
 
-export const getStorageControllerDownloadFileQueryOptions = <
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export const getStorageControllerPresignDownloadQueryOptions = <
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
@@ -40999,54 +41089,43 @@ export const getStorageControllerDownloadFileQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getStorageControllerDownloadFileQueryKey(bucket, path, params);
+    getStorageControllerPresignDownloadQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof storageControllerDownloadFile>>
+    Awaited<ReturnType<typeof storageControllerPresignDownload>>
   > = ({ signal }) =>
-    storageControllerDownloadFile(bucket, path, params, requestOptions, signal);
+    storageControllerPresignDownload(params, requestOptions, signal);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled:
-      bucket !== null &&
-      bucket !== undefined &&
-      path !== null &&
-      path !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof storageControllerPresignDownload>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type StorageControllerDownloadFileQueryResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerDownloadFile>>
+export type StorageControllerPresignDownloadQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerPresignDownload>>
 >;
-export type StorageControllerDownloadFileQueryError = void;
+export type StorageControllerPresignDownloadQueryError = void;
 
-export function useStorageControllerDownloadFile<
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>,
           TError,
-          Awaited<ReturnType<typeof storageControllerDownloadFile>>
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>
         >,
         'initialData'
       >;
@@ -41056,26 +41135,24 @@ export function useStorageControllerDownloadFile<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useStorageControllerDownloadFile<
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>,
           TError,
-          Awaited<ReturnType<typeof storageControllerDownloadFile>>
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>
         >,
         'initialData'
       >;
@@ -41085,17 +41162,15 @@ export function useStorageControllerDownloadFile<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useStorageControllerDownloadFile<
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
@@ -41107,20 +41182,18 @@ export function useStorageControllerDownloadFile<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Download a file with time-limited token
+ * @summary Create a presigned URL for direct-from-storage download
  */
 
-export function useStorageControllerDownloadFile<
-  TData = Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
   TError = void,
 >(
-  bucket: string,
-  path: string,
-  params: StorageControllerDownloadFileParams,
+  params: StorageControllerPresignDownloadParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerDownloadFile>>,
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
         TError,
         TData
       >
@@ -41131,199 +41204,8 @@ export function useStorageControllerDownloadFile<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getStorageControllerDownloadFileQueryOptions(
-    bucket,
-    path,
+  const queryOptions = getStorageControllerPresignDownloadQueryOptions(
     params,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * @summary Get a file from storage (public)
- */
-export const storageControllerGetFile = (
-  bucket: string,
-  path: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<Blob>(
-    {
-      url: `/api/storage/${bucket}/${path}`,
-      method: 'GET',
-      responseType: 'blob',
-      signal,
-    },
-    options,
-  );
-};
-
-export const getStorageControllerGetFileQueryKey = (
-  bucket: string,
-  path: string,
-) => {
-  return [`/api/storage/${bucket}/${path}`] as const;
-};
-
-export const getStorageControllerGetFileQueryOptions = <
-  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
-  TError = void,
->(
-  bucket: string,
-  path: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerGetFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStorageControllerGetFileQueryKey(bucket, path);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof storageControllerGetFile>>
-  > = ({ signal }) =>
-    storageControllerGetFile(bucket, path, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled:
-      bucket !== null &&
-      bucket !== undefined &&
-      path !== null &&
-      path !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof storageControllerGetFile>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StorageControllerGetFileQueryResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerGetFile>>
->;
-export type StorageControllerGetFileQueryError = void;
-
-export function useStorageControllerGetFile<
-  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
-  TError = void,
->(
-  bucket: string,
-  path: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerGetFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerGetFile>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerGetFile>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerGetFile<
-  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
-  TError = void,
->(
-  bucket: string,
-  path: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerGetFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerGetFile>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerGetFile>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerGetFile<
-  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
-  TError = void,
->(
-  bucket: string,
-  path: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerGetFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get a file from storage (public)
- */
-
-export function useStorageControllerGetFile<
-  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
-  TError = void,
->(
-  bucket: string,
-  path: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerGetFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getStorageControllerGetFileQueryOptions(
-    bucket,
-    path,
     options,
   );
 
