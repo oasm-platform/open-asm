@@ -2,7 +2,13 @@ import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { TechnologyDetailDTO } from '@/modules/technology/dto/technology-detail.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsDateString, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsDateString,
+  IsIP,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { AssetTag } from '../entities/asset-tags.entity';
 import { HttpResponse } from '../entities/http-response.entity';
 
@@ -66,7 +72,7 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   @ApiProperty({
     required: false,
   })
-  @IsString({ each: true })
+  @IsIP(undefined, { each: true })
   @IsOptional()
   @Transform(({ value }: { value: string | string[] }): string[] =>
     Array.isArray(value) ? value : [value],

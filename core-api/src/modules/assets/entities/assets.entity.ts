@@ -6,7 +6,7 @@ import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, Index, ManyToOne, OneToMany, Relation, Unique } from 'typeorm';
 import { AssetService } from './asset-services.entity';
-import { IpAssetsView } from './ip-assets.entity';
+import { DnsRecord } from './dns-record.entity';
 
 @Entity('assets')
 @Unique(['value', 'target'])
@@ -55,8 +55,10 @@ export class Asset extends BaseEntity {
   })
   assetGroupAssets?: Relation<AssetGroupAsset[]>;
 
-  @OneToMany(() => IpAssetsView, (ipAssets) => ipAssets.asset)
-  ipAssets?: Relation<IpAssetsView[]>;
+  @OneToMany(() => DnsRecord, (dns) => dns.asset, {
+    onDelete: 'CASCADE',
+  })
+  dnsRecordRows?: Relation<DnsRecord[]>;
 
   @ApiProperty()
   @Column({ default: true })

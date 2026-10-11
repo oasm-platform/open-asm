@@ -155,7 +155,7 @@ const JobDetailPanel = memo(function JobDetailPanel({
         <Field label="Asset">
           {job.asset?.id ? (
             <Link
-              to="/assets/$id"
+              to="/assets/services/$id"
               params={{ id: job.asset.id }}
               className="hover:underline"
             >
@@ -168,7 +168,7 @@ const JobDetailPanel = memo(function JobDetailPanel({
         <Field label="Asset service">
           {job.assetServiceId ? (
             <Link
-              to="/assets/$id"
+              to="/assets/services/$id"
               params={{ id: job.assetServiceId }}
               className="hover:underline"
             >

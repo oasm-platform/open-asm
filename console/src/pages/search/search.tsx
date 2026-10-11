@@ -143,7 +143,7 @@ export default function Search() {
           label="Assets"
           count={data.data.assets.length}
           items={data.data.assets}
-          onItemClick={(id) => navigate({ to: '/assets/' + id })}
+          onItemClick={(id) => navigate({ to: '/assets/services/' + id })}
         />
       )}
 

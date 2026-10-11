@@ -150,9 +150,10 @@ describe('StatisticService', () => {
       // per (host, assetServiceId) — otherwise a cert served on several ports
       // of the same host is counted once per service and the dashboard card
       // no longer matches the TLS tab total after clicking through.
-      expect(sql).toMatch(/DISTINCT ON\s*\(\s*hr\.tls->>'host'/);
-      expect(sql).toContain("hr.tls->>'sni'");
-      expect(sql).toContain("hr.tls->>'subject_an'");
+      expect(sql).toMatch(/DISTINCT ON\s*\(\s*tc\."host"/);
+      expect(sql).toContain('tc."sni"');
+      expect(sql).toContain('tc."subjectAn"');
+      expect(sql).toContain('FROM "tls_certificates" tc');
       expect(sql).not.toContain('assetServiceId)');
     });
 
