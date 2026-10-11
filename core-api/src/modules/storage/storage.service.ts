@@ -1,14 +1,4 @@
 import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-  OnModuleInit,
-  StreamableFile,
-} from '@nestjs/common';
-import {
   CreateBucketCommand,
   DeleteObjectCommand,
   GetBucketPolicyStatusCommand,
@@ -22,9 +12,20 @@ import {
   PutPublicAccessBlockCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
-import { randomUUID } from 'crypto';
-import { ConfigService } from '@nestjs/config';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+  StreamableFile,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
+import { Readable } from 'stream';
 import { DataSource } from 'typeorm';
 import { RustFsClient } from './rustfs.client';
 import {
@@ -33,9 +34,9 @@ import {
   parseStorageConfig,
   StorageConfig,
 } from './storage.config';
-import { Readable } from 'stream';
 
-type BucketAccess = 'public' | 'authenticated' | 'tenant' | 'private' | 'blocked';
+type BucketAccess =
+  'public' | 'authenticated' | 'tenant' | 'private' | 'blocked';
 
 const BUCKET_ACCESS = {
   system: 'public',
@@ -358,19 +359,30 @@ export class StorageService implements OnModuleInit {
       try {
         await client.send(new HeadBucketCommand({ Bucket: bucket }));
       } catch (error) {
-        if (error instanceof S3ServiceException && (error.$metadata.httpStatusCode === 404 || error.name === 'NoSuchBucket')) {
+        if (
+          error instanceof S3ServiceException &&
+          (error.$metadata.httpStatusCode === 404 ||
+            error.name === 'NoSuchBucket')
+        ) {
           try {
             await client.send(new CreateBucketCommand({ Bucket: bucket }));
             this.logger.log(`Created bucket: ${bucket}`);
           } catch (createError) {
-            if (createError instanceof S3ServiceException && createError.name === 'BucketAlreadyExists') {
+            if (
+              createError instanceof S3ServiceException &&
+              createError.name === 'BucketAlreadyExists'
+            ) {
               this.logger.debug(`Bucket already exists: ${bucket}`);
             } else {
-              this.logger.error(`Failed to create bucket ${bucket}: ${createError instanceof Error ? createError.message : 'Unknown error'}`);
+              this.logger.error(
+                `Failed to create bucket ${bucket}: ${createError instanceof Error ? createError.message : 'Unknown error'}`,
+              );
             }
           }
         } else {
-          this.logger.error(`Failed to check bucket ${bucket}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          this.logger.error(
+            `Failed to check bucket ${bucket}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
         }
       }
     }
@@ -439,7 +451,6 @@ export class StorageService implements OnModuleInit {
       MAX_S3_PRESIGN_TTL_SECONDS,
       Math.max(MIN_S3_PRESIGN_TTL_SECONDS, Math.trunc(requestedTtl)),
     );
-    this.logger.log(`Resolved presign TTL: ${clampedTtl}s`);
     return clampedTtl;
   }
 
@@ -501,7 +512,12 @@ export class StorageService implements OnModuleInit {
       contentType ? { signableHeaders: new Set(['content-type']) } : undefined,
     );
 
-    return { url: this.toBrowserUrl(url), key, path: `${bucket}/${key}`, expiresIn: clampedTtl };
+    return {
+      url: this.toBrowserUrl(url),
+      key,
+      path: `${bucket}/${key}`,
+      expiresIn: clampedTtl,
+    };
   }
 
   public async getPresignedDownloadUrl(opts: {
@@ -534,7 +550,9 @@ export class StorageService implements OnModuleInit {
     const command = new GetObjectCommand({
       Bucket: bucket,
       Key: key,
-      ResponseContentDisposition: fileName ? 'attachment; filename="' + fileName + '"' : undefined,
+      ResponseContentDisposition: fileName
+        ? 'attachment; filename="' + fileName + '"'
+        : undefined,
       ResponseContentType: contentType || undefined,
     });
 
@@ -673,8 +691,7 @@ export class StorageService implements OnModuleInit {
   private isNoSuchBucket(error: unknown): boolean {
     return (
       error instanceof S3ServiceException &&
-      (error.name === 'NoSuchBucket' ||
-        error.$metadata.httpStatusCode === 404)
+      (error.name === 'NoSuchBucket' || error.$metadata.httpStatusCode === 404)
     );
   }
 
@@ -690,7 +707,9 @@ export class StorageService implements OnModuleInit {
   private toUploadError(error: unknown): InternalServerErrorException {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error occurred';
-    return new InternalServerErrorException(`Failed to save file: ${errorMessage}`);
+    return new InternalServerErrorException(
+      `Failed to save file: ${errorMessage}`,
+    );
   }
 
   public async getFile(
@@ -726,7 +745,10 @@ export class StorageService implements OnModuleInit {
         lastModified: response.LastModified ?? null,
       };
     } catch (error: unknown) {
-      if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)) {
+      if (
+        error instanceof S3ServiceException &&
+        (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)
+      ) {
         throw new NotFoundException('File not found');
       }
       const errorMessage =
@@ -802,7 +824,11 @@ export class StorageService implements OnModuleInit {
         continuationToken = response.NextContinuationToken;
       } while (continuationToken);
     } catch (error: unknown) {
-      if (error instanceof S3ServiceException && (error.name === 'NoSuchBucket' || error.$metadata.httpStatusCode === 404)) {
+      if (
+        error instanceof S3ServiceException &&
+        (error.name === 'NoSuchBucket' ||
+          error.$metadata.httpStatusCode === 404)
+      ) {
         throw new NotFoundException('Bucket not found');
       }
       const errorMessage =
@@ -815,7 +841,10 @@ export class StorageService implements OnModuleInit {
     return files;
   }
 
-  public async deleteFile(filePath: string, bucket: string = 'default'): Promise<void> {
+  public async deleteFile(
+    filePath: string,
+    bucket: string = 'default',
+  ): Promise<void> {
     const cleanPath = filePath.replace(/^[./\s]+/, '');
 
     if (!cleanPath || cleanPath.includes('..')) {
@@ -830,7 +859,10 @@ export class StorageService implements OnModuleInit {
         }),
       );
     } catch (error: unknown) {
-      if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)) {
+      if (
+        error instanceof S3ServiceException &&
+        (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)
+      ) {
         throw new NotFoundException('File not found');
       }
       const errorMessage =
@@ -913,7 +945,10 @@ export class StorageService implements OnModuleInit {
       const content = Buffer.concat(chunks).toString('utf8');
       return JSON.parse(content) as T;
     } catch (error: unknown) {
-      if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)) {
+      if (
+        error instanceof S3ServiceException &&
+        (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)
+      ) {
         throw new NotFoundException('File not found');
       }
       if (error instanceof SyntaxError) {

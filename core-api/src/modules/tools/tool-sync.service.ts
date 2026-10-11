@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
@@ -24,8 +24,6 @@ import { builtInTools } from './tools-provider/built-in-tools';
  */
 @Injectable()
 export class ToolSyncService implements OnModuleInit {
-  private readonly logger = new Logger(ToolSyncService.name);
-
   constructor(
     @InjectRepository(Tool)
     private readonly toolsRepository: Repository<Tool>,
@@ -43,8 +41,8 @@ export class ToolSyncService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.syncAll();
-    } catch (error) {
-      this.logger.error('Error initializing tools:', error);
+    } catch {
+      // Startup sync is best-effort; failures must not block module init.
     }
   }
 
@@ -172,7 +170,6 @@ export class ToolSyncService implements OnModuleInit {
       () => this.syncConnectorToolsLocked(),
     );
     if (synced === null) {
-      this.logger.warn('Connector tools sync: another instance holds the "connector-sync" lock, skipping');
       return [];
     }
     return synced;
@@ -194,7 +191,6 @@ export class ToolSyncService implements OnModuleInit {
     try {
       raw = await fs.readFile(manifestPath, 'utf-8');
     } catch {
-      this.logger.warn(`Connector manifest not found at ${manifestPath} — skipping connector sync`);
       return [];
     }
 
@@ -202,13 +198,11 @@ export class ToolSyncService implements OnModuleInit {
     try {
       manifest = JSON.parse(raw) as { connectors?: Array<Record<string, unknown>> };
     } catch {
-      this.logger.warn(`Connector manifest at ${manifestPath} contains invalid JSON — skipping connector sync`);
       return [];
     }
 
     const connectors = manifest.connectors;
     if (!Array.isArray(connectors) || connectors.length === 0) {
-      this.logger.warn(`Connector manifest at ${manifestPath} has no connectors — skipping`);
       return [];
     }
 
@@ -328,7 +322,6 @@ export class ToolSyncService implements OnModuleInit {
             void 0; // ignore if asset_tags table/col not exists (legacy DB)
           }
           await this.toolsRepository.delete(dupId);
-          this.logger.log(`Deduped tool "${name}": kept ${keepId} (${keeper.type}), removed ${dupId} (${dup.type})`);
         }
       }
     });
@@ -367,23 +360,16 @@ export class ToolSyncService implements OnModuleInit {
         // Logo removed from the manifest: purge the now-orphaned stored object.
         // Best-effort — a storage failure must not abort the sync.
         if (staleLogoUrl && !entry.logoBase64) {
-          await this.storageService
-            .deleteFile(`connectors/${slug}.png`, 'system')
-            .then(() => this.logger.log(`Deleted stale connector logo for ${slug} -> connectors/${slug}.png`))
-            .catch((err) => this.logger.warn(`Failed to delete connector logo for ${slug}: ${err instanceof Error ? err.message : String(err)}`));
+          await this.storageService.deleteFile(`connectors/${slug}.png`, 'system').catch(() => undefined);
         }
-        this.logger.log(`Overrode tool "${slug}" with connector data (id=${existing.id})`);
         if (entry.logoBase64) {
           try {
             const buffer = this.decodeLogo(entry.logoBase64);
             if (buffer) {
-              await this.storageService
-                .uploadFile(`connectors/${slug}.png`, buffer, 'system')
-                .then(() => this.logger.log(`Uploaded connector logo for ${slug} -> connectors/${slug}.png`))
-                .catch((err) => this.logger.warn(`Failed to upload connector logo for ${slug}: ${err instanceof Error ? err.message : String(err)}`));
+              await this.storageService.uploadFile(`connectors/${slug}.png`, buffer, 'system').catch(() => undefined);
             }
-          } catch (err) {
-            this.logger.warn(`Failed to decode logo for ${slug}: ${err instanceof Error ? err.message : String(err)}`);
+          } catch {
+            // ignore malformed logo payload — DB row already saved
           }
         }
         const idx = connectorEntries.findIndex((e) => e.insert.name === slug);
@@ -403,7 +389,6 @@ export class ToolSyncService implements OnModuleInit {
     }
 
     if (toUpsert.length === 0) {
-      this.logger.log('Connector tools sync: no changes detected');
       // Still cleanup orphans (use original manifest names to avoid false orphans after takeover splice)
       await this.redisLockService.withLock('connector-tools-sync', 10_000, () =>
         this.removeOrphanConnectorTools(allConnectorNames),
@@ -441,14 +426,9 @@ export class ToolSyncService implements OnModuleInit {
         const buffer = this.decodeLogo(base64);
         if (!buffer) continue;
         const fileName = `connectors/${tool.name}.png`;
-        uploads.push(
-          this.storageService
-            .uploadFile(fileName, buffer, 'system')
-            .then(() => this.logger.log(`Uploaded connector logo for ${tool.name} -> ${fileName}`))
-            .catch((err) => this.logger.warn(`Failed to upload connector logo for ${tool.name}: ${err instanceof Error ? err.message : String(err)}`)),
-        );
-      } catch (err) {
-        this.logger.warn(`Failed to decode logo for ${tool.name}: ${err instanceof Error ? err.message : String(err)}`);
+        uploads.push(this.storageService.uploadFile(fileName, buffer, 'system').catch(() => undefined));
+      } catch {
+        // ignore malformed logo payload — DB row already saved
       }
     }
 
@@ -466,7 +446,6 @@ export class ToolSyncService implements OnModuleInit {
       this.removeOrphanProviderTools(allConnectorNames),
     );
 
-    this.logger.log(`Connector tools sync: committed ${committedTools.length} tool(s)`);
     return committedTools;
   }
 
@@ -497,10 +476,6 @@ export class ToolSyncService implements OnModuleInit {
       .execute();
 
     await this.toolsRepository.delete({ id: In(orphanIds) });
-
-    this.logger.log(
-      `Removed ${orphans.length} orphan connector tool(s): ${orphans.map((t) => t.name).join(', ')}`,
-    );
   }
 
   /**
@@ -536,13 +511,8 @@ export class ToolSyncService implements OnModuleInit {
 
       // Delete orphaned provider tools (jobs/vulnerabilities/asset_tags cascade)
       await this.toolsRepository.delete({ id: In(orphanIds) });
-
-      this.logger.log(
-        `Removed ${orphans.length} orphan provider tool(s): ${orphans.map((t) => t.name).join(', ')}`,
-      );
-    } catch (err) {
-      // Warn, not error — legacy cleanup is non-critical and should not ceil startup
-      this.logger.warn(`Failed to remove orphan provider tools: ${err instanceof Error ? err.message : String(err)}`);
+    } catch {
+      // Best-effort legacy cleanup — must not block startup.
     }
   }
 
@@ -573,9 +543,5 @@ export class ToolSyncService implements OnModuleInit {
 
     // Then delete the orphaned tools
     await this.toolsRepository.delete({ id: In(orphanIds) });
-
-    this.logger.log(
-      `Removed ${orphanTools.length} built-in tool(s) no longer declared: ${orphanTools.map((t) => t.name).join(', ')}`,
-    );
   }
 }
