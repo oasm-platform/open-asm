@@ -438,7 +438,7 @@ and Redis holds the raw `cached-static/...` path under `icon:v2:` /
   (`storage.service.ts:480`): a SigV4 `GET` with derived
   `ResponseContentType`, optional `ResponseContentDisposition`
   (`attachment; filename="..."` when `fileName` was passed), TTL clamped from
-  `S3_PRESIGN_TTL` to 60 s ... 604800 s.
+  `S3_PRESIGN_TTL` to 60 s ... 172800 s.
 
 The flag (`publicReadApplied`, `storage.service.ts:102`) is set per bucket at
 boot by `applyPublicReadPolicy` (`storage.service.ts:207`), gated on proof:
@@ -483,9 +483,8 @@ deliberately uncached by TTL.
 `S3_REGION` and `S3_FORCE_PATH_STYLE` apply to **both** clients — they are read
 once in `parseStorageConfig` and handed to each. Only the endpoint differs. The
 internal client is still forbidden from using `S3_PUBLIC_ENDPOINT`. Credentials
-for both clients are the canonical `S3_ACCESS_KEY`/`S3_SECRET_KEY` pair;
-`RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY` survive only as deprecated aliases
-(see Renamed env vars below).
+for both clients are the `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY` pair (a
+half-set pair falls back to the RustFS defaults, never mixed).
 
 Read this before touching either one. SigV4 signs the `host` header and the
 request path. A URL signed against `localhost:9000` is rejected by a browser
@@ -506,6 +505,8 @@ signature was not computed over, so a presigned browser `PUT` fails with
 are shaped; `StorageService.toBrowserUrl` and the public-read branch of
 `getClientUrlForPath` apply it.
 
+- **Unset** defaults to `/api/storage` (relative mode), so no env is needed for
+  dev or docker. Set it explicitly empty (`STORAGE_URL_BASE=`) for cloud.
 - **Empty (absolute mode, cloud).** Unchanged historic behavior: presigned URLs
   point at `S3_PUBLIC_ENDPOINT` and the plain public URL is built from it. Cloud
   sets `S3_PUBLIC_ENDPOINT` + `S3_FORCE_PATH_STYLE` and leaves this empty. The
@@ -572,25 +573,25 @@ In the Docker deployment the browser hits the console origin, so
 
 ### Switching to real S3 (configuration only)
 
-No code change. Profiles live in `core-api/example.env:42-73` and the
-compose overrides in `docker-compose.yml:43-61`. Set in `core-api/.env`:
+No code change, and nothing to set for the bundled RustFS (every variable below
+has a working default). For real S3, set in `core-api/.env`:
 
 | Variable | Value |
 | --- | --- |
 | `RUSTFS_ENDPOINT` | Endpoint the **API** reaches (e.g. the in-network or VPC endpoint). Required in the cloud — it is the internal ops endpoint, and it is deliberately never read from `S3_PUBLIC_ENDPOINT`. |
-| `S3_PUBLIC_ENDPOINT` | **Profile A (self-hosted, same-origin nginx proxy):** must equal the console origin (compose sets `http://localhost:3000` in `docker-compose.yml:57`), or the unsigned `location ^~ /system/` and `location ^~ /cached-static/` prefixes in `console/nginx.conf` are bypassed and plain public GETs fall through to the SPA. **Profile B (cloud, AWS S3):** `https://s3.<region>.amazonaws.com`, so signed URLs are virtual-hosted (`https://<bucket>.s3.<region>.amazonaws.com/<key>`). |
+| `S3_PUBLIC_ENDPOINT` | `https://s3.<region>.amazonaws.com`, so signed URLs are virtual-hosted (`https://<bucket>.s3.<region>.amazonaws.com/<key>`). Only read in absolute mode. |
 | `S3_REGION` | The bucket's region. Signs **both** clients — the internal client is not pinned to `us-east-1`. |
-| `S3_FORCE_PATH_STYLE` | `true` for RustFS/MinIO (Profile A), `false` for AWS S3 (Profile B). Applies to **both** clients, including the plain-URL builder. Ignored for public-read plain URLs when `STORAGE_URL_BASE` is set. |
-| `STORAGE_URL_BASE` | Empty (default in cloud) => absolute URLs. Set (e.g. `/api/storage`, dev/docker) => same-origin relative URLs; the proxy must strip the prefix and forward `Host` == `RUSTFS_ENDPOINT` host (see Relative vs absolute browser URLs). |
-| `S3_USE_DEFAULT_CREDENTIALS` | `true` for IAM roles / instance profiles; otherwise leave `false` and set `S3_ACCESS_KEY` + `S3_SECRET_KEY` |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated console origins applied as S3 bucket CORS (see Renamed env vars below). Cross-origin direct fetches of public objects need their origin listed here |
+| `S3_FORCE_PATH_STYLE` | `true` (default) for RustFS/MinIO, `false` for AWS S3. Applies to **both** clients, including the plain-URL builder. Ignored for public-read plain URLs when `STORAGE_URL_BASE` is set. |
+| `STORAGE_URL_BASE` | Set **empty** (`STORAGE_URL_BASE=`) => absolute URLs. Unset defaults to `/api/storage` (same-origin relative URLs; see Relative vs absolute browser URLs). |
+| `S3_USE_DEFAULT_CREDENTIALS` | `true` for IAM roles / instance profiles; otherwise leave `false` and set `RUSTFS_ACCESS_KEY` + `RUSTFS_SECRET_KEY` |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated console origins applied as S3 bucket CORS. Cross-origin direct fetches need their origin listed here; empty (default) skips bucket CORS |
 
 `StorageService.onModuleInit` applies the CORS rule to every bucket on boot
 (`GET, PUT, POST, HEAD`, `AllowedHeaders: *`, exposes `ETag`), and skips it
 entirely when the origins list is empty.
 
 The nginx public prefixes above are self-hosted, same-origin storage
-only. For Profile B (cloud) the operator must additionally disable S3 Block
+only. For cloud S3 the operator must additionally disable S3 Block
 Public Access on the public buckets (`system`, `cached-static`), or the app
 applies `PutPublicAccessBlock` itself at boot (best-effort); AWS S3 rejects
 an arbitrary `Host`, so a cloud deployment drops the proxy and relies on the
@@ -598,18 +599,8 @@ direct endpoint plus that bucket CORS.
 
 Defaults, clamping and parsing for every variable above live in
 `core-api/src/modules/storage/storage.config.ts`. `S3_PRESIGN_TTL` defaults to
-900 s and is clamped to 60 s ... 604800 s. Treat that file as the source of
-truth, not this section.
-
-#### Renamed env vars
-
-| Canonical (set this) | Deprecated alias (still read, one release) | Removal |
-| --- | --- | --- |
-| `CORS_ALLOWED_ORIGINS` | `S3_CORS_ALLOWED_ORIGINS` | Alias removed in the next release after this consolidation; set the canonical name now |
-| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` (pair only, never mixed) | Alias pair removed in the next release; the vendor names remain only where compose injects them into the RustFS container and the nginx signer |
-
-When both names are set, the canonical one wins and the alias logs a one-time
-deprecation warning.
+172800 s (2 days) and is clamped to 60 s ... 172800 s. Treat that file as the
+source of truth, not this section.
 
 ### Read authorization on `presign/download`
 

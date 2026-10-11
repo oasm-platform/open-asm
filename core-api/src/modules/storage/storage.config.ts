@@ -15,10 +15,10 @@ export interface StorageConfig {
   /** Browser-reachable storage origin used to sign presigned URLs. */
   publicEndpoint: string;
   /**
-   * Same-origin prefix the browser hits for storage, e.g. `/api/storage`.
-   * Empty => absolute mode (URLs point at `publicEndpoint`); non-empty =>
-   * relative mode (dev/docker: presign against `RUSTFS_ENDPOINT` path-style and
-   * prefix the path with this base). Trailing slashes stripped.
+   * Same-origin prefix the browser hits for storage. Unset => `/api/storage`
+   * (relative mode: presign against `RUSTFS_ENDPOINT` path-style and prefix the
+   * path with this base). Explicitly empty => absolute mode (URLs point at
+   * `publicEndpoint`, cloud S3). Trailing slashes stripped.
    */
   urlBase: string;
   region: string;
@@ -33,6 +33,8 @@ export interface StorageConfig {
 }
 
 export const DEFAULT_RUSTFS_ENDPOINT = 'http://localhost:9000';
+/** Same-origin proxy prefix (vite dev proxy + console nginx). Set empty for absolute mode. */
+export const DEFAULT_STORAGE_URL_BASE = '/api/storage';
 export const DEFAULT_S3_REGION = 'us-east-1';
 export const DEFAULT_S3_FORCE_PATH_STYLE = true;
 export const DEFAULT_S3_PRESIGN_TTL_SECONDS = 172800;
@@ -89,44 +91,23 @@ function parsePresignTtl(source: StorageConfigSource): number {
   );
 }
 
-function parseCorsOrigins(source: StorageConfigSource): string[] {
-  const canonical = source.get<string>('CORS_ALLOWED_ORIGINS');
-  const legacy = source.get<string>('S3_CORS_ALLOWED_ORIGINS');
-  const parsed = parseAllowedOrigins(
-    canonical ?? undefined,
-    parseAllowedOrigins(legacy ?? undefined, []),
-  );
-  if (!canonical?.trim() && legacy?.trim()) {
-    logger.warn(
-      'S3_CORS_ALLOWED_ORIGINS is deprecated, use CORS_ALLOWED_ORIGINS',
-    );
-  }
-  return parsed;
-}
-
-/**
- * Resolves credentials as an atomic pair: full S3 pair wins silently, else a
- * full legacy RUSTFS pair wins with one deprecation warning, else empty.
- * Half-set pairs fall through — never mixed.
- */
+/** Static credentials as an atomic pair; a half-set pair yields empty (never mixed). */
 function parseCredentials(source: StorageConfigSource): {
   accessKey: string;
   secretKey: string;
 } {
-  const s3AccessKey = readString(source, 'S3_ACCESS_KEY');
-  const s3SecretKey = readString(source, 'S3_SECRET_KEY');
-  if (s3AccessKey && s3SecretKey) {
-    return { accessKey: s3AccessKey, secretKey: s3SecretKey };
-  }
-  const rustfsAccessKey = readString(source, 'RUSTFS_ACCESS_KEY');
-  const rustfsSecretKey = readString(source, 'RUSTFS_SECRET_KEY');
-  if (rustfsAccessKey && rustfsSecretKey) {
-    logger.warn(
-      'RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY are deprecated, use S3_ACCESS_KEY/S3_SECRET_KEY',
-    );
-    return { accessKey: rustfsAccessKey, secretKey: rustfsSecretKey };
-  }
-  return { accessKey: '', secretKey: '' };
+  const accessKey = readString(source, 'RUSTFS_ACCESS_KEY');
+  const secretKey = readString(source, 'RUSTFS_SECRET_KEY');
+  return accessKey && secretKey
+    ? { accessKey, secretKey }
+    : { accessKey: '', secretKey: '' };
+}
+
+/** Unset => same-origin proxy prefix; explicitly empty => absolute mode. */
+function parseUrlBase(source: StorageConfigSource): string {
+  const raw = source.get<string>('STORAGE_URL_BASE');
+  const base = typeof raw === 'string' ? raw : DEFAULT_STORAGE_URL_BASE;
+  return base.trim().replace(/\/+$/, '');
 }
 
 /**
@@ -143,7 +124,7 @@ export function parseStorageConfig(
       readString(source, 'S3_PUBLIC_ENDPOINT') ||
       readString(source, 'RUSTFS_ENDPOINT') ||
       DEFAULT_RUSTFS_ENDPOINT,
-    urlBase: readString(source, 'STORAGE_URL_BASE').replace(/\/+$/, ''),
+    urlBase: parseUrlBase(source),
     region: readString(source, 'S3_REGION') || DEFAULT_S3_REGION,
     forcePathStyle: parseBoolean(
       source,
@@ -151,7 +132,9 @@ export function parseStorageConfig(
       DEFAULT_S3_FORCE_PATH_STYLE,
     ),
     presignTtlSeconds: parsePresignTtl(source),
-    corsAllowedOrigins: parseCorsOrigins(source),
+    corsAllowedOrigins: parseAllowedOrigins(
+      readString(source, 'CORS_ALLOWED_ORIGINS'),
+    ),
     accessKey,
     secretKey,
     useDefaultCredentials: parseBoolean(

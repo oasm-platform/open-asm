@@ -1360,22 +1360,7 @@ describe('RustFsClient credentials', () => {
     }
   });
 
-  it('should use S3_ACCESS_KEY/S3_SECRET_KEY when both are set', () => {
-    buildRustFsClient({
-      S3_ACCESS_KEY: 'ak',
-      S3_SECRET_KEY: 'sk',
-    });
-
-    expect(mockS3ClientConfigs).toHaveLength(2);
-    for (const config of mockS3ClientConfigs) {
-      expect(config.credentials).toEqual({
-        accessKeyId: 'ak',
-        secretAccessKey: 'sk',
-      });
-    }
-  });
-
-  it('should use RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY when only the legacy pair is set', () => {
+  it('should use RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY when both are set', () => {
     buildRustFsClient({
       RUSTFS_ACCESS_KEY: 'rk',
       RUSTFS_SECRET_KEY: 'rs',
@@ -1390,42 +1375,9 @@ describe('RustFsClient credentials', () => {
     }
   });
 
-  it('should prefer S3_* over RUSTFS_* when both pairs are set', () => {
+  it('should fall back to defaults when the pair is only half set', () => {
     buildRustFsClient({
-      S3_ACCESS_KEY: 'ak',
-      S3_SECRET_KEY: 'sk',
       RUSTFS_ACCESS_KEY: 'rk',
-      RUSTFS_SECRET_KEY: 'rs',
-    });
-
-    expect(mockS3ClientConfigs).toHaveLength(2);
-    for (const config of mockS3ClientConfigs) {
-      expect(config.credentials).toEqual({
-        accessKeyId: 'ak',
-        secretAccessKey: 'sk',
-      });
-    }
-  });
-
-  it('should fall through a half-set S3 pair to the full RUSTFS pair without mixing', () => {
-    buildRustFsClient({
-      S3_ACCESS_KEY: 'ak',
-      RUSTFS_ACCESS_KEY: 'rk',
-      RUSTFS_SECRET_KEY: 'rs',
-    });
-
-    expect(mockS3ClientConfigs).toHaveLength(2);
-    for (const config of mockS3ClientConfigs) {
-      expect(config.credentials).toEqual({
-        accessKeyId: 'rk',
-        secretAccessKey: 'rs',
-      });
-    }
-  });
-
-  it('should fall back to defaults when neither pair is fully set', () => {
-    buildRustFsClient({
-      S3_ACCESS_KEY: 'ak',
     });
 
     expect(mockS3ClientConfigs).toHaveLength(2);
@@ -1441,6 +1393,7 @@ describe('RustFsClient credentials', () => {
     buildRustFsClient({
       RUSTFS_ENDPOINT: 'http://internal:9000',
       S3_PUBLIC_ENDPOINT: 'https://public.example',
+      STORAGE_URL_BASE: '',
     });
 
     expect(mockS3ClientConfigs).toHaveLength(2);
@@ -1449,7 +1402,10 @@ describe('RustFsClient credentials', () => {
   });
 
   it('should fall back to RUSTFS_ENDPOINT for the presign client host', () => {
-    buildRustFsClient({ RUSTFS_ENDPOINT: 'http://internal:9000' });
+    buildRustFsClient({
+      RUSTFS_ENDPOINT: 'http://internal:9000',
+      STORAGE_URL_BASE: '',
+    });
 
     expect(mockS3ClientConfigs).toHaveLength(2);
     expect(mockS3ClientConfigs[1].endpoint).toBe('http://internal:9000');
@@ -1476,6 +1432,7 @@ describe('RustFsClient credentials', () => {
       S3_PUBLIC_ENDPOINT: 'https://cdn.example.com',
       S3_REGION: 'eu-west-1',
       S3_FORCE_PATH_STYLE: 'false',
+      STORAGE_URL_BASE: '',
     });
 
     expect(mockS3ClientConfigs).toHaveLength(2);

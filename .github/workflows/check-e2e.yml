@@ -87,7 +87,7 @@ jobs:
       # The storage e2e suites prove presigned PUT/GET and read authorization
       # against a REAL S3 backend, so RustFS must be up. Same image and default
       # credentials as docker-compose's `rustfs` service; example.env already
-      # points RUSTFS_ENDPOINT/S3_PUBLIC_ENDPOINT at http://localhost:9000.
+      # points RUSTFS_ENDPOINT at http://localhost:9000.
       rustfs:
         image: rustfs/rustfs:latest
         env:

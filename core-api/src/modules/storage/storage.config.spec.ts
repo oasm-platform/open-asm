@@ -3,6 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import {
   DEFAULT_RUSTFS_ENDPOINT,
   DEFAULT_S3_PRESIGN_TTL_SECONDS,
+  DEFAULT_STORAGE_URL_BASE,
   MAX_S3_PRESIGN_TTL_SECONDS,
   MIN_S3_PRESIGN_TTL_SECONDS,
   parseStorageConfig,
@@ -32,7 +33,7 @@ describe('parseStorageConfig', () => {
 
     expect(config).toEqual({
       publicEndpoint: DEFAULT_RUSTFS_ENDPOINT,
-      urlBase: '',
+      urlBase: DEFAULT_STORAGE_URL_BASE,
       region: 'us-east-1',
       forcePathStyle: true,
       presignTtlSeconds: DEFAULT_S3_PRESIGN_TTL_SECONDS,
@@ -44,8 +45,17 @@ describe('parseStorageConfig', () => {
   });
 
   describe('urlBase', () => {
-    it('defaults to empty (absolute mode) when STORAGE_URL_BASE is unset', () => {
-      expect(parseStorageConfig(configFrom({})).urlBase).toBe('');
+    it('defaults to the same-origin proxy prefix when STORAGE_URL_BASE is unset', () => {
+      expect(parseStorageConfig(configFrom({})).urlBase).toBe('/api/storage');
+    });
+
+    it('treats an explicitly empty STORAGE_URL_BASE as absolute mode', () => {
+      expect(
+        parseStorageConfig(configFrom({ STORAGE_URL_BASE: '' })).urlBase,
+      ).toBe('');
+      expect(
+        parseStorageConfig(configFrom({ STORAGE_URL_BASE: '   ' })).urlBase,
+      ).toBe('');
     });
 
     it('keeps a non-empty base verbatim', () => {
@@ -144,36 +154,15 @@ describe('parseStorageConfig', () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it('falls back to the legacy list with exactly one deprecation warning', () => {
-      const config = parseStorageConfig(
-        configFrom({
-          S3_CORS_ALLOWED_ORIGINS: 'http://a, , http://b',
-        }),
-      );
-
-      expect(config.corsAllowedOrigins).toEqual(['http://a', 'http://b']);
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy.mock.calls[0][0]).toMatch(/deprecat/i);
-      expect(warnSpy.mock.calls[0][0]).toBe(
-        'S3_CORS_ALLOWED_ORIGINS is deprecated, use CORS_ALLOWED_ORIGINS',
-      );
+    it('ignores the never-released S3_CORS_ALLOWED_ORIGINS name', () => {
+      expect(
+        parseStorageConfig(
+          configFrom({ S3_CORS_ALLOWED_ORIGINS: 'http://legacy.example.com' }),
+        ).corsAllowedOrigins,
+      ).toEqual([]);
     });
 
-    it('prefers the canonical list when both are set with no legacy warning', () => {
-      const config = parseStorageConfig(
-        configFrom({
-          CORS_ALLOWED_ORIGINS: 'https://canonical.example.com',
-          S3_CORS_ALLOWED_ORIGINS: 'http://legacy.example.com',
-        }),
-      );
-
-      expect(config.corsAllowedOrigins).toEqual([
-        'https://canonical.example.com',
-      ]);
-      expect(warnSpy).not.toHaveBeenCalled();
-    });
-
-    it('defaults to an empty array when both are unset', () => {
+    it('defaults to an empty array when unset', () => {
       expect(
         parseStorageConfig(configFrom({})).corsAllowedOrigins,
       ).toEqual([]);
@@ -182,44 +171,17 @@ describe('parseStorageConfig', () => {
   });
 
   describe('credentials', () => {
-    it('parses access key, secret key and default-credentials flag', () => {
-      const config = parseStorageConfig(
-        configFrom({
-          S3_ACCESS_KEY: 'ak',
-          S3_SECRET_KEY: 'sk',
-          S3_USE_DEFAULT_CREDENTIALS: 'true',
-        }),
-      );
-
-      expect(config.accessKey).toBe('ak');
-      expect(config.secretKey).toBe('sk');
-      expect(config.useDefaultCredentials).toBe(true);
-    });
-
-    it('uses the S3 pair silently when both are set', () => {
-      const config = parseStorageConfig(
-        configFrom({ S3_ACCESS_KEY: 's3ak', S3_SECRET_KEY: 's3sk' }),
-      );
-
-      expect(config.accessKey).toBe('s3ak');
-      expect(config.secretKey).toBe('s3sk');
-      expect(warnSpy).not.toHaveBeenCalled();
-    });
-
-    it('uses the legacy pair with exactly one deprecation warning', () => {
+    it('reads the RUSTFS_* pair without any deprecation warning', () => {
       const config = parseStorageConfig(
         configFrom({ RUSTFS_ACCESS_KEY: 'rk', RUSTFS_SECRET_KEY: 'rs' }),
       );
 
       expect(config.accessKey).toBe('rk');
       expect(config.secretKey).toBe('rs');
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy.mock.calls[0][0]).toBe(
-        'RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY are deprecated, use S3_ACCESS_KEY/S3_SECRET_KEY',
-      );
+      expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it('prefers the S3 pair when both pairs are set', () => {
+    it('ignores the never-released S3_ACCESS_KEY/S3_SECRET_KEY names', () => {
       const config = parseStorageConfig(
         configFrom({
           S3_ACCESS_KEY: 's3ak',
@@ -229,30 +191,20 @@ describe('parseStorageConfig', () => {
         }),
       );
 
-      expect(config.accessKey).toBe('s3ak');
-      expect(config.secretKey).toBe('s3sk');
-      expect(warnSpy).not.toHaveBeenCalled();
-    });
-
-    it('falls through a half-set S3 pair to the full legacy pair without mixing', () => {
-      const config = parseStorageConfig(
-        configFrom({
-          S3_ACCESS_KEY: 's3ak',
-          RUSTFS_ACCESS_KEY: 'rk',
-          RUSTFS_SECRET_KEY: 'rs',
-        }),
-      );
-
       expect(config.accessKey).toBe('rk');
       expect(config.secretKey).toBe('rs');
-      expect(config.accessKey).not.toBe('s3ak');
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy.mock.calls[0][0]).toBe(
-        'RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY are deprecated, use S3_ACCESS_KEY/S3_SECRET_KEY',
-      );
     });
 
-    it('returns empty credentials when neither pair is set', () => {
+    it('never mixes a half-set pair', () => {
+      const config = parseStorageConfig(
+        configFrom({ RUSTFS_ACCESS_KEY: 'rk' }),
+      );
+
+      expect(config.accessKey).toBe('');
+      expect(config.secretKey).toBe('');
+    });
+
+    it('returns empty credentials when the pair is unset', () => {
       const config = parseStorageConfig(configFrom({}));
 
       expect(config.accessKey).toBe('');
