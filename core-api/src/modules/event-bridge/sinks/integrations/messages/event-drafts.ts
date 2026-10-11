@@ -121,7 +121,8 @@ function findingLine(v: DetectedVulnerability): Line {
   if (cves.length > 0) {
     line.push(' — ', { code: cves.slice(0, 2).join(', ') });
   }
-  if (typeof v.cvssScore === 'number') {
+  // Scanners report 0 for unscored findings (info); "CVSS 0.0" is noise.
+  if (typeof v.cvssScore === 'number' && v.cvssScore > 0) {
     line.push(` (CVSS ${v.cvssScore.toFixed(1)})`);
   }
   const location = v.affectedUrl ?? v.host;

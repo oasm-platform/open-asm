@@ -84,6 +84,24 @@ describe('event drafts + render', () => {
     expect(text).not.toContain('<script>');
   });
 
+  it('omits the CVSS score of an unscored finding', () => {
+    const text = render('vulnerability.detected', {
+      ...base,
+      payload: {
+        assetValue: 'scanme.sh',
+        vulnerabilities: [
+          vuln('i1', Severity.INFO, {
+            name: 'HTTP Missing Security Headers',
+            cvssScore: 0,
+            affectedUrl: 'https://scanme.sh',
+          }),
+        ],
+      },
+    });
+    expect(text).toContain('• 🔵 HTTP Missing Security Headers @ https://scanme.sh');
+    expect(text).not.toContain('CVSS');
+  });
+
   it('renders Slack mrkdwn and plain text from the same draft', () => {
     const slack = render('vulnerability.detected', detected, 'slack');
     const plain = render('vulnerability.detected', detected, 'webhook');
