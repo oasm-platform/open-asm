@@ -1,6 +1,7 @@
 import { EventBusGroup } from '@/common/enums/enum';
 import type { RedisService } from '@/services/redis/redis.service';
-import { AuditSinkService } from './audit-sink.service';
+import { AuditSink } from '../sinks/audit/audit.sink';
+import { StreamConsumer } from './stream-consumer';
 
 /**
  * A consumer group lives ON the stream key, so anything that removes the key
@@ -9,10 +10,10 @@ import { AuditSinkService } from './audit-sink.service';
  * recovery stops consuming FOREVER while the API keeps returning 200 and the
  * audit trail silently stops growing.
  */
-describe('StreamConsumerService group recovery', () => {
+describe('StreamConsumer group recovery', () => {
   let xreadgroup: jest.Mock;
   let xgroupCreate: jest.Mock;
-  let service: AuditSinkService;
+  let service: StreamConsumer;
 
   beforeEach(() => {
     xgroupCreate = jest.fn().mockResolvedValue(undefined);
@@ -22,7 +23,7 @@ describe('StreamConsumerService group recovery', () => {
       ),
     );
 
-    service = new AuditSinkService(
+    service = new StreamConsumer(
       {
         xreadgroup,
         xgroupCreate,
@@ -34,7 +35,7 @@ describe('StreamConsumerService group recovery', () => {
           (_key: string, _ttl: number, fn: () => Promise<void>) => fn(),
         ),
       } as never,
-      { createQueryBuilder: jest.fn() } as never,
+      new AuditSink({ createQueryBuilder: jest.fn() } as never),
     );
   });
 

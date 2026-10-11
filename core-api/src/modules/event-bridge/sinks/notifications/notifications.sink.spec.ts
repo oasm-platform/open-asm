@@ -1,12 +1,13 @@
 import { NotificationScope, NotificationType } from '@/common/enums/enum';
 import type { RedisService } from '@/services/redis/redis.service';
 import type { Repository } from 'typeorm';
-import type { Notification } from '../notifications/entities/notification.entity';
-import type { NotificationRecipient } from '../notifications/entities/notification-recipient.entity';
-import type { User } from '../auth/entities/user.entity';
+import type { Notification } from '../../../notifications/entities/notification.entity';
+import type { NotificationRecipient } from '../../../notifications/entities/notification-recipient.entity';
+import type { User } from '../../../auth/entities/user.entity';
 import { EventBusGroup } from '@/common/enums/enum';
 import type { StreamEntry } from '@/services/redis/redis.service';
-import { NotificationsSinkService } from './notifications.sink.service';
+import { StreamConsumer } from '../../consuming/stream-consumer';
+import { NotificationsSink } from './notifications.sink';
 
 /**
  * The notifications lane replaces the BullMQ queue, so what matters here is
@@ -17,9 +18,9 @@ import { NotificationsSinkService } from './notifications.sink.service';
  * Each test drives one `runOnce()` against a mocked Redis + TypeORM, so the
  * assertions are about the call sequence, not about a running Redis.
  *
- * Run: task api:test:one SPEC=src/modules/event-bridge/notifications.sink.service.spec.ts
+ * Run: task api:test:one SPEC=src/modules/event-bridge/sinks/notifications/notifications.sink.spec.ts
  */
-describe('NotificationsSinkService', () => {
+describe('NotificationsSink', () => {
   const WORKSPACE = '11111111-1111-4111-8111-111111111111';
   const EVENT_ID = '22222222-2222-4222-8222-222222222222';
   const MEMBER_1 = 'aaaaaaaa-1111-4111-8111-111111111111';
@@ -34,7 +35,7 @@ describe('NotificationsSinkService', () => {
   let findBy: jest.Mock;
   let publish: jest.Mock;
 
-  let service: NotificationsSinkService;
+  let service: StreamConsumer;
 
   const entry = (type: string, payload: unknown): StreamEntry => ({
     id: '1759564000000-0',
@@ -99,12 +100,15 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
       }),
     };
 
-    service = new NotificationsSinkService(
+    service = new StreamConsumer(
       redis,
       {} as never,
-      notificationRepo as unknown as Repository<Notification>,
-      recipientRepo as unknown as Repository<NotificationRecipient>,
-      userRepo as unknown as Repository<User>,
+      new NotificationsSink(
+        redis,
+        notificationRepo as unknown as Repository<Notification>,
+        recipientRepo as unknown as Repository<NotificationRecipient>,
+        userRepo as unknown as Repository<User>,
+      ),
     );
   });
 
@@ -120,7 +124,6 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
           ports: 2,
           services: 1,
           techs: 0,
-          hasNewAssets: true,
         }),
       ]);
       await service.runOnce();
@@ -143,7 +146,6 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
           ports: 2,
           services: 1,
           techs: 0,
-          hasNewAssets: true,
         }),
       ]);
       await service.runOnce();
@@ -167,7 +169,6 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
           targetValue: 'example.com',
           targetId: 't-1',
           hosts: 3,
-          hasNewAssets: true,
         }),
       ]);
       await service.runOnce();
@@ -184,8 +185,7 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
         entry('workflow.run.completed', {
           targetValue: 'example.com',
           targetId: 't-1',
-          hasNewAssets: true,
-          incompleteDetails: 'step-2 failed',
+          failedSteps: ['step-2'],
         }),
       ]);
       await service.runOnce();
@@ -199,10 +199,47 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
     });
   });
 
+  describe('vulnerability.detected', () => {
+    it('derives the count from the published records', async () => {
+      // The producer publishes the findings, not a summary: counting is the
+      // sink's job.
+      xreadgroup.mockResolvedValue([
+        entry('vulnerability.detected', {
+          assetValue: 'a.example',
+          assetId: 'as-1',
+          targetId: 't-1',
+          vulnerabilities: [
+            { id: 'v-1', name: 'XSS', severity: 'high' },
+            { id: 'v-2', name: 'SQLi', severity: 'critical' },
+          ],
+        }),
+      ]);
+      await service.runOnce();
+
+      expect(notificationSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.NEW_VULNERABILITY_FOUND,
+          metadata: {
+            count: '2',
+            assetValue: 'a.example',
+            targetId: 't-1',
+            assetId: 'as-1',
+          },
+        }),
+      );
+    });
+  });
+
   describe('audience', () => {
     it('resolves recipients from workspace membership, not from the producer', async () => {
       xreadgroup.mockResolvedValue([
-        entry('vulnerability.detected', { count: 2, assetValue: 'a.example' }),
+        entry('vulnerability.detected', {
+          assetValue: 'a.example',
+          vulnerabilities: [
+            { id: 'v-1', name: 'XSS', severity: 'high' },
+            { id: 'v-2', name: 'SQLi', severity: 'critical' },
+          ],
+        }),
       ]);
       await service.runOnce();
 
@@ -248,7 +285,6 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
       setIfAbsent.mockResolvedValue(false);
       xreadgroup.mockResolvedValue([
         entry('workflow.run.completed', {
-          hasNewAssets: true,
           targetValue: 'example.com',
         }),
       ]);
@@ -264,9 +300,8 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
       // partial run emits are not collapsed into one.
       xreadgroup.mockResolvedValue([
         entry('workflow.run.completed', {
-          hasNewAssets: true,
           targetValue: 'example.com',
-          incompleteDetails: 'step-2 failed',
+          failedSteps: ['step-2'],
         }),
       ]);
       await service.runOnce();

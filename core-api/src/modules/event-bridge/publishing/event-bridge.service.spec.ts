@@ -5,7 +5,7 @@ import {
   EVENT_BUS_STREAM,
 } from '@/common/constants/app.constants';
 import { ValidationError } from 'cloudevents';
-import { EVENT_CATALOG } from '../connectors/event';
+import { EVENT_CATALOG } from '../contracts/event-catalog';
 import { EventBridgeService } from './event-bridge.service';
 
 /**

@@ -5,7 +5,8 @@ import {
 } from '@/common/constants/app.constants';
 import { AuditOutcome, EventBusGroup } from '@/common/enums/enum';
 import type { RedisService, StreamEntry } from '@/services/redis/redis.service';
-import { AuditSinkService } from './audit-sink.service';
+import { StreamConsumer } from '../../consuming/stream-consumer';
+import { AuditSink } from './audit.sink';
 
 /**
  * The sink is the load-bearing half of "audit is a view of the stream": once
@@ -18,9 +19,9 @@ import { AuditSinkService } from './audit-sink.service';
  * assertions are deterministic: "given this batch of entries, exactly these
  * Redis calls happen".
  *
- * Run: task api:test:one SPEC=src/modules/event-bridge/audit-sink.service.spec.ts
+ * Run: task api:test:one SPEC=src/modules/event-bridge/sinks/audit/audit.sink.spec.ts
  */
-describe('AuditSinkService', () => {
+describe('AuditSink', () => {
   const WORKSPACE = '11111111-1111-4111-8111-111111111111';
   const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 
@@ -34,7 +35,7 @@ describe('AuditSinkService', () => {
   let execute: jest.Mock;
   let withLock: jest.Mock;
 
-  let service: AuditSinkService;
+  let service: StreamConsumer;
 
   /** A well-formed `persist: true` stream entry, as XREADGROUP returns it. */
   const entry = (
@@ -95,10 +96,10 @@ describe('AuditSinkService', () => {
       }),
     };
 
-    service = new AuditSinkService(
+    service = new StreamConsumer(
       redis,
       { withLock } as never,
-      repo as never,
+      new AuditSink(repo as never),
     );
   });
 

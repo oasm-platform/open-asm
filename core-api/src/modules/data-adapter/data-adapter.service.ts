@@ -18,8 +18,12 @@ import { IpObservation } from '../assets/entities/ip-observation.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { TlsCertificate } from '../assets/entities/tls-certificate.entity';
 import { IssuesService } from '../issues/issues.service';
-import { EVENT_CATALOG } from '../connectors/event';
-import { EventBridgeService } from '../event-bridge/event-bridge.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
+import type {
+  DetectedVulnerability,
+  VulnerabilityDetectedPayload,
+} from '../event-bridge/contracts/event-payloads';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -234,6 +238,31 @@ const HTTP_RESPONSE_FACET_KEYS = [
   'resolvers',
   'chain_status_codes',
 ] as const;
+
+/**
+ * A stored vulnerability row as the `vulnerability.detected` contract carries
+ * it. Long free text (description, solution, extractor output) stays out: it
+ * lives in the database, and copying it into every stream entry would let one
+ * noisy scan crowd the bounded stream.
+ */
+function toDetectedVulnerability(vuln: Vulnerability): DetectedVulnerability {
+  return {
+    id: vuln.id,
+    name: vuln.name,
+    severity: vuln.severity,
+    synopsis: vuln.synopsis ?? undefined,
+    cvssScore: vuln.cvssScore ?? undefined,
+    cvssMetric: vuln.cvssMetric ?? undefined,
+    epssScore: vuln.epssScore ?? undefined,
+    cveId: vuln.cveId ?? undefined,
+    cweId: vuln.cweId ?? undefined,
+    tags: vuln.tags ?? undefined,
+    host: vuln.host ?? undefined,
+    ipAddress: vuln.ipAddress ?? undefined,
+    ports: vuln.ports ?? undefined,
+    affectedUrl: vuln.affectedUrl ?? undefined,
+  };
+}
 
 @Injectable()
 export class DataAdapterService {
@@ -946,10 +975,10 @@ export class DataAdapterService {
           `Publishing vulnerability.detected for ${vulsForAlert.length} vulns in workspace ${workspaceId}`,
         );
 
-        // Report the FINDING, not a notification decision: who is told about
-        // it (and in what wording) belongs to the `notifications` consumer. The
-        // count and the asset identity travel as payload because the consumer
-        // cannot re-derive them from the workspace alone.
+        // Report the FINDINGS, not a notification decision: who is told about
+        // them, how they are counted and ranked, and in what wording all
+        // belong to the consumers. The asset identity travels as payload
+        // because a consumer cannot re-derive it from the workspace alone.
         //
         // One event for the whole batch, not one per vulnerability: a scan that
         // finds 200 issues must not push 200 notifications.
@@ -958,12 +987,12 @@ export class DataAdapterService {
           outcome: 'success',
           resourceType: 'vulnerability',
           payload: {
-            count: vulsForAlert.length,
             jobId: job.id,
-            assetValue: job.asset.value,
-            assetId: job.asset.id,
             targetId: job.asset.target.id,
-          },
+            assetId: job.asset.id,
+            assetValue: job.asset.value,
+            vulnerabilities: vulsForAlert.map(toDetectedVulnerability),
+          } satisfies VulnerabilityDetectedPayload,
         });
       } else {
         this.logger.log(

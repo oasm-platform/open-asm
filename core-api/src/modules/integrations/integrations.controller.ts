@@ -20,8 +20,8 @@ import { ApiTags } from '@nestjs/swagger';
 
 import { Public } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
-import { EVENT_CATALOG } from '../connectors/event';
-import { PublishEvent } from '../event-bridge/publish-event.decorator';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import {
   AwsSsoCompleteDto,

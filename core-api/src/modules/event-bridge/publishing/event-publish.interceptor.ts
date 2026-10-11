@@ -9,10 +9,10 @@ import type {
 import { Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { catchError, Observable, tap, throwError } from 'rxjs';
-import { resolveEventName } from '../connectors/event';
+import { resolveEventName } from '../contracts/event-catalog';
 import { EventBridgeService } from './event-bridge.service';
-import type { EventEnvelopeData } from './event-envelope';
-import { isPersisted } from './event-policy';
+import type { EventEnvelopeData } from '../contracts/event-envelope';
+import { isPersisted } from '../routing/event-policy';
 import { PUBLISH_EVENT_KEY } from './publish-event.decorator';
 import { redactSecrets } from './redact-secrets';
 import type { PublishEventConfig } from './publish-event.decorator';
