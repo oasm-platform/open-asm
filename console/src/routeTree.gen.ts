@@ -24,7 +24,6 @@ import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/use
 import { Route as AuthedAgentsIndexRouteImport } from './routes/_authed/agents/index'
 import { Route as AuthedAgentsCreateRouteImport } from './routes/_authed/agents/create'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
-import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
 import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
 import { Route as AuthedGroupsIdRouteImport } from './routes/_authed/groups/$id'
 import { Route as AuthedGroupsCreateRouteImport } from './routes/_authed/groups/create'
@@ -50,6 +49,7 @@ import { Route as AuthedAgentsIdEditRouteImport } from './routes/_authed/agents/
 import { Route as AuthedAgentsConversationsIndexRouteImport } from './routes/_authed/agents/conversations/index'
 import { Route as AuthedAgentsConversationsConversationIdRouteImport } from './routes/_authed/agents/conversations/$conversationId'
 import { Route as AuthedAgentsProvidersConnectRouteImport } from './routes/_authed/agents/providers/connect'
+import { Route as AuthedAssetsServicesIdRouteImport } from './routes/_authed/assets/services/$id'
 import { Route as AuthedJobsRunsIdRouteImport } from './routes/_authed/jobs/runs/$id'
 import { Route as AuthedProvidersIdIndexRouteImport } from './routes/_authed/providers/$id/index'
 import { Route as AuthedProvidersIdEditRouteImport } from './routes/_authed/providers/$id/edit'
@@ -130,11 +130,6 @@ const AuthedAgentsCreateRoute = AuthedAgentsCreateRouteImport.update({
 const AuthedAssetsIndexRoute = AuthedAssetsIndexRouteImport.update({
   id: '/assets/',
   path: '/assets/',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedAssetsIdRoute = AuthedAssetsIdRouteImport.update({
-  id: '/assets/$id',
-  path: '/assets/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedGroupsIndexRoute = AuthedGroupsIndexRouteImport.update({
@@ -270,6 +265,11 @@ const AuthedAgentsProvidersConnectRoute =
     path: '/agents/providers/connect',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAssetsServicesIdRoute = AuthedAssetsServicesIdRouteImport.update({
+  id: '/assets/services/$id',
+  path: '/assets/services/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedJobsRunsIdRoute = AuthedJobsRunsIdRouteImport.update({
   id: '/jobs/runs/$id',
   path: '/jobs/runs/$id',
@@ -321,7 +321,6 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
-  '/assets/$id': typeof AuthedAssetsIdRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
   '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -347,6 +346,7 @@ export interface FileRoutesByFullPath {
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/agents/conversations/$conversationId': typeof AuthedAgentsConversationsConversationIdRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
+  '/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
@@ -369,7 +369,6 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
-  '/assets/$id': typeof AuthedAssetsIdRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
   '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -395,6 +394,7 @@ export interface FileRoutesByTo {
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/agents/conversations/$conversationId': typeof AuthedAgentsConversationsConversationIdRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
+  '/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
@@ -420,7 +420,6 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/agents/create': typeof AuthedAgentsCreateRoute
-  '/_authed/assets/$id': typeof AuthedAssetsIdRoute
   '/_authed/groups/$id': typeof AuthedGroupsIdRoute
   '/_authed/groups/create': typeof AuthedGroupsCreateRoute
   '/_authed/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -446,6 +445,7 @@ export interface FileRoutesById {
   '/_authed/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/_authed/agents/conversations/$conversationId': typeof AuthedAgentsConversationsConversationIdRoute
   '/_authed/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
+  '/_authed/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/_authed/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/_authed/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/_authed/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
@@ -471,7 +471,6 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/admin/users'
     | '/agents/create'
-    | '/assets/$id'
     | '/groups/$id'
     | '/groups/create'
     | '/internal-networks/$id'
@@ -497,6 +496,7 @@ export interface FileRouteTypes {
     | '/agents/$id/edit'
     | '/agents/conversations/$conversationId'
     | '/agents/providers/connect'
+    | '/assets/services/$id'
     | '/jobs/runs/$id'
     | '/providers/$id/edit'
     | '/targets/$id/$tab'
@@ -519,7 +519,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/admin/users'
     | '/agents/create'
-    | '/assets/$id'
     | '/groups/$id'
     | '/groups/create'
     | '/internal-networks/$id'
@@ -545,6 +544,7 @@ export interface FileRouteTypes {
     | '/agents/$id/edit'
     | '/agents/conversations/$conversationId'
     | '/agents/providers/connect'
+    | '/assets/services/$id'
     | '/jobs/runs/$id'
     | '/providers/$id/edit'
     | '/targets/$id/$tab'
@@ -569,7 +569,6 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/_authed/admin/users'
     | '/_authed/agents/create'
-    | '/_authed/assets/$id'
     | '/_authed/groups/$id'
     | '/_authed/groups/create'
     | '/_authed/internal-networks/$id'
@@ -595,6 +594,7 @@ export interface FileRouteTypes {
     | '/_authed/agents/$id/edit'
     | '/_authed/agents/conversations/$conversationId'
     | '/_authed/agents/providers/connect'
+    | '/_authed/assets/services/$id'
     | '/_authed/jobs/runs/$id'
     | '/_authed/providers/$id/edit'
     | '/_authed/targets/$id/$tab'
@@ -720,13 +720,6 @@ declare module '@tanstack/react-router' {
       path: '/assets'
       fullPath: '/assets/'
       preLoaderRoute: typeof AuthedAssetsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/assets/$id': {
-      id: '/_authed/assets/$id'
-      path: '/assets/$id'
-      fullPath: '/assets/$id'
-      preLoaderRoute: typeof AuthedAssetsIdRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/groups/': {
@@ -904,6 +897,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAgentsProvidersConnectRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/assets/services/$id': {
+      id: '/_authed/assets/services/$id'
+      path: '/assets/services/$id'
+      fullPath: '/assets/services/$id'
+      preLoaderRoute: typeof AuthedAssetsServicesIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/jobs/runs/$id': {
       id: '/_authed/jobs/runs/$id'
       path: '/jobs/runs/$id'
@@ -962,7 +962,6 @@ interface AuthedRouteChildren {
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedAgentsCreateRoute: typeof AuthedAgentsCreateRoute
-  AuthedAssetsIdRoute: typeof AuthedAssetsIdRoute
   AuthedGroupsIdRoute: typeof AuthedGroupsIdRoute
   AuthedGroupsCreateRoute: typeof AuthedGroupsCreateRoute
   AuthedInternalNetworksIdRoute: typeof AuthedInternalNetworksIdRoute
@@ -988,6 +987,7 @@ interface AuthedRouteChildren {
   AuthedAgentsIdEditRoute: typeof AuthedAgentsIdEditRoute
   AuthedAgentsConversationsConversationIdRoute: typeof AuthedAgentsConversationsConversationIdRoute
   AuthedAgentsProvidersConnectRoute: typeof AuthedAgentsProvidersConnectRoute
+  AuthedAssetsServicesIdRoute: typeof AuthedAssetsServicesIdRoute
   AuthedJobsRunsIdRoute: typeof AuthedJobsRunsIdRoute
   AuthedProvidersIdEditRoute: typeof AuthedProvidersIdEditRoute
   AuthedTargetsIdTabRoute: typeof AuthedTargetsIdTabRoute
@@ -1003,7 +1003,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedAgentsCreateRoute: AuthedAgentsCreateRoute,
-  AuthedAssetsIdRoute: AuthedAssetsIdRoute,
   AuthedGroupsIdRoute: AuthedGroupsIdRoute,
   AuthedGroupsCreateRoute: AuthedGroupsCreateRoute,
   AuthedInternalNetworksIdRoute: AuthedInternalNetworksIdRoute,
@@ -1030,6 +1029,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAgentsConversationsConversationIdRoute:
     AuthedAgentsConversationsConversationIdRoute,
   AuthedAgentsProvidersConnectRoute: AuthedAgentsProvidersConnectRoute,
+  AuthedAssetsServicesIdRoute: AuthedAssetsServicesIdRoute,
   AuthedJobsRunsIdRoute: AuthedJobsRunsIdRoute,
   AuthedProvidersIdEditRoute: AuthedProvidersIdEditRoute,
   AuthedTargetsIdTabRoute: AuthedTargetsIdTabRoute,
