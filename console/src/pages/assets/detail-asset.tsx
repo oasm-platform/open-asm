@@ -28,6 +28,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from '@tanstack/react-router';
 import ScreenshotCell from './components/screenshot-cell';
 import HTTPXStatusCode from './components/status-code';
+import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options';
 import { TechnologyTooltip } from './components/technology-tooltip';
 
 dayjs.extend(relativeTime);
@@ -64,9 +65,10 @@ function CopyButton({ text }: { text: string }) {
 export default function DetailAsset() {
   const { id } = useParams({ strict: false });
 
+  const screenshotOptions = useScreenshotQueryOptions();
   const { data, isLoading, error } = useAssetsControllerGetAssetById(
     id ?? '',
-    {},
+    { query: { ...screenshotOptions } },
   );
 
   const [faviconError, setFaviconError] = useState(false);

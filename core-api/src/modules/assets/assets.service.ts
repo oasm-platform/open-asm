@@ -1,4 +1,3 @@
-import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import * as fs from 'fs';
@@ -26,6 +25,7 @@ import {
 import { Target } from '../targets/entities/target.entity';
 
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
+import { StorageService } from '../storage/storage.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   GetAssetsQueryDto,
@@ -118,6 +118,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
     private workspaceEncryption: WorkspaceEncryptionService,
     private geoIpService: GeoIpService,
+    private storageService: StorageService,
     private dataSource: DataSource,
   ) {
     this.loadPrompts();
@@ -334,6 +335,28 @@ export class AssetsService {
     const techDetails = await this.enrichTechStrings(
       [...techByResponse.values()].flat(),
     );
+    // Screenshot signing (storage refactor): one batch call per page, order-
+    // preserving; malformed rows resolve to null, falsy rows stay null/''.
+    const rawPaths = items.map((item) => item.screenshotPath);
+    const signable = rawPaths
+      .filter((p): p is string => !!p)
+      .map((p) => {
+        const slashIndex = p.indexOf('/');
+        return {
+          bucket: slashIndex > 0 ? p.slice(0, slashIndex) : '',
+          path: p,
+        };
+      });
+    const signedUrls = signable.length
+      ? ((await this.storageService.signStoragePaths(signable)) ?? [])
+      : [];
+    let urlCursor = 0;
+    const urlByRaw = new Map<string, string | null>();
+    for (const raw of rawPaths) {
+      if (raw) {
+        urlByRaw.set(raw, signedUrls[urlCursor++] ?? null);
+      }
+    }
 
     return items.map((item) => {
       const asset = new GetAssetsResponseDto();
@@ -344,9 +367,10 @@ export class AssetsService {
       asset.dnsRecords = item.asset?.dnsRecords;
       asset.isEnabled = item.asset?.isEnabled;
       asset.port = item.port;
-      asset.screenshotPath = item.screenshotPath
-        ? `${STORAGE_BASE_PATH}/${item.screenshotPath}`
-        : null;
+      asset.screenshotPath =
+        (item.screenshotPath &&
+          (urlByRaw.get(item.screenshotPath) ?? null)) ||
+        (item.screenshotPath === '' ? '' : null);
       asset.ipAddresses = item.asset?.id
         ? (ipsByAsset.get(item.asset.id) ?? [])
         : [];

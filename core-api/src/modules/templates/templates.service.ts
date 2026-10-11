@@ -10,6 +10,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { PresignUploadResponseDto } from '../storage/dto/presign-storage.dto';
 import { StorageService } from '../storage/storage.service';
 import { ToolsService } from '../tools/tools.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -66,32 +67,38 @@ export class TemplatesService {
   }
 
   /**
-   * Uploads file content for a specific template
+   * Creates a presigned PUT URL so the client uploads the template YAML
+   * straight to storage, and pins the deterministic object path on the entity
    * @param templateId The ID of the template to upload file for
-   * @param fileContent The content of the file as a string
-   * @returns Promise containing the upload result
-   * @throws BadRequestException if the template is not found
+   * @param workspaceId The ID of the workspace containing the template
+   * @param userContext User context containing user information
+   * @returns Promise<PresignUploadResponseDto> The presigned upload target
+   * @throws NotFoundException if the workspace or template is not found
+   * @throws BadRequestException if the template doesn't belong to the workspace
    */
-  public async uploadFile(templateId: string, fileContent: string) {
-    const template = await this.templateRepo.findOneBy({ id: templateId });
+  public async presignTemplate(
+    templateId: string,
+    workspaceId: string,
+    userContext: UserContextPayload,
+  ): Promise<PresignUploadResponseDto> {
+    await this.getTemplateById(templateId, workspaceId, userContext);
 
-    if (!template) {
-      throw new BadRequestException('Invalid upload request');
-    }
+    const bucket = 'nuclei-templates';
+    const key = `${templateId}.yaml`;
+    const contentType = 'text/yaml';
 
-    const fileBuffer = Buffer.from(fileContent, 'utf-8');
+    const { url, expiresIn } = await this.storageService.getPresignedUploadUrl({
+      bucket,
+      key,
+      contentType,
+    });
 
-    const result = await this.storageService.uploadFile(
-      `${templateId}.yaml`,
-      fileBuffer,
-      'nuclei-templates',
-    );
+    // Always overwrite: a path left over from an older key would diverge from
+    // the object load/save actually reads.
+    const path = `${bucket}/${key}`;
+    await this.templateRepo.update({ id: templateId }, { path });
 
-    if (!template.path) {
-      await this.templateRepo.update({ id: templateId }, { path: result.path });
-    }
-
-    return result;
+    return { uploadUrl: url, key, path, contentType, expiresIn };
   }
 
   /**

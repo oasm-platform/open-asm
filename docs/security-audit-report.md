@@ -109,7 +109,7 @@ Branch: **`security-patch-2026-10-03`** (from `main`).
 | CT-13 | ✅ | `workspaceId` removed from `AddToolToWorkspaceDto` / `InstallToolDto`; taken from `@WorkspaceId()` |
 | SQ-01 | ✅ | Central `@Matches(/^[A-Za-z_][A-Za-z0-9_]*$/)` on `GetManyBaseQueryParams.sortBy` — one change, closes all 8 sinks |
 | AE-01 | ✅ | `@WorkerTokenAuth()` added |
-| AE-02 | ⏸️ | **Reverted at owner request.** Storage read is back to the original `@Public()` + deny-list (`privateBuckets = ['reports','job-results']`), so `screenshot` and `default` are publicly readable again. See the note below. |
+| AE-02 | ✅ | Closed: `GET /api/storage/:bucket/:path` is `@Optional()` with shared `authorizeRead` (`storage.controller.ts:317`); only `system` is anonymous, `screenshot`/`nuclei-templates` require membership of ANY owning workspace, `default`/unknown → 404. `GET /api/storage/presign/download` enforces the same helper before signing. Proof: `core-api/test/storage-read-authz.e2e-spec.ts` + `core-api/src/modules/storage/storage.controller.spec.ts`. |
 | AE-03 | ✅ | `@UseGuards(McpGuard)` on `POST /mcp/message` |
 | AE-04 | ✅ | `secret_token` derived via HMAC from the bot token, sent on `setWebhook`, verified with `timingSafeEqual` — no schema or `.env` change |
 | AE-06 | ✅ | `getProviderById(id, userContext)` enforces ownership; internal callers use a private raw loader |
@@ -123,11 +123,52 @@ Branch: **`security-patch-2026-10-03`** (from `main`).
 - **AE-05** hardcoded `DEFAULT_ENCRYPTION_KEY` fallback
 - **AE-07** `POST /api/init-admin` check-then-act race — the correct fix is a partial unique index, i.e. a schema change requiring explicit approval
 
-### AE-02 — deferred, and the finding stands
+### AE-02 — fixed: storage reads are authorized, and the finding is closed
 
-The storage hardening was implemented, caused a 403 on `GET /api/storage/screenshot/<key>.png`, and was **reverted at the owner's request** pending a separate plan. The vulnerability described in this report is therefore **still present**: `GET /api/storage/:bucket/:path` is `@Public()` and only blocks `reports` and `job-results`, so `screenshot` and `default` are readable without any credential.
+The earlier hardening was reverted once because it 403'd screenshots; it has
+since been re-applied with per-bucket authorization and is **no longer
+world-readable**. `GET /api/storage/:bucket/:path` is `@Optional()`
+(`storage.controller.ts:234`), not `@Public()`: the global `AuthGuard` still
+runs and populates `request.user`, while unauthenticated requests pass through
+so the login page can render the logo from the `system` bucket before a
+session exists. Both it and `GET /api/storage/presign/download` share one
+helper, `authorizeRead` (`storage.controller.ts:317`), over the classes from
+`StorageService.getBucketAccess` (`storage.service.ts:58`): `public`
+(`system`) anonymous; `authenticated` (`cached-static`) any session, anonymous
+401; `tenant` (`screenshot`, `nuclei-templates`) anonymous 401, ownership via
+`resolveObjectWorkspaceIds` (`storage.service.ts:166`) with membership of ANY
+owning workspace required else 403, unknown keys 404; `private` (`reports`,
+`job-results`) 403; `blocked` (`default`, unknown) 404. `presign/download`
+runs the same helper after `assertBucketAllowed`/`assertBucketNotPrivate`, so
+a foreign screenshot or template is refused with 403 before signing.
 
-Why it matters, restated for whoever picks this up: a screenshot object key is `md5(asset.value)` (`data-adapter.service.ts:641`) — a flat key with no workspace prefix. Anyone who knows or can guess a target hostname can compute its md5 and read that tenant's screenshot of it, unauthenticated. For an ASM product those images routinely depict internal admin panels, dashboards and login pages.
+Deviation from the recommendation below is deliberate: the audit allow-listed
+`system`, `nuclei-templates` and `cached-static` as public, but the console
+sits behind auth, so no anonymous consumer needs the latter two —
+`cached-static` is session-gated and `nuclei-templates` is tenant-gated with
+no anonymous path lost. Authorized buckets serve `private, no-cache` with
+`ETag`/`If-None-Match` 304 (`isNotModified`, `storage.controller.ts:362`);
+only `system` keeps `public, max-age=1209600` (14 days,
+`CACHE_STATIC_RESOURCE`).
+
+Residual risk that remains by design: screenshot keys are
+`md5(asset.value)` (`data-adapter.service.ts:641`), a flat key with no
+workspace prefix, and md5 is not collision resistant — a crafted value could
+alias another tenant's key. The mitigation is that authorization resolves ALL
+owning workspaces (`resolveObjectWorkspaceIds` returns every distinct owner,
+never one arbitrary row) and requires membership of ANY of them, so finding
+or guessing a key still requires a session in at least one owning workspace.
+
+Accepted cost: `@Optional()` still performs a `getSession` lookup
+(`auth.guard.ts:96`) even on anonymous `system` reads, before `authorizeRead`
+short-circuits. Proof: `core-api/test/storage-read-authz.e2e-spec.ts`
+(route-level 401/403/404/200 + collision + 304) and the `authorizeRead` unit
+matrix in `core-api/src/modules/storage/storage.controller.spec.ts`.
+
+The attempted implementation below is kept for history; the reverted
+`@Public()` + deny-list state it describes no longer applies:
+
+Why it mattered, historically: a screenshot object key is `md5(asset.value)` (`data-adapter.service.ts:641`) — a flat key with no workspace prefix. Under the reverted `@Public()` state, anyone who knew or could guess a target hostname could compute its md5 and read that tenant's screenshot of it, unauthenticated. For an ASM product those images routinely depict internal admin panels, dashboards and login pages. This no longer applies — tenant reads now require membership of ANY owning workspace (see the closure note above).
 
 The implementation that was tried and backed out, for reference:
 1. Remove `@Public()`, add `@Optional()` — the global `AuthGuard` then still runs and populates `request.user`, while unauthenticated requests pass through (required because the login page renders the logo from the `system` bucket before a session exists).
@@ -634,7 +675,11 @@ Both layers are therefore absent: `AuthGuard` returns early on `@Public()` (`aut
 - **Impact:** result-integrity attack — an attacker submits fabricated scan results for any job id, poisoning the tenant's findings. Combined with arbitrary `dto.jobId`, results can be attached to a job belonging to another tenant.
 - **Fix:** add `@WorkerTokenAuth()` to the handler, matching every sibling.
 
-### AE-02 — High — Unauthenticated read of tenant screenshots
+### AE-02 — High — Unauthenticated read of tenant screenshots (FIXED)
+
+> Status: fixed by per-bucket `authorizeRead` (`storage.controller.ts:317`);
+> see the closure note in the status table above. The code and impact below
+> describe the original vulnerable state, kept for the record.
 
 `storage.controller.ts:257-307`:
 
@@ -656,13 +701,15 @@ private readonly buckets = ['system','screenshot','nuclei-templates','job-result
 private readonly privateBuckets = ['reports', 'job-results'];
 ```
 
-Only `reports` and `job-results` are private. **`screenshot` is not**, and `data-adapter.service.ts:643` uploads tenant scan screenshots into it.
-
-- **Precondition:** **unauthenticated**.
-- **Impact:** any anonymous party who knows or guesses an object path can read a tenant's target screenshots — which for an ASM platform routinely depict internal admin panels, login pages and dashboards of the customer's internal estate. This is a direct confidentiality breach of scanned customers' infrastructure.
-- **Fix:** invert the default. Treat every bucket as private and explicitly allow-list the genuinely public ones (`system`, `nuclei-templates`, `cached-static`). Do not rely on a deny-list that a new bucket silently escapes.
-
-Note the sibling route `GET :bucket/:path/download` (`:197-255`) is better designed — it validates a signed token and takes path/bucket from the **token**, not from URL parameters.
+> Original vulnerable state (historical): only `reports` and `job-results`
+> were private. **`screenshot` was not**, and `data-adapter.service.ts:643`
+> uploads tenant scan screenshots into it.
+>
+> - **Original precondition:** **unauthenticated**.
+> - **Original impact:** any anonymous party who knew or guessed an object path could read a tenant's target screenshots — which for an ASM platform routinely depict internal admin panels, login pages and dashboards of the customer's internal estate. This was a direct confidentiality breach of scanned customers' infrastructure.
+> - **Fix applied (differs from the allow-list below):** `getBucketAccess` (`storage.service.ts:58`) classifies `system` public, `cached-static` authenticated, `screenshot`/`nuclei-templates` tenant, `reports`/`job-results` private (403), `default`/unknown blocked (404); unknown buckets default to blocked so a new bucket cannot silently escape. `nuclei-templates` and `cached-static` were tightened beyond the recommended public allow-list because the console sits behind auth.
+>
+> The sibling note below about `GET :bucket/:path/download` (`:197-255`) is stale: that signed-token route no longer exists. Its successor is `GET /api/storage/presign/download` (`storage.controller.ts:198`), which takes bucket/path as query parameters but enforces the same `authorizeRead` bucket classes (`storage.controller.ts:317`) before signing — a foreign screenshot or template is refused with 403, so the bypass the old note worried about is closed.
 
 ### AE-03 — Medium — `POST /api/mcp/message` has no guard
 

@@ -3,6 +3,7 @@ import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
+import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options';
 import { assetColumns } from './asset-column';
 import { useNavigate } from '@tanstack/react-router';
 
@@ -16,11 +17,14 @@ export default function AssetTab() {
     queryOptions,
   } = useAsset();
 
+  const screenshotOptions = useScreenshotQueryOptions();
+
   const { data, isLoading, refetch } = useAssetsControllerGetAssetsInWorkspace(
     queryParams,
     {
       query: {
         ...queryOptions.query,
+        ...screenshotOptions,
         queryKey: ['assets', ...queryOptions.query.queryKey],
       },
     },

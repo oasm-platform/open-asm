@@ -79,6 +79,25 @@ export default defineConfig(({ mode }) => {
       allowedHosts: true,
       cors: true,
       proxy: {
+        // The strip + changeOrigin are required because SigV4 signs both the path and the `host` header.
+        '/api/storage/presign': {
+          target: env.VITE_API_URL,
+          changeOrigin: true,
+          logLevel: 'silent',
+        },
+        '/api/storage/logo': {
+          target: env.VITE_API_URL,
+          changeOrigin: true,
+          logLevel: 'silent',
+        },
+        '/api/storage': {
+          // Must be reachable at Host == the RUSTFS_ENDPOINT the API signed against
+          // (SigV4 signs `host`), hence changeOrigin. Default matches dev RUSTFS_ENDPOINT.
+          target: env.VITE_STORAGE_URL || 'http://localhost:9000',
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/api\/storage/, ''),
+          logLevel: 'silent',
+        },
         '/api': {
           target: env.VITE_API_URL,
           changeOrigin: true,

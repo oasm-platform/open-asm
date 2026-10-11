@@ -1,7 +1,4 @@
-import {
-  GITHUB_REPO,
-  STORAGE_BASE_PATH,
-} from '@/common/constants/app.constants';
+import { GITHUB_REPO } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { ReleaseVersion } from '@/common/interfaces/app.interface';
 import { RedisService } from '@/services/redis/redis.service';
@@ -45,12 +42,22 @@ export class SystemConfigsService implements OnModuleInit {
   async getConfig(): Promise<SystemConfigResponseDto> {
     const config = await this.findOrCreateConfig();
 
-    return {
-      name: config.name,
-      logoPath: config.logoPath
-        ? `${STORAGE_BASE_PATH}/${config.logoPath}`
-        : null,
-    };
+    if (!config.logoPath) {
+      return { name: config.name, logoPath: null };
+    }
+
+    const url = await this.storageService.signStoragePath(config.logoPath);
+    return { name: config.name, logoPath: url };
+  }
+
+  /**
+   * Raw stored logo path (`system/<file>`) for internal consumers that need
+   * the real bucket/key (e.g. deleting the previous logo object). Never
+   * returns the client URL that `getConfig()` emits.
+   */
+  async getRawLogoPath(): Promise<string | null> {
+    const config = await this.findOrCreateConfig();
+    return config.logoPath ?? null;
   }
 
   /**

@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import { FindOperator, type DataSource, type Repository } from 'typeorm';
 import { ToolCategory, WorkerType } from '@/common/enums/enum';
@@ -250,23 +249,10 @@ describe('ToolSyncService.mapConnectorCapabilityToCategory', () => {
 });
 
 describe('ToolSyncService connector logo synchronization', () => {
-  let warnSpy: jest.SpyInstance;
-  let loggerSpies: jest.SpyInstance[];
-
   beforeEach(() => {
-    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    loggerSpies = [
-      warnSpy,
-      jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined),
-      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined),
-    ];
     // Re-arm the module-level fs spy (never restoreAllMocks — that would also
     // restore readFileSpy and make the service read the real manifest).
     readFileSpy.mockReset();
-  });
-
-  afterEach(() => {
-    for (const spy of loggerSpies) spy.mockRestore();
   });
 
   it('S1: connector without logo gets NULL logoUrl and no upload', async () => {
@@ -341,7 +327,7 @@ describe('ToolSyncService connector logo synchronization', () => {
     expect(h.rowByName('gau')!.logoUrl).toBeNull();
   });
 
-  it('S5: storage delete failure is swallowed, row still cleared, warn logged', async () => {
+  it('S5: storage delete failure is swallowed, row still cleared', async () => {
     // Arrange
     const h = createHarness();
     h.setManifest([connector({ slug: 'nessus', logo: PNG_B64 })]);
@@ -352,6 +338,6 @@ describe('ToolSyncService connector logo synchronization', () => {
     // Act / Assert (must not reject)
     await expect(runConnectorSync(h.service)).resolves.toBeDefined();
     expect(h.rowByName('nessus')!.logoUrl).toBeNull();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to delete connector logo for nessus'));
+    expect(h.deleteFile).toHaveBeenCalledWith('connectors/nessus.png', 'system');
   });
 });

@@ -21,6 +21,11 @@ services:
     depends_on:
       core-api:
         condition: service_healthy
+      # nginx resolves `upstream object_storage { server rustfs:9000; }` when it
+      # loads its config, so rustfs must exist before the console starts —
+      # otherwise nginx aborts with "host not found in upstream".
+      rustfs:
+        condition: service_started
 
   core-api:
     container_name: oasm-api

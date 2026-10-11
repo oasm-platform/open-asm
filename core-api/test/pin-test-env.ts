@@ -52,6 +52,15 @@ export function pinTestEnv(): string {
    */
   process.env.AUTH_RATE_LIMIT_DISABLED = 'true';
 
+  /**
+   * Absolute-mode storage for e2e. An unset `STORAGE_URL_BASE` defaults to
+   * `/api/storage` for the console's same-origin proxy, but the storage suites dereference the API's URL from the Node test process
+   * (`new URL(...)` + `fetch`) with no proxy to resolve it — a relative URL is
+   * an `Invalid URL`. ConfigModule never overrides a key already in
+   * `process.env` and `setupFiles` runs before the module graph loads.
+   */
+  process.env.STORAGE_URL_BASE = '';
+
   return requested;
 }
 

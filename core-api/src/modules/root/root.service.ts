@@ -5,6 +5,7 @@ import { RedisService } from '@/services/redis/redis.service';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
+import { StorageService } from '../storage/storage.service';
 import { UsersService } from '../users/users.service';
 import {
   CreateFirstAdminDto,
@@ -17,6 +18,7 @@ export class RootService {
   constructor(
     private readonly usersService: UsersService,
     private readonly systemConfigsService: SystemConfigsService,
+    private readonly storageService: StorageService,
     private configService: ConfigService,
     private redisService: RedisService,
   ) {}
@@ -77,6 +79,7 @@ export class RootService {
       name: systemConfig.name,
       logoPath: systemConfig.logoPath,
       currentVersion: currentVersion || null,
+      storagePresignTtlSeconds: this.storageService.getPresignTtlSeconds(),
     };
   }
 

@@ -19,6 +19,7 @@ import {
   Tag,
 } from 'lucide-react';
 import AssetValue from './asset-value';
+import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options';
 import AddTagDialog from './add-tag-dialog';
 import BadgeList from './badge-list';
 import ScreenshotCell from './screenshot-cell';
@@ -27,7 +28,10 @@ import { TechnologyTooltip } from './technology-tooltip';
 import ViewCode from './view-code';
 
 export default function AssetDetail({ id }: { id: string }) {
-  const { data, refetch } = useAssetsControllerGetAssetById(id, {});
+  const screenshotOptions = useScreenshotQueryOptions();
+  const { data, refetch } = useAssetsControllerGetAssetById(id, {
+    query: { ...screenshotOptions },
+  });
 
   if (!data) {
     return (
