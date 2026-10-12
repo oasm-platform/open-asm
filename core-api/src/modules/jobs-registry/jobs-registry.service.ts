@@ -715,6 +715,15 @@ export class JobsRegistryService {
       );
     }
 
+    // An agent run that matched nothing must not leave an empty history behind.
+    if (
+      jobsToInsert.length === 0 &&
+      jobRunType === JobRunType.AGENT &&
+      !existingJobHistory
+    ) {
+      await this.jobHistoryRepo.delete(jobHistory.id);
+    }
+
     // Step 4: save all jobs
     if (jobsToInsert.length > 0) {
       await jobRepo.save(jobsToInsert);

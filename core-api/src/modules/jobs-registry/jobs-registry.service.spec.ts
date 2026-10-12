@@ -2223,6 +2223,22 @@ describe('JobsRegistryService', () => {
       expect((result[0] as any).pickJobAt).toBeInstanceOf(Date);
     });
 
+    it('agent run with zero matching assets deletes its empty history', async () => {
+      mockAssetQB.getMany.mockResolvedValue([]);
+
+      const result = await service.createNewJob({
+        tool: subdomainsTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: undefined as any,
+        jobRunType: JobRunType.AGENT,
+        assignWorkerId: 'worker-1',
+      });
+
+      expect(result).toEqual([]);
+      expect(mockJobHistoryRepository.delete).toHaveBeenCalledWith('jh-1');
+    });
+
     it('maxJobs refusal keeps a caller-supplied job history', async () => {
       mockAssetQB.getMany.mockResolvedValue([
         { id: 'a1', value: 'a.example.com', isPrimary: true },
@@ -2358,6 +2374,58 @@ describe('JobsRegistryService', () => {
       const msg = JSON.parse(raw);
       expect(msg).toMatchObject({ jobId: 'j1', status: JobStatus.COMPLETED });
       expect(msg.excerpt.length).toBe(8 * 1024);
+    });
+  });
+
+  describe('failAgentJobs', () => {
+    const buildQb = (raw: unknown[]) => {
+      const qb: any = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ raw }),
+      };
+      (service as any).repo = { createQueryBuilder: jest.fn(() => qb) };
+      return qb;
+    };
+
+    it('returns 0 without touching the DB for an empty id list', async () => {
+      const qb = buildQb([]);
+      expect(await service.failAgentJobs({ jobIds: [] }, 'x')).toBe(0);
+      expect(qb.execute).not.toHaveBeenCalled();
+      expect((service as any).repo.createQueryBuilder).toHaveBeenCalledTimes(1); // builder is created but never executed
+    });
+
+    it('fails in-progress agent jobs and publishes FAILED with the reason', async () => {
+      const qb = buildQb([{ id: 'j1', jobHistoryId: 'jh-1' }]);
+      mockRedis.publish.mockClear();
+
+      const count = await service.failAgentJobs(
+        { jobIds: ['j1'] },
+        'worker lost',
+      );
+
+      expect(count).toBe(1);
+      expect(qb.set).toHaveBeenCalledWith({ status: JobStatus.FAILED });
+      expect(qb.where).toHaveBeenCalledWith('status = :status', {
+        status: JobStatus.IN_PROGRESS,
+      });
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('"jobRunType" = :agent'),
+        { agent: JobRunType.AGENT },
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith('id IN (:...jobIds)', {
+        jobIds: ['j1'],
+      });
+      const [channel, raw] = mockRedis.publish.mock.calls[0];
+      expect(channel).toBe('agent-job:done:jh-1');
+      expect(JSON.parse(raw)).toMatchObject({
+        jobId: 'j1',
+        status: JobStatus.FAILED,
+        error: 'worker lost',
+      });
     });
   });
 
