@@ -111,9 +111,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     conversationId: string,
   ): Promise<string | null> {
     try {
-      return await this.redisService.get(
-        `agent:conv:worker:${conversationId}`,
-      );
+      return await this.redisService.get(`agent:conv:worker:${conversationId}`);
     } catch (err) {
       this.logger.warn(
         `[RedisCache] Failed to read cached worker for ${conversationId}: ${err}`,

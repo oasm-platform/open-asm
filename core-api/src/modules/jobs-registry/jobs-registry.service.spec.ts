@@ -112,10 +112,14 @@ describe('JobsRegistryService', () => {
   const mockConnectorRegistryService = {
     getConnector: jest.fn(),
     getAllConnectors: jest.fn().mockReturnValue([]),
-    getResourceDefaults: jest.fn(() => ({ cpu: '500m', memory: '512Mi', timeoutSeconds: 600 })),
+    getResourceDefaults: jest.fn(() => ({
+      cpu: '500m',
+      memory: '512Mi',
+      timeoutSeconds: 600,
+    })),
   };
 
-    const mockToolConfigProfilesService = {
+  const mockToolConfigProfilesService = {
     assertProfileOwnership: jest.fn(),
     resolveConfigForDispatch: jest.fn(),
     resolveConfigForJob: jest.fn(),
@@ -646,8 +650,8 @@ describe('JobsRegistryService', () => {
 
       await service.cancelJobHistory(mockWorkspaceId, mockHistoryId);
 
-      const [, , patch]: [unknown, unknown, Record<string, unknown>] = qr
-        .update.mock.calls[0] as [unknown, unknown, Record<string, unknown>];
+      const [, , patch]: [unknown, unknown, Record<string, unknown>] = qr.update
+        .mock.calls[0] as [unknown, unknown, Record<string, unknown>];
       expect(qr.update).toHaveBeenCalledWith(
         JobHistory,
         { id: mockHistoryId },
@@ -899,7 +903,7 @@ describe('JobsRegistryService', () => {
 
       await service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId);
 
-      const selectCalls = (mockJobRepository.select).mock.calls;
+      const selectCalls = mockJobRepository.select.mock.calls;
       const selectArgs = selectCalls[selectCalls.length - 1][0] as string[];
       const statusExpr = selectArgs.find((s) => s.includes('CASE'))!;
       // Regression: a tool whose jobs finished before the cancel used to keep a
@@ -1113,7 +1117,6 @@ describe('JobsRegistryService', () => {
     });
   });
 
-
   describe('getJobHistoryWorkflow', () => {
     const mockWorkspaceId = 'workspace-uuid';
     const mockHistoryId = 'history-uuid';
@@ -1195,9 +1198,7 @@ describe('JobsRegistryService', () => {
 
     beforeEach(() => {
       jest.clearAllMocks();
-      mockJobRepository.getManyAndCount = jest
-        .fn()
-        .mockResolvedValue([[], 0]);
+      mockJobRepository.getManyAndCount = jest.fn().mockResolvedValue([[], 0]);
     });
 
     it('should scope jobs to the workspace using param binding', async () => {
@@ -1264,7 +1265,10 @@ describe('JobsRegistryService', () => {
         'job.createdAt',
         'ASC',
       );
-      expect(mockJobRepository.addOrderBy).toHaveBeenCalledWith('job.id', 'ASC');
+      expect(mockJobRepository.addOrderBy).toHaveBeenCalledWith(
+        'job.id',
+        'ASC',
+      );
     });
 
     it('should pass through whitelisted sortBy values', async () => {
@@ -1311,8 +1315,10 @@ describe('JobsRegistryService', () => {
         'tool.logoUrl',
       ]);
       // The full tool entity must no longer be selected eagerly
-      const fullToolSelects = mockJobRepository.leftJoinAndSelect.mock.calls
-        .filter(([relation]) => relation === 'job.tool');
+      const fullToolSelects =
+        mockJobRepository.leftJoinAndSelect.mock.calls.filter(
+          ([relation]) => relation === 'job.tool',
+        );
       expect(fullToolSelects).toHaveLength(0);
     });
 
@@ -1334,8 +1340,10 @@ describe('JobsRegistryService', () => {
         'asset.targetId',
       ]);
       // The full asset entity must no longer be selected eagerly
-      const fullAssetSelects = mockJobRepository.leftJoinAndSelect.mock.calls
-        .filter(([relation]) => relation === 'job.asset');
+      const fullAssetSelects =
+        mockJobRepository.leftJoinAndSelect.mock.calls.filter(
+          ([relation]) => relation === 'job.asset',
+        );
       expect(fullAssetSelects).toHaveLength(0);
       // The target join must remain: it backs the tenant workspaceId filter
       expect(mockJobRepository.leftJoin).toHaveBeenCalledWith(
@@ -1682,10 +1690,8 @@ describe('JobsRegistryService', () => {
         jobStatus: JobStatus.FAILED,
       } as any);
 
-      const [havingSql, havingParams] = filtered.paged.qb.having.mock.calls[0] as [
-        string,
-        { jobStatus: string },
-      ];
+      const [havingSql, havingParams] = filtered.paged.qb.having.mock
+        .calls[0] as [string, { jobStatus: string }];
       expect(havingSql).toContain('FILTER');
       expect(havingParams).toEqual({ jobStatus: JobStatus.FAILED });
 
@@ -2012,7 +2018,9 @@ describe('JobsRegistryService', () => {
       mockDataSource.getRepository.mockImplementation((entity: any) => {
         const name = entity?.name ?? entity;
         if (name === 'AssetService') {
-          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB) };
+          return {
+            createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB),
+          };
         }
         if (name === 'Asset') {
           return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetQB) };
@@ -2122,8 +2130,12 @@ describe('JobsRegistryService', () => {
       expect(existsPredicate()).toBeDefined();
 
       jest.clearAllMocks();
-      mockJobHistoryRepository.create = jest.fn().mockReturnValue({ id: 'jh-1' });
-      mockJobHistoryRepository.save = jest.fn().mockResolvedValue({ id: 'jh-1' });
+      mockJobHistoryRepository.create = jest
+        .fn()
+        .mockReturnValue({ id: 'jh-1' });
+      mockJobHistoryRepository.save = jest
+        .fn()
+        .mockResolvedValue({ id: 'jh-1' });
       mockConnectorRegistryService.getConnector.mockReturnValue(null);
       mockAssetServiceQB = {
         innerJoinAndSelect: jest.fn().mockReturnThis(),
@@ -2136,7 +2148,9 @@ describe('JobsRegistryService', () => {
       mockDataSource.getRepository.mockImplementation((entity: any) => {
         const name = entity?.name ?? entity;
         if (name === 'AssetService') {
-          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB) };
+          return {
+            createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB),
+          };
         }
         return mockJobRepo;
       });
@@ -2240,9 +2254,7 @@ describe('JobsRegistryService', () => {
       );
       // ...but the worker receives the stable slug.
       expect(result.tool).toBe('nikto');
-      expect(result.image).toBe(
-        'ghcr.io/oasm-platform/connector-nikto:2.6.1',
-      );
+      expect(result.image).toBe('ghcr.io/oasm-platform/connector-nikto:2.6.1');
     });
   });
 
@@ -2252,7 +2264,10 @@ describe('JobsRegistryService', () => {
         {
           id: 'job-1',
           category: 'vulnerability',
-          asset: { value: 'https://example.com', target: { workspaceId: 'ws-1' } },
+          asset: {
+            value: 'https://example.com',
+            target: { workspaceId: 'ws-1' },
+          },
           tool: { id: 'nikto', name: 'Nikto - Web Server Scanner' },
           config: null,
           configProfileId: undefined,
@@ -2520,5 +2535,4 @@ describe('JobsRegistryService', () => {
       await expect(service.getNextJob('worker-uuid')).resolves.toBeNull();
     });
   });
-
 });

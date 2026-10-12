@@ -189,9 +189,7 @@ export class AgentsService {
     }
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
-    const apiKey = dek
-      ? encryptWithDEK(dto.apiKey, dek)
-      : encrypt(dto.apiKey);
+    const apiKey = dek ? encryptWithDEK(dto.apiKey, dek) : encrypt(dto.apiKey);
 
     const config = this.llmConfigRepository.create({
       workspaceId,
@@ -256,9 +254,7 @@ export class AgentsService {
         (p) => p.id === config.provider,
       );
       const apiKey = config.apiKey ? decryptWithDEK(config.apiKey, dek) : '';
-      const apiKeyMasked = config.apiKey
-        ? this.maskApiKey(apiKey)
-        : '****';
+      const apiKeyMasked = config.apiKey ? this.maskApiKey(apiKey) : '****';
       return {
         providerId: config.provider,
         providerName: providerMeta?.name ?? config.provider,

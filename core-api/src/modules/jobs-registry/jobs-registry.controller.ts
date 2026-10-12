@@ -64,9 +64,7 @@ function normalizeSeverity(value: unknown): Severity {
 export class JobsRegistryController {
   private readonly logger = new Logger(JobsRegistryController.name);
 
-  constructor(
-    private readonly jobsRegistryService: JobsRegistryService,
-  ) {}
+  constructor(private readonly jobsRegistryService: JobsRegistryService) {}
 
   @WorkspaceAccess('job.read')
   @Doc({
@@ -626,5 +624,4 @@ export class JobsRegistryController {
     );
     return { success: !!result.jobId };
   }
-
 }

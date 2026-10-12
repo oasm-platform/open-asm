@@ -82,10 +82,19 @@ describe('JobsRegistryController', () => {
         controllers: [JobsRegistryController],
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
-          { provide: ConnectorRegistryService, useValue: mockConnectorRegistry },
-          { provide: ToolConfigProfilesService, useValue: mockToolConfigProfilesService },
+          {
+            provide: ConnectorRegistryService,
+            useValue: mockConnectorRegistry,
+          },
+          {
+            provide: ToolConfigProfilesService,
+            useValue: mockToolConfigProfilesService,
+          },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
-          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
+          {
+            provide: WorkersService,
+            useValue: { validateWorkerToken: jest.fn() },
+          },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
         ],
       }).compile();
@@ -113,7 +122,6 @@ describe('JobsRegistryController', () => {
       expect(mockJobsRegistryService.toGrpcJob).toHaveBeenCalledWith(job);
       expect(result.tool).toBe('nikto');
     });
-
   });
 
   // ── url_discovery: REST + gRPC delegation ───────────────────────────
@@ -137,14 +145,20 @@ describe('JobsRegistryController', () => {
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
           {
             provide: ConnectorRegistryService,
-            useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
+            useValue: {
+              getConnector: jest.fn(),
+              getResourceDefaults: jest.fn(),
+            },
           },
           {
             provide: ToolConfigProfilesService,
             useValue: { resolveConfigForJob: jest.fn() },
           },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
-          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
+          {
+            provide: WorkersService,
+            useValue: { validateWorkerToken: jest.fn() },
+          },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
         ],
       }).compile();
@@ -164,9 +178,9 @@ describe('JobsRegistryController', () => {
         dto,
       );
 
-      expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
-        1,
-      );
+      expect(
+        mockJobsRegistryService.updateResultByCategory,
+      ).toHaveBeenCalledTimes(1);
       const [workerId, passedDto, category] =
         mockJobsRegistryService.updateResultByCategory.mock.calls[0];
       expect(workerId).toBe('worker-uuid');
@@ -189,9 +203,9 @@ describe('JobsRegistryController', () => {
         urls,
       });
 
-      expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
-        1,
-      );
+      expect(
+        mockJobsRegistryService.updateResultByCategory,
+      ).toHaveBeenCalledTimes(1);
       const [, passedDto, category] =
         mockJobsRegistryService.updateResultByCategory.mock.calls[0];
       expect(passedDto.jobId).toBe('job-uuid');
@@ -215,7 +229,11 @@ describe('JobsRegistryController', () => {
     });
 
     it('S3 regression: updatePortsResult still delegates with PORTS_SCANNER', async () => {
-      const dto = { jobId: 'job-uuid', error: false, payload: [80, 443] } as any;
+      const dto = {
+        jobId: 'job-uuid',
+        error: false,
+        payload: [80, 443],
+      } as any;
 
       await controller.updatePortsResult({ workerId: 'worker-uuid' }, dto);
 
@@ -246,14 +264,20 @@ describe('JobsRegistryController', () => {
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
           {
             provide: ConnectorRegistryService,
-            useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
+            useValue: {
+              getConnector: jest.fn(),
+              getResourceDefaults: jest.fn(),
+            },
           },
           {
             provide: ToolConfigProfilesService,
             useValue: { resolveConfigForJob: jest.fn() },
           },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
-          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
+          {
+            provide: WorkersService,
+            useValue: { validateWorkerToken: jest.fn() },
+          },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
         ],
       }).compile();

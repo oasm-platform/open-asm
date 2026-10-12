@@ -1,11 +1,19 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
 import { WorkerScope } from '@/common/enums/enum';
 import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
 
 const worker = (id: string, workspaceId: string | null, scope: WorkerScope) =>
-  ({ id, workspaceId, scope, workspace: workspaceId ? { id: workspaceId } : null }) as any;
+  ({
+    id,
+    workspaceId,
+    scope,
+    workspace: workspaceId ? { id: workspaceId } : null,
+  }) as any;
 
 describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
-  const workersService = { enableAgentMode: jest.fn().mockResolvedValue(undefined) };
+  const workersService = {
+    enableAgentMode: jest.fn().mockResolvedValue(undefined),
+  };
   const qb = {
     update: jest.fn().mockReturnThis(),
     set: jest.fn().mockReturnThis(),
@@ -44,14 +52,18 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     connect(worker('w-other', 'ws-2', WorkerScope.WORKSPACE));
     conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
 
-    await expect(service.resolveConversationWorker('c1', 'ws-1')).resolves.toBeNull();
+    await expect(
+      service.resolveConversationWorker('c1', 'ws-1'),
+    ).resolves.toBeNull();
   });
 
   it('never resolves a cloud worker and never enables agent mode for it', async () => {
     connect(worker('w-cloud', null, WorkerScope.CLOUD));
     conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
 
-    await expect(service.resolveConversationWorker('c1', 'ws-1')).resolves.toBeNull();
+    await expect(
+      service.resolveConversationWorker('c1', 'ws-1'),
+    ).resolves.toBeNull();
     expect(workersService.enableAgentMode).not.toHaveBeenCalled();
   });
 
@@ -59,17 +71,28 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
     conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
 
-    await expect(service.resolveConversationWorker('c1', 'ws-1')).resolves.toBe('w-own');
-    expect(redis.setex).toHaveBeenCalledWith('agent:conv:worker:c1', expect.any(Number), 'w-own');
+    await expect(service.resolveConversationWorker('c1', 'ws-1')).resolves.toBe(
+      'w-own',
+    );
+    expect(redis.setex).toHaveBeenCalledWith(
+      'agent:conv:worker:c1',
+      expect.any(Number),
+      'w-own',
+    );
   });
 
   it('clears a pre-existing cloud pin and uses a workspace worker', async () => {
     connect(worker('w-cloud', null, WorkerScope.CLOUD));
     connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
     redis.get.mockResolvedValue('w-cloud');
-    conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: 'w-cloud' });
+    conversationRepo.findOne.mockResolvedValue({
+      id: 'c1',
+      workerId: 'w-cloud',
+    });
 
-    await expect(service.resolveConversationWorker('c1', 'ws-1')).resolves.toBe('w-own');
+    await expect(service.resolveConversationWorker('c1', 'ws-1')).resolves.toBe(
+      'w-own',
+    );
     expect(redis.del).toHaveBeenCalledWith('agent:conv:worker:c1');
     expect(qb.execute).toHaveBeenCalled(); // DB pin rewritten
   });
@@ -77,8 +100,16 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
   it('pushConnectorJob emits a CONNECTOR_JOB event carrying the job', () => {
     const seen = connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
 
-    expect(service.pushConnectorJob('w-own', 'call-1', { id: 'job-1' })).toBe(true);
-    expect(seen.at(-1)).toMatchObject({ type: 3, sessionId: 'call-1', job: { id: 'job-1' } });
-    expect(service.pushConnectorJob('w-gone', 'call-1', { id: 'job-1' })).toBe(false);
+    expect(service.pushConnectorJob('w-own', 'call-1', { id: 'job-1' })).toBe(
+      true,
+    );
+    expect(seen.at(-1)).toMatchObject({
+      type: 3,
+      sessionId: 'call-1',
+      job: { id: 'job-1' },
+    });
+    expect(service.pushConnectorJob('w-gone', 'call-1', { id: 'job-1' })).toBe(
+      false,
+    );
   });
 });

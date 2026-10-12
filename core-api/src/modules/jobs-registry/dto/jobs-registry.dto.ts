@@ -293,5 +293,3 @@ export class ScreenshotResultDto extends BaseResultDto {
   @Expose()
   payload?: Record<string, unknown>;
 }
-
-

@@ -29,11 +29,7 @@ import {
   type ApprovalSettings,
   type PlanRunMode,
 } from './agents.approvals';
-import {
-  AgentApprovalMode,
-  AgentMode,
-  WorkerScope,
-} from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode, WorkerScope } from '@/common/enums/enum';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -421,13 +417,23 @@ export class AgentTool {
           const { url: rawUrl } = params;
           try {
             const parsedUrl = new URL(rawUrl);
-            if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-              return { error: 'Only http and https protocols are allowed', url: rawUrl };
+            if (
+              parsedUrl.protocol !== 'http:' &&
+              parsedUrl.protocol !== 'https:'
+            ) {
+              return {
+                error: 'Only http and https protocols are allowed',
+                url: rawUrl,
+              };
             }
             const addresses = await dns.resolve4(parsedUrl.hostname);
             for (const ip of addresses) {
               if (isPrivateIp(ip)) {
-                return { error: 'Request blocked: target address is not publicly accessible', url: rawUrl };
+                return {
+                  error:
+                    'Request blocked: target address is not publicly accessible',
+                  url: rawUrl,
+                };
               }
             }
             const response = await fetch(rawUrl, {
@@ -859,7 +865,6 @@ export class AgentTool {
             }
           }
 
-
           // Clean each step
           for (const s of stepsArray) {
             if (typeof s === 'string' && s.trim()) {
@@ -923,7 +928,11 @@ export class AgentTool {
             const decision = await this.approvals.requestPlanApproval(
               normalizedSteps,
               options?.toolCallId ?? '',
-              { ...plan.approval, workspaceId: plan.workspaceId, conversationId },
+              {
+                ...plan.approval,
+                workspaceId: plan.workspaceId,
+                conversationId,
+              },
               emitter,
               options?.abortSignal,
             );
@@ -1365,7 +1374,8 @@ export class AgentTool {
       const slug = entry.slug;
       const key = `run_connector_${slug.replace(/[^a-z0-9_]/g, '_')}`;
       const capabilities = (entry.capabilities ?? []).join(', ');
-      const shortDescription = entry.shortDescription ?? entry.description ?? '';
+      const shortDescription =
+        entry.shortDescription ?? entry.description ?? '';
       const inputSchema = z.object({
         targetIds: z.array(z.string().uuid()).optional(),
         assetIds: z.array(z.string().uuid()).optional(),

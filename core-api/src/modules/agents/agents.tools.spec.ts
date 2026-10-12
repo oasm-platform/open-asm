@@ -105,9 +105,11 @@ describe('AgentTool external MCP approvals', () => {
     const input = { target: 'example.com' };
     const options = { toolCallId: 'call-1' };
 
-    await expect(wrapped.partner_scan.execute(input, options)).resolves.toEqual({
-      ok: true,
-    });
+    await expect(wrapped.partner_scan.execute(input, options)).resolves.toEqual(
+      {
+        ok: true,
+      },
+    );
     expect(authorize).toHaveBeenCalledWith(
       'partner_scan {"target":"example.com"}',
       'call-1',
@@ -165,7 +167,10 @@ describe('approval matching', () => {
   const approval = { userId: 'user-1', mode: AgentApprovalMode.MANUAL };
 
   type Wrapped = {
-    execute: (params: unknown, options: { toolCallId: string }) => Promise<unknown>;
+    execute: (
+      params: unknown,
+      options: { toolCallId: string },
+    ) => Promise<unknown>;
   };
   const wrap = (authorize: jest.Mock, metadata?: Record<string, unknown>) =>
     (
@@ -203,21 +208,24 @@ describe('approval matching', () => {
     [{ readOnlyHint: true, openWorldHint: true }, false],
     [{ destructiveHint: true }, false],
     [undefined, false],
-  ])('treats MCP annotations %j as read-only: %s', async (annotations, readOnly) => {
-    const authorize = jest.fn().mockResolvedValue({ allowed: true });
-    await wrap(authorize, annotations && { annotations }).execute(
-      {},
-      { toolCallId: 'c1' },
-    );
-    expect(authorize).toHaveBeenCalledWith(
-      expect.any(String),
-      'c1',
-      expect.anything(),
-      undefined,
-      expect.objectContaining({ readOnly }),
-      undefined,
-    );
-  });
+  ])(
+    'treats MCP annotations %j as read-only: %s',
+    async (annotations, readOnly) => {
+      const authorize = jest.fn().mockResolvedValue({ allowed: true });
+      await wrap(authorize, annotations && { annotations }).execute(
+        {},
+        { toolCallId: 'c1' },
+      );
+      expect(authorize).toHaveBeenCalledWith(
+        expect.any(String),
+        'c1',
+        expect.anything(),
+        undefined,
+        expect.objectContaining({ readOnly }),
+        undefined,
+      );
+    },
+  );
 });
 
 describe('AgentTool connector tools', () => {
@@ -231,7 +239,9 @@ describe('AgentTool connector tools', () => {
   };
   const targetUuid = '00000000-0000-4000-8000-000000000001';
   const profileUuid = '00000000-0000-4000-8000-000000000002';
-  type Runnable = { execute: (input: unknown, options?: unknown) => Promise<unknown> };
+  type Runnable = {
+    execute: (input: unknown, options?: unknown) => Promise<unknown>;
+  };
 
   const withDefaults = () => ({
     connectorRegistry: {
@@ -241,7 +251,10 @@ describe('AgentTool connector tools', () => {
   });
 
   const createAgentTool = () =>
-    Object.assign(Object.create(AgentTool.prototype), withDefaults()) as AgentTool;
+    Object.assign(
+      Object.create(AgentTool.prototype),
+      withDefaults(),
+    ) as AgentTool;
 
   const runnable = (agentTool: AgentTool): Runnable =>
     (
@@ -252,9 +265,19 @@ describe('AgentTool connector tools', () => {
 
   it('exposes an agent connector in AGENT mode and hides it in ASK mode', () => {
     const agentTool = createAgentTool();
-    const agentTools = agentTool.getTools('w1', AgentMode.AGENT, undefined, 'c1') as Record<string, unknown>;
+    const agentTools = agentTool.getTools(
+      'w1',
+      AgentMode.AGENT,
+      undefined,
+      'c1',
+    ) as Record<string, unknown>;
     expect(agentTools).toHaveProperty('run_connector_nmap');
-    const askTools = agentTool.getTools('w1', AgentMode.ASK, undefined, 'c1') as Record<string, unknown>;
+    const askTools = agentTool.getTools(
+      'w1',
+      AgentMode.ASK,
+      undefined,
+      'c1',
+    ) as Record<string, unknown>;
     expect(askTools).not.toHaveProperty('run_connector_nmap');
   });
 
@@ -281,7 +304,9 @@ describe('AgentTool connector tools', () => {
   });
 
   it('offers no connector tools without a conversation', () => {
-    expect(Object.keys(createAgentTool().getConnectorTools('ws-1', ''))).toEqual([]);
+    expect(
+      Object.keys(createAgentTool().getConnectorTools('ws-1', '')),
+    ).toEqual([]);
   });
 
   it('returns an error when neither targetIds nor assetIds are given', async () => {

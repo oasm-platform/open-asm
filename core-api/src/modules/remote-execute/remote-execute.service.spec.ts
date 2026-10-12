@@ -73,7 +73,11 @@ describe('RemoteExecuteService', () => {
         workerId: 'worker-1',
       });
 
-      const result = service.runCommand(testCommand, testSessionId, testWorkspaceId);
+      const result = service.runCommand(
+        testCommand,
+        testSessionId,
+        testWorkspaceId,
+      );
 
       expect(result).toEqual({
         id: 'cmd-1',
@@ -369,8 +373,18 @@ describe('RemoteExecuteService', () => {
       await new Promise((r) => setTimeout(r, 10));
       const cb = getCallback();
 
-      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_STDOUT', 'output line 1\n');
-      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_STDOUT', 'output line 2\n');
+      fireMessage(
+        cb,
+        channel,
+        'REMOTE_EXECUTE_RESULT_STDOUT',
+        'output line 1\n',
+      );
+      fireMessage(
+        cb,
+        channel,
+        'REMOTE_EXECUTE_RESULT_STDOUT',
+        'output line 2\n',
+      );
       fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_EXIT', '', 0);
 
       const result = await resultPromise;
@@ -649,12 +663,7 @@ describe('RemoteExecuteService', () => {
         'wrong',
         0,
       );
-      fireMessage(
-        cb,
-        channel,
-        'REMOTE_EXECUTE_RESULT_STDOUT',
-        'correct\n',
-      );
+      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_STDOUT', 'correct\n');
       fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_EXIT', '', 0);
 
       const result = await resultPromise;
@@ -781,13 +790,7 @@ describe('RemoteExecuteService', () => {
       await new Promise((r) => setTimeout(r, 10));
       const cb = getCallback();
 
-      fireMessage(
-        cb,
-        channel,
-        'REMOTE_EXECUTE_RESULT_ERROR',
-        'exec failed',
-        1,
-      );
+      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_ERROR', 'exec failed', 1);
 
       await resultPromise;
 

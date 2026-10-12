@@ -116,10 +116,10 @@ const orderJob = (job: WorkflowStepDefinition): WorkflowJob => ({
   run: job.run,
   // Authored `needs` may be a single string (legacy array form); the
   // definition is always stored canonical.
-  ...(normalizeNeeds(job.needs).length ? { needs: normalizeNeeds(job.needs) } : {}),
-  ...(job.allowFailure !== undefined
-    ? { allowFailure: job.allowFailure }
+  ...(normalizeNeeds(job.needs).length
+    ? { needs: normalizeNeeds(job.needs) }
     : {}),
+  ...(job.allowFailure !== undefined ? { allowFailure: job.allowFailure } : {}),
   ...(job.config ? { config: job.config } : {}),
   ...(job.configProfileId ? { configProfileId: job.configProfileId } : {}),
 });
@@ -166,7 +166,9 @@ function packStructValue(value: unknown): Record<string, unknown> {
         return { listValue: { values: value.map(packStructValue) } };
       }
       return {
-        structValue: { fields: packStructFields(value as Record<string, unknown>) },
+        structValue: {
+          fields: packStructFields(value as Record<string, unknown>),
+        },
       };
     default:
       // undefined / function / symbol — not JSON-representable; omit at field level
@@ -175,7 +177,9 @@ function packStructValue(value: unknown): Record<string, unknown> {
 }
 
 /** Packs a plain record into a `google.protobuf.Struct` `fields` map. */
-function packStructFields(record: Record<string, unknown>): Record<string, Record<string, unknown>> {
+function packStructFields(
+  record: Record<string, unknown>,
+): Record<string, Record<string, unknown>> {
   const fields: Record<string, Record<string, unknown>> = {};
   for (const [key, val] of Object.entries(record)) {
     if (val !== undefined) fields[key] = packStructValue(val);
@@ -240,12 +244,14 @@ export class JobsRegistryService {
     if (connectorEntry?.image) {
       let config: Record<string, unknown> | undefined;
       try {
-        config =
-          await this.toolConfigProfilesService.resolveConfigForJob(
-            job.workspaceId!,
-            job.tool!.id,
-            { config: job.config ?? undefined, configProfileId: job.configProfileId },
-          );
+        config = await this.toolConfigProfilesService.resolveConfigForJob(
+          job.workspaceId!,
+          job.tool!.id,
+          {
+            config: job.config ?? undefined,
+            configProfileId: job.configProfileId,
+          },
+        );
       } catch {
         // Never log decrypted payload — generic message only
         this.logger.warn('profile decrypt failed');
@@ -547,8 +553,7 @@ export class JobsRegistryService {
           }
         }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(
           `[config-profile] ${tool.name}: ${message} (profileId=${configProfileId ?? 'none'}, workspace=${workspaceId})`,
         );
@@ -652,7 +657,7 @@ export class JobsRegistryService {
                 port: assetService.port.toString(),
               }),
           configProfileId: isConnector ? configProfileId : undefined,
-          config: isConnector ? mergedConfig ?? config ?? null : null,
+          config: isConnector ? (mergedConfig ?? config ?? null) : null,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
@@ -692,7 +697,7 @@ export class JobsRegistryService {
                 value: asset.value,
               }),
           configProfileId: isConnector ? configProfileId : undefined,
-          config: isConnector ? mergedConfig ?? config ?? null : null,
+          config: isConnector ? (mergedConfig ?? config ?? null) : null,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
@@ -1552,8 +1557,7 @@ export class JobsRegistryService {
 
     // The window counts the filtered groups, so an empty page means no rows
     // matched at all rather than a missing count.
-    const total =
-      rawResults.length > 0 ? parseInt(rawResults[0].total, 10) : 0;
+    const total = rawResults.length > 0 ? parseInt(rawResults[0].total, 10) : 0;
 
     // Transform raw results to match the response DTO structure
     const transformedData = rawResults.map((raw) => ({
@@ -1671,13 +1675,13 @@ export class JobsRegistryService {
     jobHistory: JobHistory,
     workspaceId: string,
   ): Promise<{ tools: ToolWithStatusDto[]; steps: WorkflowStepStatusDto[] }> {
-  // Query tool statuses computed from actual jobs in this history
-  // Uses CASE/COUNT pattern from targets.service.ts L472-475
-  const rawToolStatuses = await this.repo
-    .createQueryBuilder('job')
-    .select([
-      'job.toolId as "toolId"',
-      `CASE
+    // Query tool statuses computed from actual jobs in this history
+    // Uses CASE/COUNT pattern from targets.service.ts L472-475
+    const rawToolStatuses = await this.repo
+      .createQueryBuilder('job')
+      .select([
+        'job.toolId as "toolId"',
+        `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.CANCELLED}' THEN 1 END) > 0
              AND COUNT(CASE WHEN job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}') THEN 1 END) = 0 THEN '${JobStatus.CANCELLED}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -1686,102 +1690,102 @@ export class JobsRegistryService {
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.COMPLETED}' THEN 1 END) > 0 THEN '${JobStatus.COMPLETED}'
         ELSE '${JobStatus.PENDING}'
       END as "status"`,
-    ])
-    .where('job.jobHistoryId = :historyId', { historyId: jobHistory.id })
-    .groupBy('job.toolId')
-    .getRawMany<{ toolId: string; status: JobStatus }>();
+      ])
+      .where('job.jobHistoryId = :historyId', { historyId: jobHistory.id })
+      .groupBy('job.toolId')
+      .getRawMany<{ toolId: string; status: JobStatus }>();
 
-  // Build a lookup map: toolId → computed status
-  const toolStatusMap = new Map<string, JobStatus>();
-  rawToolStatuses.forEach((row) => toolStatusMap.set(row.toolId, row.status));
+    // Build a lookup map: toolId → computed status
+    const toolStatusMap = new Map<string, JobStatus>();
+    rawToolStatuses.forEach((row) => toolStatusMap.set(row.toolId, row.status));
 
-  // Map tools from workflow content with their computed status.
-  // Only id/name/logoUrl/status are exposed — the UI renders nothing else
-  // from these records, so the rest of the Tool entity is omitted to save
-  // bandwidth (the full entity is only resolved server-side for matching).
-  const instaledTools = await this.toolsService.getInstalledTools(
-    {},
-    workspaceId,
-  );
-  // Index installed tools by name once. The old `.find()` inside `.map()`
-  // rescanned the whole installed-tool list for every workflow step, making
-  // this O(steps x tools). First match wins, matching the previous behaviour.
-  const installedToolsByName = new Map<
-    string,
-    (typeof instaledTools.data)[number]
-  >();
-  for (const tool of instaledTools.data) {
-    if (!installedToolsByName.has(tool.name)) {
-      installedToolsByName.set(tool.name, tool);
-    }
-  }
-
-  // Dependency order, not stored order: `content` is jsonb and Postgres does
-  // not preserve the map's key order.
-  const workflowJobs = orderedJobEntries(jobHistory.workflow?.content.jobs);
-
-  const tools = workflowJobs
-    .map(([, job]) => installedToolsByName.get(job.run))
-    .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined)
-    .map((tool) => ({
-      id: tool.id,
-      name: tool.name,
-      logoUrl: tool.logoUrl,
-      // Undefined when the tool has no job rows in this history (e.g. all
-      // jobs deleted) — the UI renders no badge instead of a misleading
-      // "pending".
-      status: toolStatusMap.get(tool.id!),
-    }));
-
-  // Post-process: if a tool at a later index has completed, mark earlier
-  // pending tools as skipped — the workflow clearly moved past them.
-  let hasCompletedAhead = false;
-  for (let i = tools.length - 1; i >= 0; i--) {
-    if (tools[i].status === JobStatus.COMPLETED) {
-      hasCompletedAhead = true;
-    } else if (tools[i].status === JobStatus.PENDING && hasCompletedAhead) {
-      tools[i].status = JobStatus.SKIPPED;
-    }
-  }
-
-  // Steps as the workflow engine recorded them: which ones ran in parallel,
-  // which are waiting on `needs`, and why a step never ran. Runs created
-  // before the engine have no persisted state (`steps = {}`) and fall back to
-  // the status derived from their job rows so old run pages keep working.
-  const persistedSteps = jobHistory.steps ?? {};
-  const hasPersistedState = Object.keys(persistedSteps).length > 0;
-  const steps: WorkflowStepStatusDto[] = workflowJobs.map(([id, job]) => {
-    const tool = installedToolsByName.get(job.run);
-    const state = persistedSteps[id];
-    const derived = tool ? toolStatusMap.get(tool.id!) : undefined;
-    return {
-      id,
-      name: job.name ?? id,
-      run: job.run,
-      needs: normalizeNeeds(job.needs),
-      status: state?.status ?? this.toRunStepStatus(derived),
-      reason: state?.reason,
-      jobs: state?.jobs ?? 0,
-      failed: state?.failed,
-      toolId: tool?.id,
-      logoUrl: tool?.logoUrl,
-      dispatchedAt: state?.dispatchedAt
-        ? new Date(state.dispatchedAt)
-        : undefined,
-      finishedAt: state?.finishedAt ? new Date(state.finishedAt) : undefined,
-    };
-  });
-
-  if (!hasPersistedState) {
-    let completedAhead = false;
-    for (let i = steps.length - 1; i >= 0; i--) {
-      if (steps[i].status === 'done') {
-        completedAhead = true;
-      } else if (steps[i].status === 'pending' && completedAhead) {
-        steps[i].status = 'skipped';
+    // Map tools from workflow content with their computed status.
+    // Only id/name/logoUrl/status are exposed — the UI renders nothing else
+    // from these records, so the rest of the Tool entity is omitted to save
+    // bandwidth (the full entity is only resolved server-side for matching).
+    const instaledTools = await this.toolsService.getInstalledTools(
+      {},
+      workspaceId,
+    );
+    // Index installed tools by name once. The old `.find()` inside `.map()`
+    // rescanned the whole installed-tool list for every workflow step, making
+    // this O(steps x tools). First match wins, matching the previous behaviour.
+    const installedToolsByName = new Map<
+      string,
+      (typeof instaledTools.data)[number]
+    >();
+    for (const tool of instaledTools.data) {
+      if (!installedToolsByName.has(tool.name)) {
+        installedToolsByName.set(tool.name, tool);
       }
     }
-  }
+
+    // Dependency order, not stored order: `content` is jsonb and Postgres does
+    // not preserve the map's key order.
+    const workflowJobs = orderedJobEntries(jobHistory.workflow?.content.jobs);
+
+    const tools = workflowJobs
+      .map(([, job]) => installedToolsByName.get(job.run))
+      .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined)
+      .map((tool) => ({
+        id: tool.id,
+        name: tool.name,
+        logoUrl: tool.logoUrl,
+        // Undefined when the tool has no job rows in this history (e.g. all
+        // jobs deleted) — the UI renders no badge instead of a misleading
+        // "pending".
+        status: toolStatusMap.get(tool.id!),
+      }));
+
+    // Post-process: if a tool at a later index has completed, mark earlier
+    // pending tools as skipped — the workflow clearly moved past them.
+    let hasCompletedAhead = false;
+    for (let i = tools.length - 1; i >= 0; i--) {
+      if (tools[i].status === JobStatus.COMPLETED) {
+        hasCompletedAhead = true;
+      } else if (tools[i].status === JobStatus.PENDING && hasCompletedAhead) {
+        tools[i].status = JobStatus.SKIPPED;
+      }
+    }
+
+    // Steps as the workflow engine recorded them: which ones ran in parallel,
+    // which are waiting on `needs`, and why a step never ran. Runs created
+    // before the engine have no persisted state (`steps = {}`) and fall back to
+    // the status derived from their job rows so old run pages keep working.
+    const persistedSteps = jobHistory.steps ?? {};
+    const hasPersistedState = Object.keys(persistedSteps).length > 0;
+    const steps: WorkflowStepStatusDto[] = workflowJobs.map(([id, job]) => {
+      const tool = installedToolsByName.get(job.run);
+      const state = persistedSteps[id];
+      const derived = tool ? toolStatusMap.get(tool.id!) : undefined;
+      return {
+        id,
+        name: job.name ?? id,
+        run: job.run,
+        needs: normalizeNeeds(job.needs),
+        status: state?.status ?? this.toRunStepStatus(derived),
+        reason: state?.reason,
+        jobs: state?.jobs ?? 0,
+        failed: state?.failed,
+        toolId: tool?.id,
+        logoUrl: tool?.logoUrl,
+        dispatchedAt: state?.dispatchedAt
+          ? new Date(state.dispatchedAt)
+          : undefined,
+        finishedAt: state?.finishedAt ? new Date(state.finishedAt) : undefined,
+      };
+    });
+
+    if (!hasPersistedState) {
+      let completedAhead = false;
+      for (let i = steps.length - 1; i >= 0; i--) {
+        if (steps[i].status === 'done') {
+          completedAhead = true;
+        } else if (steps[i].status === 'pending' && completedAhead) {
+          steps[i].status = 'skipped';
+        }
+      }
+    }
 
     return { tools, steps };
   }
@@ -1793,12 +1797,14 @@ export class JobsRegistryService {
    * written from), so the code view would otherwise print them shuffled.
    * ponytail: hand-rolled key lists; add a key here when the templates grow one.
    */
-  private orderWorkflowContent(content?: WorkflowContent): WorkflowContent | undefined {
+  private orderWorkflowContent(
+    content?: WorkflowContent,
+  ): WorkflowContent | undefined {
     if (!content) return undefined;
 
-    const jobs: [string, WorkflowJob][] = orderedJobEntries(
-      content.jobs,
-    ).map(([id, job]) => [id, orderJob(job)]);
+    const jobs: [string, WorkflowJob][] = orderedJobEntries(content.jobs).map(
+      ([id, job]) => [id, orderJob(job)],
+    );
 
     return {
       name: content.name,

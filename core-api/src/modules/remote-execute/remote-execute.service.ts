@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { RedisService } from '@/services/redis/redis.service';
 import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
@@ -31,7 +35,6 @@ enum ResultEventType {
   ERROR = 4,
 }
 
-
 interface ResultEvent {
   id: string;
   sessionId: string;
@@ -49,7 +52,9 @@ export class RemoteExecuteService {
     private readonly remoteExecuteSubscribeService: RemoteExecuteSubscribeService,
   ) {}
 
-  private static normalizeEventType(raw: string | number): ResultEventType | null {
+  private static normalizeEventType(
+    raw: string | number,
+  ): ResultEventType | null {
     if (typeof raw === 'number') {
       if (raw >= 1 && raw <= 4) return raw;
       return null;
@@ -108,16 +113,19 @@ export class RemoteExecuteService {
         observer.next({ data: message });
       };
 
-      this.redisService.subscribe(channel, handler).then(() => {
-        if (unsubscribed) {
-          this.redisService.unsubscribe(channel).catch((err) => {
-            this.logger.warn(`Failed to unsubscribe ${channel}: ${err}`);
-          });
-        }
-      }).catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        observer.error(new Error(`Redis subscribe failed: ${message}`));
-      });
+      this.redisService
+        .subscribe(channel, handler)
+        .then(() => {
+          if (unsubscribed) {
+            this.redisService.unsubscribe(channel).catch((err) => {
+              this.logger.warn(`Failed to unsubscribe ${channel}: ${err}`);
+            });
+          }
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          observer.error(new Error(`Redis subscribe failed: ${message}`));
+        });
 
       return () => {
         unsubscribed = true;
@@ -141,7 +149,11 @@ export class RemoteExecuteService {
     conversationId: string,
     workspaceId: string,
     timeoutMs = 60_000,
-    onEvent?: (event: { type: ResultEventType; data: string; exitCode: number }) => void,
+    onEvent?: (event: {
+      type: ResultEventType;
+      data: string;
+      exitCode: number;
+    }) => void,
   ): Promise<RemoteCommandResult> {
     const channel = `remote-execute:results:${sessionId}`;
 
@@ -168,7 +180,9 @@ export class RemoteExecuteService {
           exitCode: number;
         };
 
-        const normalizedType = RemoteExecuteService.normalizeEventType(parsed.type);
+        const normalizedType = RemoteExecuteService.normalizeEventType(
+          parsed.type,
+        );
         if (normalizedType === null) {
           this.logger.warn(
             `[waitForResult] Unknown event type "${String(parsed.type)}" — skipping`,
@@ -186,9 +200,15 @@ export class RemoteExecuteService {
         events.push(event);
 
         try {
-          onEvent?.({ type: event.type, data: event.data, exitCode: event.exitCode });
+          onEvent?.({
+            type: event.type,
+            data: event.data,
+            exitCode: event.exitCode,
+          });
         } catch (err) {
-          this.logger.warn(`onEvent callback threw: ${err instanceof Error ? err.message : String(err)}`);
+          this.logger.warn(
+            `onEvent callback threw: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
 
         this.logger.debug(
@@ -206,13 +226,9 @@ export class RemoteExecuteService {
 
           this.remoteExecuteSubscribeService.removeSession(sessionId);
 
-          this.redisService
-            .unsubscribe(channel)
-            .catch((err) => {
-              this.logger.warn(
-                `Failed to unsubscribe from ${channel}: ${err}`,
-              );
-            });
+          this.redisService.unsubscribe(channel).catch((err) => {
+            this.logger.warn(`Failed to unsubscribe from ${channel}: ${err}`);
+          });
 
           if (waitResolve) {
             waitResolve();
@@ -223,7 +239,9 @@ export class RemoteExecuteService {
       }
     });
 
-    this.logger.debug(`[waitForResult] Subscription confirmed, pushing command`);
+    this.logger.debug(
+      `[waitForResult] Subscription confirmed, pushing command`,
+    );
 
     const pushResult =
       await this.remoteExecuteSubscribeService.pushCommandWithConversation(
@@ -234,11 +252,9 @@ export class RemoteExecuteService {
       );
 
     if (!pushResult) {
-      this.redisService
-        .unsubscribe(channel)
-        .catch((err) => {
-          this.logger.warn(`Failed to unsubscribe after push failure: ${err}`);
-        });
+      this.redisService.unsubscribe(channel).catch((err) => {
+        this.logger.warn(`Failed to unsubscribe after push failure: ${err}`);
+      });
       throw new ServiceUnavailableException(
         'No available worker for remote execution',
       );
@@ -257,11 +273,9 @@ export class RemoteExecuteService {
             `[waitForResult] Timeout after ${timeoutMs}ms, collected ${events.length} events`,
           );
           this.remoteExecuteSubscribeService.removeSession(sessionId);
-          this.redisService
-            .unsubscribe(channel)
-            .catch((err) => {
-              this.logger.warn(`Failed to unsubscribe on timeout: ${err}`);
-            });
+          this.redisService.unsubscribe(channel).catch((err) => {
+            this.logger.warn(`Failed to unsubscribe on timeout: ${err}`);
+          });
         }
         resolve();
       }, timeoutMs);

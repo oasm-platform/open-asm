@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
 import { JobRunType, JobStatus } from '@/common/enums/enum';
 import { AgentConnectorRunService } from './agent-connector-run.service';
 
@@ -5,15 +6,19 @@ describe('AgentConnectorRunService', () => {
   const order: string[] = [];
   let handler: ((ch: string, raw: string) => void) | undefined;
   const redis = {
-    subscribe: jest.fn(async (_ch: string, h: (ch: string, raw: string) => void) => {
-      order.push('subscribe');
-      handler = h;
-    }),
+    subscribe: jest.fn(
+      async (_ch: string, h: (ch: string, raw: string) => void) => {
+        order.push('subscribe');
+        handler = h;
+      },
+    ),
     unsubscribe: jest.fn().mockResolvedValue(undefined),
   };
   const tools = {
     getToolByNames: jest.fn().mockResolvedValue([{ id: 'tool-1' }]),
-    getToolById: jest.fn().mockResolvedValue({ id: 'tool-1', isInstalled: true, priority: 3 }),
+    getToolById: jest
+      .fn()
+      .mockResolvedValue({ id: 'tool-1', isInstalled: true, priority: 3 }),
   };
   const jobs = [
     { id: 'j1', asset: { value: 'a.example.com' }, jobHistory: { id: 'jh-1' } },
@@ -21,7 +26,9 @@ describe('AgentConnectorRunService', () => {
   ];
   const registry = {
     createNewJob: jest.fn().mockResolvedValue(jobs),
-    buildAgentGrpcJobs: jest.fn().mockResolvedValue([{ id: 'j1' }, { id: 'j2' }]),
+    buildAgentGrpcJobs: jest
+      .fn()
+      .mockResolvedValue([{ id: 'j1' }, { id: 'j2' }]),
     failAgentJobs: jest.fn().mockResolvedValue(0),
     cancelJobHistory: jest.fn().mockResolvedValue(undefined),
   };
@@ -41,7 +48,10 @@ describe('AgentConnectorRunService', () => {
     toolCallId: 'call-1',
   };
   const done = (jobId: string, status: JobStatus, extra: object = {}) =>
-    handler!('agent-job:done:jh-1', JSON.stringify({ jobId, status, ...extra }));
+    handler!(
+      'agent-job:done:jh-1',
+      JSON.stringify({ jobId, status, ...extra }),
+    );
   let service: AgentConnectorRunService;
 
   beforeEach(() => {
@@ -89,8 +99,17 @@ describe('AgentConnectorRunService', () => {
     expect(order).toEqual(['subscribe', 'push', 'push']);
     expect(result.status).toBe('partial');
     expect(result.jobs).toEqual([
-      expect.objectContaining({ jobId: 'j1', asset: 'a.example.com', status: JobStatus.COMPLETED, excerpt: '{"ports":[443]}' }),
-      expect.objectContaining({ jobId: 'j2', status: JobStatus.FAILED, error: 'boom' }),
+      expect.objectContaining({
+        jobId: 'j1',
+        asset: 'a.example.com',
+        status: JobStatus.COMPLETED,
+        excerpt: '{"ports":[443]}',
+      }),
+      expect.objectContaining({
+        jobId: 'j2',
+        status: JobStatus.FAILED,
+        error: 'boom',
+      }),
     ]);
     expect(redis.unsubscribe).toHaveBeenCalledWith('agent-job:done:jh-1');
   });
@@ -129,15 +148,22 @@ describe('AgentConnectorRunService', () => {
   });
 
   it('fails the unpushed jobs when the stream closes mid-dispatch', async () => {
-    streams.pushConnectorJob.mockImplementationOnce(() => true).mockImplementationOnce(() => false);
+    streams.pushConnectorJob
+      .mockImplementationOnce(() => true)
+      .mockImplementationOnce(() => false);
     const pending = service.run(input);
     await new Promise((r) => setImmediate(r));
     done('j1', JobStatus.COMPLETED);
-    done('j2', JobStatus.FAILED, { error: 'worker stream closed before dispatch' });
+    done('j2', JobStatus.FAILED, {
+      error: 'worker stream closed before dispatch',
+    });
 
     const result: any = await pending;
 
-    expect(registry.failAgentJobs).toHaveBeenCalledWith({ jobIds: ['j2'] }, 'worker stream closed before dispatch');
+    expect(registry.failAgentJobs).toHaveBeenCalledWith(
+      { jobIds: ['j2'] },
+      'worker stream closed before dispatch',
+    );
     expect(result.status).toBe('partial');
   });
 
@@ -158,12 +184,18 @@ describe('AgentConnectorRunService', () => {
 
     const result: any = await pending;
 
-    const total = result.jobs.reduce((n: number, j: any) => n + (j.excerpt?.length ?? 0), 0);
+    const total = result.jobs.reduce(
+      (n: number, j: any) => n + (j.excerpt?.length ?? 0),
+      0,
+    );
     expect(total).toBe(32 * 1024);
   });
 
   it('refuses a connector that is not installed in the workspace', async () => {
-    tools.getToolById.mockResolvedValueOnce({ id: 'tool-1', isInstalled: false });
+    tools.getToolById.mockResolvedValueOnce({
+      id: 'tool-1',
+      isInstalled: false,
+    });
 
     await expect(service.run(input)).resolves.toEqual({
       error: expect.stringContaining('not installed'),

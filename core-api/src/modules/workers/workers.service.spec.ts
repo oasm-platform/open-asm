@@ -210,9 +210,7 @@ describe('WorkersService', () => {
 
       await service.autoCleanupWorkersAndJobs();
 
-      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith(
-        'worker-1',
-      );
+      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith('worker-1');
       expect(mockWorkerInstanceRepository.delete).toHaveBeenCalledWith(
         'worker-1',
       );
@@ -236,9 +234,7 @@ describe('WorkersService', () => {
 
       await service.autoCleanupWorkersAndJobs();
 
-      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith(
-        'worker-1',
-      );
+      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith('worker-1');
       expect(mockWorkerInstanceRepository.delete).not.toHaveBeenCalled();
     });
 
@@ -368,19 +364,22 @@ describe('WorkersService', () => {
 
     beforeEach(() => {
       // Default config: empty signature (matches empty from worker), no cloud key
-      (mockConfigService.get as jest.Mock).mockImplementation(
-        (key: string) => {
-          if (key === 'WORKER_SIGNATURE') return WORKER_SIG;
-          if (key === 'OASM_CLOUD_APIKEY') return '';
-          return undefined;
-        },
-      );
+      (mockConfigService.get as jest.Mock).mockImplementation((key: string) => {
+        if (key === 'WORKER_SIGNATURE') return WORKER_SIG;
+        if (key === 'OASM_CLOUD_APIKEY') return '';
+        return undefined;
+      });
     });
 
     it('should save runMode "node" when join with numeric mode=2', async () => {
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
       );
@@ -408,9 +407,14 @@ describe('WorkersService', () => {
     });
 
     it('should save runMode "node" when join with enum-string mode (grpc enums:String)', async () => {
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
       );
@@ -438,9 +442,14 @@ describe('WorkersService', () => {
     });
 
     it('should save runMode "cli" when join with numeric mode=1', async () => {
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
       );
@@ -468,9 +477,14 @@ describe('WorkersService', () => {
     });
 
     it('should save runMode null when join with no mode (legacy worker)', async () => {
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
       );
@@ -509,9 +523,14 @@ describe('WorkersService', () => {
         runMode: 'node',
       };
       // API key must be valid for the join to pass validation
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
         (opts: Record<string, unknown>) => {
           const where = opts.where as Record<string, unknown> | undefined;
@@ -547,9 +566,14 @@ describe('WorkersService', () => {
         token: 'tok-existing',
         runMode: 'node',
       };
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
         (opts: Record<string, unknown>) => {
           const where = opts.where as Record<string, unknown> | undefined;
@@ -587,7 +611,9 @@ describe('WorkersService', () => {
         scope: 'CLOUD',
       };
 
-      (mockWorkerInstanceRepository.createQueryBuilder as jest.Mock).mockReturnValue({
+      (
+        mockWorkerInstanceRepository.createQueryBuilder as jest.Mock
+      ).mockReturnValue({
         select: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -635,9 +661,9 @@ describe('WorkersService', () => {
       builtInTools: Record<string, unknown>[] = [],
       connectors: Record<string, unknown>[] = [],
     ) => {
-      (mockWorkerInstanceRepository.createQueryBuilder as jest.Mock).mockReturnValue(
-        buildQueryBuilder(rows),
-      );
+      (
+        mockWorkerInstanceRepository.createQueryBuilder as jest.Mock
+      ).mockReturnValue(buildQueryBuilder(rows));
       (mockJobsRegistryService.repo as any).count = jest
         .fn()
         .mockResolvedValue(0);
@@ -666,10 +692,7 @@ describe('WorkersService', () => {
 
     it('getWorkers counts built-ins plus connectors only for node-mode workers', async () => {
       const result = await runGetWorkers(
-        [
-          { id: 'w-node', runMode: 'node' },
-          { id: 'w-cli' },
-        ],
+        [{ id: 'w-node', runMode: 'node' }, { id: 'w-cli' }],
         [
           { id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN },
           { id: 'bt-2', name: 'nuclei', type: WorkerType.BUILT_IN },
@@ -835,7 +858,9 @@ describe('WorkersService', () => {
       expect(result.toolsCount).toBe(4);
       expect(result.toolsCount).toBe(result.tools.length);
 
-      const connectors = result.tools.filter((tool) => tool.type === 'connector');
+      const connectors = result.tools.filter(
+        (tool) => tool.type === 'connector',
+      );
       expect(connectors).toEqual([
         {
           id: 'c-1',
@@ -1011,9 +1036,13 @@ describe('WorkersService', () => {
 
   describe('isAgentWorkerForWorkspace', () => {
     it('accepts only a workspace-scoped worker of the same workspace', async () => {
-      (mockWorkerInstanceRepository.exists as jest.Mock).mockResolvedValue(true);
+      (mockWorkerInstanceRepository.exists as jest.Mock).mockResolvedValue(
+        true,
+      );
 
-      await expect(service.isAgentWorkerForWorkspace('w1', 'ws-1')).resolves.toBe(true);
+      await expect(
+        service.isAgentWorkerForWorkspace('w1', 'ws-1'),
+      ).resolves.toBe(true);
       expect(mockWorkerInstanceRepository.exists).toHaveBeenCalledWith({
         where: { id: 'w1', workspaceId: 'ws-1', scope: WorkerScope.WORKSPACE },
       });

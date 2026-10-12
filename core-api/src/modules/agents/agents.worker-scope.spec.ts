@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
 import { BadRequestException } from '@nestjs/common';
 import { AgentMode, WorkerScope } from '@/common/enums/enum';
 import { AgentsCompletionsService } from './agents.completions';
@@ -17,13 +18,18 @@ function buildCompletions(allowed: boolean) {
     create: jest.fn((v) => v),
     save: jest.fn(async (v) => v),
   };
-  const service = Object.assign(Object.create(AgentsCompletionsService.prototype), {
-    llmConfigRepository: { findOne: jest.fn().mockResolvedValue({ id: 'llm-1' }) },
-    conversationRepository,
-    workersService: {
-      isAgentWorkerForWorkspace: jest.fn().mockResolvedValue(allowed),
+  const service = Object.assign(
+    Object.create(AgentsCompletionsService.prototype),
+    {
+      llmConfigRepository: {
+        findOne: jest.fn().mockResolvedValue({ id: 'llm-1' }),
+      },
+      conversationRepository,
+      workersService: {
+        isAgentWorkerForWorkspace: jest.fn().mockResolvedValue(allowed),
+      },
     },
-  }) as any;
+  );
   return { service, conversationRepository };
 }
 
@@ -35,10 +41,9 @@ describe('worker scope enforcement', () => {
       await expect(
         service.getOrCreateConversation(dto, 'ws-1', 'user-1'),
       ).rejects.toBeInstanceOf(BadRequestException);
-      expect(service.workersService.isAgentWorkerForWorkspace).toHaveBeenCalledWith(
-        'worker-1',
-        'ws-1',
-      );
+      expect(
+        service.workersService.isAgentWorkerForWorkspace,
+      ).toHaveBeenCalledWith('worker-1', 'ws-1');
       expect(conversationRepository.save).not.toHaveBeenCalled();
     });
 

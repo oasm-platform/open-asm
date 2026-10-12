@@ -62,12 +62,16 @@ export class AgentConnectorRunService {
   ): Promise<AgentConnectorRunResult> {
     // Tool.name IS the connector slug; getToolById(workspaceId) sets
     // isInstalled from workspace_tools, so a foreign connector cannot run.
-    const [toolRow] = await this.toolsService.getToolByNames({ names: [input.slug] });
+    const [toolRow] = await this.toolsService.getToolByNames({
+      names: [input.slug],
+    });
     const tool = toolRow?.id
       ? await this.toolsService.getToolById(toolRow.id, input.workspaceId)
       : null;
     if (!tool?.isInstalled) {
-      return { error: `Connector ${input.slug} is not installed in this workspace.` };
+      return {
+        error: `Connector ${input.slug} is not installed in this workspace.`,
+      };
     }
 
     const workerId = await this.streams.resolveConversationWorker(
@@ -76,7 +80,8 @@ export class AgentConnectorRunService {
     );
     if (!workerId) {
       return {
-        error: 'No worker available for this workspace. Select a workspace worker for this conversation.',
+        error:
+          'No worker available for this workspace. Select a workspace worker for this conversation.',
       };
     }
 
@@ -98,11 +103,15 @@ export class AgentConnectorRunService {
       return { error: error instanceof Error ? error.message : String(error) };
     }
     if (jobs.length === 0) {
-      return { error: 'No matching assets for this connector; nothing to run.' };
+      return {
+        error: 'No matching assets for this connector; nothing to run.',
+      };
     }
 
     const jobHistoryId = jobs[0].jobHistory.id;
-    const assetByJob = new Map(jobs.map((job) => [job.id, job.asset?.value ?? '']));
+    const assetByJob = new Map(
+      jobs.map((job) => [job.id, job.asset?.value ?? '']),
+    );
     const outcomes = new Map<string, AgentJobDoneMessage>();
     const channel = agentJobDoneChannel(jobHistoryId);
     let allDone!: () => void;
@@ -124,40 +133,61 @@ export class AgentConnectorRunService {
         }
       });
 
-      const payloads = await this.jobsRegistry.buildAgentGrpcJobs(jobs.map((job) => job.id));
+      const payloads = await this.jobsRegistry.buildAgentGrpcJobs(
+        jobs.map((job) => job.id),
+      );
       const unpushed: string[] = [];
       for (const payload of payloads) {
-        if (unpushed.length > 0 || !this.streams.pushConnectorJob(workerId, input.toolCallId, payload)) {
+        if (
+          unpushed.length > 0 ||
+          !this.streams.pushConnectorJob(workerId, input.toolCallId, payload)
+        ) {
           unpushed.push(payload.id as string);
         }
       }
       if (unpushed.length > 0) {
         // Publishes FAILED for each, so the wait below still completes.
-        await this.jobsRegistry.failAgentJobs({ jobIds: unpushed }, 'worker stream closed before dispatch');
+        await this.jobsRegistry.failAgentJobs(
+          { jobIds: unpushed },
+          'worker stream closed before dispatch',
+        );
       }
 
-      const outcome = await new Promise<'done' | 'timeout' | 'aborted'>((resolve) => {
-        timer = setTimeout(() => resolve('timeout'), timeoutMs);
-        onAbort = () => resolve('aborted');
-        if (input.abortSignal?.aborted) resolve('aborted');
-        input.abortSignal?.addEventListener('abort', onAbort, { once: true });
-        void finished.then(() => resolve('done'));
-      });
+      const outcome = await new Promise<'done' | 'timeout' | 'aborted'>(
+        (resolve) => {
+          timer = setTimeout(() => resolve('timeout'), timeoutMs);
+          onAbort = () => resolve('aborted');
+          if (input.abortSignal?.aborted) resolve('aborted');
+          input.abortSignal?.addEventListener('abort', onAbort, { once: true });
+          void finished.then(() => resolve('done'));
+        },
+      );
 
       if (outcome === 'aborted') {
         try {
-          await this.jobsRegistry.cancelJobHistory(input.workspaceId, jobHistoryId);
+          await this.jobsRegistry.cancelJobHistory(
+            input.workspaceId,
+            jobHistoryId,
+          );
         } catch {
           // Best effort: the jobs still end on their own timeout.
         }
         return { error: 'Cancelled by user' };
       }
-      return this.summarize(jobHistoryId, jobs.map((job) => job.id), assetByJob, outcomes);
+      return this.summarize(
+        jobHistoryId,
+        jobs.map((job) => job.id),
+        assetByJob,
+        outcomes,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // Jobs exist IN_PROGRESS; fail them so none is orphaned.
       await this.jobsRegistry
-        .failAgentJobs({ jobIds: jobs.map((job) => job.id) }, `agent dispatch failed: ${message}`)
+        .failAgentJobs(
+          { jobIds: jobs.map((job) => job.id) },
+          `agent dispatch failed: ${message}`,
+        )
         .catch(() => undefined);
       return { error: message };
     } finally {
@@ -186,7 +216,9 @@ export class AgentConnectorRunService {
         excerpt,
       };
     });
-    const completed = rows.filter((row) => row.status === JobStatus.COMPLETED).length;
+    const completed = rows.filter(
+      (row) => row.status === JobStatus.COMPLETED,
+    ).length;
     const status = rows.some((row) => row.status === 'running')
       ? 'running'
       : completed === rows.length
