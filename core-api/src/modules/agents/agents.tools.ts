@@ -1358,6 +1358,9 @@ export class AgentTool {
       { method: ToolType; permissions: AgentMode[]; mcp: boolean }
     > = {};
 
+    // Connectors run on the conversation's pinned worker, so none are offered without a conversation.
+    if (!conversationId) return tools;
+
     for (const entry of this.connectorRegistry.getAgentConnectors()) {
       const slug = entry.slug;
       const key = `run_connector_${slug.replace(/[^a-z0-9_]/g, '_')}`;

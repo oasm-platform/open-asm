@@ -108,22 +108,22 @@ export class AgentConnectorRunService {
     let allDone!: () => void;
     const finished = new Promise<void>((resolve) => (allDone = resolve));
 
-    // Subscribe BEFORE pushing so a fast job cannot finish unheard.
-    await this.redis.subscribe(channel, (ch, raw) => {
-      if (ch !== channel) return;
-      try {
-        const message = JSON.parse(raw) as AgentJobDoneMessage;
-        if (!assetByJob.has(message.jobId)) return;
-        outcomes.set(message.jobId, message);
-        if (outcomes.size === assetByJob.size) allDone();
-      } catch {
-        // Malformed message: ignore, the timeout still bounds the wait.
-      }
-    });
-
     let timer: NodeJS.Timeout | undefined;
     let onAbort: (() => void) | undefined;
     try {
+      // Subscribe BEFORE pushing so a fast job cannot finish unheard.
+      await this.redis.subscribe(channel, (ch, raw) => {
+        if (ch !== channel) return;
+        try {
+          const message = JSON.parse(raw) as AgentJobDoneMessage;
+          if (!assetByJob.has(message.jobId)) return;
+          outcomes.set(message.jobId, message);
+          if (outcomes.size === assetByJob.size) allDone();
+        } catch {
+          // Malformed message: ignore, the timeout still bounds the wait.
+        }
+      });
+
       const payloads = await this.jobsRegistry.buildAgentGrpcJobs(jobs.map((job) => job.id));
       const unpushed: string[] = [];
       for (const payload of payloads) {
@@ -153,6 +153,13 @@ export class AgentConnectorRunService {
         return { error: 'Cancelled by user' };
       }
       return this.summarize(jobHistoryId, jobs.map((job) => job.id), assetByJob, outcomes);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Jobs exist IN_PROGRESS; fail them so none is orphaned.
+      await this.jobsRegistry
+        .failAgentJobs({ jobIds: jobs.map((job) => job.id) }, `agent dispatch failed: ${message}`)
+        .catch(() => undefined);
+      return { error: message };
     } finally {
       clearTimeout(timer);
       if (onAbort) input.abortSignal?.removeEventListener('abort', onAbort);

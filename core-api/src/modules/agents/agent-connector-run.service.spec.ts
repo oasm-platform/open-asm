@@ -161,4 +161,43 @@ describe('AgentConnectorRunService', () => {
     const total = result.jobs.reduce((n: number, j: any) => n + (j.excerpt?.length ?? 0), 0);
     expect(total).toBe(32 * 1024);
   });
+
+  it('refuses a connector that is not installed in the workspace', async () => {
+    tools.getToolById.mockResolvedValueOnce({ id: 'tool-1', isInstalled: false });
+
+    await expect(service.run(input)).resolves.toEqual({
+      error: expect.stringContaining('not installed'),
+    });
+    expect(registry.createNewJob).not.toHaveBeenCalled();
+  });
+
+  it('resolves the tool scoped to the workspace', async () => {
+    const pending = service.run(input);
+    await new Promise((r) => setImmediate(r));
+    done('j1', JobStatus.COMPLETED);
+    done('j2', JobStatus.COMPLETED);
+    await pending;
+
+    expect(tools.getToolById).toHaveBeenCalledWith('tool-1', 'ws-1');
+  });
+
+  it('returns the createNewJob error without subscribing', async () => {
+    const msg = 'Too many jobs (21 > 20); narrow targetIds/assetIds';
+    registry.createNewJob.mockRejectedValueOnce(new Error(msg));
+
+    await expect(service.run(input)).resolves.toEqual({ error: msg });
+    expect(redis.subscribe).not.toHaveBeenCalled();
+  });
+
+  it('fails the created jobs and returns an error when dispatch throws', async () => {
+    redis.subscribe.mockRejectedValueOnce(new Error('redis down'));
+
+    await expect(service.run(input)).resolves.toEqual({
+      error: expect.stringContaining('redis down'),
+    });
+    expect(registry.failAgentJobs).toHaveBeenCalledWith(
+      { jobIds: ['j1', 'j2'] },
+      expect.stringContaining('redis down'),
+    );
+  });
 });

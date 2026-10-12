@@ -252,9 +252,9 @@ describe('AgentTool connector tools', () => {
 
   it('exposes an agent connector in AGENT mode and hides it in ASK mode', () => {
     const agentTool = createAgentTool();
-    const agentTools = agentTool.getTools('w1', AgentMode.AGENT) as Record<string, unknown>;
+    const agentTools = agentTool.getTools('w1', AgentMode.AGENT, undefined, 'c1') as Record<string, unknown>;
     expect(agentTools).toHaveProperty('run_connector_nmap');
-    const askTools = agentTool.getTools('w1', AgentMode.ASK) as Record<string, unknown>;
+    const askTools = agentTool.getTools('w1', AgentMode.ASK, undefined, 'c1') as Record<string, unknown>;
     expect(askTools).not.toHaveProperty('run_connector_nmap');
   });
 
@@ -278,6 +278,10 @@ describe('AgentTool connector tools', () => {
       abortSignal: signal,
     });
     expect(result).toEqual({ status: 'completed' });
+  });
+
+  it('offers no connector tools without a conversation', () => {
+    expect(Object.keys(createAgentTool().getConnectorTools('ws-1', ''))).toEqual([]);
   });
 
   it('returns an error when neither targetIds nor assetIds are given', async () => {
