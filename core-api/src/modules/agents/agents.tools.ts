@@ -631,6 +631,7 @@ export class AgentTool {
           command,
           sessionId,
           conversationId,
+          workspaceId,
           60_000,
           (event) => {
             if (emitter) {

@@ -65,6 +65,7 @@ describe('RemoteExecuteService', () => {
   describe('runCommand', () => {
     const testCommand = 'whoami';
     const testSessionId = 'session-abc';
+    const testWorkspaceId = 'ws-1';
 
     it('should return RemoteCommandPayload when worker is available', () => {
       mockRemoteExecuteSubscribeService.pushCommandWithSession.mockReturnValue({
@@ -72,7 +73,7 @@ describe('RemoteExecuteService', () => {
         workerId: 'worker-1',
       });
 
-      const result = service.runCommand(testCommand, testSessionId);
+      const result = service.runCommand(testCommand, testSessionId, testWorkspaceId);
 
       expect(result).toEqual({
         id: 'cmd-1',
@@ -88,7 +89,7 @@ describe('RemoteExecuteService', () => {
       );
 
       expect(() =>
-        service.runCommand(testCommand, testSessionId),
+        service.runCommand(testCommand, testSessionId, testWorkspaceId),
       ).toThrow(ServiceUnavailableException);
     });
 
@@ -98,11 +99,11 @@ describe('RemoteExecuteService', () => {
         workerId: 'worker-1',
       });
 
-      service.runCommand(testCommand, testSessionId);
+      service.runCommand(testCommand, testSessionId, testWorkspaceId);
 
       expect(
         mockRemoteExecuteSubscribeService.pushCommandWithSession,
-      ).toHaveBeenCalledWith(testSessionId, testCommand);
+      ).toHaveBeenCalledWith(testSessionId, testCommand, testWorkspaceId);
     });
 
     it('should accept optional user context without using it', () => {
@@ -114,11 +115,11 @@ describe('RemoteExecuteService', () => {
       const user = { id: 'u1', name: 'test', workspaceId: 'ws1' } as any;
 
       expect(() =>
-        service.runCommand(testCommand, testSessionId, user),
+        service.runCommand(testCommand, testSessionId, testWorkspaceId, user),
       ).not.toThrow();
       expect(
         mockRemoteExecuteSubscribeService.pushCommandWithSession,
-      ).toHaveBeenCalledWith(testSessionId, testCommand);
+      ).toHaveBeenCalledWith(testSessionId, testCommand, testWorkspaceId);
     });
   });
 
@@ -310,6 +311,7 @@ describe('RemoteExecuteService', () => {
     const testCommand = 'whoami';
     const testSessionId = 'session-abc';
     const testConversationId = 'conv-123';
+    const testWorkspaceId = 'ws-1';
     const channel = `remote-execute:results:${testSessionId}`;
 
     function setupCapturedSubscribe() {
@@ -360,6 +362,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -389,6 +392,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -419,6 +423,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -445,6 +450,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -481,6 +487,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -509,6 +516,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         50,
       );
 
@@ -534,6 +542,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         50,
       );
 
@@ -556,6 +565,7 @@ describe('RemoteExecuteService', () => {
           testCommand,
           testSessionId,
           testConversationId,
+          testWorkspaceId,
           5000,
         ),
       ).rejects.toThrow(ServiceUnavailableException);
@@ -572,6 +582,7 @@ describe('RemoteExecuteService', () => {
           testCommand,
           testSessionId,
           testConversationId,
+          testWorkspaceId,
           5000,
         );
       } catch {
@@ -592,6 +603,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         50,
       );
 
@@ -623,6 +635,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -662,6 +675,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
         onEvent,
       );
@@ -705,6 +719,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
         onEvent,
       );
@@ -735,6 +750,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -758,6 +774,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -787,6 +804,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         50,
       );
 
@@ -806,6 +824,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -844,6 +863,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -902,6 +922,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -934,6 +955,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 

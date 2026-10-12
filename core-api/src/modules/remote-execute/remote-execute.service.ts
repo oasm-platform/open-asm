@@ -72,11 +72,13 @@ export class RemoteExecuteService {
   runCommand(
     command: string,
     sessionId: string,
+    workspaceId: string,
     _user?: UserContextPayload,
   ): RemoteCommandPayload {
     const result = this.remoteExecuteSubscribeService.pushCommandWithSession(
       sessionId,
       command,
+      workspaceId,
     );
 
     if (!result) {
@@ -137,6 +139,7 @@ export class RemoteExecuteService {
     command: string,
     sessionId: string,
     conversationId: string,
+    workspaceId: string,
     timeoutMs = 60_000,
     onEvent?: (event: { type: ResultEventType; data: string; exitCode: number }) => void,
   ): Promise<RemoteCommandResult> {
@@ -225,6 +228,7 @@ export class RemoteExecuteService {
     const pushResult =
       await this.remoteExecuteSubscribeService.pushCommandWithConversation(
         conversationId,
+        workspaceId,
         sessionId,
         command,
       );
