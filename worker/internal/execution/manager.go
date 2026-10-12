@@ -257,7 +257,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 
 	// Pool key: normalized (lowercase) image — the acquire key for warm
 	// container reuse.
-	poolKey := normalizePoolKey(spec.Image)
+	poolKey := poolKeyFor(spec)
 
 	// Connector wiring is configured once at startup (SetPool/SetStreamBinder/
 	// SetEvictor before the first Submit) — snapshot it under the lock and use

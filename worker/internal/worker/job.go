@@ -503,6 +503,9 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		// boot's ReconcileOrphans recognize this worker's own containers.
 		WorkerID: grpcClient.OwnerID(),
 	}
+	if job.GetAgent() {
+		spec.Lane = execution.AgentLane
+	}
 
 	// Attach manifest resource limits (scheduling context from core-api) when
 	// the job carries them. Legacy jobs / built-in tools omit the fields →
@@ -613,6 +616,23 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	for attempt := 0; attempt < 2; attempt++ {
 		execID, err = mgr.Submit(ctx, spec)
 		for err != nil && errors.Is(err, execution.ErrPoolExhausted) {
+			if spec.Lane == execution.AgentLane {
+				// The agent is waiting on this call: refuse now instead of
+				// queueing for poolWaitBudget. Registry jobs are never preempted.
+				msg := "worker out of capacity (cpu/mem)"
+				log.Warning("[%s] %s", job.Id, msg)
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: msg,
+					Duration: time.Since(startTime),
+				})
+				cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+				submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
+				cleanupCancel()
+				return true, false
+			}
 			if time.Now().After(poolWaitUntil) {
 				// Local scheduling gave up on this job: report it so Core can
 				// requeue it, and leave the image alone (a full pool is not an

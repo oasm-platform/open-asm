@@ -122,6 +122,19 @@ func normalizePoolKey(image string) string {
 	return strings.ToLower(strings.TrimSpace(image))
 }
 
+// AgentLane is JobSpec.Lane for jobs dispatched by an AI agent.
+const AgentLane = "agent"
+
+// poolKeyFor is the warm-pool acquire key: the normalized image, suffixed on
+// the agent lane so agent and registry jobs never share a container.
+func poolKeyFor(spec JobSpec) string {
+	key := normalizePoolKey(spec.Image)
+	if spec.Lane == AgentLane {
+		key += "#agent"
+	}
+	return key
+}
+
 // Add records a freshly created container in the pool as idle.
 func (p *PoolManager) Add(entry poolEntry) {
 	p.mu.Lock()
