@@ -144,14 +144,23 @@ export class ToolSyncService implements OnModuleInit {
       case 'ports_scanner':
       case 'port_scanner':
         return ToolCategory.PORTS_SCANNER;
+      // Repository scanners (secrets/sca/sast) report findings too: they share
+      // the vulnerabilities result path, and their `targetTypes` (git_org) is
+      // what keeps them apart from host scanners.
       case 'vulnerabilities':
+      case 'secrets':
+      case 'sca':
+      case 'sast':
         return ToolCategory.VULNERABILITIES;
       case 'screenshot':
         return ToolCategory.SCREENSHOT;
       case 'url_discovery':
         return ToolCategory.URL_DISCOVERY;
       default:
-        return ToolCategory.VULNERABILITIES;
+        // Unknown capability: the connector is not synced rather than being
+        // silently treated as a vulnerability scanner (the manifest builder
+        // rejects unknown capabilities, so this means a newer manifest).
+        return undefined;
     }
   }
 
@@ -238,6 +247,12 @@ export class ToolSyncService implements OnModuleInit {
       const logoBase64 = rawEntry['logo'] as string | undefined;
       const capabilities = rawEntry['capabilities'] as string[] | undefined;
       const category = ToolSyncService.mapConnectorCapabilityToCategory(capabilities);
+      if (!category) {
+        this.logger.warn(
+          `Connector "${slug}" skipped: unknown capability ${JSON.stringify(capabilities)}`,
+        );
+        continue;
+      }
       // Manifests predating `targetTypes` (or a platform that does not know a
       // newer type yet) fall back to the host default — the old behaviour.
       const { targetTypes, unknown: unknownTargetTypes } = parseManifestTargetTypes(

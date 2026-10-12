@@ -1421,6 +1421,26 @@ export type Vulnerability = {
   lastSeenDate: string;
   tool: Tool;
   asset: Asset;
+  /** Code findings: file path relative to the repository root */
+  filePath?: string;
+  /** @nullable */
+  lineStart?: number | null;
+  /** @nullable */
+  lineEnd?: number | null;
+  /**
+   * Commit the finding was observed in
+   * @nullable
+   */
+  commit?: string | null;
+  /**
+   * Vulnerable dependency (SCA)
+   * @nullable
+   */
+  packageName?: string | null;
+  /** @nullable */
+  installedVersion?: string | null;
+  /** @nullable */
+  fixedVersion?: string | null;
   vulnerabilityDismissal: VulnerabilityDismissal;
   analyzeStatus: VulnerabilityAnalyzeStatus;
   analyzeResult: string;
