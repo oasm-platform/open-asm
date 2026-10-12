@@ -213,11 +213,6 @@ export class CreateJobs extends PickType(Job, [
   jobRunType?: JobRunType;
   configProfileId?: string;
   config?: Record<string, unknown>;
-  /** Agent lane: create the jobs already IN_PROGRESS on this worker so the
-   * registry claim never sees them. */
-  assignWorkerId?: string;
-  /** Refuse (BadRequest) when the fan-out would create more jobs than this. */
-  maxJobs?: number;
 }
 
 // --- Category-Specific Result DTOs ---
@@ -293,3 +288,5 @@ export class ScreenshotResultDto extends BaseResultDto {
   @Expose()
   payload?: Record<string, unknown>;
 }
+
+

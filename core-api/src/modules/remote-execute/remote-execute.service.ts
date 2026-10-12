@@ -4,7 +4,11 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { RedisService } from '@/services/redis/redis.service';
-import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
+import {
+  type RemoteExecuteCommand,
+  RemoteExecuteSubscribeService,
+  type ToolRunPayload,
+} from '@/modules/workers/remote-execute-subscribe.service';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { Observable } from 'rxjs';
 import type { MessageEvent } from '@nestjs/common';
@@ -34,6 +38,12 @@ enum ResultEventType {
   EXIT = 3,
   ERROR = 4,
 }
+
+type ResultEventListener = (event: {
+  type: ResultEventType;
+  data: string;
+  exitCode: number;
+}) => void;
 
 interface ResultEvent {
   id: string;
@@ -143,17 +153,66 @@ export class RemoteExecuteService {
    *
    * Collects all events (stdout, stderr) until EXIT or ERROR is received.
    */
-  async waitForResult(
+  waitForResult(
     command: string,
     sessionId: string,
     conversationId: string,
     workspaceId: string,
     timeoutMs = 60_000,
-    onEvent?: (event: {
-      type: ResultEventType;
-      data: string;
-      exitCode: number;
-    }) => void,
+    onEvent?: ResultEventListener,
+  ): Promise<RemoteCommandResult> {
+    return this.collectResults(
+      sessionId,
+      command,
+      () =>
+        this.remoteExecuteSubscribeService.pushCommandWithConversation(
+          conversationId,
+          workspaceId,
+          sessionId,
+          command,
+        ),
+      timeoutMs,
+      onEvent,
+    );
+  }
+
+  /**
+   * Runs one connector tool on the given worker and returns its raw output.
+   * Not a job: nothing is written to the database. `command` in the result
+   * is `<tool> <target>` for display.
+   */
+  waitForToolRun(
+    workerId: string,
+    toolRun: ToolRunPayload,
+    sessionId: string,
+    timeoutMs: number,
+    onEvent?: ResultEventListener,
+    abortSignal?: AbortSignal,
+  ): Promise<RemoteCommandResult> {
+    return this.collectResults(
+      sessionId,
+      `${toolRun.tool} ${toolRun.target}`,
+      () =>
+        Promise.resolve(
+          this.remoteExecuteSubscribeService.pushToolRun(
+            workerId,
+            sessionId,
+            toolRun,
+          ),
+        ),
+      timeoutMs,
+      onEvent,
+      abortSignal,
+    );
+  }
+
+  private async collectResults(
+    sessionId: string,
+    command: string,
+    push: () => Promise<RemoteExecuteCommand | null>,
+    timeoutMs: number,
+    onEvent?: ResultEventListener,
+    abortSignal?: AbortSignal,
   ): Promise<RemoteCommandResult> {
     const channel = `remote-execute:results:${sessionId}`;
 
@@ -243,13 +302,7 @@ export class RemoteExecuteService {
       `[waitForResult] Subscription confirmed, pushing command`,
     );
 
-    const pushResult =
-      await this.remoteExecuteSubscribeService.pushCommandWithConversation(
-        conversationId,
-        workspaceId,
-        sessionId,
-        command,
-      );
+    const pushResult = await push();
 
     if (!pushResult) {
       this.redisService.unsubscribe(channel).catch((err) => {
@@ -264,9 +317,17 @@ export class RemoteExecuteService {
       `[waitForResult] Command pushed, waiting for result (timeout: ${timeoutMs}ms)`,
     );
 
+    let timer: NodeJS.Timeout | undefined;
+    let aborted = false;
+    const onAbort = () => {
+      aborted = true;
+      waitResolve?.();
+    };
     await new Promise<void>((resolve) => {
       waitResolve = resolve;
-      setTimeout(() => {
+      if (abortSignal?.aborted) onAbort();
+      abortSignal?.addEventListener('abort', onAbort, { once: true });
+      timer = setTimeout(() => {
         if (!resolved) {
           resolved = true;
           this.logger.warn(
@@ -280,6 +341,15 @@ export class RemoteExecuteService {
         resolve();
       }, timeoutMs);
     });
+    clearTimeout(timer);
+    abortSignal?.removeEventListener('abort', onAbort);
+    if (aborted && !resolved) {
+      resolved = true;
+      this.remoteExecuteSubscribeService.removeSession(sessionId);
+      this.redisService.unsubscribe(channel).catch((err) => {
+        this.logger.warn(`Failed to unsubscribe on abort: ${err}`);
+      });
+    }
 
     const exitEvent = events.find((e) => e.type === ResultEventType.EXIT);
     const errorEvent = events.find((e) => e.type === ResultEventType.ERROR);
@@ -306,8 +376,8 @@ export class RemoteExecuteService {
       stdout,
       stderr,
       exitCode: exitEvent?.exitCode ?? null,
-      error: errorEvent?.data ?? null,
-      timedOut: isTimedOut,
+      error: errorEvent?.data ?? (aborted ? 'Cancelled by user' : null),
+      timedOut: isTimedOut && !aborted,
     };
   }
 }

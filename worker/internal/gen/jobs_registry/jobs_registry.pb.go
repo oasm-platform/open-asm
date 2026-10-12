@@ -139,11 +139,8 @@ type Job struct {
 	Cpu            *string `protobuf:"bytes,9,opt,name=cpu,proto3,oneof" json:"cpu,omitempty"`                                               // e.g. "500m" (millicores) or "1" (cores)
 	Memory         *string `protobuf:"bytes,10,opt,name=memory,proto3,oneof" json:"memory,omitempty"`                                        // e.g. "512Mi", "1Gi"
 	TimeoutSeconds *int32  `protobuf:"varint,11,opt,name=timeout_seconds,json=timeoutSeconds,proto3,oneof" json:"timeout_seconds,omitempty"` // container timeout in seconds
-	// true = dispatched by an AI agent over the agent stream (RemoteExecuteSubscribe);
-	// the worker runs it on the agent lane. Never set on claimed jobs.
-	Agent         bool `protobuf:"varint,12,opt,name=agent,proto3" json:"agent,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Job) Reset() {
@@ -252,13 +249,6 @@ func (x *Job) GetTimeoutSeconds() int32 {
 		return *x.TimeoutSeconds
 	}
 	return 0
-}
-
-func (x *Job) GetAgent() bool {
-	if x != nil {
-		return x.Agent
-	}
-	return false
 }
 
 // Request for the batched claim path. `limit` is the number of free
@@ -1987,7 +1977,7 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\n" +
 	"\x13jobs_registry.proto\x12\rjobs_registry\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\x18\n" +
 	"\x06Worker\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xb7\x03\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xa1\x03\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x05asset\x18\x02 \x01(\v2\x14.jobs_registry.AssetR\x05asset\x12!\n" +
@@ -2000,16 +1990,15 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\x03cpu\x18\t \x01(\tH\x01R\x03cpu\x88\x01\x01\x12\x1b\n" +
 	"\x06memory\x18\n" +
 	" \x01(\tH\x02R\x06memory\x88\x01\x01\x12,\n" +
-	"\x0ftimeout_seconds\x18\v \x01(\x05H\x03R\x0etimeoutSeconds\x88\x01\x01\x12\x14\n" +
-	"\x05agent\x18\f \x01(\bR\x05agentB\n" +
+	"\x0ftimeout_seconds\x18\v \x01(\x05H\x03R\x0etimeoutSeconds\x88\x01\x01B\n" +
 	"\n" +
 	"\b_commandB\x06\n" +
 	"\x04_cpuB\t\n" +
 	"\a_memoryB\x12\n" +
-	"\x10_timeout_seconds\">\n" +
+	"\x10_timeout_seconds\"8\n" +
 	"\x10NextBatchRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
-	"\x05limit\x18\x02 \x01(\x05R\x05limitJ\x04\b\x03\x10\x04\"5\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\"5\n" +
 	"\aJobList\x12*\n" +
 	"\x06values\x18\x01 \x03(\v2\x12.jobs_registry.JobR\x06values\"'\n" +
 	"\vJobResponse\x12\x18\n" +

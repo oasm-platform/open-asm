@@ -13,7 +13,6 @@ import { AgentsApprovalsService } from './agents.approvals';
 import { AgentCommandApproval } from './entities/agent-command-approval.entity';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentsService } from './agents.service';
-import { AgentConnectorRunService } from './agent-connector-run.service';
 import { AgentTool } from './agents.tools';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsSkillsService } from './agents.skills';
@@ -55,7 +54,6 @@ import { HttpModule } from '@nestjs/axios';
     AgentsService,
     AgentsCompletionsService,
     AgentTool,
-    AgentConnectorRunService,
     AgentsMcpService,
     AgentsMemoriesService,
     AgentsSkillsService,

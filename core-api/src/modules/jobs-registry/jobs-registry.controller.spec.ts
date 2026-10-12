@@ -82,19 +82,10 @@ describe('JobsRegistryController', () => {
         controllers: [JobsRegistryController],
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
-          {
-            provide: ConnectorRegistryService,
-            useValue: mockConnectorRegistry,
-          },
-          {
-            provide: ToolConfigProfilesService,
-            useValue: mockToolConfigProfilesService,
-          },
+          { provide: ConnectorRegistryService, useValue: mockConnectorRegistry },
+          { provide: ToolConfigProfilesService, useValue: mockToolConfigProfilesService },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
-          {
-            provide: WorkersService,
-            useValue: { validateWorkerToken: jest.fn() },
-          },
+          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
         ],
       }).compile();
@@ -110,18 +101,41 @@ describe('JobsRegistryController', () => {
       expect(result).toEqual({ id: '', asset: {}, command: '' });
     });
 
-    it('should delegate the wire mapping to the service', async () => {
-      const job = { id: 'job-1' };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(job);
-      mockJobsRegistryService.toGrpcJob = jest
-        .fn()
-        .mockResolvedValue({ id: 'job-1', tool: 'nikto' });
+    it('should send the connector slug, not the display name, as the job tool', async () => {
+      // The worker derives the container name and the in-container TOOL env var
+      // from the proto `tool` field. The manifest display name ("Nikto - Web
+      // Server Scanner") is not a safe identifier: it is long, not unique, and
+      // sanitizes into "nikto---web-server-scanner". The slug is the identifier
+      // connectors are addressed by everywhere else.
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'job-1',
+        workspaceId: 'ws-1',
+        category: 'vulnerability',
+        asset: { value: 'https://example.com' },
+        config: null,
+        configProfileId: undefined,
+        tool: { id: 'nikto', name: 'Nikto - Web Server Scanner' },
+      });
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'Nikto - Web Server Scanner',
+        slug: 'nikto',
+        image: 'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
 
       const result = await controller.next({ id: 'worker-1' });
 
-      expect(mockJobsRegistryService.toGrpcJob).toHaveBeenCalledWith(job);
+      // Lookup still keys off the persisted tool name...
+      expect(mockConnectorRegistry.getConnector).toHaveBeenCalledWith(
+        'Nikto - Web Server Scanner',
+      );
+      // ...but the worker receives the stable slug.
       expect(result.tool).toBe('nikto');
+      expect(result.image).toBe(
+        'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      );
     });
+
   });
 
   // ── url_discovery: REST + gRPC delegation ───────────────────────────
@@ -145,20 +159,14 @@ describe('JobsRegistryController', () => {
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
           {
             provide: ConnectorRegistryService,
-            useValue: {
-              getConnector: jest.fn(),
-              getResourceDefaults: jest.fn(),
-            },
+            useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
           },
           {
             provide: ToolConfigProfilesService,
             useValue: { resolveConfigForJob: jest.fn() },
           },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
-          {
-            provide: WorkersService,
-            useValue: { validateWorkerToken: jest.fn() },
-          },
+          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
         ],
       }).compile();
@@ -178,9 +186,9 @@ describe('JobsRegistryController', () => {
         dto,
       );
 
-      expect(
-        mockJobsRegistryService.updateResultByCategory,
-      ).toHaveBeenCalledTimes(1);
+      expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
+        1,
+      );
       const [workerId, passedDto, category] =
         mockJobsRegistryService.updateResultByCategory.mock.calls[0];
       expect(workerId).toBe('worker-uuid');
@@ -203,9 +211,9 @@ describe('JobsRegistryController', () => {
         urls,
       });
 
-      expect(
-        mockJobsRegistryService.updateResultByCategory,
-      ).toHaveBeenCalledTimes(1);
+      expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
+        1,
+      );
       const [, passedDto, category] =
         mockJobsRegistryService.updateResultByCategory.mock.calls[0];
       expect(passedDto.jobId).toBe('job-uuid');
@@ -229,11 +237,7 @@ describe('JobsRegistryController', () => {
     });
 
     it('S3 regression: updatePortsResult still delegates with PORTS_SCANNER', async () => {
-      const dto = {
-        jobId: 'job-uuid',
-        error: false,
-        payload: [80, 443],
-      } as any;
+      const dto = { jobId: 'job-uuid', error: false, payload: [80, 443] } as any;
 
       await controller.updatePortsResult({ workerId: 'worker-uuid' }, dto);
 
@@ -264,20 +268,14 @@ describe('JobsRegistryController', () => {
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
           {
             provide: ConnectorRegistryService,
-            useValue: {
-              getConnector: jest.fn(),
-              getResourceDefaults: jest.fn(),
-            },
+            useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
           },
           {
             provide: ToolConfigProfilesService,
             useValue: { resolveConfigForJob: jest.fn() },
           },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
-          {
-            provide: WorkersService,
-            useValue: { validateWorkerToken: jest.fn() },
-          },
+          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
         ],
       }).compile();

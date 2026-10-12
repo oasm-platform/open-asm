@@ -228,92 +228,139 @@ describe('approval matching', () => {
   );
 });
 
-describe('AgentTool connector tools', () => {
+describe('AgentTool run_tool', () => {
   const connector = {
     name: 'Nmap',
     slug: 'nmap',
-    capabilities: ['port scan', 'service detection'],
     shortDescription: 'Network mapper',
     agentTool: true,
     image: 'nmap:latest',
   };
-  const targetUuid = '00000000-0000-4000-8000-000000000001';
-  const profileUuid = '00000000-0000-4000-8000-000000000002';
   type Runnable = {
     execute: (input: unknown, options?: unknown) => Promise<unknown>;
   };
 
-  const withDefaults = () => ({
-    connectorRegistry: {
-      getAgentConnectors: jest.fn(() => [connector]),
-      getConnector: jest.fn(() => ({ agentTool: true })),
-    },
+  const createAgentTool = (overrides: Record<string, unknown> = {}) =>
+    Object.assign(Object.create(AgentTool.prototype), {
+      connectorRegistry: {
+        getAgentConnectors: jest.fn(() => [connector]),
+        getConnector: jest.fn(() => connector),
+        getResourceDefaults: jest.fn(() => ({
+          cpu: '500m',
+          memory: '512Mi',
+          timeoutSeconds: 600,
+        })),
+      },
+      toolsService: {
+        getToolByNames: jest.fn().mockResolvedValue([{ id: 't1' }]),
+        getToolById: jest
+          .fn()
+          .mockResolvedValue({ id: 't1', isInstalled: true }),
+      },
+      remoteExecuteSubscribe: {
+        resolveConversationWorker: jest.fn().mockResolvedValue('wk-1'),
+      },
+      toolConfigProfiles: {
+        resolveConfigForJob: jest.fn().mockResolvedValue({ rate: 10 }),
+      },
+      remoteExecuteService: {
+        waitForToolRun: jest.fn().mockResolvedValue({
+          stdout: 'raw output',
+          exitCode: 0,
+          error: null,
+          timedOut: false,
+        }),
+      },
+      ...overrides,
+    }) as AgentTool;
+
+  const runnable = (agentTool: AgentTool) =>
+    agentTool.runToolTool('w1', 'c1') as unknown as Runnable;
+
+  it('is offered in AGENT mode only, and only with a conversation', () => {
+    const agentTool = createAgentTool();
+    expect(
+      agentTool.getTools('w1', AgentMode.AGENT, undefined, 'c1'),
+    ).toHaveProperty('run_tool');
+    expect(
+      agentTool.getTools('w1', AgentMode.ASK, undefined, 'c1'),
+    ).not.toHaveProperty('run_tool');
+    expect(agentTool.runToolTool('w1', '')).toBeNull();
   });
 
-  const createAgentTool = () =>
-    Object.assign(
-      Object.create(AgentTool.prototype),
-      withDefaults(),
-    ) as AgentTool;
-
-  const runnable = (agentTool: AgentTool): Runnable =>
-    (
-      agentTool.getConnectorTools('w1', 'c1')['run_connector_nmap'] as {
-        method: Runnable;
-      }
-    ).method;
-
-  it('exposes an agent connector in AGENT mode and hides it in ASK mode', () => {
+  it('pushes the tool run to the conversation worker and returns its raw output', async () => {
     const agentTool = createAgentTool();
-    const agentTools = agentTool.getTools(
-      'w1',
-      AgentMode.AGENT,
-      undefined,
-      'c1',
-    ) as Record<string, unknown>;
-    expect(agentTools).toHaveProperty('run_connector_nmap');
-    const askTools = agentTool.getTools(
-      'w1',
-      AgentMode.ASK,
-      undefined,
-      'c1',
-    ) as Record<string, unknown>;
-    expect(askTools).not.toHaveProperty('run_connector_nmap');
-  });
-
-  it('delegates to the agent connector run with the conversation and call context', async () => {
-    const agentTool = createAgentTool();
-    const run = jest.fn().mockResolvedValue({ status: 'completed' });
-    (agentTool as any).agentConnectorRun = { run };
     const signal = new AbortController().signal;
     const result = await runnable(agentTool).execute(
-      { targetIds: [targetUuid], configProfileId: profileUuid },
+      { tool: 'nmap', target: 'example.com' },
       { toolCallId: 'call-1', abortSignal: signal },
     );
-    expect(run).toHaveBeenCalledWith({
-      workspaceId: 'w1',
-      conversationId: 'c1',
-      slug: 'nmap',
-      targetIds: [targetUuid],
-      assetIds: [],
-      configProfileId: profileUuid,
-      toolCallId: 'call-1',
-      abortSignal: signal,
-    });
-    expect(result).toEqual({ status: 'completed' });
-  });
 
-  it('offers no connector tools without a conversation', () => {
-    expect(
-      Object.keys(createAgentTool().getConnectorTools('ws-1', '')),
-    ).toEqual([]);
-  });
-
-  it('returns an error when neither targetIds nor assetIds are given', async () => {
-    const agentTool = createAgentTool();
-    const result = await runnable(agentTool).execute({});
+    const wait = (agentTool as any).remoteExecuteService
+      .waitForToolRun as jest.Mock;
+    expect(wait).toHaveBeenCalledWith(
+      'wk-1',
+      {
+        tool: 'nmap',
+        image: 'nmap:latest',
+        target: 'example.com',
+        configJson: '{"rate":10}',
+        cpu: '500m',
+        memory: '512Mi',
+        timeoutSeconds: 600,
+      },
+      expect.any(String),
+      expect.any(Number),
+      expect.any(Function),
+      signal,
+    );
     expect(result).toEqual({
-      error: 'Provide at least one of targetIds or assetIds.',
+      tool: 'nmap',
+      target: 'example.com',
+      stdout: 'raw output',
+      exitCode: 0,
+      error: null,
+      timedOut: false,
+      truncated: false,
     });
+  });
+
+  it('refuses a tool not installed in the workspace', async () => {
+    const agentTool = createAgentTool({
+      toolsService: {
+        getToolByNames: jest.fn().mockResolvedValue([{ id: 't1' }]),
+        getToolById: jest
+          .fn()
+          .mockResolvedValue({ id: 't1', isInstalled: false }),
+      },
+    });
+    await expect(
+      runnable(agentTool).execute(
+        { tool: 'nmap', target: 'example.com' },
+        {
+          toolCallId: 'call-1',
+        },
+      ),
+    ).resolves.toEqual({
+      error: 'Tool nmap is not installed in this workspace.',
+    });
+  });
+
+  it('truncates oversized output', async () => {
+    const agentTool = createAgentTool();
+    (agentTool as any).remoteExecuteService.waitForToolRun = jest
+      .fn()
+      .mockResolvedValue({
+        stdout: 'x'.repeat(40 * 1024),
+        exitCode: 0,
+        error: null,
+        timedOut: false,
+      });
+    const result = (await runnable(agentTool).execute(
+      { tool: 'nmap', target: 'example.com' },
+      { toolCallId: 'call-1' },
+    )) as { stdout: string; truncated: boolean };
+    expect(result.truncated).toBe(true);
+    expect(result.stdout).toHaveLength(32 * 1024);
   });
 });

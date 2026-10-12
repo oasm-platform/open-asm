@@ -503,9 +503,6 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		// boot's ReconcileOrphans recognize this worker's own containers.
 		WorkerID: grpcClient.OwnerID(),
 	}
-	if job.GetAgent() {
-		spec.Lane = execution.AgentLane
-	}
 
 	// Attach manifest resource limits (scheduling context from core-api) when
 	// the job carries them. Legacy jobs / built-in tools omit the fields →
@@ -616,23 +613,6 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	for attempt := 0; attempt < 2; attempt++ {
 		execID, err = mgr.Submit(ctx, spec)
 		for err != nil && errors.Is(err, execution.ErrPoolExhausted) {
-			if spec.Lane == execution.AgentLane {
-				// The agent is waiting on this call: refuse now instead of
-				// queueing for poolWaitBudget. Registry jobs are never preempted.
-				msg := "worker out of capacity (cpu/mem)"
-				log.Warning("[%s] %s", job.Id, msg)
-				Emit(events, TuiEvent{
-					Type:     EventJobCompleted,
-					JobID:    job.Id,
-					Success:  false,
-					ErrorMsg: msg,
-					Duration: time.Since(startTime),
-				})
-				cleanupCtx, cleanupCancel := newDetachedCleanupContext()
-				submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
-				cleanupCancel()
-				return true, false
-			}
 			if time.Now().After(poolWaitUntil) {
 				// Local scheduling gave up on this job: report it so Core can
 				// requeue it, and leave the image alone (a full pool is not an
@@ -1141,25 +1121,4 @@ drain:
 			imageBackoff.RecordSuccess(entry.image)
 		}
 	}
-}
-
-// runAgentJob starts a connector job an AI agent pushed over the agent stream.
-// It never takes a MaxConcurrency slot: the agent lane is bounded only by the
-// node's free CPU/RAM (enforced by the warm pool, failing fast when exhausted),
-// so registry jobs and agent jobs never wait on each other's slots.
-func runAgentJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, wg *sync.WaitGroup) {
-	if mgr == nil || proxy == nil || job.GetImage() == "" {
-		cleanupCtx, cleanupCancel := newDetachedCleanupContext()
-		defer cleanupCancel()
-		submitCategoryError(cleanupCtx, grpcClient, events, job.GetId(), job.GetCategory(),
-			"agent lane: this worker cannot run connector jobs (no container runtime or not a connector job)")
-		return
-	}
-	// The lane is decided by the channel the job arrived on, not the payload.
-	job.Agent = true
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		processJob(ctx, job, grpcClient, nil, "", events, mgr, proxy, func() {})
-	}()
 }

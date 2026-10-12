@@ -131,19 +131,21 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     expect(qb.execute).toHaveBeenCalled();
   });
 
-  it('pushConnectorJob emits a CONNECTOR_JOB event carrying the job', () => {
+  it('pushToolRun emits a RUN_TOOL event carrying the tool run', () => {
     const seen = connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
+    const toolRun = {
+      tool: 'nmap',
+      image: 'img',
+      target: 'example.com',
+      configJson: '',
+    };
 
-    expect(service.pushConnectorJob('w-own', 'call-1', { id: 'job-1' })).toBe(
-      true,
-    );
-    expect(seen.at(-1)).toMatchObject({
+    expect(service.pushToolRun('w-own', 'call-1', toolRun)).toMatchObject({
       type: 3,
       sessionId: 'call-1',
-      job: { id: 'job-1' },
+      toolRun,
     });
-    expect(service.pushConnectorJob('w-gone', 'call-1', { id: 'job-1' })).toBe(
-      false,
-    );
+    expect(seen.at(-1)).toMatchObject({ type: 3, toolRun });
+    expect(service.pushToolRun('w-gone', 'call-1', toolRun)).toBeNull();
   });
 });

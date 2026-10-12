@@ -10,7 +10,6 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-	jobs_registry "oasm-worker/internal/gen/jobs_registry"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -78,8 +77,9 @@ const (
 	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN   RemoteExecuteSubscribeEventType = 0
 	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED RemoteExecuteSubscribeEventType = 1
 	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND   RemoteExecuteSubscribeEventType = 2
-	// An AI agent's connector job, pushed to the conversation's worker.
-	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB RemoteExecuteSubscribeEventType = 3
+	// An AI agent runs one connector tool against one target. Not a job: the
+	// worker streams the raw output back over RemoteExecuteResult.
+	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL RemoteExecuteSubscribeEventType = 3
 )
 
 // Enum value maps for RemoteExecuteSubscribeEventType.
@@ -88,13 +88,13 @@ var (
 		0: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN",
 		1: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED",
 		2: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND",
-		3: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB",
+		3: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL",
 	}
 	RemoteExecuteSubscribeEventType_value = map[string]int32{
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN":       0,
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED":     1,
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND":       2,
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB": 3,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN":   0,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED": 1,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND":   2,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL":  3,
 	}
 )
 
@@ -1180,6 +1180,98 @@ func (*RemoteExecuteSubscribeRequest) Descriptor() ([]byte, []int) {
 	return file_workers_proto_rawDescGZIP(), []int{14}
 }
 
+type ToolRun struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Tool           string                 `protobuf:"bytes,1,opt,name=tool,proto3" json:"tool,omitempty"` // connector slug
+	Image          string                 `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
+	Target         string                 `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"`
+	ConfigJson     string                 `protobuf:"bytes,4,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"` // resolved config profile, "" when none
+	Cpu            *string                `protobuf:"bytes,5,opt,name=cpu,proto3,oneof" json:"cpu,omitempty"`
+	Memory         *string                `protobuf:"bytes,6,opt,name=memory,proto3,oneof" json:"memory,omitempty"`
+	TimeoutSeconds *int32                 `protobuf:"varint,7,opt,name=timeout_seconds,json=timeoutSeconds,proto3,oneof" json:"timeout_seconds,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ToolRun) Reset() {
+	*x = ToolRun{}
+	mi := &file_workers_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolRun) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolRun) ProtoMessage() {}
+
+func (x *ToolRun) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolRun.ProtoReflect.Descriptor instead.
+func (*ToolRun) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ToolRun) GetTool() string {
+	if x != nil {
+		return x.Tool
+	}
+	return ""
+}
+
+func (x *ToolRun) GetImage() string {
+	if x != nil {
+		return x.Image
+	}
+	return ""
+}
+
+func (x *ToolRun) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+func (x *ToolRun) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+func (x *ToolRun) GetCpu() string {
+	if x != nil && x.Cpu != nil {
+		return *x.Cpu
+	}
+	return ""
+}
+
+func (x *ToolRun) GetMemory() string {
+	if x != nil && x.Memory != nil {
+		return *x.Memory
+	}
+	return ""
+}
+
+func (x *ToolRun) GetTimeoutSeconds() int32 {
+	if x != nil && x.TimeoutSeconds != nil {
+		return *x.TimeoutSeconds
+	}
+	return 0
+}
+
 type RemoteExecuteSubscribeResponse struct {
 	state     protoimpl.MessageState          `protogen:"open.v1"`
 	Id        string                          `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1187,15 +1279,15 @@ type RemoteExecuteSubscribeResponse struct {
 	Type      RemoteExecuteSubscribeEventType `protobuf:"varint,3,opt,name=type,proto3,enum=workers.RemoteExecuteSubscribeEventType" json:"type,omitempty"`
 	SessionId string                          `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	Command   string                          `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"`
-	// Set only for CONNECTOR_JOB: the same Job shape the registry poller receives.
-	Job           *jobs_registry.Job `protobuf:"bytes,6,opt,name=job,proto3,oneof" json:"job,omitempty"`
+	// Set only for RUN_TOOL.
+	ToolRun       *ToolRun `protobuf:"bytes,6,opt,name=tool_run,json=toolRun,proto3,oneof" json:"tool_run,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RemoteExecuteSubscribeResponse) Reset() {
 	*x = RemoteExecuteSubscribeResponse{}
-	mi := &file_workers_proto_msgTypes[15]
+	mi := &file_workers_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1207,7 +1299,7 @@ func (x *RemoteExecuteSubscribeResponse) String() string {
 func (*RemoteExecuteSubscribeResponse) ProtoMessage() {}
 
 func (x *RemoteExecuteSubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[15]
+	mi := &file_workers_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1220,7 +1312,7 @@ func (x *RemoteExecuteSubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoteExecuteSubscribeResponse.ProtoReflect.Descriptor instead.
 func (*RemoteExecuteSubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{15}
+	return file_workers_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RemoteExecuteSubscribeResponse) GetId() string {
@@ -1258,9 +1350,9 @@ func (x *RemoteExecuteSubscribeResponse) GetCommand() string {
 	return ""
 }
 
-func (x *RemoteExecuteSubscribeResponse) GetJob() *jobs_registry.Job {
+func (x *RemoteExecuteSubscribeResponse) GetToolRun() *ToolRun {
 	if x != nil {
-		return x.Job
+		return x.ToolRun
 	}
 	return nil
 }
@@ -1278,7 +1370,7 @@ type RemoteExecuteResultStream struct {
 
 func (x *RemoteExecuteResultStream) Reset() {
 	*x = RemoteExecuteResultStream{}
-	mi := &file_workers_proto_msgTypes[16]
+	mi := &file_workers_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1290,7 +1382,7 @@ func (x *RemoteExecuteResultStream) String() string {
 func (*RemoteExecuteResultStream) ProtoMessage() {}
 
 func (x *RemoteExecuteResultStream) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[16]
+	mi := &file_workers_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1303,7 +1395,7 @@ func (x *RemoteExecuteResultStream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoteExecuteResultStream.ProtoReflect.Descriptor instead.
 func (*RemoteExecuteResultStream) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{16}
+	return file_workers_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RemoteExecuteResultStream) GetId() string {
@@ -1351,7 +1443,7 @@ type RemoteExecuteResultAck struct {
 
 func (x *RemoteExecuteResultAck) Reset() {
 	*x = RemoteExecuteResultAck{}
-	mi := &file_workers_proto_msgTypes[17]
+	mi := &file_workers_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1363,7 +1455,7 @@ func (x *RemoteExecuteResultAck) String() string {
 func (*RemoteExecuteResultAck) ProtoMessage() {}
 
 func (x *RemoteExecuteResultAck) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[17]
+	mi := &file_workers_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1376,7 +1468,7 @@ func (x *RemoteExecuteResultAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoteExecuteResultAck.ProtoReflect.Descriptor instead.
 func (*RemoteExecuteResultAck) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{17}
+	return file_workers_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RemoteExecuteResultAck) GetSuccess() bool {
@@ -1409,7 +1501,7 @@ type WorkerNodeTelemetry struct {
 
 func (x *WorkerNodeTelemetry) Reset() {
 	*x = WorkerNodeTelemetry{}
-	mi := &file_workers_proto_msgTypes[18]
+	mi := &file_workers_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1421,7 +1513,7 @@ func (x *WorkerNodeTelemetry) String() string {
 func (*WorkerNodeTelemetry) ProtoMessage() {}
 
 func (x *WorkerNodeTelemetry) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[18]
+	mi := &file_workers_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1434,7 +1526,7 @@ func (x *WorkerNodeTelemetry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerNodeTelemetry.ProtoReflect.Descriptor instead.
 func (*WorkerNodeTelemetry) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{18}
+	return file_workers_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *WorkerNodeTelemetry) GetHostname() string {
@@ -1503,7 +1595,7 @@ type WorkerJobTelemetry struct {
 
 func (x *WorkerJobTelemetry) Reset() {
 	*x = WorkerJobTelemetry{}
-	mi := &file_workers_proto_msgTypes[19]
+	mi := &file_workers_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1515,7 +1607,7 @@ func (x *WorkerJobTelemetry) String() string {
 func (*WorkerJobTelemetry) ProtoMessage() {}
 
 func (x *WorkerJobTelemetry) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[19]
+	mi := &file_workers_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1528,7 +1620,7 @@ func (x *WorkerJobTelemetry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerJobTelemetry.ProtoReflect.Descriptor instead.
 func (*WorkerJobTelemetry) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{19}
+	return file_workers_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *WorkerJobTelemetry) GetActive() uint32 {
@@ -1577,7 +1669,7 @@ type ManagedContainerTelemetry struct {
 
 func (x *ManagedContainerTelemetry) Reset() {
 	*x = ManagedContainerTelemetry{}
-	mi := &file_workers_proto_msgTypes[20]
+	mi := &file_workers_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1589,7 +1681,7 @@ func (x *ManagedContainerTelemetry) String() string {
 func (*ManagedContainerTelemetry) ProtoMessage() {}
 
 func (x *ManagedContainerTelemetry) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[20]
+	mi := &file_workers_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1602,7 +1694,7 @@ func (x *ManagedContainerTelemetry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ManagedContainerTelemetry.ProtoReflect.Descriptor instead.
 func (*ManagedContainerTelemetry) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{20}
+	return file_workers_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ManagedContainerTelemetry) GetContainerId() string {
@@ -1788,7 +1880,7 @@ type WorkerContainersTelemetry struct {
 
 func (x *WorkerContainersTelemetry) Reset() {
 	*x = WorkerContainersTelemetry{}
-	mi := &file_workers_proto_msgTypes[21]
+	mi := &file_workers_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1800,7 +1892,7 @@ func (x *WorkerContainersTelemetry) String() string {
 func (*WorkerContainersTelemetry) ProtoMessage() {}
 
 func (x *WorkerContainersTelemetry) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[21]
+	mi := &file_workers_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1813,7 +1905,7 @@ func (x *WorkerContainersTelemetry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerContainersTelemetry.ProtoReflect.Descriptor instead.
 func (*WorkerContainersTelemetry) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{21}
+	return file_workers_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *WorkerContainersTelemetry) GetSupported() bool {
@@ -1884,7 +1976,7 @@ type WorkerTelemetryRequest struct {
 
 func (x *WorkerTelemetryRequest) Reset() {
 	*x = WorkerTelemetryRequest{}
-	mi := &file_workers_proto_msgTypes[22]
+	mi := &file_workers_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1896,7 +1988,7 @@ func (x *WorkerTelemetryRequest) String() string {
 func (*WorkerTelemetryRequest) ProtoMessage() {}
 
 func (x *WorkerTelemetryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[22]
+	mi := &file_workers_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1909,7 +2001,7 @@ func (x *WorkerTelemetryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerTelemetryRequest.ProtoReflect.Descriptor instead.
 func (*WorkerTelemetryRequest) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{22}
+	return file_workers_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *WorkerTelemetryRequest) GetSchemaVersion() uint32 {
@@ -2001,7 +2093,7 @@ type WorkerTelemetryResponse struct {
 
 func (x *WorkerTelemetryResponse) Reset() {
 	*x = WorkerTelemetryResponse{}
-	mi := &file_workers_proto_msgTypes[23]
+	mi := &file_workers_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2013,7 +2105,7 @@ func (x *WorkerTelemetryResponse) String() string {
 func (*WorkerTelemetryResponse) ProtoMessage() {}
 
 func (x *WorkerTelemetryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[23]
+	mi := &file_workers_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2026,7 +2118,7 @@ func (x *WorkerTelemetryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerTelemetryResponse.ProtoReflect.Descriptor instead.
 func (*WorkerTelemetryResponse) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{23}
+	return file_workers_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *WorkerTelemetryResponse) GetAcceptedSequence() uint64 {
@@ -2070,7 +2162,7 @@ type WorkerToCore struct {
 
 func (x *WorkerToCore) Reset() {
 	*x = WorkerToCore{}
-	mi := &file_workers_proto_msgTypes[24]
+	mi := &file_workers_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2082,7 +2174,7 @@ func (x *WorkerToCore) String() string {
 func (*WorkerToCore) ProtoMessage() {}
 
 func (x *WorkerToCore) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[24]
+	mi := &file_workers_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2095,7 +2187,7 @@ func (x *WorkerToCore) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerToCore.ProtoReflect.Descriptor instead.
 func (*WorkerToCore) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{24}
+	return file_workers_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *WorkerToCore) GetPayload() isWorkerToCore_Payload {
@@ -2153,7 +2245,7 @@ type CoreToWorker struct {
 
 func (x *CoreToWorker) Reset() {
 	*x = CoreToWorker{}
-	mi := &file_workers_proto_msgTypes[25]
+	mi := &file_workers_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2165,7 +2257,7 @@ func (x *CoreToWorker) String() string {
 func (*CoreToWorker) ProtoMessage() {}
 
 func (x *CoreToWorker) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[25]
+	mi := &file_workers_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2178,7 +2270,7 @@ func (x *CoreToWorker) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CoreToWorker.ProtoReflect.Descriptor instead.
 func (*CoreToWorker) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{25}
+	return file_workers_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *CoreToWorker) GetPayload() isCoreToWorker_Payload {
@@ -2253,7 +2345,7 @@ type RegisterRequest struct {
 
 func (x *RegisterRequest) Reset() {
 	*x = RegisterRequest{}
-	mi := &file_workers_proto_msgTypes[26]
+	mi := &file_workers_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2265,7 +2357,7 @@ func (x *RegisterRequest) String() string {
 func (*RegisterRequest) ProtoMessage() {}
 
 func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[26]
+	mi := &file_workers_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2278,7 +2370,7 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{26}
+	return file_workers_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RegisterRequest) GetApiKey() string {
@@ -2330,7 +2422,7 @@ type RegisterResponse struct {
 
 func (x *RegisterResponse) Reset() {
 	*x = RegisterResponse{}
-	mi := &file_workers_proto_msgTypes[27]
+	mi := &file_workers_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2342,7 +2434,7 @@ func (x *RegisterResponse) String() string {
 func (*RegisterResponse) ProtoMessage() {}
 
 func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[27]
+	mi := &file_workers_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2355,7 +2447,7 @@ func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
 func (*RegisterResponse) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{27}
+	return file_workers_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *RegisterResponse) GetWorkerId() string {
@@ -2404,7 +2496,7 @@ type Heartbeat struct {
 
 func (x *Heartbeat) Reset() {
 	*x = Heartbeat{}
-	mi := &file_workers_proto_msgTypes[28]
+	mi := &file_workers_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2416,7 +2508,7 @@ func (x *Heartbeat) String() string {
 func (*Heartbeat) ProtoMessage() {}
 
 func (x *Heartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[28]
+	mi := &file_workers_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2429,7 +2521,7 @@ func (x *Heartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
 func (*Heartbeat) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{28}
+	return file_workers_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Heartbeat) GetWorkerId() string {
@@ -2463,7 +2555,7 @@ type HeartbeatAck struct {
 
 func (x *HeartbeatAck) Reset() {
 	*x = HeartbeatAck{}
-	mi := &file_workers_proto_msgTypes[29]
+	mi := &file_workers_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2475,7 +2567,7 @@ func (x *HeartbeatAck) String() string {
 func (*HeartbeatAck) ProtoMessage() {}
 
 func (x *HeartbeatAck) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[29]
+	mi := &file_workers_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2488,7 +2580,7 @@ func (x *HeartbeatAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatAck.ProtoReflect.Descriptor instead.
 func (*HeartbeatAck) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{29}
+	return file_workers_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *HeartbeatAck) GetWorkerId() string {
@@ -2519,7 +2611,7 @@ type CancelRequest struct {
 
 func (x *CancelRequest) Reset() {
 	*x = CancelRequest{}
-	mi := &file_workers_proto_msgTypes[30]
+	mi := &file_workers_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2531,7 +2623,7 @@ func (x *CancelRequest) String() string {
 func (*CancelRequest) ProtoMessage() {}
 
 func (x *CancelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[30]
+	mi := &file_workers_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2544,7 +2636,7 @@ func (x *CancelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRequest.ProtoReflect.Descriptor instead.
 func (*CancelRequest) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{30}
+	return file_workers_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *CancelRequest) GetJobId() string {
@@ -2572,7 +2664,7 @@ var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
 	"\n" +
-	"\rworkers.proto\x12\aworkers\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13jobs_registry.proto\"\xb0\x01\n" +
+	"\rworkers.proto\x12\aworkers\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb0\x01\n" +
 	"\vJoinRequest\x12\x17\n" +
 	"\aapi_key\x18\x01 \x01(\tR\x06apiKey\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\tR\tsignature\x12\x19\n" +
@@ -2628,16 +2720,28 @@ const file_workers_proto_rawDesc = "" +
 	"\x1bBuiltinToolRegistryResponse\x12\x1d\n" +
 	"\n" +
 	"tool_paths\x18\x01 \x03(\tR\ttoolPaths\"\x1f\n" +
-	"\x1dRemoteExecuteSubscribeRequest\"\xf7\x01\n" +
+	"\x1dRemoteExecuteSubscribeRequest\"\xf5\x01\n" +
+	"\aToolRun\x12\x12\n" +
+	"\x04tool\x18\x01 \x01(\tR\x04tool\x12\x14\n" +
+	"\x05image\x18\x02 \x01(\tR\x05image\x12\x16\n" +
+	"\x06target\x18\x03 \x01(\tR\x06target\x12\x1f\n" +
+	"\vconfig_json\x18\x04 \x01(\tR\n" +
+	"configJson\x12\x15\n" +
+	"\x03cpu\x18\x05 \x01(\tH\x00R\x03cpu\x88\x01\x01\x12\x1b\n" +
+	"\x06memory\x18\x06 \x01(\tH\x01R\x06memory\x88\x01\x01\x12,\n" +
+	"\x0ftimeout_seconds\x18\a \x01(\x05H\x02R\x0etimeoutSeconds\x88\x01\x01B\x06\n" +
+	"\x04_cpuB\t\n" +
+	"\a_memoryB\x12\n" +
+	"\x10_timeout_seconds\"\x83\x02\n" +
 	"\x1eRemoteExecuteSubscribeResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tworker_id\x18\x02 \x01(\tR\bworkerId\x12<\n" +
 	"\x04type\x18\x03 \x01(\x0e2(.workers.RemoteExecuteSubscribeEventTypeR\x04type\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x18\n" +
-	"\acommand\x18\x05 \x01(\tR\acommand\x12)\n" +
-	"\x03job\x18\x06 \x01(\v2\x12.jobs_registry.JobH\x00R\x03job\x88\x01\x01B\x06\n" +
-	"\x04_job\"\xb6\x01\n" +
+	"\acommand\x18\x05 \x01(\tR\acommand\x120\n" +
+	"\btool_run\x18\x06 \x01(\v2\x10.workers.ToolRunH\x00R\atoolRun\x88\x01\x01B\v\n" +
+	"\t_tool_run\"\xb6\x01\n" +
 	"\x19RemoteExecuteResultStream\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -2771,12 +2875,12 @@ const file_workers_proto_rawDesc = "" +
 	"\rWorkerRunMode\x12\x1b\n" +
 	"\x17WORKER_RUN_MODE_UNKNOWN\x10\x00\x12\x17\n" +
 	"\x13WORKER_RUN_MODE_CLI\x10\x01\x12\x18\n" +
-	"\x14WORKER_RUN_MODE_NODE\x10\x02*\xd9\x01\n" +
+	"\x14WORKER_RUN_MODE_NODE\x10\x02*\xd4\x01\n" +
 	"\x1fRemoteExecuteSubscribeEventType\x12*\n" +
 	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN\x10\x00\x12,\n" +
 	"(REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED\x10\x01\x12*\n" +
-	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND\x10\x02\x120\n" +
-	",REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB\x10\x03*\xc6\x01\n" +
+	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND\x10\x02\x12+\n" +
+	"'REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL\x10\x03*\xc6\x01\n" +
 	"\x1cRemoteExecuteResultEventType\x12!\n" +
 	"\x1dREMOTE_EXECUTE_RESULT_UNKNOWN\x10\x00\x12 \n" +
 	"\x1cREMOTE_EXECUTE_RESULT_STDOUT\x10\x01\x12 \n" +
@@ -2832,7 +2936,7 @@ func file_workers_proto_rawDescGZIP() []byte {
 }
 
 var file_workers_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_workers_proto_goTypes = []any{
 	(WorkerRunMode)(0),                     // 0: workers.WorkerRunMode
 	(RemoteExecuteSubscribeEventType)(0),   // 1: workers.RemoteExecuteSubscribeEventType
@@ -2856,23 +2960,23 @@ var file_workers_proto_goTypes = []any{
 	(*BuiltinToolRegistryRequest)(nil),     // 19: workers.BuiltinToolRegistryRequest
 	(*BuiltinToolRegistryResponse)(nil),    // 20: workers.BuiltinToolRegistryResponse
 	(*RemoteExecuteSubscribeRequest)(nil),  // 21: workers.RemoteExecuteSubscribeRequest
-	(*RemoteExecuteSubscribeResponse)(nil), // 22: workers.RemoteExecuteSubscribeResponse
-	(*RemoteExecuteResultStream)(nil),      // 23: workers.RemoteExecuteResultStream
-	(*RemoteExecuteResultAck)(nil),         // 24: workers.RemoteExecuteResultAck
-	(*WorkerNodeTelemetry)(nil),            // 25: workers.WorkerNodeTelemetry
-	(*WorkerJobTelemetry)(nil),             // 26: workers.WorkerJobTelemetry
-	(*ManagedContainerTelemetry)(nil),      // 27: workers.ManagedContainerTelemetry
-	(*WorkerContainersTelemetry)(nil),      // 28: workers.WorkerContainersTelemetry
-	(*WorkerTelemetryRequest)(nil),         // 29: workers.WorkerTelemetryRequest
-	(*WorkerTelemetryResponse)(nil),        // 30: workers.WorkerTelemetryResponse
-	(*WorkerToCore)(nil),                   // 31: workers.WorkerToCore
-	(*CoreToWorker)(nil),                   // 32: workers.CoreToWorker
-	(*RegisterRequest)(nil),                // 33: workers.RegisterRequest
-	(*RegisterResponse)(nil),               // 34: workers.RegisterResponse
-	(*Heartbeat)(nil),                      // 35: workers.Heartbeat
-	(*HeartbeatAck)(nil),                   // 36: workers.HeartbeatAck
-	(*CancelRequest)(nil),                  // 37: workers.CancelRequest
-	(*jobs_registry.Job)(nil),              // 38: jobs_registry.Job
+	(*ToolRun)(nil),                        // 22: workers.ToolRun
+	(*RemoteExecuteSubscribeResponse)(nil), // 23: workers.RemoteExecuteSubscribeResponse
+	(*RemoteExecuteResultStream)(nil),      // 24: workers.RemoteExecuteResultStream
+	(*RemoteExecuteResultAck)(nil),         // 25: workers.RemoteExecuteResultAck
+	(*WorkerNodeTelemetry)(nil),            // 26: workers.WorkerNodeTelemetry
+	(*WorkerJobTelemetry)(nil),             // 27: workers.WorkerJobTelemetry
+	(*ManagedContainerTelemetry)(nil),      // 28: workers.ManagedContainerTelemetry
+	(*WorkerContainersTelemetry)(nil),      // 29: workers.WorkerContainersTelemetry
+	(*WorkerTelemetryRequest)(nil),         // 30: workers.WorkerTelemetryRequest
+	(*WorkerTelemetryResponse)(nil),        // 31: workers.WorkerTelemetryResponse
+	(*WorkerToCore)(nil),                   // 32: workers.WorkerToCore
+	(*CoreToWorker)(nil),                   // 33: workers.CoreToWorker
+	(*RegisterRequest)(nil),                // 34: workers.RegisterRequest
+	(*RegisterResponse)(nil),               // 35: workers.RegisterResponse
+	(*Heartbeat)(nil),                      // 36: workers.Heartbeat
+	(*HeartbeatAck)(nil),                   // 37: workers.HeartbeatAck
+	(*CancelRequest)(nil),                  // 38: workers.CancelRequest
 	(*timestamppb.Timestamp)(nil),          // 39: google.protobuf.Timestamp
 }
 var file_workers_proto_depIdxs = []int32{
@@ -2880,7 +2984,7 @@ var file_workers_proto_depIdxs = []int32{
 	0,  // 1: workers.WorkerMetadata.mode:type_name -> workers.WorkerRunMode
 	16, // 2: workers.ConnectInternalNetworkRequest.network_interfaces:type_name -> workers.NetworkInterfaceMessage
 	1,  // 3: workers.RemoteExecuteSubscribeResponse.type:type_name -> workers.RemoteExecuteSubscribeEventType
-	38, // 4: workers.RemoteExecuteSubscribeResponse.job:type_name -> jobs_registry.Job
+	22, // 4: workers.RemoteExecuteSubscribeResponse.tool_run:type_name -> workers.ToolRun
 	2,  // 5: workers.RemoteExecuteResultStream.type:type_name -> workers.RemoteExecuteResultEventType
 	4,  // 6: workers.ManagedContainerTelemetry.runtime_state:type_name -> workers.ContainerRuntimeState
 	5,  // 7: workers.ManagedContainerTelemetry.health_state:type_name -> workers.ContainerHealthState
@@ -2890,40 +2994,40 @@ var file_workers_proto_depIdxs = []int32{
 	39, // 11: workers.ManagedContainerTelemetry.finished_at:type_name -> google.protobuf.Timestamp
 	39, // 12: workers.ManagedContainerTelemetry.state_changed_at:type_name -> google.protobuf.Timestamp
 	39, // 13: workers.ManagedContainerTelemetry.last_used_at:type_name -> google.protobuf.Timestamp
-	27, // 14: workers.WorkerContainersTelemetry.items:type_name -> workers.ManagedContainerTelemetry
+	28, // 14: workers.WorkerContainersTelemetry.items:type_name -> workers.ManagedContainerTelemetry
 	39, // 15: workers.WorkerTelemetryRequest.observed_at:type_name -> google.protobuf.Timestamp
 	39, // 16: workers.WorkerTelemetryRequest.started_at:type_name -> google.protobuf.Timestamp
 	3,  // 17: workers.WorkerTelemetryRequest.state:type_name -> workers.WorkerRuntimeState
-	25, // 18: workers.WorkerTelemetryRequest.node:type_name -> workers.WorkerNodeTelemetry
-	26, // 19: workers.WorkerTelemetryRequest.jobs:type_name -> workers.WorkerJobTelemetry
-	28, // 20: workers.WorkerTelemetryRequest.containers:type_name -> workers.WorkerContainersTelemetry
+	26, // 18: workers.WorkerTelemetryRequest.node:type_name -> workers.WorkerNodeTelemetry
+	27, // 19: workers.WorkerTelemetryRequest.jobs:type_name -> workers.WorkerJobTelemetry
+	29, // 20: workers.WorkerTelemetryRequest.containers:type_name -> workers.WorkerContainersTelemetry
 	39, // 21: workers.WorkerTelemetryResponse.received_at:type_name -> google.protobuf.Timestamp
-	33, // 22: workers.WorkerToCore.register:type_name -> workers.RegisterRequest
-	35, // 23: workers.WorkerToCore.heartbeat:type_name -> workers.Heartbeat
-	34, // 24: workers.CoreToWorker.register_resp:type_name -> workers.RegisterResponse
-	36, // 25: workers.CoreToWorker.heartbeat_ack:type_name -> workers.HeartbeatAck
-	37, // 26: workers.CoreToWorker.cancel:type_name -> workers.CancelRequest
+	34, // 22: workers.WorkerToCore.register:type_name -> workers.RegisterRequest
+	36, // 23: workers.WorkerToCore.heartbeat:type_name -> workers.Heartbeat
+	35, // 24: workers.CoreToWorker.register_resp:type_name -> workers.RegisterResponse
+	37, // 25: workers.CoreToWorker.heartbeat_ack:type_name -> workers.HeartbeatAck
+	38, // 26: workers.CoreToWorker.cancel:type_name -> workers.CancelRequest
 	8,  // 27: workers.RegisterRequest.metadata:type_name -> workers.WorkerMetadata
 	7,  // 28: workers.WorkersService.Join:input_type -> workers.JoinRequest
 	10, // 29: workers.WorkersService.Alive:input_type -> workers.AliveRequest
-	29, // 30: workers.WorkersService.WorkerTelemetry:input_type -> workers.WorkerTelemetryRequest
+	30, // 30: workers.WorkersService.WorkerTelemetry:input_type -> workers.WorkerTelemetryRequest
 	12, // 31: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
 	14, // 32: workers.WorkersService.Storage:input_type -> workers.StorageRequest
 	17, // 33: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
 	19, // 34: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
 	21, // 35: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
-	23, // 36: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
-	31, // 37: workers.WorkersService.Connect:input_type -> workers.WorkerToCore
+	24, // 36: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
+	32, // 37: workers.WorkersService.Connect:input_type -> workers.WorkerToCore
 	9,  // 38: workers.WorkersService.Join:output_type -> workers.JoinResponse
 	11, // 39: workers.WorkersService.Alive:output_type -> workers.AliveResponse
-	30, // 40: workers.WorkersService.WorkerTelemetry:output_type -> workers.WorkerTelemetryResponse
+	31, // 40: workers.WorkersService.WorkerTelemetry:output_type -> workers.WorkerTelemetryResponse
 	13, // 41: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
 	15, // 42: workers.WorkersService.Storage:output_type -> workers.StorageResponse
 	18, // 43: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
 	20, // 44: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
-	22, // 45: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
-	24, // 46: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
-	32, // 47: workers.WorkersService.Connect:output_type -> workers.CoreToWorker
+	23, // 45: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
+	25, // 46: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
+	33, // 47: workers.WorkersService.Connect:output_type -> workers.CoreToWorker
 	38, // [38:48] is the sub-list for method output_type
 	28, // [28:38] is the sub-list for method input_type
 	28, // [28:28] is the sub-list for extension type_name
@@ -2939,25 +3043,26 @@ func file_workers_proto_init() {
 	file_workers_proto_msgTypes[0].OneofWrappers = []any{}
 	file_workers_proto_msgTypes[1].OneofWrappers = []any{}
 	file_workers_proto_msgTypes[15].OneofWrappers = []any{}
-	file_workers_proto_msgTypes[20].OneofWrappers = []any{}
-	file_workers_proto_msgTypes[24].OneofWrappers = []any{
+	file_workers_proto_msgTypes[16].OneofWrappers = []any{}
+	file_workers_proto_msgTypes[21].OneofWrappers = []any{}
+	file_workers_proto_msgTypes[25].OneofWrappers = []any{
 		(*WorkerToCore_Register)(nil),
 		(*WorkerToCore_Heartbeat)(nil),
 	}
-	file_workers_proto_msgTypes[25].OneofWrappers = []any{
+	file_workers_proto_msgTypes[26].OneofWrappers = []any{
 		(*CoreToWorker_RegisterResp)(nil),
 		(*CoreToWorker_HeartbeatAck)(nil),
 		(*CoreToWorker_Cancel)(nil),
 	}
-	file_workers_proto_msgTypes[26].OneofWrappers = []any{}
-	file_workers_proto_msgTypes[30].OneofWrappers = []any{}
+	file_workers_proto_msgTypes[27].OneofWrappers = []any{}
+	file_workers_proto_msgTypes[31].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workers_proto_rawDesc), len(file_workers_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   31,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

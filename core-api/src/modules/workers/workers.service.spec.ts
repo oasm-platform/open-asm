@@ -82,7 +82,6 @@ describe('WorkersService', () => {
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn(),
       },
-      failAgentJobs: jest.fn().mockResolvedValue(0),
     } as any;
 
     mockApiKeysService = {
@@ -330,32 +329,6 @@ describe('WorkersService', () => {
 
       expect(sql).toContain('j."retryCount" < 4');
       expect(sql).not.toContain('ELSE j.status');
-    });
-  });
-
-  describe('agent jobs on worker loss', () => {
-    it('releaseWorkerJobs fails the worker agent jobs and requeues only registry jobs', async () => {
-      await service.releaseWorkerJobs('w1');
-
-      expect(mockJobsRegistryService.failAgentJobs).toHaveBeenCalledWith(
-        { workerId: 'w1' },
-        'worker disconnected',
-      );
-      const sql = (
-        (mockJobsRegistryService.repo as any).andWhere as jest.Mock
-      ).mock.calls.map((c: unknown[]) => String(c[0]));
-      expect(sql.some((s) => s.includes(`"jobRunType" = 'agent'`))).toBe(true);
-    });
-
-    it('the stuck/retry sweep skips agent jobs', async () => {
-      const query = jest.fn().mockResolvedValue(undefined);
-      (mockWorkerInstanceRepository as any).manager = { query };
-
-      await (service as any).resetStuckAndFailedJobs();
-
-      expect(String(query.mock.calls.at(-1)[0])).toContain(
-        `"jobRunType" = 'agent'`,
-      );
     });
   });
 

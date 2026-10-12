@@ -260,12 +260,6 @@ export class JobResultProcessor extends WorkerHost {
 
       const completedJob = { ...job, status: JobStatus.COMPLETED, completedAt };
 
-      await this.jobsRegistryService.publishAgentJobDone(
-        job,
-        JobStatus.COMPLETED,
-        { result: dataForSync ?? rawResult.raw ?? undefined },
-      );
-
       // Hand the terminal job to the workflow engine: it dispatches every step
       // whose `needs` are now satisfied and marks the run done when nothing is
       // left to run. A step that spawns no jobs is a no-input skip, not the end

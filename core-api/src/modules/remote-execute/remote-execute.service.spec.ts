@@ -16,6 +16,7 @@ describe('RemoteExecuteService', () => {
   let mockRemoteExecuteSubscribeService: {
     pushCommandWithSession: jest.Mock;
     pushCommandWithConversation: jest.Mock;
+    pushToolRun: jest.Mock;
     removeSession: jest.Mock;
   };
 
@@ -28,6 +29,7 @@ describe('RemoteExecuteService', () => {
     mockRemoteExecuteSubscribeService = {
       pushCommandWithSession: jest.fn(),
       pushCommandWithConversation: jest.fn(),
+      pushToolRun: jest.fn(),
       removeSession: jest.fn(),
     };
 
@@ -974,6 +976,76 @@ describe('RemoteExecuteService', () => {
 
       expect(result.stdout).toBe('before exit\n');
       expect(result.timedOut).toBe(false);
+    });
+  });
+
+  describe('waitForToolRun', () => {
+    const sessionId = 'run-1';
+    const channel = `remote-execute:results:${sessionId}`;
+    const toolRun = {
+      tool: 'nmap',
+      image: 'img',
+      target: 'example.com',
+      configJson: '',
+    };
+
+    let cb: SubscribeCallback;
+    beforeEach(() => {
+      mockRedisService.subscribe.mockImplementation(
+        (_ch: string, fn: SubscribeCallback) => {
+          cb = fn;
+          return Promise.resolve();
+        },
+      );
+      mockRemoteExecuteSubscribeService.pushToolRun.mockReturnValue({
+        id: 'cmd-9',
+        workerId: 'wk-1',
+      });
+    });
+
+    it('pushes the tool run to the worker and returns the raw output', async () => {
+      const promise = service.waitForToolRun('wk-1', toolRun, sessionId, 5000);
+      await new Promise((r) => setTimeout(r, 10));
+      cb(channel, JSON.stringify({ type: 1, data: 'open 80\n' }));
+      cb(channel, JSON.stringify({ type: 3, data: '', exitCode: 0 }));
+
+      const result = await promise;
+      expect(
+        mockRemoteExecuteSubscribeService.pushToolRun,
+      ).toHaveBeenCalledWith('wk-1', sessionId, toolRun);
+      expect(result).toMatchObject({
+        command: 'nmap example.com',
+        stdout: 'open 80\n',
+        exitCode: 0,
+        error: null,
+        timedOut: false,
+      });
+    });
+
+    it('stops waiting when the call is aborted', async () => {
+      const controller = new AbortController();
+      const promise = service.waitForToolRun(
+        'wk-1',
+        toolRun,
+        sessionId,
+        60_000,
+        undefined,
+        controller.signal,
+      );
+      await new Promise((r) => setTimeout(r, 10));
+      controller.abort();
+
+      const result = await promise;
+      expect(result.error).toBe('Cancelled by user');
+      expect(result.timedOut).toBe(false);
+      expect(mockRedisService.unsubscribe).toHaveBeenCalledWith(channel);
+    });
+
+    it('throws when the worker stream is gone', async () => {
+      mockRemoteExecuteSubscribeService.pushToolRun.mockReturnValue(null);
+      await expect(
+        service.waitForToolRun('wk-1', toolRun, sessionId, 5000),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
 });

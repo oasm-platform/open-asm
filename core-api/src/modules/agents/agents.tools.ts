@@ -16,11 +16,12 @@ import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.servi
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
+import { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
+import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 
-import { AgentConnectorRunService } from './agent-connector-run.service';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   AgentsApprovalsService,
@@ -148,6 +149,9 @@ function isPrivateIp(ip: string): boolean {
   return false;
 }
 
+export const AGENT_TOOL_RUN_TIMEOUT_MS = 5 * 60_000;
+const AGENT_TOOL_OUTPUT_MAX = 32 * 1024;
+
 @Injectable()
 export class AgentTool {
   private readonly logger = new Logger(AgentTool.name);
@@ -174,7 +178,8 @@ export class AgentTool {
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly approvals: AgentsApprovalsService,
     private readonly connectorRegistry: ConnectorRegistryService,
-    private readonly agentConnectorRun: AgentConnectorRunService,
+    private readonly toolConfigProfiles: ToolConfigProfilesService,
+    private readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
   ) {}
 
   get getAssetsTool(): (workspaceId: string) => any {
@@ -1350,73 +1355,141 @@ export class AgentTool {
   }
 
   /**
-   * One AI tool per connector flagged `agentTool: true` in the manifest.
-   * Agent-only: the [AGENT] permission keeps them out of Ask mode, mcp:false
-   * keeps them off the MCP surface, and the empty READ_ONLY_TOOLS set means
-   * withApproval wraps them (MANUAL asks) like any other mutating tool.
+   * run_tool: runs one connector flagged `agentTool: true` against one target
+   * on the conversation's worker and returns the worker's raw output. Not a
+   * job: nothing goes through the job registry or the database. Agent-only,
+   * off the MCP surface, and approval-gated like any mutating tool (the
+   * target is free text).
    */
-  getConnectorTools(
+  runToolTool(
     workspaceId: string,
     conversationId: string,
-  ): Record<
-    string,
-    { method: ToolType; permissions: AgentMode[]; mcp: boolean }
-  > {
-    const tools: Record<
-      string,
-      { method: ToolType; permissions: AgentMode[]; mcp: boolean }
-    > = {};
+    emitter?: EventEmitter,
+  ): ToolType | null {
+    const slugs = this.connectorRegistry
+      .getAgentConnectors()
+      .map((entry) => entry.slug);
+    // Runs on the conversation's pinned worker, so none without a conversation.
+    if (!conversationId || slugs.length === 0) return null;
 
-    // Connectors run on the conversation's pinned worker, so none are offered without a conversation.
-    if (!conversationId) return tools;
+    const inputSchema = z.object({
+      tool: z
+        .enum(slugs as [string, ...string[]])
+        .describe('Connector slug to run'),
+      target: z
+        .string()
+        .min(1)
+        .describe('Target passed to the tool: domain, IP, host:port or URL'),
+      configProfileId: z.string().uuid().optional(),
+    });
+    const catalog = this.connectorRegistry
+      .getAgentConnectors()
+      .map(
+        (entry) =>
+          `- ${entry.slug}: ${entry.shortDescription ?? entry.description ?? ''}`,
+      )
+      .join('\n');
 
-    for (const entry of this.connectorRegistry.getAgentConnectors()) {
-      const slug = entry.slug;
-      const key = `run_connector_${slug.replace(/[^a-z0-9_]/g, '_')}`;
-      const capabilities = (entry.capabilities ?? []).join(', ');
-      const shortDescription =
-        entry.shortDescription ?? entry.description ?? '';
-      const inputSchema = z.object({
-        targetIds: z.array(z.string().uuid()).optional(),
-        assetIds: z.array(z.string().uuid()).optional(),
-        configProfileId: z.string().uuid().optional(),
-      });
+    const toolConfig: any = {
+      description: [
+        "Run one security tool against one target on this conversation's worker and get its raw output.",
+        'Nothing is saved: results are not stored as assets or vulnerabilities.',
+        `Waits up to ${AGENT_TOOL_RUN_TIMEOUT_MS / 60_000} minutes. Output: stdout, exitCode, error, timedOut, truncated.`,
+        'Params: tool (slug), target, optional configProfileId.',
+        'Tools:',
+        catalog,
+      ].join('\n'),
+      inputSchema,
+      execute: async (
+        params: z.infer<typeof inputSchema>,
+        options: { toolCallId: string; abortSignal?: AbortSignal },
+      ) => {
+        const { tool: slug, target, configProfileId } = params;
+        const entry = this.connectorRegistry.getConnector(slug);
+        // Tool.name IS the connector slug; getToolById sets isInstalled from
+        // workspace_tools, so a connector of another workspace cannot run.
+        const [toolRow] = await this.toolsService.getToolByNames({
+          names: [slug],
+        });
+        const installed = toolRow?.id
+          ? await this.toolsService.getToolById(toolRow.id, workspaceId)
+          : null;
+        if (!entry?.image || !installed?.isInstalled) {
+          return { error: `Tool ${slug} is not installed in this workspace.` };
+        }
 
-      const toolConfig: any = {
-        description: `Run the ${entry.name} connector (${capabilities}): ${shortDescription}. Runs on this conversation's worker and returns the findings (waits up to 5 minutes; longer scans return status "running" and keep saving results). At most 20 assets per call. Params: targetIds and/or assetIds (at least one), optional configProfileId.`,
-        inputSchema,
-        execute: async (
-          params: z.infer<typeof inputSchema>,
-          options: { toolCallId: string; abortSignal?: AbortSignal },
-        ) => {
-          const targetIds = params.targetIds ?? [];
-          const assetIds = params.assetIds ?? [];
-          // Validated here, not via .refine: a ZodEffects schema does not
-          // survive AI SDK JSON-schema conversion.
-          if (targetIds.length === 0 && assetIds.length === 0) {
-            return { error: 'Provide at least one of targetIds or assetIds.' };
-          }
-          return this.agentConnectorRun.run({
-            workspaceId,
+        const workerId =
+          await this.remoteExecuteSubscribe.resolveConversationWorker(
             conversationId,
-            slug,
-            targetIds,
-            assetIds,
-            configProfileId: params.configProfileId,
-            toolCallId: options.toolCallId,
-            abortSignal: options.abortSignal,
-          });
-        },
-      };
+            workspaceId,
+          );
+        if (!workerId) {
+          return {
+            error:
+              'No worker available for this workspace. Select a workspace worker for this conversation.',
+          };
+        }
 
-      tools[key] = {
-        method: tool(toolConfig),
-        permissions: [AgentMode.AGENT],
-        mcp: false,
-      };
-    }
+        let config: Record<string, unknown> | undefined;
+        try {
+          config = await this.toolConfigProfiles.resolveConfigForJob(
+            workspaceId,
+            installed.id!,
+            { configProfileId },
+          );
+        } catch (error) {
+          return {
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
 
-    return tools;
+        const limits = this.connectorRegistry.getResourceDefaults(slug);
+        let result: Awaited<ReturnType<RemoteExecuteService['waitForToolRun']>>;
+        try {
+          result = await this.remoteExecuteService.waitForToolRun(
+            workerId,
+            {
+              tool: slug,
+              image: entry.image,
+              target,
+              configJson:
+                config && Object.keys(config).length > 0
+                  ? JSON.stringify(config)
+                  : '',
+              cpu: limits.cpu,
+              memory: limits.memory,
+              timeoutSeconds: limits.timeoutSeconds,
+            },
+            randomUUID(),
+            AGENT_TOOL_RUN_TIMEOUT_MS,
+            (event) =>
+              emitter?.emit('remote-execute-output', {
+                toolCallId: options.toolCallId,
+                ...event,
+              }),
+            options.abortSignal,
+          );
+        } catch (error) {
+          // The worker stream closed between resolving and pushing.
+          return {
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+        const truncated = result.stdout.length > AGENT_TOOL_OUTPUT_MAX;
+        return {
+          tool: slug,
+          target,
+          stdout: truncated
+            ? result.stdout.slice(0, AGENT_TOOL_OUTPUT_MAX)
+            : result.stdout,
+          exitCode: result.exitCode,
+          error: result.error,
+          timedOut: result.timedOut,
+          truncated,
+        };
+      },
+    };
+    return tool(toolConfig);
   }
 
   getTools(
@@ -1432,8 +1505,6 @@ export class AgentTool {
       string,
       { method: ToolType; permissions: AgentMode[]; mcp: boolean }
     > = {
-      // Connector tools first so a built-in of the same key wins on collision.
-      ...this.getConnectorTools(workspaceId, conversationId ?? ''),
       enumerate_assets: {
         method: this.getAssetsTool(workspaceId),
         permissions: [AGENT, ASK],
@@ -1525,6 +1596,14 @@ export class AgentTool {
         mcp: false,
       },
     };
+    const runTool = this.runToolTool(
+      workspaceId,
+      conversationId ?? '',
+      emitter,
+    );
+    if (runTool) {
+      tools.run_tool = { method: runTool, permissions: [AGENT], mcp: false };
+    }
 
     return Object.fromEntries(
       Object.entries(tools)

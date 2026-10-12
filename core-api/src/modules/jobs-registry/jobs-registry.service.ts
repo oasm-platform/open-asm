@@ -19,7 +19,6 @@ import {
 } from '@/common/enums/enum';
 import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { RedisService } from '@/services/redis/redis.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
@@ -116,10 +115,10 @@ const orderJob = (job: WorkflowStepDefinition): WorkflowJob => ({
   run: job.run,
   // Authored `needs` may be a single string (legacy array form); the
   // definition is always stored canonical.
-  ...(normalizeNeeds(job.needs).length
-    ? { needs: normalizeNeeds(job.needs) }
+  ...(normalizeNeeds(job.needs).length ? { needs: normalizeNeeds(job.needs) } : {}),
+  ...(job.allowFailure !== undefined
+    ? { allowFailure: job.allowFailure }
     : {}),
-  ...(job.allowFailure !== undefined ? { allowFailure: job.allowFailure } : {}),
   ...(job.config ? { config: job.config } : {}),
   ...(job.configProfileId ? { configProfileId: job.configProfileId } : {}),
 });
@@ -147,68 +146,6 @@ const JOB_HISTORY_STATUS_SQL = `CASE
           ELSE '${JobStatus.PENDING}'
         END`;
 
-/**
- * Packs a single JSON-ish value into a `google.protobuf.Value` wire object.
- * protobufjs only reads the `fields` key of a Struct (and the oneof key of a
- * Value), so plain records/values are silently dropped during gRPC encoding.
- */
-function packStructValue(value: unknown): Record<string, unknown> {
-  if (value === null) return { nullValue: 0 };
-  switch (typeof value) {
-    case 'string':
-      return { stringValue: value };
-    case 'number':
-      return { numberValue: value };
-    case 'boolean':
-      return { boolValue: value };
-    case 'object':
-      if (Array.isArray(value)) {
-        return { listValue: { values: value.map(packStructValue) } };
-      }
-      return {
-        structValue: {
-          fields: packStructFields(value as Record<string, unknown>),
-        },
-      };
-    default:
-      // undefined / function / symbol — not JSON-representable; omit at field level
-      return { nullValue: 0 };
-  }
-}
-
-/** Packs a plain record into a `google.protobuf.Struct` `fields` map. */
-function packStructFields(
-  record: Record<string, unknown>,
-): Record<string, Record<string, unknown>> {
-  const fields: Record<string, Record<string, unknown>> = {};
-  for (const [key, val] of Object.entries(record)) {
-    if (val !== undefined) fields[key] = packStructValue(val);
-  }
-  return fields;
-}
-
-/** Redis channel an agent tool call waits on for its jobs' outcomes. */
-export const agentJobDoneChannel = (jobHistoryId: string) =>
-  `agent-job:done:${jobHistoryId}`;
-
-export interface AgentJobDoneMessage {
-  jobId: string;
-  status: JobStatus;
-  error?: string;
-  excerpt?: string;
-}
-
-const AGENT_EXCERPT_MAX = 8 * 1024;
-
-/**
- * SQL predicate excluding agent-lane jobs. They are pushed, never claimed, so
- * requeueing one to PENDING would strand it forever.
- */
-export const notAgentJobSql = (alias?: string) => {
-  const col = alias ? `${alias}."jobHistoryId"` : `"jobHistoryId"`;
-  return `(${col} IS NULL OR ${col} NOT IN (SELECT id FROM job_histories WHERE "jobRunType" = '${JobRunType.AGENT}'))`;
-};
-
 @Injectable()
 export class JobsRegistryService {
   constructor(
@@ -226,183 +163,8 @@ export class JobsRegistryService {
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
     private readonly workerStreamRegistry: WorkerStreamRegistry,
-    private readonly redisService: RedisService,
   ) {}
   private readonly logger = new Logger(JobsRegistryService.name);
-  /**
-   * Maps one claimed job to the gRPC `Job` wire shape. Shared by `Next` and
-   * `NextBatch` so the two paths can never drift apart.
-   */
-  public async toGrpcJob(
-    job: GetNextJobResult,
-  ): Promise<Record<string, unknown>> {
-    // Connector path: tool metadata present → look up registry
-    const connectorEntry = job.tool
-      ? this.connectorRegistry.getConnector(job.tool.name)
-      : null;
-
-    if (connectorEntry?.image) {
-      let config: Record<string, unknown> | undefined;
-      try {
-        config = await this.toolConfigProfilesService.resolveConfigForJob(
-          job.workspaceId!,
-          job.tool!.id,
-          {
-            config: job.config ?? undefined,
-            configProfileId: job.configProfileId,
-          },
-        );
-      } catch {
-        // Never log decrypted payload — generic message only
-        this.logger.warn('profile decrypt failed');
-      }
-
-      // Manifest resource limits — scheduling context for the worker runtime.
-      // Field names match the proto (cpu/memory/timeoutSeconds).
-      const defaults = this.connectorRegistry.getResourceDefaults(
-        job.tool!.name,
-      );
-
-      const response: Record<string, unknown> = {
-        id: job.id,
-        asset: job.asset,
-        category: job.category,
-        // The worker derives the connector container name and the in-container
-        // TOOL env var from this field, so it must be the manifest slug — the
-        // stable identifier connectors are addressed by everywhere else. The
-        // display name is long, not unique, and sanitizes into names like
-        // "oasm-nikto---web-server-scanner-ghcr-io-00fe". A malformed manifest
-        // without a slug falls back to the name so the job still runs.
-        tool: connectorEntry.slug || connectorEntry.name,
-        image: connectorEntry.image,
-        cpu: defaults.cpu,
-        memory: defaults.memory,
-        timeoutSeconds: defaults.timeoutSeconds,
-        inputs: {
-          fields: { target: { stringValue: job.asset.value } },
-        },
-      };
-
-      if (config && Object.keys(config).length > 0) {
-        response.config = { fields: packStructFields(config) };
-      }
-
-      return response;
-    }
-
-    // Legacy path — byte-for-byte compatible
-    return {
-      id: job.id,
-      asset: job.asset,
-      command: job.command,
-      category: job.category,
-    };
-  }
-
-  /** gRPC payloads for agent jobs pushed over the agent stream. */
-  public async buildAgentGrpcJobs(
-    jobIds: string[],
-  ): Promise<Record<string, unknown>[]> {
-    const jobs = await this.repo.find({
-      where: { id: In(jobIds) },
-      relations: { asset: { target: true }, tool: true },
-    });
-    return Promise.all(
-      jobs.map(async (job) => ({
-        ...(await this.toGrpcJob({
-          id: job.id,
-          category: job.category,
-          createdAt: job.createdAt,
-          updatedAt: job.updatedAt,
-          priority: job.priority,
-          command: job.command,
-          asset: job.asset,
-          tool: { id: job.tool.id!, name: job.tool.name },
-          workspaceId: job.asset.target?.workspaceId,
-          configProfileId: job.configProfileId,
-          config: job.config,
-        })),
-        agent: true,
-      })),
-    );
-  }
-
-  /**
-   * Fails in-flight agent jobs (they cannot be requeued: no lane claims them)
-   * and wakes the agent calls waiting on them. Returns how many were failed.
-   */
-  public async failAgentJobs(
-    filter: { workerId: string } | { jobIds: string[] },
-    reason: string,
-  ): Promise<number> {
-    const qb = this.repo
-      .createQueryBuilder()
-      .update(Job)
-      .set({ status: JobStatus.FAILED })
-      .where('status = :status', { status: JobStatus.IN_PROGRESS })
-      .andWhere(
-        `"jobHistoryId" IN (SELECT id FROM job_histories WHERE "jobRunType" = :agent)`,
-        { agent: JobRunType.AGENT },
-      )
-      .returning(['id', 'jobHistoryId']);
-    if ('workerId' in filter) {
-      qb.andWhere('"workerId" = :workerId', { workerId: filter.workerId });
-    } else {
-      if (filter.jobIds.length === 0) return 0;
-      qb.andWhere('id IN (:...jobIds)', { jobIds: filter.jobIds });
-    }
-    const rows = ((await qb.execute()).raw ?? []) as {
-      id: string;
-      jobHistoryId: string;
-    }[];
-    await Promise.all(
-      rows.map((row) =>
-        this.publishAgentJobDone(
-          {
-            id: row.id,
-            jobHistory: { id: row.jobHistoryId, jobRunType: JobRunType.AGENT },
-          },
-          JobStatus.FAILED,
-          { error: reason },
-        ),
-      ),
-    );
-    return rows.length;
-  }
-
-  /** Wakes the agent tool call waiting on this job. No-op for non-agent jobs. */
-  public async publishAgentJobDone(
-    job: {
-      id: string;
-      jobHistory?: { id: string; jobRunType?: JobRunType } | null;
-    },
-    status: JobStatus,
-    extra: { error?: string; result?: unknown } = {},
-  ): Promise<void> {
-    if (!job.jobHistory || job.jobHistory.jobRunType !== JobRunType.AGENT) {
-      return;
-    }
-    const message: AgentJobDoneMessage = {
-      jobId: job.id,
-      status,
-      error: extra.error,
-      excerpt:
-        extra.result === undefined
-          ? undefined
-          : JSON.stringify(extra.result).slice(0, AGENT_EXCERPT_MAX),
-    };
-    try {
-      await this.redisService.publish(
-        agentJobDoneChannel(job.jobHistory.id),
-        JSON.stringify(message),
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Failed to publish agent job outcome for ${job.id}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
   public async getManyJobs(
     workspaceId: string,
     query: GetManyJobsRequestDto,
@@ -505,8 +267,6 @@ export class JobsRegistryService {
     jobRunType,
     configProfileId,
     config,
-    assignWorkerId,
-    maxJobs,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
@@ -553,7 +313,8 @@ export class JobsRegistryService {
           }
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message =
+          error instanceof Error ? error.message : String(error);
         this.logger.warn(
           `[config-profile] ${tool.name}: ${message} (profileId=${configProfileId ?? 'none'}, workspace=${workspaceId})`,
         );
@@ -642,9 +403,7 @@ export class JobsRegistryService {
           asset: assetService.asset, // Use the associated asset from asset service
           assetService, // Store the asset service reference
           jobName: tool.name,
-          status: assignWorkerId ? JobStatus.IN_PROGRESS : JobStatus.PENDING,
-          workerId: assignWorkerId,
-          pickJobAt: assignWorkerId ? new Date() : undefined,
+          status: JobStatus.PENDING,
           category: tool.category,
           tool,
           priority: priority ?? 4,
@@ -657,7 +416,7 @@ export class JobsRegistryService {
                 port: assetService.port.toString(),
               }),
           configProfileId: isConnector ? configProfileId : undefined,
-          config: isConnector ? (mergedConfig ?? config ?? null) : null,
+          config: isConnector ? mergedConfig ?? config ?? null : null,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
@@ -684,9 +443,7 @@ export class JobsRegistryService {
           id: randomUUID(),
           asset,
           jobName: tool.name,
-          status: assignWorkerId ? JobStatus.IN_PROGRESS : JobStatus.PENDING,
-          workerId: assignWorkerId,
-          pickJobAt: assignWorkerId ? new Date() : undefined,
+          status: JobStatus.PENDING,
           category: tool.category,
           tool,
           priority: priority ?? 4,
@@ -697,31 +454,13 @@ export class JobsRegistryService {
                 value: asset.value,
               }),
           configProfileId: isConnector ? configProfileId : undefined,
-          config: isConnector ? (mergedConfig ?? config ?? null) : null,
+          config: isConnector ? mergedConfig ?? config ?? null : null,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>);
 
         jobsToInsert.push(job);
       }
-    }
-
-    if (maxJobs !== undefined && jobsToInsert.length > maxJobs) {
-      if (!existingJobHistory) {
-        await this.jobHistoryRepo.delete(jobHistory.id);
-      }
-      throw new BadRequestException(
-        `Too many jobs (${jobsToInsert.length} > ${maxJobs}); narrow targetIds/assetIds`,
-      );
-    }
-
-    // An agent run that matched nothing must not leave an empty history behind.
-    if (
-      jobsToInsert.length === 0 &&
-      jobRunType === JobRunType.AGENT &&
-      !existingJobHistory
-    ) {
-      await this.jobHistoryRepo.delete(jobHistory.id);
     }
 
     // Step 4: save all jobs
@@ -986,17 +725,6 @@ export class JobsRegistryService {
         // [OPT-1] Use addOrderBy for compound sort (priority first, then createdAt)
         .orderBy('jobs.priority', 'DESC')
         .addOrderBy('jobs.createdAt', 'ASC');
-
-      // Agent-lane jobs are pushed to their worker over the agent stream and
-      // created IN_PROGRESS, so this claim never sees them. The filter is a
-      // safety net for any path that might requeue one. LEFT JOIN so a job with
-      // no history (null run type) stays claimable; lock only `jobs` — Postgres
-      // rejects FOR UPDATE on the nullable side of an outer join.
-      queryBuilder.leftJoin('jobs.jobHistory', 'jobHistory');
-      queryBuilder.andWhere(
-        '(jobHistory.jobRunType IS NULL OR jobHistory.jobRunType <> :agentRunType)',
-        { agentRunType: JobRunType.AGENT },
-      );
 
       // [OPT-3] Only join workspace when actually needed
       if (isBuiltInTools && worker.scope !== WorkerScope.CLOUD) {
@@ -1314,11 +1042,7 @@ export class JobsRegistryService {
       },
     );
 
-    if (failed.affected) {
-      await this.publishAgentJobDone(job, JobStatus.FAILED, {
-        error: error.message,
-      });
-    } else {
+    if (!failed.affected) {
       this.logger.warn(
         `Job ${job.id} left IN_PROGRESS before its failure was applied; keeping its current status`,
       );
@@ -1566,7 +1290,8 @@ export class JobsRegistryService {
 
     // The window counts the filtered groups, so an empty page means no rows
     // matched at all rather than a missing count.
-    const total = rawResults.length > 0 ? parseInt(rawResults[0].total, 10) : 0;
+    const total =
+      rawResults.length > 0 ? parseInt(rawResults[0].total, 10) : 0;
 
     // Transform raw results to match the response DTO structure
     const transformedData = rawResults.map((raw) => ({
@@ -1684,13 +1409,13 @@ export class JobsRegistryService {
     jobHistory: JobHistory,
     workspaceId: string,
   ): Promise<{ tools: ToolWithStatusDto[]; steps: WorkflowStepStatusDto[] }> {
-    // Query tool statuses computed from actual jobs in this history
-    // Uses CASE/COUNT pattern from targets.service.ts L472-475
-    const rawToolStatuses = await this.repo
-      .createQueryBuilder('job')
-      .select([
-        'job.toolId as "toolId"',
-        `CASE
+  // Query tool statuses computed from actual jobs in this history
+  // Uses CASE/COUNT pattern from targets.service.ts L472-475
+  const rawToolStatuses = await this.repo
+    .createQueryBuilder('job')
+    .select([
+      'job.toolId as "toolId"',
+      `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.CANCELLED}' THEN 1 END) > 0
              AND COUNT(CASE WHEN job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}') THEN 1 END) = 0 THEN '${JobStatus.CANCELLED}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -1699,102 +1424,102 @@ export class JobsRegistryService {
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.COMPLETED}' THEN 1 END) > 0 THEN '${JobStatus.COMPLETED}'
         ELSE '${JobStatus.PENDING}'
       END as "status"`,
-      ])
-      .where('job.jobHistoryId = :historyId', { historyId: jobHistory.id })
-      .groupBy('job.toolId')
-      .getRawMany<{ toolId: string; status: JobStatus }>();
+    ])
+    .where('job.jobHistoryId = :historyId', { historyId: jobHistory.id })
+    .groupBy('job.toolId')
+    .getRawMany<{ toolId: string; status: JobStatus }>();
 
-    // Build a lookup map: toolId → computed status
-    const toolStatusMap = new Map<string, JobStatus>();
-    rawToolStatuses.forEach((row) => toolStatusMap.set(row.toolId, row.status));
+  // Build a lookup map: toolId → computed status
+  const toolStatusMap = new Map<string, JobStatus>();
+  rawToolStatuses.forEach((row) => toolStatusMap.set(row.toolId, row.status));
 
-    // Map tools from workflow content with their computed status.
-    // Only id/name/logoUrl/status are exposed — the UI renders nothing else
-    // from these records, so the rest of the Tool entity is omitted to save
-    // bandwidth (the full entity is only resolved server-side for matching).
-    const instaledTools = await this.toolsService.getInstalledTools(
-      {},
-      workspaceId,
-    );
-    // Index installed tools by name once. The old `.find()` inside `.map()`
-    // rescanned the whole installed-tool list for every workflow step, making
-    // this O(steps x tools). First match wins, matching the previous behaviour.
-    const installedToolsByName = new Map<
-      string,
-      (typeof instaledTools.data)[number]
-    >();
-    for (const tool of instaledTools.data) {
-      if (!installedToolsByName.has(tool.name)) {
-        installedToolsByName.set(tool.name, tool);
+  // Map tools from workflow content with their computed status.
+  // Only id/name/logoUrl/status are exposed — the UI renders nothing else
+  // from these records, so the rest of the Tool entity is omitted to save
+  // bandwidth (the full entity is only resolved server-side for matching).
+  const instaledTools = await this.toolsService.getInstalledTools(
+    {},
+    workspaceId,
+  );
+  // Index installed tools by name once. The old `.find()` inside `.map()`
+  // rescanned the whole installed-tool list for every workflow step, making
+  // this O(steps x tools). First match wins, matching the previous behaviour.
+  const installedToolsByName = new Map<
+    string,
+    (typeof instaledTools.data)[number]
+  >();
+  for (const tool of instaledTools.data) {
+    if (!installedToolsByName.has(tool.name)) {
+      installedToolsByName.set(tool.name, tool);
+    }
+  }
+
+  // Dependency order, not stored order: `content` is jsonb and Postgres does
+  // not preserve the map's key order.
+  const workflowJobs = orderedJobEntries(jobHistory.workflow?.content.jobs);
+
+  const tools = workflowJobs
+    .map(([, job]) => installedToolsByName.get(job.run))
+    .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined)
+    .map((tool) => ({
+      id: tool.id,
+      name: tool.name,
+      logoUrl: tool.logoUrl,
+      // Undefined when the tool has no job rows in this history (e.g. all
+      // jobs deleted) — the UI renders no badge instead of a misleading
+      // "pending".
+      status: toolStatusMap.get(tool.id!),
+    }));
+
+  // Post-process: if a tool at a later index has completed, mark earlier
+  // pending tools as skipped — the workflow clearly moved past them.
+  let hasCompletedAhead = false;
+  for (let i = tools.length - 1; i >= 0; i--) {
+    if (tools[i].status === JobStatus.COMPLETED) {
+      hasCompletedAhead = true;
+    } else if (tools[i].status === JobStatus.PENDING && hasCompletedAhead) {
+      tools[i].status = JobStatus.SKIPPED;
+    }
+  }
+
+  // Steps as the workflow engine recorded them: which ones ran in parallel,
+  // which are waiting on `needs`, and why a step never ran. Runs created
+  // before the engine have no persisted state (`steps = {}`) and fall back to
+  // the status derived from their job rows so old run pages keep working.
+  const persistedSteps = jobHistory.steps ?? {};
+  const hasPersistedState = Object.keys(persistedSteps).length > 0;
+  const steps: WorkflowStepStatusDto[] = workflowJobs.map(([id, job]) => {
+    const tool = installedToolsByName.get(job.run);
+    const state = persistedSteps[id];
+    const derived = tool ? toolStatusMap.get(tool.id!) : undefined;
+    return {
+      id,
+      name: job.name ?? id,
+      run: job.run,
+      needs: normalizeNeeds(job.needs),
+      status: state?.status ?? this.toRunStepStatus(derived),
+      reason: state?.reason,
+      jobs: state?.jobs ?? 0,
+      failed: state?.failed,
+      toolId: tool?.id,
+      logoUrl: tool?.logoUrl,
+      dispatchedAt: state?.dispatchedAt
+        ? new Date(state.dispatchedAt)
+        : undefined,
+      finishedAt: state?.finishedAt ? new Date(state.finishedAt) : undefined,
+    };
+  });
+
+  if (!hasPersistedState) {
+    let completedAhead = false;
+    for (let i = steps.length - 1; i >= 0; i--) {
+      if (steps[i].status === 'done') {
+        completedAhead = true;
+      } else if (steps[i].status === 'pending' && completedAhead) {
+        steps[i].status = 'skipped';
       }
     }
-
-    // Dependency order, not stored order: `content` is jsonb and Postgres does
-    // not preserve the map's key order.
-    const workflowJobs = orderedJobEntries(jobHistory.workflow?.content.jobs);
-
-    const tools = workflowJobs
-      .map(([, job]) => installedToolsByName.get(job.run))
-      .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined)
-      .map((tool) => ({
-        id: tool.id,
-        name: tool.name,
-        logoUrl: tool.logoUrl,
-        // Undefined when the tool has no job rows in this history (e.g. all
-        // jobs deleted) — the UI renders no badge instead of a misleading
-        // "pending".
-        status: toolStatusMap.get(tool.id!),
-      }));
-
-    // Post-process: if a tool at a later index has completed, mark earlier
-    // pending tools as skipped — the workflow clearly moved past them.
-    let hasCompletedAhead = false;
-    for (let i = tools.length - 1; i >= 0; i--) {
-      if (tools[i].status === JobStatus.COMPLETED) {
-        hasCompletedAhead = true;
-      } else if (tools[i].status === JobStatus.PENDING && hasCompletedAhead) {
-        tools[i].status = JobStatus.SKIPPED;
-      }
-    }
-
-    // Steps as the workflow engine recorded them: which ones ran in parallel,
-    // which are waiting on `needs`, and why a step never ran. Runs created
-    // before the engine have no persisted state (`steps = {}`) and fall back to
-    // the status derived from their job rows so old run pages keep working.
-    const persistedSteps = jobHistory.steps ?? {};
-    const hasPersistedState = Object.keys(persistedSteps).length > 0;
-    const steps: WorkflowStepStatusDto[] = workflowJobs.map(([id, job]) => {
-      const tool = installedToolsByName.get(job.run);
-      const state = persistedSteps[id];
-      const derived = tool ? toolStatusMap.get(tool.id!) : undefined;
-      return {
-        id,
-        name: job.name ?? id,
-        run: job.run,
-        needs: normalizeNeeds(job.needs),
-        status: state?.status ?? this.toRunStepStatus(derived),
-        reason: state?.reason,
-        jobs: state?.jobs ?? 0,
-        failed: state?.failed,
-        toolId: tool?.id,
-        logoUrl: tool?.logoUrl,
-        dispatchedAt: state?.dispatchedAt
-          ? new Date(state.dispatchedAt)
-          : undefined,
-        finishedAt: state?.finishedAt ? new Date(state.finishedAt) : undefined,
-      };
-    });
-
-    if (!hasPersistedState) {
-      let completedAhead = false;
-      for (let i = steps.length - 1; i >= 0; i--) {
-        if (steps[i].status === 'done') {
-          completedAhead = true;
-        } else if (steps[i].status === 'pending' && completedAhead) {
-          steps[i].status = 'skipped';
-        }
-      }
-    }
+  }
 
     return { tools, steps };
   }
@@ -1806,14 +1531,12 @@ export class JobsRegistryService {
    * written from), so the code view would otherwise print them shuffled.
    * ponytail: hand-rolled key lists; add a key here when the templates grow one.
    */
-  private orderWorkflowContent(
-    content?: WorkflowContent,
-  ): WorkflowContent | undefined {
+  private orderWorkflowContent(content?: WorkflowContent): WorkflowContent | undefined {
     if (!content) return undefined;
 
-    const jobs: [string, WorkflowJob][] = orderedJobEntries(content.jobs).map(
-      ([id, job]) => [id, orderJob(job)],
-    );
+    const jobs: [string, WorkflowJob][] = orderedJobEntries(
+      content.jobs,
+    ).map(([id, job]) => [id, orderJob(job)]);
 
     return {
       name: content.name,
@@ -1862,7 +1585,6 @@ export class JobsRegistryService {
         .innerJoin('job.asset', 'asset')
         .innerJoin('asset.target', 'target')
         .innerJoin('target.workspace', 'workspace')
-        .leftJoinAndSelect('job.jobHistory', 'jobHistory')
         .where('job.id = :jobId', { jobId })
         .andWhere('workspace.id = :workspaceId', { workspaceId })
         .getOne();
@@ -1892,11 +1614,6 @@ export class JobsRegistryService {
     try {
       // Verify job exists and belongs to workspace
       const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
-      if (job.jobHistory?.jobRunType === JobRunType.AGENT) {
-        throw new BadRequestException(
-          'Agent jobs cannot be re-run; ask the agent again',
-        );
-      }
 
       // Update job status, clear workerId, and increment retryCount
       job.status = JobStatus.PENDING;
@@ -2015,16 +1732,6 @@ export class JobsRegistryService {
         .andWhere('job.workerId IS NOT NULL')
         .getRawMany<{ jobId: string; workerId: string }>();
 
-      // Jobs that are not yet terminal: an agent call may be waiting on them.
-      const unfinished = await queryRunner.manager
-        .createQueryBuilder(Job, 'unfinishedJob')
-        .select('unfinishedJob.id', 'id')
-        .where('unfinishedJob."jobHistoryId" = :jobHistoryId', { jobHistoryId })
-        .andWhere('unfinishedJob.status IN (:...open)', {
-          open: [JobStatus.PENDING, JobStatus.IN_PROGRESS],
-        })
-        .getRawMany<{ id: string }>();
-
       // Every job of the run reports cancelled, matching what the user did —
       // a run is cancelled as a whole, so leaving some jobs "completed" made
       // the tool and group statuses disagree with the run. completedAt is kept
@@ -2082,22 +1789,6 @@ export class JobsRegistryService {
             }`,
           );
         }
-      }
-
-      // Wake agent calls waiting on the jobs we just cancelled.
-      if (history?.jobRunType === JobRunType.AGENT) {
-        await Promise.all(
-          (unfinished ?? []).map(({ id }) =>
-            this.publishAgentJobDone(
-              {
-                id,
-                jobHistory: { id: jobHistoryId, jobRunType: JobRunType.AGENT },
-              },
-              JobStatus.CANCELLED,
-              { error: 'cancelled by user' },
-            ),
-          ),
-        );
       }
 
       return {

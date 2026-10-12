@@ -17,7 +17,6 @@ describe('JobResultProcessor', () => {
   const mockJobsRegistryService = {
     findJobForUpdate: jest.fn(),
     handleJobError: jest.fn(),
-    publishAgentJobDone: jest.fn(),
   };
 
   const mockWorkflowRunnerService = {
@@ -324,11 +323,6 @@ describe('JobResultProcessor', () => {
       expect(storageService.deleteFile).toHaveBeenCalledWith(
         'job-1-1710000000000.json',
         'job-results',
-      );
-      expect(mockJobsRegistryService.publishAgentJobDone).toHaveBeenCalledWith(
-        baseJob,
-        JobStatus.COMPLETED,
-        { result: { domains: ['example.com'] } },
       );
     });
 

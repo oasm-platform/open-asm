@@ -3,7 +3,6 @@ syntax = "proto3";
 package workers;
 
 import "google/protobuf/timestamp.proto";
-import "jobs_registry.proto";
 
 option go_package = "oasm-worker/internal/gen/workers";
 
@@ -90,8 +89,19 @@ enum RemoteExecuteSubscribeEventType {
   REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN       = 0;
   REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED     = 1;
   REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND       = 2;
-  // An AI agent's connector job, pushed to the conversation's worker.
-  REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB = 3;
+  // An AI agent runs one connector tool against one target. Not a job: the
+  // worker streams the raw output back over RemoteExecuteResult.
+  REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL      = 3;
+}
+
+message ToolRun {
+  string tool                    = 1; // connector slug
+  string image                   = 2;
+  string target                  = 3;
+  string config_json             = 4; // resolved config profile, "" when none
+  optional string cpu            = 5;
+  optional string memory         = 6;
+  optional int32 timeout_seconds = 7;
 }
 
 message RemoteExecuteSubscribeResponse {
@@ -100,8 +110,8 @@ message RemoteExecuteSubscribeResponse {
   RemoteExecuteSubscribeEventType type    = 3;
   string session_id                       = 4;
   string command                          = 5;
-  // Set only for CONNECTOR_JOB: the same Job shape the registry poller receives.
-  optional jobs_registry.Job job          = 6;
+  // Set only for RUN_TOOL.
+  optional ToolRun tool_run               = 6;
 }
 
 message RemoteExecuteResultStream {

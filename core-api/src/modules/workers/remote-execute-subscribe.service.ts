@@ -22,8 +22,19 @@ export interface RemoteExecuteCommand {
   type: number;
   sessionId: string;
   command: string;
-  /** CONNECTOR_JOB only: the gRPC Job payload. */
-  job?: Record<string, unknown>;
+  /** RUN_TOOL only. */
+  toolRun?: ToolRunPayload;
+}
+
+/** One connector tool run for an agent (proto ToolRun). Not a job. */
+export interface ToolRunPayload {
+  tool: string;
+  image: string;
+  target: string;
+  configJson: string;
+  cpu?: string;
+  memory?: string;
+  timeoutSeconds?: number;
 }
 
 export interface WorkerRegistration {
@@ -212,25 +223,26 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     return payload;
   }
 
-  pushConnectorJob(
+  pushToolRun(
     workerId: string,
     sessionId: string,
-    job: Record<string, unknown>,
-  ): boolean {
+    toolRun: ToolRunPayload,
+  ): RemoteExecuteCommand | null {
     const subject = this.workers.get(workerId);
     if (!subject || subject.closed) {
       this.logger.warn(`Worker ${workerId} is not subscribed or stream closed`);
-      return false;
+      return null;
     }
-    subject.next({
+    const payload: RemoteExecuteCommand = {
       id: nanoid(),
       workerId,
-      type: 3, // REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB
+      type: 3, // REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL
       sessionId,
       command: '',
-      job,
-    });
-    return true;
+      toolRun,
+    };
+    subject.next(payload);
+    return payload;
   }
 
   pushCommandWithSession(
