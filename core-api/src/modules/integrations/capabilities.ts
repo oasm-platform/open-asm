@@ -16,7 +16,7 @@ import { universalIntegrationSchema } from './schemas/universal-integration.sche
  * ```ts
  * 'x-capabilities': {
  *   SOURCE_CODE: { title: 'Repositories', default: true },
- *   TICKETING:   { title: 'Issues' },
+ *   TICKETING:   { title: 'Ticketing' },
  * }
  * ```
  * and the user picks a non-empty subset at connect time, stored in

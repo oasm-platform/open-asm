@@ -36,7 +36,7 @@ export const gitlabSchema = {
       default: true,
     },
     [IntegrationType.TICKETING]: {
-      title: 'Issues',
+      title: 'Ticketing',
       description: 'Open a GitLab issue when new vulnerabilities are found.',
       default: false,
     },

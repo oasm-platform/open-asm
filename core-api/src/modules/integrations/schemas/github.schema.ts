@@ -35,7 +35,7 @@ export const githubSchema = {
       default: true,
     },
     [IntegrationType.TICKETING]: {
-      title: 'Issues',
+      title: 'Ticketing',
       description: 'Open a GitHub issue when new vulnerabilities are found.',
       default: false,
     },
