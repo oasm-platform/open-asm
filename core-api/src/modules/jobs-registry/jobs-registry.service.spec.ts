@@ -2148,6 +2148,26 @@ describe('JobsRegistryService', () => {
       expect((result[0] as any).pickJobAt).toBeInstanceOf(Date);
     });
 
+    it('maxJobs refusal keeps a caller-supplied job history', async () => {
+      mockAssetQB.getMany.mockResolvedValue([
+        { id: 'a1', value: 'a.example.com', isPrimary: true },
+        { id: 'a2', value: 'b.example.com', isPrimary: true },
+      ]);
+
+      await expect(
+        service.createNewJob({
+          tool: subdomainsTool,
+          targetIds: ['target-1'],
+          workspaceId: 'ws-1',
+          workflow: undefined as any,
+          jobHistory: { id: 'jh-existing' } as any,
+          maxJobs: 1,
+        }),
+      ).rejects.toThrow('Too many jobs (2 > 1)');
+      expect(mockJobRepo.save).not.toHaveBeenCalled();
+      expect(mockJobHistoryRepository.delete).not.toHaveBeenCalled();
+    });
+
     it('refuses a fan-out above maxJobs and saves nothing', async () => {
       mockAssetQB.getMany.mockResolvedValue([
         { id: 'a1', value: 'a.example.com', isPrimary: true },
@@ -2202,6 +2222,41 @@ describe('JobsRegistryService', () => {
       expect(result.image).toBe(
         'ghcr.io/oasm-platform/connector-nikto:2.6.1',
       );
+    });
+  });
+
+  describe('buildAgentGrpcJobs', () => {
+    it('builds a flagged connector payload from loaded job relations', async () => {
+      mockJobRepository.find = jest.fn().mockResolvedValue([
+        {
+          id: 'job-1',
+          category: 'vulnerability',
+          asset: { value: 'https://example.com', target: { workspaceId: 'ws-1' } },
+          tool: { id: 'nikto', name: 'Nikto - Web Server Scanner' },
+          config: null,
+          configProfileId: undefined,
+        },
+      ]);
+      mockConnectorRegistryService.getConnector.mockReturnValue({
+        name: 'Nikto - Web Server Scanner',
+        slug: 'nikto',
+        image: 'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+
+      const result = await service.buildAgentGrpcJobs(['job-1']);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        id: 'job-1',
+        agent: true,
+        tool: 'nikto',
+        image: 'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+        inputs: { fields: { target: { stringValue: 'https://example.com' } } },
+      });
+      expect(
+        mockToolConfigProfilesService.resolveConfigForJob,
+      ).toHaveBeenCalledWith('ws-1', 'nikto', expect.anything());
     });
   });
 
