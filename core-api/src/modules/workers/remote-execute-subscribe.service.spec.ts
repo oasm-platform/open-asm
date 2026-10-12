@@ -13,6 +13,7 @@ const worker = (id: string, workspaceId: string | null, scope: WorkerScope) =>
 describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
   const workersService = {
     enableAgentMode: jest.fn().mockResolvedValue(undefined),
+    isAgentWorkerForWorkspace: jest.fn().mockResolvedValue(false),
   };
   const qb = {
     update: jest.fn().mockReturnThis(),
@@ -95,6 +96,39 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     );
     expect(redis.del).toHaveBeenCalledWith('agent:conv:worker:c1');
     expect(qb.execute).toHaveBeenCalled(); // DB pin rewritten
+    expect(qb.set).toHaveBeenCalledWith({ workerId: 'w-own' });
+  });
+
+  it('keeps an in-scope pin whose worker is offline, with no fallback', async () => {
+    conversationRepo.findOne.mockResolvedValue({
+      id: 'c1',
+      workerId: 'w-offline',
+    });
+    workersService.isAgentWorkerForWorkspace.mockResolvedValue(true);
+
+    await expect(
+      service.resolveConversationWorker('c1', 'ws-1'),
+    ).resolves.toBeNull();
+    expect(workersService.isAgentWorkerForWorkspace).toHaveBeenCalledWith(
+      'w-offline',
+      'ws-1',
+    );
+    expect(qb.set).not.toHaveBeenCalled();
+    expect(qb.execute).not.toHaveBeenCalled();
+  });
+
+  it('clears an out-of-scope (cloud/foreign) pin to NULL when no fallback exists', async () => {
+    conversationRepo.findOne.mockResolvedValue({
+      id: 'c1',
+      workerId: 'w-cloud',
+    });
+    workersService.isAgentWorkerForWorkspace.mockResolvedValue(false);
+
+    await expect(
+      service.resolveConversationWorker('c1', 'ws-1'),
+    ).resolves.toBeNull();
+    expect(qb.set).toHaveBeenCalledWith({ workerId: null });
+    expect(qb.execute).toHaveBeenCalled();
   });
 
   it('pushConnectorJob emits a CONNECTOR_JOB event carrying the job', () => {

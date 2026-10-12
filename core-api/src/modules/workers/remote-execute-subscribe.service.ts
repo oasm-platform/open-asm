@@ -289,8 +289,19 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     }
 
     const workerId = this.getNextAvailableWorker(workspaceId);
-    if (conversation && conversation.workerId !== workerId) {
-      // Rewrites a stale pin (or clears it when no worker qualifies).
+    // Rewrite the pin for a new fallback. With none, clear it only when it fails
+    // the scope rule — an in-scope worker that is merely offline stays pinned.
+    const stalePin = conversation?.workerId;
+    const shouldWrite =
+      !!conversation &&
+      stalePin !== workerId &&
+      (!!workerId ||
+        (!!stalePin &&
+          !(await this.workersService.isAgentWorkerForWorkspace(
+            stalePin,
+            workspaceId,
+          ))));
+    if (shouldWrite) {
       await this.conversationRepo
         .createQueryBuilder()
         .update(AgentConversation)
