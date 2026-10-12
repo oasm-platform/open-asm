@@ -945,6 +945,29 @@ describe('AssetsService', () => {
         mockTarget,
       );
     });
+
+    it('emits the re-scan trigger of the target type (IP runs IP discovery, not domain discovery)', async () => {
+      const mockTarget = {
+        id: targetId,
+        reScanCount: 2,
+        type: 'IP',
+        value: '203.0.113.10',
+      };
+
+      mockAssetRepository.findOne = jest
+        .fn()
+        .mockResolvedValue({ id: 'asset-uuid', isPrimary: true });
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
+      mockTargetRepository.update = jest.fn().mockResolvedValue({});
+      mockEventEmitter.emit = jest.fn();
+
+      await service.reScan(targetId);
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.ip.re-scan',
+        mockTarget,
+      );
+    });
   });
 
   describe('getAssetGraph', () => {

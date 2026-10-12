@@ -619,7 +619,13 @@ export class AssetsService {
       lastDiscoveredAt: new Date(),
     });
 
-    this.eventEmitter.emit('target.domain.re-scan', target);
+    // The trigger name carries the target type (`ip.re-scan`, `cidr.re-scan`)
+    // so the matching workflow runs — it used to be hard-coded to `domain`,
+    // which ran domain discovery on IP and CIDR targets.
+    this.eventEmitter.emit(
+      `target.${target.type.toLowerCase()}.re-scan`,
+      target,
+    );
 
     return {
       message: 'Scan started',

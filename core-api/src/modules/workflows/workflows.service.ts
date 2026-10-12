@@ -1,13 +1,19 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { Tool } from '../tools/entities/tools.entity';
+import {
+  resolveToolTargetTypes,
+  triggerTargetType,
+} from '../tools/tool-target-types';
 import { Workflow, WorkflowContent } from './entities/workflow.entity';
 import { User } from '../auth/entities/user.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { GetManyWorkflowsQueryDto } from './dto/get-many-workflows.dto';
 import {
+  jobEntries,
   normalizeWorkflowContent,
   WorkflowGraphError,
 } from './workflow-graph';
@@ -19,6 +25,8 @@ export class WorkflowsService {
   constructor(
     @InjectRepository(Workflow)
     public workflowRepository: Repository<Workflow>,
+    @InjectRepository(Tool)
+    private readonly toolRepository: Repository<Tool>,
   ) {}
 
   private readonly logger = new Logger(WorkflowsService.name);
@@ -40,6 +48,7 @@ export class WorkflowsService {
     const workflow = new Workflow();
     workflow.name = name;
     workflow.content = this.normalizeContent(content);
+    await this.assertToolsCanRunOnTriggers(workflow.content);
     workflow.filePath =
       filePath || `${name.toLowerCase().replace(/\s+/g, '-')}.yaml`;
     workflow.createdBy = { id: createdBy.id } as User;
@@ -92,6 +101,7 @@ export class WorkflowsService {
     if (updateData.name) workflow.name = updateData.name;
     if (updateData.content) {
       workflow.content = this.normalizeContent(updateData.content);
+      await this.assertToolsCanRunOnTriggers(workflow.content);
     }
     if (updateData.filePath) workflow.filePath = updateData.filePath;
 
@@ -121,6 +131,61 @@ export class WorkflowsService {
         );
       }
       throw error;
+    }
+  }
+
+  /**
+   * Rejects a workflow in which a job's tool can scan NONE of the target types
+   * its triggers fire for (e.g. `subfinder` — domains only — in a workflow
+   * that only triggers on `ip.create`): that job could never produce work.
+   *
+   * Partial overlap is allowed on purpose. A workflow triggered by both
+   * `domain.create` and `ip.create` may still use `subfinder`; at run time
+   * the job simply finds no eligible asset for an IP target and is skipped.
+   * Workflows without target triggers (schedules, asset groups) are not
+   * checked here — the same run-time filter covers them.
+   *
+   * @throws BadRequestException naming every offending tool.
+   */
+  private async assertToolsCanRunOnTriggers(
+    content: WorkflowContent,
+  ): Promise<void> {
+    const triggerTypes = [
+      ...new Set(
+        (content.on?.target ?? [])
+          .map(triggerTargetType)
+          .filter((type) => type !== undefined),
+      ),
+    ];
+    if (triggerTypes.length === 0) return;
+
+    const runs = [
+      ...new Set(
+        jobEntries(content.jobs)
+          .map(([, job]) => job.run)
+          .filter((run): run is string => !!run),
+      ),
+    ];
+    if (runs.length === 0) return;
+
+    // Unknown tools are not this check's concern: the run reports them.
+    const tools = await this.toolRepository.find({
+      where: { name: In(runs) },
+      select: { name: true, targetTypes: true },
+    });
+
+    const errors = tools.flatMap((tool) => {
+      const supported = resolveToolTargetTypes(tool);
+      return triggerTypes.some((type) => supported.includes(type))
+        ? []
+        : [
+            `"${tool.name}" can only scan ${supported.join(', ')} targets but this workflow triggers on ${triggerTypes.join(', ')}`,
+          ];
+    });
+    if (errors.length > 0) {
+      throw new BadRequestException(
+        `Invalid workflow content: ${errors.join('; ')}`,
+      );
     }
   }
 

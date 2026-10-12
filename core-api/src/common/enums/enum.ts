@@ -272,6 +272,17 @@ export enum EventTriggerType {
 }
 
 /**
+ * Enum representing the type of target.
+ * Lives here rather than in target.entity.ts so entities that sit on the
+ * Target import cycle (Tool) can reference it at class-decoration time.
+ */
+export enum TargetType {
+  DOMAIN = 'DOMAIN',
+  CIDR = 'CIDR',
+  IP = 'IP',
+}
+
+/**
  * What an integration can do. Each value is a CAPABILITY backed by one
  * connector method (see `CAPABILITY_METHOD_MAP` in connector.factory.ts).
  *

@@ -1,5 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { CronSchedule, JobStatus } from '@/common/enums/enum';
+import { CronSchedule, JobStatus, TargetType } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
@@ -21,11 +21,10 @@ import {
 /**
  * Enum representing the type of target
  */
-export enum TargetType {
-  DOMAIN = 'DOMAIN',
-  CIDR = 'CIDR',
-  IP = 'IP',
-}
+// Defined in common/enums (dependency-free) so entities on the Target import
+// cycle — e.g. Tool — can use it at decoration time; re-exported here so
+// existing imports keep working.
+export { TargetType };
 
 /**
  * Enum representing where a target originated.

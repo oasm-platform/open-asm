@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import { FindOperator, type DataSource, type Repository } from 'typeorm';
-import { ToolCategory, WorkerType } from '@/common/enums/enum';
+import { TargetType, ToolCategory, WorkerType } from '@/common/enums/enum';
 import type { RedisLockService } from '@/services/redis/distributed-lock.service';
 import type { StorageService } from '../storage/storage.service';
 import type { Tool } from './entities/tools.entity';
@@ -339,5 +339,44 @@ describe('ToolSyncService connector logo synchronization', () => {
     await expect(runConnectorSync(h.service)).resolves.toBeDefined();
     expect(h.rowByName('nessus')!.logoUrl).toBeNull();
     expect(h.deleteFile).toHaveBeenCalledWith('connectors/nessus.png', 'system');
+  });
+});
+
+describe('ToolSyncService connector targetTypes synchronization', () => {
+  beforeEach(() => {
+    readFileSpy.mockReset();
+  });
+
+  it('stores the manifest targetTypes as TargetType values', async () => {
+    const h = createHarness();
+    h.setManifest([connector({ slug: 'gau', targetTypes: ['domain'] })]);
+
+    await runConnectorSync(h.service);
+
+    expect(h.rowByName('gau')!.targetTypes).toEqual([TargetType.DOMAIN]);
+  });
+
+  it('falls back to the host default when the manifest predates targetTypes', async () => {
+    const h = createHarness();
+    h.setManifest([connector({ slug: 'nessus' })]);
+
+    await runConnectorSync(h.service);
+
+    expect(h.rowByName('nessus')!.targetTypes).toEqual([
+      TargetType.DOMAIN,
+      TargetType.IP,
+      TargetType.CIDR,
+    ]);
+  });
+
+  it('updates an existing row when the manifest narrows its targetTypes', async () => {
+    const h = createHarness();
+    h.setManifest([connector({ slug: 'katana' })]);
+    await runConnectorSync(h.service);
+
+    h.setManifest([connector({ slug: 'katana', targetTypes: ['domain'] })]);
+    await runConnectorSync(h.service);
+
+    expect(h.rowByName('katana')!.targetTypes).toEqual([TargetType.DOMAIN]);
   });
 });

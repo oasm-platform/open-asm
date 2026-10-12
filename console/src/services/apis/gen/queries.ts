@@ -1236,6 +1236,8 @@ export type Tool = {
   description: string;
   command: string;
   category: ToolCategory;
+  /** Target types whose assets this tool can scan */
+  targetTypes: TargetType[];
   version: string;
   /** @nullable */
   logoUrl?: string | null;

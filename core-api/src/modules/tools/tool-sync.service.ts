@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
@@ -11,6 +11,7 @@ import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
 import { StorageService } from '../storage/storage.service';
 import { DataSource } from 'typeorm';
+import { parseManifestTargetTypes, sameTargetTypes } from './tool-target-types';
 import { builtInTools } from './tools-provider/built-in-tools';
 
 /**
@@ -24,6 +25,8 @@ import { builtInTools } from './tools-provider/built-in-tools';
  */
 @Injectable()
 export class ToolSyncService implements OnModuleInit {
+  private readonly logger = new Logger(ToolSyncService.name);
+
   constructor(
     @InjectRepository(Tool)
     private readonly toolsRepository: Repository<Tool>,
@@ -97,7 +100,8 @@ export class ToolSyncService implements OnModuleInit {
         existing.logoUrl !== tool.logoUrl ||
         existing.version !== tool.version ||
         existing.priority !== tool.priority ||
-        existing.category !== tool.category;
+        existing.category !== tool.category ||
+        !sameTargetTypes(existing.targetTypes, tool.targetTypes);
       if (needsUpdate) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
         builtInToUpsert.push({ ...tool, id: existing.id! } as ToolInsert);
@@ -109,7 +113,7 @@ export class ToolSyncService implements OnModuleInit {
         .insert()
         .orUpdate({
           conflict_target: ['name'],
-          overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'type', 'isBuiltIn', 'isOfficialSupport'],
+          overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'targetTypes', 'type', 'isBuiltIn', 'isOfficialSupport'],
         })
         .values(builtInToUpsert)
         .execute();
@@ -234,6 +238,16 @@ export class ToolSyncService implements OnModuleInit {
       const logoBase64 = rawEntry['logo'] as string | undefined;
       const capabilities = rawEntry['capabilities'] as string[] | undefined;
       const category = ToolSyncService.mapConnectorCapabilityToCategory(capabilities);
+      // Manifests predating `targetTypes` (or a platform that does not know a
+      // newer type yet) fall back to the host default — the old behaviour.
+      const { targetTypes, unknown: unknownTargetTypes } = parseManifestTargetTypes(
+        rawEntry['targetTypes'],
+      );
+      if (unknownTargetTypes.length > 0) {
+        this.logger.warn(
+          `Connector "${slug}" declares target types this platform does not support yet: ${unknownTargetTypes.join(', ')}`,
+        );
+      }
       const author = String((rawEntry['author'] as string) ?? '').trim().toLowerCase();
       const isOfficialSupport = author === 'oasm';
 
@@ -249,6 +263,7 @@ export class ToolSyncService implements OnModuleInit {
         name,
         description,
         category,
+        targetTypes,
         version,
         logoUrl,
         isBuiltIn: false,
@@ -338,6 +353,7 @@ export class ToolSyncService implements OnModuleInit {
           existing.isOfficialSupport !== entry.insert.isOfficialSupport ||
           existing.description !== entry.insert.description ||
           existing.category !== entry.insert.category ||
+          !sameTargetTypes(existing.targetTypes, entry.insert.targetTypes) ||
           existing.version !== entry.insert.version ||
           existing.logoUrl !== entry.insert.logoUrl ||
           existing.priority !== entry.insert.priority;
@@ -352,6 +368,7 @@ export class ToolSyncService implements OnModuleInit {
         existing.isOfficialSupport = entry.insert.isOfficialSupport;
         existing.description = entry.insert.description;
         existing.category = entry.insert.category;
+        existing.targetTypes = entry.insert.targetTypes;
         existing.version = entry.insert.version;
         const staleLogoUrl = existing.logoUrl;
         existing.logoUrl = entry.insert.logoUrl;
@@ -405,7 +422,7 @@ export class ToolSyncService implements OnModuleInit {
       .insert()
       .orUpdate({
         conflict_target: ['name'],
-        overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'type', 'isBuiltIn', 'isOfficialSupport'],
+        overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'targetTypes', 'type', 'isBuiltIn', 'isOfficialSupport'],
       })
       .values(toUpsert)
       .execute();
