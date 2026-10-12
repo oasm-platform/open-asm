@@ -10,6 +10,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	jobs_registry "oasm-worker/internal/gen/jobs_registry"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -77,6 +78,8 @@ const (
 	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN   RemoteExecuteSubscribeEventType = 0
 	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED RemoteExecuteSubscribeEventType = 1
 	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND   RemoteExecuteSubscribeEventType = 2
+	// An AI agent's connector job, pushed to the conversation's worker.
+	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB RemoteExecuteSubscribeEventType = 3
 )
 
 // Enum value maps for RemoteExecuteSubscribeEventType.
@@ -85,11 +88,13 @@ var (
 		0: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN",
 		1: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED",
 		2: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND",
+		3: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB",
 	}
 	RemoteExecuteSubscribeEventType_value = map[string]int32{
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN":   0,
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED": 1,
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND":   2,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN":       0,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED":     1,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND":       2,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB": 3,
 	}
 )
 
@@ -1176,12 +1181,14 @@ func (*RemoteExecuteSubscribeRequest) Descriptor() ([]byte, []int) {
 }
 
 type RemoteExecuteSubscribeResponse struct {
-	state         protoimpl.MessageState          `protogen:"open.v1"`
-	Id            string                          `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	WorkerId      string                          `protobuf:"bytes,2,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	Type          RemoteExecuteSubscribeEventType `protobuf:"varint,3,opt,name=type,proto3,enum=workers.RemoteExecuteSubscribeEventType" json:"type,omitempty"`
-	SessionId     string                          `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Command       string                          `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"`
+	state     protoimpl.MessageState          `protogen:"open.v1"`
+	Id        string                          `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkerId  string                          `protobuf:"bytes,2,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	Type      RemoteExecuteSubscribeEventType `protobuf:"varint,3,opt,name=type,proto3,enum=workers.RemoteExecuteSubscribeEventType" json:"type,omitempty"`
+	SessionId string                          `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Command   string                          `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"`
+	// Set only for CONNECTOR_JOB: the same Job shape the registry poller receives.
+	Job           *jobs_registry.Job `protobuf:"bytes,6,opt,name=job,proto3,oneof" json:"job,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1249,6 +1256,13 @@ func (x *RemoteExecuteSubscribeResponse) GetCommand() string {
 		return x.Command
 	}
 	return ""
+}
+
+func (x *RemoteExecuteSubscribeResponse) GetJob() *jobs_registry.Job {
+	if x != nil {
+		return x.Job
+	}
+	return nil
 }
 
 type RemoteExecuteResultStream struct {
@@ -2558,7 +2572,7 @@ var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
 	"\n" +
-	"\rworkers.proto\x12\aworkers\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb0\x01\n" +
+	"\rworkers.proto\x12\aworkers\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13jobs_registry.proto\"\xb0\x01\n" +
 	"\vJoinRequest\x12\x17\n" +
 	"\aapi_key\x18\x01 \x01(\tR\x06apiKey\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\tR\tsignature\x12\x19\n" +
@@ -2614,14 +2628,16 @@ const file_workers_proto_rawDesc = "" +
 	"\x1bBuiltinToolRegistryResponse\x12\x1d\n" +
 	"\n" +
 	"tool_paths\x18\x01 \x03(\tR\ttoolPaths\"\x1f\n" +
-	"\x1dRemoteExecuteSubscribeRequest\"\xc4\x01\n" +
+	"\x1dRemoteExecuteSubscribeRequest\"\xf7\x01\n" +
 	"\x1eRemoteExecuteSubscribeResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tworker_id\x18\x02 \x01(\tR\bworkerId\x12<\n" +
 	"\x04type\x18\x03 \x01(\x0e2(.workers.RemoteExecuteSubscribeEventTypeR\x04type\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x18\n" +
-	"\acommand\x18\x05 \x01(\tR\acommand\"\xb6\x01\n" +
+	"\acommand\x18\x05 \x01(\tR\acommand\x12)\n" +
+	"\x03job\x18\x06 \x01(\v2\x12.jobs_registry.JobH\x00R\x03job\x88\x01\x01B\x06\n" +
+	"\x04_job\"\xb6\x01\n" +
 	"\x19RemoteExecuteResultStream\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -2755,11 +2771,12 @@ const file_workers_proto_rawDesc = "" +
 	"\rWorkerRunMode\x12\x1b\n" +
 	"\x17WORKER_RUN_MODE_UNKNOWN\x10\x00\x12\x17\n" +
 	"\x13WORKER_RUN_MODE_CLI\x10\x01\x12\x18\n" +
-	"\x14WORKER_RUN_MODE_NODE\x10\x02*\xa7\x01\n" +
+	"\x14WORKER_RUN_MODE_NODE\x10\x02*\xd9\x01\n" +
 	"\x1fRemoteExecuteSubscribeEventType\x12*\n" +
 	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN\x10\x00\x12,\n" +
 	"(REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED\x10\x01\x12*\n" +
-	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND\x10\x02*\xc6\x01\n" +
+	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND\x10\x02\x120\n" +
+	",REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB\x10\x03*\xc6\x01\n" +
 	"\x1cRemoteExecuteResultEventType\x12!\n" +
 	"\x1dREMOTE_EXECUTE_RESULT_UNKNOWN\x10\x00\x12 \n" +
 	"\x1cREMOTE_EXECUTE_RESULT_STDOUT\x10\x01\x12 \n" +
@@ -2800,7 +2817,7 @@ const file_workers_proto_rawDesc = "" +
 	"\x13BuiltinToolRegistry\x12#.workers.BuiltinToolRegistryRequest\x1a$.workers.BuiltinToolRegistryResponse\x12k\n" +
 	"\x16RemoteExecuteSubscribe\x12&.workers.RemoteExecuteSubscribeRequest\x1a'.workers.RemoteExecuteSubscribeResponse0\x01\x12Z\n" +
 	"\x13RemoteExecuteResult\x12\".workers.RemoteExecuteResultStream\x1a\x1f.workers.RemoteExecuteResultAck\x12;\n" +
-	"\aConnect\x12\x15.workers.WorkerToCore\x1a\x15.workers.CoreToWorker(\x010\x01B\vZ\t./workersb\x06proto3"
+	"\aConnect\x12\x15.workers.WorkerToCore\x1a\x15.workers.CoreToWorker(\x010\x01B\"Z oasm-worker/internal/gen/workersb\x06proto3"
 
 var (
 	file_workers_proto_rawDescOnce sync.Once
@@ -2855,61 +2872,63 @@ var file_workers_proto_goTypes = []any{
 	(*Heartbeat)(nil),                      // 35: workers.Heartbeat
 	(*HeartbeatAck)(nil),                   // 36: workers.HeartbeatAck
 	(*CancelRequest)(nil),                  // 37: workers.CancelRequest
-	(*timestamppb.Timestamp)(nil),          // 38: google.protobuf.Timestamp
+	(*jobs_registry.Job)(nil),              // 38: jobs_registry.Job
+	(*timestamppb.Timestamp)(nil),          // 39: google.protobuf.Timestamp
 }
 var file_workers_proto_depIdxs = []int32{
 	8,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
 	0,  // 1: workers.WorkerMetadata.mode:type_name -> workers.WorkerRunMode
 	16, // 2: workers.ConnectInternalNetworkRequest.network_interfaces:type_name -> workers.NetworkInterfaceMessage
 	1,  // 3: workers.RemoteExecuteSubscribeResponse.type:type_name -> workers.RemoteExecuteSubscribeEventType
-	2,  // 4: workers.RemoteExecuteResultStream.type:type_name -> workers.RemoteExecuteResultEventType
-	4,  // 5: workers.ManagedContainerTelemetry.runtime_state:type_name -> workers.ContainerRuntimeState
-	5,  // 6: workers.ManagedContainerTelemetry.health_state:type_name -> workers.ContainerHealthState
-	6,  // 7: workers.ManagedContainerTelemetry.execution_state:type_name -> workers.ContainerExecutionState
-	38, // 8: workers.ManagedContainerTelemetry.created_at:type_name -> google.protobuf.Timestamp
-	38, // 9: workers.ManagedContainerTelemetry.started_at:type_name -> google.protobuf.Timestamp
-	38, // 10: workers.ManagedContainerTelemetry.finished_at:type_name -> google.protobuf.Timestamp
-	38, // 11: workers.ManagedContainerTelemetry.state_changed_at:type_name -> google.protobuf.Timestamp
-	38, // 12: workers.ManagedContainerTelemetry.last_used_at:type_name -> google.protobuf.Timestamp
-	27, // 13: workers.WorkerContainersTelemetry.items:type_name -> workers.ManagedContainerTelemetry
-	38, // 14: workers.WorkerTelemetryRequest.observed_at:type_name -> google.protobuf.Timestamp
-	38, // 15: workers.WorkerTelemetryRequest.started_at:type_name -> google.protobuf.Timestamp
-	3,  // 16: workers.WorkerTelemetryRequest.state:type_name -> workers.WorkerRuntimeState
-	25, // 17: workers.WorkerTelemetryRequest.node:type_name -> workers.WorkerNodeTelemetry
-	26, // 18: workers.WorkerTelemetryRequest.jobs:type_name -> workers.WorkerJobTelemetry
-	28, // 19: workers.WorkerTelemetryRequest.containers:type_name -> workers.WorkerContainersTelemetry
-	38, // 20: workers.WorkerTelemetryResponse.received_at:type_name -> google.protobuf.Timestamp
-	33, // 21: workers.WorkerToCore.register:type_name -> workers.RegisterRequest
-	35, // 22: workers.WorkerToCore.heartbeat:type_name -> workers.Heartbeat
-	34, // 23: workers.CoreToWorker.register_resp:type_name -> workers.RegisterResponse
-	36, // 24: workers.CoreToWorker.heartbeat_ack:type_name -> workers.HeartbeatAck
-	37, // 25: workers.CoreToWorker.cancel:type_name -> workers.CancelRequest
-	8,  // 26: workers.RegisterRequest.metadata:type_name -> workers.WorkerMetadata
-	7,  // 27: workers.WorkersService.Join:input_type -> workers.JoinRequest
-	10, // 28: workers.WorkersService.Alive:input_type -> workers.AliveRequest
-	29, // 29: workers.WorkersService.WorkerTelemetry:input_type -> workers.WorkerTelemetryRequest
-	12, // 30: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
-	14, // 31: workers.WorkersService.Storage:input_type -> workers.StorageRequest
-	17, // 32: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
-	19, // 33: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
-	21, // 34: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
-	23, // 35: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
-	31, // 36: workers.WorkersService.Connect:input_type -> workers.WorkerToCore
-	9,  // 37: workers.WorkersService.Join:output_type -> workers.JoinResponse
-	11, // 38: workers.WorkersService.Alive:output_type -> workers.AliveResponse
-	30, // 39: workers.WorkersService.WorkerTelemetry:output_type -> workers.WorkerTelemetryResponse
-	13, // 40: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
-	15, // 41: workers.WorkersService.Storage:output_type -> workers.StorageResponse
-	18, // 42: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
-	20, // 43: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
-	22, // 44: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
-	24, // 45: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
-	32, // 46: workers.WorkersService.Connect:output_type -> workers.CoreToWorker
-	37, // [37:47] is the sub-list for method output_type
-	27, // [27:37] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	38, // 4: workers.RemoteExecuteSubscribeResponse.job:type_name -> jobs_registry.Job
+	2,  // 5: workers.RemoteExecuteResultStream.type:type_name -> workers.RemoteExecuteResultEventType
+	4,  // 6: workers.ManagedContainerTelemetry.runtime_state:type_name -> workers.ContainerRuntimeState
+	5,  // 7: workers.ManagedContainerTelemetry.health_state:type_name -> workers.ContainerHealthState
+	6,  // 8: workers.ManagedContainerTelemetry.execution_state:type_name -> workers.ContainerExecutionState
+	39, // 9: workers.ManagedContainerTelemetry.created_at:type_name -> google.protobuf.Timestamp
+	39, // 10: workers.ManagedContainerTelemetry.started_at:type_name -> google.protobuf.Timestamp
+	39, // 11: workers.ManagedContainerTelemetry.finished_at:type_name -> google.protobuf.Timestamp
+	39, // 12: workers.ManagedContainerTelemetry.state_changed_at:type_name -> google.protobuf.Timestamp
+	39, // 13: workers.ManagedContainerTelemetry.last_used_at:type_name -> google.protobuf.Timestamp
+	27, // 14: workers.WorkerContainersTelemetry.items:type_name -> workers.ManagedContainerTelemetry
+	39, // 15: workers.WorkerTelemetryRequest.observed_at:type_name -> google.protobuf.Timestamp
+	39, // 16: workers.WorkerTelemetryRequest.started_at:type_name -> google.protobuf.Timestamp
+	3,  // 17: workers.WorkerTelemetryRequest.state:type_name -> workers.WorkerRuntimeState
+	25, // 18: workers.WorkerTelemetryRequest.node:type_name -> workers.WorkerNodeTelemetry
+	26, // 19: workers.WorkerTelemetryRequest.jobs:type_name -> workers.WorkerJobTelemetry
+	28, // 20: workers.WorkerTelemetryRequest.containers:type_name -> workers.WorkerContainersTelemetry
+	39, // 21: workers.WorkerTelemetryResponse.received_at:type_name -> google.protobuf.Timestamp
+	33, // 22: workers.WorkerToCore.register:type_name -> workers.RegisterRequest
+	35, // 23: workers.WorkerToCore.heartbeat:type_name -> workers.Heartbeat
+	34, // 24: workers.CoreToWorker.register_resp:type_name -> workers.RegisterResponse
+	36, // 25: workers.CoreToWorker.heartbeat_ack:type_name -> workers.HeartbeatAck
+	37, // 26: workers.CoreToWorker.cancel:type_name -> workers.CancelRequest
+	8,  // 27: workers.RegisterRequest.metadata:type_name -> workers.WorkerMetadata
+	7,  // 28: workers.WorkersService.Join:input_type -> workers.JoinRequest
+	10, // 29: workers.WorkersService.Alive:input_type -> workers.AliveRequest
+	29, // 30: workers.WorkersService.WorkerTelemetry:input_type -> workers.WorkerTelemetryRequest
+	12, // 31: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
+	14, // 32: workers.WorkersService.Storage:input_type -> workers.StorageRequest
+	17, // 33: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
+	19, // 34: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
+	21, // 35: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
+	23, // 36: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
+	31, // 37: workers.WorkersService.Connect:input_type -> workers.WorkerToCore
+	9,  // 38: workers.WorkersService.Join:output_type -> workers.JoinResponse
+	11, // 39: workers.WorkersService.Alive:output_type -> workers.AliveResponse
+	30, // 40: workers.WorkersService.WorkerTelemetry:output_type -> workers.WorkerTelemetryResponse
+	13, // 41: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
+	15, // 42: workers.WorkersService.Storage:output_type -> workers.StorageResponse
+	18, // 43: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
+	20, // 44: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
+	22, // 45: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
+	24, // 46: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
+	32, // 47: workers.WorkersService.Connect:output_type -> workers.CoreToWorker
+	38, // [38:48] is the sub-list for method output_type
+	28, // [28:38] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_workers_proto_init() }
@@ -2919,6 +2938,7 @@ func file_workers_proto_init() {
 	}
 	file_workers_proto_msgTypes[0].OneofWrappers = []any{}
 	file_workers_proto_msgTypes[1].OneofWrappers = []any{}
+	file_workers_proto_msgTypes[15].OneofWrappers = []any{}
 	file_workers_proto_msgTypes[20].OneofWrappers = []any{}
 	file_workers_proto_msgTypes[24].OneofWrappers = []any{
 		(*WorkerToCore_Register)(nil),

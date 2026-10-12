@@ -212,8 +212,9 @@ export enum DismissReason {
 export enum JobRunType {
   MANUAL = 'manual',
   SCHEDULED = 'scheduled',
-  /** Dispatched by an AI agent's connector tools; claimed on the separate
-   * agent lane so it never consumes a normal worker concurrency slot. */
+  /** Dispatched by an AI agent's connector tools: created IN_PROGRESS and
+   * pushed to the conversation's worker over the agent stream. Never claimed
+   * from the queue and never requeued. */
   AGENT = 'agent',
 }
 

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package jobs_registry;
 
-option go_package = "./jobs_registry";
+option go_package = "oasm-worker/internal/gen/jobs_registry";
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
@@ -52,6 +52,9 @@ message Job {
   optional string cpu = 9;               // e.g. "500m" (millicores) or "1" (cores)
   optional string memory = 10;           // e.g. "512Mi", "1Gi"
   optional int32 timeout_seconds = 11;   // container timeout in seconds
+  // true = dispatched by an AI agent over the agent stream (RemoteExecuteSubscribe);
+  // the worker runs it on the agent lane. Never set on claimed jobs.
+  bool agent = 12;
 }
 
 // Request for the batched claim path. `limit` is the number of free
@@ -60,8 +63,7 @@ message Job {
 message NextBatchRequest {
   string id = 1;
   int32 limit = 2;
-  // true = claim only AI-agent jobs (separate worker lane); false = every other job
-  bool agent = 3;
+  reserved 3; // was `agent` (pull-based agent lane, replaced by push)
 }
 
 // Ordered list of claimed jobs, highest priority first. Empty when nothing is

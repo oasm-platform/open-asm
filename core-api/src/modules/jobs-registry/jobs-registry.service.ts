@@ -685,17 +685,10 @@ export class JobsRegistryService {
    * Jobs come back in dispatch order (priority desc, then oldest first). An
    * empty array means nothing is claimable right now, which callers must treat
    * exactly like a `null` from the single-job form.
-   *
-   * `agentLane` selects which run-type the claim drains: `true` claims only
-   * AI-agent jobs (`jobRunType = 'agent'`), `false` (default) claims every
-   * other job, including those with no job history. The two lanes are
-   * disjoint, so a worker's normal concurrency slots are never spent on agent
-   * jobs.
    */
   public async getNextJobs(
     workerId: string,
     limit: number,
-    agentLane = false,
   ): Promise<GetNextJobResult[]> {
     // A worker controls how many slots it asks to fill, but never how much of
     // the queue one claim may drain.
@@ -733,21 +726,16 @@ export class JobsRegistryService {
         .orderBy('jobs.priority', 'DESC')
         .addOrderBy('jobs.createdAt', 'ASC');
 
-      // Lane isolation: agent jobs carry jobRunType = 'agent'. LEFT JOIN so a
-      // job with no job history (null run type) lands in the normal lane, and
-      // lock only `jobs` — Postgres rejects FOR UPDATE on the nullable side of
-      // an outer join.
+      // Agent-lane jobs are pushed to their worker over the agent stream and
+      // created IN_PROGRESS, so this claim never sees them. The filter is a
+      // safety net for any path that might requeue one. LEFT JOIN so a job with
+      // no history (null run type) stays claimable; lock only `jobs` — Postgres
+      // rejects FOR UPDATE on the nullable side of an outer join.
       queryBuilder.leftJoin('jobs.jobHistory', 'jobHistory');
-      if (agentLane) {
-        queryBuilder.andWhere('jobHistory.jobRunType = :agentRunType', {
-          agentRunType: JobRunType.AGENT,
-        });
-      } else {
-        queryBuilder.andWhere(
-          '(jobHistory.jobRunType IS NULL OR jobHistory.jobRunType <> :agentRunType)',
-          { agentRunType: JobRunType.AGENT },
-        );
-      }
+      queryBuilder.andWhere(
+        '(jobHistory.jobRunType IS NULL OR jobHistory.jobRunType <> :agentRunType)',
+        { agentRunType: JobRunType.AGENT },
+      );
 
       // [OPT-3] Only join workspace when actually needed
       if (isBuiltInTools && worker.scope !== WorkerScope.CLOUD) {
