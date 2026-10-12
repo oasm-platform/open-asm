@@ -258,7 +258,7 @@ export class JobsRegistryService {
       }
 
       // Manifest resource limits — scheduling context for the worker runtime.
-      // Field names match the proto (cpu/memory/timeout_seconds).
+      // Field names match the proto (cpu/memory/timeoutSeconds).
       const defaults = this.connectorRegistry.getResourceDefaults(
         job.tool!.name,
       );
@@ -277,7 +277,7 @@ export class JobsRegistryService {
         image: connectorEntry.image,
         cpu: defaults.cpu,
         memory: defaults.memory,
-        timeout_seconds: defaults.timeoutSeconds,
+        timeoutSeconds: defaults.timeoutSeconds,
         inputs: {
           fields: { target: { stringValue: job.asset.value } },
         },
@@ -2006,6 +2006,16 @@ export class JobsRegistryService {
         .andWhere('job.workerId IS NOT NULL')
         .getRawMany<{ jobId: string; workerId: string }>();
 
+      // Jobs that are not yet terminal: an agent call may be waiting on them.
+      const unfinished = await queryRunner.manager
+        .createQueryBuilder(Job, 'unfinishedJob')
+        .select('unfinishedJob.id', 'id')
+        .where('unfinishedJob."jobHistoryId" = :jobHistoryId', { jobHistoryId })
+        .andWhere('unfinishedJob.status IN (:...open)', {
+          open: [JobStatus.PENDING, JobStatus.IN_PROGRESS],
+        })
+        .getRawMany<{ id: string }>();
+
       // Every job of the run reports cancelled, matching what the user did —
       // a run is cancelled as a whole, so leaving some jobs "completed" made
       // the tool and group statuses disagree with the run. completedAt is kept
@@ -2063,6 +2073,22 @@ export class JobsRegistryService {
             }`,
           );
         }
+      }
+
+      // Wake agent calls waiting on the jobs we just cancelled.
+      if (history?.jobRunType === JobRunType.AGENT) {
+        await Promise.all(
+          (unfinished ?? []).map(({ id }) =>
+            this.publishAgentJobDone(
+              {
+                id,
+                jobHistory: { id: jobHistoryId, jobRunType: JobRunType.AGENT },
+              },
+              JobStatus.CANCELLED,
+              { error: 'cancelled by user' },
+            ),
+          ),
+        );
       }
 
       return {

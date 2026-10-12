@@ -533,7 +533,15 @@ describe('JobsRegistryService', () => {
       affected = 3,
       running = [] as { jobId: string; workerId: string }[],
       steps = {},
+      jobRunType = JobRunType.MANUAL as JobRunType,
+      unfinished = [] as { id: string }[],
     } = {}) => {
+      const unfinishedBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue(unfinished),
+      };
       const ownershipBuilder = {
         leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -557,6 +565,7 @@ describe('JobsRegistryService', () => {
       const findOne = jest.fn().mockResolvedValue({
         id: mockHistoryId,
         steps,
+        jobRunType,
         isCompleted: false,
       });
       const update = jest.fn().mockResolvedValue({ affected: 1 });
@@ -565,6 +574,7 @@ describe('JobsRegistryService', () => {
         // 'job' alias is the "which jobs are executing right now" lookup, and
         // no alias is the bulk update.
         createQueryBuilder: jest.fn((entity?: unknown, alias?: string) => {
+          if (alias === 'unfinishedJob') return unfinishedBuilder;
           if (alias === 'job') return runningBuilder;
           return entity ? ownershipBuilder : updateBuilder;
         }),
@@ -636,6 +646,36 @@ describe('JobsRegistryService', () => {
         jobId: 'job-b',
         reason: 'run cancelled by user',
       });
+    });
+
+    it('wakes agent calls waiting on unfinished jobs of an agent run', async () => {
+      const qr = buildQueryRunner({
+        jobRunType: JobRunType.AGENT,
+        unfinished: [{ id: 'j1' }, { id: 'j2' }],
+      });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+      mockRedis.publish.mockClear();
+
+      await service.cancelJobHistory(mockWorkspaceId, mockHistoryId);
+
+      expect(mockRedis.publish).toHaveBeenCalledTimes(2);
+      const [channel, raw] = mockRedis.publish.mock.calls[0];
+      expect(channel).toBe(`agent-job:done:${mockHistoryId}`);
+      expect(JSON.parse(raw)).toMatchObject({
+        jobId: 'j1',
+        status: JobStatus.CANCELLED,
+        error: 'cancelled by user',
+      });
+    });
+
+    it('publishes nothing for a non-agent run', async () => {
+      const qr = buildQueryRunner({ unfinished: [{ id: 'j1' }] });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+      mockRedis.publish.mockClear();
+
+      await service.cancelJobHistory(mockWorkspaceId, mockHistoryId);
+
+      expect(mockRedis.publish).not.toHaveBeenCalled();
     });
 
     it('closes the run so no further step can ever be dispatched', async () => {
@@ -2255,6 +2295,9 @@ describe('JobsRegistryService', () => {
       // ...but the worker receives the stable slug.
       expect(result.tool).toBe('nikto');
       expect(result.image).toBe('ghcr.io/oasm-platform/connector-nikto:2.6.1');
+      // proto-loader (keepCase:false) only reads the camelCase key.
+      expect(result.timeoutSeconds).toBe(600);
+      expect(result).not.toHaveProperty('timeout_seconds');
     });
   });
 
