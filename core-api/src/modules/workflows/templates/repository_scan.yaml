@@ -1,0 +1,19 @@
+name: repository_scan
+
+# Runs on Git organization targets after every repository sync (target
+# creation, "Sync now" and the target's sync schedule all end in a sync).
+# Triggering on `git_org.create` instead would run before any repository has
+# been imported.
+on:
+  target: [git_org.synced]
+
+# Each job runs once per scanned repository of the organization; tools only
+# ever receive assets of the target types they declare (git_org here).
+jobs:
+  secret_scan:
+    name: Secret Scan
+    run: gitleaks
+    # Inline config: a connector with a configSchema needs either a default
+    # profile in the workspace or a config here.
+    config:
+      scanHistory: false

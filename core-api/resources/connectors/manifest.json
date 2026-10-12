@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T02:48:47.8311108Z",
+  "generatedAt": "2026-10-12T09:44:36.7188285Z",
   "connectors": [
     {
       "name": "Acunetix",
@@ -17,6 +17,11 @@
       "description": "Connects to an Acunetix instance, runs a scan against a target, and streams the discovered vulnerabilities back to the Worker.",
       "capabilities": [
         "vulnerabilities"
+      ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
       ],
       "inputsSchema": {
         "additionalProperties": false,
@@ -125,6 +130,9 @@
       "capabilities": [
         "url_discovery"
       ],
+      "targetTypes": [
+        "domain"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -216,6 +224,86 @@
       }
     },
     {
+      "name": "Gitleaks - Secret Scanner",
+      "slug": "gitleaks",
+      "version": "8.30.1",
+      "image": "ghcr.io/oasm-platform/connector-gitleaks:8.30.1",
+      "author": "oasm",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://gitleaks.io",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
+      "shortDescription": "Finds secrets committed to Git repositories",
+      "description": "Scans the repositories of a Git organization for committed credentials — API keys, tokens, private keys, passwords — with Gitleaks rules. Secret values are redacted at the source: findings name the rule, file, line and commit, never the secret itself. Optionally scans recent history, where deleted secrets remain exposed.",
+      "capabilities": [
+        "secrets"
+      ],
+      "targetTypes": [
+        "git_org"
+      ],
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "ref": {
+            "description": "Branch, tag or commit to scan. Empty scans the default branch.",
+            "title": "Ref",
+            "type": "string"
+          },
+          "repository": {
+            "description": "https clone URL of the repository to scan.",
+            "examples": [
+              "https://github.com/acme/web"
+            ],
+            "format": "uri",
+            "title": "Repository",
+            "type": "string"
+          },
+          "token": {
+            "description": "Access token for private repositories.",
+            "title": "Token",
+            "type": "string",
+            "ui:widget": "password"
+          },
+          "username": {
+            "description": "HTTP user for private repositories.",
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository"
+        ],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "historyDepth": {
+            "default": 100,
+            "description": "Number of most recent commits scanned when \"Scan history\" is on.",
+            "maximum": 5000,
+            "minimum": 1,
+            "title": "History depth",
+            "type": "integer"
+          },
+          "scanHistory": {
+            "default": false,
+            "description": "Also scan recent commits. A secret deleted from the code is still exposed in history.",
+            "title": "Scan history",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "resourceDefaults": {
+        "cpu": "500m",
+        "memory": "1024Mi",
+        "timeoutSeconds": 1800
+      }
+    },
+    {
       "name": "Katana - Web Crawler",
       "slug": "katana",
       "version": "1.7.0",
@@ -231,6 +319,9 @@
       "description": "Crawls a target website with Katana (ProjectDiscovery) up to a configurable depth and streams every discovered HTTP/HTTPS URL as a finding for URL discovery.",
       "capabilities": [
         "url_discovery"
+      ],
+      "targetTypes": [
+        "domain"
       ],
       "inputsSchema": {
         "additionalProperties": false,
@@ -405,6 +496,11 @@
       "capabilities": [
         "vulnerabilities"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -499,6 +595,11 @@
       "description": "Scans a web server for 7,000+ known issues: dangerous files and CGIs, outdated server software, missing security headers, and version-specific flaws. Each finding is classified from Nikto's own test database and correlated with CVE references.",
       "capabilities": [
         "vulnerabilities"
+      ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
       ],
       "inputsSchema": {
         "additionalProperties": false,
@@ -662,6 +763,11 @@
       "capabilities": [
         "ports_scanner"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -746,6 +852,11 @@
       "description": "Runs ProjectDiscovery Nuclei template-based scans against a target URL to detect known vulnerabilities, misconfigurations, and exposed secrets.",
       "capabilities": [
         "vulnerabilities"
+      ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
       ],
       "inputsSchema": {
         "additionalProperties": false,
@@ -886,6 +997,11 @@
       "capabilities": [
         "vulnerabilities"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -993,6 +1109,11 @@
       "capabilities": [
         "ports_scanner"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1084,6 +1205,11 @@
       "description": "Scans WordPress sites using WPScan to enumerate vulnerable plugins and themes, detect known CVEs, misconfigurations, and weak credentials.",
       "capabilities": [
         "vulnerabilities"
+      ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
       ],
       "inputsSchema": {
         "additionalProperties": false,
