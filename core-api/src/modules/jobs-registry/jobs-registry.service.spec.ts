@@ -7,6 +7,7 @@ import {
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
+import { RedisService } from '@/services/redis/redis.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -62,7 +63,10 @@ describe('JobsRegistryService', () => {
     update: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    delete: jest.fn(),
   };
+
+  const mockRedis = { publish: jest.fn().mockResolvedValue(1) };
 
   const mockJobErrorLogRepository = {
     createQueryBuilder: jest.fn(),
@@ -107,6 +111,7 @@ describe('JobsRegistryService', () => {
   const mockConnectorRegistryService = {
     getConnector: jest.fn(),
     getAllConnectors: jest.fn().mockReturnValue([]),
+    getResourceDefaults: jest.fn(() => ({ cpu: '500m', memory: '512Mi', timeoutSeconds: 600 })),
   };
 
     const mockToolConfigProfilesService = {
@@ -191,6 +196,7 @@ describe('JobsRegistryService', () => {
           provide: WorkerStreamRegistry,
           useValue: mockWorkerStreamRegistry,
         },
+        { provide: RedisService, useValue: mockRedis },
         JobsRegistryService,
       ],
     }).compile();
@@ -2121,6 +2127,135 @@ describe('JobsRegistryService', () => {
         workflow: { id: 'wf-1' } as any,
       });
       expect(existsPredicate()).toBeUndefined();
+    });
+
+    it('agent lane: creates jobs IN_PROGRESS on the assigned worker', async () => {
+      mockAssetQB.getMany.mockResolvedValue([
+        { id: 'asset-1', value: 'example.com', isPrimary: true },
+      ]);
+
+      const result = await service.createNewJob({
+        tool: subdomainsTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: undefined as any,
+        jobRunType: JobRunType.AGENT,
+        assignWorkerId: 'worker-1',
+      });
+
+      expect((result[0] as any).status).toBe(JobStatus.IN_PROGRESS);
+      expect((result[0] as any).workerId).toBe('worker-1');
+      expect((result[0] as any).pickJobAt).toBeInstanceOf(Date);
+    });
+
+    it('refuses a fan-out above maxJobs and saves nothing', async () => {
+      mockAssetQB.getMany.mockResolvedValue([
+        { id: 'a1', value: 'a.example.com', isPrimary: true },
+        { id: 'a2', value: 'b.example.com', isPrimary: true },
+      ]);
+
+      await expect(
+        service.createNewJob({
+          tool: subdomainsTool,
+          targetIds: ['target-1'],
+          workspaceId: 'ws-1',
+          workflow: undefined as any,
+          maxJobs: 1,
+        }),
+      ).rejects.toThrow('Too many jobs (2 > 1)');
+      expect(mockJobRepo.save).not.toHaveBeenCalled();
+      expect(mockJobHistoryRepository.delete).toHaveBeenCalledWith('jh-1');
+    });
+  });
+
+  describe('toGrpcJob', () => {
+    it('should send the connector slug, not the display name, as the job tool', async () => {
+      // The worker derives the container name and the in-container TOOL env var
+      // from the proto `tool` field. The manifest display name ("Nikto - Web
+      // Server Scanner") is not a safe identifier: it is long, not unique, and
+      // sanitizes into "nikto---web-server-scanner". The slug is the identifier
+      // connectors are addressed by everywhere else.
+      const job = {
+        id: 'job-1',
+        workspaceId: 'ws-1',
+        category: 'vulnerability',
+        asset: { value: 'https://example.com' },
+        config: null,
+        configProfileId: undefined,
+        tool: { id: 'nikto', name: 'Nikto - Web Server Scanner' },
+      } as any;
+      mockConnectorRegistryService.getConnector.mockReturnValue({
+        name: 'Nikto - Web Server Scanner',
+        slug: 'nikto',
+        image: 'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+
+      const result = await service.toGrpcJob(job);
+
+      // Lookup still keys off the persisted tool name...
+      expect(mockConnectorRegistryService.getConnector).toHaveBeenCalledWith(
+        'Nikto - Web Server Scanner',
+      );
+      // ...but the worker receives the stable slug.
+      expect(result.tool).toBe('nikto');
+      expect(result.image).toBe(
+        'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      );
+    });
+  });
+
+  describe('publishAgentJobDone', () => {
+    it('publishes only for agent-run jobs, with a capped excerpt', async () => {
+      mockRedis.publish.mockClear();
+      await service.publishAgentJobDone(
+        { id: 'j1', jobHistory: { id: 'jh-1', jobRunType: JobRunType.MANUAL } },
+        JobStatus.COMPLETED,
+      );
+      expect(mockRedis.publish).not.toHaveBeenCalled();
+
+      await service.publishAgentJobDone(
+        { id: 'j1', jobHistory: { id: 'jh-1', jobRunType: JobRunType.AGENT } },
+        JobStatus.COMPLETED,
+        { result: { big: 'x'.repeat(20_000) } },
+      );
+      const [channel, raw] = mockRedis.publish.mock.calls[0];
+      expect(channel).toBe('agent-job:done:jh-1');
+      const msg = JSON.parse(raw);
+      expect(msg).toMatchObject({ jobId: 'j1', status: JobStatus.COMPLETED });
+      expect(msg.excerpt.length).toBe(8 * 1024);
+    });
+  });
+
+  describe('handleJobError — agent outcome', () => {
+    const job = {
+      id: 'j1',
+      retryCount: 0,
+      jobHistory: { id: 'jh-1', jobRunType: JobRunType.AGENT },
+    } as any;
+
+    beforeEach(() => {
+      mockRedis.publish.mockClear();
+      mockJobErrorLogRepository.findOne = jest.fn().mockResolvedValue(null);
+      mockJobErrorLogRepository.save = jest.fn();
+    });
+
+    it('publishes FAILED when the conditional update affected a row', async () => {
+      mockJobRepository.update = jest.fn().mockResolvedValue({ affected: 1 });
+      await service.handleJobError({ data: {} } as any, job, new Error('boom'));
+      const [channel, raw] = mockRedis.publish.mock.calls[0];
+      expect(channel).toBe('agent-job:done:jh-1');
+      expect(JSON.parse(raw)).toMatchObject({
+        jobId: 'j1',
+        status: JobStatus.FAILED,
+        error: 'boom',
+      });
+    });
+
+    it('does not publish when the job already left IN_PROGRESS', async () => {
+      mockJobRepository.update = jest.fn().mockResolvedValue({ affected: 0 });
+      await service.handleJobError({ data: {} } as any, job, new Error('boom'));
+      expect(mockRedis.publish).not.toHaveBeenCalled();
     });
   });
 

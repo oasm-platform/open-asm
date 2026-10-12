@@ -19,6 +19,7 @@ import {
 } from '@/common/enums/enum';
 import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { RedisService } from '@/services/redis/redis.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
@@ -146,6 +147,55 @@ const JOB_HISTORY_STATUS_SQL = `CASE
           ELSE '${JobStatus.PENDING}'
         END`;
 
+/**
+ * Packs a single JSON-ish value into a `google.protobuf.Value` wire object.
+ * protobufjs only reads the `fields` key of a Struct (and the oneof key of a
+ * Value), so plain records/values are silently dropped during gRPC encoding.
+ */
+function packStructValue(value: unknown): Record<string, unknown> {
+  if (value === null) return { nullValue: 0 };
+  switch (typeof value) {
+    case 'string':
+      return { stringValue: value };
+    case 'number':
+      return { numberValue: value };
+    case 'boolean':
+      return { boolValue: value };
+    case 'object':
+      if (Array.isArray(value)) {
+        return { listValue: { values: value.map(packStructValue) } };
+      }
+      return {
+        structValue: { fields: packStructFields(value as Record<string, unknown>) },
+      };
+    default:
+      // undefined / function / symbol — not JSON-representable; omit at field level
+      return { nullValue: 0 };
+  }
+}
+
+/** Packs a plain record into a `google.protobuf.Struct` `fields` map. */
+function packStructFields(record: Record<string, unknown>): Record<string, Record<string, unknown>> {
+  const fields: Record<string, Record<string, unknown>> = {};
+  for (const [key, val] of Object.entries(record)) {
+    if (val !== undefined) fields[key] = packStructValue(val);
+  }
+  return fields;
+}
+
+/** Redis channel an agent tool call waits on for its jobs' outcomes. */
+export const agentJobDoneChannel = (jobHistoryId: string) =>
+  `agent-job:done:${jobHistoryId}`;
+
+export interface AgentJobDoneMessage {
+  jobId: string;
+  status: JobStatus;
+  error?: string;
+  excerpt?: string;
+}
+
+const AGENT_EXCERPT_MAX = 8 * 1024;
+
 @Injectable()
 export class JobsRegistryService {
   constructor(
@@ -163,8 +213,138 @@ export class JobsRegistryService {
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
     private readonly workerStreamRegistry: WorkerStreamRegistry,
+    private readonly redisService: RedisService,
   ) {}
   private readonly logger = new Logger(JobsRegistryService.name);
+  /**
+   * Maps one claimed job to the gRPC `Job` wire shape. Shared by `Next` and
+   * `NextBatch` so the two paths can never drift apart.
+   */
+  public async toGrpcJob(
+    job: GetNextJobResult,
+  ): Promise<Record<string, unknown>> {
+    // Connector path: tool metadata present → look up registry
+    const connectorEntry = job.tool
+      ? this.connectorRegistry.getConnector(job.tool.name)
+      : null;
+
+    if (connectorEntry?.image) {
+      let config: Record<string, unknown> | undefined;
+      try {
+        config =
+          await this.toolConfigProfilesService.resolveConfigForJob(
+            job.workspaceId!,
+            job.tool!.id,
+            { config: job.config ?? undefined, configProfileId: job.configProfileId },
+          );
+      } catch {
+        // Never log decrypted payload — generic message only
+        this.logger.warn('profile decrypt failed');
+      }
+
+      // Manifest resource limits — scheduling context for the worker runtime.
+      // Field names match the proto (cpu/memory/timeout_seconds).
+      const defaults = this.connectorRegistry.getResourceDefaults(
+        job.tool!.name,
+      );
+
+      const response: Record<string, unknown> = {
+        id: job.id,
+        asset: job.asset,
+        category: job.category,
+        // The worker derives the connector container name and the in-container
+        // TOOL env var from this field, so it must be the manifest slug — the
+        // stable identifier connectors are addressed by everywhere else. The
+        // display name is long, not unique, and sanitizes into names like
+        // "oasm-nikto---web-server-scanner-ghcr-io-00fe". A malformed manifest
+        // without a slug falls back to the name so the job still runs.
+        tool: connectorEntry.slug || connectorEntry.name,
+        image: connectorEntry.image,
+        cpu: defaults.cpu,
+        memory: defaults.memory,
+        timeout_seconds: defaults.timeoutSeconds,
+        inputs: {
+          fields: { target: { stringValue: job.asset.value } },
+        },
+      };
+
+      if (config && Object.keys(config).length > 0) {
+        response.config = { fields: packStructFields(config) };
+      }
+
+      return response;
+    }
+
+    // Legacy path — byte-for-byte compatible
+    return {
+      id: job.id,
+      asset: job.asset,
+      command: job.command,
+      category: job.category,
+    };
+  }
+
+  /** gRPC payloads for agent jobs pushed over the agent stream. */
+  public async buildAgentGrpcJobs(
+    jobIds: string[],
+  ): Promise<Record<string, unknown>[]> {
+    const jobs = await this.repo.find({
+      where: { id: In(jobIds) },
+      relations: { asset: { target: true }, tool: true },
+    });
+    return Promise.all(
+      jobs.map(async (job) => ({
+        ...(await this.toGrpcJob({
+          id: job.id,
+          category: job.category,
+          createdAt: job.createdAt,
+          updatedAt: job.updatedAt,
+          priority: job.priority,
+          command: job.command,
+          asset: job.asset,
+          tool: { id: job.tool.id!, name: job.tool.name },
+          workspaceId: job.asset.target?.workspaceId,
+          configProfileId: job.configProfileId,
+          config: job.config,
+        })),
+        agent: true,
+      })),
+    );
+  }
+
+  /** Wakes the agent tool call waiting on this job. No-op for non-agent jobs. */
+  public async publishAgentJobDone(
+    job: {
+      id: string;
+      jobHistory?: { id: string; jobRunType?: JobRunType } | null;
+    },
+    status: JobStatus,
+    extra: { error?: string; result?: unknown } = {},
+  ): Promise<void> {
+    if (!job.jobHistory || job.jobHistory.jobRunType !== JobRunType.AGENT) {
+      return;
+    }
+    const message: AgentJobDoneMessage = {
+      jobId: job.id,
+      status,
+      error: extra.error,
+      excerpt:
+        extra.result === undefined
+          ? undefined
+          : JSON.stringify(extra.result).slice(0, AGENT_EXCERPT_MAX),
+    };
+    try {
+      await this.redisService.publish(
+        agentJobDoneChannel(job.jobHistory.id),
+        JSON.stringify(message),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to publish agent job outcome for ${job.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   public async getManyJobs(
     workspaceId: string,
     query: GetManyJobsRequestDto,
@@ -267,6 +447,8 @@ export class JobsRegistryService {
     jobRunType,
     configProfileId,
     config,
+    assignWorkerId,
+    maxJobs,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
@@ -403,7 +585,9 @@ export class JobsRegistryService {
           asset: assetService.asset, // Use the associated asset from asset service
           assetService, // Store the asset service reference
           jobName: tool.name,
-          status: JobStatus.PENDING,
+          status: assignWorkerId ? JobStatus.IN_PROGRESS : JobStatus.PENDING,
+          workerId: assignWorkerId,
+          pickJobAt: assignWorkerId ? new Date() : undefined,
           category: tool.category,
           tool,
           priority: priority ?? 4,
@@ -443,7 +627,9 @@ export class JobsRegistryService {
           id: randomUUID(),
           asset,
           jobName: tool.name,
-          status: JobStatus.PENDING,
+          status: assignWorkerId ? JobStatus.IN_PROGRESS : JobStatus.PENDING,
+          workerId: assignWorkerId,
+          pickJobAt: assignWorkerId ? new Date() : undefined,
           category: tool.category,
           tool,
           priority: priority ?? 4,
@@ -461,6 +647,15 @@ export class JobsRegistryService {
 
         jobsToInsert.push(job);
       }
+    }
+
+    if (maxJobs !== undefined && jobsToInsert.length > maxJobs) {
+      if (!existingJobHistory) {
+        await this.jobHistoryRepo.delete(jobHistory.id);
+      }
+      throw new BadRequestException(
+        `Too many jobs (${jobsToInsert.length} > ${maxJobs}); narrow targetIds/assetIds`,
+      );
     }
 
     // Step 4: save all jobs
@@ -1053,7 +1248,11 @@ export class JobsRegistryService {
       },
     );
 
-    if (!failed.affected) {
+    if (failed.affected) {
+      await this.publishAgentJobDone(job, JobStatus.FAILED, {
+        error: error.message,
+      });
+    } else {
       this.logger.warn(
         `Job ${job.id} left IN_PROGRESS before its failure was applied; keeping its current status`,
       );
