@@ -59,8 +59,40 @@ export class SourceRepositoryDto {
   @ApiProperty()
   archived: boolean;
 
+  @ApiProperty()
+  fork: boolean;
+
   @ApiProperty({ type: String, nullable: true, format: 'date-time' })
   updatedAt: string | null;
+
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' })
+  pushedAt: string | null;
+}
+
+export class SourceOrganizationDto {
+  @ApiProperty({
+    description: 'Login (GitHub) or full path (GitLab)',
+    example: 'acme',
+  })
+  path: string;
+
+  @ApiProperty({ example: 'Acme Inc.' })
+  name: string;
+
+  @ApiProperty({ enum: ['organization', 'user', 'group'] })
+  kind: 'organization' | 'user' | 'group';
+
+  @ApiProperty({ example: 'https://github.com/acme' })
+  url: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  avatarUrl: string | null;
+
+  @ApiProperty({
+    description: 'Value of a GIT_ORG target for this namespace',
+    example: 'github.com/acme',
+  })
+  targetValue: string;
 }
 
 export class ListRepositoriesResponseDto {

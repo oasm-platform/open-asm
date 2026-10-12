@@ -34,6 +34,7 @@ import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import {
   ListRepositoriesQueryDto,
   ListRepositoriesResponseDto,
+  SourceOrganizationDto,
 } from './dto/list-repositories.dto';
 import { SchemasResponseDto } from './dto/schemas-response.dto';
 import { TelegramConnectDto } from './dto/telegram-connect.dto';
@@ -112,6 +113,27 @@ export class IntegrationsController {
       userId,
       syncSchedule: dto.syncSchedule,
     });
+  }
+
+  @Doc({
+    summary: 'List organizations of a source-code integration',
+    description:
+      'Lists the namespaces the integration token can read — the GitHub user and its organizations, or the GitLab user and its groups. Each entry carries the value of a GIT_ORG target for it. Requires the SOURCE_CODE capability.',
+    response: {
+      serialization: SourceOrganizationDto,
+      isArray: true,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('integration.read')
+  @Get(':id/organizations')
+  listOrganizations(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.integrationsService.listOrganizations(id, workspaceId);
   }
 
   @Doc({

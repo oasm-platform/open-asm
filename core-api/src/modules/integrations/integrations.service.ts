@@ -40,6 +40,7 @@ import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
 import type {
   ListRepositoriesQueryDto,
   ListRepositoriesResponseDto,
+  SourceOrganizationDto,
 } from './dto/list-repositories.dto';
 import type { TestIntegrationDto } from './dto/test-integration.dto';
 import type { UpdateIntegrationDto } from './dto/update-integration.dto';
@@ -485,6 +486,33 @@ export class IntegrationsService {
       IntegrationType.NOTIFICATION,
       testConfig,
     );
+  }
+
+  /**
+   * Lists the namespaces (GitHub orgs/user, GitLab groups/user) a SOURCE_CODE
+   * integration can read — the choices for a new GIT_ORG target.
+   */
+  async listOrganizations(
+    id: string,
+    workspaceId: string,
+  ): Promise<SourceOrganizationDto[]> {
+    const { integration, decryptedConfig } =
+      await this.getIntegrationWithDecryptedConfig(id, workspaceId);
+
+    if (!hasCapability(integration, IntegrationType.SOURCE_CODE)) {
+      throw new BadRequestException(
+        'Organizations can only be listed for integrations with the SOURCE_CODE capability',
+      );
+    }
+
+    const connector = resolveSourceCodeConnector(integration.appType);
+    try {
+      return await connector.listOrganizations(decryptedConfig);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to list organizations',
+      );
+    }
   }
 
   /**

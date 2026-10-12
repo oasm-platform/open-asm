@@ -968,6 +968,28 @@ describe('AssetsService', () => {
         mockTarget,
       );
     });
+
+    it('re-syncs a Git organization instead of requiring a primary host asset', async () => {
+      const mockTarget = {
+        id: targetId,
+        reScanCount: 0,
+        type: 'GIT_ORG',
+        value: 'github.com/acme',
+      };
+      mockAssetRepository.findOne = jest.fn().mockResolvedValue(null);
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
+      mockTargetRepository.update = jest.fn().mockResolvedValue({});
+      mockEventEmitter.emit = jest.fn();
+
+      const result = await service.reScan(targetId);
+
+      expect(result).toEqual({ message: 'Repository sync started' });
+      expect(mockAssetRepository.findOne).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.git_org.re-scan',
+        mockTarget,
+      );
+    });
   });
 
   describe('getAssetGraph', () => {

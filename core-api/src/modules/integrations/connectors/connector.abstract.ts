@@ -96,13 +96,39 @@ export interface SourceRepository {
   defaultBranch: string | null;
   private: boolean;
   archived: boolean;
+  /** True when the repository is a fork of another one. */
+  fork: boolean;
   updatedAt: string | null;
+  /** Last push to any branch, when the provider reports it. */
+  pushedAt: string | null;
 }
 
 export interface RepositoryQuery {
   search?: string;
   page: number;
   limit: number;
+  /**
+   * Restrict to one owner: a GitHub organization/user login or a GitLab
+   * group/user path. Omitted → every repository the token can see.
+   */
+  owner?: string;
+}
+
+/**
+ * A namespace that owns repositories and can become a GIT_ORG target: a
+ * GitHub organization or user, a GitLab group or user.
+ */
+export interface SourceOrganization {
+  /** Login (GitHub) or full path (GitLab) — what RepositoryQuery.owner takes. */
+  path: string;
+  /** Display name. */
+  name: string;
+  kind: 'organization' | 'user' | 'group';
+  /** Browser URL of the namespace. */
+  url: string;
+  avatarUrl: string | null;
+  /** Target value for this namespace: `<host>/<path>`, e.g. github.com/acme. */
+  targetValue: string;
 }
 
 export interface RepositoryPage {
@@ -138,6 +164,9 @@ export interface SourceCodeCapable {
     config: ConnectorConfig,
     query: RepositoryQuery,
   ): Promise<RepositoryPage>;
+
+  /** Namespaces the token can read: its own user plus orgs/groups. */
+  listOrganizations(config: ConnectorConfig): Promise<SourceOrganization[]>;
 }
 
 /**

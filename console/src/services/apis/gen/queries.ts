@@ -198,6 +198,27 @@ export type CreateIntegrationDto = {
   syncSchedule?: string;
 };
 
+export type SourceOrganizationDtoKind =
+  (typeof SourceOrganizationDtoKind)[keyof typeof SourceOrganizationDtoKind];
+
+export const SourceOrganizationDtoKind = {
+  organization: 'organization',
+  user: 'user',
+  group: 'group',
+} as const;
+
+export type SourceOrganizationDto = {
+  /** Login (GitHub) or full path (GitLab) */
+  path: string;
+  name: string;
+  kind: SourceOrganizationDtoKind;
+  url: string;
+  /** @nullable */
+  avatarUrl: string | null;
+  /** Value of a GIT_ORG target for this namespace */
+  targetValue: string;
+};
+
 export type SourceRepositoryDto = {
   /** Provider-side repository id */
   id: string;
@@ -208,8 +229,11 @@ export type SourceRepositoryDto = {
   defaultBranch: string | null;
   private: boolean;
   archived: boolean;
+  fork: boolean;
   /** @nullable */
   updatedAt: string | null;
+  /** @nullable */
+  pushedAt: string | null;
 };
 
 export type ListRepositoriesResponseDto = {
@@ -323,6 +347,7 @@ export const TargetType = {
   DOMAIN: 'DOMAIN',
   CIDR: 'CIDR',
   IP: 'IP',
+  GIT_ORG: 'GIT_ORG',
 } as const;
 
 /**
@@ -335,6 +360,8 @@ export const TargetSource = {
   cloudflare: 'cloudflare',
   aws: 'aws',
   vercel: 'vercel',
+  github: 'github',
+  gitlab: 'gitlab',
   INTERNAL_NETWORK: 'INTERNAL_NETWORK',
 } as const;
 
@@ -360,6 +387,12 @@ export const CronSchedule = {
   '0_0_1_*_*': '0 0 1 * *',
 } as const;
 
+/**
+ * GIT_ORG options: includeArchived, includeForks
+ * @nullable
+ */
+export type TargetSettings = { [key: string]: unknown } | null;
+
 export type Target = {
   id: string;
   createdAt: string;
@@ -372,6 +405,14 @@ export type Target = {
   source: TargetSource;
   lastDiscoveredAt: string;
   totalAssetServices: number;
+  totalAssets?: number;
+  /** @nullable */
+  integrationId?: string | null;
+  /**
+   * GIT_ORG options: includeArchived, includeForks
+   * @nullable
+   */
+  settings?: TargetSettings;
   status: JobStatus;
   scanSchedule: CronSchedule;
 };
@@ -389,10 +430,20 @@ export type BulkTargetResultDto = {
   totalSkipped: number;
 };
 
+export type GitOrgTargetSettingsDto = {
+  /** Scan archived repositories */
+  includeArchived?: boolean;
+  /** Scan forks */
+  includeForks?: boolean;
+};
+
 export type CreateTargetDto = {
-  /** The target value (domain, IP address, or CIDR notation) */
+  /** The target value: domain, IP address, CIDR notation, or for GIT_ORG `<host>/<owner>` (e.g. github.com/acme) */
   value: string;
-  /** The type of target (DOMAIN, CIDR, or IP) */
+  /** GIT_ORG only (required there): the SOURCE_CODE integration that syncs the repositories */
+  integrationId?: string;
+  settings?: GitOrgTargetSettingsDto;
+  /** The type of target (DOMAIN, CIDR, IP, or GIT_ORG) */
   type?: TargetType;
 };
 
@@ -437,6 +488,10 @@ export type GetManyTargetResponseDto = {
   scanSchedule: GetManyTargetResponseDtoScanSchedule;
   status: GetManyTargetResponseDtoStatus;
   totalAssetServices: number;
+  /** Enabled assets — for a GIT_ORG target, scanned repositories */
+  totalAssets: number;
+  /** @nullable */
+  integrationId?: string | null;
   duration: number;
   lastDiscoveredAt: string;
   internalNetworkId: string;
@@ -459,6 +514,33 @@ export const TargetScopeType = {
   EXTERNAL: 'EXTERNAL',
 } as const;
 
+export type TargetRepositoryDto = {
+  /** Asset id */
+  id: string;
+  value: string;
+  /** False when skipped (archived/fork) or gone */
+  isEnabled: boolean;
+  fullName: string;
+  url: string;
+  /** @nullable */
+  defaultBranch: string | null;
+  private: boolean;
+  archived: boolean;
+  fork: boolean;
+  /** @nullable */
+  pushedAt: string | null;
+  createdAt: string;
+};
+
+export type GetManyTargetRepositoryDtoDto = {
+  data: TargetRepositoryDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type UpdateTargetDtoScanSchedule =
   (typeof UpdateTargetDtoScanSchedule)[keyof typeof UpdateTargetDtoScanSchedule];
 
@@ -472,7 +554,9 @@ export const UpdateTargetDtoScanSchedule = {
 } as const;
 
 export type UpdateTargetDto = {
-  scanSchedule: UpdateTargetDtoScanSchedule;
+  scanSchedule?: UpdateTargetDtoScanSchedule;
+  /** GIT_ORG only. Applied by a repository sync started right away. */
+  settings?: GitOrgTargetSettingsDto;
 };
 
 /**
@@ -1052,6 +1136,11 @@ export type JobTimelineResponseDto = {
 
 export type AssetDnsRecords = { [key: string]: unknown };
 
+/**
+ * @nullable
+ */
+export type AssetMetadata = { [key: string]: unknown } | null;
+
 export type Asset = {
   id: string;
   createdAt: string;
@@ -1061,6 +1150,8 @@ export type Asset = {
   isPrimary: boolean;
   dnsRecords: AssetDnsRecords;
   isEnabled: boolean;
+  /** @nullable */
+  metadata?: AssetMetadata;
 };
 
 export type GetNextJobResponseDtoCategory =
@@ -3864,6 +3955,18 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
    * Filter by target scope (INTERNAL or EXTERNAL)
    */
   scope?: TargetScopeType;
+};
+
+export type TargetsControllerGetTargetRepositoriesParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * true → only scanned repositories, false → only skipped ones
+   */
+  isEnabled?: boolean;
 };
 
 export type WorkspacesControllerGetWorkspacesParams = {
@@ -7662,6 +7765,180 @@ export function useIntegrationsControllerGetManyIntegrations<
 }
 
 /**
+ * Lists the namespaces the integration token can read — the GitHub user and its organizations, or the GitLab user and its groups. Each entry carries the value of a GIT_ORG target for it. Requires the SOURCE_CODE capability.
+ * @summary List organizations of a source-code integration
+ */
+export const integrationsControllerListOrganizations = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SourceOrganizationDto[]>(
+    { url: `/api/integrations/${id}/organizations`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getIntegrationsControllerListOrganizationsQueryKey = (
+  id: string,
+) => {
+  return [`/api/integrations/${id}/organizations`] as const;
+};
+
+export const getIntegrationsControllerListOrganizationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getIntegrationsControllerListOrganizationsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof integrationsControllerListOrganizations>>
+  > = ({ signal }) =>
+    integrationsControllerListOrganizations(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IntegrationsControllerListOrganizationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof integrationsControllerListOrganizations>>
+>;
+export type IntegrationsControllerListOrganizationsQueryError = unknown;
+
+export function useIntegrationsControllerListOrganizations<
+  TData = Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerListOrganizations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerListOrganizations<
+  TData = Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+          TError,
+          Awaited<ReturnType<typeof integrationsControllerListOrganizations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIntegrationsControllerListOrganizations<
+  TData = Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List organizations of a source-code integration
+ */
+
+export function useIntegrationsControllerListOrganizations<
+  TData = Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof integrationsControllerListOrganizations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getIntegrationsControllerListOrganizationsQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Lists the repositories the integration token can access, live from the provider (GitHub / GitLab). Requires the SOURCE_CODE capability.
  * @summary List repositories of a source-code integration
  */
@@ -9959,6 +10236,401 @@ export function useTargetsControllerExportTargetsToCSV<
 } {
   const queryOptions =
     getTargetsControllerExportTargetsToCSVQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Lists the repositories synced into a GIT_ORG target (its assets), with provider details. Disabled repositories (archived, forks, or gone from the provider) are listed after the scanned ones.
+ * @summary List repositories of a Git organization target
+ */
+export const targetsControllerGetTargetRepositories = (
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyTargetRepositoryDtoDto>(
+    { url: `/api/targets/${id}/repositories`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getTargetsControllerGetTargetRepositoriesInfiniteQueryKey = (
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+) => {
+  return [
+    'infinite',
+    `/api/targets/${id}/repositories`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getTargetsControllerGetTargetRepositoriesQueryKey = (
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+) => {
+  return [
+    `/api/targets/${id}/repositories`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getTargetsControllerGetTargetRepositoriesInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+    TargetsControllerGetTargetRepositoriesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRepositoriesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTargetsControllerGetTargetRepositoriesInfiniteQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+    QueryKey,
+    TargetsControllerGetTargetRepositoriesParams['page']
+  > = ({ signal, pageParam }) =>
+    targetsControllerGetTargetRepositories(
+      id,
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+    TError,
+    TData,
+    QueryKey,
+    TargetsControllerGetTargetRepositoriesParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetRepositoriesInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>
+  >;
+export type TargetsControllerGetTargetRepositoriesInfiniteQueryError = unknown;
+
+export function useTargetsControllerGetTargetRepositoriesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+    TargetsControllerGetTargetRepositoriesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | TargetsControllerGetTargetRepositoriesParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRepositoriesParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetRepositoriesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+    TargetsControllerGetTargetRepositoriesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRepositoriesParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetRepositoriesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+    TargetsControllerGetTargetRepositoriesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRepositoriesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List repositories of a Git organization target
+ */
+
+export function useTargetsControllerGetTargetRepositoriesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+    TargetsControllerGetTargetRepositoriesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRepositoriesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getTargetsControllerGetTargetRepositoriesInfiniteQueryOptions(
+      id,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getTargetsControllerGetTargetRepositoriesQueryOptions = <
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTargetsControllerGetTargetRepositoriesQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>
+  > = ({ signal }) =>
+    targetsControllerGetTargetRepositories(id, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetRepositoriesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>
+>;
+export type TargetsControllerGetTargetRepositoriesQueryError = unknown;
+
+export function useTargetsControllerGetTargetRepositories<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | TargetsControllerGetTargetRepositoriesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetRepositories<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetRepositories<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List repositories of a Git organization target
+ */
+
+export function useTargetsControllerGetTargetRepositories<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRepositoriesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRepositories>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTargetsControllerGetTargetRepositoriesQueryOptions(
+    id,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

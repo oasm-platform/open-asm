@@ -6,6 +6,7 @@ import {
   type RepositoryPage,
   type RepositoryQuery,
   type SourceCodeCapable,
+  type SourceOrganization,
   type SourceRepository,
   type TicketingCapable,
 } from './connector.abstract';
@@ -16,6 +17,8 @@ const GITHUB_API_VERSION = '2022-11-28';
 /** `/user/repos` has no name filter, so a search scans at most this many pages. */
 const MAX_SEARCH_SCAN_PAGES = 10;
 const SEARCH_SCAN_PAGE_SIZE = 100;
+/** Organizations of one user — 1000 is far beyond any real membership. */
+const MAX_ORG_PAGES = 10;
 
 /** Stored integration config (see github.schema.ts). */
 interface GithubConfig {
@@ -42,9 +45,22 @@ interface GithubRepo {
   default_branch?: string;
   private: boolean;
   archived: boolean;
+  fork?: boolean;
   has_issues?: boolean;
   updated_at?: string;
+  pushed_at?: string | null;
 }
+
+interface GithubAccount {
+  login: string;
+  name?: string | null;
+  html_url?: string;
+  avatar_url?: string | null;
+  type?: 'User' | 'Organization';
+}
+
+/** Builds the repo-list path for one page (owner already resolved). */
+type RepoPagePath = (perPage: number, page: number) => string;
 
 /**
  * GitHub connector — one connection, two capabilities:
@@ -88,11 +104,12 @@ export class GithubConnector
   ): Promise<RepositoryPage> {
     const cfg = config as unknown as GithubConfig;
     const search = query.search?.trim().toLowerCase();
+    const pagePath = await this.resolveRepoPagePath(cfg, query.owner);
 
     if (!search) {
       const { body, headers } = await this.request<GithubRepo[]>(
         cfg,
-        `/user/repos?${this.repoListParams(query.limit, query.page)}`,
+        pagePath(query.limit, query.page),
       );
       return {
         data: body.map(toSourceRepository),
@@ -110,7 +127,7 @@ export class GithubConnector
     while (more && scanPage <= MAX_SEARCH_SCAN_PAGES) {
       const { body, headers } = await this.request<GithubRepo[]>(
         cfg,
-        `/user/repos?${this.repoListParams(SEARCH_SCAN_PAGE_SIZE, scanPage)}`,
+        pagePath(SEARCH_SCAN_PAGE_SIZE, scanPage),
       );
       matches.push(
         ...body.filter((repo) => repo.full_name.toLowerCase().includes(search)),
@@ -126,6 +143,34 @@ export class GithubConnector
       limit: query.limit,
       hasNextPage: matches.length > start + query.limit,
     };
+  }
+
+  async listOrganizations(
+    config: ConnectorConfig,
+  ): Promise<SourceOrganization[]> {
+    const cfg = config as unknown as GithubConfig;
+    const { body: user } = await this.request<GithubAccount>(cfg, '/user');
+    // The web origin (github.com or the GHES host) comes from the profile
+    // URL, so org links and target values are right on Enterprise too.
+    const webOrigin = new URL(user.html_url ?? 'https://github.com').origin;
+    const host = new URL(webOrigin).host;
+
+    const organizations: SourceOrganization[] = [
+      toOrganization(user, 'user', webOrigin, host),
+    ];
+    for (let page = 1; page <= MAX_ORG_PAGES; page++) {
+      const { body, headers } = await this.request<GithubAccount[]>(
+        cfg,
+        `/user/orgs?per_page=100&page=${page}`,
+      );
+      organizations.push(
+        ...body.map((org) =>
+          toOrganization(org, 'organization', webOrigin, host),
+        ),
+      );
+      if (!hasNextLink(headers)) break;
+    }
+    return organizations;
   }
 
   async createTicket(config: ConnectorConfig): Promise<void> {
@@ -151,13 +196,49 @@ export class GithubConnector
     this.logger.log(`GitHub issue opened in ${repository}`);
   }
 
-  private repoListParams(perPage: number, page: number): string {
-    return new URLSearchParams({
-      per_page: String(perPage),
-      page: String(page),
-      sort: 'updated',
-      affiliation: 'owner,collaborator,organization_member',
-    }).toString();
+  /**
+   * Picks the endpoint that lists an owner's repositories *including private
+   * ones the token can read*:
+   * - no owner → `/user/repos` (everything the token sees)
+   * - an organization → `/orgs/{org}/repos?type=all`
+   * - the token's own user → `/user/repos?affiliation=owner`
+   *   (`/users/{me}/repos` would return public repositories only)
+   * - another user → `/users/{user}/repos` (public only, by GitHub design)
+   */
+  private async resolveRepoPagePath(
+    cfg: GithubConfig,
+    owner: string | undefined,
+  ): Promise<RepoPagePath> {
+    const params = (perPage: number, page: number, extra: Record<string, string>) =>
+      new URLSearchParams({
+        per_page: String(perPage),
+        page: String(page),
+        sort: 'updated',
+        ...extra,
+      }).toString();
+
+    if (!owner) {
+      return (perPage, page) =>
+        `/user/repos?${params(perPage, page, { affiliation: 'owner,collaborator,organization_member' })}`;
+    }
+
+    const encoded = encodeURIComponent(owner);
+    const { body: account } = await this.request<GithubAccount>(
+      cfg,
+      `/users/${encoded}`,
+    );
+    if (account.type === 'Organization') {
+      return (perPage, page) =>
+        `/orgs/${encoded}/repos?${params(perPage, page, { type: 'all' })}`;
+    }
+
+    const { body: me } = await this.request<GithubAccount>(cfg, '/user');
+    if (me.login.toLowerCase() === owner.toLowerCase()) {
+      return (perPage, page) =>
+        `/user/repos?${params(perPage, page, { affiliation: 'owner' })}`;
+    }
+    return (perPage, page) =>
+      `/users/${encoded}/repos?${params(perPage, page, { type: 'owner' })}`;
   }
 
   private requireTicketRepository(cfg: GithubConfig): string {
@@ -205,7 +286,25 @@ function toSourceRepository(repo: GithubRepo): SourceRepository {
     defaultBranch: repo.default_branch ?? null,
     private: repo.private,
     archived: repo.archived,
+    fork: repo.fork ?? false,
     updatedAt: repo.updated_at ?? null,
+    pushedAt: repo.pushed_at ?? null,
+  };
+}
+
+function toOrganization(
+  account: GithubAccount,
+  kind: SourceOrganization['kind'],
+  webOrigin: string,
+  host: string,
+): SourceOrganization {
+  return {
+    path: account.login,
+    name: account.name || account.login,
+    kind,
+    url: account.html_url ?? `${webOrigin}/${account.login}`,
+    avatarUrl: account.avatar_url ?? null,
+    targetValue: `${host}/${account.login}`.toLowerCase(),
   };
 }
 

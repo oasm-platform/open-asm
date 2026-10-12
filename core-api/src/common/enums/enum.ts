@@ -157,6 +157,7 @@ export enum BullMQName {
   ISSUE_CREATION = 'issue-creation',
   VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
   INTEGRATION_SYNC_SCHEDULE = 'integration-sync-schedule',
+  REPOSITORY_SYNC = 'repository-sync',
   AUDIT_RETENTION = 'audit-retention',
 }
 
@@ -280,6 +281,11 @@ export enum TargetType {
   DOMAIN = 'DOMAIN',
   CIDR = 'CIDR',
   IP = 'IP',
+  /**
+   * A GitHub organization/user or GitLab group bound to a SOURCE_CODE
+   * integration. Its assets are the repositories, synced from the provider.
+   */
+  GIT_ORG = 'GIT_ORG',
 }
 
 /**

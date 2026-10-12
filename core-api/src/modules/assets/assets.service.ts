@@ -22,7 +22,7 @@ import { LLMProvider } from '../agents/enums/agent.enums';
 import {
   getLLMProviderConfig,
 } from '../agents/llm-provider-supported';
-import { Target } from '../targets/entities/target.entity';
+import { Target, TargetType } from '../targets/entities/target.entity';
 
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { StorageService } from '../storage/storage.service';
@@ -600,6 +600,17 @@ export class AssetsService {
 
     if (!target) {
       throw new NotFoundException('Target not found');
+    }
+
+    // A Git organization has no primary host asset: "re-scan" means re-sync
+    // its repositories, which RepositorySyncService does on this event (the
+    // scan schedule lands here too). Scanning follows on `git_org.synced`.
+    if (target.type === TargetType.GIT_ORG) {
+      await this.targetRepo.update(targetId, {
+        reScanCount: target.reScanCount + 1,
+      });
+      this.eventEmitter.emit('target.git_org.re-scan', target);
+      return { message: 'Repository sync started' };
     }
 
     const asset = await this.assetRepo.findOne({

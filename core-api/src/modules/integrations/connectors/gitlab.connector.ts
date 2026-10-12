@@ -6,12 +6,15 @@ import {
   type RepositoryPage,
   type RepositoryQuery,
   type SourceCodeCapable,
+  type SourceOrganization,
   type SourceRepository,
   type TicketingCapable,
 } from './connector.abstract';
 import { providerFetch, trimBaseUrl } from './source-code.http';
 
 const GITLAB_BASE_URL = 'https://gitlab.com';
+/** Groups of one user — 1000 is far beyond any real membership. */
+const MAX_GROUP_PAGES = 10;
 
 /** Stored integration config (see gitlab.schema.ts). */
 interface GitlabConfig {
@@ -40,6 +43,27 @@ interface GitlabProject {
   archived?: boolean;
   issues_enabled?: boolean;
   last_activity_at?: string;
+  /** Present (non-null) when the project is a fork. */
+  forked_from_project?: unknown;
+}
+
+interface GitlabUser {
+  username: string;
+  name?: string;
+  web_url?: string;
+  avatar_url?: string | null;
+}
+
+interface GitlabGroup {
+  full_path: string;
+  full_name?: string;
+  web_url?: string;
+  avatar_url?: string | null;
+}
+
+interface GitlabNamespace {
+  kind: 'group' | 'user';
+  full_path: string;
 }
 
 /**
@@ -84,7 +108,6 @@ export class GitlabConnector
   ): Promise<RepositoryPage> {
     const cfg = config as unknown as GitlabConfig;
     const params = new URLSearchParams({
-      membership: 'true',
       order_by: 'last_activity_at',
       sort: 'desc',
       per_page: String(query.limit),
@@ -93,9 +116,10 @@ export class GitlabConnector
     const search = query.search?.trim();
     if (search) params.set('search', search);
 
+    const basePath = await this.resolveProjectsPath(cfg, query.owner, params);
     const { body, headers } = await this.request<GitlabProject[]>(
       cfg,
-      `/projects?${params.toString()}`,
+      `${basePath}?${params.toString()}`,
     );
     return {
       data: body.map(toSourceRepository),
@@ -107,6 +131,49 @@ export class GitlabConnector
         ? headers.get('x-next-page') !== ''
         : body.length === query.limit,
     };
+  }
+
+  async listOrganizations(
+    config: ConnectorConfig,
+  ): Promise<SourceOrganization[]> {
+    const cfg = config as unknown as GitlabConfig;
+    const webOrigin = new URL(trimBaseUrl(cfg.baseUrl || GITLAB_BASE_URL)).origin;
+    const host = new URL(webOrigin).host;
+
+    const { body: user } = await this.request<GitlabUser>(cfg, '/user');
+    const organizations: SourceOrganization[] = [
+      {
+        path: user.username,
+        name: user.name || user.username,
+        kind: 'user',
+        url: user.web_url ?? `${webOrigin}/${user.username}`,
+        avatarUrl: user.avatar_url ?? null,
+        targetValue: `${host}/${user.username}`.toLowerCase(),
+      },
+    ];
+
+    // min_access_level=10 (Guest): every group the user is a member of,
+    // subgroups included, as their own entries.
+    for (let page = 1; page <= MAX_GROUP_PAGES; page++) {
+      const { body, headers } = await this.request<GitlabGroup[]>(
+        cfg,
+        `/groups?min_access_level=10&per_page=100&page=${page}`,
+      );
+      organizations.push(
+        ...body.map(
+          (group): SourceOrganization => ({
+            path: group.full_path,
+            name: group.full_name || group.full_path,
+            kind: 'group',
+            url: group.web_url ?? `${webOrigin}/${group.full_path}`,
+            avatarUrl: group.avatar_url ?? null,
+            targetValue: `${host}/${group.full_path}`.toLowerCase(),
+          }),
+        ),
+      );
+      if (!headers.get('x-next-page')) break;
+    }
+    return organizations;
   }
 
   async createTicket(config: ConnectorConfig): Promise<void> {
@@ -129,6 +196,32 @@ export class GitlabConnector
       },
     });
     this.logger.log(`GitLab issue opened in ${project}`);
+  }
+
+  /**
+   * Picks the project-list endpoint for an owner:
+   * - no owner → `/projects?membership=true` (everything the token is in)
+   * - a group → `/groups/{path}/projects` with subgroups
+   * - a user → `/users/{username}/projects`
+   */
+  private async resolveProjectsPath(
+    cfg: GitlabConfig,
+    owner: string | undefined,
+    params: URLSearchParams,
+  ): Promise<string> {
+    if (!owner) {
+      params.set('membership', 'true');
+      return '/projects';
+    }
+    const { body: namespace } = await this.request<GitlabNamespace>(
+      cfg,
+      `/namespaces/${encodeURIComponent(owner)}`,
+    );
+    if (namespace.kind === 'group') {
+      params.set('include_subgroups', 'true');
+      return `/groups/${encodeURIComponent(namespace.full_path)}/projects`;
+    }
+    return `/users/${encodeURIComponent(namespace.full_path)}/projects`;
   }
 
   private requireTicketRepository(cfg: GitlabConfig): string {
@@ -174,6 +267,9 @@ function toSourceRepository(project: GitlabProject): SourceRepository {
     defaultBranch: project.default_branch ?? null,
     private: project.visibility !== 'public',
     archived: project.archived ?? false,
+    fork: !!project.forked_from_project,
     updatedAt: project.last_activity_at ?? null,
+    // GitLab reports activity (pushes, issues, MRs), not pushes alone.
+    pushedAt: project.last_activity_at ?? null,
   };
 }
