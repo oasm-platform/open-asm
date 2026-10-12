@@ -33,6 +33,7 @@ describe('JobsRegistryService', () => {
   let service: JobsRegistryService;
 
   const mockJobRepository = {
+    find: jest.fn(),
     createQueryBuilder: jest.fn().mockReturnThis(),
     innerJoin: jest.fn().mockReturnThis(),
     leftJoin: jest.fn().mockReturnThis(),
@@ -2247,7 +2248,7 @@ describe('JobsRegistryService', () => {
 
   describe('buildAgentGrpcJobs', () => {
     it('builds a flagged connector payload from loaded job relations', async () => {
-      mockJobRepository.find = jest.fn().mockResolvedValue([
+      mockJobRepository.find.mockResolvedValueOnce([
         {
           id: 'job-1',
           category: 'vulnerability',
