@@ -27,8 +27,8 @@ import {
   GetManyNetworkInterfacesResponseDto,
 } from './dtos/get-many-network-interfaces.dto';
 import { UpdateInternalNetworkDto } from './dtos/update-internal-network.dto';
-import { EVENT_CATALOG } from '../connectors/event';
-import { PublishEvent } from '../event-bridge/publish-event.decorator';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { InternalNetworksService } from './internal-networks.service';
 
 @Controller('internal-networks')

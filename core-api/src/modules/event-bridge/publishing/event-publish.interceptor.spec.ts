@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { lastValueFrom, of, throwError } from 'rxjs';
 import type { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import type { EventBridgeService } from './event-bridge.service';
-import { EVENT_CATALOG } from '../connectors/event';
+import { EVENT_CATALOG } from '../contracts/event-catalog';
 import { EventPublishInterceptor } from './event-publish.interceptor';
 import type { PublishEventConfig } from './publish-event.decorator';
 
@@ -19,7 +19,7 @@ import type { PublishEventConfig } from './publish-event.decorator';
  *    error is what reaches the client;
  *  - a buggy extractor skips the event instead of turning a 200 into a 500.
  *
- * Run: task api:test:one SPEC=src/modules/event-bridge/event-publish.interceptor.spec.ts
+ * Run: task api:test:one SPEC=src/modules/event-bridge/publishing/event-publish.interceptor.spec.ts
  */
 describe('EventPublishInterceptor', () => {
   const WORKSPACE = '11111111-1111-4111-8111-111111111111';

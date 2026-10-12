@@ -1,17 +1,13 @@
 import { EventBusGroup } from '@/common/enums/enum';
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
-import { RedisService } from '@/services/redis/redis.service';
 import { Injectable } from '@nestjs/common';
-import type { EventName } from '../connectors/event';
-import { SUBSCRIPTIONS } from './event-policy';
-import type { ConsumedEvent } from './stream-consumer.service';
-import { StreamConsumerService } from './stream-consumer.service';
+import type { EventSink } from '../../consuming/event-sink';
+import { SUBSCRIPTIONS } from '../../routing/subscriptions';
 
 /**
  * Consumer group `projection`: read models.
  *
  * Its own group so a slow rebuild cannot delay the audit trail, and so the
- * rebuild can be replayed or paused independently of it. Not single-instance —
+ * rebuild can be replayed or paused independently of it. Not exclusive —
  * projections are last-writer-wins per key, so two replicas converging on the
  * same value is the desired behaviour, not a race to guard against.
  *
@@ -29,20 +25,20 @@ import { StreamConsumerService } from './stream-consumer.service';
  * does not exist is an error, not an empty read.
  */
 @Injectable()
-export class ProjectionSinkService extends StreamConsumerService {
-  constructor(redis: RedisService, lock: RedisLockService) {
-    super(redis, lock, {
-      group: EventBusGroup.Projection,
-      domains: SUBSCRIPTIONS.projection,
-    });
+export class ProjectionSink implements EventSink {
+  readonly group = EventBusGroup.Projection;
+  readonly domains = SUBSCRIPTIONS[EventBusGroup.Projection];
+
+  /**
+   * No projection to apply yet. Rejecting every name lets the consumer ack
+   * without decoding, which keeps the group's cursor advancing — that is also
+   * what makes adding a handler later safe (it replays from the group start).
+   */
+  accepts(): boolean {
+    return false;
   }
 
-  protected async onEntry(
-    _name: EventName,
-    _event: ConsumedEvent,
-  ): Promise<void> {
-    // No projection to apply yet — see the class comment. Entries are consumed
-    // and acknowledged so the group's cursor advances; that is also what makes
-    // enabling a handler later safe (it replays from the group start).
+  async handle(): Promise<void> {
+    // Unreachable while `accepts` is false; see above.
   }
 }

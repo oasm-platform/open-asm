@@ -7,8 +7,9 @@ import {
 import { RedisService } from '@/services/redis/redis.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CloudEvent } from 'cloudevents';
-import type { CatalogEvent, EventName } from '../connectors/event';
-import { EVENT_CATALOG_TOKEN, resolveEventName } from '../connectors/event';
+import type { CatalogEvent } from '../contracts/event-catalog';
+import { EVENT_CATALOG_TOKEN, resolveEventName } from '../contracts/event-catalog';
+import { toStreamFields } from '../transport/stream-codec';
 
 /**
  * Writes domain events onto the single Redis Stream. The stream key and the
@@ -130,31 +131,3 @@ export class EventBridgeService {
 function describe(event: CatalogEvent | string): string {
   return typeof event === 'string' ? event : (event?.name ?? '<unknown>');
 }
-
-/**
- * Flattens a structured CloudEvents envelope into Redis Stream fields.
- *
- * `data` is the only non-scalar attribute, so it is JSON-encoded into its own
- * field. Every other attribute is JSON-encoded too when it is not already a
- * string: `String(value)` on an object would silently write the literal
- * `"[object Object]"`, and JSON keeps numbers/booleans byte-identical to their
- * String() form while making anything structured lossless.
- *
- * An absent `data` stays absent rather than becoming `null` — `data` is
- * OPTIONAL, and fabricating an empty payload would tell a consumer the
- * opposite of the truth.
- */
-function toStreamFields(
-  envelope: Record<string, unknown>,
-): Record<string, string> {
-  const fields: Record<string, string> = {};
-  for (const [key, value] of Object.entries(envelope)) {
-    if (value === undefined) {
-      continue;
-    }
-    fields[key] = typeof value === 'string' ? value : JSON.stringify(value);
-  }
-  return fields;
-}
-
-export type { EventName };

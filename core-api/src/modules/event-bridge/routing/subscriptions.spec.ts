@@ -1,6 +1,6 @@
 import { EventBusGroup } from '@/common/enums/enum';
-import { EVENT_NAMES, type EventName } from '../connectors/event';
-import { SUBSCRIPTIONS } from './event-policy';
+import { EVENT_NAMES, type EventName } from '../contracts/event-catalog';
+import { SUBSCRIPTIONS } from './subscriptions';
 
 /**
  * `SUBSCRIPTIONS` is the single declaration of what each lane consumes, so
@@ -8,7 +8,7 @@ import { SUBSCRIPTIONS } from './event-policy';
  * handler. The values are real domains and the groups are real Redis groups —
  * a typo in either fails silently in production as a lane that never fires.
  *
- * Run: task api:test:one SPEC=src/modules/event-bridge/event-subscriptions.spec.ts
+ * Run: task api:test:one SPEC=src/modules/event-bridge/routing/subscriptions.spec.ts
  */
 describe('event bus subscriptions', () => {
   const groups = Object.keys(SUBSCRIPTIONS);

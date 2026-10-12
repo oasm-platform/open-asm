@@ -1,5 +1,5 @@
-import { AUDIT_ACTION_CATALOG } from '../audit/constants/audit-events';
-import { EVENT_NAMES, type EventName } from '../connectors/event';
+import { AUDIT_ACTION_CATALOG } from '../../audit/constants/audit-events';
+import { EVENT_NAMES, type EventName } from '../contracts/event-catalog';
 import { EVENT_POLICY, eventSeverity, isPersisted } from './event-policy';
 
 /**
@@ -14,7 +14,7 @@ import { EVENT_POLICY, eventSeverity, isPersisted } from './event-policy';
  * runtime half: that the policy agrees with the audit catalog, and that the
  * lookup helpers never return a wrong default for a real event.
  *
- * Run: task api:test:one SPEC=src/modules/event-bridge/event-policy.spec.ts
+ * Run: task api:test:one SPEC=src/modules/event-bridge/routing/event-policy.spec.ts
  */
 describe('event policy', () => {
   describe('coverage', () => {

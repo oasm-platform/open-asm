@@ -36,13 +36,14 @@ export interface EventEnvelopeData {
   payload?: unknown;
 }
 
-/** Guards for the two fields the sink cannot do without. */
-export function isPersistableEnvelope(
-  data: EventEnvelopeData | undefined,
-): data is EventEnvelopeData & { workspaceId: string; outcome: AuditOutcome } {
-  return (
-    typeof data?.workspaceId === 'string' &&
-    data.workspaceId.length > 0 &&
-    typeof data.outcome === 'string'
-  );
+/**
+ * Normalized envelope handed to a sink: the producer's `data` plus the two
+ * CloudEvents attributes every sink needs and none should re-derive from the
+ * raw entry — the idempotency key (`id`) and the ordering key (`time`).
+ */
+export interface ConsumedEvent extends EventEnvelopeData {
+  /** CloudEvents `id`. Also the idempotency key for redeliveries. */
+  eventId: string;
+  /** CloudEvents `time` as an ISO string, or undefined when malformed. */
+  occurredAt?: string;
 }

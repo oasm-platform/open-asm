@@ -1,6 +1,6 @@
 import { SetMetadata } from '@nestjs/common';
 import type { AuditActorType } from '@/common/enums/enum';
-import type { CatalogEvent } from '../connectors/event';
+import type { CatalogEvent } from '../contracts/event-catalog';
 
 export const PUBLISH_EVENT_KEY = 'publish_event_key';
 

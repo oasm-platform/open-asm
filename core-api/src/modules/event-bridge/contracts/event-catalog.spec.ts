@@ -1,4 +1,4 @@
-import { AUDIT_ACTION_CATALOG } from '../audit/constants/audit-events';
+import { AUDIT_ACTION_CATALOG } from '../../audit/constants/audit-events';
 import {
   EVENT_CATALOG,
   EVENT_CATALOG_TOKEN,
@@ -10,7 +10,7 @@ import {
   resolveEventName,
   type CatalogEvent,
   type EventName,
-} from '../connectors/event';
+} from './event-catalog';
 
 /**
  * The catalog is hand-maintained, so the risks are (a) it drifts from the audit
@@ -24,7 +24,7 @@ import {
  * (tsconfig.build.json) and jest strips types via SWC, so a type-level
  * assertion written in THIS file would never run — the tree being the only
  * source is what makes the union trustworthy.
- * Run: task api:test:one SPEC=src/modules/event-bridge/event.spec.ts
+ * Run: task api:test:one SPEC=src/modules/event-bridge/contracts/event-catalog.spec.ts
  */
 describe('event catalog', () => {
   describe('naming contract', () => {

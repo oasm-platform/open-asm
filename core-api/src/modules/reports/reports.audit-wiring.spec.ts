@@ -3,7 +3,7 @@ jest.mock('./renderer/pdf-renderer', () => ({
 }));
 
 import { Reflector } from '@nestjs/core';
-import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publish-event.decorator';
+import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publishing/publish-event.decorator';
 import { ReportsController } from './reports.controller';
 
 describe('ReportsController audit wiring (M4.4 decorator events)', () => {
