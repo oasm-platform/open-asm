@@ -2264,6 +2264,47 @@ describe('JobsRegistryService', () => {
       );
     });
 
+    it('agent lane claims only agent jobs; normal lane excludes them', async () => {
+      // Given: a worker with jobs on both lanes
+      const agent = givenWorkerAndQueue(buildWorker(), []);
+
+      // When: the agent lane claims
+      await service.getNextJobs('worker-uuid', 2, true);
+
+      // Then: only agent-run jobs match
+      expect(agent.qb.leftJoin).toHaveBeenCalledWith(
+        'jobs.jobHistory',
+        'jobHistory',
+      );
+      const agentPredicates = agent.qb.andWhere.mock.calls.map((call) =>
+        String(call[0]),
+      );
+      expect(
+        agentPredicates.some((sql) =>
+          sql.includes('jobHistory.jobRunType = :agentRunType'),
+        ),
+      ).toBe(true);
+
+      // When: the normal lane claims
+      const normal = givenWorkerAndQueue(buildWorker(), []);
+      await service.getNextJobs('worker-uuid', 2, false);
+
+      // Then: every non-agent job (or one with no history) matches
+      const normalPredicates = normal.qb.andWhere.mock.calls.map((call) =>
+        String(call[0]),
+      );
+      expect(
+        normalPredicates.some((sql) =>
+          sql.includes('jobHistory.jobRunType IS NULL'),
+        ),
+      ).toBe(true);
+      expect(
+        normalPredicates.some((sql) =>
+          sql.includes('jobHistory.jobRunType <> :agentRunType'),
+        ),
+      ).toBe(true);
+    });
+
     it('getNextJob delegates to the batched claim', async () => {
       // Given: one claimable job
       const { qb } = givenWorkerAndQueue(buildWorker(), [

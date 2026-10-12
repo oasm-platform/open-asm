@@ -60,6 +60,8 @@ message Job {
 message NextBatchRequest {
   string id = 1;
   int32 limit = 2;
+  // true = claim only AI-agent jobs (separate worker lane); false = every other job
+  bool agent = 3;
 }
 
 // Ordered list of claimed jobs, highest priority first. Empty when nothing is

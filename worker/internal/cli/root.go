@@ -131,7 +131,8 @@ The worker runs in one of two modes, reported to core-api when it joins:
 
   node  Headless worker node for Docker / production deployments. Launch with
         '--mode node' and configure via the flags below or WORKER_* environment
-        variables (WORKER_API_KEY, WORKER_MAX_CONCURRENCY, WORKER_GRPC_HOST,
+        variables (WORKER_API_KEY, WORKER_MAX_CONCURRENCY,
+        WORKER_AGENT_CONCURRENCY, WORKER_GRPC_HOST,
         WORKER_GRPC_PORT, WORKER_TOOL_PATH, WORKER_NETWORK,
         WORKER_CONNECTOR_ADDR). WORKER_CONNECTOR_ADDR overrides the address
         connector containers dial back on (default port 26276); when unset the
@@ -162,6 +163,9 @@ The worker runs in one of two modes, reported to core-api when it joins:
 
 	rootCmd.Flags().Int("max-concurrency", 0, "Maximum number of concurrent jobs; 0 (default) auto-sizes from the CPU/RAM available to the worker")
 	viper.BindPFlag("max_concurrency", rootCmd.Flags().Lookup("max-concurrency"))
+
+	rootCmd.Flags().Int("agent-concurrency", 0, "Size of the separate AI-agent job lane; 0 disables it, a negative value uses the default")
+	viper.BindPFlag("agent_concurrency", rootCmd.Flags().Lookup("agent-concurrency"))
 
 	rootCmd.Flags().String("grpc-host", "localhost", "gRPC server host")
 	viper.BindPFlag("grpc_host", rootCmd.Flags().Lookup("grpc-host"))

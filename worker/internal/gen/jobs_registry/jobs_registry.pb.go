@@ -255,9 +255,11 @@ func (x *Job) GetTimeoutSeconds() int32 {
 // concurrency slots on the caller, so the server never hands back more jobs
 // than the worker can start immediately.
 type NextBatchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Limit int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	// true = claim only AI-agent jobs (separate worker lane); false = every other job
+	Agent         bool `protobuf:"varint,3,opt,name=agent,proto3" json:"agent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -304,6 +306,13 @@ func (x *NextBatchRequest) GetLimit() int32 {
 		return x.Limit
 	}
 	return 0
+}
+
+func (x *NextBatchRequest) GetAgent() bool {
+	if x != nil {
+		return x.Agent
+	}
+	return false
 }
 
 // Ordered list of claimed jobs, highest priority first. Empty when nothing is
@@ -1995,10 +2004,11 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\b_commandB\x06\n" +
 	"\x04_cpuB\t\n" +
 	"\a_memoryB\x12\n" +
-	"\x10_timeout_seconds\"8\n" +
+	"\x10_timeout_seconds\"N\n" +
 	"\x10NextBatchRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
-	"\x05limit\x18\x02 \x01(\x05R\x05limit\"5\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x14\n" +
+	"\x05agent\x18\x03 \x01(\bR\x05agent\"5\n" +
 	"\aJobList\x12*\n" +
 	"\x06values\x18\x01 \x03(\v2\x12.jobs_registry.JobR\x06values\"'\n" +
 	"\vJobResponse\x12\x18\n" +

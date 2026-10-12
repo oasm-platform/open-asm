@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { z } from 'zod';
 
 import { AssetsService } from '@/modules/assets/assets.service';
+import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { IssuesService } from '@/modules/issues/issues.service';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
@@ -27,7 +28,7 @@ import {
   type ApprovalSettings,
   type PlanRunMode,
 } from './agents.approvals';
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode, JobRunType } from '@/common/enums/enum';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -171,6 +172,7 @@ export class AgentTool {
     private readonly todoRepository: Repository<AgentConversationTodo>,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly approvals: AgentsApprovalsService,
+    private readonly connectorRegistry: ConnectorRegistryService,
   ) {}
 
   get getAssetsTool(): (workspaceId: string) => any {
@@ -504,7 +506,12 @@ export class AgentTool {
           });
           return {
             ...response,
-            data: response.data.map((i) => ({ id: i.id, name: i.name })),
+            data: response.data.map((i) => ({
+              id: i.id,
+              name: i.name,
+              agentTool:
+                this.connectorRegistry.getConnector(i.name)?.agentTool === true,
+            })),
           };
         },
       };
@@ -1325,6 +1332,95 @@ export class AgentTool {
     };
   }
 
+  /**
+   * One AI tool per connector flagged `agentTool: true` in the manifest.
+   * Agent-only: the [AGENT] permission keeps them out of Ask mode, mcp:false
+   * keeps them off the MCP surface, and the empty READ_ONLY_TOOLS set means
+   * withApproval wraps them (MANUAL asks) like any other mutating tool.
+   */
+  getConnectorTools(
+    workspaceId: string,
+  ): Record<
+    string,
+    { method: ToolType; permissions: AgentMode[]; mcp: boolean }
+  > {
+    const tools: Record<
+      string,
+      { method: ToolType; permissions: AgentMode[]; mcp: boolean }
+    > = {};
+
+    for (const entry of this.connectorRegistry.getAgentConnectors()) {
+      const slug = entry.slug;
+      const key = `run_connector_${slug.replace(/[^a-z0-9_]/g, '_')}`;
+      const capabilities = (entry.capabilities ?? []).join(', ');
+      const shortDescription = entry.shortDescription ?? entry.description ?? '';
+      const inputSchema = z.object({
+        targetIds: z.array(z.string().uuid()).optional(),
+        assetIds: z.array(z.string().uuid()).optional(),
+        configProfileId: z.string().uuid().optional(),
+      });
+
+      const toolConfig: any = {
+        description: `Run the ${entry.name} connector (${capabilities}): ${shortDescription}. Creates a background scan job; check progress with review_jobs. Params: targetIds and/or assetIds (at least one), optional configProfileId.`,
+        inputSchema,
+        execute: async (params: z.infer<typeof inputSchema>) => {
+          const targetIds = params.targetIds ?? [];
+          const assetIds = params.assetIds ?? [];
+          // Validated here, not via .refine: a ZodEffects schema does not
+          // survive AI SDK JSON-schema conversion.
+          if (targetIds.length === 0 && assetIds.length === 0) {
+            return { error: 'Provide at least one of targetIds or assetIds.' };
+          }
+          try {
+            // Tool.name IS the connector slug. getToolById(workspaceId) sets
+            // isInstalled from the workspace_tools row, so an LLM-supplied
+            // connector cannot dispatch unless it belongs to this workspace.
+            const [toolRow] = await this.toolsService.getToolByNames({
+              names: [slug],
+            });
+            const tool = toolRow?.id
+              ? await this.toolsService.getToolById(toolRow.id, workspaceId)
+              : null;
+            if (!tool?.isInstalled) {
+              return {
+                error: `Connector ${slug} is not installed in this workspace.`,
+              };
+            }
+
+            const jobs = await this.jobsRegistryService.createNewJob({
+              tool,
+              workspaceId,
+              targetIds,
+              assetIds,
+              configProfileId: params.configProfileId,
+              priority: tool.priority,
+              jobName: `agent:${slug}`,
+              jobRunType: JobRunType.AGENT,
+            } as Parameters<JobsRegistryService['createNewJob']>[0]);
+
+            return {
+              jobHistoryId: jobs[0]?.jobHistory?.id ?? null,
+              jobCount: jobs.length,
+              jobIds: jobs.slice(0, 20).map((job) => job.id),
+            };
+          } catch (error) {
+            return {
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+        },
+      };
+
+      tools[key] = {
+        method: tool(toolConfig),
+        permissions: [AgentMode.AGENT],
+        mcp: false,
+      };
+    }
+
+    return tools;
+  }
+
   getTools(
     workspaceId: string,
     agentMode: AgentMode,
@@ -1338,6 +1434,8 @@ export class AgentTool {
       string,
       { method: ToolType; permissions: AgentMode[]; mcp: boolean }
     > = {
+      // Connector tools first so a built-in of the same key wins on collision.
+      ...this.getConnectorTools(workspaceId),
       enumerate_assets: {
         method: this.getAssetsTool(workspaceId),
         permissions: [AGENT, ASK],

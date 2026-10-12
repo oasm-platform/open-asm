@@ -450,10 +450,12 @@ export class JobsRegistryController {
   async nextBatch(request: {
     id: string;
     limit: number;
+    agent?: boolean;
   }): Promise<{ values: Record<string, unknown>[] }> {
     const jobs = await this.jobsRegistryService.getNextJobs(
       request.id,
       Number(request.limit) || 1,
+      Boolean(request.agent),
     );
 
     const values = await Promise.all(

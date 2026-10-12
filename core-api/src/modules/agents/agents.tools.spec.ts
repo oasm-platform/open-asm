@@ -1,4 +1,4 @@
-import { AgentApprovalMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { EventEmitter } from 'node:events';
 import { AgentsMcpService, getMcpToolMetadata } from './agents.mcp';
@@ -217,5 +217,111 @@ describe('approval matching', () => {
       expect.objectContaining({ readOnly }),
       undefined,
     );
+  });
+});
+
+describe('AgentTool connector tools', () => {
+  const connector = {
+    name: 'Nmap',
+    slug: 'nmap',
+    capabilities: ['port scan', 'service detection'],
+    shortDescription: 'Network mapper',
+    agentTool: true,
+    image: 'nmap:latest',
+  };
+  const targetUuid = '00000000-0000-4000-8000-000000000001';
+  const profileUuid = '00000000-0000-4000-8000-000000000002';
+  type Runnable = { execute: (input: unknown) => Promise<unknown> };
+
+  const withDefaults = (installed: boolean) => ({
+    connectorRegistry: {
+      getAgentConnectors: jest.fn(() => [connector]),
+      getConnector: jest.fn(() => ({ agentTool: true })),
+    },
+    toolsService: {
+      getToolByNames: jest.fn(() =>
+        Promise.resolve([{ id: 'tool-1', name: 'nmap' }]),
+      ),
+      getToolById: jest.fn(() =>
+        Promise.resolve({ id: 'tool-1', name: 'nmap', priority: 4, isInstalled: installed }),
+      ),
+    },
+    jobsRegistryService: {
+      createNewJob: jest.fn(() => Promise.resolve([{ id: 'job-1', jobHistory: { id: 'hist-1' } }])),
+    },
+  });
+
+  const createAgentTool = (installed = true) =>
+    Object.assign(Object.create(AgentTool.prototype), withDefaults(installed)) as AgentTool;
+
+  const runnable = (agentTool: AgentTool): Runnable =>
+    (
+      agentTool.getConnectorTools('w1')['run_connector_nmap'] as {
+        method: Runnable;
+      }
+    ).method;
+
+  it('exposes an agent connector in AGENT mode and hides it in ASK mode', () => {
+    const agentTool = createAgentTool();
+    const agentTools = agentTool.getTools('w1', AgentMode.AGENT) as Record<string, unknown>;
+    expect(agentTools).toHaveProperty('run_connector_nmap');
+    const askTools = agentTool.getTools('w1', AgentMode.ASK) as Record<string, unknown>;
+    expect(askTools).not.toHaveProperty('run_connector_nmap');
+  });
+
+  it('returns an error when the connector is not installed in the workspace', async () => {
+    const agentTool = createAgentTool(false);
+    const result = await runnable(agentTool).execute({ targetIds: [targetUuid] });
+    expect(result).toEqual({
+      error: 'Connector nmap is not installed in this workspace.',
+    });
+  });
+
+  it('dispatches a scan job scoped to the workspace with the given ids', async () => {
+    const agentTool = createAgentTool();
+    const result = await runnable(agentTool).execute({
+      targetIds: [targetUuid],
+      configProfileId: profileUuid,
+    });
+    expect((agentTool as unknown as { toolsService: { getToolById: jest.Mock } }).toolsService.getToolById).toHaveBeenCalledWith(
+      'tool-1',
+      'w1',
+    );
+    expect(
+      (agentTool as unknown as { jobsRegistryService: { createNewJob: jest.Mock } }).jobsRegistryService.createNewJob,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'w1',
+        targetIds: [targetUuid],
+        configProfileId: profileUuid,
+        jobName: 'agent:nmap',
+      }),
+    );
+    expect(result).toEqual({
+      jobHistoryId: 'hist-1',
+      jobCount: 1,
+      jobIds: ['job-1'],
+    });
+  });
+
+  it('returns an error when neither targetIds nor assetIds are given', async () => {
+    const agentTool = createAgentTool();
+    const result = await runnable(agentTool).execute({});
+    expect(result).toEqual({
+      error: 'Provide at least one of targetIds or assetIds.',
+    });
+  });
+
+  it('surfaces a config-profile error from createNewJob', async () => {
+    const agentTool = createAgentTool();
+    (
+      agentTool as unknown as { jobsRegistryService: { createNewJob: jest.Mock } }
+    ).jobsRegistryService.createNewJob.mockRejectedValueOnce(
+      new Error('missing/default profile for connector "nmap"'),
+    );
+    const result = await runnable(agentTool).execute({ targetIds: [targetUuid] });
+    expect(result).toEqual({
+      error: 'missing/default profile for connector "nmap"',
+    });
   });
 });

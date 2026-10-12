@@ -7,6 +7,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+// DefaultAgentConcurrency is the size of the AI-agent lane when the operator
+// sets none or a negative value. It is a small fixed pool because agent jobs
+// are interactive and few.
+const DefaultAgentConcurrency = 2
+
 type TLSConfig struct {
 	Enabled    bool   `mapstructure:"tls_enabled"`
 	CAFile     string `mapstructure:"tls_ca_file"`
@@ -20,13 +25,19 @@ type Config struct {
 	// MaxConcurrency is the max number of concurrent jobs. 0 (default) = auto:
 	// ResolveMaxConcurrency sizes it from the CPU/RAM available to the worker.
 	// A positive value is an explicit operator override.
-	MaxConcurrency int       `mapstructure:"max_concurrency"`
-	GrpcHost       string    `mapstructure:"grpc_host"`
-	GrpcPort       int       `mapstructure:"grpc_port"`
-	ToolPath       string    `mapstructure:"tool_path"`
-	Network        string    `mapstructure:"network"`
-	WorkspaceRoot  string    `mapstructure:"workspace_root"`
-	TLS            TLSConfig `mapstructure:",squash"`
+	MaxConcurrency int `mapstructure:"max_concurrency"`
+	// AgentConcurrency is the size of the dedicated lane that runs jobs
+	// dispatched by an AI agent's connector tools (JobRunType.AGENT). Those jobs
+	// never consume MaxConcurrency slots: the poller claims the agent lane first
+	// every cycle on its own pool. Default 2; a negative value means the
+	// default; 0 disables the lane (this worker never claims agent jobs).
+	AgentConcurrency int       `mapstructure:"agent_concurrency"`
+	GrpcHost         string    `mapstructure:"grpc_host"`
+	GrpcPort         int       `mapstructure:"grpc_port"`
+	ToolPath         string    `mapstructure:"tool_path"`
+	Network          string    `mapstructure:"network"`
+	WorkspaceRoot    string    `mapstructure:"workspace_root"`
+	TLS              TLSConfig `mapstructure:",squash"`
 
 	// Connector server — Docker containers connect back to the worker via this gRPC endpoint.
 	ConnectorPort                int    `mapstructure:"connector_port"`                  // gRPC port for connectors, default 26276
@@ -68,6 +79,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("api_key", "")
 	viper.SetDefault("network", "")
 	viper.SetDefault("max_concurrency", 0) // 0 = auto-size from available CPU/RAM
+	viper.SetDefault("agent_concurrency", DefaultAgentConcurrency)
 	viper.SetDefault("grpc_host", "localhost")
 	viper.SetDefault("grpc_port", 16276)
 	viper.SetDefault("tool_path", "oasm-tools")
@@ -92,6 +104,13 @@ func LoadConfig() (*Config, error) {
 	// would build an unbuffered channel and stall every job. An explicit
 	// positive value is the operator's override and passes through untouched.
 	cfg.MaxConcurrency = ResolveMaxConcurrency(cfg.MaxConcurrency)
+
+	// A negative lane size is meaningless and would make a zero-capacity
+	// semaphore behave unpredictably; treat it as "unset" and use the default.
+	// 0 is honoured as "disable the lane".
+	if cfg.AgentConcurrency < 0 {
+		cfg.AgentConcurrency = DefaultAgentConcurrency
+	}
 
 	return &cfg, nil
 }
