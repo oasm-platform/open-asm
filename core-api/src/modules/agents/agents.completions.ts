@@ -24,6 +24,7 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 
 import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { WorkersService } from '@/modules/workers/workers.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
   APPROVAL_TIMEOUT_MS,
@@ -155,6 +156,7 @@ export class AgentsCompletionsService {
     private readonly agentsSkillsService: AgentsSkillsService,
     private readonly workspaceEncryption: WorkspaceEncryptionService,
     private readonly approvals: AgentsApprovalsService,
+    private readonly workersService: WorkersService,
   ) {
     this.loadAllPrompts();
   }
@@ -564,6 +566,12 @@ export class AgentsCompletionsService {
       dto.provider,
       dto.model,
     );
+    if (
+      dto.workerId &&
+      !(await this.workersService.isAgentWorkerForWorkspace(dto.workerId, workspaceId))
+    ) {
+      throw new BadRequestException('Worker is not available to agents in this workspace');
+    }
     const newConversation = this.conversationRepository.create({
       ...(dto.conversationId ? { id: dto.conversationId } : {}),
       workspaceId,

@@ -195,6 +195,16 @@ export class WorkersService {
     return null;
   }
 
+  /** Agents may only use workspace-scoped workers of their own workspace (never cloud). */
+  public async isAgentWorkerForWorkspace(
+    workerId: string,
+    workspaceId: string,
+  ): Promise<boolean> {
+    return this.repo.exists({
+      where: { id: workerId, workspaceId, scope: WorkerScope.WORKSPACE },
+    });
+  }
+
   /**
    * Retrieves a paginated list of workers.
    *

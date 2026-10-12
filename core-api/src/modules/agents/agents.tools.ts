@@ -28,7 +28,12 @@ import {
   type ApprovalSettings,
   type PlanRunMode,
 } from './agents.approvals';
-import { AgentApprovalMode, AgentMode, JobRunType } from '@/common/enums/enum';
+import {
+  AgentApprovalMode,
+  AgentMode,
+  JobRunType,
+  WorkerScope,
+} from '@/common/enums/enum';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -534,6 +539,7 @@ export class AgentTool {
             sortOrder: SortOrder.DESC,
             search: q,
             workspaceId,
+            scope: WorkerScope.WORKSPACE,
             enabledAgentMode: true,
           });
           return {

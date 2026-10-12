@@ -54,6 +54,7 @@ describe('WorkersService', () => {
       getManyAndCount: jest.fn(),
       getRawMany: jest.fn(),
       getRawOne: jest.fn(),
+      exists: jest.fn(),
     } as any;
 
     mockAssetRepository = {
@@ -978,6 +979,17 @@ describe('WorkersService', () => {
         builtInToolFixtures,
       );
       expect(withoutTool.tool).toBeNull();
+    });
+  });
+
+  describe('isAgentWorkerForWorkspace', () => {
+    it('accepts only a workspace-scoped worker of the same workspace', async () => {
+      (mockWorkerInstanceRepository.exists as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.isAgentWorkerForWorkspace('w1', 'ws-1')).resolves.toBe(true);
+      expect(mockWorkerInstanceRepository.exists).toHaveBeenCalledWith({
+        where: { id: 'w1', workspaceId: 'ws-1', scope: WorkerScope.WORKSPACE },
+      });
     });
   });
 });

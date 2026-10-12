@@ -3,7 +3,7 @@ import {
   GetManyBaseResponseDto,
   SortOrder,
 } from '@/common/dtos/get-many-base.dto';
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode, WorkerScope } from '@/common/enums/enum';
 import { encrypt } from '@/common/utils/encryption.util';
 import {
   decryptWithDEK,
@@ -118,6 +118,7 @@ export class AgentsService {
       sortBy: '"createdAt"',
       sortOrder: SortOrder.DESC,
       workspaceId,
+      scope: WorkerScope.WORKSPACE,
       enabledAgentMode: true,
     });
     return {
