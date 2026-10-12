@@ -196,6 +196,15 @@ export interface AgentJobDoneMessage {
 
 const AGENT_EXCERPT_MAX = 8 * 1024;
 
+/**
+ * SQL predicate excluding agent-lane jobs. They are pushed, never claimed, so
+ * requeueing one to PENDING would strand it forever.
+ */
+export const notAgentJobSql = (alias?: string) => {
+  const col = alias ? `${alias}."jobHistoryId"` : `"jobHistoryId"`;
+  return `(${col} IS NULL OR ${col} NOT IN (SELECT id FROM job_histories WHERE "jobRunType" = '${JobRunType.AGENT}'))`;
+};
+
 @Injectable()
 export class JobsRegistryService {
   constructor(
@@ -310,6 +319,49 @@ export class JobsRegistryService {
         agent: true,
       })),
     );
+  }
+
+  /**
+   * Fails in-flight agent jobs (they cannot be requeued: no lane claims them)
+   * and wakes the agent calls waiting on them. Returns how many were failed.
+   */
+  public async failAgentJobs(
+    filter: { workerId: string } | { jobIds: string[] },
+    reason: string,
+  ): Promise<number> {
+    const qb = this.repo
+      .createQueryBuilder()
+      .update(Job)
+      .set({ status: JobStatus.FAILED })
+      .where('status = :status', { status: JobStatus.IN_PROGRESS })
+      .andWhere(
+        `"jobHistoryId" IN (SELECT id FROM job_histories WHERE "jobRunType" = :agent)`,
+        { agent: JobRunType.AGENT },
+      )
+      .returning(['id', 'jobHistoryId']);
+    if ('workerId' in filter) {
+      qb.andWhere('"workerId" = :workerId', { workerId: filter.workerId });
+    } else {
+      if (filter.jobIds.length === 0) return 0;
+      qb.andWhere('id IN (:...jobIds)', { jobIds: filter.jobIds });
+    }
+    const rows = ((await qb.execute()).raw ?? []) as {
+      id: string;
+      jobHistoryId: string;
+    }[];
+    await Promise.all(
+      rows.map((row) =>
+        this.publishAgentJobDone(
+          {
+            id: row.id,
+            jobHistory: { id: row.jobHistoryId, jobRunType: JobRunType.AGENT },
+          },
+          JobStatus.FAILED,
+          { error: reason },
+        ),
+      ),
+    );
+    return rows.length;
   }
 
   /** Wakes the agent tool call waiting on this job. No-op for non-agent jobs. */
@@ -1795,6 +1847,7 @@ export class JobsRegistryService {
         .innerJoin('job.asset', 'asset')
         .innerJoin('asset.target', 'target')
         .innerJoin('target.workspace', 'workspace')
+        .leftJoinAndSelect('job.jobHistory', 'jobHistory')
         .where('job.id = :jobId', { jobId })
         .andWhere('workspace.id = :workspaceId', { workspaceId })
         .getOne();
@@ -1824,6 +1877,11 @@ export class JobsRegistryService {
     try {
       // Verify job exists and belongs to workspace
       const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
+      if (job.jobHistory?.jobRunType === JobRunType.AGENT) {
+        throw new BadRequestException(
+          'Agent jobs cannot be re-run; ask the agent again',
+        );
+      }
 
       // Update job status, clear workerId, and increment retryCount
       job.status = JobStatus.PENDING;

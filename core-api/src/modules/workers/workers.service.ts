@@ -29,7 +29,10 @@ import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import {
+  JobsRegistryService,
+  notAgentJobSql,
+} from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
@@ -163,12 +166,17 @@ export class WorkersService {
    * workers can pick up the freed jobs immediately.
    */
   public async releaseWorkerJobs(workerId: string) {
+    await this.jobsRegistryService.failAgentJobs(
+      { workerId },
+      'worker disconnected',
+    );
     await this.jobsRegistryService.repo
       .createQueryBuilder('jobs')
       .update()
       .set({ status: JobStatus.PENDING, workerId: undefined })
       .where('jobs."workerId" = :id', { id: workerId })
       .andWhere('jobs.status = :status', { status: JobStatus.IN_PROGRESS })
+      .andWhere(notAgentJobSql('jobs'))
       .execute();
   }
 
@@ -766,6 +774,7 @@ export class WorkersService {
       SET status = '${JobStatus.PENDING}',
           "workerId" = NULL
       WHERE (
+        (
           j.status = '${JobStatus.IN_PROGRESS}'
           AND j."workerId"::uuid NOT IN (
             SELECT id FROM workers
@@ -776,6 +785,7 @@ export class WorkersService {
           AND j."retryCount" < ${JOB_MAX_RETRIES}
           AND j."assetId" IS NOT NULL
         )
+        ) AND ${notAgentJobSql('j')}
     `);
   }
 
@@ -785,12 +795,17 @@ export class WorkersService {
    * @param workerId - The ID of the worker whose jobs should be reset.
    */
   private async fallbackWorkerRejoin(workerId: string) {
+    await this.jobsRegistryService.failAgentJobs(
+      { workerId },
+      'worker restarted',
+    );
     await this.jobsRegistryService.repo
       .createQueryBuilder()
       .update()
       .set({ status: JobStatus.PENDING })
       .where('workerId = :workerId', { workerId })
       .andWhere('status = :status', { status: JobStatus.IN_PROGRESS })
+      .andWhere(notAgentJobSql())
       .execute();
   }
 

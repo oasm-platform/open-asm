@@ -223,6 +223,26 @@ describe('JobsRegistryService', () => {
       },
     };
 
+    it('refuses to re-run an agent job', async () => {
+      mockDataSource.createQueryRunner.mockReturnValue({
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: { save: jest.fn() },
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      });
+      mockJobRepository.getOne.mockResolvedValue({
+        ...mockJob,
+        status: JobStatus.FAILED,
+        jobHistory: { id: 'jh-1', jobRunType: JobRunType.AGENT },
+      });
+
+      await expect(
+        service.reRunJob(mockWorkspaceId, mockJobId),
+      ).rejects.toThrow('Agent jobs cannot be re-run');
+    });
+
     it('should successfully re-run a job', async () => {
       const mockQueryRunner = {
         connect: jest.fn(),
