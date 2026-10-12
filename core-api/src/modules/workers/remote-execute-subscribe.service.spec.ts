@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { WorkerScope } from '@/common/enums/enum';
 import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
 

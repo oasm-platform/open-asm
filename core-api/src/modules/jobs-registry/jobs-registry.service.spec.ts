@@ -533,7 +533,7 @@ describe('JobsRegistryService', () => {
       affected = 3,
       running = [] as { jobId: string; workerId: string }[],
       steps = {},
-      jobRunType = JobRunType.MANUAL as JobRunType,
+      jobRunType = JobRunType.MANUAL,
       unfinished = [] as { id: string }[],
     } = {}) => {
       const unfinishedBuilder = {
@@ -2379,7 +2379,7 @@ describe('JobsRegistryService', () => {
 
   describe('failAgentJobs', () => {
     const buildQb = (raw: unknown[]) => {
-      const qb: any = {
+      const qb: Record<string, jest.Mock> = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
