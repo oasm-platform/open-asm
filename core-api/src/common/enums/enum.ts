@@ -265,6 +265,8 @@ export enum DefaultWorkflow {
   DOMAIN_DISCOVERY = 'domain_discovery.yaml',
   IP_ADDRESS_DISCOVERY = 'ip_address_discovery.yaml',
   VULNERABILITY_SCAN_BASIC = 'vulnerability_scan_basic.yaml',
+  // Git organization targets: scans every repository after each sync.
+  REPOSITORY_SCAN = 'repository_scan.yaml',
 }
 
 export enum EventTriggerType {
