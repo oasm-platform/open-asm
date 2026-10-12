@@ -271,10 +271,20 @@ export enum EventTriggerType {
   WORKFLOW_END = 'WORKFLOW_END',
 }
 
+/**
+ * What an integration can do. Each value is a CAPABILITY backed by one
+ * connector method (see `CAPABILITY_METHOD_MAP` in connector.factory.ts).
+ *
+ * Single-capability apps (Slack, Telegram, AWS, …) store their one value in
+ * `integrations.category`. Multi-capability apps (GitHub, GitLab) declare
+ * `x-capabilities` in their schema and store the enabled subset in
+ * `integrations.capabilities`; `category` then holds the primary one.
+ */
 export enum IntegrationType {
   TICKETING = 'TICKETING',
   NOTIFICATION = 'NOTIFICATION',
   CLOUD_PROVIDER = 'CLOUD_PROVIDER',
+  SOURCE_CODE = 'SOURCE_CODE',
 }
 
 /**

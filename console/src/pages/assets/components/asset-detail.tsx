@@ -26,6 +26,7 @@ import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
 import ViewCode from './view-code';
+import { asTlsInfo } from '../tls-info';
 
 export default function AssetDetail({ id }: { id: string }) {
   const screenshotOptions = useScreenshotQueryOptions();
@@ -42,7 +43,7 @@ export default function AssetDetail({ id }: { id: string }) {
   }
 
   const { value, httpResponses, ipAddresses, tags } = data;
-  const tls = httpResponses?.tls;
+  const tls = asTlsInfo(httpResponses?.tls);
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after

@@ -82,17 +82,83 @@ export interface CloudProviderSyncConfig extends ConnectorConfig {
 }
 
 /**
+ * A repository exposed by a SOURCE_CODE connector, normalised across
+ * providers so the console can render GitHub and GitLab the same way.
+ */
+export interface SourceRepository {
+  /** Provider-side id (stable across renames). */
+  id: string;
+  name: string;
+  /** `owner/repo` (GitHub) or `group/subgroup/project` (GitLab). */
+  fullName: string;
+  /** Browser URL of the repository. */
+  url: string;
+  defaultBranch: string | null;
+  private: boolean;
+  archived: boolean;
+  updatedAt: string | null;
+}
+
+export interface RepositoryQuery {
+  search?: string;
+  page: number;
+  limit: number;
+}
+
+export interface RepositoryPage {
+  data: SourceRepository[];
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+}
+
+// ─── Capability contracts ───────────────────────────────────────────
+// One interface per IntegrationType. A connector implements every
+// capability its app declares — a multi-capability app (GitHub) is one class
+// implementing several of these instead of one subclass per category.
+
+/** {@link IntegrationType.NOTIFICATION} */
+export interface NotificationCapable {
+  push(config: ConnectorConfig): Promise<void>;
+}
+
+/** {@link IntegrationType.CLOUD_PROVIDER} */
+export interface CloudProviderCapable {
+  syncAssets(config: ConnectorConfig): Promise<unknown>;
+}
+
+/** {@link IntegrationType.TICKETING} */
+export interface TicketingCapable {
+  createTicket(config: ConnectorConfig): Promise<void>;
+}
+
+/** {@link IntegrationType.SOURCE_CODE} */
+export interface SourceCodeCapable {
+  listRepositories(
+    config: ConnectorConfig,
+    query: RepositoryQuery,
+  ): Promise<RepositoryPage>;
+}
+
+/**
  * Base abstract class for all integration connectors.
- * Provides common shape that category-specific connectors extend.
  *
- * Concrete implementations should be registered per appType (e.g., Slack, Jira)
- * and implement the category-specific abstract methods below.
+ * Concrete implementations are registered per appType (e.g., Slack, GitHub)
+ * and implement one capability interface per capability their app declares.
+ * Single-capability connectors extend one of the category classes below.
  */
 export abstract class BaseConnector {
   /**
-   * The integration category determines which primary action this connector supports.
+   * Optional credential check used by "Test integration" for capabilities
+   * that have no side-effect-free action of their own (TICKETING must not
+   * open a real ticket, SOURCE_CODE has nothing to push). `capability` narrows
+   * the check (e.g. GitHub verifies write access to the issue repository only
+   * when TICKETING is tested); undefined means "the connection itself".
    */
-  abstract get category(): IntegrationType;
+  testConnection?(
+    config: ConnectorConfig,
+    capability?: IntegrationType,
+  ): Promise<void>;
 
   /**
    * Optional lifecycle hook called before the connector executes its action.
@@ -126,8 +192,11 @@ export abstract class BaseConnector {
  * }
  * ```
  */
-export abstract class NotificationConnector extends BaseConnector {
-  override readonly category = IntegrationType.NOTIFICATION;
+export abstract class NotificationConnector
+  extends BaseConnector
+  implements NotificationCapable
+{
+  readonly category = IntegrationType.NOTIFICATION;
 
   /**
    * Push a notification payload to the external service.
@@ -152,8 +221,11 @@ export abstract class NotificationConnector extends BaseConnector {
  * }
  * ```
  */
-export abstract class CloudProviderConnector extends BaseConnector {
-  override readonly category = IntegrationType.CLOUD_PROVIDER;
+export abstract class CloudProviderConnector
+  extends BaseConnector
+  implements CloudProviderCapable
+{
+  readonly category = IntegrationType.CLOUD_PROVIDER;
 
   /**
    * Synchronise assets from the cloud provider into the platform.
@@ -181,8 +253,11 @@ export abstract class CloudProviderConnector extends BaseConnector {
  * }
  * ```
  */
-export abstract class TicketingConnector extends BaseConnector {
-  override readonly category = IntegrationType.TICKETING;
+export abstract class TicketingConnector
+  extends BaseConnector
+  implements TicketingCapable
+{
+  readonly category = IntegrationType.TICKETING;
 
   /**
    * Create a ticket in the external ticketing / issue-tracking system.

@@ -31,6 +31,10 @@ import {
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { GetIntegrationDto } from './dto/get-integration.dto';
 import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
+import {
+  ListRepositoriesQueryDto,
+  ListRepositoriesResponseDto,
+} from './dto/list-repositories.dto';
 import { SchemasResponseDto } from './dto/schemas-response.dto';
 import { TelegramConnectDto } from './dto/telegram-connect.dto';
 import { TestIntegrationDto } from './dto/test-integration.dto';
@@ -102,11 +106,33 @@ export class IntegrationsController {
       description: dto.description,
       appType: dto.appType,
       category: dto.category,
+      capabilities: dto.capabilities,
       config: dto.config,
       workspaceId,
       userId,
       syncSchedule: dto.syncSchedule,
     });
+  }
+
+  @Doc({
+    summary: 'List repositories of a source-code integration',
+    description:
+      'Lists the repositories the integration token can access, live from the provider (GitHub / GitLab). Requires the SOURCE_CODE capability.',
+    response: {
+      serialization: ListRepositoriesResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('integration.read')
+  @Get(':id/repositories')
+  listRepositories(
+    @Param() { id }: IdQueryParamDto,
+    @Query() query: ListRepositoriesQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.integrationsService.listRepositories(id, workspaceId, query);
   }
 
   @Doc({
@@ -211,7 +237,7 @@ export class IntegrationsController {
   @Doc({
     summary: 'Test an integration',
     description:
-      'Sends a test payload using the integration connector. The connector class is resolved by appType and the correct method is dispatched by category — no if/else chains.',
+      'Tests one capability of the integration (body.capability; defaults to the category for single-capability apps, or a connection check for multi-capability apps). NOTIFICATION sends a test message, CLOUD_PROVIDER runs a dry-run sync, TICKETING / SOURCE_CODE verify access without side effects.',
     request: {
       getWorkspaceId: true,
     },
