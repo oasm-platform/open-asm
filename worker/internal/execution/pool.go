@@ -2,6 +2,7 @@ package execution
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,11 @@ import (
 // pooled container of the image is busy. The caller backs off and retries;
 // the job is never failed to Core on this error.
 var ErrPoolExhausted = errors.New("pool exhausted: max replicas reached for image")
+
+// ErrNodeBudgetExhausted is the node CPU/RAM budget refusal. It wraps
+// ErrPoolExhausted so existing errors.Is(err, ErrPoolExhausted) wait loops
+// still match; it is the only refusal the agent lane can hit.
+var ErrNodeBudgetExhausted = fmt.Errorf("%w: node cpu/mem budget exhausted", ErrPoolExhausted)
 
 // ---------------------------------------------------------------------------
 // Warm-pool container reuse (Phase 2).
@@ -130,10 +136,15 @@ const AgentLane = "agent"
 func poolKeyFor(spec JobSpec) string {
 	key := normalizePoolKey(spec.Image)
 	if spec.Lane == AgentLane {
-		key += "#agent"
+		key += agentPoolSuffix
 	}
 	return key
 }
+
+const agentPoolSuffix = "#" + AgentLane
+
+// isAgentPoolKey reports whether key was built by poolKeyFor for an agent job.
+func isAgentPoolKey(key string) bool { return strings.HasSuffix(key, agentPoolSuffix) }
 
 // Add records a freshly created container in the pool as idle.
 func (p *PoolManager) Add(entry poolEntry) {
@@ -399,23 +410,30 @@ func (p *PoolManager) SetResourceBudget(cpuMillis, memBytes int) {
 // the old check-then-create window and each spawn a container. Returns false
 // when a limit is reached; the caller refuses with ErrPoolExhausted.
 func (p *PoolManager) ReserveReplica(token, poolKey string, cpuMillis, memBytes int) bool {
+	return p.reserveReplica(token, poolKey, cpuMillis, memBytes) == nil
+}
+
+// reserveReplica is ReserveReplica with the refusal reason: ErrPoolExhausted
+// for the per-image cap, ErrNodeBudgetExhausted for the node budget. Agent-lane
+// keys skip the per-image cap; only the node budget guards them.
+func (p *PoolManager) reserveReplica(token, poolKey string, cpuMillis, memBytes int) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	key := normalizePoolKey(poolKey)
-	if p.maxReplicasPerImage > 0 &&
+	if !isAgentPoolKey(key) && p.maxReplicasPerImage > 0 &&
 		p.busyCountLocked(key)+p.pendingCountLocked(key) >= p.maxReplicasPerImage {
-		return false
+		return ErrPoolExhausted
 	}
 	busyCPU, busyMem := p.busyResourcesLocked()
 	pendCPU, pendMem := p.pendingResourcesLocked()
 	if p.cpuBudgetMillis > 0 && busyCPU+pendCPU+cpuMillis > p.cpuBudgetMillis {
-		return false
+		return ErrNodeBudgetExhausted
 	}
 	if p.memBudgetBytes > 0 && busyMem+pendMem+memBytes > p.memBudgetBytes {
-		return false
+		return ErrNodeBudgetExhausted
 	}
 	p.pendingReplicas[token] = replicaRequest{poolKey: key, cpuMillis: cpuMillis, memBytes: memBytes}
-	return true
+	return nil
 }
 
 // ReleaseReplica releases the reservation held by token — whether the creation

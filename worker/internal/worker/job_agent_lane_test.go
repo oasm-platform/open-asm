@@ -21,18 +21,23 @@ func TestAgentConnectorJobFailsFastWhenPoolExhausted(t *testing.T) {
 
 	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
 	mgr := execution.NewManager(fakeRT, 0)
-	mgr.SetPool(execution.NewPoolManager(0, 1, 0))
+	pool := execution.NewPoolManager(0, 1, 0)
+	// Node budget fits exactly one job; the agent lane has no replica cap.
+	pool.SetResourceBudget(1000, 1<<30)
+	mgr.SetPool(pool)
 	proxy := connector.NewProxy()
 	img := "ghcr.io/oasm-platform/connector-nmap:7.97"
+	agentLimits := map[string]any{"cpu": "1000m", "memory": "512Mi"}
+	agentCPU, agentMem := "1000m", "512Mi"
 
-	// Occupy the only agent-lane replica.
-	if _, err := mgr.Submit(context.Background(), execution.JobSpec{Tool: "nmap", Image: img, JobID: "agent-occupier", Lane: execution.AgentLane}); err != nil {
+	// Occupy the whole node budget.
+	if _, err := mgr.Submit(context.Background(), execution.JobSpec{Tool: "nmap", Image: img, JobID: "agent-occupier", Lane: execution.AgentLane, Limits: agentLimits}); err != nil {
 		t.Fatalf("occupier: %v", err)
 	}
 
 	events := make(chan TuiEvent, 256)
 	start := time.Now()
-	processConnectorJob(context.Background(), &pb.Job{Id: "agent-job-1", Tool: "nmap", Image: img, Agent: true},
+	processConnectorJob(context.Background(), &pb.Job{Id: "agent-job-1", Tool: "nmap", Image: img, Agent: true, Cpu: &agentCPU, Memory: &agentMem},
 		client, events, mgr, proxy, func() {}, time.Now(), "ports_scanner")
 
 	if waited := time.Since(start); waited > 2*time.Second {
