@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	jobsregistry "oasm-worker/internal/gen/jobs_registry"
 	pb "oasm-worker/internal/gen/workers"
 
 	"oasm-worker/internal/grpcclient"
@@ -69,7 +70,7 @@ func (s *sessionSandbox) close() error {
 	return os.RemoveAll(s.rootPath)
 }
 
-func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent) {
+func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent, runAgent func(*jobsregistry.Job)) {
 	log := NewTuiLogger(events, "RemoteExec")
 	remoteSem := make(chan struct{}, 16)
 
@@ -183,6 +184,15 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 					log.Warning("remote exec concurrency limit reached")
 					_ = handler.SendErrorFor(ctx, sessionID, cmdID, cmdWorkerID, "server busy")
 				}
+
+			case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTOR_JOB:
+				job := resp.GetJob()
+				if job.GetId() == "" {
+					log.Warning("Agent connector job event without a job")
+					continue
+				}
+				log.Info("Agent connector job received: %s (%s)", job.GetId(), job.GetTool())
+				runAgent(job)
 
 			default:
 				log.Warning("Unknown remote execute event type: %v", resp.Type)

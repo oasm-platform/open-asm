@@ -1142,3 +1142,24 @@ drain:
 		}
 	}
 }
+
+// runAgentJob starts a connector job an AI agent pushed over the agent stream.
+// It never takes a MaxConcurrency slot: the agent lane is bounded only by the
+// node's free CPU/RAM (enforced by the warm pool, failing fast when exhausted),
+// so registry jobs and agent jobs never wait on each other's slots.
+func runAgentJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, wg *sync.WaitGroup) {
+	if mgr == nil || proxy == nil || job.GetImage() == "" {
+		cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+		defer cleanupCancel()
+		submitCategoryError(cleanupCtx, grpcClient, events, job.GetId(), job.GetCategory(),
+			"agent lane: this worker cannot run connector jobs (no container runtime or not a connector job)")
+		return
+	}
+	// The lane is decided by the channel the job arrived on, not the payload.
+	job.Agent = true
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		processJob(ctx, job, grpcClient, nil, "", events, mgr, proxy, func() {})
+	}()
+}

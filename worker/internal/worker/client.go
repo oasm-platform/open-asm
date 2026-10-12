@@ -311,7 +311,11 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 				return nil, nil
 			}
 
-			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events)
+			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events, func(j *pb.Job) {
+				// mgr/proxy are read at call time: they are set after the
+				// connector server starts, which may be after this setup runs.
+				runAgentJob(sessionCtx, j, grpcClient, events, mgr, proxy, &wg)
+			})
 			return sessionCtx, sessionCancel
 		},
 		startPoller: func(sessionCtx context.Context) context.CancelFunc {
