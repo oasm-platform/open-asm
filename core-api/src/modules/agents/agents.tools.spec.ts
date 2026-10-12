@@ -3,7 +3,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { EventEmitter } from 'node:events';
 import { AgentsMcpService, getMcpToolMetadata } from './agents.mcp';
 import type { AgentsService } from './agents.service';
-import { AgentTool, stableStringify } from './agents.tools';
+import { AgentTool, pageToolOutput, stableStringify } from './agents.tools';
 
 describe('MCP tool metadata', () => {
   afterEach(() => {
@@ -263,6 +263,10 @@ describe('AgentTool run_tool', () => {
       toolConfigProfiles: {
         resolveConfigForJob: jest.fn().mockResolvedValue({ rate: 10 }),
       },
+      redisService: {
+        setex: jest.fn().mockResolvedValue('OK'),
+        get: jest.fn().mockResolvedValue(null),
+      },
       remoteExecuteService: {
         waitForToolRun: jest.fn().mockResolvedValue({
           stdout: 'raw output',
@@ -311,7 +315,7 @@ describe('AgentTool run_tool', () => {
       },
       expect.any(String),
       expect.any(Number),
-      expect.any(Function),
+      undefined,
       signal,
     );
     expect(result).toEqual({
@@ -322,7 +326,9 @@ describe('AgentTool run_tool', () => {
       error: null,
       timedOut: false,
       truncated: false,
+      totalLines: 1,
     });
+    expect((agentTool as any).redisService.setex).not.toHaveBeenCalled();
   });
 
   it('refuses a tool not installed in the workspace', async () => {
@@ -346,12 +352,15 @@ describe('AgentTool run_tool', () => {
     });
   });
 
-  it('truncates oversized output', async () => {
+  it('keeps a truncated output in Redis and pages it with read_tool_output', async () => {
     const agentTool = createAgentTool();
+    const full = Array.from({ length: 3000 }, (_, i) =>
+      i === 2500 ? 'admin [Status: 200]' : `path${i} [Status: 404]`,
+    ).join('\n');
     (agentTool as any).remoteExecuteService.waitForToolRun = jest
       .fn()
       .mockResolvedValue({
-        stdout: 'x'.repeat(40 * 1024),
+        stdout: full,
         exitCode: 0,
         error: null,
         timedOut: false,
@@ -359,8 +368,58 @@ describe('AgentTool run_tool', () => {
     const result = (await runnable(agentTool).execute(
       { tool: 'nmap', target: 'example.com' },
       { toolCallId: 'call-1' },
-    )) as { stdout: string; truncated: boolean };
+    )) as { stdout: string; truncated: boolean; runId: string };
+
     expect(result.truncated).toBe(true);
-    expect(result.stdout).toHaveLength(32 * 1024);
+    expect(result.stdout).toHaveLength(8 * 1024);
+    const setex = (agentTool as any).redisService.setex as jest.Mock;
+    expect(setex).toHaveBeenCalledWith(
+      `agent:tool-output:c1:${result.runId}`,
+      3600,
+      full,
+    );
+
+    (agentTool as any).redisService.get = jest.fn().mockResolvedValue(full);
+    const page = (await (
+      agentTool.readToolOutputTool('c1') as unknown as Runnable
+    ).execute({ runId: result.runId, pattern: 'status: 200' })) as {
+      output: string;
+      matchedLines: number;
+    };
+    expect(page.matchedLines).toBe(1);
+    expect(page.output).toBe('2501: admin [Status: 200]\n');
+  });
+
+  it('read_tool_output reports an expired run', async () => {
+    const agentTool = createAgentTool();
+    await expect(
+      (agentTool.readToolOutputTool('c1') as unknown as Runnable).execute({
+        runId: '00000000-0000-4000-8000-000000000001',
+      }),
+    ).resolves.toHaveProperty('error');
+  });
+});
+
+describe('pageToolOutput', () => {
+  const raw = ['a', 'b', 'c', 'd', 'e'].join('\n');
+
+  it('pages by line with nextOffset', () => {
+    expect(pageToolOutput(raw, { offset: 1, limit: 2 })).toEqual({
+      totalLines: 5,
+      offset: 1,
+      nextOffset: 3,
+      output: '2: b\n3: c\n',
+    });
+    expect(pageToolOutput(raw, { offset: 3, limit: 10 }).nextOffset).toBeNull();
+  });
+
+  it('cuts an oversized line but still advances', () => {
+    const page = pageToolOutput('x'.repeat(20_000) + '\nnext', {
+      offset: 0,
+      limit: 10,
+    });
+    expect(page.output.length).toBeLessThanOrEqual(8 * 1024);
+    expect(page.output).toContain('[line cut]');
+    expect(page.nextOffset).toBe(1);
   });
 });

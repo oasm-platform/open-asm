@@ -1541,9 +1541,13 @@ export class AgentsCompletionsService {
           exitCode: number;
         }) => {
           if (controllerClosed) return;
+          // Transient: a non-transient data chunk is appended to the message
+          // parts and the client re-clones the whole message per chunk, so a
+          // long output (thousands of chunks) froze the chat.
           controller.enqueue({
             type: 'data-remote-execute-output',
             data,
+            transient: true,
           } as unknown as UIMessageChunk);
         };
         todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);

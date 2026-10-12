@@ -16,6 +16,7 @@ import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.servi
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
+import { RedisService } from '@/services/redis/redis.service';
 import { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
@@ -102,6 +103,7 @@ const READ_ONLY_TOOLS = new Set([
   'display_available_tools',
   'list_active_workers',
   'review_jobs',
+  'read_tool_output',
 ]);
 
 /**
@@ -150,7 +152,60 @@ function isPrivateIp(ip: string): boolean {
 }
 
 export const AGENT_TOOL_RUN_TIMEOUT_MS = 5 * 60_000;
-const AGENT_TOOL_OUTPUT_MAX = 32 * 1024;
+/** What one run_tool / read_tool_output answer puts into the LLM context. */
+const AGENT_TOOL_OUTPUT_PAGE = 8 * 1024;
+/** Full output kept for read_tool_output: Redis only, never the database. */
+const AGENT_TOOL_OUTPUT_STORE_MAX = 10 * 1024 * 1024;
+const AGENT_TOOL_OUTPUT_TTL_SECONDS = 3600;
+
+const toolOutputKey = (conversationId: string, runId: string) =>
+  `agent:tool-output:${conversationId}:${runId}`;
+
+/**
+ * One page of a stored tool output: lines from `offset` (into the matching
+ * lines when `pattern` is set, a case-insensitive substring), at most `limit`
+ * lines and AGENT_TOOL_OUTPUT_PAGE characters. Lines are numbered 1-based as
+ * in the full output.
+ */
+export function pageToolOutput(
+  raw: string,
+  {
+    offset,
+    limit,
+    pattern,
+  }: { offset: number; limit: number; pattern?: string },
+) {
+  const lines = raw.split('\n');
+  const needle = pattern?.toLowerCase();
+  const picked: number[] = [];
+  lines.forEach((line, i) => {
+    if (!needle || line.toLowerCase().includes(needle)) picked.push(i);
+  });
+
+  let output = '';
+  let next = offset;
+  for (const i of picked.slice(offset, offset + limit)) {
+    const row = `${i + 1}: ${lines[i]}\n`;
+    const room = AGENT_TOOL_OUTPUT_PAGE - output.length;
+    if (row.length > room) {
+      // A single oversized line still advances, cut, so paging cannot stall.
+      if (output === '') {
+        output = `${row.slice(0, room - 15)} …[line cut]\n`;
+        next++;
+      }
+      break;
+    }
+    output += row;
+    next++;
+  }
+  return {
+    totalLines: lines.length,
+    ...(needle ? { matchedLines: picked.length } : {}),
+    offset,
+    nextOffset: next < picked.length ? next : null,
+    output,
+  };
+}
 
 @Injectable()
 export class AgentTool {
@@ -180,6 +235,7 @@ export class AgentTool {
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfiles: ToolConfigProfilesService,
     private readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
+    private readonly redisService: RedisService,
   ) {}
 
   get getAssetsTool(): (workspaceId: string) => any {
@@ -1361,11 +1417,7 @@ export class AgentTool {
    * off the MCP surface, and approval-gated like any mutating tool (the
    * target is free text).
    */
-  runToolTool(
-    workspaceId: string,
-    conversationId: string,
-    emitter?: EventEmitter,
-  ): ToolType | null {
+  runToolTool(workspaceId: string, conversationId: string): ToolType | null {
     const slugs = this.connectorRegistry
       .getAgentConnectors()
       .map((entry) => entry.slug);
@@ -1394,7 +1446,8 @@ export class AgentTool {
       description: [
         "Run one security tool against one target on this conversation's worker and get its raw output.",
         'Nothing is saved: results are not stored as assets or vulnerabilities.',
-        `Waits up to ${AGENT_TOOL_RUN_TIMEOUT_MS / 60_000} minutes. Output: stdout, exitCode, error, timedOut, truncated.`,
+        `Waits up to ${AGENT_TOOL_RUN_TIMEOUT_MS / 60_000} minutes. Output: stdout (first ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB), exitCode, error, timedOut, truncated, totalLines.`,
+        'When truncated is true the full output is kept for 1 hour: read it with read_tool_output(runId), filtering with pattern instead of paging through everything.',
         'Params: tool (slug), target, optional configProfileId.',
         'Tools:',
         catalog,
@@ -1444,6 +1497,7 @@ export class AgentTool {
         }
 
         const limits = this.connectorRegistry.getResourceDefaults(slug);
+        const runId = randomUUID();
         let result: Awaited<ReturnType<RemoteExecuteService['waitForToolRun']>>;
         try {
           result = await this.remoteExecuteService.waitForToolRun(
@@ -1460,13 +1514,11 @@ export class AgentTool {
               memory: limits.memory,
               timeoutSeconds: limits.timeoutSeconds,
             },
-            randomUUID(),
+            runId,
             AGENT_TOOL_RUN_TIMEOUT_MS,
-            (event) =>
-              emitter?.emit('remote-execute-output', {
-                toolCallId: options.toolCallId,
-                ...event,
-              }),
+            // No live stream: the chat renders no terminal for run_tool, so
+            // per-chunk events only cost re-renders.
+            undefined,
             options.abortSignal,
           );
         } catch (error) {
@@ -1475,17 +1527,85 @@ export class AgentTool {
             error: error instanceof Error ? error.message : String(error),
           };
         }
-        const truncated = result.stdout.length > AGENT_TOOL_OUTPUT_MAX;
+        const { stdout } = result;
+        const truncated = stdout.length > AGENT_TOOL_OUTPUT_PAGE;
+        let stored = false;
+        if (truncated) {
+          try {
+            await this.redisService.setex(
+              toolOutputKey(conversationId, runId),
+              AGENT_TOOL_OUTPUT_TTL_SECONDS,
+              stdout.slice(0, AGENT_TOOL_OUTPUT_STORE_MAX),
+            );
+            stored = true;
+          } catch (error) {
+            this.logger.warn(
+              `Failed to keep tool output ${runId}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }
         return {
           tool: slug,
           target,
-          stdout: truncated
-            ? result.stdout.slice(0, AGENT_TOOL_OUTPUT_MAX)
-            : result.stdout,
+          stdout: stdout.slice(0, AGENT_TOOL_OUTPUT_PAGE),
           exitCode: result.exitCode,
           error: result.error,
           timedOut: result.timedOut,
           truncated,
+          totalLines: stdout.split('\n').length,
+          ...(stored ? { runId } : {}),
+          ...(stdout.length > AGENT_TOOL_OUTPUT_STORE_MAX
+            ? { note: 'Output over 10MB: only the first 10MB is kept.' }
+            : {}),
+        };
+      },
+    };
+    return tool(toolConfig);
+  }
+
+  /** Pages through a run_tool output kept in Redis for this conversation. */
+  readToolOutputTool(conversationId: string): ToolType {
+    const inputSchema = z.object({
+      runId: z.string().uuid().describe('runId returned by run_tool'),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Line to start from (into the matching lines with pattern)'),
+      limit: z.number().int().min(1).max(1000).optional(),
+      pattern: z
+        .string()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Keep only lines containing this text (case-insensitive)'),
+    });
+    const toolConfig: any = {
+      description: [
+        'Read the full output of a run_tool call that came back truncated.',
+        `Returns at most ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB per call, lines numbered as in the full output; continue from nextOffset.`,
+        'Prefer pattern (e.g. "200", "admin") to pull only the relevant lines.',
+        'Params: runId, optional offset (default 0), limit (default 200), pattern.',
+      ].join('\n'),
+      inputSchema,
+      execute: async (params: z.infer<typeof inputSchema>) => {
+        const raw = await this.redisService.get(
+          toolOutputKey(conversationId, params.runId),
+        );
+        if (raw === null) {
+          return {
+            error:
+              'No stored output for this runId (expired after 1 hour or unknown). Run the tool again.',
+          };
+        }
+        return {
+          runId: params.runId,
+          ...pageToolOutput(raw, {
+            offset: params.offset ?? 0,
+            limit: params.limit ?? 200,
+            pattern: params.pattern,
+          }),
         };
       },
     };
@@ -1596,13 +1716,14 @@ export class AgentTool {
         mcp: false,
       },
     };
-    const runTool = this.runToolTool(
-      workspaceId,
-      conversationId ?? '',
-      emitter,
-    );
+    const runTool = this.runToolTool(workspaceId, conversationId ?? '');
     if (runTool) {
       tools.run_tool = { method: runTool, permissions: [AGENT], mcp: false };
+      tools.read_tool_output = {
+        method: this.readToolOutputTool(conversationId ?? ''),
+        permissions: [AGENT],
+        mcp: false,
+      };
     }
 
     return Object.fromEntries(
