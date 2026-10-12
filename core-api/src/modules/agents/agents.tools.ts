@@ -20,6 +20,7 @@ import { ToolsService } from '@/modules/tools/tools.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 
+import { AgentConnectorRunService } from './agent-connector-run.service';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   AgentsApprovalsService,
@@ -31,7 +32,6 @@ import {
 import {
   AgentApprovalMode,
   AgentMode,
-  JobRunType,
   WorkerScope,
 } from '@/common/enums/enum';
 import {
@@ -178,6 +178,7 @@ export class AgentTool {
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly approvals: AgentsApprovalsService,
     private readonly connectorRegistry: ConnectorRegistryService,
+    private readonly agentConnectorRun: AgentConnectorRunService,
   ) {}
 
   get getAssetsTool(): (workspaceId: string) => any {
@@ -1347,6 +1348,7 @@ export class AgentTool {
    */
   getConnectorTools(
     workspaceId: string,
+    conversationId: string,
   ): Record<
     string,
     { method: ToolType; permissions: AgentMode[]; mcp: boolean }
@@ -1368,9 +1370,12 @@ export class AgentTool {
       });
 
       const toolConfig: any = {
-        description: `Run the ${entry.name} connector (${capabilities}): ${shortDescription}. Creates a background scan job; check progress with review_jobs. Params: targetIds and/or assetIds (at least one), optional configProfileId.`,
+        description: `Run the ${entry.name} connector (${capabilities}): ${shortDescription}. Runs on this conversation's worker and returns the findings (waits up to 5 minutes; longer scans return status "running" and keep saving results). At most 20 assets per call. Params: targetIds and/or assetIds (at least one), optional configProfileId.`,
         inputSchema,
-        execute: async (params: z.infer<typeof inputSchema>) => {
+        execute: async (
+          params: z.infer<typeof inputSchema>,
+          options: { toolCallId: string; abortSignal?: AbortSignal },
+        ) => {
           const targetIds = params.targetIds ?? [];
           const assetIds = params.assetIds ?? [];
           // Validated here, not via .refine: a ZodEffects schema does not
@@ -1378,43 +1383,16 @@ export class AgentTool {
           if (targetIds.length === 0 && assetIds.length === 0) {
             return { error: 'Provide at least one of targetIds or assetIds.' };
           }
-          try {
-            // Tool.name IS the connector slug. getToolById(workspaceId) sets
-            // isInstalled from the workspace_tools row, so an LLM-supplied
-            // connector cannot dispatch unless it belongs to this workspace.
-            const [toolRow] = await this.toolsService.getToolByNames({
-              names: [slug],
-            });
-            const tool = toolRow?.id
-              ? await this.toolsService.getToolById(toolRow.id, workspaceId)
-              : null;
-            if (!tool?.isInstalled) {
-              return {
-                error: `Connector ${slug} is not installed in this workspace.`,
-              };
-            }
-
-            const jobs = await this.jobsRegistryService.createNewJob({
-              tool,
-              workspaceId,
-              targetIds,
-              assetIds,
-              configProfileId: params.configProfileId,
-              priority: tool.priority,
-              jobName: `agent:${slug}`,
-              jobRunType: JobRunType.AGENT,
-            } as Parameters<JobsRegistryService['createNewJob']>[0]);
-
-            return {
-              jobHistoryId: jobs[0]?.jobHistory?.id ?? null,
-              jobCount: jobs.length,
-              jobIds: jobs.slice(0, 20).map((job) => job.id),
-            };
-          } catch (error) {
-            return {
-              error: error instanceof Error ? error.message : String(error),
-            };
-          }
+          return this.agentConnectorRun.run({
+            workspaceId,
+            conversationId,
+            slug,
+            targetIds,
+            assetIds,
+            configProfileId: params.configProfileId,
+            toolCallId: options.toolCallId,
+            abortSignal: options.abortSignal,
+          });
         },
       };
 
@@ -1442,7 +1420,7 @@ export class AgentTool {
       { method: ToolType; permissions: AgentMode[]; mcp: boolean }
     > = {
       // Connector tools first so a built-in of the same key wins on collision.
-      ...this.getConnectorTools(workspaceId),
+      ...this.getConnectorTools(workspaceId, conversationId ?? ''),
       enumerate_assets: {
         method: this.getAssetsTool(workspaceId),
         permissions: [AGENT, ASK],

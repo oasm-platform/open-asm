@@ -231,32 +231,21 @@ describe('AgentTool connector tools', () => {
   };
   const targetUuid = '00000000-0000-4000-8000-000000000001';
   const profileUuid = '00000000-0000-4000-8000-000000000002';
-  type Runnable = { execute: (input: unknown) => Promise<unknown> };
+  type Runnable = { execute: (input: unknown, options?: unknown) => Promise<unknown> };
 
-  const withDefaults = (installed: boolean) => ({
+  const withDefaults = () => ({
     connectorRegistry: {
       getAgentConnectors: jest.fn(() => [connector]),
       getConnector: jest.fn(() => ({ agentTool: true })),
     },
-    toolsService: {
-      getToolByNames: jest.fn(() =>
-        Promise.resolve([{ id: 'tool-1', name: 'nmap' }]),
-      ),
-      getToolById: jest.fn(() =>
-        Promise.resolve({ id: 'tool-1', name: 'nmap', priority: 4, isInstalled: installed }),
-      ),
-    },
-    jobsRegistryService: {
-      createNewJob: jest.fn(() => Promise.resolve([{ id: 'job-1', jobHistory: { id: 'hist-1' } }])),
-    },
   });
 
-  const createAgentTool = (installed = true) =>
-    Object.assign(Object.create(AgentTool.prototype), withDefaults(installed)) as AgentTool;
+  const createAgentTool = () =>
+    Object.assign(Object.create(AgentTool.prototype), withDefaults()) as AgentTool;
 
   const runnable = (agentTool: AgentTool): Runnable =>
     (
-      agentTool.getConnectorTools('w1')['run_connector_nmap'] as {
+      agentTool.getConnectorTools('w1', 'c1')['run_connector_nmap'] as {
         method: Runnable;
       }
     ).method;
@@ -269,39 +258,26 @@ describe('AgentTool connector tools', () => {
     expect(askTools).not.toHaveProperty('run_connector_nmap');
   });
 
-  it('returns an error when the connector is not installed in the workspace', async () => {
-    const agentTool = createAgentTool(false);
-    const result = await runnable(agentTool).execute({ targetIds: [targetUuid] });
-    expect(result).toEqual({
-      error: 'Connector nmap is not installed in this workspace.',
-    });
-  });
-
-  it('dispatches a scan job scoped to the workspace with the given ids', async () => {
+  it('delegates to the agent connector run with the conversation and call context', async () => {
     const agentTool = createAgentTool();
-    const result = await runnable(agentTool).execute({
+    const run = jest.fn().mockResolvedValue({ status: 'completed' });
+    (agentTool as any).agentConnectorRun = { run };
+    const signal = new AbortController().signal;
+    const result = await runnable(agentTool).execute(
+      { targetIds: [targetUuid], configProfileId: profileUuid },
+      { toolCallId: 'call-1', abortSignal: signal },
+    );
+    expect(run).toHaveBeenCalledWith({
+      workspaceId: 'w1',
+      conversationId: 'c1',
+      slug: 'nmap',
       targetIds: [targetUuid],
+      assetIds: [],
       configProfileId: profileUuid,
+      toolCallId: 'call-1',
+      abortSignal: signal,
     });
-    expect((agentTool as unknown as { toolsService: { getToolById: jest.Mock } }).toolsService.getToolById).toHaveBeenCalledWith(
-      'tool-1',
-      'w1',
-    );
-    expect(
-      (agentTool as unknown as { jobsRegistryService: { createNewJob: jest.Mock } }).jobsRegistryService.createNewJob,
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workspaceId: 'w1',
-        targetIds: [targetUuid],
-        configProfileId: profileUuid,
-        jobName: 'agent:nmap',
-      }),
-    );
-    expect(result).toEqual({
-      jobHistoryId: 'hist-1',
-      jobCount: 1,
-      jobIds: ['job-1'],
-    });
+    expect(result).toEqual({ status: 'completed' });
   });
 
   it('returns an error when neither targetIds nor assetIds are given', async () => {
@@ -309,19 +285,6 @@ describe('AgentTool connector tools', () => {
     const result = await runnable(agentTool).execute({});
     expect(result).toEqual({
       error: 'Provide at least one of targetIds or assetIds.',
-    });
-  });
-
-  it('surfaces a config-profile error from createNewJob', async () => {
-    const agentTool = createAgentTool();
-    (
-      agentTool as unknown as { jobsRegistryService: { createNewJob: jest.Mock } }
-    ).jobsRegistryService.createNewJob.mockRejectedValueOnce(
-      new Error('missing/default profile for connector "nmap"'),
-    );
-    const result = await runnable(agentTool).execute({ targetIds: [targetUuid] });
-    expect(result).toEqual({
-      error: 'missing/default profile for connector "nmap"',
     });
   });
 });
