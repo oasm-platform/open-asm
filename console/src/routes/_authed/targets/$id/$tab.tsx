@@ -10,6 +10,7 @@ const targetDetailSearchSchema = z.object({
   sortBy: z.string().default('createdAt'),
   sortOrder: z.enum(['ASC', 'DESC']).default('DESC'),
   filter: z.string().default(''),
+  where: z.string().optional(),
   status: z.string().optional(),
   severity: z.string().optional(),
   tags: z.string().optional(),

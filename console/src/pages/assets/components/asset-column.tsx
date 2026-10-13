@@ -1,3 +1,4 @@
+import type { AssetTls } from '../tls-info';
 import { TlsDateBadge } from '@/components/tls-date-badge';
 import { Badge } from '@/components/ui/badge';
 import type {
@@ -101,7 +102,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     size: 200,
     cell: ({ row }) => {
       const data = row.original;
-      const tls = data.httpResponses?.tls;
+      const tls = data.httpResponses?.tls as AssetTls | undefined;
       if (!tls) return <div className="min-h-15" />;
 
       return (

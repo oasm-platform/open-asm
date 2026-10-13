@@ -1,3 +1,4 @@
+import type { AssetTls } from './tls-info';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -112,7 +113,7 @@ export default function DetailAsset() {
   }
 
   const { value, httpResponses, ipAddresses, tags } = data;
-  const tls = httpResponses?.tls;
+  const tls = httpResponses?.tls as AssetTls | undefined;
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after

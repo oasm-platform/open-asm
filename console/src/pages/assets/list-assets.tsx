@@ -2,7 +2,7 @@ import { Tabs, useQueryTab } from '@/components/ui/tabs';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import CreateWorkspace from '../workspaces/create-workspace';
 import AssetTabContent from './components/asset-tab';
-import FilterFormInfinite from './components/filter-form-infinite';
+import AssetFilterBar from './components/asset-filter-bar';
 import HostAssetsTab from './components/host-assets-tab';
 import IpAssetsTab from './components/ip-assets-tab';
 import PortAssetsTab from './components/port-assets-tab';
@@ -86,7 +86,7 @@ export function ListAssets() {
   return (
     <div className="w-full space-y-2">
       <div className="flex justify-between items-center">
-        <FilterFormInfinite />
+        <AssetFilterBar />
         {/* <ExportDataButton api="api/assets/services/export" prefix="assets" /> */}
       </div>
       <Tabs value={tab} onValueChange={setTab}>

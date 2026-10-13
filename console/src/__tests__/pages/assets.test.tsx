@@ -119,4 +119,12 @@ describe('Assets Page', () => {
       expect(screen.getByText('https://api.example.com')).toBeInTheDocument();
     });
   });
+
+  it('migrates legacy deep links into the filter bar', async () => {
+    renderWithProviders(<Assets />, {
+      initialEntries: ['/assets?tab=port&ports=443'],
+    });
+
+    expect(await screen.findByText('Port in ["443"]')).toBeInTheDocument();
+  });
 });

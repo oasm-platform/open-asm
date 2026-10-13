@@ -9,6 +9,7 @@ const assetsSearchSchema = z.object({
   sortBy: z.string().default('value'),
   sortOrder: z.enum(['ASC', 'DESC']).default('ASC'),
   filter: z.string().default(''),
+  where: z.string().optional(),
   ipAddresses: z.union([z.string(), z.array(z.string())]).optional(),
   ports: z.union([z.string(), z.array(z.string())]).optional(),
   urls: z.union([z.string(), z.array(z.string())]).optional(),

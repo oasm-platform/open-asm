@@ -1,3 +1,4 @@
+import type { AssetTls } from '../tls-info';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -42,7 +43,7 @@ export default function AssetDetail({ id }: { id: string }) {
   }
 
   const { value, httpResponses, ipAddresses, tags } = data;
-  const tls = httpResponses?.tls;
+  const tls = httpResponses?.tls as AssetTls | undefined;
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after
