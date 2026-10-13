@@ -62,6 +62,8 @@ export function ValueInput({ field, condition, onChange, error }: {
               if (isList) setListText(e.target.value);
               else onChange(e.target.value);
             }}
+            // Keep typed-but-unconfirmed list text instead of dropping it on Apply/click-away.
+            onBlur={() => { if (isList) commit(listText); }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -83,7 +85,7 @@ export function ValueInput({ field, condition, onChange, error }: {
               <CommandEmpty>{isFetching ? 'Loading…' : 'No suggestions'}</CommandEmpty>
               <CommandGroup>
                 {options.map((o) => (
-                  <CommandItem key={o.value} value={o.value} onSelect={() => commit(o.value)}>
+                  <CommandItem key={o.value} value={o.value} onMouseDown={(e) => e.preventDefault()} onSelect={() => commit(o.value)}>
                     {o.label}
                   </CommandItem>
                 ))}

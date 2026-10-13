@@ -14,6 +14,9 @@ describe('legacyToFilter', () => {
   it('splits comma-separated legacy strings like the old toArray did', () => {
     expect(legacyToFilter({ techs: 'nginx,php' })?.items[0]).toEqual({ field: 'tech', op: 'in', value: ['nginx', 'php'] });
   });
+  it('maps legacy urls to an in-condition the url field accepts', () => {
+    expect(legacyToFilter({ urls: 'https://a/x' })?.items[0]).toEqual({ field: 'url', op: 'in', value: ['https://a/x'] });
+  });
   it('returns undefined without legacy keys', () => {
     expect(legacyToFilter({ tab: 'service' })).toBeUndefined();
   });

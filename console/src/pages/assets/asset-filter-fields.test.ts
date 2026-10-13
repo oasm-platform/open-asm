@@ -15,7 +15,15 @@ describe('ASSET_FILTER_FIELDS validation', () => {
     expect(err('ip', 'eq', '1.2.3')).toMatch(/IP/);
     expect(err('ip', 'inSubnet', ['10.0.0.0/8', '2001:db8::/32'])).toBeNull();
     expect(err('ip', 'inSubnet', ['10.0.0.0/40'])).toMatch(/CIDR/);
+    expect(err('ip', 'eq', 'fe80::1%eth0')).toMatch(/IP/);
+    expect(err('ip', 'inSubnet', ['fe80::1%eth0/64'])).toMatch(/CIDR/);
     expect(err('port', 'eq', '70000')).toMatch(/port/i);
     expect(err('statusCode', 'eq', '20')).toMatch(/status/i);
+  });
+  it('allows url in/notIn and requires a group uuid', () => {
+    expect(err('url', 'in', ['https://a/x'])).toBeNull();
+    expect(err('url', 'notIn', ['https://a/x'])).toBeNull();
+    expect(err('assetGroup', 'eq', 'my group')).toBe('Pick a group from the list');
+    expect(err('assetGroup', 'eq', '123e4567-e89b-12d3-a456-426614174000')).toBeNull();
   });
 });

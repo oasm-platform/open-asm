@@ -28,7 +28,10 @@ export default function AssetFilterBar() {
 
   return (
     <div className="flex w-full flex-col gap-2 md:flex-row md:items-center">
-      <FilterToolbar fields={ASSET_FILTER_FIELDS} value={appliedFilter} onApply={setAppliedFilter}
+      <FilterToolbar fields={ASSET_FILTER_FIELDS} value={appliedFilter} onApply={(f) => {
+          if (f?.items.length) setSearch(''); // drop pending search so it isn't written behind the tree
+          setAppliedFilter(f);
+        }}
         search={search} onSearchChange={setSearch} />
       <DatePickerWithRange label="Date" value={dateRange} onChange={setDateRange} className="w-full md:w-60" />
     </div>

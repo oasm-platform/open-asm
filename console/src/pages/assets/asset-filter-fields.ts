@@ -13,6 +13,7 @@ const IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 // shortcut: loose IPv6 shape check; the server's isIP is authoritative and returns 400 on a miss.
 const IPV6 = /^[0-9a-f:]+(:\d{1,3}(\.\d{1,3}){3})?$/i;
 const isIp = (v: string) => IPV4.test(v) || (v.includes(':') && IPV6.test(v));
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isCidr = (v: string) => {
   const [addr, prefix, extra] = v.split('/');
   if (extra !== undefined || !/^\d{1,3}$/.test(prefix ?? '')) return false;
@@ -43,7 +44,7 @@ export const ASSET_FILTER_FIELDS: FilterFieldConfig[] = [
     validate: (v, op: FilterOp) => (op === 'inSubnet' ? (isCidr(v) ? null : `"${v}" is not a valid CIDR`) : isIp(v) ? null : `"${v}" is not a valid IP`) },
   { key: 'tech', label: 'Technology', operators: ['eq', 'neq', 'contains', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetTechnologyAssets(useScope(s), opts(on, (d: GetManyGetTechnologyAssetsDTODto) => toOptions(d.data.map((e) => e.technology.name))))) },
-  { key: 'url', label: 'URL', operators: ['eq', 'contains', 'notContains'],
+  { key: 'url', label: 'URL', operators: ['eq', 'contains', 'notContains', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetUrlAssets(useScope(s), opts(on, (d: GetManyGetUrlAssetsDTODto) => toOptions(d.data.map((e) => e.url))))) },
   { key: 'statusCode', label: 'Status code', operators: ['eq', 'neq', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetStatusCodeAssets(useScope(s), opts(on, (d: GetManyGetStatusCodeAssetsDTODto) => toOptions(d.data.map((e) => e.statusCode))))),
@@ -56,6 +57,7 @@ export const ASSET_FILTER_FIELDS: FilterFieldConfig[] = [
   { key: 'tag', label: 'Tag', operators: ['eq', 'neq', 'contains', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetTagAssets({ ...useScope(s), sortBy: 'assetCount', sortOrder: 'DESC' }, opts(on, (d: GetManyGetTagAssetsDTODto) => toOptions(d.data.map((e) => e.tag))))) },
   { key: 'assetGroup', label: 'Asset group', operators: ['eq', 'neq', 'in', 'notIn'],
+    validate: (v) => (UUID.test(v) ? null : 'Pick a group from the list'),
     useSuggestions: (s, on) => {
       const { targetIds, limit, page } = useScope(s);
       return wrap(useAssetGroupControllerGetAll({ targetIds, limit, page, search: s || undefined },

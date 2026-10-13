@@ -63,4 +63,23 @@ describe('FilterBuilder', () => {
     await user.type(screen.getByLabelText('Value'), 'a{Enter}');
     expect(onApply).toHaveBeenCalledWith({ logic: 'and', items: [{ field: 'host', op: 'eq', value: 'a' }] });
   });
+
+  it('trims scalar values on Apply', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    render(<FilterBuilder fields={fields} value={undefined} onApply={onApply} onCancel={() => {}} />);
+    await user.type(screen.getByLabelText('Value'), '  a  ');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply).toHaveBeenCalledWith({ logic: 'and', items: [{ field: 'host', op: 'eq', value: 'a' }] });
+  });
+
+  it('keeps unconfirmed list text typed before Apply', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    const value = { logic: 'and' as const, items: [{ field: 'port', op: 'in' as const, value: ['443'] }] };
+    render(<FilterBuilder fields={fields} value={value} onApply={onApply} onCancel={() => {}} />);
+    await user.type(screen.getByLabelText('Value'), '80');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply).toHaveBeenCalledWith({ logic: 'and', items: [{ field: 'port', op: 'in', value: ['443', '80'] }] });
+  });
 });

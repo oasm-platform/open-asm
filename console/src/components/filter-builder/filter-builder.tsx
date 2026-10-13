@@ -21,6 +21,10 @@ export function FilterBuilder({ fields, value, onApply, onCancel }: Props) {
     value?.items.length ? value : addCondition({ logic: 'and', items: [] }, fields),
   );
   const error = filterError(draft, fields);
+  const trimmed = (): Filter => {
+    const t = (c: FilterCondition): FilterCondition => ({ ...c, value: Array.isArray(c.value) ? c.value.map((s) => s.trim()) : c.value.trim() });
+    return { ...draft, items: draft.items.map((i) => (isGroup(i) ? { ...i, conditions: i.conditions.map(t) } : t(i))) };
+  };
 
   // Render helpers, not components: a component declared here would remount every render and drop input focus.
   const renderLogic = (logic: FilterLogic, groupIndex?: number) => (
@@ -57,7 +61,11 @@ export function FilterBuilder({ fields, value, onApply, onCancel }: Props) {
   return (
     <form
       className="flex w-[min(44rem,calc(100vw-2rem))] flex-col gap-2"
-      onSubmit={(e) => { e.preventDefault(); if (!error) onApply(draft); }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const clean = trimmed();
+        if (!filterError(clean, fields)) onApply(clean);
+      }}
     >
       {draft.items.map((item, i) => (
         <div key={i} className="flex flex-col gap-2">
