@@ -33,6 +33,7 @@ import {
   PickTechnologyDetailDTO,
 } from './dto/assets.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
+import { GetTagAssetsDTO } from './dto/get-tag-assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetUrlAssetsDTO } from './dto/get-url-assets.dto';
@@ -763,6 +764,48 @@ export class AssetsService {
     );
 
     return getManyResponse({ query, data, total });
+  }
+
+  /**
+   * Retrieves distinct service tags in the workspace with the number of assets carrying each tag.
+   */
+  public async getTagAssets(
+    query: GetAssetsQueryDto,
+    workspaceId: string,
+  ): Promise<GetManyBaseResponseDto<GetTagAssetsDTO>> {
+    const offset = (query.page - 1) * query.limit;
+    const sortColumn = query.sortBy === 'tag' ? 'ast.tag' : '"assetCount"';
+
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
+      .innerJoin('asset_service.tags', 'ast')
+      .select(['ast.tag AS tag', 'COUNT(DISTINCT asset_service.id) AS "assetCount"'])
+      .groupBy('ast.tag');
+
+    if (query.value) {
+      queryBuilder.andWhere('ast.tag ILIKE :value', { value: `%${query.value}%` });
+    }
+
+    const totalInDb = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(*)')
+      .from('(' + queryBuilder.getQuery() + ')', 't1')
+      .setParameters(queryBuilder.getParameters())
+      .getRawOne<{ count: number }>();
+
+    const list = await queryBuilder
+      .orderBy(sortColumn, query.sortOrder)
+      .limit(query.limit)
+      .offset(offset)
+      .getRawMany<{ tag: string; assetCount: string }>();
+
+    const data = list.map((item) => {
+      const obj = new GetTagAssetsDTO();
+      obj.tag = item.tag;
+      obj.assetCount = Number(item.assetCount);
+      return obj;
+    });
+
+    return getManyResponse({ query, data, total: Number(totalInDb?.count ?? 0) });
   }
 
   /**
