@@ -1,4 +1,9 @@
-import { parseFilterParam, validateAssetFilter } from './asset-filter';
+import {
+  compileAssetFilter,
+  legacyParamsToFilter,
+  parseFilterParam,
+  validateAssetFilter,
+} from './asset-filter';
 
 const cond = (field: string, op: string, value: unknown) => ({ field, op, value });
 const root = (...items: unknown[]) => ({ logic: 'and', items });
@@ -60,5 +65,69 @@ describe('parseFilterParam', () => {
   });
   it('passes undefined through', () => {
     expect(parseFilterParam(undefined)).toBeUndefined();
+  });
+});
+
+describe('compileAssetFilter', () => {
+  const compile = (...items: unknown[]) =>
+    compileAssetFilter({ logic: 'and', items } as never, 'af');
+
+  it('returns null for an empty filter', () => {
+    expect(compile()).toBeNull();
+  });
+
+  it('eq binds a single-element array to = ANY', () => {
+    expect(compile(cond('host', 'eq', 'a.com'))).toEqual({
+      sql: '((asset.value = ANY(:af0)))',
+      params: { af0: ['a.com'] },
+    });
+  });
+
+  it('notIn negates the match', () => {
+    const r = compile(cond('port', 'notIn', ['80', '443']));
+    expect(r?.sql).toBe('(NOT (asset_service.port = ANY(:af0)))');
+    expect(r?.params).toEqual({ af0: ['80', '443'] });
+  });
+
+  it('contains escapes LIKE metacharacters', () => {
+    const r = compile(cond('host', 'contains', '50%_off\\x'));
+    expect(r?.sql).toBe('((asset.value ILIKE :af0))');
+    expect(r?.params).toEqual({ af0: '%50\\%\\_off\\\\x%' });
+  });
+
+  it('inSubnet uses the inet containment operator', () => {
+    const r = compile(cond('ip', 'inSubnet', ['10.0.0.0/8']));
+    expect(r?.sql).toContain('io."ip" <<= ANY(CAST(:af0 AS cidr[]))');
+  });
+
+  it('tag and assetGroup use their join tables', () => {
+    expect(compile(cond('tag', 'eq', 'prod'))?.sql).toContain('FROM asset_services_tags ast');
+    expect(compile(cond('assetGroup', 'eq', 'x'))?.sql).toContain('FROM assets_group_assets aga');
+  });
+
+  it('combines a root AND with an OR group and numbers params uniquely', () => {
+    const r = compile(
+      cond('host', 'eq', 'a'),
+      { logic: 'or', conditions: [cond('statusCode', 'eq', '200'), cond('url', 'notContains', 'admin')] },
+    );
+    expect(r?.sql).toMatch(/^\(\(asset\.value = ANY\(:af0\)\) AND \(\(.*:af1.*\) OR NOT \(.*:af2.*\)\)\)$/);
+    expect(Object.keys(r?.params ?? {})).toEqual(['af0', 'af1', 'af2']);
+  });
+
+  it('never puts values into the SQL text', () => {
+    const r = compile(cond('host', 'eq', "x' OR 1=1 --"));
+    expect(r?.sql).not.toContain('1=1');
+  });
+});
+
+describe('legacyParamsToFilter', () => {
+  it('returns undefined when no legacy params are set', () => {
+    expect(legacyParamsToFilter({})).toBeUndefined();
+  });
+  it('maps each array param to an in condition', () => {
+    expect(legacyParamsToFilter({ hosts: ['a'], ports: ['80'], tlsHosts: [] })).toEqual({
+      logic: 'and',
+      items: [cond('host', 'in', ['a']), cond('port', 'in', ['80'])],
+    });
   });
 });

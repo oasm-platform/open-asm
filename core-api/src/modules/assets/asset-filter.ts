@@ -125,3 +125,98 @@ export function IsAssetFilter(): PropertyDecorator {
     });
   };
 }
+
+type Fragment = (p: string) => string;
+
+// One "matches any of :p" fragment per field (moved from the old whereBuilder),
+// plus an ILIKE fragment where `contains` is allowed and the subnet fragment for ip.
+const FIELD_SQL: Record<AssetFilterField, { any: Fragment; like?: Fragment; subnet?: Fragment }> = {
+  host: {
+    any: (p) => `asset.value = ANY(${p})`,
+    like: (p) => `asset.value ILIKE ${p}`,
+  },
+  port: { any: (p) => `asset_service.port = ANY(${p})` },
+  ip: {
+    // Asset IPs = its DNS A/AAAA records (same source as the IP tab).
+    any: (p) => `EXISTS (SELECT 1 FROM ip_observations io WHERE io."assetId" = asset.id AND io.source IN ('dns_a', 'dns_aaaa') AND io."ip" = ANY(CAST(${p} AS inet[])))`,
+    subnet: (p) => `EXISTS (SELECT 1 FROM ip_observations io WHERE io."assetId" = asset.id AND io.source IN ('dns_a', 'dns_aaaa') AND io."ip" <<= ANY(CAST(${p} AS cidr[])))`,
+  },
+  tech: {
+    // Match the full "name:version" string when the value carries a version, else the bare name.
+    any: (p) => `EXISTS (SELECT 1 FROM http_response_technologies hrt WHERE hrt."httpResponseId" = latest_http_response.id AND (hrt.name = ANY(${p}) OR (hrt.name || ':' || hrt.version) = ANY(${p})))`,
+    like: (p) => `EXISTS (SELECT 1 FROM http_response_technologies hrt WHERE hrt."httpResponseId" = latest_http_response.id AND hrt.name ILIKE ${p})`,
+  },
+  url: {
+    any: (p) => `EXISTS (SELECT 1 FROM discovered_urls du WHERE du."assetServiceId" = asset_service.id AND du.url = ANY(${p}))`,
+    like: (p) => `EXISTS (SELECT 1 FROM discovered_urls du WHERE du."assetServiceId" = asset_service.id AND du.url ILIKE ${p})`,
+  },
+  statusCode: {
+    any: (p) => `EXISTS (SELECT 1 FROM http_status_codes hsc WHERE hsc."httpResponseId" = latest_http_response.id AND hsc."statusCode" = ANY(${p}))`,
+  },
+  tlsHost: {
+    any: (p) => `EXISTS (SELECT 1 FROM tls_certificates tc WHERE tc."httpResponseId" = latest_http_response.id AND tc."host" = ANY(${p}))`,
+    like: (p) => `EXISTS (SELECT 1 FROM tls_certificates tc WHERE tc."httpResponseId" = latest_http_response.id AND tc."host" ILIKE ${p})`,
+  },
+  tag: {
+    any: (p) => `EXISTS (SELECT 1 FROM asset_services_tags ast WHERE ast."assetServiceId" = asset_service.id AND ast.tag = ANY(${p}))`,
+    like: (p) => `EXISTS (SELECT 1 FROM asset_services_tags ast WHERE ast."assetServiceId" = asset_service.id AND ast.tag ILIKE ${p})`,
+  },
+  assetGroup: {
+    any: (p) => `EXISTS (SELECT 1 FROM assets_group_assets aga WHERE aga."assetId" = asset.id AND aga."assetGroupId" = ANY(CAST(${p} AS uuid[])))`,
+  },
+};
+
+const escapeLike = (v: string) => v.replace(/[\\%_]/g, (m) => `\\${m}`);
+
+export function compileAssetFilter(
+  filter: AssetFilter,
+  prefix: string,
+): { sql: string; params: Record<string, unknown> } | null {
+  const params: Record<string, unknown> = {};
+  const compileCondition = ({ field, op, value }: AssetFilterCondition): string => {
+    const name = `${prefix}${Object.keys(params).length}`;
+    const p = `:${name}`;
+    const sql = FIELD_SQL[field];
+    switch (op) {
+      case 'eq':
+      case 'neq':
+      case 'in':
+      case 'notIn':
+        params[name] = Array.isArray(value) ? value : [value];
+        return op === 'eq' || op === 'in' ? `(${sql.any(p)})` : `NOT (${sql.any(p)})`;
+      case 'contains':
+      case 'notContains':
+        params[name] = `%${escapeLike(value as string)}%`;
+        return op === 'contains' ? `(${sql.like!(p)})` : `NOT (${sql.like!(p)})`;
+      case 'inSubnet':
+        params[name] = value;
+        return `(${sql.subnet!(p)})`;
+    }
+  };
+  const join = (logic: AssetFilterLogic, parts: string[]) =>
+    `(${parts.join(logic === 'or' ? ' OR ' : ' AND ')})`;
+
+  const parts = filter.items.map((item) =>
+    'conditions' in item ? join(item.logic, item.conditions.map(compileCondition)) : compileCondition(item),
+  );
+  return parts.length ? { sql: join(filter.logic, parts), params } : null;
+}
+
+const LEGACY_KEYS = {
+  hosts: 'host',
+  ports: 'port',
+  ipAddresses: 'ip',
+  techs: 'tech',
+  urls: 'url',
+  statusCodes: 'statusCode',
+  tlsHosts: 'tlsHost',
+} as const satisfies Record<string, AssetFilterField>;
+
+export function legacyParamsToFilter(
+  q: Partial<Record<keyof typeof LEGACY_KEYS, string[]>>,
+): AssetFilter | undefined {
+  const items = Object.entries(LEGACY_KEYS)
+    .filter(([key]) => q[key as keyof typeof LEGACY_KEYS]?.length)
+    .map(([key, field]) => ({ field, op: 'in' as const, value: q[key as keyof typeof LEGACY_KEYS]! }));
+  return items.length ? { logic: 'and', items } : undefined;
+}
