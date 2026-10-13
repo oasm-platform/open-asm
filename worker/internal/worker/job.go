@@ -442,6 +442,16 @@ func findingToVulnerability(f *connectorpb.Finding) *pb.Vulnerability {
 		IpAddress:        f.GetIp(),
 		PublicationDate:  f.GetPublicationDate(),
 		ModificationDate: f.GetModificationDate(),
+
+		// Code findings (repository scanners); empty for host scanners.
+		FilePath:         f.GetFilePath(),
+		LineStart:        f.GetLineStart(),
+		LineEnd:          f.GetLineEnd(),
+		Commit:           f.GetCommit(),
+		PackageName:      f.GetPackageName(),
+		InstalledVersion: f.GetInstalledVersion(),
+		FixedVersion:     f.GetFixedVersion(),
+		Fingerprint:      f.GetFingerprint(),
 	}
 }
 

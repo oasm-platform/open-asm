@@ -1,9 +1,10 @@
+import { IntegrationType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 
 /**
  * Request body for testing an integration.
- * The test sends a sample payload matching the integration's category.
+ * The test sends a sample payload matching the tested capability.
  */
 export class TestIntegrationDto {
   @ApiProperty({
@@ -14,4 +15,15 @@ export class TestIntegrationDto {
   @IsOptional()
   @IsString()
   text?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: IntegrationType,
+    enumName: 'IntegrationType',
+    description:
+      'Capability to test. Defaults to the category for single-capability apps; multi-capability apps test the connection itself when omitted.',
+  })
+  @IsOptional()
+  @IsEnum(IntegrationType)
+  capability?: IntegrationType;
 }

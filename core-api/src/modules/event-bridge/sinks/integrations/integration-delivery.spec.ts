@@ -1,6 +1,10 @@
 import { AuditOutcome, NotificationType, Severity } from '@/common/enums/enum';
 import type { VulnerabilityDetectedPayload } from '../../contracts/event-payloads';
-import { eventForIntegration, notificationTypeFor } from './integration-delivery';
+import {
+  eventForIntegration,
+  isTicketable,
+  notificationTypeFor,
+} from './integration-delivery';
 import type { ConsumedEvent } from '../../contracts/event-envelope';
 
 /**
@@ -32,6 +36,13 @@ describe('integration delivery policy', () => {
     (event?.payload as VulnerabilityDetectedPayload | undefined)?.vulnerabilities.map(
       (v) => v.severity,
     );
+
+  it('opens tickets for findings only — never for runs or ticket events', () => {
+    expect(isTicketable('vulnerability.detected')).toBe(true);
+    expect(isTicketable('workflow.run.completed')).toBe(false);
+    // A ticket about a ticket would loop forever.
+    expect(isTicketable('integration.ticket.created')).toBe(false);
+  });
 
   it('keeps only enabled severities, using schema defaults for missing toggles', () => {
     // Defaults: critical/high on, medium off.

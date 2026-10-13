@@ -5,6 +5,7 @@ import JobStatusBadge from '@/components/ui/job-status';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   JobStatus,
+  TargetType,
   useTargetsControllerGetTargetById,
   useVulnerabilitiesControllerScan,
 } from '@/services/apis/gen/queries';
@@ -17,6 +18,7 @@ import { ListAssets } from '../assets/list-assets';
 import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
 import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
 import AssetsDiscovering from './assets-discovering';
+import { GitOrgDetail } from './git-org-detail';
 import { TargetSwitcher } from './components/target-switcher';
 import SettingTarget from './setting-target';
 
@@ -71,6 +73,11 @@ export function DetailTarget() {
         </Button>
       </div>
     );
+  }
+
+  // A Git organization has repositories, not a host inventory.
+  if (target.type === TargetType.GIT_ORG) {
+    return <GitOrgDetail target={target} tab={tab} refetch={refetch} />;
   }
 
   return (

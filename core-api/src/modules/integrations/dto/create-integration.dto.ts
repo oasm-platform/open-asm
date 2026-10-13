@@ -1,6 +1,15 @@
 import { IsCronSchedule } from '@/modules/asset-group/dto/cron-schedule.validator';
+import { IntegrationType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateIntegrationDto {
   @ApiProperty({ example: 'My Jira Integration', description: 'Human-readable name' })
@@ -18,9 +27,28 @@ export class CreateIntegrationDto {
   @IsString()
   appType: string;
 
-  @ApiProperty({ example: 'ticketing', description: 'Integration category' })
+  @ApiProperty({
+    example: 'TICKETING',
+    description:
+      'Integration category. For multi-capability apps this is the primary capability.',
+  })
   @IsString()
   category: string;
+
+  @ApiProperty({
+    required: false,
+    enum: IntegrationType,
+    enumName: 'IntegrationType',
+    isArray: true,
+    example: [IntegrationType.SOURCE_CODE, IntegrationType.TICKETING],
+    description:
+      'Capabilities to enable (multi-capability apps such as GitHub). Defaults to [category]; single-capability apps only accept [category].',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsEnum(IntegrationType, { each: true })
+  capabilities?: IntegrationType[];
 
   @ApiProperty({
     description: 'App-specific configuration validated via JSON Schema',

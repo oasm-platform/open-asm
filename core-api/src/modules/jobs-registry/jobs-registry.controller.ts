@@ -28,7 +28,13 @@ import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
+import {
+  buildConnectorInputs,
+  isRepositoryAsset,
+  repositoryUsername,
+} from './connector-inputs';
 import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
@@ -107,6 +113,7 @@ export class JobsRegistryController {
     private readonly jobsRegistryService: JobsRegistryService,
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
+    private readonly integrationsService: IntegrationsService,
   ) {}
 
   @WorkspaceAccess('job.read')
@@ -467,6 +474,50 @@ export class JobsRegistryController {
    * Maps one claimed job to the gRPC `Job` wire shape. Shared by `Next` and
    * `NextBatch` so the two paths can never drift apart.
    */
+  /**
+   * Inputs of a connector job. A repository asset (GIT_ORG target) gets its
+   * clone URL plus the integration's token, decrypted here for this dispatch
+   * only — never persisted on the job. Without a usable integration the job
+   * still runs, unauthenticated (public repositories).
+   */
+  private async resolveConnectorInputs(
+    job: GetNextJobResult,
+  ): Promise<Record<string, string>> {
+    const asset = job.asset as unknown as {
+      value: string;
+      metadata?: Record<string, unknown> | null;
+      target?: { type?: string; integrationId?: string | null } | null;
+    };
+    if (!isRepositoryAsset(asset)) {
+      return buildConnectorInputs(asset);
+    }
+
+    const integrationId = asset.target?.integrationId;
+    if (!integrationId || !job.workspaceId) {
+      return buildConnectorInputs(asset);
+    }
+    try {
+      const { integration, decryptedConfig } =
+        await this.integrationsService.getIntegrationWithDecryptedConfig(
+          integrationId,
+          job.workspaceId,
+        );
+      const token = decryptedConfig.apiToken;
+      return buildConnectorInputs(
+        asset,
+        typeof token === 'string' && token
+          ? { username: repositoryUsername(integration.appType), token }
+          : null,
+      );
+    } catch {
+      // Never log the decrypted payload — generic message only.
+      this.logger.warn(
+        `repository credentials unavailable for job ${job.id}; dispatching unauthenticated`,
+      );
+      return buildConnectorInputs(asset);
+    }
+  }
+
   private async mapJobToGrpcJob(
     job: GetNextJobResult,
   ): Promise<Record<string, unknown>> {
@@ -511,7 +562,7 @@ export class JobsRegistryController {
         memory: defaults.memory,
         timeout_seconds: defaults.timeoutSeconds,
         inputs: {
-          fields: { target: { stringValue: job.asset.value } },
+          fields: packStructFields(await this.resolveConnectorInputs(job)),
         },
       };
 

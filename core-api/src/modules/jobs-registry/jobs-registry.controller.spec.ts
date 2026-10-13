@@ -5,6 +5,7 @@ import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { WorkersService } from '../workers/workers.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -61,6 +62,7 @@ describe('JobsRegistryController', () => {
     let mockJobsRegistryService: any;
     let mockConnectorRegistry: any;
     let mockToolConfigProfilesService: any;
+    let mockIntegrationsService: { getIntegrationWithDecryptedConfig: jest.Mock };
 
     beforeEach(async () => {
       mockJobsRegistryService = {
@@ -77,6 +79,9 @@ describe('JobsRegistryController', () => {
       mockToolConfigProfilesService = {
         resolveConfigForJob: jest.fn(),
       };
+      mockIntegrationsService = {
+        getIntegrationWithDecryptedConfig: jest.fn(),
+      };
 
       const module: TestingModule = await Test.createTestingModule({
         controllers: [JobsRegistryController],
@@ -84,6 +89,7 @@ describe('JobsRegistryController', () => {
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
           { provide: ConnectorRegistryService, useValue: mockConnectorRegistry },
           { provide: ToolConfigProfilesService, useValue: mockToolConfigProfilesService },
+          { provide: IntegrationsService, useValue: mockIntegrationsService },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
           { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
@@ -134,6 +140,81 @@ describe('JobsRegistryController', () => {
       expect(result.image).toBe(
         'ghcr.io/oasm-platform/connector-nikto:2.6.1',
       );
+      // Host asset: the historical single `target` input.
+      expect(result.inputs).toEqual({
+        fields: { target: { stringValue: 'https://example.com' } },
+      });
+    });
+
+    it('sends repository inputs with the integration token for a Git organization asset', async () => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'job-2',
+        workspaceId: 'ws-1',
+        category: 'vulnerabilities',
+        asset: {
+          value: 'github.com/acme/web',
+          metadata: { url: 'https://github.com/acme/web', defaultBranch: 'main' },
+          target: { type: 'GIT_ORG', integrationId: 'int-1' },
+        },
+        config: null,
+        tool: { id: 'gitleaks', name: 'gitleaks' },
+      });
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'Gitleaks',
+        slug: 'gitleaks',
+        image: 'ghcr.io/oasm-platform/connector-gitleaks:8',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+      mockIntegrationsService.getIntegrationWithDecryptedConfig.mockResolvedValue({
+        integration: { appType: 'gitlab' },
+        decryptedConfig: { apiToken: 'glpat-secret' },
+      });
+
+      const result = await controller.next({ id: 'worker-1' });
+
+      expect(
+        mockIntegrationsService.getIntegrationWithDecryptedConfig,
+      ).toHaveBeenCalledWith('int-1', 'ws-1');
+      expect(result.inputs).toEqual({
+        fields: {
+          repository: { stringValue: 'https://github.com/acme/web' },
+          ref: { stringValue: 'main' },
+          username: { stringValue: 'oauth2' },
+          token: { stringValue: 'glpat-secret' },
+        },
+      });
+    });
+
+    it('dispatches a repository job unauthenticated when the integration is unavailable', async () => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'job-3',
+        workspaceId: 'ws-1',
+        category: 'vulnerabilities',
+        asset: {
+          value: 'github.com/acme/web',
+          metadata: { url: 'https://github.com/acme/web', defaultBranch: 'main' },
+          target: { type: 'GIT_ORG', integrationId: 'int-gone' },
+        },
+        config: null,
+        tool: { id: 'gitleaks', name: 'gitleaks' },
+      });
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        slug: 'gitleaks',
+        image: 'ghcr.io/oasm-platform/connector-gitleaks:8',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+      mockIntegrationsService.getIntegrationWithDecryptedConfig.mockRejectedValue(
+        new Error('not found'),
+      );
+
+      const result = await controller.next({ id: 'worker-1' });
+
+      expect(result.inputs).toEqual({
+        fields: {
+          repository: { stringValue: 'https://github.com/acme/web' },
+          ref: { stringValue: 'main' },
+        },
+      });
     });
 
   });
@@ -160,6 +241,10 @@ describe('JobsRegistryController', () => {
           {
             provide: ConnectorRegistryService,
             useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
+          },
+          {
+            provide: IntegrationsService,
+            useValue: { getIntegrationWithDecryptedConfig: jest.fn() },
           },
           {
             provide: ToolConfigProfilesService,
@@ -269,6 +354,10 @@ describe('JobsRegistryController', () => {
           {
             provide: ConnectorRegistryService,
             useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
+          },
+          {
+            provide: IntegrationsService,
+            useValue: { getIntegrationWithDecryptedConfig: jest.fn() },
           },
           {
             provide: ToolConfigProfilesService,

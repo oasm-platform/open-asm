@@ -6,7 +6,7 @@ import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { isIP } from 'node:net';
 import { DataSource, EntityManager, InsertResult } from 'typeorm';
-import { Severity, ToolCategory } from '../../common/enums/enum';
+import { Severity, TargetType, ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
@@ -139,7 +139,70 @@ const RESCAN_OVERWRITE_COLUMNS = [
   'publicationDate',
   'modificationDate',
   'filePath',
+  'lineStart',
+  'lineEnd',
+  'commit',
+  'packageName',
+  'installedVersion',
+  'fixedVersion',
 ] as const;
+
+/**
+ * Code-finding fields. The gRPC loader fills absent proto3 scalars with
+ * defaults ('' / 0), so a host finding would otherwise store empty strings
+ * and zero line numbers; they are stored as NULL instead.
+ */
+const CODE_FINDING_FIELDS = [
+  'lineStart',
+  'lineEnd',
+  'commit',
+  'packageName',
+  'installedVersion',
+  'fixedVersion',
+] as const;
+
+function normalizeCodeFields(
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const field of CODE_FINDING_FIELDS) {
+    const value = values[field];
+    normalized[field] = value === '' || value === 0 || value === undefined ? null : value;
+  }
+  return normalized;
+}
+
+/**
+ * Deduplication key of a finding.
+ *
+ * Host findings keep the historical name + asset + tool key, so every
+ * existing row still matches on re-scan — whatever `fingerprint` a legacy
+ * payload happens to carry is ignored for them.
+ *
+ * Findings on a repository asset (GIT_ORG target) append the connector's own
+ * per-finding identity (rule + file + line…), so several findings of one rule
+ * in one repository stay distinct instead of collapsing into one row.
+ */
+export function vulnerabilityFingerprint(args: {
+  name: string;
+  assetId: string;
+  // Optional only because Tool.id is; interpolated exactly as before.
+  toolId: string | undefined;
+  /** True for repository assets; only then is sourceFingerprint used. */
+  isRepositoryAsset: boolean;
+  sourceFingerprint?: unknown;
+}): string {
+  const source =
+    args.isRepositoryAsset &&
+    typeof args.sourceFingerprint === 'string' &&
+    args.sourceFingerprint !== ''
+      ? `-${args.sourceFingerprint}`
+      : '';
+  return crypto
+    .createHash('md5')
+    .update(`${args.name}-${args.assetId}-${args.toolId}${source}`)
+    .digest('hex');
+}
 
 /**
  * Columns an incoming finding may omit. `updatedAt`/`lastSeenDate` are always
@@ -851,16 +914,21 @@ export class DataAdapterService {
       }
 
       const now = new Date();
+      const isRepositoryAsset =
+        job.asset.target?.type === TargetType.GIT_ORG;
       const values = data.map((vuln) => {
-        const stringHash = `${vuln.name}-${job.asset.id}-${job.tool.id}`;
-        const fingerprint = crypto
-          .createHash('md5')
-          .update(stringHash)
-          .digest('hex');
+        const fingerprint = vulnerabilityFingerprint({
+          name: vuln.name,
+          assetId: job.asset.id,
+          toolId: job.tool.id,
+          isRepositoryAsset,
+          sourceFingerprint: vuln.fingerprint,
+        });
         const vulnValues = { ...vuln } as unknown as Record<string, string | number | boolean | object | null>;
         delete vulnValues.id;
         return {
           ...vulnValues,
+          ...normalizeCodeFields(vulnValues),
           severity:
             typeof vulnValues.severity === 'string'
               ? (vulnValues.severity.toLowerCase() as Severity)

@@ -17,12 +17,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
-import { IsNull, Not } from 'typeorm';
+import { ArrayContains, IsNull, Not } from 'typeorm';
 import type { Repository } from 'typeorm';
 import type {
   CloudProviderSyncConfig,
   ConnectorSyncResult,
 } from './connectors/connector.abstract';
+import { hasCapability } from './capabilities';
 import { AwsSsoService } from './connectors/aws/aws-sso.service';
 import { runConnector } from './connectors/connector.factory';
 import { Integration } from './entities/integration.entity';
@@ -70,14 +71,21 @@ export class IntegrationSyncService implements OnModuleInit {
    * or jobs that lost their key). Mirrors targets.service.ts:655-675.
    */
   async onModuleInit(): Promise<void> {
+    const unscheduled = {
+      syncSchedule: Not('disabled'),
+      syncJobId: IsNull(),
+    };
     const pending = await this.integrationRepository.find({
-      where: {
-        // Only cloud-provider integrations can ever have a sync scheduler —
-        // pre-existing rows of other categories are never re-scheduled (F3).
-        category: IntegrationType.CLOUD_PROVIDER,
-        syncSchedule: Not('disabled'),
-        syncJobId: IsNull(),
-      },
+      // Only integrations with the CLOUD_PROVIDER capability can ever have a
+      // sync scheduler — rows without it are never re-scheduled (F3). Legacy
+      // rows carry it as their category, multi-capability rows in the array.
+      where: [
+        { ...unscheduled, category: IntegrationType.CLOUD_PROVIDER },
+        {
+          ...unscheduled,
+          capabilities: ArrayContains([IntegrationType.CLOUD_PROVIDER]),
+        },
+      ],
     });
 
     for (const integration of pending) {
@@ -215,7 +223,7 @@ export class IntegrationSyncService implements OnModuleInit {
     // rows scheduled before the create/update gates existed. The connector
     // dispatch below is hardcoded to CLOUD_PROVIDER, so anything else would
     // fail every tick with "connector.syncAssets is not a function" (F3).
-    if (integration.category !== (IntegrationType.CLOUD_PROVIDER as string)) {
+    if (!hasCapability(integration, IntegrationType.CLOUD_PROVIDER)) {
       throw new BadRequestException(
         'syncSchedule is only supported for CLOUD_PROVIDER integrations',
       );

@@ -17,7 +17,10 @@ import {
   useIntegrationsControllerTestIntegration,
   useIntegrationsControllerUpdateIntegration,
 } from '@/services/apis/gen/queries';
-import type { GetIntegrationDto } from '@/services/apis/gen/queries';
+import type {
+  GetIntegrationDto,
+  IntegrationType,
+} from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   buildCronExpression,
@@ -29,12 +32,22 @@ import {
 import { Loader2, Pencil, Play, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  capabilityLabel,
+  CLOUD_PROVIDER_CAPABILITY,
+  getCapabilityMeta,
+  getIntegrationCapabilities,
+  isDiscriminatorKey,
+} from '../capabilities';
 import type { SchemaOneOfItem } from '../index';
+import { CapabilityPicker } from './capability-picker';
+import { getEffectiveRequired } from './connect-integration-sheet';
 import { IntegrationLogo } from './integration-logo';
+import { RepositoryList } from './repository-list';
 import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
 import { TelegramConnect } from './telegram-connect';
 
-const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
+const SOURCE_CODE_CAPABILITY = 'SOURCE_CODE';
 
 const SSO_SECRET_FIELDS = ['clientId', 'clientSecret', 'refreshToken'];
 
@@ -49,7 +62,7 @@ function buildDetailConfig(
 ): Record<string, unknown> {
   const config: Record<string, unknown> = {};
   for (const [key, prop] of Object.entries(schema.properties ?? {})) {
-    if (key === 'app_type' || key === 'category') continue;
+    if (isDiscriminatorKey(key)) continue;
     if (!(key in values)) continue;
     const keep =
       isPropertyVisible(prop as SchemaProperty, values) ||
@@ -82,6 +95,9 @@ export function IntegrationDetailSheet({
 }: IntegrationDetailSheetProps) {
   const queryClient = useQueryClient();
 
+  const capabilityMeta = getCapabilityMeta(schema);
+  const integrationCapabilities = getIntegrationCapabilities(integration);
+
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
@@ -103,9 +119,13 @@ export function IntegrationDetailSheet({
       setEditSchedule(
         scheduleOn && integration.syncSchedule ? integration.syncSchedule : '',
       );
-      const values: Record<string, unknown> = {};
+      // Enabled capabilities live in form values so `ui:capability` fields
+      // show/hide as they are toggled.
+      const values: Record<string, unknown> = {
+        capabilities: integrationCapabilities,
+      };
       for (const [key, prop] of Object.entries(schema.properties ?? {})) {
-        if (key === 'app_type' || key === 'category') continue;
+        if (isDiscriminatorKey(key)) continue;
         const configVal = (integration.config as Record<string, unknown>)[key];
         if (configVal !== undefined && configVal !== null) {
           values[key] = configVal;
@@ -177,8 +197,13 @@ export function IntegrationDetailSheet({
     });
 
   const formProperties = Object.entries(schema.properties ?? {}).filter(
-    ([key]) => key !== 'app_type' && key !== 'category',
+    ([key]) => !isDiscriminatorKey(key),
   ) as [string, SchemaProperty][];
+
+  const editCapabilities = capabilityMeta
+    ? ((formValues.capabilities as string[] | undefined) ?? integrationCapabilities)
+    : integrationCapabilities;
+  const supportsSync = integrationCapabilities.includes(CLOUD_PROVIDER_CAPABILITY);
 
   // The detail sheet never runs the SSO device flow, so switching an existing
   // integration to `sso` would store no clientId/clientSecret/refreshToken and
@@ -214,8 +239,22 @@ export function IntegrationDetailSheet({
     ? formatNextRun(new Date(integration.lastRunAt), getLocalTimezone())
     : '—';
 
-  // Group properties by ui:form:group
-  const grouped = formProperties.reduce<
+  // VIEW mode has no form state; resolve conditions against the stored config
+  // (plus the enabled capabilities, for `ui:capability`-scoped fields).
+  const conditionValues = isEditing
+    ? formValues
+    : {
+        ...(integration.config as Record<string, unknown>),
+        capabilities: integrationCapabilities,
+      };
+
+  // Group properties by ui:form:group. Hidden fields are dropped first so a
+  // group whose fields are all hidden leaves no empty heading.
+  const grouped = formProperties
+    .filter(([key, prop]) =>
+      isPropertyVisible(isEditing ? editPropFor(key, prop) : prop, conditionValues),
+    )
+    .reduce<
     [
       ungrouped: [string, SchemaProperty][],
       groups: Record<string, [string, SchemaProperty][]>,
@@ -236,11 +275,6 @@ export function IntegrationDetailSheet({
 
   const [ungroupedProperties, propertyGroups] = grouped;
 
-  // VIEW mode has no form state; resolve conditions against the stored config.
-  const conditionValues = isEditing
-    ? formValues
-    : (integration.config as Record<string, unknown>);
-
   const handleValueChange = (key: string, value: unknown) => {
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
@@ -252,12 +286,32 @@ export function IntegrationDetailSheet({
       return;
     }
 
+    // Multi-capability apps: enabling a capability can make new fields
+    // required (e.g. TICKETING → issue repository); catch that here instead
+    // of a generic server toast. Legacy apps keep their existing behaviour.
+    const missing = !capabilityMeta
+      ? []
+      : getEffectiveRequired(schema, formValues).filter((key) => {
+          const prop = schema.properties?.[key] as SchemaProperty | undefined;
+          if (prop && !isPropertyVisible(prop, formValues)) return false;
+          const value = formValues[key];
+          if (typeof value === 'string') return value.trim() === '';
+          return value === undefined || value === null;
+        });
+    if (missing.length > 0) {
+      toast.error('Please fill in required fields: ' + missing.join(', '));
+      return;
+    }
+
     updateIntegration({
       id: integration.id,
       data: {
         name: editName.trim(),
         config: buildDetailConfig(schema, formValues),
-        ...(integration.category === CLOUD_PROVIDER_CATEGORY
+        ...(capabilityMeta
+          ? { capabilities: editCapabilities as IntegrationType[] }
+          : {}),
+        ...(supportsSync
           ? {
               syncSchedule: scheduleEnabled
                 ? editSchedule || getDefaultSchedule()
@@ -288,13 +342,71 @@ export function IntegrationDetailSheet({
           onSubmit={isEditing ? handleSave : undefined}
         >
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="shrink-0">
-              <span className="capitalize">
-                {integration.category.replace(/_/g, ' ')}
-              </span>
-            </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            {integrationCapabilities.map((capability) => (
+              <Badge key={capability} variant="secondary" className="shrink-0">
+                <span className="capitalize">
+                  {capabilityMeta
+                    ? capabilityLabel(capability, schema)
+                    : capability.replace(/_/g, ' ')}
+                </span>
+              </Badge>
+            ))}
           </div>
+
+          {/* Multi-capability apps: toggle capabilities (edit) or test each
+              one individually (view). */}
+          {capabilityMeta && isEditing && (
+            <CapabilityPicker
+              capabilities={capabilityMeta}
+              value={editCapabilities}
+              onChange={(value) => handleValueChange('capabilities', value)}
+              disabled={isSaving}
+            />
+          )}
+          {capabilityMeta && !isEditing && (
+            <div className="space-y-2 rounded-lg border p-3">
+              <Label className="text-sm font-medium">Capabilities</Label>
+              {integrationCapabilities.map((capability) => (
+                <div
+                  key={capability}
+                  className="flex items-center justify-between gap-2 border-t pt-2"
+                >
+                  <div className="space-y-0.5">
+                    <p className="text-sm">
+                      {capabilityLabel(capability, schema)}
+                    </p>
+                    {capabilityMeta[capability]?.description && (
+                      <p className="text-xs text-muted-foreground">
+                        {capabilityMeta[capability].description}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    disabled={isTesting || isSyncing}
+                    onClick={() =>
+                      testIntegration({
+                        id: integration.id,
+                        data: { capability: capability as IntegrationType },
+                      })
+                    }
+                  >
+                    <Play className="size-3.5" />
+                    Test
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!isEditing &&
+            integrationCapabilities.includes(SOURCE_CODE_CAPABILITY) && (
+              <RepositoryList integrationId={integration.id} />
+            )}
 
           {formProperties.length === 0 && (
             <p className="text-sm text-muted-foreground">
@@ -440,7 +552,7 @@ export function IntegrationDetailSheet({
           )}
 
           {/* Sync section — only for cloud provider integrations */}
-          {integration.category === CLOUD_PROVIDER_CATEGORY && (
+          {supportsSync && (
             <div className="space-y-3 rounded-lg border p-3">
               {isEditing ? (
                 <>

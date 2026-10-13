@@ -379,9 +379,21 @@ type Finding struct {
 	Iava             []string               `protobuf:"bytes,21,rep,name=iava,proto3" json:"iava,omitempty"`
 	PublicationDate  *timestamppb.Timestamp `protobuf:"bytes,22,opt,name=publication_date,json=publicationDate,proto3" json:"publication_date,omitempty"`
 	ModificationDate *timestamppb.Timestamp `protobuf:"bytes,23,opt,name=modification_date,json=modificationDate,proto3" json:"modification_date,omitempty"`
+	Confidence       float64                `protobuf:"fixed64,24,opt,name=confidence,proto3" json:"confidence,omitempty"`
 	CeaId            []string               `protobuf:"bytes,25,rep,name=cea_id,json=ceaId,proto3" json:"cea_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// --- Code findings (repository scanners: secrets, dependencies, SAST) ---
+	// All optional: host scanners leave them empty. Mirrors the SDK.
+	FilePath         string `protobuf:"bytes,26,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
+	LineStart        int32  `protobuf:"varint,27,opt,name=line_start,json=lineStart,proto3" json:"line_start,omitempty"`
+	LineEnd          int32  `protobuf:"varint,28,opt,name=line_end,json=lineEnd,proto3" json:"line_end,omitempty"`
+	Commit           string `protobuf:"bytes,29,opt,name=commit,proto3" json:"commit,omitempty"`
+	PackageName      string `protobuf:"bytes,30,opt,name=package_name,json=packageName,proto3" json:"package_name,omitempty"`
+	InstalledVersion string `protobuf:"bytes,31,opt,name=installed_version,json=installedVersion,proto3" json:"installed_version,omitempty"`
+	FixedVersion     string `protobuf:"bytes,32,opt,name=fixed_version,json=fixedVersion,proto3" json:"fixed_version,omitempty"`
+	// Connector-chosen identity of the finding within its asset; Core dedupes on it.
+	Fingerprint   string `protobuf:"bytes,33,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Finding) Reset() {
@@ -575,11 +587,74 @@ func (x *Finding) GetModificationDate() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Finding) GetConfidence() float64 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
 func (x *Finding) GetCeaId() []string {
 	if x != nil {
 		return x.CeaId
 	}
 	return nil
+}
+
+func (x *Finding) GetFilePath() string {
+	if x != nil {
+		return x.FilePath
+	}
+	return ""
+}
+
+func (x *Finding) GetLineStart() int32 {
+	if x != nil {
+		return x.LineStart
+	}
+	return 0
+}
+
+func (x *Finding) GetLineEnd() int32 {
+	if x != nil {
+		return x.LineEnd
+	}
+	return 0
+}
+
+func (x *Finding) GetCommit() string {
+	if x != nil {
+		return x.Commit
+	}
+	return ""
+}
+
+func (x *Finding) GetPackageName() string {
+	if x != nil {
+		return x.PackageName
+	}
+	return ""
+}
+
+func (x *Finding) GetInstalledVersion() string {
+	if x != nil {
+		return x.InstalledVersion
+	}
+	return ""
+}
+
+func (x *Finding) GetFixedVersion() string {
+	if x != nil {
+		return x.FixedVersion
+	}
+	return ""
+}
+
+func (x *Finding) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
 }
 
 type Done struct {
@@ -866,7 +941,7 @@ const file_connector_proto_rawDesc = "" +
 	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\x12\x19\n" +
 	"\bis_error\x18\x03 \x01(\bR\aisError\x12.\n" +
-	"\bfindings\x18\x04 \x03(\v2\x12.connector.FindingR\bfindings\"\xf2\x05\n" +
+	"\bfindings\x18\x04 \x03(\v2\x12.connector.FindingR\bfindings\"\x98\b\n" +
 	"\aFinding\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bseverity\x18\x02 \x01(\tR\bseverity\x12\x12\n" +
@@ -896,8 +971,20 @@ const file_connector_proto_rawDesc = "" +
 	"\x06bid_id\x18\x14 \x03(\tR\x05bidId\x12\x12\n" +
 	"\x04iava\x18\x15 \x03(\tR\x04iava\x12E\n" +
 	"\x10publication_date\x18\x16 \x01(\v2\x1a.google.protobuf.TimestampR\x0fpublicationDate\x12G\n" +
-	"\x11modification_date\x18\x17 \x01(\v2\x1a.google.protobuf.TimestampR\x10modificationDate\x12\x15\n" +
-	"\x06cea_id\x18\x19 \x03(\tR\x05ceaId\"?\n" +
+	"\x11modification_date\x18\x17 \x01(\v2\x1a.google.protobuf.TimestampR\x10modificationDate\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\x18 \x01(\x01R\n" +
+	"confidence\x12\x15\n" +
+	"\x06cea_id\x18\x19 \x03(\tR\x05ceaId\x12\x1b\n" +
+	"\tfile_path\x18\x1a \x01(\tR\bfilePath\x12\x1d\n" +
+	"\n" +
+	"line_start\x18\x1b \x01(\x05R\tlineStart\x12\x19\n" +
+	"\bline_end\x18\x1c \x01(\x05R\alineEnd\x12\x16\n" +
+	"\x06commit\x18\x1d \x01(\tR\x06commit\x12!\n" +
+	"\fpackage_name\x18\x1e \x01(\tR\vpackageName\x12+\n" +
+	"\x11installed_version\x18\x1f \x01(\tR\x10installedVersion\x12#\n" +
+	"\rfixed_version\x18  \x01(\tR\ffixedVersion\x12 \n" +
+	"\vfingerprint\x18! \x01(\tR\vfingerprint\"?\n" +
 	"\x04Done\x12!\n" +
 	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\xa4\x01\n" +

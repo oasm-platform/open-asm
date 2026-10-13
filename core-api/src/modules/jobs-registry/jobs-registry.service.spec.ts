@@ -3,6 +3,7 @@ import {
   JobPriority,
   JobRunType,
   JobStatus,
+  TargetType,
   ToolCategory,
   WorkerScope,
   WorkerType,
@@ -2081,6 +2082,71 @@ describe('JobsRegistryService', () => {
         expect.anything(),
       );
       expect(result.map((job) => job.asset.id)).toEqual(selectedAssetIds);
+    });
+
+    describe('target type filter', () => {
+      it('restricts assets to the target types the tool declares', async () => {
+        await service.createNewJob({
+          tool: { ...subdomainsTool, targetTypes: [TargetType.DOMAIN] },
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        expect(mockAssetQB.innerJoin).toHaveBeenCalledWith(
+          'assets.target',
+          'target',
+        );
+        expect(mockAssetQB.andWhere).toHaveBeenCalledWith(
+          'target.type IN (:...targetTypes)',
+          { targetTypes: [TargetType.DOMAIN] },
+        );
+      });
+
+      it('treats a tool without declared target types as a host scanner', async () => {
+        await service.createNewJob({
+          tool: portsScannerTool,
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        expect(mockAssetQB.andWhere).toHaveBeenCalledWith(
+          'target.type IN (:...targetTypes)',
+          {
+            targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR],
+          },
+        );
+      });
+
+      it('restricts asset services the same way', async () => {
+        await service.createNewJob({
+          tool: { ...httpProbeTool, targetTypes: [TargetType.IP] },
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        expect(mockAssetServiceQB.innerJoin).toHaveBeenCalledWith(
+          'asset.target',
+          'target',
+        );
+        expect(mockAssetServiceQB.andWhere).toHaveBeenCalledWith(
+          'target.type IN (:...targetTypes)',
+          { targetTypes: [TargetType.IP] },
+        );
+      });
+
+      it('creates no job when no asset of a supported type is in scope', async () => {
+        mockAssetQB.getMany.mockResolvedValue([]);
+
+        const result = await service.createNewJob({
+          tool: { ...subdomainsTool, targetTypes: [TargetType.DOMAIN] },
+          targetIds: ['ip-target'],
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        // The workflow runner marks a zero-job step as skipped ('no-inputs').
+        expect(result).toEqual([]);
+      });
     });
 
     it('S3 regression: SCREENSHOT uses asset services with liveOnly=true; HTTP_PROBE with liveOnly=false', async () => {
