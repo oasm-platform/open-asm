@@ -21,7 +21,7 @@ export function FilterToolbar({ fields, value, onApply, search, onSearchChange }
   const apply = (f: Filter | undefined) => { onApply(f); setOpen(false); };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover modal open={open} onOpenChange={setOpen}>
       <div className="flex w-full min-w-0 items-center gap-2">
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="h-9 shrink-0">

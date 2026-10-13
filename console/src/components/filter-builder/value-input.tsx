@@ -16,7 +16,9 @@ export function ValueInput({ field, condition, onChange, error }: {
 }) {
   const isList = LIST_OPS.has(condition.op);
   const values = Array.isArray(condition.value) ? condition.value : [];
-  const [text, setText] = useState(isList ? '' : (condition.value as string));
+  // Scalar ops are fully controlled by the draft; local text is only the list-op chip entry.
+  const [listText, setListText] = useState('');
+  const text = isList ? listText : (condition.value as string);
   const [open, setOpen] = useState(false);
   const search = useDebounce(text, 300);
   const { options, isFetching } = field.useSuggestions(search, open && condition.op !== 'inSubnet');
@@ -26,9 +28,8 @@ export function ValueInput({ field, condition, onChange, error }: {
     if (!t) return;
     if (isList) {
       if (!values.includes(t)) onChange([...values, t]);
-      setText('');
+      setListText('');
     } else {
-      setText(t);
       onChange(t);
       setOpen(false);
     }
@@ -57,14 +58,20 @@ export function ValueInput({ field, condition, onChange, error }: {
             placeholder={condition.op === 'inSubnet' ? '10.0.0.0/8' : isList ? 'Type and press Enter' : 'Value'}
             onFocus={() => setOpen(true)}
             onChange={(e) => {
-              setText(e.target.value);
               setOpen(true);
-              if (!isList) onChange(e.target.value);
+              if (isList) setListText(e.target.value);
+              else onChange(e.target.value);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                commit(text);
+                const form = e.currentTarget.form;
+                if (isList && text.trim()) commit(text);
+                else if (isList) form?.requestSubmit();
+                else {
+                  commit(text);
+                  form?.requestSubmit();
+                }
               }
             }}
             className="h-9"

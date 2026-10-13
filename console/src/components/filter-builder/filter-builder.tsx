@@ -58,7 +58,6 @@ export function FilterBuilder({ fields, value, onApply, onCancel }: Props) {
     <form
       className="flex w-[min(44rem,calc(100vw-2rem))] flex-col gap-2"
       onSubmit={(e) => { e.preventDefault(); if (!error) onApply(draft); }}
-      onKeyDown={(e) => { if (e.key === 'Escape') onCancel(); }}
     >
       {draft.items.map((item, i) => (
         <div key={i} className="flex flex-col gap-2">

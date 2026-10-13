@@ -46,4 +46,21 @@ describe('FilterBuilder', () => {
     await user.click(screen.getByRole('button', { name: 'Clear all' }));
     expect(onApply).toHaveBeenCalledWith(undefined);
   });
+
+  it('keeps value text in sync after removing a row', async () => {
+    const user = userEvent.setup();
+    const value = { logic: 'and' as const, items: [{ field: 'host', op: 'eq' as const, value: 'a' }, { field: 'host', op: 'eq' as const, value: 'b' }] };
+    render(<FilterBuilder fields={fields} value={value} onApply={() => {}} onCancel={() => {}} />);
+    await user.click(screen.getAllByRole('button', { name: 'Remove filter' })[0]);
+    expect(screen.getAllByLabelText('Value')).toHaveLength(1);
+    expect(screen.getByLabelText('Value')).toHaveValue('b');
+  });
+
+  it('Enter applies a valid draft', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    render(<FilterBuilder fields={fields} value={undefined} onApply={onApply} onCancel={() => {}} />);
+    await user.type(screen.getByLabelText('Value'), 'a{Enter}');
+    expect(onApply).toHaveBeenCalledWith({ logic: 'and', items: [{ field: 'host', op: 'eq', value: 'a' }] });
+  });
 });
