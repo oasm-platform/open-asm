@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Filter as FilterIcon, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { FilterBuilder } from './filter-builder';
 import { countConditions, filterToText, type Filter, type FilterFieldConfig } from './filter-model';
@@ -38,8 +37,8 @@ export function FilterToolbar({ fields, value, onApply, search, onSearchChange }
                 {filterToText(value!, fields)}
               </button>
             ) : (
-              <Input aria-label="Search assets" placeholder="Search value"
-                className="h-8 border-0 shadow-none focus-visible:ring-0"
+              <input aria-label="Search assets" placeholder="Search value"
+                className="h-8 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"
                 value={search} onChange={(e) => onSearchChange(e.target.value)} />
             )}
             {(count > 0 || search) && (
