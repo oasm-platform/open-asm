@@ -2,6 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import DetailTarget from '@/pages/targets/detail-target';
 
+const legacyParam = z
+  .union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))])
+  .optional(); // the router JSON-parses `?ports=443` into a number
+
 const targetDetailSearchSchema = z.object({
   animation: z.string().optional(),
   tab: z.string().optional(),
@@ -17,13 +21,13 @@ const targetDetailSearchSchema = z.object({
   createdFrom: z.string().optional(),
   createdTo: z.string().optional(),
   targetId: z.string().optional(),
-  ipAddresses: z.union([z.string(), z.array(z.string())]).optional(),
-  ports: z.union([z.string(), z.array(z.string())]).optional(),
-  urls: z.union([z.string(), z.array(z.string())]).optional(),
-  techs: z.union([z.string(), z.array(z.string())]).optional(),
-  hosts: z.union([z.string(), z.array(z.string())]).optional(),
-  statusCodes: z.union([z.string(), z.array(z.string())]).optional(),
-  tlsHosts: z.union([z.string(), z.array(z.string())]).optional(),
+  ipAddresses: legacyParam,
+  ports: legacyParam,
+  urls: legacyParam,
+  techs: legacyParam,
+  hosts: legacyParam,
+  statusCodes: legacyParam,
+  tlsHosts: legacyParam,
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });

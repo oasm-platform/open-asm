@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FilterToolbar } from '@/components/filter-builder/filter-toolbar';
 import { DatePickerWithRange } from '@/components/ui/date-picker-range';
 import useDebounce from '@/hooks/use-debounce';
@@ -16,9 +16,12 @@ export default function AssetFilterBar() {
   } = useAsset();
   const [search, setSearch] = useState(filter ?? '');
   const debounced = useDebounce(search, 500);
+  // setFilter changes identity with the URL filter; depending on it would re-write stale debounced text.
+  const setFilterRef = useRef(setFilter);
+  setFilterRef.current = setFilter;
   useEffect(() => {
-    setFilter(debounced);
-  }, [debounced, setFilter]);
+    setFilterRef.current(debounced);
+  }, [debounced]);
   useEffect(() => {
     setSearch(filter ?? ''); // cleared when a tree is applied
   }, [filter]);

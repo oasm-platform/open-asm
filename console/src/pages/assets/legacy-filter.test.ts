@@ -17,4 +17,13 @@ describe('legacyToFilter', () => {
   it('returns undefined without legacy keys', () => {
     expect(legacyToFilter({ tab: 'service' })).toBeUndefined();
   });
+  it('stringifies numeric params parsed from the URL', () => {
+    expect(legacyToFilter({ ports: 443, statusCodes: [200, 404] })).toEqual({
+      logic: 'and',
+      items: [
+        { field: 'port', op: 'in', value: ['443'] },
+        { field: 'statusCode', op: 'in', value: ['200', '404'] },
+      ],
+    });
+  });
 });
