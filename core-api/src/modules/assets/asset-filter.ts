@@ -62,7 +62,7 @@ function validateCondition(c: unknown, path: string): string | null {
   if (!isObject(c)) return `${path} must be an object`;
   const field = c.field as AssetFilterField;
   const op = c.op as AssetFilterOp;
-  if (!(typeof field === 'string' && field in FIELD_OPS)) return `${path}.field is not a filterable field`;
+  if (!(typeof field === 'string' && Object.prototype.hasOwnProperty.call(FIELD_OPS, field))) return `${path}.field is not a filterable field`;
   if (!FIELD_OPS[field].includes(op)) return `${path}.op "${String(op)}" is not allowed for ${field}`;
   const isList = LIST_OPS.has(op);
   if (isList !== Array.isArray(c.value)) return `${path}.value must be ${isList ? 'an array' : 'a string'}`;
@@ -72,6 +72,7 @@ function validateCondition(c: unknown, path: string): string | null {
   for (const v of values) {
     if (typeof v !== 'string' || v.length === 0 || v.length > FILTER_LIMITS.length)
       return `${path}.value entries must be 1-${FILTER_LIMITS.length} character strings`;
+    if (v.includes('\u0000')) return `${path}.value must not contain NUL characters`;
     if (!checkValue(field, op, v)) return `${path}.value "${v}" is not a valid ${op === 'inSubnet' ? 'CIDR' : field}`;
   }
   return null;

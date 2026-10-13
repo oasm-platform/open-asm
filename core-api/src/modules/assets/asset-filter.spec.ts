@@ -37,6 +37,10 @@ describe('validateAssetFilter', () => {
     ['nested group', root({ logic: 'or', conditions: [{ logic: 'and', conditions: [cond('host', 'eq', 'a')] }] })],
     ['empty group', root({ logic: 'or', conditions: [] })],
     ['51 values', root(cond('host', 'in', Array.from({ length: 51 }, (_, i) => `h${i}`)))],
+    ['prototype key constructor', root(cond('constructor', 'eq', 'x'))],
+    ['prototype key toString', root(cond('toString', 'eq', 'x'))],
+    ['prototype key __proto__', root(cond('__proto__', 'eq', 'x'))],
+    ['NUL in value', root(cond('host', 'eq', 'a\u0000b'))],
     ['21 conditions', root(...Array.from({ length: 21 }, () => cond('host', 'eq', 'a')))],
   ])('rejects %s', (_, input) => {
     expect(validateAssetFilter(input)).toEqual(expect.any(String));
