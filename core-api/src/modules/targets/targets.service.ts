@@ -57,6 +57,13 @@ const GIT_ORG_SOURCES: Record<string, TargetSource> = {
   gitlab: TargetSource.GITLAB,
 };
 
+/** Strips trailing slashes in linear time (`/\/+$/` backtracks on many '/'). */
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end--;
+  return value.slice(0, end);
+}
+
 @Injectable()
 export class TargetsService implements OnModuleInit {
   constructor(
@@ -276,7 +283,9 @@ export class TargetsService implements OnModuleInit {
     const ips: string[] = [];
     for (let i = 0; i < count; i++) {
       const n = (network + i) >>> 0;
-      ips.push(`${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`);
+      ips.push(
+        `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`,
+      );
     }
 
     return ips;
@@ -347,7 +356,7 @@ export class TargetsService implements OnModuleInit {
     // the (workspace, value) uniqueness check cannot be dodged by casing.
     for (const target of targets) {
       if (target.type === TargetType.GIT_ORG) {
-        target.value = target.value.trim().toLowerCase().replace(/\/+$/, '');
+        target.value = trimTrailingSlashes(target.value.trim().toLowerCase());
       }
     }
 
@@ -651,7 +660,8 @@ export class TargetsService implements OnModuleInit {
       }
     >
   > {
-    const { limit, page, sortBy, sortOrder, value, type, status, scope } = query;
+    const { limit, page, sortBy, sortOrder, value, type, status, scope } =
+      query;
 
     const offset = (page - 1) * limit;
 
@@ -694,7 +704,7 @@ export class TargetsService implements OnModuleInit {
       queryBuilder.andWhere('targets.type = :type', { type });
     }
 
-if (status) {
+    if (status) {
       // Filter by computed status using HAVING clause
       const statusCase = `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -713,7 +723,7 @@ if (status) {
       }
     }
 
-if (scope !== undefined) {
+    if (scope !== undefined) {
       if (scope === TargetScopeType.INTERNAL) {
         queryBuilder.andWhere('targets.internalNetworkId IS NOT NULL');
       } else {
@@ -734,10 +744,14 @@ if (scope !== undefined) {
     const targets = await queryBuilder.limit(limit).offset(offset).getRawMany();
 
     // Enrich each raw source value into its display DTO (label + icon).
-    const data = targets.map((row: Omit<Target, 'source'> & { source: unknown; duration: number }) => ({
-      ...row,
-      source: toTargetSourceDto(String(row.source)),
-    }));
+    const data = targets.map(
+      (
+        row: Omit<Target, 'source'> & { source: unknown; duration: number },
+      ) => ({
+        ...row,
+        source: toTargetSourceDto(String(row.source)),
+      }),
+    );
 
     return getManyResponse({ query, data, total });
   }
@@ -804,7 +818,11 @@ if (scope !== undefined) {
    * @throws NotFoundException if the target is not found.
    * @returns The updated target entity.
    */
-  public async updateTarget(id: string, dto: UpdateTargetDto, workspaceId: string) {
+  public async updateTarget(
+    id: string,
+    dto: UpdateTargetDto,
+    workspaceId: string,
+  ) {
     const target = await this.repo.findOneBy({ id, workspaceId });
     if (!target) {
       throw new NotFoundException('Target not found');
@@ -830,7 +848,9 @@ if (scope !== undefined) {
 
     // Update the target in the database
     const result = await this.repo.update(id, {
-      ...(dto.scanSchedule !== undefined ? { scanSchedule: dto.scanSchedule } : {}),
+      ...(dto.scanSchedule !== undefined
+        ? { scanSchedule: dto.scanSchedule }
+        : {}),
       ...(dto.settings !== undefined
         ? {
             settings: {
@@ -889,12 +909,13 @@ if (scope !== undefined) {
 
     const [assets, total] = await qb.getManyAndCount();
     const data = assets.map((asset): TargetRepositoryDto => {
-      const meta = (asset.metadata ?? {});
+      const meta = asset.metadata ?? {};
       return {
         id: asset.id,
         value: asset.value,
         isEnabled: asset.isEnabled,
-        fullName: typeof meta.fullName === 'string' ? meta.fullName : asset.value,
+        fullName:
+          typeof meta.fullName === 'string' ? meta.fullName : asset.value,
         url: typeof meta.url === 'string' ? meta.url : `https://${asset.value}`,
         defaultBranch: (meta.defaultBranch as string | null) ?? null,
         private: meta.private === true,
