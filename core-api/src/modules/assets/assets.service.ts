@@ -51,6 +51,7 @@ import { AssetTag } from './entities/asset-tags.entity';
 import { Asset } from './entities/assets.entity';
 import { DnsRecord } from './entities/dns-record.entity';
 import { HttpResponseTechnology } from './entities/http-response-technology.entity';
+import { compileAssetFilter, legacyParamsToFilter } from './asset-filter';
 import { HttpStatusCode } from './entities/http-status-code.entity';
 import {
   IpObservation,
@@ -407,59 +408,6 @@ export class AssetsService {
   }
 
   private buildBaseQuery(query: GetAssetsQueryDto, workspaceId: string) {
-    const {
-      targetIds,
-      hosts,
-      ipAddresses,
-      ports,
-      techs,
-      statusCodes,
-      tlsHosts,
-      urls,
-    } = query;
-
-    const whereBuilder = {
-      targetIds: {
-        value: targetIds,
-        whereClause: `"asset"."targetId" = ANY(:param)`,
-      },
-      techs: {
-        value: techs,
-        // Facet table: match the full "name:version" string when the filter
-        // carries a version, else the bare name.
-        whereClause: `EXISTS (SELECT 1 FROM http_response_technologies hrt WHERE hrt."httpResponseId" = latest_http_response.id AND (hrt.name = ANY(:param) OR (hrt.name || ':' || hrt.version) = ANY(:param)))`,
-      },
-      hosts: {
-        value: hosts,
-        whereClause: `asset.value = ANY(:param)`,
-      },
-      ipAddresses: {
-        value: ipAddresses,
-        // Asset IPs = its DNS A/AAAA records (same source as the IP tab).
-        // Bare inet column (no host()) so UQ_ip_observations_asset applies.
-        whereClause: `EXISTS (SELECT 1 FROM ip_observations io WHERE io."assetId" = asset.id AND io.source IN ('dns_a', 'dns_aaaa') AND io."ip" = ANY(CAST(:param AS inet[])))`,
-      },
-      ports: {
-        value: ports,
-        whereClause: `asset_service.port = ANY(:param)`,
-      },
-      urls: {
-        value: urls,
-        // A url row originates from `discovered_urls` (the gau
-        // `url_discovery` connector). EXISTS keeps the filter independent of
-        // any join, so asset pagination is not multiplied by url rows.
-        whereClause: `EXISTS (SELECT 1 FROM discovered_urls du WHERE du."assetServiceId" = asset_service.id AND du.url = ANY(:param))`,
-      },
-      statusCodes: {
-        value: statusCodes,
-        whereClause: `EXISTS (SELECT 1 FROM http_status_codes hsc WHERE hsc."httpResponseId" = latest_http_response.id AND hsc."statusCode" = ANY(:param))`,
-      },
-      tlsHosts: {
-        value: tlsHosts,
-        whereClause: `EXISTS (SELECT 1 FROM tls_certificates tc WHERE tc."httpResponseId" = latest_http_response.id AND tc."host" = ANY(:param))`,
-      },
-    };
-
     const queryBuilder = this.assetServiceRepo
       .createQueryBuilder('asset_service')
       .leftJoinAndSelect('asset_service.asset', 'asset')
@@ -473,16 +421,19 @@ export class AssetsService {
         workspaceId,
       });
 
-    for (const [key, value] of Object.entries(whereBuilder)) {
-      if (query[key]) {
-        const newWhereClause = value.whereClause.replaceAll(
-          ':param',
-          `:${key}`,
-        );
-        queryBuilder.andWhere(newWhereClause, {
-          [key]: value.value,
-        });
-      }
+    if (query.targetIds?.length) {
+      queryBuilder.andWhere('"asset"."targetId" = ANY(:targetIds)', {
+        targetIds: query.targetIds,
+      });
+    }
+
+    // Legacy array params (MCP, dashboard links) and the filter tree share one compiler.
+    for (const [filter, prefix] of [
+      [legacyParamsToFilter(query), 'lf'],
+      [query.filter, 'af'],
+    ] as const) {
+      const compiled = filter && compileAssetFilter(filter, prefix);
+      if (compiled) queryBuilder.andWhere(compiled.sql, compiled.params);
     }
 
     if (query.startDate) {
