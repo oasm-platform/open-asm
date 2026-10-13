@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-12T10:08:10.7257308Z",
+  "generatedAt": "2026-10-13T02:23:26.5201164Z",
   "connectors": [
     {
       "name": "Acunetix",
@@ -135,6 +135,7 @@
         "ip",
         "cidr"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -278,6 +279,7 @@
       "targetTypes": [
         "domain"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -388,6 +390,7 @@
       "targetTypes": [
         "git_org"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -446,7 +449,8 @@
         "cpu": "500m",
         "memory": "1024Mi",
         "timeoutSeconds": 1800
-      }
+      },
+      "logo": "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"
     },
     {
       "name": "Katana - Web Crawler",
@@ -468,6 +472,7 @@
       "targetTypes": [
         "domain"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -746,6 +751,7 @@
         "ip",
         "cidr"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -913,6 +919,7 @@
         "ip",
         "cidr"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1003,6 +1010,7 @@
         "ip",
         "cidr"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1147,6 +1155,7 @@
         "ip",
         "cidr"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1259,6 +1268,7 @@
         "ip",
         "cidr"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1356,6 +1366,7 @@
         "ip",
         "cidr"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1623,6 +1634,7 @@
         "ip",
         "cidr"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1790,6 +1802,7 @@
         "ip",
         "cidr"
       ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
