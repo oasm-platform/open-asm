@@ -25,7 +25,7 @@ export const FIELD_OPS: Record<AssetFilterField, readonly AssetFilterOp[]> = {
   port: ['eq', 'neq', 'in', 'notIn'],
   ip: ['eq', 'neq', 'in', 'notIn', 'inSubnet'],
   tech: ['eq', 'neq', 'contains', 'in', 'notIn'],
-  url: ['eq', 'contains', 'notContains'],
+  url: ['eq', 'contains', 'notContains', 'in', 'notIn'],
   statusCode: ['eq', 'neq', 'in', 'notIn'],
   tlsHost: ['eq', 'neq', 'contains', 'in'],
   tag: ['eq', 'neq', 'contains', 'in', 'notIn'],
@@ -42,7 +42,7 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 
 function isCidr(v: string): boolean {
   const [addr, prefix, extra] = v.split('/');
-  if (extra !== undefined || !prefix || !/^\d{1,3}$/.test(prefix)) return false;
+  if (extra !== undefined || !prefix || !/^\d{1,3}$/.test(prefix) || addr.includes('%')) return false;
   const version = isIP(addr, 4) ? 32 : isIP(addr, 6) ? 128 : 0;
   return version > 0 && Number(prefix) <= version;
 }
@@ -50,7 +50,7 @@ function isCidr(v: string): boolean {
 function checkValue(field: AssetFilterField, op: AssetFilterOp, v: string): boolean {
   if (op === 'inSubnet') return isCidr(v);
   switch (field) {
-    case 'ip': return isIP(v);
+    case 'ip': return isIP(v) && !v.includes('%'); // inet rejects zone ids -> would be a 500
     case 'port': return /^\d{1,5}$/.test(v) && Number(v) <= 65535;
     case 'statusCode': return /^\d{3}$/.test(v);
     case 'assetGroup': return isUUID(v);
@@ -139,7 +139,7 @@ const FIELD_SQL: Record<AssetFilterField, { any: Fragment; like?: Fragment; subn
   ip: {
     // Asset IPs = its DNS A/AAAA records (same source as the IP tab).
     any: (p) => `EXISTS (SELECT 1 FROM ip_observations io WHERE io."assetId" = asset.id AND io.source IN ('dns_a', 'dns_aaaa') AND io."ip" = ANY(CAST(${p} AS inet[])))`,
-    subnet: (p) => `EXISTS (SELECT 1 FROM ip_observations io WHERE io."assetId" = asset.id AND io.source IN ('dns_a', 'dns_aaaa') AND io."ip" <<= ANY(CAST(${p} AS cidr[])))`,
+    subnet: (p) => `EXISTS (SELECT 1 FROM ip_observations io WHERE io."assetId" = asset.id AND io.source IN ('dns_a', 'dns_aaaa') AND io."ip" <<= ANY(CAST(${p} AS inet[])))`,
   },
   tech: {
     // Match the full "name:version" string when the value carries a version, else the bare name.

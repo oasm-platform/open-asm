@@ -13,6 +13,9 @@ describe('validateAssetFilter', () => {
     ['empty root', root()],
     ['host contains', root(cond('host', 'contains', 'api'))],
     ['port in', root(cond('port', 'in', ['80', '443']))],
+    ['url in', root(cond('url', 'in', ['https://a/x']))],
+    ['url notIn', root(cond('url', 'notIn', ['https://a/x']))],
+    ['ip inSubnet with host bits', root(cond('ip', 'inSubnet', ['10.1.2.3/24']))],
     ['ip inSubnet v4+v6', root(cond('ip', 'inSubnet', ['10.0.0.0/8', '2001:db8::/32']))],
     ['ip eq', root(cond('ip', 'eq', '1.2.3.4'))],
     ['statusCode neq', root(cond('statusCode', 'neq', '404'))],
@@ -36,6 +39,8 @@ describe('validateAssetFilter', () => {
     ['bad ip', root(cond('ip', 'eq', '999.1.1.1'))],
     ['bad cidr prefix', root(cond('ip', 'inSubnet', ['10.0.0.0/33']))],
     ['cidr without prefix', root(cond('ip', 'inSubnet', ['10.0.0.0']))],
+    ['ipv6 zone id', root(cond('ip', 'eq', 'fe80::1%eth0'))],
+    ['ipv6 zone id in cidr', root(cond('ip', 'inSubnet', ['fe80::1%eth0/64']))],
     ['bad port', root(cond('port', 'eq', '70000'))],
     ['bad status code', root(cond('statusCode', 'eq', '20'))],
     ['bad uuid', root(cond('assetGroup', 'eq', 'abc'))],
@@ -97,7 +102,7 @@ describe('compileAssetFilter', () => {
 
   it('inSubnet uses the inet containment operator', () => {
     const r = compile(cond('ip', 'inSubnet', ['10.0.0.0/8']));
-    expect(r?.sql).toContain('io."ip" <<= ANY(CAST(:af0 AS cidr[]))');
+    expect(r?.sql).toContain('io."ip" <<= ANY(CAST(:af0 AS inet[]))');
   });
 
   it('tag and assetGroup use their join tables', () => {

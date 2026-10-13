@@ -174,6 +174,7 @@ describe('Asset filter tree (e2e)', () => {
     ['ip', 'in', ['192.0.2.10', '10.9.9.9'], 'A'],
     ['ip', 'notIn', ['192.0.2.10'], 'B'],
     ['ip', 'inSubnet', ['192.0.2.0/24'], 'A'],
+    ['ip', 'inSubnet', ['192.0.2.77/24'], 'A'],
     ['ip', 'inSubnet', ['192.0.2.0/24', '198.51.100.0/24'], 'AB'],
     ['tech', 'eq', 'Nginx', 'A'],
     ['tech', 'eq', 'Nginx:1.25', 'A'],
@@ -182,6 +183,8 @@ describe('Asset filter tree (e2e)', () => {
     ['tech', 'in', ['Nginx:1.25'], 'A'],
     ['tech', 'notIn', ['Nginx'], 'B'],
     ['url', 'eq', `https://${hostA}/login`, 'A'],
+    ['url', 'in', [`https://${hostA}/login`, 'https://nope/x'], 'A'],
+    ['url', 'notIn', [`https://${hostA}/login`], 'B'],
     ['url', 'contains', 'login', 'A'],
     ['url', 'notContains', 'login', 'B'],
     ['statusCode', 'eq', '200', 'A'],
@@ -338,6 +341,10 @@ describe('Asset filter tree (e2e)', () => {
     [
       'bad CIDR',
       JSON.stringify(and({ field: 'ip', op: 'inSubnet', value: ['1.2.3.4/99'] })),
+    ],
+    [
+      'IPv6 zone id',
+      JSON.stringify(and({ field: 'ip', op: 'eq', value: 'fe80::1%eth0' })),
     ],
     [
       'disallowed operator',
