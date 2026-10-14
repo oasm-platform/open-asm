@@ -7,8 +7,8 @@ import { DataSource } from 'typeorm';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { EventBridgeService } from '../event-bridge/event-bridge.service';
-import { EVENT_CATALOG } from '../connectors/event';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 
 describe('StatisticService', () => {
@@ -261,7 +261,7 @@ describe('StatisticService', () => {
 
       const data = publishedPayload();
       expect(data.outcome).toBe('failure');
-      expect(data.payload.incompleteDetails).toBe('port_scan failed');
+      expect(data.payload.failedSteps).toEqual(['port_scan']);
     });
 
     it('names what never ran, so the notice is actionable', async () => {
@@ -280,14 +280,15 @@ describe('StatisticService', () => {
         }),
       );
 
-      expect(publishedPayload()?.payload.incompleteDetails).toBe(
-        'port_scan failed; http_probe skipped after a failure',
-      );
+      // Raw step ids, not a sentence: the wording is the consumers' job.
+      expect(publishedPayload()?.payload).toMatchObject({
+        failedSteps: ['port_scan'],
+        blockedSteps: ['http_probe'],
+        cancelledSteps: [],
+      });
     });
 
-    it('omits the incomplete flag entirely for a clean run', async () => {
-      // Absent, not empty: the sink treats "present" as "send the notice", so
-      // an empty string would still produce one.
+    it('reports empty step lists for a clean run', async () => {
       snapshotSpy().mockResolvedValue({
         hosts: 2,
         ports: 4,
@@ -306,8 +307,11 @@ describe('StatisticService', () => {
 
       const data = publishedPayload();
       expect(data.outcome).toBe('success');
-      expect(data.payload).not.toHaveProperty('incompleteDetails');
-      expect(data.payload.hasNewAssets).toBe(true);
+      expect(data.payload).toMatchObject({
+        failedSteps: [],
+        blockedSteps: [],
+        cancelledSteps: [],
+      });
     });
 
     it('publishes nothing when the workspace cannot be resolved', async () => {

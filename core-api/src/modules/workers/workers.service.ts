@@ -195,6 +195,16 @@ export class WorkersService {
     return null;
   }
 
+  /** Agents may only use workspace-scoped workers of their own workspace (never cloud). */
+  public async isAgentWorkerForWorkspace(
+    workerId: string,
+    workspaceId: string,
+  ): Promise<boolean> {
+    return this.repo.exists({
+      where: { id: workerId, workspaceId, scope: WorkerScope.WORKSPACE },
+    });
+  }
+
   /**
    * Retrieves a paginated list of workers.
    *
@@ -206,8 +216,15 @@ export class WorkersService {
   public async getWorkers(
     query: GetManyWorkersDto,
   ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
-    const { page, limit, sortOrder, workspaceId, enabledAgentMode, scope, runMode } =
-      query;
+    const {
+      page,
+      limit,
+      sortOrder,
+      workspaceId,
+      enabledAgentMode,
+      scope,
+      runMode,
+    } = query;
     let { sortBy } = query;
     if (!sortBy) {
       sortBy = '"createdAt"';
@@ -485,7 +502,11 @@ export class WorkersService {
       // ones it just started are the ones worth showing.
       .orderBy('job.pickJobAt', 'DESC')
       .limit(MAX_RUNNING_JOBS_PER_WORKER)
-      .getRawMany<{ tool: string | null; target: string | null; service: string | null }>();
+      .getRawMany<{
+        tool: string | null;
+        target: string | null;
+        service: string | null;
+      }>();
 
     const jobsByTool = new Map<string, WorkerToolJobDto[]>();
     for (const row of rows) {
@@ -601,7 +622,9 @@ export class WorkersService {
         if (Object.keys(updates).length > 0) {
           await this.repo.update({ id: existingWorker.id }, updates);
         }
-        return this.repo.findOne({ where: { id: existingWorker.id } }) as Promise<WorkerInstance>;
+        return this.repo.findOne({
+          where: { id: existingWorker.id },
+        }) as Promise<WorkerInstance>;
       }
     }
 

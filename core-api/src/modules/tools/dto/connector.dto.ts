@@ -41,4 +41,7 @@ export class ConnectorDto {
 
   @ApiProperty({ type: [String] })
   capabilities: string[];
+
+  @ApiProperty({ required: false })
+  agentTool?: boolean;
 }

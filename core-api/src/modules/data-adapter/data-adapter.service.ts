@@ -6,7 +6,7 @@ import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { isIP } from 'node:net';
 import { DataSource, EntityManager, InsertResult } from 'typeorm';
-import { Severity, ToolCategory } from '../../common/enums/enum';
+import { Severity, TargetType, ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
@@ -18,8 +18,12 @@ import { IpObservation } from '../assets/entities/ip-observation.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { TlsCertificate } from '../assets/entities/tls-certificate.entity';
 import { IssuesService } from '../issues/issues.service';
-import { EVENT_CATALOG } from '../connectors/event';
-import { EventBridgeService } from '../event-bridge/event-bridge.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
+import type {
+  DetectedVulnerability,
+  VulnerabilityDetectedPayload,
+} from '../event-bridge/contracts/event-payloads';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -135,7 +139,70 @@ const RESCAN_OVERWRITE_COLUMNS = [
   'publicationDate',
   'modificationDate',
   'filePath',
+  'lineStart',
+  'lineEnd',
+  'commit',
+  'packageName',
+  'installedVersion',
+  'fixedVersion',
 ] as const;
+
+/**
+ * Code-finding fields. The gRPC loader fills absent proto3 scalars with
+ * defaults ('' / 0), so a host finding would otherwise store empty strings
+ * and zero line numbers; they are stored as NULL instead.
+ */
+const CODE_FINDING_FIELDS = [
+  'lineStart',
+  'lineEnd',
+  'commit',
+  'packageName',
+  'installedVersion',
+  'fixedVersion',
+] as const;
+
+function normalizeCodeFields(
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const field of CODE_FINDING_FIELDS) {
+    const value = values[field];
+    normalized[field] = value === '' || value === 0 || value === undefined ? null : value;
+  }
+  return normalized;
+}
+
+/**
+ * Deduplication key of a finding.
+ *
+ * Host findings keep the historical name + asset + tool key, so every
+ * existing row still matches on re-scan — whatever `fingerprint` a legacy
+ * payload happens to carry is ignored for them.
+ *
+ * Findings on a repository asset (GIT_ORG target) append the connector's own
+ * per-finding identity (rule + file + line…), so several findings of one rule
+ * in one repository stay distinct instead of collapsing into one row.
+ */
+export function vulnerabilityFingerprint(args: {
+  name: string;
+  assetId: string;
+  // Optional only because Tool.id is; interpolated exactly as before.
+  toolId: string | undefined;
+  /** True for repository assets; only then is sourceFingerprint used. */
+  isRepositoryAsset: boolean;
+  sourceFingerprint?: unknown;
+}): string {
+  const source =
+    args.isRepositoryAsset &&
+    typeof args.sourceFingerprint === 'string' &&
+    args.sourceFingerprint !== ''
+      ? `-${args.sourceFingerprint}`
+      : '';
+  return crypto
+    .createHash('md5')
+    .update(`${args.name}-${args.assetId}-${args.toolId}${source}`)
+    .digest('hex');
+}
 
 /**
  * Columns an incoming finding may omit. `updatedAt`/`lastSeenDate` are always
@@ -234,6 +301,31 @@ const HTTP_RESPONSE_FACET_KEYS = [
   'resolvers',
   'chain_status_codes',
 ] as const;
+
+/**
+ * A stored vulnerability row as the `vulnerability.detected` contract carries
+ * it. Long free text (description, solution, extractor output) stays out: it
+ * lives in the database, and copying it into every stream entry would let one
+ * noisy scan crowd the bounded stream.
+ */
+function toDetectedVulnerability(vuln: Vulnerability): DetectedVulnerability {
+  return {
+    id: vuln.id,
+    name: vuln.name,
+    severity: vuln.severity,
+    synopsis: vuln.synopsis ?? undefined,
+    cvssScore: vuln.cvssScore ?? undefined,
+    cvssMetric: vuln.cvssMetric ?? undefined,
+    epssScore: vuln.epssScore ?? undefined,
+    cveId: vuln.cveId ?? undefined,
+    cweId: vuln.cweId ?? undefined,
+    tags: vuln.tags ?? undefined,
+    host: vuln.host ?? undefined,
+    ipAddress: vuln.ipAddress ?? undefined,
+    ports: vuln.ports ?? undefined,
+    affectedUrl: vuln.affectedUrl ?? undefined,
+  };
+}
 
 @Injectable()
 export class DataAdapterService {
@@ -822,16 +914,21 @@ export class DataAdapterService {
       }
 
       const now = new Date();
+      const isRepositoryAsset =
+        job.asset.target?.type === TargetType.GIT_ORG;
       const values = data.map((vuln) => {
-        const stringHash = `${vuln.name}-${job.asset.id}-${job.tool.id}`;
-        const fingerprint = crypto
-          .createHash('md5')
-          .update(stringHash)
-          .digest('hex');
+        const fingerprint = vulnerabilityFingerprint({
+          name: vuln.name,
+          assetId: job.asset.id,
+          toolId: job.tool.id,
+          isRepositoryAsset,
+          sourceFingerprint: vuln.fingerprint,
+        });
         const vulnValues = { ...vuln } as unknown as Record<string, string | number | boolean | object | null>;
         delete vulnValues.id;
         return {
           ...vulnValues,
+          ...normalizeCodeFields(vulnValues),
           severity:
             typeof vulnValues.severity === 'string'
               ? (vulnValues.severity.toLowerCase() as Severity)
@@ -946,10 +1043,10 @@ export class DataAdapterService {
           `Publishing vulnerability.detected for ${vulsForAlert.length} vulns in workspace ${workspaceId}`,
         );
 
-        // Report the FINDING, not a notification decision: who is told about
-        // it (and in what wording) belongs to the `notifications` consumer. The
-        // count and the asset identity travel as payload because the consumer
-        // cannot re-derive them from the workspace alone.
+        // Report the FINDINGS, not a notification decision: who is told about
+        // them, how they are counted and ranked, and in what wording all
+        // belong to the consumers. The asset identity travels as payload
+        // because a consumer cannot re-derive it from the workspace alone.
         //
         // One event for the whole batch, not one per vulnerability: a scan that
         // finds 200 issues must not push 200 notifications.
@@ -958,12 +1055,12 @@ export class DataAdapterService {
           outcome: 'success',
           resourceType: 'vulnerability',
           payload: {
-            count: vulsForAlert.length,
             jobId: job.id,
-            assetValue: job.asset.value,
-            assetId: job.asset.id,
             targetId: job.asset.target.id,
-          },
+            assetId: job.asset.id,
+            assetValue: job.asset.value,
+            vulnerabilities: vulsForAlert.map(toDetectedVulnerability),
+          } satisfies VulnerabilityDetectedPayload,
         });
       } else {
         this.logger.log(

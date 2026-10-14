@@ -89,14 +89,15 @@ func (h *RemoteExecuteHandler) SendError(ctx context.Context, errMsg string) err
 	return h.SendResult(ctx, workers.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR, []byte(errMsg), 0)
 }
 
-// SendErrorFor sends an error attributed to a specific session/id, avoiding
-// misattribution when SendError is called concurrently with Next updates.
-func (h *RemoteExecuteHandler) SendErrorFor(ctx context.Context, sessionID, id, workerID, errMsg string) error {
+// SendResultFor sends one result event attributed to a specific session/id.
+// Concurrent runs must use it: SendResult reads ids that Next overwrites.
+func (h *RemoteExecuteHandler) SendResultFor(ctx context.Context, sessionID, id string, eventType workers.RemoteExecuteResultEventType, data []byte, exitCode int32) error {
 	req := &workers.RemoteExecuteResultStream{
 		Id:        id,
 		SessionId: sessionID,
-		Type:      workers.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR,
-		Data:      []byte(errMsg),
+		Type:      eventType,
+		Data:      data,
+		ExitCode:  exitCode,
 	}
 	resp, err := h.client.workers.RemoteExecuteResult(ctx, req)
 	if err != nil {
@@ -105,8 +106,14 @@ func (h *RemoteExecuteHandler) SendErrorFor(ctx context.Context, sessionID, id, 
 	if !resp.Success {
 		return fmt.Errorf("server rejected the result: %s", resp.Message)
 	}
-	_ = workerID
 	return nil
+}
+
+// SendErrorFor sends an error attributed to a specific session/id, avoiding
+// misattribution when SendError is called concurrently with Next updates.
+func (h *RemoteExecuteHandler) SendErrorFor(ctx context.Context, sessionID, id, workerID, errMsg string) error {
+	_ = workerID
+	return h.SendResultFor(ctx, sessionID, id, workers.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR, []byte(errMsg), 0)
 }
 
 // ID returns the id of the most recently received event.

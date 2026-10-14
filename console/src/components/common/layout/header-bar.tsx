@@ -7,6 +7,15 @@ import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { SearchForm } from '../../ui/search-form';
 import { ThemeSwitch } from '@/components/ui/theme-switch-icon';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Link } from '@tanstack/react-router';
+import { ChevronDown, Group, Plus, Target } from 'lucide-react';
 
 export function HeaderBar() {
   const { isMobile } = useSidebar();
@@ -24,6 +33,33 @@ export function HeaderBar() {
             <SearchForm className="w-full max-w-xl" />
           </div>
           <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="hidden gap-1 md:inline-flex"
+                >
+                  <Plus />
+                  <span>Create</span>
+                  <ChevronDown />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/targets/start-discovery">
+                    <Target />
+                    Target
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/groups/create">
+                    <Group />
+                    Group
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ThemeSwitch />
             <NotificationBell />
           </div>

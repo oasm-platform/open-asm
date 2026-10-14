@@ -9,6 +9,7 @@ import {
   DefaultWorkflow,
   EventTriggerType,
   Severity,
+  TargetType,
 } from '@/common/enums/enum';
 import { GeoIp, GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
@@ -19,8 +20,9 @@ import { Asset } from '../assets/entities/assets.entity';
 import { CreateJobs } from '../jobs-registry/dto/jobs-registry.dto';
 import { Job } from '../jobs-registry/entities/job.entity';
 import type { RunStepState } from '../workflows/workflow-graph';
-import { EVENT_CATALOG } from '../connectors/event';
-import { EventBridgeService } from '../event-bridge/event-bridge.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
+import type { WorkflowRunCompletedPayload } from '../event-bridge/contracts/event-payloads';
 import { Target } from '../targets/entities/target.entity';
 import { AssetLocationDto } from './dto/asset-location.dto';
 
@@ -100,11 +102,14 @@ export class StatisticService {
    * @returns A promise that resolves to the total count of assets.
    */
   private async countAssets(workspaceId: string): Promise<number> {
+    // Repositories of Git organization targets are not part of the host
+    // attack surface this number describes.
     return this.dataSource
       .getRepository(Asset)
       .createQueryBuilder('asset')
       .innerJoin('asset.target', 'target')
       .where('target.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('target.type != :gitOrg', { gitOrg: TargetType.GIT_ORG })
       .getCount();
   }
 
@@ -387,7 +392,8 @@ export class StatisticService {
       .leftJoin('asset.target', 'target')
       .select('target.workspaceId', 'workspaceId')
       .addSelect('COUNT(asset.id)', 'count')
-      .where('1=1');
+      // Host assets only — repositories are counted on their own target.
+      .where('target.type != :gitOrg', { gitOrg: TargetType.GIT_ORG });
 
     if (workspaceIds?.length) {
       query.andWhere('target.workspaceId IN (:...workspaceIds)', {
@@ -1547,15 +1553,6 @@ export class StatisticService {
       );
       const incomplete =
         failedSteps.length + blockedSteps.length + cancelledSteps.length > 0;
-      const incompleteDetails = [
-        failedSteps.length > 0 ? `${failedSteps.join(', ')} failed` : '',
-        blockedSteps.length > 0
-          ? `${blockedSteps.join(', ')} skipped after a failure`
-          : '',
-        cancelledSteps.length > 0 ? `${cancelledSteps.join(', ')} cancelled` : '',
-      ]
-        .filter(Boolean)
-        .join('; ');
 
       const members = await this.workspacesService.getMemberOfWorkspaceByJobId(
         job.id,
@@ -1570,9 +1567,9 @@ export class StatisticService {
       const workspaceId = members[0].workspace.id;
 
       // Publish the run's OUTCOME, not a notification decision. Who gets told
-      // what is the `notifications` consumer's call; this service only reports
-      // what happened. Recipients are resolved downstream, which is what lets a
-      // member who joins tomorrow start receiving them.
+      // what — and in which words — is the consumers' call; this service only
+      // reports what happened. Recipients are resolved downstream, which is
+      // what lets a member who joins tomorrow start receiving them.
       //
       // `outcome: 'failure'` means "this run did not finish cleanly" — not "the
       // publish failed" — so a partial run is still honest to every consumer.
@@ -1590,12 +1587,12 @@ export class StatisticService {
             ports: diffs.ports ?? 0,
             services: diffs.services ?? 0,
             techs: diffs.techs ?? 0,
-            hasNewAssets: Object.keys(diffs).length > 0,
-            // Present ONLY when the run did not complete its graph — the
-            // `notifications` sink uses its absence to decide whether the
-            // "scan stopped halfway" message is warranted at all.
-            ...(incomplete ? { incompleteDetails } : {}),
-          },
+            // Empty for a clean run; consumers decide whether a non-empty
+            // list warrants the "scan stopped halfway" message.
+            failedSteps,
+            blockedSteps,
+            cancelledSteps,
+          } satisfies WorkflowRunCompletedPayload,
         },
         { subject: `workspace:${workspaceId}/workflow_run:${job.id}` },
       );

@@ -158,6 +158,7 @@ describe('AgentTool plan tools', () => {
       repo,
       null,
       approvals,
+      { getAgentConnectors: () => [], getConnector: () => null },
     );
   });
 

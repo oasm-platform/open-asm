@@ -5,7 +5,7 @@ import { VulnerabilitiesController } from '../vulnerabilities/vulnerabilities.co
 import {
   PUBLISH_EVENT_KEY,
   type PublishEventConfig,
-} from '../event-bridge/publish-event.decorator';
+} from '../event-bridge/publishing/publish-event.decorator';
 
 type PublishEventMetadata = { event: unknown } & PublishEventConfig;
 

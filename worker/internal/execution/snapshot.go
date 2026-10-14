@@ -44,7 +44,7 @@ func (m *Manager) ContainerSnapshots() []ContainerDescriptor {
 			Image:          execution.Spec.Image,
 			ImageVersion:   execution.Spec.Version,
 			Tool:           execution.Spec.Tool,
-			PoolKey:        normalizePoolKey(execution.Spec.Image),
+			PoolKey:        poolKeyFor(execution.Spec),
 			Pooled:         m.pool != nil,
 			PoolState:      PoolStateBusy,
 			ExecutionID:    execution.ID,

@@ -2,7 +2,7 @@ import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
-import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publish-event.decorator';
+import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publishing/publish-event.decorator';
 import type { AuditContext, AuditService } from '../audit/audit.service';
 import { WorkspacesController } from './workspaces.controller';
 import type { WorkspacesService } from './workspaces.service';

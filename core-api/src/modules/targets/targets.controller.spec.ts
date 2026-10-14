@@ -1,6 +1,6 @@
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
 import { Reflector } from '@nestjs/core';
-import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publish-event.decorator';
+import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publishing/publish-event.decorator';
 import { TargetsController } from './targets.controller';
 
 describe('TargetsController workspace permission guards', () => {

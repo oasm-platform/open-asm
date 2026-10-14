@@ -157,6 +157,7 @@ export enum BullMQName {
   ISSUE_CREATION = 'issue-creation',
   VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
   INTEGRATION_SYNC_SCHEDULE = 'integration-sync-schedule',
+  REPOSITORY_SYNC = 'repository-sync',
   AUDIT_RETENTION = 'audit-retention',
 }
 
@@ -264,6 +265,8 @@ export enum DefaultWorkflow {
   DOMAIN_DISCOVERY = 'domain_discovery.yaml',
   IP_ADDRESS_DISCOVERY = 'ip_address_discovery.yaml',
   VULNERABILITY_SCAN_BASIC = 'vulnerability_scan_basic.yaml',
+  // Git organization targets: scans every repository after each sync.
+  REPOSITORY_SCAN = 'repository_scan.yaml',
 }
 
 export enum EventTriggerType {
@@ -271,10 +274,36 @@ export enum EventTriggerType {
   WORKFLOW_END = 'WORKFLOW_END',
 }
 
+/**
+ * Enum representing the type of target.
+ * Lives here rather than in target.entity.ts so entities that sit on the
+ * Target import cycle (Tool) can reference it at class-decoration time.
+ */
+export enum TargetType {
+  DOMAIN = 'DOMAIN',
+  CIDR = 'CIDR',
+  IP = 'IP',
+  /**
+   * A GitHub organization/user or GitLab group bound to a SOURCE_CODE
+   * integration. Its assets are the repositories, synced from the provider.
+   */
+  GIT_ORG = 'GIT_ORG',
+}
+
+/**
+ * What an integration can do. Each value is a CAPABILITY backed by one
+ * connector method (see `CAPABILITY_METHOD_MAP` in connector.factory.ts).
+ *
+ * Single-capability apps (Slack, Telegram, AWS, …) store their one value in
+ * `integrations.category`. Multi-capability apps (GitHub, GitLab) declare
+ * `x-capabilities` in their schema and store the enabled subset in
+ * `integrations.capabilities`; `category` then holds the primary one.
+ */
 export enum IntegrationType {
   TICKETING = 'TICKETING',
   NOTIFICATION = 'NOTIFICATION',
   CLOUD_PROVIDER = 'CLOUD_PROVIDER',
+  SOURCE_CODE = 'SOURCE_CODE',
 }
 
 /**

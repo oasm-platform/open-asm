@@ -9,7 +9,7 @@ import type { EntityManager, Repository } from 'typeorm';
 import type { AuditAction } from './constants/audit-events';
 import type { GetAuditEventsQueryDto } from './dto/audit.dto';
 import { AuditEvent } from './entities/audit-event.entity';
-import { redactSecrets } from '../event-bridge/redact-secrets';
+import { redactSecrets } from '../event-bridge/publishing/redact-secrets';
 
 /** Separator between the occurredAt ISO and the id inside a keyset cursor. */
 const CURSOR_SEPARATOR = '|';

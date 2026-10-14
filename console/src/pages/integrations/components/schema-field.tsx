@@ -24,6 +24,8 @@ export interface SchemaProperty {
   'ui:text-color'?: string;
   'ui:form:group'?: string;
   'ui:visibleWhen'?: { field: string; equals: unknown | unknown[] };
+  /** Only shown while this capability is enabled (multi-capability apps). */
+  'ui:capability'?: string;
   default?: unknown;
   items?: {
     type?: string;
@@ -251,10 +253,20 @@ function renderView(fieldKey: string, prop: SchemaProperty, value: unknown) {
   return <ViewValue>{String(value ?? '')}</ViewValue>;
 }
 
+/**
+ * `values.capabilities` holds the enabled capabilities of a multi-capability
+ * app; a `ui:capability`-scoped field is hidden while its capability is off.
+ * Legacy schemas never set `ui:capability`, so they are unaffected.
+ */
 export function isPropertyVisible(
   prop: SchemaProperty,
   values: Record<string, unknown>,
 ): boolean {
+  const capability = prop['ui:capability'];
+  if (capability) {
+    const enabled = values.capabilities;
+    if (!Array.isArray(enabled) || !enabled.includes(capability)) return false;
+  }
   const condition = prop['ui:visibleWhen'];
   if (!condition) return true;
   const current = values[condition.field];
