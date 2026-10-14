@@ -6,7 +6,7 @@ const agentsSearchSchema = z.object({
   text: z.string().optional(),
 });
 
-export const Route = createFileRoute('/_authed/agents/')({
+export const Route = createFileRoute('/_authed/aistudio/')({
   validateSearch: agentsSearchSchema,
   component: () => (
       <AgentsLandingPage />

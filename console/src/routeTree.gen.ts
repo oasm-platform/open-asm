@@ -21,8 +21,8 @@ import { Route as InviteTokenRouteImport } from './routes/invite/$token'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
-import { Route as AuthedAgentsIndexRouteImport } from './routes/_authed/agents/index'
 import { Route as AuthedAgentsCreateRouteImport } from './routes/_authed/agents/create'
+import { Route as AuthedAistudioIndexRouteImport } from './routes/_authed/aistudio/index'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
 import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
 import { Route as AuthedGroupsIdRouteImport } from './routes/_authed/groups/$id'
@@ -46,9 +46,9 @@ import { Route as AuthedWorkspacesIndexRouteImport } from './routes/_authed/work
 import { Route as AuthedWorkspacesCreateRouteImport } from './routes/_authed/workspaces/create'
 import { Route as AuthedAgentsIdIndexRouteImport } from './routes/_authed/agents/$id/index'
 import { Route as AuthedAgentsIdEditRouteImport } from './routes/_authed/agents/$id/edit'
-import { Route as AuthedAgentsConversationsIndexRouteImport } from './routes/_authed/agents/conversations/index'
-import { Route as AuthedAgentsConversationsConversationIdRouteImport } from './routes/_authed/agents/conversations/$conversationId'
 import { Route as AuthedAgentsProvidersConnectRouteImport } from './routes/_authed/agents/providers/connect'
+import { Route as AuthedAistudioConversationsIndexRouteImport } from './routes/_authed/aistudio/conversations/index'
+import { Route as AuthedAistudioConversationsConversationIdRouteImport } from './routes/_authed/aistudio/conversations/$conversationId'
 import { Route as AuthedAssetsServicesIdRouteImport } from './routes/_authed/assets/services/$id'
 import { Route as AuthedJobsRunsIdRouteImport } from './routes/_authed/jobs/runs/$id'
 import { Route as AuthedProvidersIdIndexRouteImport } from './routes/_authed/providers/$id/index'
@@ -117,14 +117,14 @@ const AuthedAdminUsersRoute = AuthedAdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAgentsIndexRoute = AuthedAgentsIndexRouteImport.update({
-  id: '/agents/',
-  path: '/agents/',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedAgentsCreateRoute = AuthedAgentsCreateRouteImport.update({
   id: '/agents/create',
   path: '/agents/create',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAistudioIndexRoute = AuthedAistudioIndexRouteImport.update({
+  id: '/aistudio/',
+  path: '/aistudio/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAssetsIndexRoute = AuthedAssetsIndexRouteImport.update({
@@ -247,22 +247,22 @@ const AuthedAgentsIdEditRoute = AuthedAgentsIdEditRouteImport.update({
   path: '/agents/$id/edit',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAgentsConversationsIndexRoute =
-  AuthedAgentsConversationsIndexRouteImport.update({
-    id: '/agents/conversations/',
-    path: '/agents/conversations/',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedAgentsConversationsConversationIdRoute =
-  AuthedAgentsConversationsConversationIdRouteImport.update({
-    id: '/agents/conversations/$conversationId',
-    path: '/agents/conversations/$conversationId',
-    getParentRoute: () => AuthedRoute,
-  } as any)
 const AuthedAgentsProvidersConnectRoute =
   AuthedAgentsProvidersConnectRouteImport.update({
     id: '/agents/providers/connect',
     path: '/agents/providers/connect',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAistudioConversationsIndexRoute =
+  AuthedAistudioConversationsIndexRouteImport.update({
+    id: '/aistudio/conversations/',
+    path: '/aistudio/conversations/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAistudioConversationsConversationIdRoute =
+  AuthedAistudioConversationsConversationIdRouteImport.update({
+    id: '/aistudio/conversations/$conversationId',
+    path: '/aistudio/conversations/$conversationId',
     getParentRoute: () => AuthedRoute,
   } as any)
 const AuthedAssetsServicesIdRoute = AuthedAssetsServicesIdRouteImport.update({
@@ -331,7 +331,7 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/workers/$id': typeof AuthedWorkersIdRoute
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
-  '/agents/': typeof AuthedAgentsIndexRoute
+  '/aistudio/': typeof AuthedAistudioIndexRoute
   '/assets/': typeof AuthedAssetsIndexRoute
   '/groups/': typeof AuthedGroupsIndexRoute
   '/integrations/': typeof AuthedIntegrationsIndexRoute
@@ -344,8 +344,8 @@ export interface FileRoutesByFullPath {
   '/workers/': typeof AuthedWorkersIndexRoute
   '/workspaces/': typeof AuthedWorkspacesIndexRoute
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
-  '/agents/conversations/$conversationId': typeof AuthedAgentsConversationsConversationIdRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
+  '/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
   '/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
@@ -353,7 +353,7 @@ export interface FileRoutesByFullPath {
   '/settings/members/permission-groups/$permissionId': typeof SettingsMembersPermissionGroupsPermissionIdRoute
   '/settings/members/permission-groups/new': typeof SettingsMembersPermissionGroupsNewRoute
   '/agents/$id/': typeof AuthedAgentsIdIndexRoute
-  '/agents/conversations/': typeof AuthedAgentsConversationsIndexRoute
+  '/aistudio/conversations/': typeof AuthedAistudioConversationsIndexRoute
   '/providers/$id/': typeof AuthedProvidersIdIndexRoute
   '/targets/$id/': typeof AuthedTargetsIdIndexRoute
 }
@@ -379,7 +379,7 @@ export interface FileRoutesByTo {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/workers/$id': typeof AuthedWorkersIdRoute
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
-  '/agents': typeof AuthedAgentsIndexRoute
+  '/aistudio': typeof AuthedAistudioIndexRoute
   '/assets': typeof AuthedAssetsIndexRoute
   '/groups': typeof AuthedGroupsIndexRoute
   '/integrations': typeof AuthedIntegrationsIndexRoute
@@ -392,8 +392,8 @@ export interface FileRoutesByTo {
   '/workers': typeof AuthedWorkersIndexRoute
   '/workspaces': typeof AuthedWorkspacesIndexRoute
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
-  '/agents/conversations/$conversationId': typeof AuthedAgentsConversationsConversationIdRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
+  '/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
   '/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
@@ -401,7 +401,7 @@ export interface FileRoutesByTo {
   '/settings/members/permission-groups/$permissionId': typeof SettingsMembersPermissionGroupsPermissionIdRoute
   '/settings/members/permission-groups/new': typeof SettingsMembersPermissionGroupsNewRoute
   '/agents/$id': typeof AuthedAgentsIdIndexRoute
-  '/agents/conversations': typeof AuthedAgentsConversationsIndexRoute
+  '/aistudio/conversations': typeof AuthedAistudioConversationsIndexRoute
   '/providers/$id': typeof AuthedProvidersIdIndexRoute
   '/targets/$id': typeof AuthedTargetsIdIndexRoute
 }
@@ -430,7 +430,7 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/_authed/workers/$id': typeof AuthedWorkersIdRoute
   '/_authed/workspaces/create': typeof AuthedWorkspacesCreateRoute
-  '/_authed/agents/': typeof AuthedAgentsIndexRoute
+  '/_authed/aistudio/': typeof AuthedAistudioIndexRoute
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
   '/_authed/groups/': typeof AuthedGroupsIndexRoute
   '/_authed/integrations/': typeof AuthedIntegrationsIndexRoute
@@ -443,8 +443,8 @@ export interface FileRoutesById {
   '/_authed/workers/': typeof AuthedWorkersIndexRoute
   '/_authed/workspaces/': typeof AuthedWorkspacesIndexRoute
   '/_authed/agents/$id/edit': typeof AuthedAgentsIdEditRoute
-  '/_authed/agents/conversations/$conversationId': typeof AuthedAgentsConversationsConversationIdRoute
   '/_authed/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
+  '/_authed/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
   '/_authed/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/_authed/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/_authed/providers/$id/edit': typeof AuthedProvidersIdEditRoute
@@ -452,7 +452,7 @@ export interface FileRoutesById {
   '/settings/members/permission-groups/$permissionId': typeof SettingsMembersPermissionGroupsPermissionIdRoute
   '/settings/members/permission-groups/new': typeof SettingsMembersPermissionGroupsNewRoute
   '/_authed/agents/$id/': typeof AuthedAgentsIdIndexRoute
-  '/_authed/agents/conversations/': typeof AuthedAgentsConversationsIndexRoute
+  '/_authed/aistudio/conversations/': typeof AuthedAistudioConversationsIndexRoute
   '/_authed/providers/$id/': typeof AuthedProvidersIdIndexRoute
   '/_authed/targets/$id/': typeof AuthedTargetsIdIndexRoute
 }
@@ -481,7 +481,7 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/workers/$id'
     | '/workspaces/create'
-    | '/agents/'
+    | '/aistudio/'
     | '/assets/'
     | '/groups/'
     | '/integrations/'
@@ -494,8 +494,8 @@ export interface FileRouteTypes {
     | '/workers/'
     | '/workspaces/'
     | '/agents/$id/edit'
-    | '/agents/conversations/$conversationId'
     | '/agents/providers/connect'
+    | '/aistudio/conversations/$conversationId'
     | '/assets/services/$id'
     | '/jobs/runs/$id'
     | '/providers/$id/edit'
@@ -503,7 +503,7 @@ export interface FileRouteTypes {
     | '/settings/members/permission-groups/$permissionId'
     | '/settings/members/permission-groups/new'
     | '/agents/$id/'
-    | '/agents/conversations/'
+    | '/aistudio/conversations/'
     | '/providers/$id/'
     | '/targets/$id/'
   fileRoutesByTo: FileRoutesByTo
@@ -529,7 +529,7 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/workers/$id'
     | '/workspaces/create'
-    | '/agents'
+    | '/aistudio'
     | '/assets'
     | '/groups'
     | '/integrations'
@@ -542,8 +542,8 @@ export interface FileRouteTypes {
     | '/workers'
     | '/workspaces'
     | '/agents/$id/edit'
-    | '/agents/conversations/$conversationId'
     | '/agents/providers/connect'
+    | '/aistudio/conversations/$conversationId'
     | '/assets/services/$id'
     | '/jobs/runs/$id'
     | '/providers/$id/edit'
@@ -551,7 +551,7 @@ export interface FileRouteTypes {
     | '/settings/members/permission-groups/$permissionId'
     | '/settings/members/permission-groups/new'
     | '/agents/$id'
-    | '/agents/conversations'
+    | '/aistudio/conversations'
     | '/providers/$id'
     | '/targets/$id'
   id:
@@ -579,7 +579,7 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/$id'
     | '/_authed/workers/$id'
     | '/_authed/workspaces/create'
-    | '/_authed/agents/'
+    | '/_authed/aistudio/'
     | '/_authed/assets/'
     | '/_authed/groups/'
     | '/_authed/integrations/'
@@ -592,8 +592,8 @@ export interface FileRouteTypes {
     | '/_authed/workers/'
     | '/_authed/workspaces/'
     | '/_authed/agents/$id/edit'
-    | '/_authed/agents/conversations/$conversationId'
     | '/_authed/agents/providers/connect'
+    | '/_authed/aistudio/conversations/$conversationId'
     | '/_authed/assets/services/$id'
     | '/_authed/jobs/runs/$id'
     | '/_authed/providers/$id/edit'
@@ -601,7 +601,7 @@ export interface FileRouteTypes {
     | '/settings/members/permission-groups/$permissionId'
     | '/settings/members/permission-groups/new'
     | '/_authed/agents/$id/'
-    | '/_authed/agents/conversations/'
+    | '/_authed/aistudio/conversations/'
     | '/_authed/providers/$id/'
     | '/_authed/targets/$id/'
   fileRoutesById: FileRoutesById
@@ -701,18 +701,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminUsersRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/agents/': {
-      id: '/_authed/agents/'
-      path: '/agents'
-      fullPath: '/agents/'
-      preLoaderRoute: typeof AuthedAgentsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/agents/create': {
       id: '/_authed/agents/create'
       path: '/agents/create'
       fullPath: '/agents/create'
       preLoaderRoute: typeof AuthedAgentsCreateRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/aistudio/': {
+      id: '/_authed/aistudio/'
+      path: '/aistudio'
+      fullPath: '/aistudio/'
+      preLoaderRoute: typeof AuthedAistudioIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/assets/': {
@@ -876,25 +876,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAgentsIdEditRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/agents/conversations/': {
-      id: '/_authed/agents/conversations/'
-      path: '/agents/conversations'
-      fullPath: '/agents/conversations/'
-      preLoaderRoute: typeof AuthedAgentsConversationsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/agents/conversations/$conversationId': {
-      id: '/_authed/agents/conversations/$conversationId'
-      path: '/agents/conversations/$conversationId'
-      fullPath: '/agents/conversations/$conversationId'
-      preLoaderRoute: typeof AuthedAgentsConversationsConversationIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/agents/providers/connect': {
       id: '/_authed/agents/providers/connect'
       path: '/agents/providers/connect'
       fullPath: '/agents/providers/connect'
       preLoaderRoute: typeof AuthedAgentsProvidersConnectRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/aistudio/conversations/': {
+      id: '/_authed/aistudio/conversations/'
+      path: '/aistudio/conversations'
+      fullPath: '/aistudio/conversations/'
+      preLoaderRoute: typeof AuthedAistudioConversationsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/aistudio/conversations/$conversationId': {
+      id: '/_authed/aistudio/conversations/$conversationId'
+      path: '/aistudio/conversations/$conversationId'
+      fullPath: '/aistudio/conversations/$conversationId'
+      preLoaderRoute: typeof AuthedAistudioConversationsConversationIdRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/assets/services/$id': {
@@ -972,7 +972,7 @@ interface AuthedRouteChildren {
   AuthedVulnerabilitiesIdRoute: typeof AuthedVulnerabilitiesIdRoute
   AuthedWorkersIdRoute: typeof AuthedWorkersIdRoute
   AuthedWorkspacesCreateRoute: typeof AuthedWorkspacesCreateRoute
-  AuthedAgentsIndexRoute: typeof AuthedAgentsIndexRoute
+  AuthedAistudioIndexRoute: typeof AuthedAistudioIndexRoute
   AuthedAssetsIndexRoute: typeof AuthedAssetsIndexRoute
   AuthedGroupsIndexRoute: typeof AuthedGroupsIndexRoute
   AuthedIntegrationsIndexRoute: typeof AuthedIntegrationsIndexRoute
@@ -985,14 +985,14 @@ interface AuthedRouteChildren {
   AuthedWorkersIndexRoute: typeof AuthedWorkersIndexRoute
   AuthedWorkspacesIndexRoute: typeof AuthedWorkspacesIndexRoute
   AuthedAgentsIdEditRoute: typeof AuthedAgentsIdEditRoute
-  AuthedAgentsConversationsConversationIdRoute: typeof AuthedAgentsConversationsConversationIdRoute
   AuthedAgentsProvidersConnectRoute: typeof AuthedAgentsProvidersConnectRoute
+  AuthedAistudioConversationsConversationIdRoute: typeof AuthedAistudioConversationsConversationIdRoute
   AuthedAssetsServicesIdRoute: typeof AuthedAssetsServicesIdRoute
   AuthedJobsRunsIdRoute: typeof AuthedJobsRunsIdRoute
   AuthedProvidersIdEditRoute: typeof AuthedProvidersIdEditRoute
   AuthedTargetsIdTabRoute: typeof AuthedTargetsIdTabRoute
   AuthedAgentsIdIndexRoute: typeof AuthedAgentsIdIndexRoute
-  AuthedAgentsConversationsIndexRoute: typeof AuthedAgentsConversationsIndexRoute
+  AuthedAistudioConversationsIndexRoute: typeof AuthedAistudioConversationsIndexRoute
   AuthedProvidersIdIndexRoute: typeof AuthedProvidersIdIndexRoute
   AuthedTargetsIdIndexRoute: typeof AuthedTargetsIdIndexRoute
 }
@@ -1013,7 +1013,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedVulnerabilitiesIdRoute: AuthedVulnerabilitiesIdRoute,
   AuthedWorkersIdRoute: AuthedWorkersIdRoute,
   AuthedWorkspacesCreateRoute: AuthedWorkspacesCreateRoute,
-  AuthedAgentsIndexRoute: AuthedAgentsIndexRoute,
+  AuthedAistudioIndexRoute: AuthedAistudioIndexRoute,
   AuthedAssetsIndexRoute: AuthedAssetsIndexRoute,
   AuthedGroupsIndexRoute: AuthedGroupsIndexRoute,
   AuthedIntegrationsIndexRoute: AuthedIntegrationsIndexRoute,
@@ -1026,15 +1026,15 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedWorkersIndexRoute: AuthedWorkersIndexRoute,
   AuthedWorkspacesIndexRoute: AuthedWorkspacesIndexRoute,
   AuthedAgentsIdEditRoute: AuthedAgentsIdEditRoute,
-  AuthedAgentsConversationsConversationIdRoute:
-    AuthedAgentsConversationsConversationIdRoute,
   AuthedAgentsProvidersConnectRoute: AuthedAgentsProvidersConnectRoute,
+  AuthedAistudioConversationsConversationIdRoute:
+    AuthedAistudioConversationsConversationIdRoute,
   AuthedAssetsServicesIdRoute: AuthedAssetsServicesIdRoute,
   AuthedJobsRunsIdRoute: AuthedJobsRunsIdRoute,
   AuthedProvidersIdEditRoute: AuthedProvidersIdEditRoute,
   AuthedTargetsIdTabRoute: AuthedTargetsIdTabRoute,
   AuthedAgentsIdIndexRoute: AuthedAgentsIdIndexRoute,
-  AuthedAgentsConversationsIndexRoute: AuthedAgentsConversationsIndexRoute,
+  AuthedAistudioConversationsIndexRoute: AuthedAistudioConversationsIndexRoute,
   AuthedProvidersIdIndexRoute: AuthedProvidersIdIndexRoute,
   AuthedTargetsIdIndexRoute: AuthedTargetsIdIndexRoute,
 }

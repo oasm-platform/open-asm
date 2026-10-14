@@ -70,7 +70,7 @@ export default function AgentConversationsPage() {
 
   const handleSelect = useCallback(
     (conversationId: string) => {
-      void navigate({ to: `/agents/conversations/${conversationId}` });
+      void navigate({ to: `/aistudio/conversations/${conversationId}` });
     },
     [navigate],
   );

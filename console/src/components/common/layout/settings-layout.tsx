@@ -1,108 +1,44 @@
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { usePermission } from '@/hooks/usePermission';
-import { filterTabGroups, settingsTabGroups } from '@/pages/settings/settings';
-import { useSession } from '@/utils/authClient';
-import { Link, useLocation } from '@tanstack/react-router';
-import { ArrowLeft, Menu } from 'lucide-react';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { settingsTabGroups } from '@/pages/settings/settings';
 import type { JSX, ReactNode } from 'react';
+import { HeaderBar } from './header-bar';
+import { AppSidebar, type NavGroup } from './menu-bar';
 
 interface SettingsLayoutProps {
   children: ReactNode;
 }
 
+// Settings tab groups in the shape the shared sidebar expects.
+// Permission/role filtering is done by AppSidebar.
+const settingsMenu: NavGroup[] = settingsTabGroups.map((group) => ({
+  title: group.name,
+  url: '#',
+  roles: group.roles,
+  items: group.tabs.map((tab) => ({
+    title: tab.label,
+    icon: tab.icon,
+    url: tab.path,
+    permission: tab.permission,
+  })),
+}));
+
 export default function SettingsLayout({
   children,
 }: SettingsLayoutProps): JSX.Element {
-  const location = useLocation();
-  const { data } = useSession();
-  const { hasPermission } = usePermission();
-  const visibleGroups = filterTabGroups(settingsTabGroups, {
-    userRole: data?.user.role,
-    hasPermission,
-  });
-
-  // Determine if a tab is active based on current path
-  const isActive = (path: string) => location.pathname.startsWith(path);
-
-  // Settings navigation menu content (for both desktop sidebar and mobile sheet)
-  const navMenu = (
-    <nav className="flex-1 py-3">
-      <ul className="space-y-1">
-        {visibleGroups.map((group, groupIndex) => (
-          <div>
-            <li key={group.name} className="p-2">
-              {/* Group header */}
-              <div className="text-xs font-semibold text-muted-foreground uppercase mb-2 tracking-wider px-3">
-                {group.name}
-              </div>
-              {/* Tabs in this group */}
-              {group.tabs.map((tab) => (
-                <Link
-                  key={tab.id}
-                  to={tab.path}
-                  className={`block px-3 py-1 rounded-md text-sm font-medium transition-colors mb-1 last:mb-0 ${
-                    isActive(tab.path)
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                  }`}
-                >
-                  {tab.label}
-                </Link>
-              ))}
-            </li>
-            {/* Group divider - shown after group */}
-            {groupIndex < visibleGroups.length - 1 && (
-              <div className="border-b my-2" />
-            )}
-          </div>
-        ))}
-      </ul>
-    </nav>
-  );
-
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
-      {/* Header with Back To App and menu toggle - always visible */}
-      <header className="flex items-center gap-2 p-2 border-b bg-background shrink-0">
-        {/* Back To App button - always visible on the left */}
-        <Link to="/" className="mr-auto">
-          <Button variant="outline" className="hidden md:flex">
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="md:hidden"
-            title="Back"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-
-        {/* Menu button - only visible on mobile */}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="md:hidden shrink-0">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-64">
-            {navMenu}
-          </SheetContent>
-        </Sheet>
-      </header>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Desktop sidebar - always visible on md and above */}
-        <aside className="hidden md:flex md:w-64 border-r bg-background flex-col shrink-0">
-          {navMenu}
-        </aside>
-
-        {/* Main content area */}
-        <main className="flex-1 overflow-auto p-6">{children}</main>
-      </div>
-    </div>
+    <SidebarProvider>
+      <AppSidebar
+        groups={settingsMenu}
+        primary={false}
+        title="Settings"
+        showSwitchWorkspace
+      />
+      <SidebarInset>
+        <HeaderBar />
+        <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+          {children}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

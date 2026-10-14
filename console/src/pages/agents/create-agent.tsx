@@ -14,7 +14,7 @@ export default function CreateAgentPage() {
       {
         onSuccess: () => {
           toast.success('Provider connected successfully');
-          navigate({ to: '/agents' });
+          navigate({ to: '/aistudio' });
         },
         onError: (error) => {
           toast.error('Failed to connect provider');
