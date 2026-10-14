@@ -29,7 +29,7 @@ jobs:
       ENFORCE: 'true'
     steps:
       - name: Check PR size
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const SOFT_LINES = 400;   // above this: warning comment
