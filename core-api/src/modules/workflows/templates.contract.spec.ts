@@ -84,4 +84,13 @@ describe('default workflow templates', () => {
     expect(content.on?.target).toEqual(['git_org.synced']);
     expect(tools.get('gitleaks')).toEqual([TargetType.GIT_ORG]);
   });
+
+  it('scans repositories for secrets and for vulnerable dependencies', () => {
+    const content = yaml.load(
+      fs.readFileSync(path.join(templatesDir, 'repository_scan.yaml'), 'utf8'),
+    ) as Template;
+    const runs = jobEntries(content.jobs).map(([, job]) => job.run);
+    expect(runs).toEqual(expect.arrayContaining(['gitleaks', 'trivy']));
+    expect(tools.get('trivy')).toEqual([TargetType.GIT_ORG]);
+  });
 });
