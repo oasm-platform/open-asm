@@ -13,6 +13,7 @@ import { SUBSCRIPTIONS } from '../../routing/subscriptions';
 import {
   eventForIntegration,
   isPushable,
+  isTicketable,
   shouldPush,
 } from './integration-delivery';
 import { draftMessage } from './messages/event-drafts';
@@ -20,14 +21,18 @@ import { formatForAppType, renderMessage } from './messages/render';
 import { toOutboundEnvelope } from './outbound-envelope';
 
 /**
- * Integration categories this lane pushes to.
+ * Integration capabilities this lane pushes to.
  *
- * TICKETING (Jira et al.) and NOTIFICATION (Slack/Telegram/webhook) are both
- * "tell a human outside the app". CLOUD_PROVIDER is deliberately absent: those
- * connectors IMPORT data (sync), they do not receive events, and letting them
- * see the stream would create a feedback loop back into targets/assets.
+ * TICKETING (Jira, GitHub issues, …) and NOTIFICATION (Slack/Telegram/webhook)
+ * are both "tell a human outside the app". CLOUD_PROVIDER and SOURCE_CODE are
+ * deliberately absent: those connectors IMPORT data, they do not receive
+ * events, and letting them see the stream would create a feedback loop back
+ * into targets/assets.
+ *
+ * An integration with BOTH capabilities is delivered once per capability —
+ * a chat message and a ticket are two different side effects.
  */
-const PUSHABLE_CATEGORIES: IntegrationType[] = [
+const PUSHABLE_CAPABILITIES: IntegrationType[] = [
   IntegrationType.TICKETING,
   IntegrationType.NOTIFICATION,
 ];
@@ -77,15 +82,15 @@ export class IntegrationsSink implements EventSink {
   }
 
   private async push(name: EventName, event: ConsumedEvent): Promise<void> {
-    const integrations = await this.findPushable(event.workspaceId);
-    if (integrations.length === 0) {
+    const deliveries = await this.findPushable(name, event.workspaceId);
+    if (deliveries.length === 0) {
       return;
     }
 
     const dek = await this.workspaceEncryption.getDEK(event.workspaceId);
 
     const results = await Promise.allSettled(
-      integrations.map(async (integration) => {
+      deliveries.map(async ({ integration, capability }) => {
         const config = decryptSensitiveConfigFields(integration.config, dek);
 
         // Policy: muted entirely, or narrowed to what this integration wants
@@ -96,17 +101,17 @@ export class IntegrationsSink implements EventSink {
         }
 
         // View: payload → draft → this channel's markup.
-        const text = renderMessage(
-          draftMessage(name, scoped),
-          formatForAppType(integration.appType),
-        );
+        const draft = draftMessage(name, scoped);
+        const text = renderMessage(draft, formatForAppType(integration.appType));
 
         const result = await runConnector(
           integration.appType,
-          integration.category,
+          capability,
           {
             ...config,
             ...toOutboundEnvelope(name, scoped),
+            // Ticket title; chat connectors ignore it.
+            title: draft.title,
             text,
             // Idempotency key for the receiver. Deliberately NOT a secret and
             // NOT redacted: the receiver needs it to dedupe.
@@ -137,15 +142,22 @@ export class IntegrationsSink implements EventSink {
     }
   }
 
-  private async findPushable(workspaceId: string) {
-    const byCategory = await Promise.all(
-      PUSHABLE_CATEGORIES.map((category) =>
-        this.integrationsService.getIntegrationEntitiesByCategory(
-          workspaceId,
-          category,
-        ),
-      ),
+  /** One delivery per (integration, capability) that should see this event. */
+  private async findPushable(name: EventName, workspaceId: string) {
+    const capabilities = PUSHABLE_CAPABILITIES.filter(
+      (capability) =>
+        capability !== IntegrationType.TICKETING || isTicketable(name),
     );
-    return byCategory.flat();
+    const byCapability = await Promise.all(
+      capabilities.map(async (capability) => {
+        const integrations =
+          await this.integrationsService.getIntegrationEntitiesByCapability(
+            workspaceId,
+            capability,
+          );
+        return integrations.map((integration) => ({ integration, capability }));
+      }),
+    );
+    return byCapability.flat();
   }
 }

@@ -1,6 +1,10 @@
 import { IntegrationType } from '@/common/enums/enum';
-import { Logger } from '@nestjs/common';
-import type { BaseConnector, ConnectorConfig } from './connector.abstract';
+import { BadRequestException, Logger } from '@nestjs/common';
+import type {
+  BaseConnector,
+  ConnectorConfig,
+  SourceCodeCapable,
+} from './connector.abstract';
 import { getConnectorClass } from './connector.registry';
 
 /**
@@ -8,6 +12,7 @@ import { getConnectorClass } from './connector.registry';
  */
 export interface ConnectorTestResult {
   success: boolean;
+  /** The capability that was exercised (kept as `category` for API compat). */
   category: string;
   appType: string;
   message: string;
@@ -16,12 +21,14 @@ export interface ConnectorTestResult {
 }
 
 /**
- * Map of IntegrationType enum value → the abstract method name on BaseConnector.
+ * Map of capability → the method a connector implements for it.
  *
- * This is the SINGLE data-driven dispatch point — adding a new category only
- * requires an entry here plus a new abstract subclass. No if/else chains.
+ * This is the SINGLE data-driven dispatch point for capabilities that run as
+ * a fire-and-forget action. SOURCE_CODE is absent on purpose: listing
+ * repositories returns data and takes a query, so it is resolved through
+ * {@link resolveSourceCodeConnector} instead of being "run".
  */
-const CATEGORY_METHOD_MAP: Record<string, string> = {
+const CAPABILITY_METHOD_MAP: Partial<Record<IntegrationType, string>> = {
   [IntegrationType.NOTIFICATION]: 'push',
   [IntegrationType.CLOUD_PROVIDER]: 'syncAssets',
   [IntegrationType.TICKETING]: 'createTicket',
@@ -29,84 +36,164 @@ const CATEGORY_METHOD_MAP: Record<string, string> = {
 
 const logger = new Logger('ConnectorFactory');
 
+function result(
+  appType: string,
+  capability: string,
+  fields: Pick<ConnectorTestResult, 'success' | 'message' | 'error'>,
+): ConnectorTestResult {
+  return {
+    category: capability,
+    appType,
+    timestamp: new Date().toISOString(),
+    ...fields,
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown connector error';
+}
+
 /**
- * Resolve the connector class for the given appType and dispatch the correct
- * abstract method based on the integration's category.
+ * Resolve the connector class for the given appType and dispatch the method
+ * that implements `capability`.
  *
- * Hook lifecycle: beforeExecute → <category method> → afterExecute
+ * Hook lifecycle: beforeExecute → <capability method> → afterExecute
  *
- * @param appType  - Integration app type (e.g. 'telegram', 'slack', 'webhook')
- * @param category - Integration category enum value (e.g. IntegrationType.NOTIFICATION)
- * @param config   - Merged config (stored integration config + runtime test params)
+ * @param appType    - Integration app type (e.g. 'telegram', 'github')
+ * @param capability - The capability to exercise (e.g. IntegrationType.NOTIFICATION).
+ *                     For single-capability apps this is the stored category.
+ * @param config     - Merged config (stored integration config + runtime params)
  * @returns Test result indicating success or failure
  */
 export async function runConnector(
   appType: string,
-  category: string,
+  capability: string,
   config: ConnectorConfig,
 ): Promise<ConnectorTestResult> {
   // 1. Resolve connector class by appType (data-driven, no switch)
   const ConnectorClass = getConnectorClass(appType);
   if (!ConnectorClass) {
-    return {
+    return result(appType, capability, {
       success: false,
-      category,
-      appType,
       message: `No connector registered for appType "${appType}"`,
-      timestamp: new Date().toISOString(),
-    };
+    });
   }
 
-  // 2. Resolve method name by category (data-driven, no switch)
-  const methodName = CATEGORY_METHOD_MAP[category];
+  // 2. Resolve method name by capability (data-driven, no switch)
+  const methodName = CAPABILITY_METHOD_MAP[capability as IntegrationType];
   if (!methodName) {
-    return {
+    return result(appType, capability, {
       success: false,
-      category,
-      appType,
-      message: `No method mapped for category "${category}". Supported categories: ${Object.values(IntegrationType).join(', ')}`,
-      timestamp: new Date().toISOString(),
-    };
+      message: `No method mapped for capability "${capability}". Supported: ${Object.keys(CAPABILITY_METHOD_MAP).join(', ')}`,
+    });
   }
 
   // 3. Instantiate connector (plain class, no DI needed)
   const connector: BaseConnector = new ConnectorClass();
+  const method = (
+    connector as unknown as Record<
+      string,
+      ((cfg: ConnectorConfig) => Promise<void>) | undefined
+    >
+  )[methodName];
+  if (typeof method !== 'function') {
+    return result(appType, capability, {
+      success: false,
+      message: `Connector "${appType}" does not implement ${methodName}() for capability "${capability}"`,
+    });
+  }
 
   try {
     // 4. Execute lifecycle: beforeExecute → method → afterExecute
     logger.log(
-      `Executing ${appType}.${String(methodName)}() for category ${category}`,
+      `Executing ${appType}.${methodName}() for capability ${capability}`,
     );
 
     await connector.beforeExecute?.(config);
-    await (
-      connector as unknown as Record<
-        string,
-        (cfg: ConnectorConfig) => Promise<void>
-      >
-    )[methodName](config);
+    await method.call(connector, config);
     await connector.afterExecute?.(config);
 
-    return {
+    return result(appType, capability, {
       success: true,
-      category,
-      appType,
-      message: `${appType}.${String(methodName)}() completed successfully`,
-      timestamp: new Date().toISOString(),
-    };
+      message: `${appType}.${methodName}() completed successfully`,
+    });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown connector error';
-
-    logger.error(`Connector test failed for ${appType}: ${errorMessage}`);
-
-    return {
+    const message = errorMessage(error);
+    logger.error(`Connector test failed for ${appType}: ${message}`);
+    return result(appType, capability, {
       success: false,
-      category,
-      appType,
       message: `Connector test failed`,
-      timestamp: new Date().toISOString(),
-      error: errorMessage,
-    };
+      error: message,
+    });
   }
+}
+
+/**
+ * Side-effect-free credential check via `connector.testConnection()`. Used
+ * to test capabilities whose action would touch the outside world (TICKETING
+ * would open a real ticket) or that have no action at all (SOURCE_CODE).
+ *
+ * @param capability - Narrows the check; undefined tests the connection only.
+ */
+export async function testConnectorConnection(
+  appType: string,
+  capability: string | undefined,
+  config: ConnectorConfig,
+): Promise<ConnectorTestResult> {
+  const label = capability ?? 'CONNECTION';
+  const ConnectorClass = getConnectorClass(appType);
+  if (!ConnectorClass) {
+    return result(appType, label, {
+      success: false,
+      message: `No connector registered for appType "${appType}"`,
+    });
+  }
+
+  const connector: BaseConnector = new ConnectorClass();
+  if (typeof connector.testConnection !== 'function') {
+    return result(appType, label, {
+      success: false,
+      message: `Connector "${appType}" does not support connection tests`,
+    });
+  }
+
+  try {
+    await connector.testConnection(
+      config,
+      capability as IntegrationType | undefined,
+    );
+    return result(appType, label, {
+      success: true,
+      message: capability
+        ? `${appType} ${capability.toLowerCase()} access verified`
+        : `${appType} connection verified`,
+    });
+  } catch (error) {
+    const message = errorMessage(error);
+    logger.error(`Connection test failed for ${appType}: ${message}`);
+    return result(appType, label, {
+      success: false,
+      message: 'Connector test failed',
+      error: message,
+    });
+  }
+}
+
+/**
+ * Returns the connector for `appType` typed as a SOURCE_CODE provider, or
+ * throws when the app has no such implementation.
+ */
+export function resolveSourceCodeConnector(appType: string): SourceCodeCapable {
+  const ConnectorClass = getConnectorClass(appType);
+  const connector = ConnectorClass ? new ConnectorClass() : undefined;
+  if (
+    !connector ||
+    typeof (connector as Partial<SourceCodeCapable>).listRepositories !==
+      'function'
+  ) {
+    throw new BadRequestException(
+      `Integration app "${appType}" cannot list repositories`,
+    );
+  }
+  return connector as unknown as SourceCodeCapable;
 }

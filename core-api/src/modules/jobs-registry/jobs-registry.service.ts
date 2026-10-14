@@ -40,6 +40,7 @@ import {
 } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import type { TargetType } from '@/common/enums/enum';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
@@ -47,6 +48,7 @@ import {
   getSensitiveFields,
   maskProfile,
 } from '../tools/validators/tool-config-profiles.crypto';
+import { resolveToolTargetTypes } from '../tools/tool-target-types';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import {
@@ -371,6 +373,12 @@ export class JobsRegistryService {
     const jobRepo = this.dataSource.getRepository(Job);
     const jobsToInsert: Job[] = [];
 
+    // A tool only ever receives assets of the target types it declares, so a
+    // host scanner never sees a repository (and vice versa) — whether the run
+    // came from a trigger, a schedule, an asset group or a manual dispatch.
+    // A step left with no eligible asset produces no job and is skipped.
+    const targetTypes = resolveToolTargetTypes(tool);
+
     // Step 2: find appropriate data source based on tool category
     if (
       tool.category === ToolCategory.HTTP_PROBE ||
@@ -389,6 +397,7 @@ export class JobsRegistryService {
         workspaceId,
         liveOnly,
         assetServiceIds,
+        targetTypes,
       );
 
       // Step 3: iterate tools and create jobs
@@ -429,6 +438,7 @@ export class JobsRegistryService {
         targetIds,
         assetIds,
         workspaceId,
+        targetTypes,
       );
 
       const filteredAssets = this.filterAssetsByCategory(assets, tool.category);
@@ -543,17 +553,21 @@ export class JobsRegistryService {
    * @param targetIds list of target IDs to filter assets
    * @param assetIds list of asset IDs to filter assets
    * @param workspaceId workspace ID to filter assets
+   * @param targetTypes only assets whose target has one of these types
    * @returns Promise<Array<Asset>> list of filtered assets
    */
   private async findAssetsForJob(
-    targetIds?: string[],
-    assetIds?: string[],
-    workspaceId?: string,
+    targetIds: string[] | undefined,
+    assetIds: string[] | undefined,
+    workspaceId: string | undefined,
+    targetTypes: TargetType[],
   ): Promise<Asset[]> {
     const assetsQueryBuilder = this.dataSource
       .getRepository(Asset)
       .createQueryBuilder('assets')
-      .where('assets.isEnabled = true');
+      .innerJoin('assets.target', 'target')
+      .where('assets.isEnabled = true')
+      .andWhere('target.type IN (:...targetTypes)', { targetTypes });
 
     if (targetIds && targetIds.length > 0) {
       assetsQueryBuilder.andWhere('assets.targetId IN (:...targetIds)', {
@@ -568,9 +582,9 @@ export class JobsRegistryService {
     }
 
     if (workspaceId) {
-      assetsQueryBuilder
-        .innerJoin('assets.target', 'target')
-        .andWhere('target.workspaceId = :workspaceId', { workspaceId });
+      assetsQueryBuilder.andWhere('target.workspaceId = :workspaceId', {
+        workspaceId,
+      });
     }
 
     return await assetsQueryBuilder.getMany();
@@ -589,20 +603,24 @@ export class JobsRegistryService {
    *   http_responses rows also has isErrorPage = false (default), so the
    *   EXISTS predicate on http_responses with failed = false is the
    *   authoritative "httpx confirmed live" predicate.
+   * @param targetTypes only services whose asset's target has one of these types
    * @returns Promise<Array<AssetService>> list of filtered asset services
    */
   private async findAssetServicesForJob(
-    targetIds?: string[],
-    assetIds?: string[],
-    workspaceId?: string,
-    liveOnly?: boolean,
-    assetServiceIds?: string[],
+    targetIds: string[] | undefined,
+    assetIds: string[] | undefined,
+    workspaceId: string | undefined,
+    liveOnly: boolean | undefined,
+    assetServiceIds: string[] | undefined,
+    targetTypes: TargetType[],
   ): Promise<AssetService[]> {
     const assetServicesQueryBuilder = this.dataSource
       .getRepository(AssetService)
       .createQueryBuilder('assetServices')
       .innerJoinAndSelect('assetServices.asset', 'asset')
-      .where('asset.isEnabled = true');
+      .innerJoin('asset.target', 'target')
+      .where('asset.isEnabled = true')
+      .andWhere('target.type IN (:...targetTypes)', { targetTypes });
 
     if (liveOnly) {
       // EXISTS semi-join: keeps the row set unmultiplied, so no DISTINCT is
@@ -637,9 +655,9 @@ export class JobsRegistryService {
     }
 
     if (workspaceId) {
-      assetServicesQueryBuilder
-        .innerJoin('asset.target', 'target')
-        .andWhere('target.workspaceId = :workspaceId', { workspaceId });
+      assetServicesQueryBuilder.andWhere('target.workspaceId = :workspaceId', {
+        workspaceId,
+      });
     }
 
     return await assetServicesQueryBuilder.getMany();

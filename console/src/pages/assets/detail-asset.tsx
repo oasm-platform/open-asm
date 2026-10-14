@@ -1,4 +1,3 @@
-import type { AssetTls } from './tls-info';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,7 @@ import ScreenshotCell from './components/screenshot-cell';
 import HTTPXStatusCode from './components/status-code';
 import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options';
 import { TechnologyTooltip } from './components/technology-tooltip';
+import { asTlsInfo } from './tls-info';
 
 dayjs.extend(relativeTime);
 
@@ -113,7 +113,7 @@ export default function DetailAsset() {
   }
 
   const { value, httpResponses, ipAddresses, tags } = data;
-  const tls = httpResponses?.tls as AssetTls | undefined;
+  const tls = asTlsInfo(httpResponses?.tls);
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after

@@ -120,6 +120,7 @@ const integrationT1: GetIntegrationDto = {
   description: '',
   appType: 'cloudflare',
   category: 'CLOUD_PROVIDER',
+  capabilities: ['CLOUD_PROVIDER'],
   config: {},
   workspaceId: 'ws-1',
   createdById: 'u-1',

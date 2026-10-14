@@ -15,21 +15,32 @@ import {
   useIntegrationsControllerCreateIntegration,
   getIntegrationsControllerGetManyIntegrationsQueryKey,
 } from '@/services/apis/gen/queries';
+import type { IntegrationType } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  CLOUD_PROVIDER_CAPABILITY,
+  getCapabilityMeta,
+  getDefaultCapabilities,
+  isDiscriminatorKey,
+} from '../capabilities';
 import { AwsSsoConnect } from './aws-sso-connect';
+import { CapabilityPicker } from './capability-picker';
 import { IntegrationLogo } from './integration-logo';
 import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
-
-const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
 
 /** Schema fields the AWS SSO wizard collects itself (not the raw form). */
 const AWS_SSO_WIZARD_FIELDS = ['region', 'startUrl', 'accountId', 'roleName'];
 
 interface SchemaAllOfEntry {
-  if?: { properties?: Record<string, { const?: unknown }> };
+  if?: {
+    properties?: Record<
+      string,
+      { const?: unknown; contains?: { const?: unknown } }
+    >;
+  };
   then?: { required?: string[] };
 }
 
@@ -39,27 +50,30 @@ interface SchemaAllOfEntry {
  * The AWS schema keeps method-scoped requirements in `allOf` (not `required`),
  * so without this an accessKey form with empty credentials would pass
  * client-side validation and only fail with a generic server toast.
+ * Multi-capability schemas use `contains` (e.g. "TICKETING enabled →
+ * ticketRepository required"), matched against the `capabilities` array.
  */
-function getEffectiveRequired(
+export function getEffectiveRequired(
   schema: { required?: string[]; [key: string]: unknown },
   values: Record<string, unknown>,
 ): string[] {
-  const base = (schema.required ?? []).filter(
-    (key) => key !== 'app_type' && key !== 'category',
-  );
+  const base = (schema.required ?? []).filter((key) => !isDiscriminatorKey(key));
   const required = new Set(base);
   const allOf = (schema.allOf as SchemaAllOfEntry[] | undefined) ?? [];
   for (const entry of allOf) {
     const conditionProps = entry.if?.properties;
     if (conditionProps) {
-      const matches = Object.entries(conditionProps).every(
-        ([field, cond]) =>
-          cond.const === undefined || values[field] === cond.const,
-      );
+      const matches = Object.entries(conditionProps).every(([field, cond]) => {
+        if (cond.contains?.const !== undefined) {
+          const current = values[field];
+          return Array.isArray(current) && current.includes(cond.contains.const);
+        }
+        return cond.const === undefined || values[field] === cond.const;
+      });
       if (!matches) continue;
     }
     for (const key of entry.then?.required ?? []) {
-      if (key !== 'app_type' && key !== 'category') required.add(key);
+      if (!isDiscriminatorKey(key)) required.add(key);
     }
   }
   return [...required];
@@ -67,8 +81,9 @@ function getEffectiveRequired(
 
 /**
  * Payload config: only entries whose property is currently visible (drops
- * stale values from a previously selected connection method), plus the
- * discriminator `connectionMethod`. Never includes `app_type`/`category`.
+ * stale values from a previously selected connection method or a disabled
+ * capability), plus the discriminator `connectionMethod`. Never includes
+ * `app_type`/`category`/`capabilities` — those travel at the top level.
  */
 function buildVisibleConfig(
   schema: { properties?: Record<string, unknown>; [key: string]: unknown },
@@ -76,7 +91,7 @@ function buildVisibleConfig(
 ): Record<string, unknown> {
   const config: Record<string, unknown> = {};
   for (const [key, prop] of Object.entries(schema.properties ?? {})) {
-    if (key === 'app_type' || key === 'category') continue;
+    if (isDiscriminatorKey(key)) continue;
     if (!isPropertyVisible(prop as SchemaProperty, values)) continue;
     if (!(key in values)) continue;
     config[key] = values[key];
@@ -122,8 +137,13 @@ export function ConnectIntegrationSheet({
       setDraftCron('');
       setScheduleEnabled(false);
       const defaults: Record<string, unknown> = {};
+      // Kept in form values (not separate state) so `ui:capability`
+      // visibility and `contains` required-rules can read it.
+      if (getCapabilityMeta(schema)) {
+        defaults.capabilities = getDefaultCapabilities(schema);
+      }
       for (const [key, prop] of Object.entries(schema.properties ?? {})) {
-        if (key === 'app_type' || key === 'category') continue;
+        if (isDiscriminatorKey(key)) continue;
         const typedProp = prop as SchemaProperty;
         if (typedProp.default !== undefined) {
           defaults[key] = typedProp.default;
@@ -133,10 +153,21 @@ export function ConnectIntegrationSheet({
       }
       setFormValues(defaults);
     }
-  }, [open, schema.title, schema.properties]);
+  }, [open, schema]);
 
   const appType = (schema.properties?.app_type as SchemaProperty | undefined)?.const ?? schema.$id ?? '';
-  const category = (schema.properties?.category as SchemaProperty | undefined)?.const ?? '';
+  const capabilityMeta = getCapabilityMeta(schema);
+  const selectedCapabilities = capabilityMeta
+    ? ((formValues.capabilities as string[] | undefined) ?? [])
+    : undefined;
+  // Multi-capability apps: the primary category is the first enabled
+  // capability (the API re-derives it the same way).
+  const category = capabilityMeta
+    ? (selectedCapabilities?.[0] ?? '')
+    : ((schema.properties?.category as SchemaProperty | undefined)?.const ?? '');
+  const supportsSync = capabilityMeta
+    ? !!selectedCapabilities?.includes(CLOUD_PROVIDER_CAPABILITY)
+    : category === CLOUD_PROVIDER_CAPABILITY;
 
   // AWS SSO uses the device-authorization wizard (todo 16) instead of raw
   // schema fields: the OIDC client credentials + refresh token come from the
@@ -146,16 +177,19 @@ export function ConnectIntegrationSheet({
   // All properties except the hidden discriminator fields
   const formProperties = Object.entries(schema.properties ?? {}).filter(
     ([key]) =>
-      key !== 'app_type' &&
-      key !== 'category' &&
+      !isDiscriminatorKey(key) &&
       !(
         isAwsSso &&
         (AWS_SSO_WIZARD_FIELDS.includes(key) || key === 'regions')
       ),
   ) as [string, SchemaProperty][];
 
-  // Group properties by ui:form:group for grid layout sections
-  const grouped = formProperties.reduce<
+  // Group properties by ui:form:group for grid layout sections. Hidden fields
+  // are dropped first so a group whose fields are all hidden (e.g. ticket
+  // severities while TICKETING is off) does not leave an empty heading.
+  const grouped = formProperties
+    .filter(([, prop]) => isPropertyVisible(prop, formValues))
+    .reduce<
     [
       ungrouped: [string, SchemaProperty][],
       groups: Record<string, [string, SchemaProperty][]>,
@@ -236,9 +270,12 @@ export function ConnectIntegrationSheet({
         name: integrationName.trim(),
         appType,
         category,
+        ...(selectedCapabilities
+          ? { capabilities: selectedCapabilities as IntegrationType[] }
+          : {}),
         // syncSchedule is only meaningful for cloud providers; omit it
         // otherwise so other categories never send 'disabled' (U11).
-        ...(category === CLOUD_PROVIDER_CATEGORY ? { syncSchedule } : {}),
+        ...(supportsSync ? { syncSchedule } : {}),
         config: buildVisibleConfig(schema, formValues),
       },
     });
@@ -272,7 +309,15 @@ export function ConnectIntegrationSheet({
             />
           </div>
 
-          {category === CLOUD_PROVIDER_CATEGORY && (
+          {capabilityMeta && (
+            <CapabilityPicker
+              capabilities={capabilityMeta}
+              value={selectedCapabilities ?? []}
+              onChange={(value) => handleValueChange('capabilities', value)}
+            />
+          )}
+
+          {supportsSync && (
             <div className="space-y-2 rounded-lg border p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="space-y-1">

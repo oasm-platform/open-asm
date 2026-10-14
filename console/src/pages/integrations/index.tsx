@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { getSchemaCapabilities } from './capabilities';
 import { AppsTabContent } from './components/apps-tab-content';
 import { ConnectIntegrationSheet } from './components/connect-integration-sheet';
 import { ConnectedTabContent } from './components/connected-tab-content';
@@ -107,11 +108,12 @@ export default function Integrations() {
       (b.isAvailable === false ? 0 : 1) - (a.isAvailable === false ? 0 : 1),
   );
 
+  // The category filter is a capability filter: a multi-capability app (e.g.
+  // GitHub) shows up under every capability it supports.
   const categories = useMemo(() => {
     const catSet = new Set<string>();
     for (const s of appSchemas) {
-      const c = (s.properties?.category as { const?: string })?.const;
-      if (c) catSet.add(c);
+      for (const c of getSchemaCapabilities(s)) catSet.add(c);
     }
     return Array.from(catSet).sort();
   }, [appSchemas]);
@@ -119,9 +121,8 @@ export default function Integrations() {
   const filteredSchemas = useMemo(() => {
     const search = debouncedSearch.toLowerCase().trim();
     return appSchemas.filter((s) => {
-      if (categoryParam) {
-        const c = (s.properties?.category as { const?: string })?.const;
-        if (c !== categoryParam) return false;
+      if (categoryParam && !getSchemaCapabilities(s).includes(categoryParam)) {
+        return false;
       }
       if (search) {
         const title = (s.title ?? '').toLowerCase();

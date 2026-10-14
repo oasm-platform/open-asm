@@ -1,6 +1,8 @@
 import { ScanScheduleSelect } from '@/components/scan-schedule-select';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Sheet,
   SheetContent,
@@ -13,6 +15,7 @@ import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { Target } from '@/services/apis/gen/queries';
 import {
   JobStatus,
+  TargetType,
   UpdateTargetDtoScanSchedule,
   useTargetsControllerDeleteTarget,
   useTargetsControllerReScanTarget,
@@ -21,7 +24,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
 import clsx from 'clsx';
-import { Clock, RefreshCw, Settings, Trash2 } from 'lucide-react';
+import { Clock, GitFork, RefreshCw, Settings, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
@@ -44,6 +47,11 @@ const SettingTarget = ({
     target.scanSchedule || UpdateTargetDtoScanSchedule['0_0_*_*_0'],
   ); // Default to target's scan schedule or weekly if not set
   const [isRediscovering, setIsRediscovering] = useState(false);
+  const isGitOrg = target.type === TargetType.GIT_ORG;
+  const gitOrgSettings = (target.settings ?? {}) as {
+    includeArchived?: boolean;
+    includeForks?: boolean;
+  };
 
   // Mutation hook to permanently delete a target
   const { mutate: deleteTarget } = useTargetsControllerDeleteTarget({
@@ -90,6 +98,16 @@ const SettingTarget = ({
     },
   );
 
+  // GIT_ORG filters; the API starts a repository sync to apply them.
+  const updateGitOrgSetting = (
+    key: 'includeArchived' | 'includeForks',
+    value: boolean,
+  ) =>
+    updateTargetScanSchedule({
+      id: target.id,
+      data: { settings: { ...gitOrgSettings, [key]: value } },
+    });
+
   return (
     <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
       <SheetTrigger asChild>
@@ -120,7 +138,7 @@ const SettingTarget = ({
                         htmlFor="scan-frequency"
                         className="text-sm font-medium"
                       >
-                        Scan Schedule
+                        {isGitOrg ? 'Sync Schedule' : 'Scan Schedule'}
                       </label>
                       <ScanScheduleSelect
                         value={frequency}
@@ -139,11 +157,50 @@ const SettingTarget = ({
                 </div>
               </div>
 
+              {isGitOrg && (
+                <div className="space-y-3 p-2">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                      <GitFork className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <p className="text-sm font-medium">Repositories to scan</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pl-12">
+                    <Label htmlFor="setting-include-archived" className="font-normal">
+                      Archived repositories
+                    </Label>
+                    <Switch
+                      id="setting-include-archived"
+                      checked={gitOrgSettings.includeArchived === true}
+                      onCheckedChange={(checked) =>
+                        updateGitOrgSetting('includeArchived', checked)
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pl-12">
+                    <Label htmlFor="setting-include-forks" className="font-normal">
+                      Forks
+                    </Label>
+                    <Switch
+                      id="setting-include-forks"
+                      checked={gitOrgSettings.includeForks === true}
+                      onCheckedChange={(checked) =>
+                        updateGitOrgSetting('includeForks', checked)
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-0.5">
                 <div className="space-y-1">
                   <ConfirmDialog
-                    title="Re-discover target"
-                    description="This will initiate a new scan of the target. The process might take a few minutes to complete."
+                    title={isGitOrg ? 'Sync repositories' : 'Re-discover target'}
+                    description={
+                      isGitOrg
+                        ? 'This fetches the repository list from the provider again.'
+                        : 'This will initiate a new scan of the target. The process might take a few minutes to complete.'
+                    }
                     onConfirm={() => {
                       setIsRediscovering(true);
                       rediscoverTarget(
@@ -166,8 +223,13 @@ const SettingTarget = ({
                       );
                       navigate({
                         to: '/targets/$id/$tab',
-                        params: { id: target.id, tab: 'inventory' },
-                        search: { animation: 'true', page: 1, pageSize: 100 },
+                        params: {
+                          id: target.id,
+                          tab: isGitOrg ? 'repositories' : 'inventory',
+                        },
+                        search: isGitOrg
+                          ? {}
+                          : { animation: 'true', page: 1, pageSize: 100 },
                       });
                       setIsSheetOpen(false);
                     }}
@@ -184,11 +246,15 @@ const SettingTarget = ({
                             />
                           </div>
                           <div className="flex-1">
-                            <p className="font-medium">Re-discover Target</p>
+                            <p className="font-medium">
+                              {isGitOrg ? 'Sync Repositories' : 'Re-discover Target'}
+                            </p>
                             <p className="text-xs text-muted-foreground">
-                              {target.status === JobStatus.completed
-                                ? 'Scan the target again for changes'
-                                : 'Target is currently being processed'}
+                              {target.status !== JobStatus.completed
+                                ? 'Target is currently being processed'
+                                : isGitOrg
+                                  ? 'Fetch new, renamed and removed repositories'
+                                  : 'Scan the target again for changes'}
                             </p>
                           </div>
                           {target.status !== JobStatus.completed && (
