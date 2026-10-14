@@ -45,7 +45,7 @@ Full walkthrough: [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md). Repo conventions f
 ## Workflow
 
 1. Fork, branch: `git checkout -b feat/short-name` (or `fix/…`).
-2. Make the change. Keep diffs minimal; one concern per PR.
+2. Make the change. Keep diffs minimal; one concern per PR — see [Pull Request Size](#pull-request-size).
 3. Verify (pre-commit hook is **inert** — nothing runs automatically):
    ```bash
    task lint
@@ -58,6 +58,33 @@ Full walkthrough: [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md). Repo conventions f
    - Proto files → `task proto`, output in `worker/internal/gen/`.
    - Connector catalog → `task sync-connectors` (or `MANIFEST_PATH=<local>/manifest.json` for preview).
 5. Push, open a PR against `main` with a clear description, linked issue, and test evidence.
+
+## Pull Request Size
+
+Small PRs get reviewed faster and more carefully. Past a few hundred lines, reviewers start skimming and bugs get through. This matters even more with AI-assisted code: a generated diff is cheap to produce, but reviewing it is no faster.
+
+**Limits** (enforced by the `pr-size` workflow):
+
+| Lines changed | Result |
+|---|---|
+| ≤ 400 | ✅ Ideal |
+| 401 – 1,000 | ⚠️ Bot posts a warning comment; check passes |
+| > 1,000, or > 40 files | 🚫 Check fails |
+
+Lockfiles, generated code (`.open-api/`, `console/src/services/apis/gen/`, `routeTree.gen.ts`, `worker/internal/gen/`, connector `manifest.json`), migrations, snapshots and deleted files are not counted.
+
+**One PR = one logical change.** If you can't describe the PR in one sentence without "and", split it. Ways to split:
+
+- **Prep refactor first.** Land the rename, extraction or move as its own PR with no behaviour change, then make the real change on top of it.
+- **Stack PRs.** Open PR 2 with PR 1's branch as its base and mention the dependency in the description. Once PR 1 merges, rebase PR 2 onto `main`.
+- **Split by layer.** Backend endpoint + tests → regenerated client → console UI. Each one ships separately.
+- **Hide unfinished work behind a flag or an unrouted page**, so partial features can merge without being user-visible.
+- **Keep schema, contract and dependency changes separate** (they need sign-off anyway, see Hard Rule 6).
+- **No drive-by changes.** Formatting sweeps, unrelated cleanups and "while I'm here" fixes go in their own PR.
+
+**Using AI tools:** you own every line you submit. Review the full diff yourself before opening the PR. If the agent produced more than one concern, ask it to plan a split into a sequence of PRs instead of submitting the whole thing.
+
+**Exceptions:** some changes are large but mechanical, such as a repo-wide rename or a vendored update. A maintainer can apply the `size/override` label to these. Ask in the PR and explain why it can't be split. Contributors should not apply the label themselves.
 
 ## Commits
 
@@ -87,4 +114,4 @@ feat|fix|hot-fix|perf|chore|docs|style|refactor|test|ci(scope): description
 
 ## CI
 
-Path-filtered workflows in `.github/workflows/`: `check-lint`, `check-test` (API), `check-build`, `frontend-tests` (console, `main` only), `worker-ci` (fmt + vet + build), `check-e2e`, `build-release`/`build-nightly`. Rehearse locally: `bash .github/scripts/test-local.sh <workflow>` (needs Docker + `act`). Local equivalents: `task lint`, `task api:test`, `task build`, `task console:test:run`, `task worker:format && task worker:lint && task worker:check`.
+Path-filtered workflows in `.github/workflows/`: `check-lint`, `check-test` (API), `check-build`, `frontend-tests` (console, `main` only), `worker-ci` (fmt + vet + build), `check-e2e`, `pr-size` (every PR, not path-filtered — see [Pull Request Size](#pull-request-size)), `build-release`/`build-nightly`. Rehearse locally: `bash .github/scripts/test-local.sh <workflow>` (needs Docker + `act`). Local equivalents: `task lint`, `task api:test`, `task build`, `task console:test:run`, `task worker:format && task worker:lint && task worker:check`.
