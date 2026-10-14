@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -75,6 +76,9 @@ func (c *Client) Join(ctx context.Context) error {
 func (c *Client) persistToken(tok string) error {
 	if c.tokenFile == "" || tok == "" {
 		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(c.tokenFile), 0o700); err != nil {
+		return err
 	}
 	return os.WriteFile(c.tokenFile, []byte(tok+"\n"), 0o600)
 }
