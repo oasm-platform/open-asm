@@ -1,12 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { decryptWithDEK } from '@/common/utils/workspace-encryption.util';
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import {
+  AgentConfigResponseDto,
+  AgentSearchProviderInputDto,
+  UpsertAgentConfigDto,
+} from './dto/agent-config.dto';
 import {
   AgentConfig,
   AgentModelRef,
   AgentModelsConfig,
+  AgentSearchProviderConfig,
 } from './entities/agent-config.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
+import { SearchProvider } from './enums/agent.enums';
 
 export function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 4) return '****';
@@ -31,6 +40,18 @@ export function formatUserInstructions(config: AgentConfig | null): string {
       : '',
   ].filter(Boolean);
   return parts.join('\n\n');
+}
+
+/** The tool set without the tools the user turned off. */
+export function withoutDisabledTools<T extends Record<string, unknown>>(
+  tools: T,
+  config: AgentConfig | null,
+): T {
+  const disabled = new Set(config?.disabledTools ?? []);
+  if (disabled.size === 0) return tools;
+  return Object.fromEntries(
+    Object.entries(tools).filter(([name]) => !disabled.has(name)),
+  ) as T;
 }
 
 /** An LLM connection with the model and limits the agent runs it with. */
@@ -100,6 +121,7 @@ export class AgentsConfigService {
     private readonly configRepository: Repository<AgentConfig>,
     @InjectRepository(AgentLLMConfig)
     private readonly llmConfigRepository: Repository<AgentLLMConfig>,
+    private readonly workspaceEncryption: WorkspaceEncryptionService,
   ) {}
 
   find(workspaceId: string, userId: string): Promise<AgentConfig | null> {
@@ -120,6 +142,61 @@ export class AgentsConfigService {
       userId,
       agentConfig,
     );
+  }
+
+  async get(
+    workspaceId: string,
+    userId: string,
+  ): Promise<AgentConfigResponseDto> {
+    const config = await this.find(workspaceId, userId);
+    return this.toResponse(config, workspaceId);
+  }
+
+  async upsert(
+    workspaceId: string,
+    userId: string,
+    dto: UpsertAgentConfigDto,
+  ): Promise<AgentConfigResponseDto> {
+    const config = await this.findOrCreate(workspaceId, userId);
+
+    if (dto.modelsConfig !== undefined) {
+      const models = dto.modelsConfig ?? {};
+      await this.assertOwnLLMConfigs(workspaceId, userId, models);
+      config.modelsConfig = models;
+      // Chat picks its model from the connection, so keep it on the default
+      if (models.default) {
+        await this.llmConfigRepository.update(
+          { id: models.default.llmConfigId, workspaceId, userId },
+          { model: models.default.model },
+        );
+      }
+    }
+    if (dto.searchProviders !== undefined) {
+      config.searchProviders = await this.mergeSearchProviders(
+        workspaceId,
+        config.searchProviders,
+        dto.searchProviders ?? [],
+      );
+    }
+    if (dto.instruction !== undefined) {
+      config.instruction = dto.instruction?.trim() || null;
+    }
+    if (dto.maxSteps !== undefined) config.maxSteps = dto.maxSteps;
+    if (dto.defaultAgentMode !== undefined) {
+      config.defaultAgentMode = dto.defaultAgentMode;
+    }
+    if (dto.defaultApprovalMode !== undefined) {
+      config.defaultApprovalMode = dto.defaultApprovalMode;
+    }
+    if (dto.disabledTools !== undefined) {
+      config.disabledTools = [...new Set(dto.disabledTools)];
+    }
+    if (dto.responseLanguage !== undefined) {
+      config.responseLanguage = dto.responseLanguage || null;
+    }
+
+    const saved = await this.configRepository.save(config);
+    return this.toResponse(saved, workspaceId);
   }
 
   /** Makes this connection the default model, keeping its limits if unchanged. */
@@ -160,6 +237,22 @@ export class AgentsConfigService {
     await this.configRepository.save(config);
   }
 
+  /** Search providers with plain API keys, default first. */
+  async getSearchProviders(
+    workspaceId: string,
+    userId: string,
+  ): Promise<{ provider: SearchProvider; apiKey: string }[]> {
+    const config = await this.find(workspaceId, userId);
+    if (!config?.searchProviders.length) return [];
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    return [...config.searchProviders]
+      .sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
+      .map((p) => ({
+        provider: p.provider,
+        apiKey: decryptWithDEK(p.apiKey, dek),
+      }));
+  }
+
   /**
    * The user's row, created first if missing. The insert skips on conflict,
    * so two first writes at once cannot hit the unique index.
@@ -179,5 +272,83 @@ export class AgentsConfigService {
     return this.configRepository.findOneOrFail({
       where: { workspaceId, userId },
     });
+  }
+
+  private async assertOwnLLMConfigs(
+    workspaceId: string,
+    userId: string,
+    models: AgentModelsConfig,
+  ): Promise<void> {
+    const ids = [...new Set(modelRefs(models).map((ref) => ref.llmConfigId))];
+    if (ids.length === 0) return;
+    const found = await this.llmConfigRepository.count({
+      where: { id: In(ids), workspaceId, userId },
+    });
+    if (found !== ids.length) {
+      throw new BadRequestException('LLM config not found');
+    }
+  }
+
+  /**
+   * Replaces the provider list. An entry without apiKey keeps the saved key;
+   * exactly one entry ends up as the default.
+   */
+  private async mergeSearchProviders(
+    workspaceId: string,
+    saved: AgentSearchProviderConfig[],
+    input: AgentSearchProviderInputDto[],
+  ): Promise<AgentSearchProviderConfig[]> {
+    const providers = input.map((p) => p.provider);
+    if (new Set(providers).size !== providers.length) {
+      throw new BadRequestException('Each search provider can be added once');
+    }
+    if (input.filter((p) => p.isDefault).length > 1) {
+      throw new BadRequestException('Only one search provider can be default');
+    }
+    const hasDefault = input.some((p) => p.isDefault);
+
+    return Promise.all(
+      input.map(async (p, index) => {
+        let apiKey = saved.find((s) => s.provider === p.provider)?.apiKey;
+        if (p.apiKey) {
+          apiKey = await this.workspaceEncryption.encrypt(
+            workspaceId,
+            p.apiKey,
+          );
+        }
+        if (!apiKey) {
+          throw new BadRequestException(`API key required for ${p.provider}`);
+        }
+        return {
+          provider: p.provider,
+          apiKey,
+          isDefault: hasDefault ? !!p.isDefault : index === 0,
+        };
+      }),
+    );
+  }
+
+  private async toResponse(
+    config: AgentConfig | null,
+    workspaceId: string,
+  ): Promise<AgentConfigResponseDto> {
+    const providers = config?.searchProviders ?? [];
+    const dek = providers.length
+      ? await this.workspaceEncryption.getDEK(workspaceId)
+      : null;
+    return {
+      modelsConfig: config?.modelsConfig ?? {},
+      searchProviders: providers.map((p) => ({
+        provider: p.provider,
+        apiKeyMasked: maskApiKey(decryptWithDEK(p.apiKey, dek)),
+        isDefault: p.isDefault,
+      })),
+      instruction: config?.instruction ?? null,
+      maxSteps: config?.maxSteps ?? null,
+      defaultAgentMode: config?.defaultAgentMode ?? null,
+      defaultApprovalMode: config?.defaultApprovalMode ?? null,
+      disabledTools: config?.disabledTools ?? [],
+      responseLanguage: config?.responseLanguage ?? null,
+    };
   }
 }

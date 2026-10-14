@@ -1,3 +1,5 @@
+import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
+import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -5,10 +7,15 @@ import {
   findDefaultLLMConfig,
   formatUserInstructions,
   withAgentConfig,
+  withoutDisabledTools,
 } from './agents.config';
 import { AgentConfig } from './entities/agent-config.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
-import { LLMProvider } from './enums/agent.enums';
+import { LLMProvider, SearchProvider } from './enums/agent.enums';
+
+jest.mock('@/common/utils/workspace-encryption.util', () => ({
+  decryptWithDEK: (text: string) => text.replace(/^enc\((.*)\)$/, '$1'),
+}));
 
 const WS = 'ws-1';
 const USER = 'user-1';
@@ -35,6 +42,7 @@ describe('AgentsConfigService', () => {
     createQueryBuilder: jest.Mock;
   };
   let insert: { values: jest.Mock; orIgnore: jest.Mock; execute: jest.Mock };
+  let llmRepo: { count: jest.Mock; findOne: jest.Mock; update: jest.Mock };
 
   beforeEach(async () => {
     insert = {
@@ -49,19 +57,61 @@ describe('AgentsConfigService', () => {
       save: jest.fn((v: AgentConfig) => Promise.resolve(v)),
       createQueryBuilder: jest.fn(() => ({ insert: () => insert })),
     };
+    llmRepo = { count: jest.fn(), findOne: jest.fn(), update: jest.fn() };
 
     const module = await Test.createTestingModule({
       providers: [
         AgentsConfigService,
         { provide: getRepositoryToken(AgentConfig), useValue: configRepo },
-        { provide: getRepositoryToken(AgentLLMConfig), useValue: {} },
+        { provide: getRepositoryToken(AgentLLMConfig), useValue: llmRepo },
+        {
+          provide: WorkspaceEncryptionService,
+          useValue: {
+            encrypt: jest.fn((_ws: string, text: string) =>
+              Promise.resolve(`enc(${text})`),
+            ),
+            getDEK: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     }).compile();
     service = module.get(AgentsConfigService);
   });
 
+  it('returns defaults when the user has no config yet', async () => {
+    await expect(service.get(WS, USER)).resolves.toEqual({
+      modelsConfig: {},
+      searchProviders: [],
+      instruction: null,
+      maxSteps: null,
+      defaultAgentMode: null,
+      defaultApprovalMode: null,
+      disabledTools: [],
+      responseLanguage: null,
+    });
+  });
+
+  it('rejects models on connections the user does not own', async () => {
+    llmRepo.count.mockResolvedValue(1);
+
+    await expect(
+      service.upsert(WS, USER, {
+        modelsConfig: {
+          default: { llmConfigId: 'a', model: 'gpt-5' },
+          small: { llmConfigId: 'b', model: 'mini' },
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(llmRepo.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({ workspaceId: WS, userId: USER }),
+    });
+    expect(configRepo.save).not.toHaveBeenCalled();
+  });
+
   it('creates the first row with a conflict-safe insert', async () => {
-    await service.setDefaultModel(WS, USER, 'a', 'gpt-5');
+    llmRepo.count.mockResolvedValue(1);
+
+    await service.upsert(WS, USER, { instruction: 'hi' });
 
     expect(insert.values).toHaveBeenCalledWith({
       workspaceId: WS,
@@ -69,8 +119,110 @@ describe('AgentsConfigService', () => {
     });
     expect(insert.orIgnore).toHaveBeenCalled();
     expect(configRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ instruction: 'hi' }),
+    );
+  });
+
+  it('puts the default model on its connection, which chat reads', async () => {
+    llmRepo.count.mockResolvedValue(1);
+
+    await service.upsert(WS, USER, {
+      modelsConfig: { default: { llmConfigId: 'a', model: 'gpt-5-mini' } },
+    });
+
+    expect(llmRepo.update).toHaveBeenCalledWith(
+      { id: 'a', workspaceId: WS, userId: USER },
+      { model: 'gpt-5-mini' },
+    );
+  });
+
+  it('clears models and search providers with null', async () => {
+    configRepo.findOne.mockResolvedValue(
+      agentConfig({
+        modelsConfig: { default: { llmConfigId: 'a', model: 'x' } },
+        searchProviders: [
+          { provider: SearchProvider.EXA, apiKey: 'k', isDefault: true },
+        ],
+      }),
+    );
+
+    await service.upsert(WS, USER, {
+      modelsConfig: null,
+      searchProviders: null,
+    });
+
+    expect(configRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ modelsConfig: {}, searchProviders: [] }),
+    );
+    expect(llmRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('encrypts new search keys, keeps saved ones and picks one default', async () => {
+    configRepo.findOne.mockResolvedValue(
+      agentConfig({
+        searchProviders: [
+          { provider: SearchProvider.EXA, apiKey: 'saved', isDefault: true },
+        ],
+      }),
+    );
+
+    await service.upsert(WS, USER, {
+      searchProviders: [
+        { provider: SearchProvider.EXA },
+        { provider: SearchProvider.FIRECRAWL, apiKey: 'fc-key' },
+      ],
+    });
+
+    const saved = configRepo.save.mock.calls[0][0] as AgentConfig;
+    expect(saved.searchProviders).toEqual([
+      { provider: SearchProvider.EXA, apiKey: 'saved', isDefault: true },
+      {
+        provider: SearchProvider.FIRECRAWL,
+        apiKey: 'enc(fc-key)',
+        isDefault: false,
+      },
+    ]);
+  });
+
+  it('rejects a search provider without any key', async () => {
+    await expect(
+      service.upsert(WS, USER, {
+        searchProviders: [{ provider: SearchProvider.TINYFISH }],
+      }),
+    ).rejects.toThrow('API key required for tinyfish');
+  });
+
+  it('rejects duplicate providers and two defaults', async () => {
+    await expect(
+      service.upsert(WS, USER, {
+        searchProviders: [
+          { provider: SearchProvider.EXA, apiKey: 'a' },
+          { provider: SearchProvider.EXA, apiKey: 'b' },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.upsert(WS, USER, {
+        searchProviders: [
+          { provider: SearchProvider.EXA, apiKey: 'a', isDefault: true },
+          { provider: SearchProvider.FIRECRAWL, apiKey: 'b', isDefault: true },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('only changes the fields sent and clears with null', async () => {
+    configRepo.findOne.mockResolvedValue(
+      agentConfig({ instruction: 'old', maxSteps: 30, responseLanguage: 'vi' }),
+    );
+
+    await service.upsert(WS, USER, { instruction: null, maxSteps: 10 });
+
+    expect(configRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelsConfig: { default: { llmConfigId: 'a', model: 'gpt-5' } },
+        instruction: null,
+        maxSteps: 10,
+        responseLanguage: 'vi',
       }),
     );
   });
@@ -150,6 +302,19 @@ describe('withAgentConfig', () => {
     expect(resolved.contextWindow).toBeUndefined();
     expect(resolved.maxOutputTokens).toBeUndefined();
     expect(resolved.maxSteps).toBe(40);
+  });
+});
+
+describe('withoutDisabledTools', () => {
+  it('drops the tools the user turned off', () => {
+    const tools = { a: 1, execute_remote_command: 2, b: 3 };
+    expect(
+      withoutDisabledTools(
+        tools,
+        agentConfig({ disabledTools: ['execute_remote_command'] }),
+      ),
+    ).toEqual({ a: 1, b: 3 });
+    expect(withoutDisabledTools(tools, null)).toBe(tools);
   });
 });
 
