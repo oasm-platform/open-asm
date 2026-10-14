@@ -417,11 +417,11 @@ importers:
         specifier: ^3.1048.0
         version: 3.1048.0
       '@grpc/grpc-js':
-        specifier: ^1.14.2
-        version: 1.14.4
+        specifier: ^1.14.5
+        version: 1.14.5
       '@grpc/reflection':
         specifier: ^1.0.4
-        version: 1.0.4(@grpc/grpc-js@1.14.4)
+        version: 1.0.4(@grpc/grpc-js@1.14.5)
       '@modelcontextprotocol/sdk':
         specifier: ^1.31.0
         version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@3.25.76)
@@ -445,7 +445,7 @@ importers:
         version: 12.0.1(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)
       '@nestjs/microservices':
         specifier: ^12.1.0
-        version: 12.1.0(@grpc/grpc-js@1.14.4)(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        version: 12.1.0(@grpc/grpc-js@1.14.5)(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
         specifier: ^12.1.0
         version: 12.1.0(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)
@@ -2020,8 +2020,8 @@ packages:
   '@gerrit0/mini-shiki@3.23.0':
     resolution: {integrity: sha512-bEMORlG0cqdjVyCEuU0cDQbORWX+kYCeo0kV1lbxF5bt4r7SID2l9bqsxJEM0zndaxpOUT7riCyIVEuqq/Ynxg==}
 
-  '@grpc/grpc-js@1.14.4':
-    resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
+  '@grpc/grpc-js@1.14.5':
+    resolution: {integrity: sha512-7VZM+SVdEcUUqSQeNI3zM8Qs/BhQKZndPo2h5VkYkAM8Iz0wJIa8mKV5ekQGqG8UUsnkQ0NMxIxwkIHYvj0qOw==}
     engines: {node: '>=12.10.0'}
 
   '@grpc/proto-loader@0.7.15':
@@ -9271,6 +9271,10 @@ packages:
     resolution: {integrity: sha512-/FPD0nUc9jH6rfFjji9IBqOz4pcSE3CsT1m7Ep6Mdb0LxSUMj8hgl6GomOvZzpNpAqqGaXA0P3VSrZLFzIhQrw==}
     engines: {node: '>=12.0.0'}
 
+  protobufjs@7.6.6:
+    resolution: {integrity: sha512-dYDWdjSl5RNb7SgPxGQcRU+GtvP7s2fpkrY0r432PcOIaZ0/rBcxEZnQN67iJhFuQiVw754JDoPruPCNdGsbjg==}
+    engines: {node: '>=12.0.0'}
+
   proxy-addr@2.0.7:
     resolution: {integrity: sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==}
     engines: {node: '>= 0.10'}
@@ -12989,7 +12993,7 @@ snapshots:
       '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.0.2
 
-  '@grpc/grpc-js@1.14.4':
+  '@grpc/grpc-js@1.14.5':
     dependencies:
       '@grpc/proto-loader': 0.8.1
       '@js-sdsl/ordered-map': 4.4.2
@@ -13005,12 +13009,12 @@ snapshots:
     dependencies:
       lodash.camelcase: 4.3.0
       long: 5.3.2
-      protobufjs: 7.6.5
+      protobufjs: 7.6.6
       yargs: 17.7.3
 
-  '@grpc/reflection@1.0.4(@grpc/grpc-js@1.14.4)':
+  '@grpc/reflection@1.0.4(@grpc/grpc-js@1.14.5)':
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@grpc/proto-loader': 0.7.15
       protobufjs: 7.6.5
 
@@ -13276,7 +13280,7 @@ snapshots:
     dependencies:
       '@jest/fake-timers': 29.7.0
       '@jest/types': 29.6.3
-      '@types/node': 22.20.1
+      '@types/node': 22.20.5
       jest-mock: 29.7.0
 
   '@jest/expect-utils@29.7.0':
@@ -13294,7 +13298,7 @@ snapshots:
     dependencies:
       '@jest/types': 29.6.3
       '@sinonjs/fake-timers': 10.3.0
-      '@types/node': 22.20.1
+      '@types/node': 22.20.5
       jest-message-util: 29.7.0
       jest-mock: 29.7.0
       jest-util: 29.7.0
@@ -13310,7 +13314,7 @@ snapshots:
 
   '@jest/pattern@30.4.0':
     dependencies:
-      '@types/node': 22.20.1
+      '@types/node': 22.20.5
       jest-regex-util: 30.4.0
 
   '@jest/reporters@29.7.0':
@@ -13720,7 +13724,7 @@ snapshots:
       tslib: 2.8.1
       uid: 2.0.2
     optionalDependencies:
-      '@nestjs/microservices': 12.1.0(@grpc/grpc-js@1.14.4)(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/microservices': 12.1.0(@grpc/grpc-js@1.14.5)(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express': 12.1.0(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)
 
   '@nestjs/event-emitter@12.0.1(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)':
@@ -13737,7 +13741,7 @@ snapshots:
       class-transformer: 0.5.1
       class-validator: 0.14.4
 
-  '@nestjs/microservices@12.1.0(@grpc/grpc-js@1.14.4)(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@nestjs/microservices@12.1.0(@grpc/grpc-js@1.14.5)(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
       '@nestjs/common': 12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 12.1.0(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@12.1.0)(@nestjs/platform-express@12.1.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -13746,7 +13750,7 @@ snapshots:
       rxjs: 7.8.2
       tslib: 2.8.1
     optionalDependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       ioredis: 5.11.1
 
   '@nestjs/platform-express@12.1.0(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)':
@@ -13816,7 +13820,7 @@ snapshots:
       '@nestjs/core': 12.1.0(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@12.1.0)(@nestjs/platform-express@12.1.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       tslib: 2.8.1
     optionalDependencies:
-      '@nestjs/microservices': 12.1.0(@grpc/grpc-js@1.14.4)(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/microservices': 12.1.0(@grpc/grpc-js@1.14.5)(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express': 12.1.0(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)
 
   '@nestjs/typeorm@12.0.1(@nestjs/common@12.1.0(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(ioredis@5.11.1)(mongodb@6.21.0(@aws-sdk/credential-providers@3.1130.0))(pg@8.22.0)(ts-node@10.9.2(@swc/core@1.16.2(@swc/helpers@0.5.23))(@types/node@22.20.1)(typescript@5.9.3)))':
@@ -16010,7 +16014,7 @@ snapshots:
 
   '@types/graceful-fs@4.1.9':
     dependencies:
-      '@types/node': 22.20.1
+      '@types/node': 22.20.5
 
   '@types/hast@3.0.5':
     dependencies:
@@ -16066,7 +16070,6 @@ snapshots:
   '@types/node@22.20.5':
     dependencies:
       undici-types: 6.21.0
-    optional: true
 
   '@types/prop-types@15.7.15':
     optional: true
@@ -19258,7 +19261,7 @@ snapshots:
       '@jest/expect': 29.7.0
       '@jest/test-result': 29.7.0
       '@jest/types': 29.6.3
-      '@types/node': 22.20.1
+      '@types/node': 22.20.5
       chalk: 4.1.2
       co: 4.6.0
       dedent: 1.7.2
@@ -19352,7 +19355,7 @@ snapshots:
       '@jest/environment': 29.7.0
       '@jest/fake-timers': 29.7.0
       '@jest/types': 29.6.3
-      '@types/node': 22.20.1
+      '@types/node': 22.20.5
       jest-mock: 29.7.0
       jest-util: 29.7.0
 
@@ -19401,7 +19404,7 @@ snapshots:
   jest-mock@29.7.0:
     dependencies:
       '@jest/types': 29.6.3
-      '@types/node': 22.20.1
+      '@types/node': 22.20.5
       jest-util: 29.7.0
 
   jest-pnp-resolver@1.2.3(jest-resolve@29.7.0):
@@ -19547,7 +19550,7 @@ snapshots:
 
   jest-worker@29.7.0:
     dependencies:
-      '@types/node': 22.20.1
+      '@types/node': 22.20.5
       jest-util: 29.7.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
@@ -21080,6 +21083,20 @@ snapshots:
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.2
       '@types/node': 22.20.1
+      long: 5.3.2
+
+  protobufjs@7.6.6:
+    dependencies:
+      '@protobufjs/aspromise': 1.1.2
+      '@protobufjs/base64': 1.1.2
+      '@protobufjs/codegen': 2.0.5
+      '@protobufjs/eventemitter': 1.1.1
+      '@protobufjs/fetch': 1.1.1
+      '@protobufjs/float': 1.0.2
+      '@protobufjs/path': 1.1.2
+      '@protobufjs/pool': 1.1.0
+      '@protobufjs/utf8': 1.1.2
+      '@types/node': 22.20.5
       long: 5.3.2
 
   proxy-addr@2.0.7:
