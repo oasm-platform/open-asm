@@ -3,7 +3,7 @@ import LogoFrame from '@/components/ui/logo-frame';
 import ToolLogo from '@/components/ui/tool-logo';
 import { type Tool } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
-import { BadgeCheck } from 'lucide-react';
+import { BadgeCheck, Bot } from 'lucide-react';
 
 interface ToolCardProps {
   tool: Tool;
@@ -36,6 +36,11 @@ const ToolCard = ({ tool }: ToolCardProps) => {
           </span>
         )}
         <Badge variant="secondary">{formatCategory(tool.category)}</Badge>
+        {tool.agentTool && (
+          <span title="AI agent tool" className="inline-flex shrink-0">
+            <Bot className="size-4 text-muted-foreground" />
+          </span>
+        )}
       </div>
       <p className="text-sm text-muted-foreground line-clamp-2">
         {tool.description || 'No description available.'}
