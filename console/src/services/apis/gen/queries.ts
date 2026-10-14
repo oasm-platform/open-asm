@@ -1888,6 +1888,20 @@ export type GetManyGetTlsResponseDtoDto = {
   pageCount: number;
 };
 
+export type GetTagAssetsDTO = {
+  tag: string;
+  assetCount: number;
+};
+
+export type GetManyGetTagAssetsDTODto = {
+  data: GetTagAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 /**
  * Determines which group the node belongs to.
  */
@@ -4102,6 +4116,10 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
   tlsHosts?: string[];
   urls?: string[];
   /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.
+   */
+  filter?: string;
+  /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
   startDate?: string;
@@ -4126,6 +4144,10 @@ export type AssetsControllerGetIpAssetsParams = {
   statusCodes?: string[];
   tlsHosts?: string[];
   urls?: string[];
+  /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.
+   */
+  filter?: string;
   /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
@@ -4152,6 +4174,10 @@ export type AssetsControllerGetHostAssetsParams = {
   tlsHosts?: string[];
   urls?: string[];
   /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.
+   */
+  filter?: string;
+  /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
   startDate?: string;
@@ -4176,6 +4202,10 @@ export type AssetsControllerGetPortAssetsParams = {
   statusCodes?: string[];
   tlsHosts?: string[];
   urls?: string[];
+  /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.
+   */
+  filter?: string;
   /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
@@ -4202,6 +4232,10 @@ export type AssetsControllerGetUrlAssetsParams = {
   tlsHosts?: string[];
   urls?: string[];
   /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.
+   */
+  filter?: string;
+  /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
   startDate?: string;
@@ -4226,6 +4260,10 @@ export type AssetsControllerGetTechnologyAssetsParams = {
   statusCodes?: string[];
   tlsHosts?: string[];
   urls?: string[];
+  /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.
+   */
+  filter?: string;
   /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
@@ -4252,6 +4290,10 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
   tlsHosts?: string[];
   urls?: string[];
   /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.
+   */
+  filter?: string;
+  /**
    * Filter assets created on or after this date (YYYY-MM-DD)
    */
   startDate?: string;
@@ -4270,11 +4312,44 @@ export type AssetsControllerGetTlsAssetsParams = {
   hosts?: string[];
   targetIds?: string[];
   /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.
+   */
+  filter?: string;
+  /**
    * Filter TLS certs with not_after on or after this date (YYYY-MM-DD)
    */
   startDate?: string;
   /**
    * Filter TLS certs with not_after on or before this date (YYYY-MM-DD)
+   */
+  endDate?: string;
+};
+
+export type AssetsControllerGetTagAssetsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  value?: string;
+  targetIds?: string[];
+  ipAddresses?: string[];
+  ports?: string[];
+  hosts?: string[];
+  techs?: string[];
+  statusCodes?: string[];
+  tlsHosts?: string[];
+  urls?: string[];
+  /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.
+   */
+  filter?: string;
+  /**
+   * Filter assets created on or after this date (YYYY-MM-DD)
+   */
+  startDate?: string;
+  /**
+   * Filter assets created on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
 };
@@ -21709,6 +21784,365 @@ export function useAssetsControllerGetTlsAssets<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getAssetsControllerGetTlsAssetsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves distinct service tags in the workspace with number of assets.
+ * @summary Get tags along with number of assets
+ */
+export const assetsControllerGetTagAssets = (
+  params?: AssetsControllerGetTagAssetsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetTagAssetsDTODto>(
+    { url: `/api/assets/tags`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetTagAssetsInfiniteQueryKey = (
+  params?: AssetsControllerGetTagAssetsParams,
+) => {
+  return ['infinite', `/api/assets/tags`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetTagAssetsQueryKey = (
+  params?: AssetsControllerGetTagAssetsParams,
+) => {
+  return [`/api/assets/tags`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetTagAssetsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+    AssetsControllerGetTagAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTagAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTagAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetTagAssetsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+    QueryKey,
+    AssetsControllerGetTagAssetsParams['page']
+  > = ({ signal, pageParam }) =>
+    assetsControllerGetTagAssets(
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+    TError,
+    TData,
+    QueryKey,
+    AssetsControllerGetTagAssetsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetTagAssetsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetTagAssets>>
+>;
+export type AssetsControllerGetTagAssetsInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetTagAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+    AssetsControllerGetTagAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AssetsControllerGetTagAssetsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTagAssetsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTagAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+    AssetsControllerGetTagAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTagAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTagAssetsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTagAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+    AssetsControllerGetTagAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTagAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTagAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tags along with number of assets
+ */
+
+export function useAssetsControllerGetTagAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+    AssetsControllerGetTagAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTagAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTagAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetTagAssetsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getAssetsControllerGetTagAssetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTagAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetTagAssetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetTagAssets>>
+  > = ({ signal }) =>
+    assetsControllerGetTagAssets(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetTagAssetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetTagAssets>>
+>;
+export type AssetsControllerGetTagAssetsQueryError = unknown;
+
+export function useAssetsControllerGetTagAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+  TError = unknown,
+>(
+  params: undefined | AssetsControllerGetTagAssetsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTagAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTagAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTagAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTagAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTagAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTagAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tags along with number of assets
+ */
+
+export function useAssetsControllerGetTagAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTagAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTagAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetTagAssetsQueryOptions(
     params,
     options,
   );
