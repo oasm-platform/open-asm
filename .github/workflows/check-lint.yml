@@ -12,17 +12,18 @@ on:
       - 'pnpm-workspace.yaml'
       - '.npmrc'
       - 'tsconfig*.json'
+  # No `paths:` here: "Check Lint (core-api|console)" are required checks on
+  # main, and a workflow-level filter leaves them "Expected" forever on PRs that
+  # don't touch these paths, blocking merge and auto-merge. The filter runs as a
+  # step (not a job-level `if`, which would collapse the matrix check names).
   pull_request:
     branches:
       - '**'
-    paths:
-      - 'core-api/**'
-      - 'console/**'
-      - 'package*.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - '.npmrc'
-      - 'tsconfig*.json'
+
+permissions:
+  contents: read
+  # dorny/paths-filter lists PR files through the REST API.
+  pull-requests: read
 
 jobs:
   lint:
@@ -35,20 +36,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - name: Detect changes
+        uses: dorny/paths-filter@v3
+        id: filter
         with:
-          version: 10.33.2
+          filters: |
+            relevant:
+              - 'core-api/**'
+              - 'console/**'
+              - 'package*.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
+              - 'tsconfig*.json'
+              - '.nvmrc'
+              - '.github/workflows/check-lint.yml'
+
+      - name: Setup pnpm
+        if: steps.filter.outputs.relevant == 'true'
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
+        if: steps.filter.outputs.relevant == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        if: steps.filter.outputs.relevant == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Run lint
+        if: steps.filter.outputs.relevant == 'true'
         run: pnpm --filter ${{ matrix.service }} run lint
