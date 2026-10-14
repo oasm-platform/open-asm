@@ -14,8 +14,8 @@ import { TlsCertificate } from '../assets/entities/tls-certificate.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
 import { IssuesService } from '../issues/issues.service';
 import type { Job } from '../jobs-registry/entities/job.entity';
-import { EventBridgeService } from '../event-bridge/event-bridge.service';
-import { EVENT_CATALOG } from '../connectors/event';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -1720,13 +1720,13 @@ describe('DataAdapterService', () => {
         job: mockJob,
       });
 
-      // Should publish vulnerability.detected with count=1 (only the new vuln)
+      // Should publish vulnerability.detected carrying only the new vuln
       expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
         EVENT_CATALOG.vulnerability.detected,
         expect.objectContaining({
           workspaceId: 'workspace-id',
           payload: expect.objectContaining({
-            count: 1,
+            vulnerabilities: [expect.objectContaining({ name: newVuln.name })],
           }),
         }),
       );
@@ -1834,7 +1834,7 @@ describe('DataAdapterService', () => {
         EVENT_CATALOG.vulnerability.detected,
         expect.objectContaining({
           payload: expect.objectContaining({
-            count: 1,
+            vulnerabilities: [expect.objectContaining({ name: lowVuln.name })],
           }),
         }),
       );

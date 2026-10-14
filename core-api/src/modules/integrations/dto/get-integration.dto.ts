@@ -21,6 +21,13 @@ export class GetIntegrationDto {
   category: string;
 
   @ApiProperty({
+    type: [String],
+    description:
+      'Enabled capabilities. Single-capability integrations report [category].',
+  })
+  capabilities: string[];
+
+  @ApiProperty({
     description: 'Configuration with sensitive fields masked',
   })
   config: Record<string, unknown>;

@@ -47,6 +47,14 @@ const INTEGRATION_SOURCE_SCHEMAS: Record<string, IntegrationSourceSchema> = {
     title: 'Vercel',
     icon: '/static/images/integrations/vercel.svg',
   },
+  github: {
+    title: 'GitHub',
+    icon: '/static/images/integrations/github.svg',
+  },
+  gitlab: {
+    title: 'GitLab',
+    icon: '/static/images/integrations/gitlab.svg',
+  },
 };
 
 const MANUAL_SOURCE: TargetSourceDto = { source: 'Manual', icon: '' };

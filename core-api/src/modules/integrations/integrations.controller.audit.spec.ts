@@ -1,6 +1,6 @@
 import { Reflector } from '@nestjs/core';
-import type { PublishEventConfig } from '../event-bridge/publish-event.decorator';
-import { PUBLISH_EVENT_KEY } from '../event-bridge/publish-event.decorator';
+import type { PublishEventConfig } from '../event-bridge/publishing/publish-event.decorator';
+import { PUBLISH_EVENT_KEY } from '../event-bridge/publishing/publish-event.decorator';
 import { IntegrationsController } from './integrations.controller';
 import type { CreateIntegrationDto } from './dto/create-integration.dto';
 import type { UpdateIntegrationDto } from './dto/update-integration.dto';

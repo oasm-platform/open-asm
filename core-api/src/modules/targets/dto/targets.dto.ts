@@ -1,9 +1,10 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { CronSchedule, JobStatus, ScanStatus, TargetScopeType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -14,18 +15,54 @@ import {
 import { Target, TargetType } from '../entities/target.entity';
 import { TargetSourceDto } from '../target-source.dto';
 
+export class GitOrgTargetSettingsDto {
+  @ApiProperty({
+    required: false,
+    default: false,
+    description: 'Scan archived repositories',
+  })
+  @IsOptional()
+  @IsBoolean()
+  includeArchived?: boolean;
+
+  @ApiProperty({
+    required: false,
+    default: false,
+    description: 'Scan forks',
+  })
+  @IsOptional()
+  @IsBoolean()
+  includeForks?: boolean;
+}
+
 export class CreateTargetDto {
   @ApiProperty({
     example: 'example.com',
-    description: 'The target value (domain, IP address, or CIDR notation)',
+    description:
+      'The target value: domain, IP address, CIDR notation, or for GIT_ORG `<host>/<owner>` (e.g. github.com/acme)',
   })
   @IsString()
   value: string;
 
   @ApiProperty({
+    required: false,
+    description:
+      'GIT_ORG only (required there): the SOURCE_CODE integration that syncs the repositories',
+  })
+  @IsOptional()
+  @IsUUID()
+  integrationId?: string;
+
+  @ApiProperty({ required: false, type: GitOrgTargetSettingsDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GitOrgTargetSettingsDto)
+  settings?: GitOrgTargetSettingsDto;
+
+  @ApiProperty({
     enum: TargetType,
     enumName: 'TargetType',
-    description: 'The type of target (DOMAIN, CIDR, or IP)',
+    description: 'The type of target (DOMAIN, CIDR, IP, or GIT_ORG)',
     example: TargetType.DOMAIN,
     required: false,
     default: TargetType.DOMAIN,
@@ -119,6 +156,15 @@ export class GetManyTargetResponseDto {
   @ApiProperty({ example: 100 })
   totalAssetServices: number;
 
+  @ApiProperty({
+    example: 12,
+    description: 'Enabled assets — for a GIT_ORG target, scanned repositories',
+  })
+  totalAssets: number;
+
+  @ApiProperty({ type: String, nullable: true, required: false })
+  integrationId?: string | null;
+
   @ApiProperty()
   duration: number;
 
@@ -168,9 +214,68 @@ export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
 }
 
 export class UpdateTargetDto {
-  @ApiProperty({ enum: CronSchedule })
+  @ApiProperty({ enum: CronSchedule, required: false })
   @IsString()
   @IsEnum(CronSchedule)
   @IsOptional()
   scanSchedule?: CronSchedule;
+
+  @ApiProperty({
+    required: false,
+    type: GitOrgTargetSettingsDto,
+    description: 'GIT_ORG only. Applied by a repository sync started right away.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GitOrgTargetSettingsDto)
+  settings?: GitOrgTargetSettingsDto;
+}
+
+export class GetTargetRepositoriesQueryDto extends GetManyBaseQueryParams {
+  @ApiProperty({
+    required: false,
+    description: 'true → only scanned repositories, false → only skipped ones',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? undefined : value === true || value === 'true',
+  )
+  @IsBoolean()
+  isEnabled?: boolean;
+}
+
+/** A repository of a GIT_ORG target (one of its assets). */
+export class TargetRepositoryDto {
+  @ApiProperty({ description: 'Asset id' })
+  id: string;
+
+  @ApiProperty({ example: 'github.com/acme/web' })
+  value: string;
+
+  @ApiProperty({ description: 'False when skipped (archived/fork) or gone' })
+  isEnabled: boolean;
+
+  @ApiProperty({ example: 'acme/web' })
+  fullName: string;
+
+  @ApiProperty({ example: 'https://github.com/acme/web' })
+  url: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  defaultBranch: string | null;
+
+  @ApiProperty()
+  private: boolean;
+
+  @ApiProperty()
+  archived: boolean;
+
+  @ApiProperty()
+  fork: boolean;
+
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' })
+  pushedAt: string | null;
+
+  @ApiProperty()
+  createdAt: Date;
 }

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package jobs_registry;
 
-option go_package = "./jobs_registry";
+option go_package = "oasm-worker/internal/gen/jobs_registry";
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
@@ -247,7 +247,17 @@ message Vulnerability {
   string file_path = 31;
   string job_history_id = 32;
   bool is_archived = 33;
+  // Set by repository scanners: the connector's stable identity of the
+  // finding within its asset. Core keys deduplication on it when present.
   string fingerprint = 34;
+
+  // Code findings (repository scanners). Empty / 0 for host findings.
+  int32 line_start = 35;
+  int32 line_end = 36;
+  string commit = 37;
+  string package_name = 38;
+  string installed_version = 39;
+  string fixed_version = 40;
 }
 
 // --- Enums ---

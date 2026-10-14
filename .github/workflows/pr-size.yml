@@ -1,0 +1,154 @@
+name: PR Size
+
+# Keeps pull requests small enough to review properly. Posts a single sticky bot
+# comment when a PR gets large, and fails the check when it exceeds the hard limit.
+#
+# Uses pull_request_target so the bot can also comment on PRs from forks (the
+# pull_request token is read-only there). This is safe ONLY because the job never
+# checks out or executes PR code — it reads the file list through the API.
+# Do not add an actions/checkout step to this workflow.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  size:
+    name: PR Size
+    runs-on: ubuntu-latest
+    env:
+      # Set to 'false' to only comment without failing the check (e.g. during a trial period).
+      ENFORCE: 'true'
+    steps:
+      - name: Check PR size
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const SOFT_LINES = 400;   // above this: warning comment
+            const HARD_LINES = 1000;  // above this: check fails
+            const HARD_FILES = 40;    // above this: check fails
+            const OVERRIDE_LABEL = 'size/override';
+            const MARKER = '<!-- pr-size-check -->';
+            const ENFORCE = process.env.ENFORCE === 'true';
+
+            // Generated or mechanical files — not counted (see AGENTS.md "generated code").
+            const IGNORED = [
+              /^pnpm-lock\.yaml$/,
+              /(^|\/)package-lock\.json$/,
+              /(^|\/)go\.sum$/,
+              /^\.open-api\//,
+              /^console\/src\/services\/apis\/gen\//,
+              /^console\/src\/routeTree\.gen\.ts$/,
+              /^worker\/internal\/gen\//,
+              /^core-api\/resources\/connectors\/manifest\.json$/,
+              /^core-api\/src\/database\/migrations\//,
+              /\.snap$/,
+            ];
+
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const fmt = (n) => n.toLocaleString('en-US');
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner, repo, pull_number: pr.number, per_page: 100,
+            });
+            const counted = files.filter(
+              (f) => f.status !== 'removed' && !IGNORED.some((re) => re.test(f.filename)),
+            );
+            const lines = counted.reduce((sum, f) => sum + f.additions + f.deletions, 0);
+            const excluded = files.length - counted.length;
+
+            const overridden = pr.labels.some((l) => l.name === OVERRIDE_LABEL);
+            const tooLarge = lines > HARD_LINES || counted.length > HARD_FILES;
+            const large = tooLarge || lines > SOFT_LINES;
+
+            core.info(`Counted ${counted.length} files / ${lines} lines (${excluded} excluded).`);
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pr.number, per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.user?.type === 'Bot' && c.body?.includes(MARKER),
+            );
+
+            const upsert = async (body) => {
+              if (existing) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+              }
+            };
+
+            if (!large) {
+              if (existing) {
+                await upsert(
+                  `${MARKER}\n### ✅ PR size is fine now\n\n` +
+                  `${fmt(lines)} lines across ${counted.length} files. Thanks for keeping it reviewable!`,
+                );
+              }
+              return;
+            }
+
+            const guide = `${context.serverUrl}/${owner}/${repo}/blob/${pr.base.ref}/CONTRIBUTING.md#pull-request-size`;
+            const largest = [...counted]
+              .sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions))
+              .slice(0, 10)
+              .map((f) => `| \`${f.filename}\` | +${fmt(f.additions)} / −${fmt(f.deletions)} |`)
+              .join('\n');
+
+            let heading;
+            let advice;
+            if (tooLarge && overridden) {
+              heading = `### ⚠️ Large PR — size limit overridden with \`${OVERRIDE_LABEL}\``;
+              advice = 'Reviewers: budget extra time and review this in passes (structure first, then details).';
+            } else if (tooLarge) {
+              heading = '### 🚫 This PR is too large to review effectively';
+              advice =
+                `Please split it into smaller PRs that each do **one** thing — see [Pull Request Size](${guide}) for how.\n\n` +
+                `If the size is genuinely unavoidable (mechanical rename, generated-only change, vendored update), ` +
+                `ask a maintainer to apply the \`${OVERRIDE_LABEL}\` label.`;
+            } else {
+              heading = '### ⚠️ This PR is getting large';
+              advice =
+                `Reviews get noticeably less thorough above ~${SOFT_LINES} lines. ` +
+                `Consider splitting it — see [Pull Request Size](${guide}). This is a warning only; the check still passes.`;
+            }
+
+            const body = [
+              MARKER,
+              heading,
+              '',
+              '| | This PR | Recommended | Limit |',
+              '|---|---:|---:|---:|',
+              `| Lines changed | ${fmt(lines)} | ≤ ${fmt(SOFT_LINES)} | ${fmt(HARD_LINES)} |`,
+              `| Files changed | ${fmt(counted.length)} | — | ${fmt(HARD_FILES)} |`,
+              '',
+              `<sub>Not counted: lockfiles, generated code, migrations, snapshots and deleted files (${fmt(excluded)} files).</sub>`,
+              '',
+              '<details><summary>Largest files</summary>',
+              '',
+              '| File | Changes |',
+              '|---|---:|',
+              largest,
+              '',
+              '</details>',
+              '',
+              advice,
+            ].join('\n');
+
+            await upsert(body);
+
+            if (tooLarge && !overridden && ENFORCE) {
+              core.setFailed(
+                `PR too large: ${counted.length} files / ${lines} lines ` +
+                `(limit ${HARD_FILES} files / ${HARD_LINES} lines). Split it or get the ${OVERRIDE_LABEL} label.`,
+              );
+            }

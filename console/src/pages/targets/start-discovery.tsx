@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
+import { GitOrgPicker } from './components/git-org-picker';
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
 const cidr24Regex = /^(\d{1,3}\.){3}\d{1,3}\/24$/;
@@ -22,27 +23,31 @@ const targetTypeColor: Record<string, string> = {
   DOMAIN: 'border-blue-500 text-blue-500',
   CIDR: 'border-green-500 text-green-500',
   IP: 'border-orange-500 text-orange-500',
+  GIT_ORG: 'border-purple-500 text-purple-500',
 };
 
 const targetTypeBg: Record<string, string> = {
   DOMAIN: 'bg-blue-500/10',
   CIDR: 'bg-green-500/10',
   IP: 'bg-orange-500/10',
+  GIT_ORG: 'bg-purple-500/10',
 };
 
 const targetTypeButton: Record<string, string> = {
   DOMAIN: 'bg-blue-500 hover:bg-blue-600 text-white',
   CIDR: 'bg-green-500 hover:bg-green-600 text-white',
   IP: 'bg-orange-500 hover:bg-orange-600 text-white',
+  GIT_ORG: 'bg-purple-500 hover:bg-purple-600 text-white',
 };
 
 const textareaBorderColor: Record<string, string> = {
   DOMAIN: 'border-blue-500 focus-visible:ring-blue-500',
   CIDR: 'border-green-500 focus-visible:ring-green-500',
   IP: 'border-orange-500 focus-visible:ring-orange-500',
+  GIT_ORG: 'border-purple-500 focus-visible:ring-purple-500',
 };
 
-type TargetType = 'DOMAIN' | 'CIDR' | 'IP';
+type TargetType = 'DOMAIN' | 'CIDR' | 'IP' | 'GIT_ORG';
 
 type FormValues = {
   value: string;
@@ -227,8 +232,9 @@ export default function StartDiscovery() {
         <div className={`bg-card rounded-lg border ${targetTypeBg[targetType]} p-4`}>
           <div className="mb-6">
             <p className="text-muted-foreground mt-2">
-              Enter one or more targets to scan, separated by commas or new
-              lines.
+              {targetType === 'GIT_ORG'
+                ? 'Pick GitHub organizations or GitLab groups; their repositories are synced and scanned.'
+                : 'Enter one or more targets to scan, separated by commas or new lines.'}
             </p>
           </div>
 
@@ -273,9 +279,23 @@ export default function StartDiscovery() {
                     CIDR /24
                   </span>
                 </Label>
+                <Label htmlFor="type-git-org" className="flex items-center gap-2 cursor-pointer">
+                  <RadioGroupItem
+                    value="GIT_ORG"
+                    id="type-git-org"
+                    className={targetTypeColor.GIT_ORG}
+                  />
+                  <span className={`${targetType === 'GIT_ORG' ? 'font-bold' : 'font-normal'} ${targetTypeColor.GIT_ORG}`}>
+                    Git organization
+                  </span>
+                </Label>
               </RadioGroup>
             </div>
 
+            {targetType === 'GIT_ORG' ? (
+              <GitOrgPicker />
+            ) : (
+            <>
             <div className="space-y-2">
               <Textarea
                 id="targets"
@@ -353,6 +373,8 @@ export default function StartDiscovery() {
                 Start Discovery
               </Button>
             </div>
+            </>
+            )}
           </form>
         </div>
       </div>

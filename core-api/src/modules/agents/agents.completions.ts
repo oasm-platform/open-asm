@@ -11,12 +11,7 @@ import type {
   ToolSet,
   UIMessageChunk,
 } from 'ai';
-import {
-  generateText,
-  isStepCount,
-  streamText,
-  toUIMessageStream,
-} from 'ai';
+import { generateText, isStepCount, streamText, toUIMessageStream } from 'ai';
 import * as fs from 'fs';
 import * as Mustache from 'mustache';
 import { EventEmitter } from 'node:events';
@@ -24,6 +19,7 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 
 import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { WorkersService } from '@/modules/workers/workers.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
   APPROVAL_TIMEOUT_MS,
@@ -155,6 +151,7 @@ export class AgentsCompletionsService {
     private readonly agentsSkillsService: AgentsSkillsService,
     private readonly workspaceEncryption: WorkspaceEncryptionService,
     private readonly approvals: AgentsApprovalsService,
+    private readonly workersService: WorkersService,
   ) {
     this.loadAllPrompts();
   }
@@ -296,7 +293,10 @@ export class AgentsCompletionsService {
   ): Promise<LanguageModel> {
     let apiKey = '';
     if (config.apiKey) {
-      apiKey = await this.workspaceEncryption.decrypt(workspaceId, config.apiKey);
+      apiKey = await this.workspaceEncryption.decrypt(
+        workspaceId,
+        config.apiKey,
+      );
     }
     const providerConfig = getLLMProviderConfig(config.provider);
 
@@ -335,7 +335,10 @@ export class AgentsCompletionsService {
         CONVERSATION_CONTENT: conversationContent,
       });
 
-      const model = await this.createLanguageModel(llmConfig, llmConfig.workspaceId);
+      const model = await this.createLanguageModel(
+        llmConfig,
+        llmConfig.workspaceId,
+      );
 
       const titleResult = await generateText({
         model,
@@ -564,6 +567,17 @@ export class AgentsCompletionsService {
       dto.provider,
       dto.model,
     );
+    if (
+      dto.workerId &&
+      !(await this.workersService.isAgentWorkerForWorkspace(
+        dto.workerId,
+        workspaceId,
+      ))
+    ) {
+      throw new BadRequestException(
+        'Worker is not available to agents in this workspace',
+      );
+    }
     const newConversation = this.conversationRepository.create({
       ...(dto.conversationId ? { id: dto.conversationId } : {}),
       workspaceId,
@@ -803,7 +817,10 @@ export class AgentsCompletionsService {
         CONVERSATION_CONTENT: conversationContent,
       });
 
-      const model = await this.createLanguageModel(llmConfig, llmConfig.workspaceId);
+      const model = await this.createLanguageModel(
+        llmConfig,
+        llmConfig.workspaceId,
+      );
 
       const result = await generateText({
         model,
@@ -886,7 +903,9 @@ export class AgentsCompletionsService {
     );
   }
 
-  private async loadTodoItems(conversationId: string): Promise<AgentTodoItem[]> {
+  private async loadTodoItems(
+    conversationId: string,
+  ): Promise<AgentTodoItem[]> {
     const entities = await this.todoRepository.find({
       where: { conversationId },
       order: { sortOrder: 'ASC' },
@@ -1055,7 +1074,10 @@ export class AgentsCompletionsService {
       });
 
       // Create a model instance for summarization
-      const model = await this.createLanguageModel(llmConfig, llmConfig.workspaceId);
+      const model = await this.createLanguageModel(
+        llmConfig,
+        llmConfig.workspaceId,
+      );
 
       // Generate the summary
       const result = await generateText({
@@ -1329,8 +1351,7 @@ export class AgentsCompletionsService {
             const parts: Record<string, unknown>[] = [];
             let hasReasoningPart = false;
             for (const step of event.steps) {
-              const stepReasoning =
-                step.reasoningText ?? '';
+              const stepReasoning = step.reasoningText ?? '';
               if (stepReasoning.trim()) {
                 parts.push({ type: 'reasoning', text: stepReasoning.trim() });
                 hasReasoningPart = true;
@@ -1520,9 +1541,13 @@ export class AgentsCompletionsService {
           exitCode: number;
         }) => {
           if (controllerClosed) return;
+          // Transient: a non-transient data chunk is appended to the message
+          // parts and the client re-clones the whole message per chunk, so a
+          // long output (thousands of chunks) froze the chat.
           controller.enqueue({
             type: 'data-remote-execute-output',
             data,
+            transient: true,
           } as unknown as UIMessageChunk);
         };
         todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
@@ -1894,8 +1919,7 @@ export class AgentsCompletionsService {
     const skillsPrompt =
       await this.agentsSkillsService.buildSkillsPrompt(workspaceId);
     let loadSkillTool:
-      | ReturnType<AgentsSkillsService['createLoadSkillTool']>
-      | undefined;
+      ReturnType<AgentsSkillsService['createLoadSkillTool']> | undefined;
     if (skillsPrompt) {
       contextParts.push(skillsPrompt);
       skillsContext = skillsPrompt;

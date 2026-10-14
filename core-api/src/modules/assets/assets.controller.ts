@@ -33,6 +33,7 @@ import {
   GenerateServiceTagsResponseDto,
 } from './dto/generate-service-tags.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
+import { GetTagAssetsDTO } from './dto/get-tag-assets.dto';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -191,6 +192,26 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetsService.getManyTls(query, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get tags along with number of assets',
+    description:
+      'Retrieves distinct service tags in the workspace with number of assets.',
+    response: {
+      serialization: GetManyResponseDto(GetTagAssetsDTO),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('asset.read')
+  @Get('/tags')
+  getTagAssets(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getTagAssets(query, workspaceId);
   }
 
   @Doc({

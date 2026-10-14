@@ -1,6 +1,10 @@
 import { IsCronSchedule } from '@/modules/asset-group/dto/cron-schedule.validator';
+import { IntegrationType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  ArrayNotEmpty,
+  IsArray,
+  IsEnum,
   IsObject,
   IsOptional,
   IsString,
@@ -28,6 +32,20 @@ export class UpdateIntegrationDto {
   @IsOptional()
   @IsObject()
   config?: Record<string, unknown>;
+
+  @ApiProperty({
+    required: false,
+    enum: IntegrationType,
+    enumName: 'IntegrationType',
+    isArray: true,
+    description:
+      'Replaces the enabled capabilities (multi-capability apps only). The stored config is re-validated against the new set.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsEnum(IntegrationType, { each: true })
+  capabilities?: IntegrationType[];
 
   @ApiProperty({
     required: false,

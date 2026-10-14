@@ -17,8 +17,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { EVENT_CATALOG } from '../connectors/event';
-import { PublishEvent } from '../event-bridge/publish-event.decorator';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { Asset } from '../assets/entities/assets.entity';
 import { AssetGroupService } from './asset-group.service';
 import { AssetGroupWorkflowService } from './asset-group-workflow.service';

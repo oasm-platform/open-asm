@@ -251,11 +251,18 @@ describe('IntegrationSyncService', () => {
 
       expect(repoMock.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {
-            syncSchedule: expect.anything(),
-            syncJobId: expect.anything(),
-            category: IntegrationType.CLOUD_PROVIDER,
-          },
+          where: [
+            {
+              syncSchedule: expect.anything(),
+              syncJobId: expect.anything(),
+              category: IntegrationType.CLOUD_PROVIDER,
+            },
+            {
+              syncSchedule: expect.anything(),
+              syncJobId: expect.anything(),
+              capabilities: expect.anything(),
+            },
+          ],
         }),
       );
       expect(queueMock.add).toHaveBeenCalledTimes(2);
