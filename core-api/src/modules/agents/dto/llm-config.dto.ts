@@ -4,14 +4,12 @@ import {
   IsBoolean,
   IsDate,
   IsEnum,
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUrl,
   IsUUID,
   MaxLength,
-  Min,
   ValidateNested,
 } from 'class-validator';
 import { LLMProvider } from '../enums/agent.enums';
@@ -144,22 +142,11 @@ export class CreateLLMConfigDto {
   @IsUrl(LOCAL_URL_OPTIONS)
   @MaxLength(500)
   apiUrl?: string;
-
-  @ApiPropertyOptional({
-    description: 'Custom context window size in tokens',
-    example: 8192,
-    minimum: 1,
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  contextWindow?: number;
 }
 
 export class UpdateLLMConfigDto extends PartialType(CreateLLMConfigDto) {
   @ApiPropertyOptional({
-    description: 'Whether this is the preferred configuration for new conversations',
+    description: 'Make this connection the default model for new conversations',
     example: true,
   })
   @IsOptional()
@@ -217,20 +204,8 @@ export class LLMConfigResponseDto {
   @MaxLength(500)
   apiUrl?: string | null;
 
-  @ApiPropertyOptional({
-    description: 'Custom context window size in tokens',
-    example: 8192,
-    minimum: 1,
-    nullable: true,
-    type: Number,
-  })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  contextWindow?: number | null;
-
   @ApiProperty({
-    description: 'Whether this is the preferred configuration',
+    description: 'Whether this is the default model connection',
     example: true,
   })
   @IsBoolean()

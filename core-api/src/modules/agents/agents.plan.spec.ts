@@ -576,12 +576,16 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     agentMode: AgentMode,
     approvalMode: AgentApprovalMode,
     todos: TodoStatus[] = [],
+    agentConfig: unknown = null,
   ) => {
     const service: any = Object.create(AgentsCompletionsService.prototype);
     service.getPrompt = jest.fn((name: string) => `prompt:${name}`);
     service.agentsMemories = {
       stmFormatForPrompt: jest.fn(() => Promise.resolve('')),
       ltmFormatForPrompt: jest.fn(() => Promise.resolve('')),
+    };
+    service.agentsConfig = {
+      find: jest.fn(() => Promise.resolve(agentConfig)),
     };
     service.todoRepository = createTodoRepo();
     service.todoRepository.rows = todos.map((status, i) => ({
@@ -599,6 +603,17 @@ describe('AgentsCompletionsService plan mode prompt', () => {
       'u1',
     ) as Promise<string[]>;
   };
+
+  it("puts the user's instructions right after the shared system prompt", async () => {
+    const parts = await build(AgentMode.ASK, AgentApprovalMode.MANUAL, [], {
+      instruction: 'Report in tables.',
+    });
+    expect(parts.slice(0, 3)).toEqual([
+      'prompt:ASK.md',
+      'prompt:SYSTEM.md',
+      '## User instructions\nReport in tables.',
+    ]);
+  });
 
   it.each([AgentMode.AGENT, AgentMode.ASK])(
     'asks for a plan first in %s mode when plan mode is on',
