@@ -6,7 +6,6 @@ import type { TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
 import { DataSource } from 'typeorm';
-import { AuditInterceptor } from './audit.interceptor';
 import { AuditRetentionService } from './audit-retention.service';
 import { AuditService } from './audit.service';
 import { AuditEvent } from './entities/audit-event.entity';
@@ -119,33 +118,27 @@ describe('AuditModule boot (real DI graph)', () => {
     expect(paramtypes[1]).toBe(DataSource);
   });
 
-  it('registers AuditInterceptor as a global APP_INTERCEPTOR', () => {
-    // Regression: the interceptor was wired via APP_INTERCEPTOR but nothing
-    // pinned the provider — deleting it left every test green while prod wrote
-    // zero audit events. Nest 11 does NOT keep the bare APP_INTERCEPTOR token
-    // in the module graph: DependenciesScanner.insertProvider re-keys global
-    // enhancers as `APP_INTERCEPTOR (UUID: <uuid>)` (scanner.js), so
-    // `moduleRef.get(APP_INTERCEPTOR)` throws UnknownElementException. Pin the
-    // real registration by scanning the module graph for the enhancer token
-    // and resolving it through DI (what Nest applies to every route).
+  it('no longer registers a global APP_INTERCEPTOR', () => {
+    // The audit write is a SINK over the event stream now, not a producer-side
+    // interceptor: EventPublishInterceptor (event-bridge module) is the one
+    // APP_INTERCEPTOR, and it publishes instead of writing rows. Asserting the
+    // absence here is what stops a second producer-side audit write from being
+    // reintroduced beside the sink — that would double every audit row.
+    //
+    // Nest does NOT keep the bare APP_INTERCEPTOR token in the module graph:
+    // DependenciesScanner re-keys global enhancers as `APP_INTERCEPTOR (UUID:
+    // …)`, so the tokens are matched by prefix rather than compared.
     const container = (
       moduleRef as unknown as {
         container: {
-          getModules: () => Map<
-            string,
-            { providers: Map<unknown, unknown> }
-          >;
+          getModules: () => Map<string, { providers: Map<unknown, unknown> }>;
         };
       }
     ).container;
-    const enhancerToken = [...container.getModules().values()]
+    const enhancerTokens = [...container.getModules().values()]
       .flatMap((m) => [...m.providers.keys()])
-      .find((t) => String(t).startsWith('APP_INTERCEPTOR'));
-    expect(enhancerToken).toBeDefined();
-    const appInterceptor = moduleRef.get<AuditInterceptor>(enhancerToken!, {
-      strict: false,
-    });
-    expect(appInterceptor).toBeInstanceOf(AuditInterceptor);
+      .filter((t) => String(t).startsWith('APP_INTERCEPTOR'));
+    expect(enhancerTokens).toHaveLength(0);
   });
 
   it('marks AuditModule as @Global so AuditService is injectable anywhere', () => {

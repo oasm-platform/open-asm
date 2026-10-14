@@ -34,6 +34,9 @@ type DockerRuntime struct {
 	connectorAddr  string // resolved dial address containers use to reach the worker's connector gRPC server
 	connectorToken string // shared secret for connector authentication
 	logger         Logger
+	// pullProgress, when set, receives image pull progress: jobID, image,
+	// fraction downloaded (negative = indeterminate) and a terminal flag.
+	pullProgress func(jobID, image string, pulled float64, done bool)
 }
 
 // Logger receives DockerRuntime lifecycle log lines (image pull, create, start,
@@ -44,9 +47,22 @@ type Logger interface {
 	Warning(msg string, args ...any)
 }
 
-// SetLogger wires a lifecycle logger. Nil disables logging (safe).
+// ProgressLogger is the optional Logger extension for pull progress. A logger
+// that does not implement it (tests, plain loggers) simply gets no progress
+// reporting — pull still works, only the bar is missing.
+type ProgressLogger interface {
+	ImagePullProgress(jobID, image string, pulled float64, done bool)
+}
+
+// SetLogger wires a lifecycle logger. Nil disables logging (safe). A logger
+// implementing ProgressLogger additionally receives image pull progress.
 func (d *DockerRuntime) SetLogger(l Logger) {
 	d.logger = l
+	if pl, ok := l.(ProgressLogger); ok {
+		d.pullProgress = pl.ImagePullProgress
+	} else {
+		d.pullProgress = nil
+	}
 }
 
 func (d *DockerRuntime) logInfo(msg string, args ...any) {
@@ -59,6 +75,141 @@ func (d *DockerRuntime) logWarning(msg string, args ...any) {
 	if d.logger != nil {
 		d.logger.Warning(msg, args...)
 	}
+}
+
+// Image pull progress cadence. The Docker pull stream emits a frame per layer
+// per read, which is far more than a progress bar or a log needs; two updates
+// per second with a 1%-step floor keeps the display responsive without
+// flooding the TUI event channel.
+const (
+	pullProgressInterval = 500 * time.Millisecond
+	pullProgressStep     = 0.01
+)
+
+// pullFrame is one JSON object from the Docker pull stream. Progress fields
+// are per-layer byte counts; `error` marks a failed pull.
+type pullFrame struct {
+	Status         string `json:"status"`
+	ID             string `json:"id"`
+	Error          string `json:"error"`
+	ProgressDetail struct {
+		Current int64 `json:"current"`
+		Total   int64 `json:"total"`
+	} `json:"progressDetail"`
+}
+
+// pullAccumulator turns a stream of per-layer progress frames into one
+// monotonic fraction for the whole pull.
+//
+// Layering maths: every frame carries only its own layer's bytes, but layers
+// are downloaded in parallel, so naive summing double-counts and per-frame
+// percentages jump backwards. Instead each layer's HIGH-WATER mark is kept in
+// the map and the fraction is `sum(current) / sum(total)`. Total bytes only
+// grow as new layers appear, which makes the fraction monotonic in practice.
+type pullAccumulator struct {
+	layers  map[string][2]int64 // layer id -> {current high-water, total}
+	started bool
+}
+
+func newPullAccumulator() *pullAccumulator {
+	return &pullAccumulator{layers: map[string][2]int64{}}
+}
+
+// add records one frame. Fetching is gated until the first byte-progress
+// frame: an image whose layers are all cached reports "Download complete"
+// (with no progressDetail) for every layer, which must not be mistaken for a
+// real download.
+func (a *pullAccumulator) add(f pullFrame) {
+	if f.ProgressDetail.Total <= 0 {
+		return
+	}
+	cur, total := f.ProgressDetail.Current, f.ProgressDetail.Total
+	prev := a.layers[f.ID]
+	if cur > prev[0] {
+		prev[0] = cur
+	}
+	if total > prev[1] {
+		prev[1] = total
+	}
+	a.layers[f.ID] = prev
+	a.started = true
+}
+
+// fraction reports bytes downloaded over bytes known.
+func (a *pullAccumulator) fraction() (float64, bool) {
+	if !a.started {
+		return 0, false
+	}
+	var current, total int64
+	for _, l := range a.layers {
+		current += l[0]
+		total += l[1]
+	}
+	if total <= 0 {
+		return 0, false
+	}
+	got := float64(current) / float64(total)
+	if got > 1 {
+		got = 1
+	}
+	return got, true
+}
+
+// consumePull drains the pull stream, reporting progress through the wired
+// logger. It returns the first frame-level error, if any; the caller decides
+// how that interacts with the subsequent image inspect.
+//
+// Reporting is throttled: a tick is emitted when the fraction moves by at
+// least pullProgressStep, when pullProgressInterval has passed, and always on
+// completion. A frame-level error is reported as a terminal tick followed by a
+// warning line — the pull may still have succeeded for other layers.
+func (d *DockerRuntime) consumePull(ctx context.Context, r io.Reader, spec JobSpec) error {
+	acc := newPullAccumulator()
+	var firstErr error
+	var emitted float64
+	lastSent := time.Now()
+
+	report := func(done bool) {
+		if d.pullProgress == nil || !acc.started {
+			return
+		}
+		got, ok := acc.fraction()
+		if !ok && !done {
+			return
+		}
+		d.pullProgress(spec.JobID, spec.Image, got, done)
+	}
+
+	dec := json.NewDecoder(r)
+	for {
+		if ctx.Err() != nil {
+			break
+		}
+		var frame pullFrame
+		if err := dec.Decode(&frame); err != nil {
+			if err != io.EOF && firstErr == nil {
+				firstErr = fmt.Errorf("read pull progress: %w", err)
+			}
+			break
+		}
+		if frame.Error != "" && firstErr == nil {
+			firstErr = fmt.Errorf("%s", frame.Error)
+		}
+		acc.add(frame)
+
+		got, ok := acc.fraction()
+		if ok && (got-emitted >= pullProgressStep || time.Since(lastSent) >= pullProgressInterval) {
+			report(false)
+			emitted = got
+			lastSent = time.Now()
+		}
+	}
+	report(true)
+
+	if firstErr != nil {
+		d.logWarning("docker: image pull reported an error: %s: %v", spec.Image, firstErr)
+	}
+	return firstErr
 }
 
 // resolveHost resolves the Docker engine endpoint with precedence:
@@ -251,8 +402,15 @@ func generateExecID() string {
 }
 
 // sanitizeToolName normalizes a tool name into Docker's container name charset
-// ([a-z0-9_.-]): lowercase, invalid runes collapse to '-', truncated to 80
-// chars so the final name stays well under Docker's 128-char limit.
+// ([a-z0-9_-]): lowercase, every non-alphanumeric rune collapses to a single
+// '-', truncated to 80 chars so the final name stays well under Docker's
+// 128-char limit.
+//
+// Runs of separators collapse too. A literal '-' is not special-cased as a
+// passthrough because that produced tripled separators from display names:
+// "Nikto - Web Server Scanner" → space '-', literal '-', space '-' → "nikto---
+// web-server-scanner". Separators are also trimmed after truncation so a cut
+// can never leave a dangling one.
 func sanitizeToolName(tool string) string {
 	t := strings.ToLower(tool)
 	var b strings.Builder
@@ -260,7 +418,7 @@ func sanitizeToolName(tool string) string {
 	dash := false
 	for _, r := range t {
 		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
 			b.WriteRune(r)
 			dash = false
 		default:
@@ -271,11 +429,12 @@ func sanitizeToolName(tool string) string {
 		}
 	}
 	s := strings.Trim(b.String(), "-")
+	if len(s) > maxToolSlugLen {
+		s = s[:maxToolSlugLen]
+	}
+	s = strings.Trim(s, "-")
 	if s == "" {
 		s = "tool"
-	}
-	if len(s) > 80 {
-		s = s[:80]
 	}
 	return s
 }
@@ -287,18 +446,65 @@ func randHex4() string {
 	return hex.EncodeToString(b)
 }
 
-// buildContainerName builds the pooled container name oasm-<tool>-<poolShort>-<rand4>.
-// The pool short is the sanitized pool key (normalized image) truncated to 8
-// chars: same-image containers in the pool share the prefix, so a container
-// listing groups a warm pool at a glance. The random suffix keeps concurrent
-// creates of the same tool collision-free; a 409 Conflict (stale container
-// holding the name) is retried once with a fresh suffix in Create.
-func buildContainerName(tool, poolRef string) string {
-	short := sanitizeToolName(poolRef)
-	if len(short) > 8 {
-		short = short[:8]
+// maxToolSlugLen caps the tool segment; maxRegistrySlugLen caps the registry
+// segment. Together they keep the whole name well under Docker's 128-char limit
+// (5 "oasm-" + 80 + 1 + 32 + 1 + 4 random = 123).
+const (
+	maxToolSlugLen     = 80
+	maxRegistrySlugLen = 32
+)
+
+// imageRegistrySlug extracts the registry host from an image reference and
+// renders it into Docker's container-name charset: "ghcr.io" → "ghcr-io",
+// "registry.local:5000/oasm/nmap:7.97" → "registry-local-5000".
+//
+// Only the REGISTRY is kept, never the repository path — the old scheme cut
+// the whole image key at 8 chars, which leaked the repo ("ghcr-io-open-asm-…")
+// and, when the cut landed on the separator, produced a doubled dash
+// ("oasm-nuclei-ghcr-io--a3f1").
+func imageRegistrySlug(image string) string {
+	ref := image
+	// Strip a digest: repo@sha256:… — the "@" tail carries no host.
+	if i := strings.Index(ref, "@"); i >= 0 {
+		ref = ref[:i]
 	}
-	return fmt.Sprintf("oasm-%s-%s-%s", sanitizeToolName(tool), short, randHex4())
+	// Strip a tag, but only when the colon comes after the last slash;
+	// otherwise it is a registry port ("registry:5000/repo").
+	if i := strings.LastIndex(ref, ":"); i >= 0 && i > strings.LastIndex(ref, "/") {
+		ref = ref[:i]
+	}
+	host := ""
+	if i := strings.Index(ref, "/"); i >= 0 {
+		host = ref[:i]
+	}
+	// Per Docker's reference grammar the first segment is a registry only when
+	// it looks like a host (has a dot or a port, or is "localhost"); otherwise
+	// it is a Docker Hub namespace ("library/nuclei") and the registry is the
+	// implicit default.
+	if host == "" || (host != "localhost" && !strings.ContainsAny(host, ".:")) {
+		return "docker-io"
+	}
+	slug := strings.Trim(sanitizeToolName(host), "-")
+	if len(slug) > maxRegistrySlugLen {
+		slug = strings.Trim(slug[:maxRegistrySlugLen], "-")
+	}
+	if slug == "" {
+		return "docker-io"
+	}
+	return slug
+}
+
+// buildContainerName builds the container name oasm-<tool-slug>-<registry-slug>-<rand4>
+// (e.g. "oasm-nikto-ghcr-io-1234"). The tool slug keeps a container listing
+// readable, the registry slug groups containers by source, and the random
+// suffix makes concurrent creates of the same tool collision-free; a 409
+// Conflict (stale container holding the name) is retried once with a fresh
+// suffix in Create.
+//
+// poolRef is the pool key when set, else the image — both carry the registry,
+// so the name stays identical whether or not the warm pool is enabled.
+func buildContainerName(tool, poolRef string) string {
+	return fmt.Sprintf("oasm-%s-%s-%s", sanitizeToolName(tool), imageRegistrySlug(poolRef), randHex4())
 }
 
 // imageIsCached reports whether the engine already holds a local copy of the
@@ -425,9 +631,10 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID)
 
 	// Container config: image, env, labels for lifecycle management.
-	// oasm.pool_key (normalized image) marks pooled containers so worker
-	// startup + sweeper can identify (and prune) them; oasm.last_used is
-	// informational only — the in-memory pool owns sweep timing.
+	// oasm.pool_key (normalized image) names pooled containers and lets the
+	// sweeper identify them; oasm-managed scopes the startup orphan
+	// reconcile; oasm.last_used is informational only — the in-memory pool
+	// owns sweep timing.
 	labels := map[string]string{
 		"trace_id":     opts.TraceID,
 		"tool":         spec.Tool,
@@ -440,6 +647,12 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	labels["oasm.pool_key"] = poolRef
 	labels["oasm.last_used"] = time.Now().UTC().Format(time.RFC3339)
+	// Ownership stamp (startup orphan reconcile): hash of the worker identity
+	// so a restarted worker reclaims ITS running orphans and never a
+	// sibling's. Absent for direct runtime users → tier 3 (keep) only.
+	if spec.WorkerID != "" {
+		labels["oasm.worker_id"] = spec.WorkerID
+	}
 	// Labels assigned after the struct literal so gofmt keeps
 	// "Image: spec.Image" single-spaced (source-guard test).
 	config := &container.Config{
@@ -454,7 +667,12 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		if err != nil {
 			return Handle{}, fmt.Errorf("image pull %s: %w", spec.Image, err)
 		}
-		_, _ = io.Copy(io.Discard, pullReader)
+		// Stream the pull instead of discarding it: the JSON progress frames
+		// carry per-layer byte counts, which is the only way to tell a slow
+		// download from a stalled one. Consuming the stream is also required —
+		// the pull completes only while the reader is drained.
+		d.logInfo("docker: pulling image: %s", spec.Image)
+		d.consumePull(ctx, pullReader, spec)
 		pullReader.Close()
 		d.logInfo("docker: image pull done: %s", spec.Image)
 		inspect, _, _ = d.cli.ImageInspectWithRaw(ctx, spec.Image)
@@ -492,9 +710,9 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	applyDefaultIsolation(hostConfig)
 
-	// Pooled container name: oasm-<tool>-<poolShort8>-<rand4> — same-image
-	// containers group under one short prefix; an idle warm container is
-	// reused by the next execution of the same image (Phase 2).
+	// Container name: oasm-<tool-slug>-<registry-slug>-<rand4>. An idle warm
+	// container is reused by the next execution of the same image (Phase 2);
+	// the name only has to be unique and readable, not the pool key itself.
 	name := buildContainerName(spec.Tool, poolRef)
 
 	resp, err := d.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
@@ -521,15 +739,22 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	d.logInfo("docker: container started: %s exec=%s job=%s", containerID, execID, spec.JobID)
 
-	return Handle{
-		ID: containerID,
+	handle := Handle{
+		ID:        containerID,
+		Name:      name,
+		CreatedAt: time.Now().UTC(),
 		Labels: map[string]string{
 			"trace_id":      opts.TraceID,
 			"tool":          spec.Tool,
 			"exec_id":       execID,
+			"job_id":        spec.JobID,
 			"oasm.pool_key": poolRef,
 		},
-	}, nil
+	}
+	if spec.WorkerID != "" {
+		handle.Labels["oasm.worker_id"] = spec.WorkerID
+	}
+	return handle, nil
 }
 
 // Start starts the container unless it is already running. Create already
@@ -568,7 +793,18 @@ func (d *DockerRuntime) Inspect(ctx context.Context, h Handle) (InspectResult, e
 	if err != nil {
 		return InspectResult{}, err
 	}
-	res := InspectResult{Running: j.State.Running, ExitCode: j.State.ExitCode}
+	res := InspectResult{
+		Running:   j.State.Running,
+		Status:    j.State.Status,
+		ExitCode:  j.State.ExitCode,
+		OOMKilled: j.State.OOMKilled,
+	}
+	if startedAt, err := time.Parse(time.RFC3339Nano, j.State.StartedAt); err == nil {
+		res.StartedAt = startedAt
+	}
+	if finishedAt, err := time.Parse(time.RFC3339Nano, j.State.FinishedAt); err == nil {
+		res.FinishedAt = finishedAt
+	}
 	if j.State.Health != nil {
 		res.Health = j.State.Health.Status
 	}
@@ -794,24 +1030,88 @@ func (d *DockerRuntime) Cleanup(ctx context.Context, h Handle) error {
 	return nil
 }
 
-// PrunePoolContainers removes every container tagged oasm.pool_key left over
-// from a previous worker process (crash/orphan guard). Called once at worker
-// startup when the pool is enabled; stale idle containers from a dead worker
-// must not accumulate forever. Best-effort — failures are logged, never fatal.
-func (d *DockerRuntime) PrunePoolContainers(ctx context.Context) {
+// ReconcileReport summarizes one startup ReconcileOrphans pass.
+type ReconcileReport struct {
+	StoppedRemoved    int // tier 1: terminal-state managed containers removed
+	OwnRunningRemoved int // tier 2: running containers stamped with our ownerID
+	SkippedForeign    int // tier 3: running containers kept (other/unknown owner)
+	Failed            int // remove attempts rejected by the engine
+}
+
+// ReconcileOrphans enforces the startup ownership policy over every
+// oasm-managed container on the engine (Docker labels are the source of
+// truth — no state store):
+//
+//	tier 1  exited/created/dead/removing → always remove: nothing can use
+//	        them and they only accumulate across crashes;
+//	tier 2  running/paused/restarting AND oasm.worker_id == ownerID
+//	        (non-empty) → force remove: a fresh process holds no streams or
+//	        exec tokens for them, so they can never be adopted;
+//	tier 3  live AND owner different or missing → KEEP: on a shared
+//	        docker.sock this may be a sibling worker's live container (a
+//	        core-side owner referee lands separately).
+//
+// ownerID empty (first-ever run: no signature, no token) degrades to tier 1
+// only — the fail-safe direction. Called once per boot from
+// reconcileStartupOrphans, before grpcClient.Connect: the fresh process owns
+// no containers yet, so tier-2 matches can only be dead predecessors'.
+// Best-effort — failures are logged, never fatal.
+func (d *DockerRuntime) ReconcileOrphans(ctx context.Context, ownerID string) ReconcileReport {
+	var rep ReconcileReport
 	if d.cli == nil {
-		return
+		return rep
 	}
 	f := filters.NewArgs()
-	f.Add("label", "oasm.pool_key")
-	report, err := d.cli.ContainersPrune(ctx, f)
+	f.Add("label", "oasm-managed=true")
+	list, err := d.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: f})
 	if err != nil {
-		d.logWarning("docker: pool prune failed: %v", err)
-		return
+		d.logWarning("docker: orphan reconcile list failed: %v", err)
+		return rep
 	}
-	if n := len(report.ContainersDeleted); n > 0 {
-		d.logInfo("docker: pruned %d stale pool container(s) from a previous worker", n)
+	for _, c := range list {
+		terminal := isTerminalState(c.State)
+		ours := ownerID != "" && c.Labels["oasm.worker_id"] == ownerID
+		switch {
+		case terminal, ours:
+			if err := d.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true}); err != nil {
+				rep.Failed++
+				d.logWarning("docker: orphan reconcile: remove %s failed: %v", shortID(c.ID), err)
+				continue
+			}
+			if terminal {
+				rep.StoppedRemoved++
+			} else {
+				rep.OwnRunningRemoved++
+			}
+		default:
+			rep.SkippedForeign++
+			d.logInfo("docker: orphan: keeping foreign running container %s owner=%q state=%q",
+				shortID(c.ID), c.Labels["oasm.worker_id"], c.State)
+		}
 	}
+	d.logInfo("docker: orphan reconcile: stopped=%d own_running=%d foreign_kept=%d failed=%d owner_id=%q",
+		rep.StoppedRemoved, rep.OwnRunningRemoved, rep.SkippedForeign, rep.Failed, ownerID)
+	return rep
+}
+
+// isTerminalState reports whether a container state is dead weight that can
+// never serve another execution (tier 1). Everything else — running, paused,
+// restarting, unknown — counts as live and requires ownership proof.
+func isTerminalState(state string) bool {
+	switch state {
+	case "exited", "created", "dead", "removing":
+		return true
+	default:
+		return false
+	}
+}
+
+// shortID trims a Docker ID to the conventional 12 chars for log lines.
+func shortID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
 }
 
 // buildContainerEnv constructs the env var slice for a connector container.

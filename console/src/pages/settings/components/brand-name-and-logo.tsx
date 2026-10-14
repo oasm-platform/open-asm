@@ -13,11 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   getRootControllerGetMetadataQueryKey,
-  useStorageControllerUploadLogo,
+  useStorageControllerConfirmLogoUpload,
+  useStorageControllerPresignLogoUpload,
   useSystemConfigsControllerGetConfig,
   useSystemConfigsControllerRemoveLogo,
   useSystemConfigsControllerUpdateConfig,
 } from '@/services/apis/gen/queries';
+import { uploadToPresignedUrl } from '@/services/storage';
+import { resolveClientUrl } from '@/utils/storage-url';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
@@ -63,19 +66,11 @@ export default function BrandNameAndLogoSettings() {
     },
   });
 
-  // Add upload logo mutation
-  const uploadLogoMutation = useStorageControllerUploadLogo({
-    mutation: {
-      onSuccess: () => {
-        toast.success('Logo uploaded successfully');
-        refetch(); // Refresh config to get updated logo path
-      },
-      onError: (error) => {
-        console.error('Upload error:', error);
-        toast.error('Failed to upload logo');
-      },
-    },
-  });
+  // Ordering is load-bearing: presign -> PUT bytes -> confirm, errors via mutateAsync reject in onSubmit
+  const presignLogoMutation = useStorageControllerPresignLogoUpload();
+  const confirmLogoMutation = useStorageControllerConfirmLogoUpload();
+  const isLogoUploadPending =
+    presignLogoMutation.isPending || confirmLogoMutation.isPending;
 
   const form = useForm<SystemConfigFormValues>({
     resolver: zodResolver(systemConfigSchema),
@@ -114,10 +109,10 @@ export default function BrandNameAndLogoSettings() {
       }
 
       // Set initial logo preview if logo exists
-      // logoPath is a string like "/api/storage/system/logo.png" or null
+      // logoPath is an absolute public/presigned URL; legacy relative
+      // "/..." values still get the app origin prepended.
       if (config.logoPath && typeof config.logoPath === 'string') {
-        const fullUrl = `${window.location.origin}${config.logoPath}`;
-        setLogoPreview(fullUrl);
+        setLogoPreview(resolveClientUrl(config.logoPath));
       } else if (config.logoPath === null) {
         // If logoPath is null, no logo exists
         setLogoPreview(null);
@@ -200,19 +195,26 @@ export default function BrandNameAndLogoSettings() {
     // If there's a new logo file, upload it first
     if (logoFile) {
       try {
-        await uploadLogoMutation.mutateAsync({
-          data: { file: logoFile },
+        const presigned = await presignLogoMutation.mutateAsync({
+          data: { fileName: logoFile.name, contentType: logoFile.type },
         });
-        // If logo upload succeeds, then update the config
-        updateConfigMutation.mutate({
-          data: {
-            name: values.name,
-          },
-        });
+        // The signed Content-Type is exactly logoFile.type, so echo it back byte-for-byte
+        await uploadToPresignedUrl(
+          presigned.uploadUrl,
+          logoFile,
+          logoFile.type,
+        );
+        await confirmLogoMutation.mutateAsync({ data: { key: presigned.key } });
       } catch (error) {
         console.error('Logo upload failed:', error);
         toast.error('Failed to upload logo');
+        return;
       }
+      updateConfigMutation.mutate({
+        data: {
+          name: values.name,
+        },
+      });
     } else if (shouldRemoveLogo) {
       // If logo should be removed, update the config without logoPath
       updateConfigMutation.mutate({
@@ -280,7 +282,7 @@ export default function BrandNameAndLogoSettings() {
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={uploadLogoMutation.isPending}
+                        disabled={isLogoUploadPending}
                       >
                         Remove
                       </Button>

@@ -1,5 +1,6 @@
-import { WorkerType } from '@/common/enums/enum';
+import { JobStatus, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { ConfigService } from '@nestjs/config';
+import { NotFoundException } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -16,6 +17,7 @@ import { RedisService } from '@/services/redis/redis.service';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
+import { WorkerTelemetryService } from './worker-telemetry.service';
 
 describe('WorkersService', () => {
   let service: WorkersService;
@@ -31,6 +33,7 @@ describe('WorkersService', () => {
   let mockRedisService: Partial<RedisService>;
   let mockAliveStreamManager: Partial<AliveStreamManager>;
   let mockConnectorRegistryService: Partial<ConnectorRegistryService>;
+  let mockWorkerTelemetryService: Partial<WorkerTelemetryService>;
 
   beforeEach(async () => {
     mockWorkerInstanceRepository = {
@@ -51,6 +54,7 @@ describe('WorkersService', () => {
       getManyAndCount: jest.fn(),
       getRawMany: jest.fn(),
       getRawOne: jest.fn(),
+      exists: jest.fn(),
     } as any;
 
     mockAssetRepository = {
@@ -112,6 +116,10 @@ describe('WorkersService', () => {
       getConnector: jest.fn().mockReturnValue(null),
     };
 
+    mockWorkerTelemetryService = {
+      get: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkersService,
@@ -163,6 +171,10 @@ describe('WorkersService', () => {
           provide: ConnectorRegistryService,
           useValue: mockConnectorRegistryService,
         },
+        {
+          provide: WorkerTelemetryService,
+          useValue: mockWorkerTelemetryService,
+        },
       ],
     }).compile();
 
@@ -197,9 +209,7 @@ describe('WorkersService', () => {
 
       await service.autoCleanupWorkersAndJobs();
 
-      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith(
-        'worker-1',
-      );
+      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith('worker-1');
       expect(mockWorkerInstanceRepository.delete).toHaveBeenCalledWith(
         'worker-1',
       );
@@ -223,9 +233,7 @@ describe('WorkersService', () => {
 
       await service.autoCleanupWorkersAndJobs();
 
-      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith(
-        'worker-1',
-      );
+      expect(mockAliveStreamManager.isActive).toHaveBeenCalledWith('worker-1');
       expect(mockWorkerInstanceRepository.delete).not.toHaveBeenCalled();
     });
 
@@ -280,24 +288,71 @@ describe('WorkersService', () => {
     });
   });
 
+  describe('requeue of stuck and failed jobs', () => {
+    /**
+     * Drives `autoCleanupWorkersAndJobs` with no stale workers and captures the
+     * requeue SQL — the only place these rules live.
+     */
+    const captureRequeueSql = async () => {
+      const query = jest.fn().mockResolvedValue(undefined);
+      (mockWorkerInstanceRepository as any).manager = { query };
+      (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([]);
+
+      await service.autoCleanupWorkersAndJobs();
+
+      return String(query.mock.calls[0][0]);
+    };
+
+    it('requeues IN_PROGRESS jobs whose worker row is gone', async () => {
+      const sql = await captureRequeueSql();
+
+      expect(sql).toContain(`j.status = '${JobStatus.IN_PROGRESS}'`);
+      expect(sql).toContain('SELECT id FROM workers');
+      expect(sql).toContain(`status = '${JobStatus.PENDING}'`);
+      expect(sql).toContain('"workerId" = NULL');
+    });
+
+    it('never requeues a job with no asset, because nothing can ever claim it', async () => {
+      // getNextJob INNER JOINs assets, so an asset-less job — what
+      // persistFailedConfigJob writes when a config profile is orphaned — can
+      // never be picked up. Requeueing it left the row PENDING forever and
+      // pinned its run at "in progress", because no execution could finish it.
+      const sql = await captureRequeueSql();
+
+      expect(sql).toContain('j."assetId" IS NOT NULL');
+    });
+
+    it('leaves FAILED jobs untouched once their retries are spent', async () => {
+      // They used to be matched by the WHERE and rewritten to the same value on
+      // every sweep, which only produced dead tuples.
+      const sql = await captureRequeueSql();
+
+      expect(sql).toContain('j."retryCount" < 4');
+      expect(sql).not.toContain('ELSE j.status');
+    });
+  });
+
   describe('join - runMode', () => {
     const WORKER_SIG = 'test-sig';
 
     beforeEach(() => {
       // Default config: empty signature (matches empty from worker), no cloud key
-      (mockConfigService.get as jest.Mock).mockImplementation(
-        (key: string) => {
-          if (key === 'WORKER_SIGNATURE') return WORKER_SIG;
-          if (key === 'OASM_CLOUD_APIKEY') return '';
-          return undefined;
-        },
-      );
+      (mockConfigService.get as jest.Mock).mockImplementation((key: string) => {
+        if (key === 'WORKER_SIGNATURE') return WORKER_SIG;
+        if (key === 'OASM_CLOUD_APIKEY') return '';
+        return undefined;
+      });
     });
 
     it('should save runMode "node" when join with numeric mode=2', async () => {
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
       );
@@ -325,9 +380,14 @@ describe('WorkersService', () => {
     });
 
     it('should save runMode "node" when join with enum-string mode (grpc enums:String)', async () => {
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
       );
@@ -355,9 +415,14 @@ describe('WorkersService', () => {
     });
 
     it('should save runMode "cli" when join with numeric mode=1', async () => {
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
       );
@@ -385,9 +450,14 @@ describe('WorkersService', () => {
     });
 
     it('should save runMode null when join with no mode (legacy worker)', async () => {
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
       );
@@ -426,9 +496,14 @@ describe('WorkersService', () => {
         runMode: 'node',
       };
       // API key must be valid for the join to pass validation
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
         (opts: Record<string, unknown>) => {
           const where = opts.where as Record<string, unknown> | undefined;
@@ -464,9 +539,14 @@ describe('WorkersService', () => {
         token: 'tok-existing',
         runMode: 'node',
       };
-      (mockApiKeysService.apiKeysRepository.findOne as jest.Mock).mockResolvedValue(
-        { id: 'key-1', type: 'WORKSPACE', ref: 'ws-1', key: 'api-key-1' },
-      );
+      (
+        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
+      ).mockResolvedValue({
+        id: 'key-1',
+        type: 'WORKSPACE',
+        ref: 'ws-1',
+        key: 'api-key-1',
+      });
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
         (opts: Record<string, unknown>) => {
           const where = opts.where as Record<string, unknown> | undefined;
@@ -504,7 +584,9 @@ describe('WorkersService', () => {
         scope: 'CLOUD',
       };
 
-      (mockWorkerInstanceRepository.createQueryBuilder as jest.Mock).mockReturnValue({
+      (
+        mockWorkerInstanceRepository.createQueryBuilder as jest.Mock
+      ).mockReturnValue({
         select: jest.fn().mockReturnThis(),
         addSelect: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -534,7 +616,7 @@ describe('WorkersService', () => {
     });
   });
 
-  describe('getWorkers - connector tool shaping (#2 #3 #7 #8)', () => {
+  describe('getWorkers - built-in tools query hoisting', () => {
     const buildQueryBuilder = (rows: Record<string, unknown>[]) => ({
       select: jest.fn().mockReturnThis(),
       addSelect: jest.fn().mockReturnThis(),
@@ -547,170 +629,396 @@ describe('WorkersService', () => {
       getManyAndCount: jest.fn().mockResolvedValue([rows, rows.length]),
     });
 
-    const runGetWorkers = async (rows: Record<string, unknown>[]) => {
-      (mockWorkerInstanceRepository.createQueryBuilder as jest.Mock).mockReturnValue(
-        buildQueryBuilder(rows),
-      );
+    const runGetWorkers = async (
+      rows: Record<string, unknown>[],
+      builtInTools: Record<string, unknown>[] = [],
+      connectors: Record<string, unknown>[] = [],
+    ) => {
+      (
+        mockWorkerInstanceRepository.createQueryBuilder as jest.Mock
+      ).mockReturnValue(buildQueryBuilder(rows));
       (mockJobsRegistryService.repo as any).count = jest
         .fn()
         .mockResolvedValue(0);
+      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
+        data: builtInTools,
+      });
+      (
+        mockConnectorRegistryService.getAllConnectors as jest.Mock
+      ).mockReturnValue(connectors);
       return service.getWorkers({ page: 1, limit: 10 } as any);
     };
 
-    it('worker tools maps connector category from capabilities', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['subdomains'],
-        },
-      ]);
-
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'node' }]);
-
-      expect(result.data[0].tools).toHaveLength(1);
-      expect(result.data[0].tools[0]).toMatchObject({
-        id: 'nuclei',
-        category: 'subdomains',
-      });
-      expect(result.data[0].tools[0].category).not.toBe('vulnerabilities');
-    });
-
-    it('worker tools defaults category when capabilities absent', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        { slug: 'wpscan', name: 'WPScan' } as any,
-      ]);
-
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'node' }]);
-
-      expect(result.data[0].tools).toHaveLength(1);
-      expect(result.data[0].tools[0]).toMatchObject({
-        id: 'wpscan',
-        category: 'vulnerabilities',
-      });
-    });
-
-    it('getMany hoists built-in tools query to single call', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue(
-        [],
+    it('getWorkers returns toolsCount without the tools array', async () => {
+      const result = await runGetWorkers(
+        [{ id: 'w-1' }, { id: 'w-2' }, { id: 'w-3' }],
+        [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
       );
-      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
-        data: [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
-      });
-
-      const result = await runGetWorkers([
-        { id: 'w-1' },
-        { id: 'w-2' },
-        { id: 'w-3' },
-      ]);
 
       expect(mockToolsService.getBuiltInTools).toHaveBeenCalledTimes(1);
       expect(result.data).toHaveLength(3);
       for (const worker of result.data) {
-        expect(worker.tools).toEqual([
-          expect.objectContaining({ id: 'bt-1', name: 'subfinder' }),
-        ]);
+        expect(worker.toolsCount).toBe(1);
+        expect(worker).not.toHaveProperty('tools');
       }
     });
 
-    it('worker tools marks connectors distinctly with stored logo', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['vulnerabilities'],
-          logo: 'aGVsbG8=',
-        },
-        {
-          slug: 'wpscan',
-          name: 'WPScan',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['vulnerabilities'],
-        } as any,
-      ]);
+    it('getWorkers counts built-ins plus connectors only for node-mode workers', async () => {
+      const result = await runGetWorkers(
+        [{ id: 'w-node', runMode: 'node' }, { id: 'w-cli' }],
+        [
+          { id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN },
+          { id: 'bt-2', name: 'nuclei', type: WorkerType.BUILT_IN },
+        ],
+        [
+          { slug: 'c-1', name: 'Connector 1', capabilities: [] },
+          { slug: 'c-2', name: 'Connector 2', capabilities: [] },
+          { slug: 'c-3', name: 'Connector 3', capabilities: [] },
+        ],
+      );
 
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'node' }]);
-      const tools = result.data[0].tools as Array<Record<string, unknown>>;
-
-      expect(tools).toHaveLength(2);
-      const nuclei = tools.find((t) => t.id === 'nuclei');
-      expect(nuclei?.type).toBe(WorkerType.CONNECTOR);
-      expect(nuclei?.logoUrl).toBe('/connectors/nuclei.png');
-      expect(String(nuclei?.logoUrl)).not.toContain('data:image/png;base64');
-      const wpscan = tools.find((t) => t.id === 'wpscan');
-      expect(wpscan?.type).toBe(WorkerType.CONNECTOR);
-      expect(wpscan?.logoUrl).toBeUndefined();
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0].toolsCount).toBe(5);
+      expect(result.data[1].toolsCount).toBe(2);
+      for (const worker of result.data) {
+        expect(worker).not.toHaveProperty('tools');
+      }
     });
+  });
 
-    it('cli worker gets builtin tools only (no connectors)', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['subdomains'],
-        },
-      ]);
-      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
-        data: [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
-      });
+  describe('getWorkerById', () => {
+    const workerId = '11111111-1111-4111-8111-111111111111';
+    const workspaceId = '22222222-2222-4222-8222-222222222222';
 
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'cli' }]);
-
-      expect(result.data[0].tools).toHaveLength(1);
-      expect(result.data[0].tools[0]).toMatchObject({
+    const builtInToolFixtures = [
+      {
         id: 'bt-1',
         name: 'subfinder',
-      });
-      expect(result.data[0].tools.some((t: any) => t.id === 'nuclei')).toBe(false);
+        logoUrl: 'https://example.com/subfinder.png',
+        category: 'subdomains',
+        type: WorkerType.BUILT_IN,
+      },
+      {
+        id: 'bt-2',
+        name: 'nuclei',
+        logoUrl: null,
+        category: 'vulnerabilities',
+        type: WorkerType.BUILT_IN,
+      },
+    ];
+
+    const connectorFixtures = [
+      { slug: 'c-1', name: 'Connector 1', logo: true, capabilities: [] },
+      { slug: 'c-2', name: 'Connector 2', logo: false, capabilities: [] },
+      { slug: 'c-3', name: 'Connector 3', logo: true, capabilities: [] },
+    ];
+
+    /** Stands in for the raw-value query builder `getRunningJobsByTool` uses. */
+    const buildRunningJobsQuery = (rows: Record<string, unknown>[]) => ({
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue(rows),
     });
 
-    it('worker without runMode (legacy) gets builtin tools only', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
-        {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['subdomains'],
-        },
-      ]);
+    const runGetWorkerById = async (
+      worker: Record<string, unknown> | null,
+      builtInTools: Record<string, unknown>[] = [],
+      connectors: Record<string, unknown>[] = [],
+      runningJobRows: Record<string, unknown>[] = [],
+      telemetry?: Record<string, unknown> | null,
+    ) => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(
+        worker,
+      );
+      (mockJobsRegistryService.repo as any).count = jest
+        .fn()
+        .mockResolvedValue(0);
+      (mockJobsRegistryService.repo as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(buildRunningJobsQuery(runningJobRows));
       (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
-        data: [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
+        data: builtInTools,
       });
+      (
+        mockConnectorRegistryService.getAllConnectors as jest.Mock
+      ).mockReturnValue(connectors);
+      if (telemetry !== undefined) {
+        (mockWorkerTelemetryService.get as jest.Mock).mockResolvedValue(
+          telemetry,
+        );
+      }
+      return service.getWorkerById(workerId, workspaceId);
+    };
 
-      const result = await runGetWorkers([{ id: 'w-1' }]);
-
-      expect(result.data[0].tools).toHaveLength(1);
-      expect(result.data[0].tools.some((t: any) => t.id === 'nuclei')).toBe(false);
+    const containerTelemetry = (tools: string[]) => ({
+      schemaVersion: 1,
+      workerId,
+      instanceId: 'instance-1',
+      sequence: '12',
+      state: 'READY',
+      freshness: 'fresh',
+      containers: {
+        supported: true,
+        total: tools.length,
+        active: tools.length,
+        idle: 0,
+        unhealthy: 0,
+        truncated: false,
+        items: tools.map((tool, index) => ({
+          containerId: `container-${index}`,
+          containerName: `oasm-${tool}-${index}`,
+          image: `example/${tool}:latest`,
+          imageVersion: '1.0.0',
+          tool,
+          poolKey: `example/${tool}:latest`,
+          pooled: true,
+          runtimeState: 'RUNNING',
+          healthState: 'HEALTHY',
+          executionState: 'NONE',
+          connectorConnected: true,
+          oomKilled: false,
+          cpuLimitMillicores: 1000,
+          memoryLimitBytes: '1073741824',
+          inspectionSucceeded: true,
+        })),
+      },
     });
 
-    it('node worker gets builtin tools plus connectors', async () => {
-      (mockConnectorRegistryService.getAllConnectors as jest.Mock).mockReturnValue([
+    it('returns built-in tools only for a cli worker and keeps toolsCount in sync', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'cli', name: 'cli-1' },
+        builtInToolFixtures,
+        connectorFixtures,
+      );
+
+      expect(result.tools).toHaveLength(2);
+      expect(result.toolsCount).toBe(result.tools.length);
+      expect(result.tools).toEqual([
         {
-          slug: 'nuclei',
-          name: 'Nuclei',
-          version: '1.0.0',
-          image: 'image',
-          capabilities: ['subdomains'],
+          id: 'bt-1',
+          name: 'subfinder',
+          logoUrl: 'https://example.com/subfinder.png',
+          category: 'subdomains',
+          type: 'builtin',
+          currentJobs: [],
+        },
+        {
+          id: 'bt-2',
+          name: 'nuclei',
+          logoUrl: null,
+          category: 'vulnerabilities',
+          type: 'builtin',
+          currentJobs: [],
         },
       ]);
-      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
-        data: [{ id: 'bt-1', name: 'subfinder', type: WorkerType.BUILT_IN }],
+      expect(result.runMode).toBe('cli');
+    });
+
+    it('appends connectors for a node worker and exposes the slug as both id and name', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'node' },
+        builtInToolFixtures,
+        connectorFixtures,
+        [],
+        containerTelemetry(['c-1', 'c-2']),
+      );
+
+      expect(result.tools).toHaveLength(4);
+      expect(result.toolsCount).toBe(4);
+      expect(result.toolsCount).toBe(result.tools.length);
+
+      const connectors = result.tools.filter(
+        (tool) => tool.type === 'connector',
+      );
+      expect(connectors).toEqual([
+        {
+          id: 'c-1',
+          name: 'c-1',
+          logoUrl: '/connectors/c-1.png',
+          type: 'connector',
+          currentJobs: [],
+        },
+        {
+          id: 'c-2',
+          name: 'c-2',
+          logoUrl: undefined,
+          type: 'connector',
+          currentJobs: [],
+        },
+      ]);
+    });
+
+    it('excludes a connector with a running job but no container', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'node' },
+        builtInToolFixtures,
+        connectorFixtures,
+        [{ tool: 'c-1', target: 'example.com', service: null }],
+        containerTelemetry(['c-2']),
+      );
+
+      expect(result.tools.filter((tool) => tool.type === 'connector')).toEqual([
+        expect.objectContaining({ name: 'c-2', currentJobs: [] }),
+      ]);
+      expect(result.tools.find((tool) => tool.name === 'c-1')).toBeUndefined();
+    });
+
+    it('keeps a connector with a container even when it has no running job', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'node' },
+        builtInToolFixtures,
+        connectorFixtures,
+        [],
+        containerTelemetry(['c-3']),
+      );
+
+      expect(result.tools.filter((tool) => tool.type === 'connector')).toEqual([
+        expect.objectContaining({ name: 'c-3', currentJobs: [] }),
+      ]);
+    });
+
+    it('groups the worker running jobs under the tool that executes them', async () => {
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'node' },
+        builtInToolFixtures,
+        connectorFixtures,
+        [
+          // Connector job: `Tool.name` is the connector slug. These are the raw
+          // columns the query projects.
+          { tool: 'c-1', target: 'example.com', service: null },
+          // Built-in job with a concrete service.
+          {
+            tool: 'nuclei',
+            target: 'api.example.com',
+            service: 'https://api.example.com:8443',
+          },
+          // Asset-service-only job: no asset row, the service carries the label.
+          { tool: 'c-2', target: null, service: '10.0.0.5:9200' },
+          // Job whose tool relation was dropped — skipped, never crashed on.
+          { tool: null, target: null, service: null },
+        ],
+        containerTelemetry(['c-1', 'c-2']),
+      );
+
+      const byName = new Map(result.tools.map((tool) => [tool.name, tool]));
+      expect(byName.get('c-1')?.currentJobs).toEqual([
+        { target: 'example.com', service: undefined },
+      ]);
+      expect(byName.get('nuclei')?.currentJobs).toEqual([
+        { target: 'api.example.com', service: 'https://api.example.com:8443' },
+      ]);
+      expect(byName.get('c-2')?.currentJobs).toEqual([
+        { target: '10.0.0.5:9200', service: '10.0.0.5:9200' },
+      ]);
+      expect(byName.get('subfinder')?.currentJobs).toEqual([]);
+    });
+
+    it('throws NotFoundException when the worker does not exist', async () => {
+      await expect(
+        runGetWorkerById(null, builtInToolFixtures, connectorFixtures),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException when the worker belongs to another workspace', async () => {
+      await expect(
+        runGetWorkerById(
+          {
+            id: workerId,
+            workspaceId: '33333333-3333-4333-8333-333333333333',
+            runMode: 'cli',
+          },
+          builtInToolFixtures,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('does not throw for a cloud worker that has no workspace', async () => {
+      const result = await runGetWorkerById(
+        {
+          id: workerId,
+          workspaceId: null,
+          scope: WorkerScope.CLOUD,
+          runMode: 'cli',
+        },
+        builtInToolFixtures,
+      );
+
+      expect(result.id).toBe(workerId);
+    });
+
+    it('includes the Redis telemetry snapshot without persisting it on the entity', async () => {
+      const telemetry = {
+        schemaVersion: 1,
+        workerId,
+        instanceId: 'instance-1',
+        sequence: '12',
+        state: 'READY',
+        freshness: 'fresh',
+      };
+      (mockWorkerTelemetryService.get as jest.Mock).mockResolvedValue(
+        telemetry,
+      );
+
+      const result = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'cli' },
+        builtInToolFixtures,
+      );
+
+      expect(result.telemetry).toEqual(telemetry);
+      expect(mockWorkerTelemetryService.get).toHaveBeenCalledWith(workerId);
+    });
+
+    it('never exposes the worker token', async () => {
+      const result = await runGetWorkerById(
+        {
+          id: workerId,
+          workspaceId,
+          runMode: 'cli',
+          token: 'super-secret-token',
+        },
+        builtInToolFixtures,
+      );
+
+      expect(result).not.toHaveProperty('token');
+      expect(JSON.stringify(result)).not.toContain('super-secret-token');
+    });
+
+    it('exposes the bound tool as an id/name pair and null when absent', async () => {
+      const withTool = await runGetWorkerById(
+        {
+          id: workerId,
+          workspaceId,
+          runMode: 'cli',
+          tool: { id: 'tool-1', name: 'nuclei', token: 'nope' },
+        },
+        builtInToolFixtures,
+      );
+      expect(withTool.tool).toEqual({ id: 'tool-1', name: 'nuclei' });
+
+      const withoutTool = await runGetWorkerById(
+        { id: workerId, workspaceId, runMode: 'cli', tool: null },
+        builtInToolFixtures,
+      );
+      expect(withoutTool.tool).toBeNull();
+    });
+  });
+
+  describe('isAgentWorkerForWorkspace', () => {
+    it('accepts only a workspace-scoped worker of the same workspace', async () => {
+      (mockWorkerInstanceRepository.exists as jest.Mock).mockResolvedValue(
+        true,
+      );
+
+      await expect(
+        service.isAgentWorkerForWorkspace('w1', 'ws-1'),
+      ).resolves.toBe(true);
+      expect(mockWorkerInstanceRepository.exists).toHaveBeenCalledWith({
+        where: { id: 'w1', workspaceId: 'ws-1', scope: WorkerScope.WORKSPACE },
       });
-
-      const result = await runGetWorkers([{ id: 'w-1', runMode: 'node' }]);
-
-      const tools = result.data[0].tools as Array<Record<string, unknown>>;
-      const ids = tools.map((t) => t.id);
-      expect(ids).toContain('bt-1');
-      expect(ids).toContain('nuclei');
     });
   });
 });

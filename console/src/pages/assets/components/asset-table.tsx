@@ -1,5 +1,6 @@
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
+import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
 import { useState } from 'react';
 import { type AssetContextType } from '../context/asset-context';
@@ -9,20 +10,28 @@ import AssetDetailSheet from './asset-detail-sheet';
 export function AssetTable({
   filter,
 }: {
-  filter: Partial<AssetContextType['queryParams']>;
+  // Row drill-downs still deep-link with legacy array params (server accepts them).
+  filter: Partial<AssetContextType['queryParams']> &
+    Partial<Record<'ipAddresses' | 'ports' | 'hosts' | 'techs' | 'statusCodes' | 'tlsHosts' | 'urls', string[]>>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [rowID, setRowID] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
+  const screenshotOptions = useScreenshotQueryOptions();
   const { data, isLoading, refetch } = useAssetsControllerGetAssetsInWorkspace(
     {
       page,
       limit: pageSize,
       ...filter,
     },
-    { query: { queryKey: ['sub-assets-filter', page, pageSize, filter] } },
+    {
+      query: {
+        queryKey: ['sub-assets-filter', page, pageSize, filter],
+        ...screenshotOptions,
+      },
+    },
   );
 
   const assets = data?.data ?? [];

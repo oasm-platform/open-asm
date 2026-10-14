@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -22,12 +23,14 @@ const tokenFileName = ".worker-token"
 // Client wraps the gRPC connection to core-api and the generated service
 // stubs, attaching the worker token via PerRPCCredentials on every call.
 type Client struct {
-	conn     *grpc.ClientConn
-	apiKey   string
-	toolPath string
-	runMode  string // "cli", "node", or "" (unknown)
-	logger   Logger
-	auth     *tokenAuth
+	conn              *grpc.ClientConn
+	apiKey            string
+	toolPath          string
+	runMode           string // "cli", "node", or "" (unknown)
+	logger            Logger
+	auth              *tokenAuth
+	telemetryProvider TelemetryProvider
+	telemetrySequence atomic.Uint64
 
 	// tokenFile is where the worker token is persisted across restarts so a
 	// rejoin can recover the same worker identity (core matches on the token).
@@ -45,6 +48,16 @@ type Client struct {
 	connectBaseDelay time.Duration // default 2s
 	connectMaxDelay  time.Duration // default 30s
 	reconnectDelay   time.Duration // default 1s
+
+	telemetryBaseDelay   time.Duration // default 1s
+	telemetryMaxDelay    time.Duration // default 30s
+	telemetryCallTimeout time.Duration // default 3s
+
+	// streamCancel handles a job cancellation pushed by core-api over the
+	// bidirectional stream. Set once at startup (before Connect); nil means the
+	// stream is still opened but cancels are ignored.
+	streamCancelMu sync.RWMutex
+	streamCancel   StreamCancelFunc
 }
 
 // NewClient validates the required configuration and creates a lazily-dialing
@@ -78,16 +91,19 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 	}
 
 	c := &Client{
-		conn:             conn,
-		apiKey:           apiKey,
-		toolPath:         toolPath,
-		logger:           logger,
-		auth:             auth,
-		workers:          workerPb.NewWorkersServiceClient(conn),
-		jobs:             jobRegistryPb.NewJobsRegistryServiceClient(conn),
-		connectBaseDelay: 2 * time.Second,
-		connectMaxDelay:  30 * time.Second,
-		reconnectDelay:   1 * time.Second,
+		conn:                 conn,
+		apiKey:               apiKey,
+		toolPath:             toolPath,
+		logger:               logger,
+		auth:                 auth,
+		workers:              workerPb.NewWorkersServiceClient(conn),
+		jobs:                 jobRegistryPb.NewJobsRegistryServiceClient(conn),
+		connectBaseDelay:     2 * time.Second,
+		connectMaxDelay:      30 * time.Second,
+		reconnectDelay:       1 * time.Second,
+		telemetryBaseDelay:   1 * time.Second,
+		telemetryMaxDelay:    30 * time.Second,
+		telemetryCallTimeout: 3 * time.Second,
 	}
 
 	c.tokenFile = resolveTokenFilePath()
@@ -147,6 +163,21 @@ func (c *Client) workersClient() workerPb.WorkersServiceClient { return c.worker
 
 // jobsClient returns the JobsRegistryService stub.
 func (c *Client) jobsClient() jobRegistryPb.JobsRegistryServiceClient { return c.jobs }
+
+// SetStreamCancelHandler registers the callback invoked when core-api asks this
+// worker to stop a job over the bidirectional stream. Must be called before
+// Connect; passing nil disables cancel handling.
+func (c *Client) SetStreamCancelHandler(fn StreamCancelFunc) {
+	c.streamCancelMu.Lock()
+	defer c.streamCancelMu.Unlock()
+	c.streamCancel = fn
+}
+
+func (c *Client) streamCancelHandler() StreamCancelFunc {
+	c.streamCancelMu.RLock()
+	defer c.streamCancelMu.RUnlock()
+	return c.streamCancel
+}
 
 // SetRunMode stores the worker run mode ("cli", "node", or "") which is
 // sent in metadata during Join. Must be called before Connect.

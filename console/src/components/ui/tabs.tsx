@@ -22,12 +22,20 @@ function useQueryTab({
   const search = useSearch({ strict: false }) as Record<string, unknown>;
 
   const raw = search[tabParam];
+  // When validValues is given it is the source of truth for what renders: a
+  // fallback outside that list leaves Radix with a value no trigger/content
+  // owns, so no panel mounts. Prefer defaultValue only when it actually exists.
+  const fallback = validValues
+    ? (validValues.includes(defaultValue ?? '')
+        ? defaultValue
+        : validValues?.[0]) ?? ''
+    : (defaultValue ?? '');
   const value =
     typeof raw === 'string' &&
     (!validValues || validValues.includes(raw)) &&
     raw
       ? raw
-      : (defaultValue ?? validValues?.[0] ?? '');
+      : fallback;
 
   const setValue = React.useCallback(
     (next: string) => {
@@ -40,18 +48,27 @@ function useQueryTab({
     [navigate, tabParam],
   );
 
-  // Strip the tab search-param when navigating away so other pages don't inherit it.
+  // Strip the tab search-param when navigating away so other pages don't
+  // inherit it. Defer the cleanup by one microtask: React StrictMode performs
+  // a setup -> cleanup -> setup cycle during development, and deleting the
+  // query in that synthetic cleanup loses the tab restored from the URL.
+  const mountedRef = React.useRef(false);
   React.useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      navigate({
-        search: (prev: Record<string, unknown>) => {
-          const next = { ...prev };
-          delete next[tabParam];
-          return next;
-        },
-        replace: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+      mountedRef.current = false;
+      queueMicrotask(() => {
+        if (mountedRef.current) return;
+        navigate({
+          search: (prev: Record<string, unknown>) => {
+            const next = { ...prev };
+            delete next[tabParam];
+            return next;
+          },
+          replace: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+      });
     };
     // Only on unmount — navigate and tabParam are stable refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps

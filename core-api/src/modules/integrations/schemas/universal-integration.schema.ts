@@ -1,7 +1,11 @@
+import { awsSchema } from './aws.schema';
 import { cloudflareSchema } from './cloudflare.schema';
+import { githubSchema } from './github.schema';
+import { gitlabSchema } from './gitlab.schema';
 import { jiraSchema } from './jira.schema';
 import { slackSchema } from './slack.schema';
 import { telegramSchema } from './telegram.schema';
+import { vercelSchema } from './vercel.schema';
 import { webhookSchema } from './webhook.schema';
 
 /**
@@ -12,6 +16,11 @@ import { webhookSchema } from './webhook.schema';
  * To add a new integration: create a schema file (e.g. slack.schema.ts),
  * add it to the oneOf array below, and its const values will serve as
  * the discriminating keys.
+ *
+ * Single-capability app: `category: { const: X }` (see slack.schema.ts).
+ * Multi-capability app:  `x-capabilities` + `capabilityDiscriminators()`
+ * (see github.schema.ts and ../capabilities.ts). New apps that can do more
+ * than one thing should use the latter.
  */
 export const universalIntegrationSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -20,15 +29,17 @@ export const universalIntegrationSchema = {
   description:
     'Discriminated union of all supported integration configurations.',
   oneOf: [
+    awsSchema,
     cloudflareSchema,
-    // githubSchema,
+    githubSchema,
+    gitlabSchema,
     jiraSchema,
     slackSchema,
     telegramSchema,
     webhookSchema,
+    vercelSchema,
     // linearSchema,
-    // Add more integration schemas here as they are implemented:
-    // awsSchema, etc.
+    // Add more integration schemas here as they are implemented.
   ],
 } as const;
 

@@ -6,7 +6,6 @@ import {
   Get,
   Param,
   Patch,
-  Post,
   Query,
   Req,
   Sse,
@@ -17,7 +16,6 @@ import { NotificationsService } from './notifications.service';
 import { I18nLang } from 'nestjs-i18n';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { getWorkspaceIdFromRequest } from '@/common/decorators/workspace-id.decorator';
-import { CreateNotificationDto } from './dto/create-notification.dto';
 import { DeleteNotificationByRefDto } from './dto/delete-notification-by-ref.dto';
 import { UserContext } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
@@ -59,15 +57,13 @@ export class NotificationsController {
     );
   }
 
-  @Doc({
-    summary: 'Create a notification',
-    description:
-      'Create a new notification for a specific user or group of users',
-  })
-  @Post()
-  async createNotification(@Body() body: CreateNotificationDto) {
-    return this.notificationsService.createNotification(body);
-  }
+  // NOTE: `POST /notifications` (createNotification) was removed.
+  // Every real caller of NotificationsService.createNotification is an internal
+  // service (workspaces, data-adapter, statistic, vulnerability processor); the
+  // HTTP route had no client. Exposing it let any authenticated user create
+  // in-app notifications for arbitrary user ids — including administrators —
+  // with attacker-controlled interpolation metadata, and the `notification`
+  // permission resource has no `write` action to gate it with.
 
   @Doc({
     summary: 'Subscribe to notifications stream',

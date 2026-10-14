@@ -22,6 +22,7 @@ import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ToolsService } from '../tools/tools.service';
 import { WorkflowsService } from '../workflows/workflows.service';
+import { orderedJobEntries } from '../workflows/workflow-graph';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   VulnerabilityStatisticsDto,
@@ -75,7 +76,10 @@ export class VulnerabilitiesService {
       );
     }
 
-    const job = workflow.content.jobs?.[0];
+    // Dependency order, not stored order: `content.jobs` is a map and jsonb does
+    // not preserve its key order, so "the first job" is only meaningful when it
+    // is derived from the graph.
+    const job = orderedJobEntries(workflow.content.jobs)[0]?.[1];
     await this.jobRegistryService.createNewJob({
       tool: tools[0],
       workflow,

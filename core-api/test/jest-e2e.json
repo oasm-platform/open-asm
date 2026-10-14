@@ -1,37 +1,20 @@
 {
-  "moduleFileExtensions": [
-    "js",
-    "json",
-    "ts",
-    "tsx"
-  ],
+  "moduleFileExtensions": ["js", "json", "ts", "tsx"],
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.m?(t|j)sx?$": [
-      "@swc/jest",
-      {
-        "jsc": {
-          "parser": {
-            "syntax": "typescript",
-            "decorators": true
-          },
-          "target": "es5",
-          "transform": {
-            "legacyDecorator": true,
-            "decoratorMetadata": true
-          }
-        },
-        "module": {
-          "type": "commonjs",
-          "noInterop": true
-        }
-      }
-    ]
+    "^.+\\.m?(t|j)sx?$": ["./swc-jest-transform.cjs", {}]
   },
   "moduleNameMapper": {
-    "^@/(.*)$": "../src/$1"
+    "^@/(.*)$": "../src/$1",
+    "^@react-pdf/renderer$": "<rootDir>/stubs/react-pdf-renderer.js"
   },
-  "transformIgnorePatterns": []
+  "transformIgnorePatterns": [
+    "node_modules/(?!(?:.pnpm/[^/]+/node_modules/)?(?:better-auth|better-call|@better-auth|@better-fetch|@noble|@opentelemetry|@standard-schema|@formatjs|@nestjs|intl-messageformat|rou3|set-cookie-parser|kysely|nanostores|zod|defu|jose|file-type|load-esm|uid|react|react-dom|ai|@ai-sdk|@workflow|eventsource-parser)(?:/|$))"
+  ],
+  "setupFiles": ["<rootDir>/setup-env.ts"],
+  "globalSetup": "<rootDir>/global-setup.ts",
+  "globalTeardown": "<rootDir>/global-teardown.ts",
+  "testTimeout": 60000
 }

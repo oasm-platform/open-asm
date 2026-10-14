@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { CronSchedule, JobStatus } from '@/common/enums/enum';
+import { CronSchedule, JobStatus, TargetType } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
+import { Integration } from '@/modules/integrations/entities/integration.entity';
 import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Logger } from '@nestjs/common';
@@ -21,11 +22,10 @@ import {
 /**
  * Enum representing the type of target
  */
-export enum TargetType {
-  DOMAIN = 'DOMAIN',
-  CIDR = 'CIDR',
-  IP = 'IP',
-}
+// Defined in common/enums (dependency-free) so entities on the Target import
+// cycle — e.g. Tool — can use it at decoration time; re-exported here so
+// existing imports keep working.
+export { TargetType };
 
 /**
  * Enum representing where a target originated.
@@ -36,7 +36,23 @@ export enum TargetType {
 export enum TargetSource {
   MANUAL = 'MANUAL',
   CLOUDFLARE = 'cloudflare',
+  AWS = 'aws',
+  VERCEL = 'vercel',
+  GITHUB = 'github',
+  GITLAB = 'gitlab',
   INTERNAL_NETWORK = 'INTERNAL_NETWORK',
+}
+
+/**
+ * Per-target options of a GIT_ORG target. Repositories excluded by these
+ * filters are still recorded (as disabled assets) so nothing silently
+ * disappears; they are just never scanned.
+ */
+export interface GitOrgTargetSettings {
+  /** Scan archived repositories (default false). */
+  includeArchived?: boolean;
+  /** Scan forks (default false). */
+  includeForks?: boolean;
 }
 
 @Entity('targets')
@@ -44,6 +60,7 @@ export enum TargetSource {
 @Index('IDX_targets_internalNetworkId', ['internalNetwork'])
 @Index('IDX_targets_scanSchedule_jobId', ['scanSchedule', 'jobId'])
 @Index('IDX_targets_workspaceId', ['workspaceId'])
+@Index('IDX_targets_integrationId', ['integrationId'])
 @Unique(['workspaceId', 'value'])
 export class Target extends BaseEntity {
   @ApiProperty({
@@ -51,7 +68,12 @@ export class Target extends BaseEntity {
     description: 'The target value (domain, IP address, or CIDR notation)',
   })
   @IsString()
-  @Transform(({ value }: { value: string }) => {
+  @Transform(({ value, obj }: { value: string; obj?: { type?: string } }) => {
+    // A Git organization is `host/owner[/subgroup…]`; reducing it to the
+    // hostname below would collapse every org onto `github.com`.
+    if (obj?.type === TargetType.GIT_ORG) {
+      return value;
+    }
     try {
       // Check if it's a CIDR notation (e.g., 192.168.1.0/24)
       const cidrRegex = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
@@ -119,6 +141,33 @@ export class Target extends BaseEntity {
 
   @ApiProperty()
   totalAssetServices: number;
+
+  /** Enabled assets — for a GIT_ORG target, the repositories it scans. */
+  @ApiProperty({ required: false })
+  totalAssets?: number;
+
+  /**
+   * SOURCE_CODE integration a GIT_ORG target syncs its repositories through.
+   * SET NULL when the integration is removed: the target and its history stay,
+   * syncing pauses until another integration is attached.
+   */
+  @ApiProperty({ required: false, nullable: true, type: String })
+  @Column({ type: 'uuid', nullable: true })
+  integrationId: string | null;
+
+  @ManyToOne(() => Integration, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'integrationId' })
+  integration?: Relation<Integration>;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: Object,
+    additionalProperties: true,
+    description: 'GIT_ORG options: includeArchived, includeForks',
+  })
+  @Column({ type: 'jsonb', nullable: true })
+  settings: GitOrgTargetSettings | null;
 
   @ApiProperty({ enum: JobStatus, enumName: 'JobStatus' })
   status: JobStatus;

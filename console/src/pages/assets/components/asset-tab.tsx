@@ -2,14 +2,13 @@ import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
-import { useState } from 'react';
 import { useAsset } from '../context/asset-context';
+import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options';
 import { assetColumns } from './asset-column';
-import AssetDetailSheet from './asset-detail-sheet';
+import { useNavigate } from '@tanstack/react-router';
 
 export default function AssetTab() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [rowID, setRowID] = useState('');
+  const navigate = useNavigate();
 
   const {
     tableHandlers: { setPage, setPageSize, setParams },
@@ -18,11 +17,14 @@ export default function AssetTab() {
     queryOptions,
   } = useAsset();
 
+  const screenshotOptions = useScreenshotQueryOptions();
+
   const { data, isLoading, refetch } = useAssetsControllerGetAssetsInWorkspace(
     queryParams,
     {
       query: {
         ...queryOptions.query,
+        ...screenshotOptions,
         queryKey: ['assets', ...queryOptions.query.queryKey],
       },
     },
@@ -37,7 +39,7 @@ export default function AssetTab() {
     );
 
   return (
-    <TabsContent value="service">
+    <TabsContent value="service" className="[&_div.my-4:first-child]:mt-0">
       <DataTable
         data={assets}
         columns={assetColumns}
@@ -53,11 +55,9 @@ export default function AssetTab() {
         }}
         totalItems={total}
         onRowClick={(row) => {
-          setRowID(row.id);
-          setIsOpen(true);
+          navigate({ to: `/assets/services/${row.id}` });
         }}
       />
-      <AssetDetailSheet open={isOpen} setOpen={setIsOpen} id={rowID} />
     </TabsContent>
   );
 }

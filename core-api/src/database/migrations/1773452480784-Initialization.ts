@@ -361,6 +361,11 @@ export class Initialization1773452480784 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "issues" ADD CONSTRAINT "FK_6ec638588b8a31143a6ac931ffa" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
     );
+    // TypeORM only auto-creates typeorm_metadata while a @ViewEntity exists;
+    // once the views are gone a fresh DB would lack it, so create it here.
+    await queryRunner.query(
+      `CREATE TABLE IF NOT EXISTS "typeorm_metadata" ("type" character varying NOT NULL, "database" character varying, "schema" character varying, "table" character varying, "name" character varying, "value" text)`,
+    );
     await queryRunner.query(`CREATE VIEW "ip_assets_view" AS SELECT
         a.id as "assetId",
         jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'A') AS ip

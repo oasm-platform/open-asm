@@ -9,7 +9,10 @@ import {
   ReasoningTrigger,
 } from '@/components/ai-elements/reasoning';
 import { Markdown } from '@/components/common/markdown';
-import { ToolCallDisplay } from '@/components/common/tool-call-display';
+import {
+  ToolCallDisplay,
+  type ToolCallState,
+} from '@/components/common/tool-call-display';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import type { UIMessage } from 'ai';
 import { motion } from 'framer-motion';
@@ -130,7 +133,7 @@ export const ChatMessage = memo(function ChatMessage({
             kind: 'tool',
             toolCallId: tp.toolCallId,
             toolName: effectiveToolName,
-            state: getToolStatus(tp.state),
+            state: getToolStatus(tp.state, tp.output),
             input: tp.input,
             output: tp.output,
           });
@@ -186,11 +189,7 @@ export const ChatMessage = memo(function ChatMessage({
                       toolCall={{
                         toolCallId: item.toolCallId,
                         toolName: item.toolName,
-                        status: item.state as
-                          | 'pending'
-                          | 'executing'
-                          | 'completed'
-                          | 'error',
+                        status: item.state as ToolCallState['status'],
                         input: item.input as
                           | Record<string, unknown>
                           | undefined,

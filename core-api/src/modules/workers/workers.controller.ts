@@ -1,6 +1,7 @@
 import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
 import { Public } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
@@ -12,6 +13,8 @@ import {
   Controller,
   Get,
   Logger,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -24,6 +27,7 @@ import { join } from 'path';
 import { Observable } from 'rxjs';
 import {
   GetManyWorkersDto,
+  GetWorkerResponseDto,
   WorkerAliveDto,
   WorkerJoinDto,
 } from './dto/workers.dto';
@@ -34,9 +38,32 @@ import {
   RemoteExecuteSubscribeService,
 } from './remote-execute-subscribe.service';
 import { WorkersService } from './workers.service';
+import { WorkerTelemetryService } from './worker-telemetry.service';
+import type {
+  WorkerTelemetryAck,
+  WorkerTelemetryRequest,
+} from './worker-telemetry.types';
 
 interface GrpcCall {
   getPeer?(): string | undefined;
+}
+
+interface GrpcTimestamp {
+  seconds: string;
+  nanos: number;
+}
+
+interface GrpcWorkerTelemetryAck
+  extends Omit<WorkerTelemetryAck, 'receivedAt'> {
+  receivedAt: GrpcTimestamp;
+}
+
+function toGrpcTimestamp(value: string): GrpcTimestamp {
+  const milliseconds = new Date(value).getTime();
+  return {
+    seconds: Math.floor(milliseconds / 1000).toString(),
+    nanos: (milliseconds % 1000) * 1_000_000,
+  };
 }
 
 @ApiTags('Workers')
@@ -48,6 +75,7 @@ export class WorkersController {
     private readonly remoteExecuteSubscribeService: RemoteExecuteSubscribeService,
     private readonly grpcWorkerContext: GrpcWorkerContext,
     private readonly aliveStreamManager: AliveStreamManager,
+    private readonly workerTelemetryService: WorkerTelemetryService,
   ) {}
 
   @Doc({
@@ -90,6 +118,26 @@ export class WorkersController {
   @Get()
   getWorkers(@Query() query: GetManyWorkersDto) {
     return this.workersService.getWorkers(query);
+  }
+
+  @Doc({
+    summary: 'Get a worker by ID',
+    description:
+      'Retrieves a single worker by its ID, including its connected tools.',
+    response: {
+      serialization: GetWorkerResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('worker.read')
+  @Get(':id')
+  getWorkerById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetWorkerResponseDto> {
+    return this.workersService.getWorkerById(id, workspaceId);
   }
 
   @GrpcMethod('WorkersService', 'GetManifest')
@@ -206,6 +254,29 @@ export class WorkersController {
         }
       };
     });
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('WorkersService', 'WorkerTelemetry')
+  async grpcWorkerTelemetry(
+    request: WorkerTelemetryRequest,
+    metadata: Metadata,
+  ): Promise<GrpcWorkerTelemetryAck> {
+    const workerToken = metadata.get(WORKER_TOKEN_HEADER)[0] as
+      | string
+      | undefined;
+    if (!workerToken) {
+      throw new RpcException('Worker token is missing');
+    }
+    const worker = this.grpcWorkerContext.getWorker(workerToken);
+    if (!worker) {
+      throw new RpcException('Worker not found in context');
+    }
+    const response = await this.workerTelemetryService.record(worker, request);
+    return {
+      ...response,
+      receivedAt: toGrpcTimestamp(response.receivedAt),
+    };
   }
 
   @GrpcMethod('WorkersService', 'ConnectInternalNetwork')

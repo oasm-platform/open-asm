@@ -237,7 +237,7 @@ const DropdownCard = React.memo(
               {data.data.assets.map((asset) => (
                 <div
                   key={asset.id}
-                  onClick={() => navigate({ to: '/assets/$id', params: { id: asset.id } })}
+                  onClick={() => navigate({ to: '/assets/services/$id', params: { id: asset.id } })}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors group"
                 >
                   <CloudCheck className="size-3 text-gray-400 group-hover:text-gray-600" />

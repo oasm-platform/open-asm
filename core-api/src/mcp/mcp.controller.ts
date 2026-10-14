@@ -17,6 +17,7 @@ export class McpController {
     await this.mcpService.handleSSEConnection(workspaceId, req, res);
   }
 
+  @UseGuards(McpGuard)
   @Post('message')
   async handleMessage(@Req() req: Request, @Res() res: Response): Promise<void> {
     await this.mcpService.handleMessage(req, res);

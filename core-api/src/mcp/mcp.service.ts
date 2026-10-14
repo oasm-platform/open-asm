@@ -9,7 +9,7 @@ import { z } from 'zod';
 
 interface AiToolLike {
   description: string;
-  parameters: z.ZodTypeAny;
+  inputSchema: z.ZodTypeAny;
   execute: (
     args: unknown,
     options?: { toolCallId?: string },
@@ -23,6 +23,7 @@ interface McpSession {
   createdAt: number;
 }
 
+/** Extracts the raw object shape expected by the MCP SDK tool API. */
 function schemaToShape(schema: z.ZodTypeAny): Record<string, unknown> {
   if (schema instanceof z.ZodObject) {
     return schema.shape as Record<string, unknown>;
@@ -156,7 +157,7 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
     try {
       const execute = aiTool.execute;
 
-      const shape = schemaToShape(aiTool.parameters);
+      const shape = schemaToShape(aiTool.inputSchema);
 
       server.tool(name, aiTool.description, shape, async (...args: unknown[]) => {
         try {

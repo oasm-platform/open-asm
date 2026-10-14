@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { TopPortsSkeleton } from './dashboard-skeleton';
 import { useStatisticControllerGetTopPorts } from '@/services/apis/gen/queries';
 import { ChevronRight, Radio } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
@@ -15,21 +16,7 @@ const TopPorts = () => {
     },
   });
 
-  if (isLoading) {
-    return (
-      <Card className="h-[340px] overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="flex items-center gap-2">
-            <Radio className="h-5 w-5 text-primary" />
-            Top Ports
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          Loading...
-        </CardContent>
-      </Card>
-    );
-  }
+  if (isLoading) return <TopPortsSkeleton />;
 
   if (error || !data) {
     return (

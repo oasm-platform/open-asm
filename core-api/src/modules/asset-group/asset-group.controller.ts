@@ -17,7 +17,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { AuditLog } from '../audit/audit-log.decorator';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { Asset } from '../assets/entities/assets.entity';
 import { AssetGroupService } from './asset-group.service';
 import { AssetGroupWorkflowService } from './asset-group-workflow.service';
@@ -112,7 +113,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('asset_group.created', {
+  @PublishEvent(EVENT_CATALOG.asset_group.created, {
     // Best-effort changes from the body; name is required by the DTO.
     changes: (body) => ({
       name: { after: (body as { name?: string })?.name ?? '' },
@@ -240,11 +241,11 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @AuditLog('asset_group.deleted')
+  @PublishEvent(EVENT_CATALOG.asset_group.deleted)
   @WorkspaceAccess('group.write')
   @Delete(':id')
-  delete(@Param('id') id: string) {
-    return this.assetGroupService.delete(id);
+  delete(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
+    return this.assetGroupService.delete(id, workspaceId);
   }
 
   @Doc({
@@ -310,12 +311,14 @@ export class AssetGroupController {
   updateAssetGroupWorkflow(
     @Param('id') assetGroupWorkflowId: string,
     @Body() updateDto: UpdateAssetGroupWorkflowDto,
+    @WorkspaceId() workspaceId: string,
   ) {
     return this.assetGroupWorkflowService.updateAssetGroupWorkflow(
       assetGroupWorkflowId,
       {
         schedule: updateDto.schedule,
       },
+      workspaceId,
     );
   }
 
@@ -331,10 +334,14 @@ export class AssetGroupController {
   })
   @WorkspaceAccess('workflow.write')
   @Post('workflows/:id/run')
-  runGroupWorkflowScheduler(@Param() queryParams: IdQueryParamDto) {
+  runGroupWorkflowScheduler(
+    @Param() queryParams: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.assetGroupWorkflowService.runGroupWorkflowScheduler(
       queryParams.id,
       JobRunType.MANUAL,
+      workspaceId,
     );
   }
 }

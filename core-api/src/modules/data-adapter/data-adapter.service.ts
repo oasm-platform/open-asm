@@ -4,18 +4,26 @@ import { Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as crypto from 'crypto';
-import { DataSource, InsertResult } from 'typeorm';
-import {
-  NotificationScope,
-  NotificationType,
-  ToolCategory,
-} from '../../common/enums/enum';
+import { isIP } from 'node:net';
+import { DataSource, EntityManager, InsertResult } from 'typeorm';
+import { Severity, TargetType, ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
+import { DnsRecord } from '../assets/entities/dns-record.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
+import { HttpResponseTechnology } from '../assets/entities/http-response-technology.entity';
+import { HttpStatusCode } from '../assets/entities/http-status-code.entity';
+import { IpObservation } from '../assets/entities/ip-observation.entity';
 import { Port } from '../assets/entities/ports.entity';
+import { TlsCertificate } from '../assets/entities/tls-certificate.entity';
 import { IssuesService } from '../issues/issues.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
+import type {
+  DetectedVulnerability,
+  VulnerabilityDetectedPayload,
+} from '../event-bridge/contracts/event-payloads';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -65,6 +73,260 @@ export function mergeDnsRecords(
   return merged;
 }
 
+/**
+ * Facet rows mirroring one asset's `dnsRecords` json: every record goes to
+ * `dns_records`, valid A/AAAA addresses also go to `ip_observations`.
+ */
+export function toDnsFacetRows(
+  assetId: string,
+  records: Record<string, unknown> | null | undefined,
+): {
+  dnsRows: Array<{ assetId: string; recordType: string; value: string }>;
+  ipRows: Array<{ assetId: string; ip: string; source: 'dns_a' | 'dns_aaaa' }>;
+} {
+  const dnsRows: Array<{ assetId: string; recordType: string; value: string }> = [];
+  const ipRows: Array<{ assetId: string; ip: string; source: 'dns_a' | 'dns_aaaa' }> = [];
+  for (const [rawType, values] of Object.entries(records ?? {})) {
+    if (!Array.isArray(values)) continue;
+    const recordType = rawType.toUpperCase();
+    for (const value of new Set(values)) {
+      if (typeof value !== 'string' || value === '') continue;
+      dnsRows.push({ assetId, recordType, value });
+      if (recordType === 'A' && isIP(value) === 4) {
+        ipRows.push({ assetId, ip: value, source: 'dns_a' });
+      } else if (recordType === 'AAAA' && isIP(value) === 6) {
+        ipRows.push({ assetId, ip: value, source: 'dns_aaaa' });
+      }
+    }
+  }
+  return { dnsRows, ipRows };
+}
+
+/**
+ * Scanner-derived vulnerability columns refreshed from the incoming finding on
+ * a fingerprint conflict. `firstDetectedDate`, `isArchived` and the `analyze*`
+ * fields are deliberately excluded so a re-scan cannot reset provenance,
+ * triage, or AI-analysis state.
+ */
+const RESCAN_OVERWRITE_COLUMNS = [
+  'updatedAt',
+  'lastSeenDate',
+  'name',
+  'description',
+  'synopsis',
+  'severity',
+  'tags',
+  'references',
+  'authors',
+  'affectedUrl',
+  'ipAddress',
+  'host',
+  'ports',
+  'cvssMetric',
+  'cvssScore',
+  'epssScore',
+  'vprScore',
+  'cveId',
+  'bidId',
+  'cweId',
+  'ceaId',
+  'iava',
+  'cveUrl',
+  'cweUrl',
+  'solution',
+  'extractorName',
+  'extractedResults',
+  'publicationDate',
+  'modificationDate',
+  'filePath',
+  'lineStart',
+  'lineEnd',
+  'commit',
+  'packageName',
+  'installedVersion',
+  'fixedVersion',
+] as const;
+
+/**
+ * Code-finding fields. The gRPC loader fills absent proto3 scalars with
+ * defaults ('' / 0), so a host finding would otherwise store empty strings
+ * and zero line numbers; they are stored as NULL instead.
+ */
+const CODE_FINDING_FIELDS = [
+  'lineStart',
+  'lineEnd',
+  'commit',
+  'packageName',
+  'installedVersion',
+  'fixedVersion',
+] as const;
+
+function normalizeCodeFields(
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const field of CODE_FINDING_FIELDS) {
+    const value = values[field];
+    normalized[field] = value === '' || value === 0 || value === undefined ? null : value;
+  }
+  return normalized;
+}
+
+/**
+ * Deduplication key of a finding.
+ *
+ * Host findings keep the historical name + asset + tool key, so every
+ * existing row still matches on re-scan — whatever `fingerprint` a legacy
+ * payload happens to carry is ignored for them.
+ *
+ * Findings on a repository asset (GIT_ORG target) append the connector's own
+ * per-finding identity (rule + file + line…), so several findings of one rule
+ * in one repository stay distinct instead of collapsing into one row.
+ */
+export function vulnerabilityFingerprint(args: {
+  name: string;
+  assetId: string;
+  // Optional only because Tool.id is; interpolated exactly as before.
+  toolId: string | undefined;
+  /** True for repository assets; only then is sourceFingerprint used. */
+  isRepositoryAsset: boolean;
+  sourceFingerprint?: unknown;
+}): string {
+  const source =
+    args.isRepositoryAsset &&
+    typeof args.sourceFingerprint === 'string' &&
+    args.sourceFingerprint !== ''
+      ? `-${args.sourceFingerprint}`
+      : '';
+  return crypto
+    .createHash('md5')
+    .update(`${args.name}-${args.assetId}-${args.toolId}${source}`)
+    .digest('hex');
+}
+
+/**
+ * Columns an incoming finding may omit. `updatedAt`/`lastSeenDate` are always
+ * stamped by the ingest, so only the optionals need preserving.
+ */
+const RESCAN_PRESERVE_COLUMNS = RESCAN_OVERWRITE_COLUMNS.filter(
+  (column) => column !== 'updatedAt' && column !== 'lastSeenDate',
+);
+
+/**
+ * Rows per INSERT statement for the vulnerability upsert. Postgres' extended
+ * query protocol caps a prepared statement at 65535 parameters; a row here is
+ * ~45 columns, so a bulk insert of a couple thousand findings overflows the
+ * cap and the whole batch is rejected by the driver ("bind message has N
+ * parameter formats but 0 parameters"). 500 rows ≈ 22.5k parameters keeps a
+ * comfortable margin under the cap while limiting round-trips.
+ */
+export const VULNERABILITY_INSERT_CHUNK_SIZE = 500;
+
+/**
+ * Split a httpx tech string on the FIRST ':' only — versions may contain
+ * further colons. Returns [name, version|null]; empty input → null.
+ */
+export function splitTechString(
+  raw: string,
+): { name: string; version: string | null } | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const idx = trimmed.indexOf(':');
+  if (idx < 0) return { name: trimmed, version: null };
+  const name = trimmed.slice(0, idx).trim();
+  if (!name) return null;
+  const version = trimmed.slice(idx + 1).trim() || null;
+  return { name, version };
+}
+
+/**
+ * Flatten the httpx `tls` jsonb payload into a TlsCertificate row. Unknown or
+ * malformed date strings become null (never throw — ingest must not fail on
+ * dirty scanner data).
+ */
+export function toTlsCertificateRow(
+  tls: Record<string, unknown> | null | undefined,
+  keys: { httpResponseId: string; assetServiceId?: string; jobHistoryId?: string },
+): Record<string, unknown> | null {
+  if (!tls || typeof tls !== 'object') return null;
+  const str = (key: string): string | undefined => {
+    const v = tls[key];
+    return typeof v === 'string' && v !== '' ? v : undefined;
+  };
+  const bool = (key: string): boolean => tls[key] === true;
+  const fp =
+    tls.fingerprint_hash && typeof tls.fingerprint_hash === 'object'
+      ? (tls.fingerprint_hash as Record<string, unknown>)
+      : {};
+  const fpStr = (key: string): string | undefined => {
+    const v = fp[key];
+    return typeof v === 'string' && v !== '' ? v : undefined;
+  };
+  const arr = (key: string): string[] | undefined => {
+    const v = tls[key];
+    return Array.isArray(v) && v.every((e) => typeof e === 'string')
+      ? (v)
+      : undefined;
+  };
+  return {
+    ...keys,
+    host: str('host'),
+    port: str('port'),
+    probeStatus: bool('probe_status'),
+    tlsVersion: str('tls_version'),
+    cipher: str('cipher'),
+    notBefore: normalizeTimestamp(tls.not_before),
+    notAfter: normalizeTimestamp(tls.not_after),
+    subjectDn: str('subject_dn'),
+    subjectCn: str('subject_cn'),
+    subjectAn: arr('subject_an'),
+    serial: str('serial'),
+    issuerDn: str('issuer_dn'),
+    issuerCn: str('issuer_cn'),
+    issuerOrg: arr('issuer_org'),
+    fingerprintMd5: fpStr('md5'),
+    fingerprintSha1: fpStr('sha1'),
+    fingerprintSha256: fpStr('sha256'),
+    wildcardCertificate: bool('wildcard_certificate'),
+    tlsConnection: str('tls_connection'),
+    sni: str('sni'),
+  };
+}
+
+/** Columns that live in child facet tables, never in `http_responses`. */
+const HTTP_RESPONSE_FACET_KEYS = [
+  'tls',
+  'tech',
+  'a',
+  'resolvers',
+  'chain_status_codes',
+] as const;
+
+/**
+ * A stored vulnerability row as the `vulnerability.detected` contract carries
+ * it. Long free text (description, solution, extractor output) stays out: it
+ * lives in the database, and copying it into every stream entry would let one
+ * noisy scan crowd the bounded stream.
+ */
+function toDetectedVulnerability(vuln: Vulnerability): DetectedVulnerability {
+  return {
+    id: vuln.id,
+    name: vuln.name,
+    severity: vuln.severity,
+    synopsis: vuln.synopsis ?? undefined,
+    cvssScore: vuln.cvssScore ?? undefined,
+    cvssMetric: vuln.cvssMetric ?? undefined,
+    epssScore: vuln.epssScore ?? undefined,
+    cveId: vuln.cveId ?? undefined,
+    cweId: vuln.cweId ?? undefined,
+    tags: vuln.tags ?? undefined,
+    host: vuln.host ?? undefined,
+    ipAddress: vuln.ipAddress ?? undefined,
+    ports: vuln.ports ?? undefined,
+    affectedUrl: vuln.affectedUrl ?? undefined,
+  };
+}
+
 @Injectable()
 export class DataAdapterService {
   private readonly logger = new Logger(DataAdapterService.name);
@@ -74,8 +336,63 @@ export class DataAdapterService {
     private workspaceService: WorkspacesService,
     private issuesService: IssuesService,
     private storageService: StorageService,
-    private readonly notificationsService: NotificationsService,
+    private readonly eventBridge: EventBridgeService,
   ) {}
+
+  /**
+   * Makes the DNS facet rows (`dns_records` + DNS-sourced `ip_observations`)
+   * of each asset mirror the `dnsRecords` json just written for it: stale
+   * rows are deleted, current ones inserted. Batched per call.
+   */
+  private async syncDnsFacets(
+    manager: EntityManager,
+    recordsByAssetId: Map<string, Record<string, string[]> | null>,
+  ): Promise<void> {
+    const assetIds = [...recordsByAssetId.keys()];
+    if (assetIds.length === 0) return;
+
+    await manager
+      .createQueryBuilder()
+      .delete()
+      .from(DnsRecord)
+      .where('"assetId" IN (:...assetIds)', { assetIds })
+      .execute();
+    await manager
+      .createQueryBuilder()
+      .delete()
+      .from(IpObservation)
+      .where('"assetId" IN (:...assetIds)', { assetIds })
+      .andWhere(`source IN ('dns_a', 'dns_aaaa')`)
+      .execute();
+
+    const dnsRows: ReturnType<typeof toDnsFacetRows>['dnsRows'] = [];
+    const ipRows: ReturnType<typeof toDnsFacetRows>['ipRows'] = [];
+    for (const [assetId, records] of recordsByAssetId) {
+      const facets = toDnsFacetRows(assetId, records);
+      dnsRows.push(...facets.dnsRows);
+      ipRows.push(...facets.ipRows);
+    }
+    // 3 bind params per row; stay far below Postgres' 65535 cap.
+    const BATCH = 5000;
+    for (let i = 0; i < dnsRows.length; i += BATCH) {
+      await manager
+        .createQueryBuilder()
+        .insert()
+        .into(DnsRecord)
+        .values(dnsRows.slice(i, i + BATCH))
+        .orIgnore()
+        .execute();
+    }
+    for (let i = 0; i < ipRows.length; i += BATCH) {
+      await manager
+        .createQueryBuilder()
+        .insert()
+        .into(IpObservation)
+        .values(ipRows.slice(i, i + BATCH))
+        .orIgnore()
+        .execute();
+    }
+  }
 
   public async validateData<T extends object>(
     data: object | object[],
@@ -167,25 +484,28 @@ export class DataAdapterService {
       // dnsRecords with NULL on re-runs (the isPrimary refresh is only
       // relevant on first creation anyway). With replaceDnsRecords the apex
       // records REPLACE the existing set (stale records disappear).
+      // assetId → the dnsRecords json written in this call; its facet rows
+      // are re-synced below so they always mirror the json.
+      const dnsWrites = new Map<string, Record<string, string[]> | null>();
+
       if (primaryAsset) {
         const apexRecords = uniqueData.find(
           (asset) => asset.value === primaryAsset.value,
         );
         if (apexRecords) {
+          const primaryRecords = opts?.replaceDnsRecords
+            ? apexRecords.dnsRecords
+            : mergeDnsRecords(
+                primaryAsset.dnsRecords,
+                apexRecords.dnsRecords,
+              );
           await queryRunner.manager
             .createQueryBuilder()
             .update(Asset)
             .where({ id: primaryAsset.id })
-            .set({
-              isPrimary: true,
-              dnsRecords: opts?.replaceDnsRecords
-                ? apexRecords.dnsRecords
-                : mergeDnsRecords(
-                    primaryAsset.dnsRecords,
-                    apexRecords.dnsRecords,
-                  ),
-            })
+            .set({ isPrimary: true, dnsRecords: primaryRecords })
             .execute();
+          dnsWrites.set(primaryAsset.id, primaryRecords);
         }
       }
 
@@ -217,8 +537,40 @@ export class DataAdapterService {
         : insertQb.orIgnore()
       ).execute();
 
+      // Resolve ids by value: with orIgnore, RETURNING only yields the rows
+      // actually inserted, so `identifiers[i]` does NOT line up with
+      // `uniqueData[i]` once any asset already exists.
+      const values = uniqueData.map((asset) => asset.value);
+      const rows = values.length
+        ? await queryRunner.manager
+            .createQueryBuilder()
+            .select('asset.id', 'id')
+            .addSelect('asset.value', 'value')
+            .from(Asset, 'asset')
+            .where('asset.targetId = :targetId', { targetId })
+            .andWhere('asset.value IN (:...values)', { values })
+            .getRawMany<{ id: string; value: string }>()
+        : [];
+      const idByValue = new Map(rows.map((row) => [row.value, row.id]));
+      // Only rows whose json this call wrote: inserted rows, plus every
+      // existing row when replaceDnsRecords overwrote them.
+      // Skipped (orIgnore) rows leave an undefined identifier.
+      const insertedIds = new Set(
+        (insertResult.identifiers as Array<{ id?: string } | undefined>)
+          .map((identifier) => identifier?.id)
+          .filter((id): id is string => !!id),
+      );
+      for (const asset of uniqueData) {
+        const id = idByValue.get(asset.value);
+        if (!id || dnsWrites.has(id)) continue;
+        if (opts?.replaceDnsRecords || insertedIds.has(id)) {
+          dnsWrites.set(id, asset.dnsRecords);
+        }
+      }
+      await this.syncDnsFacets(queryRunner.manager, dnsWrites);
+
       await queryRunner.commitTransaction();
-      return insertResult.identifiers?.length ?? 0;
+      return insertedIds.size;
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
@@ -228,9 +580,10 @@ export class DataAdapterService {
   }
 
   /**
-   * HTTP responses data normalization
-   * @param param0
-   * @returns
+   * HTTP probe ingest: one slim `http_responses` row plus fan-out into the
+   * facet child tables (tls_certificates, http_response_technologies,
+   * ip_observations, http_status_codes) inside the same transaction.
+   * The gRPC/REST payload shape is unchanged — the split happens here.
    */
   public async httpResponses({
     data,
@@ -241,6 +594,9 @@ export class DataAdapterService {
     await queryRunner.startTransaction();
 
     try {
+      const assetServiceId = job.assetService?.id;
+      const jobHistoryId = job.jobHistory.id;
+
       if (data.failed && job.assetServiceId) {
         await queryRunner.manager
           .createQueryBuilder()
@@ -250,23 +606,229 @@ export class DataAdapterService {
           .execute();
       }
 
-      await queryRunner.manager
-        .createQueryBuilder()
-        .insert()
-        .into(HttpResponse)
-        .values((() => {
-          const values = { ...data } as unknown as Record<string, string | number | boolean | object | null>;
-          delete values.id;
-          return {
-            ...values,
-            assetServiceId: job.assetService?.id,
-            jobHistoryId: job.jobHistory.id,
-          };
-        })())
-        .execute();
+      const { id: _ignored, ...rest } = data as unknown as Record<
+        string,
+        string | number | boolean | object | null | undefined
+      >;
+      void _ignored;
+      for (const key of HTTP_RESPONSE_FACET_KEYS) delete rest[key];
+      const saved = await queryRunner.manager.getRepository(HttpResponse).save({
+        ...rest,
+        assetServiceId,
+        jobHistoryId,
+      });
+      const httpResponseId = saved.id;
 
+      const tasks: Promise<unknown>[] = [];
+
+      const tlsRow = toTlsCertificateRow(
+        data.tls,
+        { httpResponseId, assetServiceId, jobHistoryId },
+      );
+      if (tlsRow) {
+        tasks.push(
+          queryRunner.manager
+            .createQueryBuilder()
+            .insert()
+            .into(TlsCertificate)
+            .values(tlsRow)
+            .orUpdate({
+              conflict_target: ['httpResponseId'],
+              overwrite: Object.keys(tlsRow).filter(
+                (k) => k !== 'httpResponseId',
+              ),
+            })
+            .execute(),
+        );
+      }
+
+      const techRows = Array.isArray(data.tech)
+        ? data.tech
+            .map((t) =>
+              typeof t === 'string'
+                ? splitTechString(t)
+                : null,
+            )
+            .filter(
+              (t): t is { name: string; version: string | null } => t !== null,
+            )
+            .map((t) => ({
+              name: t.name,
+              version: t.version ?? undefined,
+              httpResponseId,
+              assetServiceId,
+            }))
+        : [];
+      if (techRows.length > 0) {
+        tasks.push(
+          queryRunner.manager
+            .createQueryBuilder()
+            .insert()
+            .into(HttpResponseTechnology)
+            .values(techRows)
+            .orIgnore()
+            .execute(),
+        );
+      }
+
+      const ipRows: Array<{
+        ip: string;
+        source: 'httpx_a' | 'resolver';
+        httpResponseId: string;
+        assetServiceId?: string;
+        jobHistoryId: string;
+      }> = [];
+      for (const ip of Array.isArray(data.a) ? data.a : []) {
+        if (typeof ip === 'string' && ip !== '' && isIP(ip) !== 0) {
+          ipRows.push({
+            ip,
+            source: 'httpx_a',
+            httpResponseId,
+            assetServiceId,
+            jobHistoryId,
+          });
+        }
+      }
+      for (const ip of Array.isArray(data.resolvers) ? data.resolvers : []) {
+        if (typeof ip === 'string' && ip !== '' && isIP(ip) !== 0) {
+          ipRows.push({
+            ip,
+            source: 'resolver',
+            httpResponseId,
+            assetServiceId,
+            jobHistoryId,
+          });
+        }
+      }
+      if (ipRows.length > 0) {
+        tasks.push(
+          queryRunner.manager
+            .createQueryBuilder()
+            .insert()
+            .into(IpObservation)
+            .values(ipRows)
+            .orIgnore()
+            .execute(),
+        );
+      }
+
+      const statusRows: Array<{
+        statusCode: number;
+        isPrimary: boolean;
+        chainIndex?: number;
+        httpResponseId: string;
+        assetServiceId?: string;
+      }> = [];
+      if (
+        typeof data.status_code === 'number' &&
+        Number.isInteger(data.status_code)
+      ) {
+        statusRows.push({
+          statusCode: data.status_code,
+          isPrimary: true,
+          chainIndex: undefined,
+          httpResponseId,
+          assetServiceId,
+        });
+      }
+      const chain = Array.isArray(data.chain_status_codes)
+        ? data.chain_status_codes
+        : [];
+      chain.forEach((code, i) => {
+        const n = typeof code === 'number' ? code : parseInt(String(code), 10);
+        if (Number.isInteger(n)) {
+          statusRows.push({
+            statusCode: n,
+            isPrimary: false,
+            chainIndex: i,
+            httpResponseId,
+            assetServiceId,
+          });
+        }
+      });
+      if (statusRows.length > 0) {
+        tasks.push(
+          queryRunner.manager
+            .createQueryBuilder()
+            .insert()
+            .into(HttpStatusCode)
+            .values(statusRows)
+            .orIgnore()
+            .execute(),
+        );
+      }
+
+      await Promise.all(tasks);
       await queryRunner.commitTransaction();
 
+      return;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * URL discovery data normalization: one row per unique URL, attached to the
+   * job's AssetService and JobHistory. Deduped in-app (Set) and DB-level
+   * (unique constraint + orIgnore) so worker retries / workflow re-runs are
+   * idempotent.
+   */
+  public async urlDiscovery({
+    data,
+    job,
+  }: DataAdapterInput<DiscoveredUrl[]>): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      if (!job.assetServiceId) {
+        this.logger.warn(
+          `urlDiscovery: job ${job.id} has no assetServiceId — skipping`,
+        );
+        await queryRunner.commitTransaction();
+        return;
+      }
+
+      const MAX_URL_LENGTH = 2048;
+      const raw = (data ?? [])
+        .map((d) => d?.url?.trim())
+        .filter((u): u is string => !!u);
+      const tooLong = raw.filter((u) => u.length > MAX_URL_LENGTH);
+      if (tooLong.length > 0) {
+        this.logger.warn(
+          `urlDiscovery: dropped ${tooLong.length} url(s) longer than ${MAX_URL_LENGTH} chars for job ${job.id}`,
+        );
+      }
+      const urls = [...new Set(raw.filter((u) => u.length <= MAX_URL_LENGTH))];
+
+      if (urls.length > 0) {
+        // A single INSERT would exceed PostgreSQL's 65535 bind-parameter cap
+        // (3 params per row → ~21k rows), so insert in bounded chunks inside
+        // the same transaction.
+        const INSERT_BATCH_SIZE = 5000;
+        for (let i = 0; i < urls.length; i += INSERT_BATCH_SIZE) {
+          const batch = urls.slice(i, i + INSERT_BATCH_SIZE);
+          await queryRunner.manager
+            .createQueryBuilder()
+            .insert()
+            .into(DiscoveredUrl)
+            .values(
+              batch.map((url) => ({
+                url,
+                assetServiceId: job.assetServiceId,
+                jobHistoryId: job.jobHistory.id,
+              })),
+            )
+            .orIgnore()
+            .execute();
+        }
+      }
+
+      await queryRunner.commitTransaction();
       return;
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -352,16 +914,25 @@ export class DataAdapterService {
       }
 
       const now = new Date();
+      const isRepositoryAsset =
+        job.asset.target?.type === TargetType.GIT_ORG;
       const values = data.map((vuln) => {
-        const stringHash = `${vuln.name}-${job.asset.id}-${job.tool.id}`;
-        const fingerprint = crypto
-          .createHash('md5')
-          .update(stringHash)
-          .digest('hex');
+        const fingerprint = vulnerabilityFingerprint({
+          name: vuln.name,
+          assetId: job.asset.id,
+          toolId: job.tool.id,
+          isRepositoryAsset,
+          sourceFingerprint: vuln.fingerprint,
+        });
         const vulnValues = { ...vuln } as unknown as Record<string, string | number | boolean | object | null>;
         delete vulnValues.id;
         return {
           ...vulnValues,
+          ...normalizeCodeFields(vulnValues),
+          severity:
+            typeof vulnValues.severity === 'string'
+              ? (vulnValues.severity.toLowerCase() as Severity)
+              : Severity.INFO,
           fingerprint,
           assetId: job.asset.id,
           toolId: job.tool.id,
@@ -380,34 +951,67 @@ export class DataAdapterService {
         new Map(values.map((v) => [v.fingerprint, v])).values(),
       );
 
-      // Pre-check: find which fingerprints already exist
-      // to avoid sending notifications for updated vulns
-      const existingRows = await manager
+      // Pre-check: load the stored rows for the fingerprints about to be
+      // upserted, both to avoid notifications for updated vulns and to reuse
+      // their enrichment values below.
+      const existingRows: Array<Record<string, unknown>> = await manager
         .createQueryBuilder()
         .select('v.fingerprint', 'fingerprint')
+        .addSelect(
+          RESCAN_PRESERVE_COLUMNS.map((column) => `v.${column} AS ${column}`),
+        )
         .from(Vulnerability, 'v')
         .where('v.fingerprint IN (:...fingerprints)', {
           fingerprints: uniqueValues.map((v) => v.fingerprint),
         })
         .getRawMany();
 
-      const existingFingerprints = new Set<string>(
-        (existingRows as { fingerprint: string }[]).map((r) => r.fingerprint),
+      const existingByFingerprint = new Map<string, Record<string, unknown>>(
+        existingRows.map((row) => [row.fingerprint as string, row]),
       );
 
-      const result = await manager
-        .createQueryBuilder()
-        .insert()
-        .into(Vulnerability)
-        .values(uniqueValues)
-        .orUpdate({
-          conflict_target: ['fingerprint'],
-          overwrite: ['updatedAt', 'severity', 'lastSeenDate'],
-        })
-        .returning('*')
-        .execute();
+      // A finding that omits a field inserts NULL, and EXCLUDED would then
+      // erase the stored value on conflict — keep the old value instead.
+      for (const value of uniqueValues) {
+        const previous = existingByFingerprint.get(value.fingerprint);
+        if (!previous) continue;
+        const incoming = value as unknown as Record<string, unknown>;
+        for (const column of RESCAN_PRESERVE_COLUMNS) {
+          if (incoming[column] === undefined || incoming[column] === null) {
+            incoming[column] = previous[column];
+          }
+        }
+      }
 
-      const insertedVulnerabilities = result.raw as Vulnerability[];
+      const existingFingerprints = new Set<string>(
+        existingByFingerprint.keys(),
+      );
+
+      // Chunk the upsert so no single statement exceeds Postgres' 65535
+      // parameter ceiling — see VULNERABILITY_INSERT_CHUNK_SIZE.
+      const insertedVulnerabilities: Vulnerability[] = [];
+      for (
+        let offset = 0;
+        offset < uniqueValues.length;
+        offset += VULNERABILITY_INSERT_CHUNK_SIZE
+      ) {
+        const chunk = uniqueValues.slice(
+          offset,
+          offset + VULNERABILITY_INSERT_CHUNK_SIZE,
+        );
+        const result = await manager
+          .createQueryBuilder()
+          .insert()
+          .into(Vulnerability)
+          .values(chunk)
+          .orUpdate({
+            conflict_target: ['fingerprint'],
+            overwrite: [...RESCAN_OVERWRITE_COLUMNS],
+          })
+          .returning('*')
+          .execute();
+        insertedVulnerabilities.push(...(result.raw as Vulnerability[]));
+      }
 
       // Only send notifications for truly new vulnerabilities,
       // not for existing ones that were just updated
@@ -420,7 +1024,7 @@ export class DataAdapterService {
 
       if (vulsForAlert.length > 0) {
         this.logger.log(
-          `Found ${vulsForAlert.length} new vulns for job ${job.id}, looking up workspace members`,
+          `Found ${vulsForAlert.length} new vulns for job ${job.id}, looking up workspace`,
         );
 
         const members =
@@ -428,34 +1032,36 @@ export class DataAdapterService {
 
         if (members.length === 0) {
           this.logger.warn(
-            `No workspace members found for job ${job.id}, skipping notification`,
+            `No workspace resolved for job ${job.id}, skipping the event`,
           );
           return;
         }
 
-        this.logger.log(
-          `Found ${members.length} workspace members for job ${job.id}, creating notification`,
-        );
-
-        const recipientIds = members.map((m) => m.user.id);
         const workspaceId = members[0].workspace.id;
 
-        await this.notificationsService.createNotification({
-          recipients: recipientIds,
-          scope: NotificationScope.GROUP,
-          type: NotificationType.NEW_VULNERABILITY_FOUND,
-          metadata: {
-            count: String(vulsForAlert.length),
-            assetValue: job.asset.value,
+        this.logger.log(
+          `Publishing vulnerability.detected for ${vulsForAlert.length} vulns in workspace ${workspaceId}`,
+        );
+
+        // Report the FINDINGS, not a notification decision: who is told about
+        // them, how they are counted and ranked, and in what wording all
+        // belong to the consumers. The asset identity travels as payload
+        // because a consumer cannot re-derive it from the workspace alone.
+        //
+        // One event for the whole batch, not one per vulnerability: a scan that
+        // finds 200 issues must not push 200 notifications.
+        await this.eventBridge.publishSafely(EVENT_CATALOG.vulnerability.detected, {
+          workspaceId,
+          outcome: 'success',
+          resourceType: 'vulnerability',
+          payload: {
+            jobId: job.id,
             targetId: job.asset.target.id,
             assetId: job.asset.id,
-          },
-          workspaceId,
+            assetValue: job.asset.value,
+            vulnerabilities: vulsForAlert.map(toDetectedVulnerability),
+          } satisfies VulnerabilityDetectedPayload,
         });
-
-        this.logger.log(
-          `Notification created for ${vulsForAlert.length} vulns in workspace ${workspaceId}`,
-        );
       } else {
         this.logger.log(
           `No new vulns to alert for job ${job.id} (${uniqueValues.length} total deduped, ${existingFingerprints.size} already existed)`,
@@ -532,6 +1138,10 @@ export class DataAdapterService {
           handler: (data: DataAdapterInput<ScreenshotPayload>) =>
             this.screenshot(data),
           validationClass: ScreenshotPayload,
+        },
+        [ToolCategory.URL_DISCOVERY]: {
+          handler: (data: DataAdapterInput<DiscoveredUrl[]>) =>
+            this.urlDiscovery(data),
         },
       };
 

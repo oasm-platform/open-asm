@@ -171,7 +171,11 @@ function PairingDialog({
               <p className="text-sm text-muted-foreground">
                 Click the button below to generate a new pairing token.
               </p>
-              <Button onClick={handleGenerate} className="mt-2 gap-2">
+              <Button
+                type="button"
+                onClick={handleGenerate}
+                className="mt-2 gap-2"
+              >
                 <QrCode className="size-4" />
                 Generate Pairing Token
               </Button>
@@ -245,6 +249,7 @@ function PairingDialog({
 
               {connected ? (
                 <Button
+                  type="button"
                   variant="default"
                   className="w-full"
                   onClick={() => onOpenChange(false)}
@@ -254,6 +259,7 @@ function PairingDialog({
               ) : (
                 <div className="flex w-full gap-2">
                   <Button
+                    type="button"
                     variant="outline"
                     className="flex-1"
                     onClick={handleGenerate}
@@ -265,6 +271,7 @@ function PairingDialog({
                     Generate New Token
                   </Button>
                   <Button
+                    type="button"
                     variant="default"
                     className="flex-1"
                     onClick={() => onOpenChange(false)}
@@ -335,6 +342,7 @@ export function TelegramConnect({
               </CardTitle>
             </div>
             <Button
+              type="button"
               variant="outline"
               size="sm"
               className="gap-1.5"
@@ -393,6 +401,7 @@ export function TelegramConnect({
                         onConfirm={() => disconnectMutation.mutate(c.id)}
                         trigger={
                           <Button
+                            type="button"
                             variant="ghost"
                             size="icon-sm"
                             disabled={disconnectMutation.isPending}
@@ -427,6 +436,7 @@ export function TelegramConnect({
             <p className="text-xs text-destructive">
               Failed to load connections.{' '}
               <Button
+                type="button"
                 variant="link"
                 size="sm"
                 className="h-auto p-0 text-xs"

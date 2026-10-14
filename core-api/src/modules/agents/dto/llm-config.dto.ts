@@ -1,168 +1,381 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsDate,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { LLMProvider } from '../enums/agent.enums';
 
+const LOCAL_URL_OPTIONS = {
+  protocols: ['http', 'https'],
+  require_protocol: true,
+  require_tld: false,
+};
+
 export class LLMProviderSupportedDto {
-  @ApiProperty({ enum: LLMProvider, description: 'Provider identifier' })
+  @ApiProperty({
+    description: 'Stable provider identifier',
+    enum: LLMProvider,
+    example: LLMProvider.OPENAI,
+  })
+  @IsEnum(LLMProvider)
   id: LLMProvider;
 
-  @ApiProperty({ description: 'Provider display name' })
+  @ApiProperty({
+    description: 'Human-readable provider name',
+    example: 'OpenAI',
+  })
+  @IsString()
   name: string;
 
-  @ApiProperty({ description: 'Provider logo path' })
+  @ApiProperty({
+    description: 'Path or URL of the provider logo',
+    example: '/images/llm/openai.svg',
+  })
+  @IsString()
   logo: string;
 
-  @ApiProperty({
-    description: 'Whether provider accepts custom API URL',
-    required: false,
+  @ApiPropertyOptional({
+    description: 'Whether the provider accepts a custom API base URL',
+    example: false,
   })
+  @IsOptional()
+  @IsBoolean()
   isAcceptCustomApiUrl?: boolean;
 }
 
 export class LLMProviderStatusDto {
-  @ApiProperty({ enum: LLMProvider, description: 'Provider identifier' })
+  @ApiProperty({
+    description: 'Stable provider identifier',
+    enum: LLMProvider,
+    example: LLMProvider.OPENAI,
+  })
+  @IsEnum(LLMProvider)
   id: LLMProvider;
 
-  @ApiProperty({ description: 'Provider display name' })
+  @ApiProperty({
+    description: 'Human-readable provider name',
+    example: 'OpenAI',
+  })
+  @IsString()
   name: string;
 
-  @ApiProperty({ description: 'Provider logo path' })
+  @ApiProperty({
+    description: 'Path or URL of the provider logo',
+    example: '/images/llm/openai.svg',
+  })
+  @IsString()
   logo: string;
 
-  @ApiProperty({ description: 'Whether provider has a configured LLM config' })
+  @ApiProperty({
+    description: 'Whether the user has configured this provider',
+    example: true,
+  })
+  @IsBoolean()
   isConnected: boolean;
 
   @ApiProperty({
-    description: 'LLM config if connected, null otherwise',
+    description: 'Active provider configuration, or null when disconnected',
     nullable: true,
     type: () => LLMConfigResponseDto,
   })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LLMConfigResponseDto)
   config: LLMConfigResponseDto | null;
 }
 
 export class CreateLLMConfigDto {
-  @ApiProperty({ enum: LLMProvider, example: LLMProvider.OPENROUTER })
+  @ApiProperty({
+    description: 'Provider to configure',
+    enum: LLMProvider,
+    example: LLMProvider.OPENROUTER,
+  })
   @IsEnum(LLMProvider)
   provider: LLMProvider;
 
-  @ApiProperty({ required: false, example: 'My OpenAI key' })
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiProperty({})
-  @IsString()
-  @IsOptional()
-  apiKey: string;
-
-  @ApiProperty({ required: false })
-  @IsString()
-  @IsOptional()
-  model: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  apiUrl?: string;
-
-  @ApiProperty({
-    example: 8192,
-    description: 'Custom context window size in tokens. Overrides API-provided value.',
-    required: false,
+  @ApiPropertyOptional({
+    description: 'User-defined label for the configuration',
+    example: 'Production OpenAI key',
+    maxLength: 255,
   })
   @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name?: string;
+
+  @ApiProperty({
+    description: 'Provider API key used to authenticate model requests',
+    example: 'sk-...',
+    writeOnly: true,
+  })
+  @IsString()
+  @IsNotEmpty()
+  apiKey: string;
+
+  @ApiPropertyOptional({
+    description: 'Default model identifier; the first available model is used when omitted',
+    example: 'gpt-5',
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  model?: string;
+
+  @ApiPropertyOptional({
+    description: 'Custom provider API base URL',
+    example: 'https://api.example.com/v1',
+    maxLength: 500,
+  })
+  @IsOptional()
+  @IsUrl(LOCAL_URL_OPTIONS)
+  @MaxLength(500)
+  apiUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Custom context window size in tokens',
+    example: 8192,
+    minimum: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   contextWindow?: number;
 }
 
 export class UpdateLLMConfigDto extends PartialType(CreateLLMConfigDto) {
-  @ApiProperty({ example: true, required: false })
+  @ApiPropertyOptional({
+    description: 'Whether this is the preferred configuration for new conversations',
+    example: true,
+  })
   @IsOptional()
   @IsBoolean()
   isPreferred?: boolean;
 }
 
 export class LLMConfigResponseDto {
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Unique LLM configuration identifier',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsUUID()
   id: string;
 
-  @ApiProperty({ enum: LLMProvider })
+  @ApiProperty({
+    description: 'Configured provider identifier',
+    enum: LLMProvider,
+    example: LLMProvider.OPENAI,
+  })
+  @IsEnum(LLMProvider)
   provider: LLMProvider;
 
-  @ApiProperty({ required: false })
-  name?: string;
-
-  @ApiProperty()
-  @IsString()
+  @ApiPropertyOptional({
+    description: 'User-defined label for the configuration',
+    example: 'Production OpenAI key',
+    maxLength: 255,
+    nullable: true,
+    type: String,
+  })
   @IsOptional()
-  model?: string;
+  @IsString()
+  @MaxLength(255)
+  name?: string | null;
 
-  @ApiProperty({ required: false })
-  apiUrl?: string;
+  @ApiProperty({
+    description: 'Default model identifier',
+    example: 'gpt-5',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  model: string;
 
-  @ApiProperty({ required: false })
-  contextWindow?: number;
+  @ApiPropertyOptional({
+    description: 'Custom provider API base URL',
+    example: 'https://api.example.com/v1',
+    maxLength: 500,
+    nullable: true,
+    type: String,
+  })
+  @IsOptional()
+  @IsUrl(LOCAL_URL_OPTIONS)
+  @MaxLength(500)
+  apiUrl?: string | null;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Custom context window size in tokens',
+    example: 8192,
+    minimum: 1,
+    nullable: true,
+    type: Number,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  contextWindow?: number | null;
+
+  @ApiProperty({
+    description: 'Whether this is the preferred configuration',
+    example: true,
+  })
+  @IsBoolean()
   isPreferred: boolean;
 
-  @ApiProperty({ description: 'Masked API key (shows last 4 chars)' })
+  @ApiProperty({
+    description: 'Masked API key showing only its final characters',
+    example: '********abcd',
+  })
+  @IsString()
   apiKeyMasked: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Timestamp when the configuration was created',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  @IsDate()
   createdAt: Date;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Timestamp when the configuration was last updated',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  @IsDate()
   updatedAt: Date;
 }
 
 export class ProviderModelDto {
-  @ApiProperty({ description: 'Model identifier for API calls' })
+  @ApiProperty({
+    description: 'Model identifier used for provider API calls',
+    example: 'gpt-5',
+  })
+  @IsString()
+  @IsNotEmpty()
   id: string;
 
-  @ApiProperty({ description: 'Human-readable model name' })
+  @ApiProperty({
+    description: 'Human-readable model name',
+    example: 'GPT-5',
+  })
+  @IsString()
+  @IsNotEmpty()
   name: string;
 }
 
 export class LLMConfigWithProviderDto {
-  @ApiProperty({ enum: LLMProvider, description: 'Provider identifier' })
+  @ApiProperty({
+    description: 'Stable provider identifier',
+    enum: LLMProvider,
+    example: LLMProvider.OPENAI,
+  })
+  @IsEnum(LLMProvider)
   providerId: LLMProvider;
 
-  @ApiProperty({ description: 'Provider display name' })
+  @ApiProperty({
+    description: 'Human-readable provider name',
+    example: 'OpenAI',
+  })
+  @IsString()
   providerName: string;
 
-  @ApiProperty({ description: 'Provider logo path', required: false })
+  @ApiPropertyOptional({
+    description: 'Path or URL of the provider logo',
+    example: '/images/llm/openai.svg',
+  })
+  @IsOptional()
+  @IsString()
   logo?: string;
 
-  @ApiProperty({ description: 'Connection status' })
+  @ApiProperty({
+    description: 'Whether the user has configured this provider',
+    example: true,
+  })
+  @IsBoolean()
   isConnected: boolean;
 
-  @ApiProperty({ description: 'Whether provider accepts custom API URL' })
+  @ApiPropertyOptional({
+    description: 'Whether the provider accepts a custom API base URL',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
   isAcceptCustomApiUrl?: boolean;
 
-  @ApiProperty({ description: 'LLM config ID if connected', required: false })
+  @ApiPropertyOptional({
+    description: 'LLM configuration identifier when connected',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsOptional()
+  @IsUUID()
   configId?: string;
 
-  @ApiProperty({ description: 'User-defined label for this config', required: false })
+  @ApiPropertyOptional({
+    description: 'User-defined configuration label',
+    example: 'Production OpenAI key',
+  })
+  @IsOptional()
+  @IsString()
   name?: string;
 
-  @ApiProperty({ description: 'Model name if connected', required: false })
+  @ApiPropertyOptional({
+    description: 'Configured model identifier',
+    example: 'gpt-5',
+  })
+  @IsOptional()
+  @IsString()
   model?: string;
 
-  @ApiProperty({ description: 'API URL if connected', required: false })
+  @ApiPropertyOptional({
+    description: 'Configured custom API base URL',
+    example: 'https://api.example.com/v1',
+  })
+  @IsOptional()
+  @IsUrl(LOCAL_URL_OPTIONS)
   apiUrl?: string;
 
-  @ApiProperty({
-    description: 'Is preferred config if connected',
-    required: false,
+  @ApiPropertyOptional({
+    description: 'Whether this is the preferred configuration',
+    example: true,
   })
+  @IsOptional()
+  @IsBoolean()
   isPreferred?: boolean;
 
-  @ApiProperty({ description: 'Masked API key if connected', required: false })
+  @ApiPropertyOptional({
+    description: 'Masked provider API key',
+    example: '********abcd',
+  })
+  @IsOptional()
+  @IsString()
   apiKeyMasked?: string;
 
-  @ApiProperty({ description: 'Created at if connected', required: false })
+  @ApiPropertyOptional({
+    description: 'Timestamp when the configuration was created',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  @IsOptional()
+  @IsDate()
   createdAt?: Date;
 
-  @ApiProperty({ description: 'Updated at if connected', required: false })
+  @ApiPropertyOptional({
+    description: 'Timestamp when the configuration was last updated',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  @IsOptional()
+  @IsDate()
   updatedAt?: Date;
 }

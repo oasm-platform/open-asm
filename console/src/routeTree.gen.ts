@@ -17,7 +17,6 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedReportsRouteImport } from './routes/_authed/reports'
 import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
-import { Route as AuthedWorkersRouteImport } from './routes/_authed/workers'
 import { Route as InviteTokenRouteImport } from './routes/invite/$token'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
@@ -25,7 +24,6 @@ import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/use
 import { Route as AuthedAgentsIndexRouteImport } from './routes/_authed/agents/index'
 import { Route as AuthedAgentsCreateRouteImport } from './routes/_authed/agents/create'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
-import { Route as AuthedAssetsIdRouteImport } from './routes/_authed/assets/$id'
 import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
 import { Route as AuthedGroupsIdRouteImport } from './routes/_authed/groups/$id'
 import { Route as AuthedGroupsCreateRouteImport } from './routes/_authed/groups/create'
@@ -42,6 +40,8 @@ import { Route as AuthedToolsIndexRouteImport } from './routes/_authed/tools/ind
 import { Route as AuthedToolsIdRouteImport } from './routes/_authed/tools/$id'
 import { Route as AuthedVulnerabilitiesIndexRouteImport } from './routes/_authed/vulnerabilities/index'
 import { Route as AuthedVulnerabilitiesIdRouteImport } from './routes/_authed/vulnerabilities/$id'
+import { Route as AuthedWorkersIndexRouteImport } from './routes/_authed/workers/index'
+import { Route as AuthedWorkersIdRouteImport } from './routes/_authed/workers/$id'
 import { Route as AuthedWorkspacesIndexRouteImport } from './routes/_authed/workspaces/index'
 import { Route as AuthedWorkspacesCreateRouteImport } from './routes/_authed/workspaces/create'
 import { Route as AuthedAgentsIdIndexRouteImport } from './routes/_authed/agents/$id/index'
@@ -49,6 +49,7 @@ import { Route as AuthedAgentsIdEditRouteImport } from './routes/_authed/agents/
 import { Route as AuthedAgentsConversationsIndexRouteImport } from './routes/_authed/agents/conversations/index'
 import { Route as AuthedAgentsConversationsConversationIdRouteImport } from './routes/_authed/agents/conversations/$conversationId'
 import { Route as AuthedAgentsProvidersConnectRouteImport } from './routes/_authed/agents/providers/connect'
+import { Route as AuthedAssetsServicesIdRouteImport } from './routes/_authed/assets/services/$id'
 import { Route as AuthedJobsRunsIdRouteImport } from './routes/_authed/jobs/runs/$id'
 import { Route as AuthedProvidersIdIndexRouteImport } from './routes/_authed/providers/$id/index'
 import { Route as AuthedProvidersIdEditRouteImport } from './routes/_authed/providers/$id/edit'
@@ -96,11 +97,6 @@ const AuthedSearchRoute = AuthedSearchRouteImport.update({
   path: '/search',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedWorkersRoute = AuthedWorkersRouteImport.update({
-  id: '/workers',
-  path: '/workers',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
@@ -134,11 +130,6 @@ const AuthedAgentsCreateRoute = AuthedAgentsCreateRouteImport.update({
 const AuthedAssetsIndexRoute = AuthedAssetsIndexRouteImport.update({
   id: '/assets/',
   path: '/assets/',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedAssetsIdRoute = AuthedAssetsIdRouteImport.update({
-  id: '/assets/$id',
-  path: '/assets/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedGroupsIndexRoute = AuthedGroupsIndexRouteImport.update({
@@ -226,6 +217,16 @@ const AuthedVulnerabilitiesIdRoute = AuthedVulnerabilitiesIdRouteImport.update({
   path: '/vulnerabilities/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedWorkersIndexRoute = AuthedWorkersIndexRouteImport.update({
+  id: '/workers/',
+  path: '/workers/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedWorkersIdRoute = AuthedWorkersIdRouteImport.update({
+  id: '/workers/$id',
+  path: '/workers/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedWorkspacesIndexRoute = AuthedWorkspacesIndexRouteImport.update({
   id: '/workspaces/',
   path: '/workspaces/',
@@ -264,6 +265,11 @@ const AuthedAgentsProvidersConnectRoute =
     path: '/agents/providers/connect',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAssetsServicesIdRoute = AuthedAssetsServicesIdRouteImport.update({
+  id: '/assets/services/$id',
+  path: '/assets/services/$id',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedJobsRunsIdRoute = AuthedJobsRunsIdRouteImport.update({
   id: '/jobs/runs/$id',
   path: '/jobs/runs/$id',
@@ -310,13 +316,11 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRouteWithChildren
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
-  '/workers': typeof AuthedWorkersRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/settings/': typeof SettingsIndexRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
-  '/assets/$id': typeof AuthedAssetsIdRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
   '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -325,6 +329,7 @@ export interface FileRoutesByFullPath {
   '/targets/start-discovery': typeof AuthedTargetsStartDiscoveryRoute
   '/tools/$id': typeof AuthedToolsIdRoute
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
+  '/workers/$id': typeof AuthedWorkersIdRoute
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
   '/agents/': typeof AuthedAgentsIndexRoute
   '/assets/': typeof AuthedAssetsIndexRoute
@@ -336,10 +341,12 @@ export interface FileRoutesByFullPath {
   '/targets/': typeof AuthedTargetsIndexRoute
   '/tools/': typeof AuthedToolsIndexRoute
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
+  '/workers/': typeof AuthedWorkersIndexRoute
   '/workspaces/': typeof AuthedWorkspacesIndexRoute
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/agents/conversations/$conversationId': typeof AuthedAgentsConversationsConversationIdRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
+  '/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
@@ -356,14 +363,12 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
-  '/workers': typeof AuthedWorkersRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/': typeof AuthedIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
-  '/assets/$id': typeof AuthedAssetsIdRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
   '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -372,6 +377,7 @@ export interface FileRoutesByTo {
   '/targets/start-discovery': typeof AuthedTargetsStartDiscoveryRoute
   '/tools/$id': typeof AuthedToolsIdRoute
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
+  '/workers/$id': typeof AuthedWorkersIdRoute
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
   '/agents': typeof AuthedAgentsIndexRoute
   '/assets': typeof AuthedAssetsIndexRoute
@@ -383,10 +389,12 @@ export interface FileRoutesByTo {
   '/targets': typeof AuthedTargetsIndexRoute
   '/tools': typeof AuthedToolsIndexRoute
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
+  '/workers': typeof AuthedWorkersIndexRoute
   '/workspaces': typeof AuthedWorkspacesIndexRoute
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/agents/conversations/$conversationId': typeof AuthedAgentsConversationsConversationIdRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
+  '/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
@@ -406,14 +414,12 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRouteWithChildren
   '/_authed/reports': typeof AuthedReportsRoute
   '/_authed/search': typeof AuthedSearchRoute
-  '/_authed/workers': typeof AuthedWorkersRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/_authed/': typeof AuthedIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/agents/create': typeof AuthedAgentsCreateRoute
-  '/_authed/assets/$id': typeof AuthedAssetsIdRoute
   '/_authed/groups/$id': typeof AuthedGroupsIdRoute
   '/_authed/groups/create': typeof AuthedGroupsCreateRoute
   '/_authed/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -422,6 +428,7 @@ export interface FileRoutesById {
   '/_authed/targets/start-discovery': typeof AuthedTargetsStartDiscoveryRoute
   '/_authed/tools/$id': typeof AuthedToolsIdRoute
   '/_authed/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
+  '/_authed/workers/$id': typeof AuthedWorkersIdRoute
   '/_authed/workspaces/create': typeof AuthedWorkspacesCreateRoute
   '/_authed/agents/': typeof AuthedAgentsIndexRoute
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
@@ -433,10 +440,12 @@ export interface FileRoutesById {
   '/_authed/targets/': typeof AuthedTargetsIndexRoute
   '/_authed/tools/': typeof AuthedToolsIndexRoute
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
+  '/_authed/workers/': typeof AuthedWorkersIndexRoute
   '/_authed/workspaces/': typeof AuthedWorkspacesIndexRoute
   '/_authed/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/_authed/agents/conversations/$conversationId': typeof AuthedAgentsConversationsConversationIdRoute
   '/_authed/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
+  '/_authed/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/_authed/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
   '/_authed/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/_authed/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
@@ -457,13 +466,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/reports'
     | '/search'
-    | '/workers'
     | '/invite/$token'
     | '/settings/$tab'
     | '/settings/'
     | '/admin/users'
     | '/agents/create'
-    | '/assets/$id'
     | '/groups/$id'
     | '/groups/create'
     | '/internal-networks/$id'
@@ -472,6 +479,7 @@ export interface FileRouteTypes {
     | '/targets/start-discovery'
     | '/tools/$id'
     | '/vulnerabilities/$id'
+    | '/workers/$id'
     | '/workspaces/create'
     | '/agents/'
     | '/assets/'
@@ -483,10 +491,12 @@ export interface FileRouteTypes {
     | '/targets/'
     | '/tools/'
     | '/vulnerabilities/'
+    | '/workers/'
     | '/workspaces/'
     | '/agents/$id/edit'
     | '/agents/conversations/$conversationId'
     | '/agents/providers/connect'
+    | '/assets/services/$id'
     | '/jobs/runs/$id'
     | '/providers/$id/edit'
     | '/targets/$id/$tab'
@@ -503,14 +513,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/reports'
     | '/search'
-    | '/workers'
     | '/invite/$token'
     | '/settings/$tab'
     | '/'
     | '/settings'
     | '/admin/users'
     | '/agents/create'
-    | '/assets/$id'
     | '/groups/$id'
     | '/groups/create'
     | '/internal-networks/$id'
@@ -519,6 +527,7 @@ export interface FileRouteTypes {
     | '/targets/start-discovery'
     | '/tools/$id'
     | '/vulnerabilities/$id'
+    | '/workers/$id'
     | '/workspaces/create'
     | '/agents'
     | '/assets'
@@ -530,10 +539,12 @@ export interface FileRouteTypes {
     | '/targets'
     | '/tools'
     | '/vulnerabilities'
+    | '/workers'
     | '/workspaces'
     | '/agents/$id/edit'
     | '/agents/conversations/$conversationId'
     | '/agents/providers/connect'
+    | '/assets/services/$id'
     | '/jobs/runs/$id'
     | '/providers/$id/edit'
     | '/targets/$id/$tab'
@@ -552,14 +563,12 @@ export interface FileRouteTypes {
     | '/settings'
     | '/_authed/reports'
     | '/_authed/search'
-    | '/_authed/workers'
     | '/invite/$token'
     | '/settings/$tab'
     | '/_authed/'
     | '/settings/'
     | '/_authed/admin/users'
     | '/_authed/agents/create'
-    | '/_authed/assets/$id'
     | '/_authed/groups/$id'
     | '/_authed/groups/create'
     | '/_authed/internal-networks/$id'
@@ -568,6 +577,7 @@ export interface FileRouteTypes {
     | '/_authed/targets/start-discovery'
     | '/_authed/tools/$id'
     | '/_authed/vulnerabilities/$id'
+    | '/_authed/workers/$id'
     | '/_authed/workspaces/create'
     | '/_authed/agents/'
     | '/_authed/assets/'
@@ -579,10 +589,12 @@ export interface FileRouteTypes {
     | '/_authed/targets/'
     | '/_authed/tools/'
     | '/_authed/vulnerabilities/'
+    | '/_authed/workers/'
     | '/_authed/workspaces/'
     | '/_authed/agents/$id/edit'
     | '/_authed/agents/conversations/$conversationId'
     | '/_authed/agents/providers/connect'
+    | '/_authed/assets/services/$id'
     | '/_authed/jobs/runs/$id'
     | '/_authed/providers/$id/edit'
     | '/_authed/targets/$id/$tab'
@@ -661,13 +673,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSearchRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/workers': {
-      id: '/_authed/workers'
-      path: '/workers'
-      fullPath: '/workers'
-      preLoaderRoute: typeof AuthedWorkersRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/invite/$token': {
       id: '/invite/$token'
       path: '/invite/$token'
@@ -715,13 +720,6 @@ declare module '@tanstack/react-router' {
       path: '/assets'
       fullPath: '/assets/'
       preLoaderRoute: typeof AuthedAssetsIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/assets/$id': {
-      id: '/_authed/assets/$id'
-      path: '/assets/$id'
-      fullPath: '/assets/$id'
-      preLoaderRoute: typeof AuthedAssetsIdRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/groups/': {
@@ -836,6 +834,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedVulnerabilitiesIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/workers/': {
+      id: '/_authed/workers/'
+      path: '/workers'
+      fullPath: '/workers/'
+      preLoaderRoute: typeof AuthedWorkersIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/workers/$id': {
+      id: '/_authed/workers/$id'
+      path: '/workers/$id'
+      fullPath: '/workers/$id'
+      preLoaderRoute: typeof AuthedWorkersIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/workspaces/': {
       id: '/_authed/workspaces/'
       path: '/workspaces'
@@ -883,6 +895,13 @@ declare module '@tanstack/react-router' {
       path: '/agents/providers/connect'
       fullPath: '/agents/providers/connect'
       preLoaderRoute: typeof AuthedAgentsProvidersConnectRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/assets/services/$id': {
+      id: '/_authed/assets/services/$id'
+      path: '/assets/services/$id'
+      fullPath: '/assets/services/$id'
+      preLoaderRoute: typeof AuthedAssetsServicesIdRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/jobs/runs/$id': {
@@ -940,11 +959,9 @@ declare module '@tanstack/react-router' {
 interface AuthedRouteChildren {
   AuthedReportsRoute: typeof AuthedReportsRoute
   AuthedSearchRoute: typeof AuthedSearchRoute
-  AuthedWorkersRoute: typeof AuthedWorkersRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedAgentsCreateRoute: typeof AuthedAgentsCreateRoute
-  AuthedAssetsIdRoute: typeof AuthedAssetsIdRoute
   AuthedGroupsIdRoute: typeof AuthedGroupsIdRoute
   AuthedGroupsCreateRoute: typeof AuthedGroupsCreateRoute
   AuthedInternalNetworksIdRoute: typeof AuthedInternalNetworksIdRoute
@@ -953,6 +970,7 @@ interface AuthedRouteChildren {
   AuthedTargetsStartDiscoveryRoute: typeof AuthedTargetsStartDiscoveryRoute
   AuthedToolsIdRoute: typeof AuthedToolsIdRoute
   AuthedVulnerabilitiesIdRoute: typeof AuthedVulnerabilitiesIdRoute
+  AuthedWorkersIdRoute: typeof AuthedWorkersIdRoute
   AuthedWorkspacesCreateRoute: typeof AuthedWorkspacesCreateRoute
   AuthedAgentsIndexRoute: typeof AuthedAgentsIndexRoute
   AuthedAssetsIndexRoute: typeof AuthedAssetsIndexRoute
@@ -964,10 +982,12 @@ interface AuthedRouteChildren {
   AuthedTargetsIndexRoute: typeof AuthedTargetsIndexRoute
   AuthedToolsIndexRoute: typeof AuthedToolsIndexRoute
   AuthedVulnerabilitiesIndexRoute: typeof AuthedVulnerabilitiesIndexRoute
+  AuthedWorkersIndexRoute: typeof AuthedWorkersIndexRoute
   AuthedWorkspacesIndexRoute: typeof AuthedWorkspacesIndexRoute
   AuthedAgentsIdEditRoute: typeof AuthedAgentsIdEditRoute
   AuthedAgentsConversationsConversationIdRoute: typeof AuthedAgentsConversationsConversationIdRoute
   AuthedAgentsProvidersConnectRoute: typeof AuthedAgentsProvidersConnectRoute
+  AuthedAssetsServicesIdRoute: typeof AuthedAssetsServicesIdRoute
   AuthedJobsRunsIdRoute: typeof AuthedJobsRunsIdRoute
   AuthedProvidersIdEditRoute: typeof AuthedProvidersIdEditRoute
   AuthedTargetsIdTabRoute: typeof AuthedTargetsIdTabRoute
@@ -980,11 +1000,9 @@ interface AuthedRouteChildren {
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedReportsRoute: AuthedReportsRoute,
   AuthedSearchRoute: AuthedSearchRoute,
-  AuthedWorkersRoute: AuthedWorkersRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedAgentsCreateRoute: AuthedAgentsCreateRoute,
-  AuthedAssetsIdRoute: AuthedAssetsIdRoute,
   AuthedGroupsIdRoute: AuthedGroupsIdRoute,
   AuthedGroupsCreateRoute: AuthedGroupsCreateRoute,
   AuthedInternalNetworksIdRoute: AuthedInternalNetworksIdRoute,
@@ -993,6 +1011,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedTargetsStartDiscoveryRoute: AuthedTargetsStartDiscoveryRoute,
   AuthedToolsIdRoute: AuthedToolsIdRoute,
   AuthedVulnerabilitiesIdRoute: AuthedVulnerabilitiesIdRoute,
+  AuthedWorkersIdRoute: AuthedWorkersIdRoute,
   AuthedWorkspacesCreateRoute: AuthedWorkspacesCreateRoute,
   AuthedAgentsIndexRoute: AuthedAgentsIndexRoute,
   AuthedAssetsIndexRoute: AuthedAssetsIndexRoute,
@@ -1004,11 +1023,13 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedTargetsIndexRoute: AuthedTargetsIndexRoute,
   AuthedToolsIndexRoute: AuthedToolsIndexRoute,
   AuthedVulnerabilitiesIndexRoute: AuthedVulnerabilitiesIndexRoute,
+  AuthedWorkersIndexRoute: AuthedWorkersIndexRoute,
   AuthedWorkspacesIndexRoute: AuthedWorkspacesIndexRoute,
   AuthedAgentsIdEditRoute: AuthedAgentsIdEditRoute,
   AuthedAgentsConversationsConversationIdRoute:
     AuthedAgentsConversationsConversationIdRoute,
   AuthedAgentsProvidersConnectRoute: AuthedAgentsProvidersConnectRoute,
+  AuthedAssetsServicesIdRoute: AuthedAssetsServicesIdRoute,
   AuthedJobsRunsIdRoute: AuthedJobsRunsIdRoute,
   AuthedProvidersIdEditRoute: AuthedProvidersIdEditRoute,
   AuthedTargetsIdTabRoute: AuthedTargetsIdTabRoute,

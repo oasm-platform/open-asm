@@ -1,4 +1,3 @@
-import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import * as fs from 'fs';
@@ -17,20 +16,27 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 import { LLMProvider } from '../agents/enums/agent.enums';
 import {
   getLLMProviderConfig,
 } from '../agents/llm-provider-supported';
-import { Target } from '../targets/entities/target.entity';
+import { Target, TargetType } from '../targets/entities/target.entity';
 
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
+import { StorageService } from '../storage/storage.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
+import {
+  GetAssetsQueryDto,
+  GetAssetsResponseDto,
+  PickTechnologyDetailDTO,
+} from './dto/assets.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
+import { GetTagAssetsDTO } from './dto/get-tag-assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
+import { GetUrlAssetsDTO } from './dto/get-url-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import {
@@ -44,23 +50,46 @@ import { UpdateAssetDto } from './dto/update-asset.dto';
 import { AssetService } from './entities/asset-services.entity';
 import { AssetTag } from './entities/asset-tags.entity';
 import { Asset } from './entities/assets.entity';
-import { TlsAssetsView } from './entities/tls-assets.entity';
+import { DnsRecord } from './entities/dns-record.entity';
+import { HttpResponseTechnology } from './entities/http-response-technology.entity';
+import { compileAssetFilter, legacyParamsToFilter } from './asset-filter';
+import { HttpStatusCode } from './entities/http-status-code.entity';
+import {
+  IpObservation,
+  IpObservationSource,
+} from './entities/ip-observation.entity';
+import { TlsCertificate } from './entities/tls-certificate.entity';
 
-// Type cho raw database response từ TLS query
-// interface TlsRawData {
-//   host: string;
-//   sni: string;
-//   subject_dn: string;
-//   subject_an: string[];
-//   not_after: string;
-//   not_before: string;
-//   tls_connection: string;
-// }
+/** IP sources that belong to an asset (its DNS A/AAAA records). */
+const DNS_IP_SOURCES: IpObservationSource[] = ['dns_a', 'dns_aaaa'];
 
-// Type cho item từ raw query result
-// interface TlsRawQueryItem {
-//   tls: TlsRawData;
-// }
+/** A tls_certificates row in the legacy HttpResponse.tls payload shape. */
+function toLegacyTls(cert: TlsCertificate): Record<string, unknown> {
+  return {
+    host: cert.host,
+    port: cert.port,
+    probe_status: cert.probeStatus,
+    tls_version: cert.tlsVersion,
+    cipher: cert.cipher,
+    not_before: cert.notBefore?.toISOString() ?? null,
+    not_after: cert.notAfter?.toISOString() ?? null,
+    subject_dn: cert.subjectDn,
+    subject_cn: cert.subjectCn,
+    subject_an: cert.subjectAn ?? [],
+    serial: cert.serial,
+    issuer_dn: cert.issuerDn,
+    issuer_cn: cert.issuerCn,
+    issuer_org: cert.issuerOrg ?? [],
+    fingerprint_hash: {
+      md5: cert.fingerprintMd5,
+      sha1: cert.fingerprintSha1,
+      sha256: cert.fingerprintSha256,
+    },
+    wildcard_certificate: cert.wildcardCertificate,
+    tls_connection: cert.tlsConnection,
+    sni: cert.sni,
+  };
+}
 
 @Injectable()
 export class AssetsService {
@@ -74,8 +103,16 @@ export class AssetsService {
     public readonly assetServiceRepo: Repository<AssetService>,
     @InjectRepository(Target)
     public readonly targetRepo: Repository<Target>,
-    @InjectRepository(TlsAssetsView)
-    public readonly tlsAssetsViewRepo: Repository<TlsAssetsView>,
+    @InjectRepository(TlsCertificate)
+    public readonly tlsCertificateRepo: Repository<TlsCertificate>,
+    @InjectRepository(HttpResponseTechnology)
+    public readonly httpResponseTechnologyRepo: Repository<HttpResponseTechnology>,
+    @InjectRepository(HttpStatusCode)
+    public readonly httpStatusCodeRepo: Repository<HttpStatusCode>,
+    @InjectRepository(IpObservation)
+    public readonly ipObservationRepo: Repository<IpObservation>,
+    @InjectRepository(DnsRecord)
+    public readonly dnsRecordRepo: Repository<DnsRecord>,
     @InjectRepository(AgentLLMConfig)
     private readonly llmConfigRepository: Repository<AgentLLMConfig>,
     private eventEmitter: EventEmitter2,
@@ -83,6 +120,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
     private workspaceEncryption: WorkspaceEncryptionService,
     private geoIpService: GeoIpService,
+    private storageService: StorageService,
     private dataSource: DataSource,
   ) {
     this.loadPrompts();
@@ -202,48 +240,175 @@ export class AssetsService {
     });
   }
 
+  /**
+   * Batch-loads the facets the asset list renders, one query per facet:
+   * asset IPs (DNS A/AAAA, same source as the IP tab and the IP filter),
+   * tech strings and TLS of the given http responses.
+   */
+  private async loadFacets(
+    assetIds: string[],
+    httpResponseIds: string[],
+  ): Promise<{
+    ipsByAsset: Map<string, string[]>;
+    techByResponse: Map<string, string[]>;
+    tlsByResponse: Map<string, Record<string, unknown>>;
+  }> {
+    const [ipRows, techRows, certs] = await Promise.all([
+      assetIds.length
+        ? this.ipObservationRepo.find({
+            select: ['assetId', 'ip'],
+            where: { assetId: In(assetIds), source: In(DNS_IP_SOURCES) },
+            order: { ip: 'ASC' },
+          })
+        : [],
+      httpResponseIds.length
+        ? this.httpResponseTechnologyRepo.find({
+            select: ['httpResponseId', 'name', 'version'],
+            where: { httpResponseId: In(httpResponseIds) },
+          })
+        : [],
+      httpResponseIds.length
+        ? this.tlsCertificateRepo.find({
+            where: { httpResponseId: In(httpResponseIds) },
+          })
+        : [],
+    ]);
+
+    const ipsByAsset = new Map<string, string[]>();
+    for (const row of ipRows ?? []) {
+      if (!row.assetId) continue;
+      const list = ipsByAsset.get(row.assetId) ?? [];
+      if (!list.includes(row.ip)) list.push(row.ip);
+      ipsByAsset.set(row.assetId, list);
+    }
+    const techByResponse = new Map<string, string[]>();
+    for (const row of techRows ?? []) {
+      const list = techByResponse.get(row.httpResponseId) ?? [];
+      list.push(row.version ? `${row.name}:${row.version}` : row.name);
+      techByResponse.set(row.httpResponseId, list);
+    }
+    const tlsByResponse = new Map<string, Record<string, unknown>>();
+    for (const cert of (certs ?? []) as TlsCertificate[]) {
+      tlsByResponse.set(cert.httpResponseId, toLegacyTls(cert));
+    }
+    return { ipsByAsset, techByResponse, tlsByResponse };
+  }
+
+  /** Enriches every distinct tech string once; returns tech → details. */
+  private async enrichTechStrings(
+    techs: string[],
+  ): Promise<Map<string, PickTechnologyDetailDTO & { website?: string }>> {
+    const unique = [...new Set(techs)];
+    const enriched =
+      (await this.technologyForwarderService.enrichTechnologies(unique)) ?? [];
+    const byTech = new Map<
+      string,
+      PickTechnologyDetailDTO & { website?: string }
+    >();
+    unique.forEach((tech, i) => {
+      const e = enriched[i];
+      if (e?.name === undefined) return;
+      byTech.set(tech, {
+        name: e.name,
+        description: e.description,
+        iconUrl: e.iconUrl,
+        categoryNames: e.categoryNames,
+        website: e.website,
+      });
+    });
+    return byTech;
+  }
+
+  /**
+   * Maps asset-service rows (from buildBaseQuery) to the list/detail DTO,
+   * batching every facet lookup across the page.
+   */
+  private async toAssetResponses(
+    items: AssetService[],
+  ): Promise<GetAssetsResponseDto[]> {
+    const assetIds = items
+      .map((item) => item.asset?.id)
+      .filter((id): id is string => !!id);
+    const latestIds = items
+      .map((item) => item.httpResponses?.[0]?.id)
+      .filter((id): id is string => !!id);
+    const { ipsByAsset, techByResponse, tlsByResponse } =
+      await this.loadFacets(assetIds, latestIds);
+    const techDetails = await this.enrichTechStrings(
+      [...techByResponse.values()].flat(),
+    );
+    // Screenshot signing (storage refactor): one batch call per page, order-
+    // preserving; malformed rows resolve to null, falsy rows stay null/''.
+    const rawPaths = items.map((item) => item.screenshotPath);
+    const signable = rawPaths
+      .filter((p): p is string => !!p)
+      .map((p) => {
+        const slashIndex = p.indexOf('/');
+        return {
+          bucket: slashIndex > 0 ? p.slice(0, slashIndex) : '',
+          path: p,
+        };
+      });
+    const signedUrls = signable.length
+      ? ((await this.storageService.signStoragePaths(signable)) ?? [])
+      : [];
+    let urlCursor = 0;
+    const urlByRaw = new Map<string, string | null>();
+    for (const raw of rawPaths) {
+      if (raw) {
+        urlByRaw.set(raw, signedUrls[urlCursor++] ?? null);
+      }
+    }
+
+    return items.map((item) => {
+      const asset = new GetAssetsResponseDto();
+      asset.id = item.id;
+      asset.value = item.value;
+      asset.targetId = item.asset?.targetId;
+      asset.createdAt = item.createdAt;
+      asset.dnsRecords = item.asset?.dnsRecords;
+      asset.isEnabled = item.asset?.isEnabled;
+      asset.port = item.port;
+      asset.screenshotPath =
+        (item.screenshotPath &&
+          (urlByRaw.get(item.screenshotPath) ?? null)) ||
+        (item.screenshotPath === '' ? '' : null);
+      asset.ipAddresses = item.asset?.id
+        ? (ipsByAsset.get(item.asset.id) ?? [])
+        : [];
+
+      const latest = item.httpResponses?.[0];
+      if (latest) {
+        asset.httpResponses = latest;
+        latest.tech = techByResponse.get(latest.id) ?? [];
+        latest.tls = tlsByResponse.get(latest.id) ?? null;
+        if (latest.tech.length) {
+          asset.httpResponses.techList = latest.tech
+            .map((tech) => techDetails.get(tech))
+            .filter((detail) => detail !== undefined);
+        }
+      }
+      return asset;
+    });
+  }
+
+  /** Tech strings ("name" or "name:version") for one http response. */
+  private async getTechStringsForHttpResponse(
+    httpResponseId: string,
+  ): Promise<string[]> {
+    const { techByResponse } = await this.loadFacets([], [httpResponseId]);
+    return techByResponse.get(httpResponseId) ?? [];
+  }
+
+  /** TLS payload in the legacy HttpResponse.tls shape for one http response. */
+  private async getTlsForHttpResponse(
+    httpResponseId: string,
+  ): Promise<Record<string, unknown> | null> {
+    const { tlsByResponse } = await this.loadFacets([], [httpResponseId]);
+    return tlsByResponse.get(httpResponseId) ?? null;
+  }
+
   private buildBaseQuery(query: GetAssetsQueryDto, workspaceId: string) {
-    const {
-      targetIds,
-      hosts,
-      ipAddresses,
-      ports,
-      techs,
-      statusCodes,
-      tlsHosts,
-    } = query;
-
-    const whereBuilder = {
-      targetIds: {
-        value: targetIds,
-        whereClause: `"asset"."targetId" = ANY(:param)`,
-      },
-      techs: {
-        value: techs,
-        whereClause: `latest_http_response.tech && :param`,
-      },
-      hosts: {
-        value: hosts,
-        whereClause: `asset.value = ANY(:param)`,
-      },
-      ipAddresses: {
-        value: ipAddresses,
-        whereClause: '"ipAssets"."ip" = ANY(:param)',
-      },
-      ports: {
-        value: ports,
-        whereClause: `asset_service.port = ANY(:param)`,
-      },
-      statusCodes: {
-        value: statusCodes,
-        whereClause: `"statusCodeAssets"."statusCode" = ANY(:param)`,
-      },
-      tlsHosts: {
-        value: tlsHosts,
-        whereClause: `"tlsAssets"."host" = ANY(:param)`,
-      },
-    };
-
     const queryBuilder = this.assetServiceRepo
       .createQueryBuilder('asset_service')
       .leftJoinAndSelect('asset_service.asset', 'asset')
@@ -253,23 +418,23 @@ export class AssetsService {
         'latest_http_response',
         'latest_http_response.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = asset_service.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
-      .leftJoinAndSelect('asset.ipAssets', 'ipAssets')
-      .leftJoin('asset_service.statusCodeAssets', 'statusCodeAssets')
-      .leftJoin('asset_service.tlsAssets', 'tlsAssets')
       .where('targets.workspaceId = :workspaceId', {
         workspaceId,
       });
 
-    for (const [key, value] of Object.entries(whereBuilder)) {
-      if (query[key]) {
-        const newWhereClause = value.whereClause.replaceAll(
-          ':param',
-          `:${key}`,
-        );
-        queryBuilder.andWhere(newWhereClause, {
-          [key]: value.value,
-        });
-      }
+    if (query.targetIds?.length) {
+      queryBuilder.andWhere('"asset"."targetId" = ANY(:targetIds)', {
+        targetIds: query.targetIds,
+      });
+    }
+
+    // Legacy array params (MCP, dashboard links) and the filter tree share one compiler.
+    for (const [filter, prefix] of [
+      [legacyParamsToFilter(query), 'lf'],
+      [query.filter, 'af'],
+    ] as const) {
+      const compiled = filter && compileAssetFilter(filter, prefix);
+      if (compiled) queryBuilder.andWhere(compiled.sql, compiled.params);
     }
 
     if (query.startDate) {
@@ -331,47 +496,7 @@ export class AssetsService {
       .take(query.limit)
       .getManyAndCount();
 
-    const assets = list.map(async (item) => {
-      const asset = new GetAssetsResponseDto();
-      asset.id = item.id;
-      asset.value = item.value;
-      asset.targetId = item.asset?.targetId;
-      asset.createdAt = item.createdAt;
-      asset.dnsRecords = item.asset?.dnsRecords;
-      asset.isEnabled = item.asset?.isEnabled;
-      asset.screenshotPath =
-        item.screenshotPath && `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
-      // asset.tags = item.asset.tags || [];
-      asset.ipAddresses = item.asset?.ipAssets
-        ? item.asset.ipAssets.map((e) => e.ipAddress)
-        : [];
-
-      if (item.httpResponses && item.httpResponses.length > 0) {
-        asset.httpResponses = item.httpResponses[0];
-        if (asset.httpResponses?.tech) {
-          const techList = (
-            await this.technologyForwarderService.enrichTechnologies(
-              asset.httpResponses.tech,
-            )
-          ).map((e) => {
-            return {
-              name: e.name,
-              description: e.description,
-              iconUrl: e.iconUrl,
-              categoryNames: e.categoryNames,
-              website: e.website,
-            };
-          });
-
-          asset.httpResponses.techList = techList.filter(
-            (e) => e.name !== undefined,
-          );
-        }
-      }
-      return asset;
-    });
-
-    const data = await Promise.all(assets);
+    const data = await this.toAssetResponses(list);
 
     return getManyResponse({ query, data, total });
   }
@@ -415,7 +540,31 @@ export class AssetsService {
    * @param assetId - The ID of the asset to rescan.
    * @throws Error if the asset is not found.
    */
-  public async reScan(targetId: string): Promise<DefaultMessageResponseDto> {
+  public async reScan(
+    targetId: string,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    // The rescan runs inside the target's own workspace — assert the caller is
+    // acting in that workspace before any worker jobs are dispatched.
+    const target = await this.targetRepo.findOne({
+      where: { id: targetId, workspaceId },
+    });
+
+    if (!target) {
+      throw new NotFoundException('Target not found');
+    }
+
+    // A Git organization has no primary host asset: "re-scan" means re-sync
+    // its repositories, which RepositorySyncService does on this event (the
+    // scan schedule lands here too). Scanning follows on `git_org.synced`.
+    if (target.type === TargetType.GIT_ORG) {
+      await this.targetRepo.update(targetId, {
+        reScanCount: target.reScanCount + 1,
+      });
+      this.eventEmitter.emit('target.git_org.re-scan', target);
+      return { message: 'Repository sync started' };
+    }
+
     const asset = await this.assetRepo.findOne({
       where: {
         target: { id: targetId },
@@ -427,28 +576,19 @@ export class AssetsService {
       throw new NotFoundException('Asset not found');
     }
 
-    const target = await this.targetRepo.findOne({
-      where: {
-        id: targetId,
-      },
-    });
-    const workspaceId =
-      await this.workspaceService.getWorkspaceIdByTargetId(targetId);
-
-    if (!workspaceId) {
-      throw new NotFoundException('Workspace not found');
-    }
-
-    if (!target) {
-      throw new NotFoundException('Target not found');
-    }
     const reScanCount = target.reScanCount + 1;
     await this.targetRepo.update(targetId, {
       reScanCount,
       lastDiscoveredAt: new Date(),
     });
 
-    this.eventEmitter.emit('target.domain.re-scan', target);
+    // The trigger name carries the target type (`ip.re-scan`, `cidr.re-scan`)
+    // so the matching workflow runs — it used to be hard-coded to `domain`,
+    // which ran domain discovery on IP and CIDR targets.
+    this.eventEmitter.emit(
+      `target.${target.type.toLowerCase()}.re-scan`,
+      target,
+    );
 
     return {
       message: 'Scan started',
@@ -473,17 +613,7 @@ export class AssetsService {
 
     const item = await queryBuilder.getOneOrFail();
 
-    const asset = new GetAssetsResponseDto();
-    asset.id = item.id;
-    asset.value = item.value;
-    asset.targetId = item.asset?.targetId;
-    asset.createdAt = item.createdAt;
-    asset.dnsRecords = item.asset?.dnsRecords;
-    asset.isEnabled = item.asset?.isEnabled;
-    asset.port = item.port;
-    asset.screenshotPath = item.screenshotPath
-      ? `${STORAGE_BASE_PATH}/${item.screenshotPath}`
-      : null;
+    const [asset] = await this.toAssetResponses([item]);
 
     // Load tags separately - tags belong to AssetService, not Asset
     const tagsResult = await this.dataSource
@@ -496,32 +626,6 @@ export class AssetsService {
     asset.tags = tagsResult.map(
       (t) => ({ id: t.id, tag: t.tag }),
     ) as AssetTag[];
-
-    asset.ipAddresses = item.asset?.ipAssets
-      ? item.asset.ipAssets.map((e) => e.ipAddress)
-      : [];
-
-    if (item.httpResponses && item.httpResponses.length > 0) {
-      asset.httpResponses = item.httpResponses[0];
-      if (asset.httpResponses?.tech) {
-        const techList = (
-          await this.technologyForwarderService.enrichTechnologies(
-            asset.httpResponses.tech,
-          )
-        ).map((e) => {
-          return {
-            name: e.name,
-            description: e.description,
-            iconUrl: e.iconUrl,
-            categoryNames: e.categoryNames,
-          };
-        });
-
-        asset.httpResponses.techList = techList.filter(
-          (e) => e.name !== undefined,
-        );
-      }
-    }
     return asset;
   }
 
@@ -540,35 +644,47 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.buildBaseQuery(query, workspaceId)
-      .select([
-        '"ipAssets"."ip"',
-        'COUNT(DISTINCT asset_service.id) as "assetCount"',
-      ])
-      .andWhere('"ipAssets"."ip" IS NOT NULL')
-      .groupBy('"ipAssets"."ip"');
+    // Asset IPs are the DNS A/AAAA records of the asset (as in the legacy
+    // ip_assets_view); assetCount = distinct filtered services on those
+    // assets. httpx/resolver observations are excluded on purpose.
+    const filteredServicesQuery = this.buildBaseQuery(query, workspaceId)
+      .select('asset_service.id', 'serviceId')
+      .addSelect('asset_service."assetId"', 'assetId');
 
+    const params: Record<string, unknown> = {
+      ...filteredServicesQuery.getParameters(),
+    };
     if (query.value) {
-      queryBuilder.andWhere('"ipAssets"."ip"::text ILIKE :value', {
-        value: `%${query.value}%`,
-      });
+      params.ipValue = `%${query.value}%`;
     }
 
-    if (query.value) {
-      queryBuilder.andWhere('"ipAssets"."ip"::text ILIKE :value', {
-        value: `%${query.value}%`,
-      });
-    }
+    const groupedSql = `
+      SELECT host(io."ip") AS ip, COUNT(DISTINCT fs."serviceId") AS "assetCount"
+      FROM (${filteredServicesQuery.getQuery()}) fs
+      INNER JOIN ip_observations io
+        ON io."assetId" = fs."assetId" AND io.source IN ('dns_a', 'dns_aaaa')${
+          query.value ? ' AND host(io."ip") ILIKE :ipValue' : ''
+        }
+      GROUP BY io."ip"
+    `;
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
       .select('COUNT(*)')
-      .from('(' + queryBuilder.getQuery() + ')', 't1')
-      .setParameters(queryBuilder.getParameters())
+      .from('(' + groupedSql + ')', 't1')
+      .setParameters(params)
       .getRawOne<{ count: number }>();
 
-    const list = await queryBuilder
-      .orderBy(query.sortBy, query.sortOrder)
+    const list = await this.dataSource
+      .createQueryBuilder()
+      .select('t.ip AS ip, t."assetCount" AS "assetCount"')
+      .from('(' + groupedSql + ')', 't')
+      .setParameters(params)
+      .orderBy(
+        query.sortBy === 'ip' ? 't.ip' : 't."assetCount"',
+        query.sortOrder,
+      )
+      .addOrderBy('t.ip', query.sortOrder)
       .limit(query.limit)
       .offset(offset)
       .getRawMany();
@@ -668,6 +784,48 @@ export class AssetsService {
   }
 
   /**
+   * Retrieves distinct service tags in the workspace with the number of assets carrying each tag.
+   */
+  public async getTagAssets(
+    query: GetAssetsQueryDto,
+    workspaceId: string,
+  ): Promise<GetManyBaseResponseDto<GetTagAssetsDTO>> {
+    const offset = (query.page - 1) * query.limit;
+    const sortColumn = query.sortBy === 'tag' ? 'ast.tag' : '"assetCount"';
+
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
+      .innerJoin('asset_service.tags', 'ast')
+      .select(['ast.tag AS tag', 'COUNT(DISTINCT asset_service.id) AS "assetCount"'])
+      .groupBy('ast.tag');
+
+    if (query.value) {
+      queryBuilder.andWhere('ast.tag ILIKE :value', { value: `%${query.value}%` });
+    }
+
+    const totalInDb = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(*)')
+      .from('(' + queryBuilder.getQuery() + ')', 't1')
+      .setParameters(queryBuilder.getParameters())
+      .getRawOne<{ count: number }>();
+
+    const list = await queryBuilder
+      .orderBy(sortColumn, query.sortOrder)
+      .limit(query.limit)
+      .offset(offset)
+      .getRawMany<{ tag: string; assetCount: string }>();
+
+    const data = list.map((item) => {
+      const obj = new GetTagAssetsDTO();
+      obj.tag = item.tag;
+      obj.assetCount = Number(item.assetCount);
+      return obj;
+    });
+
+    return getManyResponse({ query, data, total: Number(totalInDb?.count ?? 0) });
+  }
+
+  /**
    * Retrieves a list of Port with number of asset
    *
    * @returns A promise that resolves to the list of port.
@@ -721,6 +879,84 @@ export class AssetsService {
   }
 
   /**
+   * Retrieves a list of discovered urls with number of asset services
+   *
+   * Single source: `discovered_urls` (the gau `url_discovery` connector).
+   * Rows are grouped by url with COUNT(DISTINCT assetServiceId).
+   * `http_responses` (httpx probe targets) are deliberately excluded — they
+   * are probe endpoints, not discovered urls.
+   *
+   * @returns A promise that resolves to the list of discovered urls.
+   *
+   */
+  public async getUrlAssets(
+    query: GetAssetsQueryDto,
+    workspaceId: string,
+  ): Promise<GetManyBaseResponseDto<GetUrlAssetsDTO>> {
+    const offset = (query.page - 1) * query.limit;
+
+    // Whitelist: unknown sortBy values fall back to the aggregate column.
+    const sortColumn =
+      query.sortBy === 'url' ? 't.url' : 't."assetCount"';
+
+    // The filtered asset-service scope: reusing buildBaseQuery keeps every
+    // filter (targetIds/hosts/ip/ports/techs/statusCodes/tls/dates) intact.
+    const filteredServicesQuery = this.buildBaseQuery(
+      query,
+      workspaceId,
+    ).select('asset_service.id');
+
+    const parameters: Record<string, unknown> = {
+      ...filteredServicesQuery.getParameters(),
+    };
+    if (query.value) {
+      parameters.urlValue = `%${query.value}%`;
+    }
+
+    const groupedSql = `
+      SELECT du.url AS url, COUNT(DISTINCT du."assetServiceId") AS "assetCount"
+      FROM discovered_urls du
+      WHERE du.url IS NOT NULL AND du.url <> ''
+        AND du."assetServiceId" IN (${filteredServicesQuery.getQuery()})${
+          query.value ? ' AND du.url ILIKE :urlValue' : ''
+        }
+      GROUP BY du.url
+    `;
+
+    const totalInDb = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(*)')
+      .from('(' + groupedSql + ')', 't1')
+      .setParameters(parameters)
+      .getRawOne<{ count: number }>();
+
+    const list = await this.dataSource
+      .createQueryBuilder()
+      .select('t.url AS url, t."assetCount" AS "assetCount"')
+      .from('(' + groupedSql + ')', 't')
+      .setParameters(parameters)
+      .orderBy(sortColumn, query.sortOrder)
+      // Unique tiebreaker: "assetCount" is not unique (nearly every url has
+      // a count of 1), so Postgres may order ties differently per query,
+      // causing rows to repeat/skip across offset pages.
+      .addOrderBy('t.url', query.sortOrder)
+      .limit(query.limit)
+      .offset(offset)
+      .getRawMany<GetUrlAssetsDTO>();
+
+    const total = totalInDb?.count ?? 0;
+
+    const data = list.map((item: GetUrlAssetsDTO) => {
+      const obj = new GetUrlAssetsDTO();
+      obj.url = item.url;
+      obj.assetCount = item.assetCount;
+      return obj;
+    });
+
+    return getManyResponse({ query, data, total });
+  }
+
+  /**
    * Retrieves a list of Port with number of asset
    *
    * @returns A promise that resolves to the list of port.
@@ -736,22 +972,25 @@ export class AssetsService {
     }
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
-      .leftJoin(
-        '(SELECT 1)',
-        'dummy',
-        'TRUE CROSS JOIN LATERAL unnest("latest_http_response"."tech") AS unnested_tech',
+      .innerJoin(
+        'http_response_technologies',
+        'hrt',
+        'hrt."httpResponseId" = latest_http_response.id',
       )
       .select([
-        'unnested_tech as "technology"',
+        `hrt.name || CASE WHEN hrt.version IS NULL THEN '' ELSE ':' || hrt.version END as "technology"`,
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
-      .andWhere('latest_http_response.tech IS NOT NULL')
-      .groupBy('unnested_tech');
+      .groupBy('hrt.name')
+      .addGroupBy('hrt.version');
 
     if (query.value) {
-      queryBuilder.andWhere('unnested_tech ILIKE :value', {
-        value: `%${query.value}%`,
-      });
+      queryBuilder.andWhere(
+        `(hrt.name || CASE WHEN hrt.version IS NULL THEN '' ELSE ':' || hrt.version END) ILIKE :value`,
+        {
+          value: `%${query.value}%`,
+        },
+      );
     }
 
     const totalInDb = await this.dataSource
@@ -767,7 +1006,8 @@ export class AssetsService {
       .offset(offset)
       .getRawMany();
 
-    // Extract just the technology names (without version) for enrichment
+    // Tech names are stored split (name + version); enrichment needs the
+    // bare name only.
     const techNames = list.map(
       (item: { technology: string; assetCount: number }) =>
         item.technology.split(':')[0],
@@ -778,7 +1018,10 @@ export class AssetsService {
 
     const data = list.map(
       (item: { technology: string; assetCount: number }) => {
-        const [name, version] = item.technology.split(':');
+        const idx = item.technology.indexOf(':');
+        const name = idx < 0 ? item.technology : item.technology.slice(0, idx);
+        const version =
+          idx < 0 ? undefined : item.technology.slice(idx + 1) || undefined;
         const obj = new GetTechnologyAssetsDTO();
         obj.assetCount = item.assetCount;
 
@@ -826,21 +1069,23 @@ export class AssetsService {
     }
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
+      .innerJoin(
+        'http_status_codes',
+        'hsc',
+        'hsc."httpResponseId" = latest_http_response.id',
+      )
       .select([
-        '"statusCodeAssets"."statusCode"',
+        'hsc."statusCode" AS "statusCode"',
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
-      .groupBy('"statusCodeAssets"."statusCode"')
-      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
-      .andWhere('"statusCodeAssets"."statusCode" != 0');
+      .groupBy('hsc."statusCode"')
+      .andWhere('hsc."statusCode" IS NOT NULL')
+      .andWhere('hsc."statusCode" != 0');
 
     if (query.value) {
-      queryBuilder.andWhere(
-        '"statusCodeAssets"."statusCode"::text ILIKE :value',
-        {
-          value: `%${query.value}%`,
-        },
-      );
+      queryBuilder.andWhere('hsc."statusCode"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      });
     }
 
     const totalInDb = await this.dataSource
@@ -929,104 +1174,87 @@ export class AssetsService {
 
   /**
    * Retrieves a paginated list of TLS certificates.
-   * Built on top of buildBaseQuery so workspace isolation, and all other
-   * filters (targetIds, hosts, …) come for free via the tlsAssets left-join
-   * that is already wired into the base query.
+   * Reads `tls_certificates` directly, scoped to the workspace via the
+   * asset_service → asset → target chain so all standard filters
+   * (targetIds, hosts, …) still apply.
    */
   public async getManyTls(
     query: GetTlsQueryDto,
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetTlsResponseDto>> {
-    const allowedSortColumns = [
-      'host',
-      'sni',
-      'not_after',
-      'not_before',
-      'subject_dn',
-      'tls_version',
-    ];
-    if (!allowedSortColumns.includes(query.sortBy)) {
-      query.sortBy = 'not_after';
-    }
+    const sortByMap: Record<string, string> = {
+      host: 'host',
+      sni: 'sni',
+      not_after: 'notAfter',
+      not_before: 'notBefore',
+      subject_dn: 'subjectDn',
+      tls_version: 'tlsVersion',
+    };
+    const sortColumn = sortByMap[query.sortBy] ?? 'notAfter';
 
     const offset = (query.page - 1) * query.limit;
 
-    // Re-use the base query (workspace isolation + all standard filters).
-    // Cast to GetAssetsQueryDto so we can forward targetIds / hosts filters.
-    // startDate/endDate are stripped here: buildBaseQuery applies them to
-    // asset_service."createdAt", but for TLS the range must filter the cert's
-    // not_after only (handled below) — forwarding them would wrongly exclude
-    // certs whose service row predates the range.
+    // `hosts` is a cert-host filter, applied once on tc."host" below — not
+    // a service filter (that would also constrain on the latest response).
     const baseQuery: GetAssetsQueryDto = {
       ...query,
-      tlsHosts: query.hosts,
+      hosts: undefined,
       startDate: undefined,
       endDate: undefined,
     };
-    const qb = this.buildBaseQuery(baseQuery, workspaceId).select([
-      '"tlsAssets"."host"              AS host',
-      '"tlsAssets"."sni"               AS sni',
-      '"tlsAssets"."subject_dn"        AS subject_dn',
-      '"tlsAssets"."subject_cn"        AS subject_cn',
-      '"tlsAssets"."issuer_dn"         AS issuer_dn',
-      '"tlsAssets"."not_before"        AS not_before',
-      '"tlsAssets"."not_after"         AS not_after',
-      '"tlsAssets"."tls_version"       AS tls_version',
-      '"tlsAssets"."cipher"            AS cipher',
-      '"tlsAssets"."tls_connection"    AS tls_connection',
-      '"tlsAssets"."subject_an"        AS subject_an',
-    ]);
+    const filteredServicesQuery = this.buildBaseQuery(
+      baseQuery,
+      workspaceId,
+    ).select('asset_service.id');
 
-    // Only rows that actually have TLS data
-    qb.andWhere('"tlsAssets"."host" IS NOT NULL');
-
-    // Deduplicate: same TLS cert can be joined via multiple asset_service rows
-    // (e.g. same host on different ports). Group by all TLS columns so each
-    // distinct certificate appears only once.
-    qb.groupBy('"tlsAssets"."host"')
-      .addGroupBy('"tlsAssets"."sni"')
-      .addGroupBy('"tlsAssets"."subject_dn"')
-      .addGroupBy('"tlsAssets"."subject_cn"')
-      .addGroupBy('"tlsAssets"."issuer_dn"')
-      .addGroupBy('"tlsAssets"."not_before"')
-      .addGroupBy('"tlsAssets"."not_after"')
-      .addGroupBy('"tlsAssets"."tls_version"')
-      .addGroupBy('"tlsAssets"."cipher"')
-      .addGroupBy('"tlsAssets"."tls_connection"')
-      .addGroupBy('"tlsAssets"."subject_an"');
-
-    // Text search on host
+    const params: Record<string, unknown> = {
+      ...filteredServicesQuery.getParameters(),
+    };
     if (query.search) {
-      qb.andWhere('"tlsAssets"."host" ILIKE :tlsSearch', {
-        tlsSearch: `%${query.search}%`,
-      });
+      params.tlsSearch = `%${query.search}%`;
     }
-
-    // Faceted host filter (query.hosts maps to tlsHosts in buildBaseQuery
-    // via the whereBuilder, but GetTlsQueryDto uses `hosts` directly)
     if (query.hosts && query.hosts.length > 0) {
-      qb.andWhere('"tlsAssets"."host" = ANY(:tlsHostFilter)', {
-        tlsHostFilter: query.hosts,
-      });
+      params.tlsHostFilter = query.hosts;
     }
-
-    // Date filtering on not_after field
     if (query.startDate) {
-      qb.andWhere('"tlsAssets"."not_after"::timestamp >= :startDate', {
-        startDate: query.startDate,
-      });
+      params.tlsStartDate = query.startDate;
     }
     if (query.endDate) {
-      qb.andWhere('"tlsAssets"."not_after"::timestamp <= :endDate', {
-        endDate: `${query.endDate} 23:59:59.999`,
-      });
+      params.tlsEndDate = `${query.endDate} 23:59:59.999`;
     }
+
+    const certSql = `
+      SELECT DISTINCT ON (tc."host", tc."assetServiceId")
+        tc."host" AS host,
+        tc."sni" AS sni,
+        tc."subjectDn" AS subject_dn,
+        tc."subjectCn" AS subject_cn,
+        tc."issuerDn" AS issuer_dn,
+        tc."notBefore" AS not_before,
+        tc."notAfter" AS not_after,
+        tc."tlsVersion" AS tls_version,
+        tc."cipher" AS cipher,
+        tc."tlsConnection" AS tls_connection,
+        tc."subjectAn" AS subject_an
+      FROM tls_certificates tc
+      WHERE tc."host" IS NOT NULL
+        AND tc."assetServiceId" IN (${filteredServicesQuery.getQuery()})${
+          query.search ? ' AND tc."host" ILIKE :tlsSearch' : ''
+        }${
+          query.hosts && query.hosts.length > 0
+            ? ' AND tc."host" = ANY(:tlsHostFilter)'
+            : ''
+        }${query.startDate ? ' AND tc."notAfter" >= :tlsStartDate' : ''}${
+          query.endDate ? ' AND tc."notAfter" <= :tlsEndDate' : ''
+        }
+      ORDER BY tc."host", tc."assetServiceId", tc."createdAt" DESC
+    `;
 
     const totalResult = await this.dataSource
       .createQueryBuilder()
       .select('COUNT(*)')
-      .from('(' + qb.getQuery() + ')', 'cnt_sub')
-      .setParameters(qb.getParameters())
+      .from('(' + certSql + ')', 'cnt_sub')
+      .setParameters(params)
       .getRawOne<{ count: string }>();
     const total = Number(totalResult?.count ?? 0);
 
@@ -1036,16 +1264,29 @@ export class AssetsService {
       subject_dn: string;
       subject_cn: string;
       issuer_dn: string;
-      not_before: string;
-      not_after: string;
+      not_before: Date;
+      not_after: Date;
       tls_version: string;
       cipher: string;
       tls_connection: string;
-      subject_an: string;
+      subject_an: string[] | null;
     };
 
-    const list = await qb
-      .orderBy(`"tlsAssets"."${query.sortBy}"`, query.sortOrder)
+    const sortKeyMap: Record<string, string> = {
+      host: 't.host',
+      sni: 't.sni',
+      notAfter: 't.not_after',
+      notBefore: 't.not_before',
+      subjectDn: 't.subject_dn',
+      tlsVersion: 't.tls_version',
+    };
+
+    const list = await this.dataSource
+      .createQueryBuilder()
+      .select('t.*')
+      .from('(' + certSql + ')', 't')
+      .setParameters(params)
+      .orderBy(sortKeyMap[sortColumn] ?? 't.not_after', query.sortOrder)
       .limit(query.limit)
       .offset(offset)
       .getRawMany<TlsRaw>();
@@ -1057,18 +1298,18 @@ export class AssetsService {
       obj.subject_dn = item.subject_dn;
       obj.subject_cn = item.subject_cn;
       obj.issuer_dn = item.issuer_dn;
-      obj.not_after = item.not_after;
-      obj.not_before = item.not_before;
+      obj.not_after =
+        item.not_after instanceof Date
+          ? item.not_after.toISOString()
+          : (item.not_after);
+      obj.not_before =
+        item.not_before instanceof Date
+          ? item.not_before.toISOString()
+          : (item.not_before);
       obj.tls_version = item.tls_version;
       obj.cipher = item.cipher;
       obj.tls_connection = item.tls_connection;
-      try {
-        obj.subject_an = item.subject_an
-          ? (JSON.parse(item.subject_an) as string[])
-          : [];
-      } catch {
-        obj.subject_an = [];
-      }
+      obj.subject_an = Array.isArray(item.subject_an) ? item.subject_an : [];
       return obj;
     });
 
@@ -1094,6 +1335,12 @@ export class AssetsService {
     }
 
     const latestHttpResponse = assetService.httpResponses?.[0];
+    const latestTechs = latestHttpResponse
+      ? await this.getTechStringsForHttpResponse(latestHttpResponse.id)
+      : [];
+    const latestTls = latestHttpResponse
+      ? await this.getTlsForHttpResponse(latestHttpResponse.id)
+      : null;
 
     const serviceContext = {
       service: {
@@ -1105,7 +1352,7 @@ export class AssetsService {
         http: {
           title: latestHttpResponse.title,
           webserver: latestHttpResponse.webserver,
-          tech: latestHttpResponse.tech,
+          tech: latestTechs,
           status_code: latestHttpResponse.status_code,
           scheme: latestHttpResponse.scheme,
           host: latestHttpResponse.host,
@@ -1113,7 +1360,7 @@ export class AssetsService {
           content_type: latestHttpResponse.content_type,
           words: latestHttpResponse.words,
           lines: latestHttpResponse.lines,
-          tls: latestHttpResponse.tls,
+          tls: latestTls,
         },
       }),
     };
@@ -1136,9 +1383,10 @@ export class AssetsService {
   public async toggleAsset(
     assetId: string,
     isEnabled: boolean,
+    workspaceId: string,
   ): Promise<Asset> {
     const asset = await this.assetRepo.findOne({
-      where: { id: assetId },
+      where: { id: assetId, target: { workspaceId } },
     });
 
     if (!asset) {
@@ -1170,21 +1418,55 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(
       new GetAssetsQueryDto(),
       workspaceId,
-    ).select([
-      'asset_service.value',
-      'asset_service.port',
-      'latest_http_response.tech',
-      'latest_http_response.tls',
-    ]);
+    ).select(['asset_service.value', 'asset_service.port']);
 
     const services = await queryBuilder.getMany();
+    const serviceIds = services.map((s) => s.id);
+
+    const [techAgg, tlsAgg] = await Promise.all([
+      serviceIds.length > 0
+        ? this.httpResponseTechnologyRepo
+            .createQueryBuilder('hrt')
+            .select(
+              `hrt."assetServiceId" AS "assetServiceId", array_agg(hrt.name || CASE WHEN hrt.version IS NULL THEN '' ELSE ':' || hrt.version END) AS "techs"`,
+            )
+            .where('hrt."assetServiceId" IN (:...serviceIds)', { serviceIds })
+            .groupBy('hrt."assetServiceId"')
+            .getRawMany<{ assetServiceId: string; techs: string[] }>()
+        : Promise.resolve([]),
+      serviceIds.length > 0
+        ? this.tlsCertificateRepo
+            .createQueryBuilder('tc')
+            .select(
+              `tc."assetServiceId" AS "assetServiceId", tc."host" AS "host", tc."sni" AS "sni", tc."subjectDn" AS "subject_dn", tc."notAfter" AS "not_after", tc."notBefore" AS "not_before", tc."tlsConnection" AS "tls_connection"`,
+            )
+            .distinctOn(['tc."host"', 'tc."assetServiceId"'])
+            .where('tc."assetServiceId" IN (:...serviceIds)', { serviceIds })
+            .andWhere('tc."host" IS NOT NULL')
+            .orderBy('tc."host"')
+            .addOrderBy('tc."assetServiceId"')
+            .addOrderBy('tc."createdAt"', 'DESC')
+            .getRawMany<
+              Record<string, string | null> & { assetServiceId: string }
+            >()
+        : Promise.resolve([]),
+    ]);
+    const techByService = new Map(techAgg.map((r) => [r.assetServiceId, r.techs ?? []]));
+    const tlsByService = new Map(tlsAgg.map((r) => [r.assetServiceId, r]));
 
     return services.map((service) => {
       return {
         value: service.value,
         ports: service.port ? [service.port] : [],
-        techs: service.httpResponses?.[0]?.tech || [],
-        tls: service.httpResponses?.[0]?.tls || null,
+        techs: techByService.get(service.id) ?? [],
+        tls: (tlsByService.get(service.id) as {
+          host?: string;
+          sni?: string;
+          subject_dn?: string;
+          not_after?: string;
+          not_before?: string;
+          tls_connection?: string;
+        }) ?? null,
       };
     });
   }
@@ -1222,10 +1504,14 @@ export class AssetsService {
     }
     const targetsPromise = targetQb.getMany();
 
-    // ── 2. Asset nodes (with IP join) ────────────────────────────────
+    // ── 2. Asset nodes (with DNS IPs) ────────────────────────────────
     const assetQb = this.assetRepo
       .createQueryBuilder('a')
-      .leftJoinAndSelect('a.ipAssets', 'ip')
+      .leftJoinAndSelect(
+        'a.dnsRecordRows',
+        'dns',
+        `dns."recordType" IN ('A', 'AAAA')`,
+      )
       .innerJoin('a.target', 'target')
       .where('target.workspaceId = :workspaceId', { workspaceId });
     if (query.targetId) {
@@ -1251,14 +1537,13 @@ export class AssetsService {
         `
         SELECT
           svc.id AS "serviceId",
-          t_raw.tech AS "tech"
-        FROM http_responses hr
-        INNER JOIN LATERAL unnest(hr.tech) AS t_raw(tech) ON TRUE
+          hrt.name || CASE WHEN hrt.version IS NULL THEN '' ELSE ':' || hrt.version END AS "tech"
+        FROM http_response_technologies hrt
+        INNER JOIN http_responses hr ON hr.id = hrt."httpResponseId"
         INNER JOIN asset_services svc ON svc.id = hr."assetServiceId"
         INNER JOIN assets a ON a.id = svc."assetId"
         INNER JOIN targets tgt ON tgt.id = a."targetId"
         WHERE tgt."workspaceId" = $1
-          AND hr.tech IS NOT NULL
           ${targetFilter}
           AND hr.id = (
             SELECT hr2.id FROM http_responses hr2
@@ -1269,17 +1554,42 @@ export class AssetsService {
         rawParams,
       );
 
-    // ── 6. TLS nodes (via entity repo) ──────────────────────────────
-    const tlsQb = this.tlsAssetsViewRepo
-      .createQueryBuilder('tls')
-      .leftJoinAndSelect('tls.assetService', 'assetService')
-      .leftJoinAndSelect('assetService.asset', 'asset')
-      .innerJoin('asset.target', 'target')
-      .where('target.workspaceId = :workspaceId', { workspaceId });
-    if (query.targetId) {
-      tlsQb.andWhere('target.id = :targetId', { targetId: query.targetId });
-    }
-    const tlsRecordsPromise = tlsQb.getMany();
+    // ── 6. TLS nodes (normalized table, latest cert per service) ────
+    const tlsRecordsPromise: Promise<
+      {
+        host: string;
+        sni: string;
+        subjectDn: string;
+        issuerDn: string;
+        notBefore: string;
+        notAfter: string;
+        tlsVersion: string;
+        cipher: string;
+        assetServiceId: string;
+      }[]
+    > = this.dataSource.query(
+      `
+        SELECT DISTINCT ON (tc."host", tc."assetServiceId")
+          tc."host" AS "host",
+          tc."sni" AS "sni",
+          tc."subjectDn" AS "subjectDn",
+          tc."issuerDn" AS "issuerDn",
+          tc."notBefore" AS "notBefore",
+          tc."notAfter" AS "notAfter",
+          tc."tlsVersion" AS "tlsVersion",
+          tc."cipher" AS "cipher",
+          tc."assetServiceId" AS "assetServiceId"
+        FROM tls_certificates tc
+        INNER JOIN asset_services svc ON svc.id = tc."assetServiceId"
+        INNER JOIN assets a ON a.id = svc."assetId"
+        INNER JOIN targets tgt ON tgt.id = a."targetId"
+        WHERE tgt."workspaceId" = $1
+          ${targetFilter}
+          AND tc."host" IS NOT NULL
+        ORDER BY tc."host", tc."assetServiceId", tc."createdAt" DESC
+        `,
+      rawParams,
+    );
 
     // ── 7. StatusCode nodes (raw query) ─────────────────────────────
     const statusServiceRowsPromise: Promise<
@@ -1291,14 +1601,14 @@ export class AssetsService {
     > = this.dataSource.query(
       `
         SELECT
-          scv."statusCode" AS "statusCode",
-          scv."assetServiceId" AS "serviceId",
+          hsc."statusCode" AS "statusCode",
+          hsc."assetServiceId" AS "serviceId",
           hr."createdAt" AS "lastScannedAt"
-        FROM status_code_asset_services_view scv
-        INNER JOIN asset_services svc ON svc.id = scv."assetServiceId"
+        FROM http_status_codes hsc
+        INNER JOIN asset_services svc ON svc.id = hsc."assetServiceId"
         INNER JOIN assets a ON a.id = svc."assetId"
         INNER JOIN targets tgt ON tgt.id = a."targetId"
-        INNER JOIN http_responses hr ON hr."assetServiceId" = scv."assetServiceId"
+        INNER JOIN http_responses hr ON hr."assetServiceId" = hsc."assetServiceId"
           AND hr.id = (
             SELECT hr2.id FROM http_responses hr2
             WHERE hr2."assetServiceId" = hr."assetServiceId"
@@ -1306,8 +1616,8 @@ export class AssetsService {
           )
         WHERE tgt."workspaceId" = $1
           ${targetFilter}
-          AND scv."statusCode" IS NOT NULL
-          AND scv."statusCode" != 0
+          AND hsc."statusCode" IS NOT NULL
+          AND hsc."statusCode" != 0
         `,
       rawParams,
     );
@@ -1335,12 +1645,15 @@ export class AssetsService {
       statusServiceRowsPromise,
     ]);
 
-    // ── 3. IP nodes (collected from asset ipAssets) ──────────────────
+    // ── 3. IP nodes (collected from normalized dns records) ─────────
     const ipSet = new Set<string>();
     for (const a of assets) {
-      if (a.ipAssets) {
-        for (const ip of a.ipAssets) {
-          if (ip.ipAddress) ipSet.add(ip.ipAddress);
+      const rows = (
+        a as unknown as { dnsRecordRows?: { value?: string }[] }
+      ).dnsRecordRows;
+      if (rows) {
+        for (const r of rows) {
+          if (r.value) ipSet.add(r.value);
         }
       }
     }
@@ -1352,7 +1665,8 @@ export class AssetsService {
       baseName: string;
     }> = [];
     for (const row of techRows) {
-      const baseName = row.tech.split(':')[0];
+      const idx = row.tech.indexOf(':');
+      const baseName = idx < 0 ? row.tech : row.tech.slice(0, idx);
       techBaseNames.add(baseName);
       serviceTechPairs.push({ serviceId: row.serviceId, baseName });
     }
@@ -1416,9 +1730,12 @@ export class AssetsService {
             targetId: a.targetId,
             isEnabled: a.isEnabled,
             dnsRecords: a.dnsRecords,
-            ipAddresses: a.ipAssets
-              ? a.ipAssets.map((ip) => ip.ipAddress)
-              : [],
+            ipAddresses: (
+              (a as unknown as { dnsRecordRows?: { value?: string }[] })
+                .dnsRecordRows ?? []
+            )
+              .map((r) => r.value)
+              .filter((v): v is string => !!v),
           },
         },
       });
@@ -1485,11 +1802,11 @@ export class AssetsService {
           metadata: {
             host: tls.host,
             sni: tls.sni,
-            subjectDn: tls.subject_dn,
-            issuerDn: tls.issuer_dn,
-            notBefore: tls.not_before,
-            notAfter: tls.not_after,
-            tlsVersion: tls.tls_version,
+            subjectDn: tls.subjectDn,
+            issuerDn: tls.issuerDn,
+            notBefore: tls.notBefore,
+            notAfter: tls.notAfter,
+            tlsVersion: tls.tlsVersion,
             cipher: tls.cipher,
           },
         },
@@ -1538,10 +1855,13 @@ export class AssetsService {
     }
 
     for (const a of assets) {
-      if (a.ipAssets) {
-        for (const ip of a.ipAssets) {
-          if (ip.ipAddress) {
-            addEdge(`asset|${a.id}`, `ip|${ip.ipAddress}`, 'resolves_to');
+      const rows = (
+        a as unknown as { dnsRecordRows?: { value?: string }[] }
+      ).dnsRecordRows;
+      if (rows) {
+        for (const r of rows) {
+          if (r.value) {
+            addEdge(`asset|${a.id}`, `ip|${r.value}`, 'resolves_to');
           }
         }
       }
@@ -1674,20 +1994,20 @@ export class AssetsService {
       statusRows = await this.dataSource.query(
         `
         SELECT
-          scv."statusCode" AS "statusCode",
-          scv."assetServiceId" AS "serviceId",
+          hsc."statusCode" AS "statusCode",
+          hsc."assetServiceId" AS "serviceId",
           hr."createdAt" AS "lastScannedAt"
-        FROM status_code_asset_services_view scv
-        INNER JOIN asset_services svc ON svc.id = scv."assetServiceId"
-        INNER JOIN http_responses hr ON hr."assetServiceId" = scv."assetServiceId"
+        FROM http_status_codes hsc
+        INNER JOIN asset_services svc ON svc.id = hsc."assetServiceId"
+        INNER JOIN http_responses hr ON hr."assetServiceId" = hsc."assetServiceId"
           AND hr.id = (
             SELECT hr2.id FROM http_responses hr2
             WHERE hr2."assetServiceId" = hr."assetServiceId"
             ORDER BY hr2."createdAt" DESC LIMIT 1
           )
         WHERE svc."assetId" = $1
-          AND scv."statusCode" IS NOT NULL
-          AND scv."statusCode" != 0
+          AND hsc."statusCode" IS NOT NULL
+          AND hsc."statusCode" != 0
         `,
         [assetId],
       );

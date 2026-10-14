@@ -1,11 +1,10 @@
-import { ToolCategory } from '@/common/enums/enum';
-import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
+import { JobRunType } from '@/common/enums/enum';
+import { WorkflowRunnerService } from '@/modules/jobs-registry/workflow-runner.service';
 import type { Target } from '@/modules/targets/entities/target.entity';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
-import { ToolsService } from '../tools/tools.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import type { Workflow } from './entities/workflow.entity';
 import { TriggerWorkflowService } from './trigger-workflow.service';
@@ -15,17 +14,12 @@ describe('TriggerWorkflowService', () => {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   let capturedHandler: Function;
 
-  const mockJobRegistryService = {
-    createNewJob: jest.fn(),
+  const mockWorkflowRunner = {
+    startRun: jest.fn(),
   };
 
   const mockWorkspacesService = {
     getWorkspaceIdByTargetId: jest.fn(),
-    getWorkspaceConfigValue: jest.fn(),
-  };
-
-  const mockToolsService = {
-    getToolByNames: jest.fn(),
   };
 
   const mockEventEmitter = {
@@ -50,8 +44,7 @@ describe('TriggerWorkflowService', () => {
     content: {
       jobs: [
         { name: 'Scan Subdomain', run: 'subfinder' },
-        { name: 'Port Scan', run: 'naabu' },
-        { name: 'HTTP Probe', run: 'httpx' },
+        { name: 'Port Scan', run: 'naabu', needs: ['Scan Subdomain'] },
       ],
     },
     workspace: { id: 'workspace-uuid' },
@@ -64,16 +57,12 @@ describe('TriggerWorkflowService', () => {
       providers: [
         TriggerWorkflowService,
         {
-          provide: JobsRegistryService,
-          useValue: mockJobRegistryService,
+          provide: WorkflowRunnerService,
+          useValue: mockWorkflowRunner,
         },
         {
           provide: WorkspacesService,
           useValue: mockWorkspacesService,
-        },
-        {
-          provide: ToolsService,
-          useValue: mockToolsService,
         },
         {
           provide: EventEmitter2,
@@ -98,11 +87,15 @@ describe('TriggerWorkflowService', () => {
     mockDataSource.getRepository.mockReturnValue({
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
     });
-    (mockQueryBuilder.getOne).mockResolvedValue(mockWorkflow);
+    mockQueryBuilder.getOne.mockResolvedValue(mockWorkflow);
 
     mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
       'workspace-uuid',
     );
+    mockWorkflowRunner.startRun.mockResolvedValue({
+      jobHistory: { id: 'history-1' },
+      dispatched: 1,
+    });
   });
 
   /** Helper: invoke handler and flush microtasks so the void promise chain completes */
@@ -120,109 +113,63 @@ describe('TriggerWorkflowService', () => {
       expect(capturedHandler).toBeDefined();
     });
 
-    it('should start from first job when isAssetsDiscovery is true', async () => {
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: true,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'subfinder', category: ToolCategory.SUBDOMAINS, priority: 4 },
-        { name: 'naabu', category: ToolCategory.PORTS_SCANNER, priority: 3 },
-        { name: 'httpx', category: ToolCategory.HTTP_PROBE, priority: 2 },
-      ]);
-
+    it('starts a run scoped to the event target', async () => {
       service.onModuleInit();
       await invokeHandler('target.domain.create', mockTarget);
 
-      expect(mockJobRegistryService.createNewJob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tool: expect.objectContaining({ name: 'subfinder' }),
-          targetIds: ['target-uuid'],
-          workflow: mockWorkflow,
-        }),
-      );
+      expect(mockWorkflowRunner.startRun).toHaveBeenCalledWith({
+        workflow: mockWorkflow,
+        workspaceId: 'workspace-uuid',
+        jobName: 'domain_discovery - example.com',
+        jobRunType: JobRunType.MANUAL,
+        targetIds: ['target-uuid'],
+      });
     });
 
-    it('should skip SUBDOMAINS and start from first non-SUBDOMAINS when isAssetsDiscovery is false', async () => {
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: false,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'subfinder', category: ToolCategory.SUBDOMAINS, priority: 4 },
-        { name: 'naabu', category: ToolCategory.PORTS_SCANNER, priority: 3 },
-        { name: 'httpx', category: ToolCategory.HTTP_PROBE, priority: 2 },
-      ]);
+    it('does not start a run when no workflow matches the event', async () => {
+      (
+        mockDataSource.getRepository('').createQueryBuilder as jest.Mock
+      )().getOne.mockResolvedValue(null);
 
       service.onModuleInit();
       await invokeHandler('target.domain.create', mockTarget);
 
-      // Should skip subfinder and start with naabu
-      expect(mockJobRegistryService.createNewJob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tool: expect.objectContaining({
-            name: 'naabu',
-            category: ToolCategory.PORTS_SCANNER,
-          }),
-          targetIds: ['target-uuid'],
-          workflow: mockWorkflow,
-        }),
-      );
+      expect(mockWorkflowRunner.startRun).not.toHaveBeenCalled();
     });
 
-    it('should skip workflow when all jobs are SUBDOMAINS and discovery is disabled', async () => {
-      const allSubdomainsWorkflow = {
-        ...mockWorkflow,
-        content: {
-          jobs: [
-            { name: 'Scan Subdomain', run: 'subfinder' },
-          ],
-        },
-      };
-      (mockDataSource.getRepository('' as any).createQueryBuilder as jest.Mock)().getOne.mockResolvedValue(allSubdomainsWorkflow);
-
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: false,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'subfinder', category: ToolCategory.SUBDOMAINS, priority: 4 },
-      ]);
-
-      service.onModuleInit();
-      await invokeHandler('target.domain.create', mockTarget);
-
-      expect(mockJobRegistryService.createNewJob).not.toHaveBeenCalled();
-    });
-
-    it('should not fail when workflow has no jobs', async () => {
-      const emptyWorkflow = {
-        ...mockWorkflow,
-        content: { jobs: [] },
-      };
-      (mockDataSource.getRepository('' as any).createQueryBuilder as jest.Mock)().getOne.mockResolvedValue(emptyWorkflow);
-
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: true,
+    it('succeeds without a run when every step is filtered out', async () => {
+      mockWorkflowRunner.startRun.mockResolvedValue({
+        jobHistory: null,
+        dispatched: 0,
       });
 
-      service.onModuleInit();
-      await invokeHandler('target.domain.create', mockTarget);
+      const result = await service.trigger('target.domain.create', mockTarget);
 
-      expect(mockJobRegistryService.createNewJob).not.toHaveBeenCalled();
+      expect(result).toEqual({ workflowId: 'workflow-uuid', success: true });
     });
   });
 
   describe('trigger', () => {
     it('RED: success → returns { success: true, workflowId }', async () => {
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: true,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'subfinder', category: ToolCategory.SUBDOMAINS, priority: 4 },
-      ]);
-      mockJobRegistryService.createNewJob.mockResolvedValue([{ id: 'job-1' }]);
-
       const result = await service.trigger('target.domain.create', mockTarget);
 
       expect(result).toEqual({ workflowId: 'workflow-uuid', success: true });
+    });
+
+    it('reports a workflow without jobs as a failure', async () => {
+      const emptyWorkflow = {
+        ...mockWorkflow,
+        content: { jobs: [] },
+      };
+      (
+        mockDataSource.getRepository('').createQueryBuilder as jest.Mock
+      )().getOne.mockResolvedValue(emptyWorkflow);
+
+      const result = await service.trigger('target.domain.create', mockTarget);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('does not have any jobs');
+      expect(mockWorkflowRunner.startRun).not.toHaveBeenCalled();
     });
 
     it('RED: orphan configProfileId → returns { success: false, error } with profileId, warn-logs it', async () => {
@@ -238,14 +185,10 @@ describe('TriggerWorkflowService', () => {
           ],
         },
       };
-      (mockDataSource.getRepository('' as any).createQueryBuilder as jest.Mock)().getOne.mockResolvedValue(orphanWorkflow);
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: true,
-      });
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'nuclei', category: ToolCategory.VULNERABILITIES, priority: 4 },
-      ]);
-      mockJobRegistryService.createNewJob.mockRejectedValue(
+      (
+        mockDataSource.getRepository('').createQueryBuilder as jest.Mock
+      )().getOne.mockResolvedValue(orphanWorkflow);
+      mockWorkflowRunner.startRun.mockRejectedValue(
         new Error('ToolConfigProfile orphan-profile-id not found'),
       );
 

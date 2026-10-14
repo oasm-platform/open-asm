@@ -1,9 +1,11 @@
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
+import { ToolCategory } from '@/common/enums/enum';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { WorkersService } from '../workers/workers.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -44,6 +46,10 @@ describe('JobsRegistryController', () => {
       expect(required('cancelJob')).toEqual(['job.write']);
     });
 
+    it('requires job.write on cancelJobHistory', () => {
+      expect(required('cancelJobHistory')).toEqual(['job.write']);
+    });
+
     it('requires job.delete on deleteJob', () => {
       expect(required('deleteJob')).toEqual(['job.delete']);
     });
@@ -56,6 +62,7 @@ describe('JobsRegistryController', () => {
     let mockJobsRegistryService: any;
     let mockConnectorRegistry: any;
     let mockToolConfigProfilesService: any;
+    let mockIntegrationsService: { getIntegrationWithDecryptedConfig: jest.Mock };
 
     beforeEach(async () => {
       mockJobsRegistryService = {
@@ -72,6 +79,9 @@ describe('JobsRegistryController', () => {
       mockToolConfigProfilesService = {
         resolveConfigForJob: jest.fn(),
       };
+      mockIntegrationsService = {
+        getIntegrationWithDecryptedConfig: jest.fn(),
+      };
 
       const module: TestingModule = await Test.createTestingModule({
         controllers: [JobsRegistryController],
@@ -79,6 +89,7 @@ describe('JobsRegistryController', () => {
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
           { provide: ConnectorRegistryService, useValue: mockConnectorRegistry },
           { provide: ToolConfigProfilesService, useValue: mockToolConfigProfilesService },
+          { provide: IntegrationsService, useValue: mockIntegrationsService },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
           { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
@@ -96,322 +107,311 @@ describe('JobsRegistryController', () => {
       expect(result).toEqual({ id: '', asset: {}, command: '' });
     });
 
-    it('should return connector response with all 4 new fields for connector job', async () => {
-      const mockJob = {
-        id: 'job-1',
-        category: 'VULNERABILITIES',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 4,
-        command: undefined,
-        asset: { id: 'a1', value: 'example.com' },
-        tool: { id: 'tool-1', name: 'my-connector' },
-        workspaceId: 'ws-1',
-        configProfileId: 'profile-1',
-      };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
-      mockConnectorRegistry.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
-        apiKey: 'decrypted-key',
-      });
-
-      const result = await controller.next({ id: 'worker-1' });
-
-      expect(result).toHaveProperty('tool', 'my-connector');
-      expect(result).toHaveProperty('image', 'my-connector:latest');
-      // protobufjs Struct shape: plain keys are dropped by Struct.fromObject,
-      // so inputs/config must be { fields: { key: { <kind>Value: value } } }
-      expect(result).toHaveProperty('inputs', {
-        fields: { target: { stringValue: 'example.com' } },
-      });
-      expect(result).toHaveProperty('config', {
-        fields: { apiKey: { stringValue: 'decrypted-key' } },
-      });
-      expect(result).toHaveProperty('id', 'job-1');
-      expect(result).toHaveProperty('category', 'VULNERABILITIES');
-      // Must NOT include command in connector response
-      expect(result).not.toHaveProperty('command');
-    });
-
-    it('should attach manifest resource defaults to connector response', async () => {
-      const mockJob = {
-        id: 'job-rd',
-        category: 'VULNERABILITIES',
-        asset: { id: 'a1', value: 'example.com' },
-        tool: { id: 'tool-1', name: 'my-connector' },
-        workspaceId: 'ws-1',
-        configProfileId: 'profile-1',
-      };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
-      mockConnectorRegistry.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-      mockConnectorRegistry.getResourceDefaults.mockReturnValue({
-        cpu: '500m',
-        memory: '512Mi',
-        timeoutSeconds: 600,
-      });
-      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue(null);
-
-      const result = await controller.next({ id: 'worker-1' });
-
-      expect(result).toHaveProperty('cpu', '500m');
-      expect(result).toHaveProperty('memory', '512Mi');
-      expect(result).toHaveProperty('timeout_seconds', 600);
-      expect(mockConnectorRegistry.getResourceDefaults).toHaveBeenCalledWith(
-        'my-connector',
-      );
-    });
-
-    it('should not attach resource fields for built-in (non-connector) job', async () => {
+    it('should send the connector slug, not the display name, as the job tool', async () => {
+      // The worker derives the container name and the in-container TOOL env var
+      // from the proto `tool` field. The manifest display name ("Nikto - Web
+      // Server Scanner") is not a safe identifier: it is long, not unique, and
+      // sanitizes into "nikto---web-server-scanner". The slug is the identifier
+      // connectors are addressed by everywhere else.
       mockJobsRegistryService.getNextJob.mockResolvedValue({
-        id: 'job-legacy',
-        category: 'VULNERABILITIES',
-        command: 'nmap -sV target',
-        asset: { id: 'a1', value: 'example.com' },
+        id: 'job-1',
+        workspaceId: 'ws-1',
+        category: 'vulnerability',
+        asset: { value: 'https://example.com' },
+        config: null,
+        configProfileId: undefined,
+        tool: { id: 'nikto', name: 'Nikto - Web Server Scanner' },
       });
-      mockConnectorRegistry.getConnector.mockReturnValue(null);
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'Nikto - Web Server Scanner',
+        slug: 'nikto',
+        image: 'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
 
       const result = await controller.next({ id: 'worker-1' });
 
-      expect(result).not.toHaveProperty('cpu');
-      expect(result).not.toHaveProperty('memory');
-      expect(result).not.toHaveProperty('timeout_seconds');
-      expect(mockConnectorRegistry.getResourceDefaults).not.toHaveBeenCalled();
+      // Lookup still keys off the persisted tool name...
+      expect(mockConnectorRegistry.getConnector).toHaveBeenCalledWith(
+        'Nikto - Web Server Scanner',
+      );
+      // ...but the worker receives the stable slug.
+      expect(result.tool).toBe('nikto');
+      expect(result.image).toBe(
+        'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      );
+      // Host asset: the historical single `target` input.
+      expect(result.inputs).toEqual({
+        fields: { target: { stringValue: 'https://example.com' } },
+      });
     });
 
-    it('should pack mixed-type config values into Struct fields by kind', async () => {
-      const mockJob = {
-        id: 'job-1b',
-        category: 'VULNERABILITIES',
-        asset: { id: 'a1', value: 'example.com' },
-        tool: { id: 'tool-1', name: 'my-connector' },
+    it('sends repository inputs with the integration token for a Git organization asset', async () => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'job-2',
         workspaceId: 'ws-1',
-        configProfileId: 'profile-1',
-      };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
-      mockConnectorRegistry.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
+        category: 'vulnerabilities',
+        asset: {
+          value: 'github.com/acme/web',
+          metadata: { url: 'https://github.com/acme/web', defaultBranch: 'main' },
+          target: { type: 'GIT_ORG', integrationId: 'int-1' },
+        },
+        config: null,
+        tool: { id: 'gitleaks', name: 'gitleaks' },
       });
-      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
-        apiKey: 'decrypted-key',
-        timeout: 30,
-        verbose: true,
-        rateLimit: null,
-        tags: ['web', 'cve'],
-        proxy: { host: 'proxy:8080' },
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'Gitleaks',
+        slug: 'gitleaks',
+        image: 'ghcr.io/oasm-platform/connector-gitleaks:8',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+      mockIntegrationsService.getIntegrationWithDecryptedConfig.mockResolvedValue({
+        integration: { appType: 'gitlab' },
+        decryptedConfig: { apiToken: 'glpat-secret' },
       });
 
       const result = await controller.next({ id: 'worker-1' });
 
-      expect(result.config).toEqual({
+      expect(
+        mockIntegrationsService.getIntegrationWithDecryptedConfig,
+      ).toHaveBeenCalledWith('int-1', 'ws-1');
+      expect(result.inputs).toEqual({
         fields: {
-          apiKey: { stringValue: 'decrypted-key' },
-          timeout: { numberValue: 30 },
-          verbose: { boolValue: true },
-          rateLimit: { nullValue: 0 },
-          tags: {
-            listValue: {
-              values: [{ stringValue: 'web' }, { stringValue: 'cve' }],
-            },
-          },
-          proxy: {
-            structValue: {
-              fields: { host: { stringValue: 'proxy:8080' } },
-            },
-          },
+          repository: { stringValue: 'https://github.com/acme/web' },
+          ref: { stringValue: 'main' },
+          username: { stringValue: 'oauth2' },
+          token: { stringValue: 'glpat-secret' },
         },
       });
     });
 
-    it('should use explicit configProfileId over default', async () => {
-      const mockJob = {
-        id: 'job-2',
-        category: 'VULNERABILITIES',
-        asset: { id: 'a1', value: 'example.com' },
-        tool: { id: 'tool-1', name: 'my-connector' },
-        workspaceId: 'ws-1',
-        configProfileId: 'explicit-profile',
-      };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
-      mockConnectorRegistry.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
-        apiKey: 'explicit-key',
-      });
-
-      await controller.next({ id: 'worker-1' });
-
-      expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledWith(
-        'ws-1',
-        'tool-1',
-        { config: undefined, configProfileId: 'explicit-profile' },
-      );
-    });
-
-    it('should fall back to default profile when no configProfileId', async () => {
-      const mockJob = {
+    it('dispatches a repository job unauthenticated when the integration is unavailable', async () => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
         id: 'job-3',
-        category: 'VULNERABILITIES',
-        asset: { id: 'a1', value: 'example.com' },
-        tool: { id: 'tool-1', name: 'my-connector' },
         workspaceId: 'ws-1',
-        configProfileId: undefined,
-      };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
+        category: 'vulnerabilities',
+        asset: {
+          value: 'github.com/acme/web',
+          metadata: { url: 'https://github.com/acme/web', defaultBranch: 'main' },
+          target: { type: 'GIT_ORG', integrationId: 'int-gone' },
+        },
+        config: null,
+        tool: { id: 'gitleaks', name: 'gitleaks' },
+      });
       mockConnectorRegistry.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
+        slug: 'gitleaks',
+        image: 'ghcr.io/oasm-platform/connector-gitleaks:8',
       });
-      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
-        apiKey: 'default-key',
-      });
-
-      await controller.next({ id: 'worker-1' });
-
-      // profileId is undefined → resolveConfigForJob called with undefined profileId
-      expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledWith(
-        'ws-1',
-        'tool-1',
-        { config: undefined, configProfileId: undefined },
-      );
-    });
-
-    it('should omit config when no profiles exist', async () => {
-      const mockJob = {
-        id: 'job-4',
-        category: 'VULNERABILITIES',
-        asset: { id: 'a1', value: 'example.com' },
-        tool: { id: 'tool-1', name: 'my-connector' },
-        workspaceId: 'ws-1',
-        configProfileId: undefined,
-      };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
-      mockConnectorRegistry.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue(undefined);
-
-      const result = await controller.next({ id: 'worker-1' });
-
-      expect(result).not.toHaveProperty('config');
-    });
-
-    it('should omit config and log warning on decrypt failure', async () => {
-      const mockJob = {
-        id: 'job-5',
-        category: 'VULNERABILITIES',
-        asset: { id: 'a1', value: 'example.com' },
-        tool: { id: 'tool-1', name: 'my-connector' },
-        workspaceId: 'ws-1',
-        configProfileId: 'profile-1',
-      };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
-      mockConnectorRegistry.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-      mockToolConfigProfilesService.resolveConfigForJob.mockRejectedValue(
-        new Error('decrypt failed'),
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+      mockIntegrationsService.getIntegrationWithDecryptedConfig.mockRejectedValue(
+        new Error('not found'),
       );
 
       const result = await controller.next({ id: 'worker-1' });
 
-      // Config omitted on failure
-      expect(result).not.toHaveProperty('config');
-      // Still returns all connector fields
-      expect(result).toHaveProperty('tool', 'my-connector');
-      expect(result).toHaveProperty('image', 'my-connector:latest');
-      expect(result).toHaveProperty('inputs');
+      expect(result.inputs).toEqual({
+        fields: {
+          repository: { stringValue: 'https://github.com/acme/web' },
+          ref: { stringValue: 'main' },
+        },
+      });
     });
 
-    it('should never log decrypted values on decrypt failure', async () => {
-      const mockJob = {
-        id: 'job-6',
-        category: 'VULNERABILITIES',
-        asset: { id: 'a1', value: 'secret-host' },
-        tool: { id: 'tool-1', name: 'my-connector' },
-        workspaceId: 'ws-1',
-        configProfileId: 'profile-1',
+  });
+
+  // ── url_discovery: REST + gRPC delegation ───────────────────────────
+
+  describe('url-discovery result endpoints', () => {
+    let controller: JobsRegistryController;
+    let mockJobsRegistryService: any;
+
+    beforeEach(async () => {
+      mockJobsRegistryService = {
+        getNextJob: jest.fn(),
+        updateResultByCategory: jest.fn().mockResolvedValue({
+          jobId: 'bull-job-id',
+          queueId: 'job-result',
+        }),
       };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
-      mockConnectorRegistry.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-      mockToolConfigProfilesService.resolveConfigForJob.mockRejectedValue(
-        new Error('bad-dek'),
+
+      const module: TestingModule = await Test.createTestingModule({
+        controllers: [JobsRegistryController],
+        providers: [
+          { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          {
+            provide: ConnectorRegistryService,
+            useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
+          },
+          {
+            provide: IntegrationsService,
+            useValue: { getIntegrationWithDecryptedConfig: jest.fn() },
+          },
+          {
+            provide: ToolConfigProfilesService,
+            useValue: { resolveConfigForJob: jest.fn() },
+          },
+          { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
+          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
+          { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
+        ],
+      }).compile();
+
+      controller = module.get(JobsRegistryController);
+    });
+
+    it('S1 REST: POST :workerId/result/url-discovery delegates with ToolCategory.URL_DISCOVERY', async () => {
+      const dto = {
+        jobId: 'job-uuid',
+        error: false,
+        payload: [{ url: 'https://a.example.com' }],
+      } as any;
+
+      const result = await controller.updateUrlDiscoveryResult(
+        { workerId: 'worker-uuid' },
+        dto,
       );
 
-      const loggerSpy = jest.spyOn((controller as any).logger, 'warn');
-
-      const result = await controller.next({ id: 'worker-1' });
-
-      expect(result).not.toHaveProperty('config');
-      // Verify the logger was called with generic message only
-      expect(loggerSpy).toHaveBeenCalledWith('profile decrypt failed');
-      // Ensure no secret value appears in ANY warn call
-      for (const call of loggerSpy.mock.calls) {
-        expect(String(call)).not.toContain('secret-host');
-        expect(String(call)).not.toContain('bad-dek');
-        expect(String(call)).not.toContain('profile-1');
-      }
-      loggerSpy.mockRestore();
+      expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
+        1,
+      );
+      const [workerId, passedDto, category] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(workerId).toBe('worker-uuid');
+      expect(passedDto).toBe(dto);
+      expect(category).toBe(ToolCategory.URL_DISCOVERY);
+      expect(result).toEqual({ jobId: 'bull-job-id', queueId: 'job-result' });
     });
 
-    it('should return legacy response for non-connector (built-in) job', async () => {
-      const mockJob = {
-        id: 'job-7',
-        category: 'SUBDOMAINS',
-        asset: { id: 'a1', value: 'example.com' },
-        command: 'subfinder -d example.com',
-        // No tool, workspaceId, configProfileId — built-in path
-      };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
-      // No connector entry for built-in tools
-      mockConnectorRegistry.getConnector.mockReturnValue(null);
+    it('S1 gRPC: ResultUrlDiscovery maps proto urls → dto.payload and returns {success:true}', async () => {
+      const urls = [
+        { url: 'https://a.example.com' },
+        { url: 'https://b.example.com' },
+      ];
 
-      const result = await controller.next({ id: 'worker-1' });
-
-      expect(result).toEqual({
-        id: 'job-7',
-        asset: { id: 'a1', value: 'example.com' },
-        command: 'subfinder -d example.com',
-        category: 'SUBDOMAINS',
+      const result = await controller.resultUrlDiscovery({
+        workerId: 'worker-uuid',
+        jobId: 'job-uuid',
+        error: false,
+        raw: 'raw-out',
+        urls,
       });
+
+      expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
+        1,
+      );
+      const [, passedDto, category] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(passedDto.jobId).toBe('job-uuid');
+      expect(passedDto.raw).toBe('raw-out');
+      expect(passedDto.payload).toEqual(urls);
+      expect(category).toBe(ToolCategory.URL_DISCOVERY);
+      expect(result).toEqual({ success: true });
     });
 
-    it('should return legacy response when connector has no image', async () => {
-      const mockJob = {
-        id: 'job-8',
-        category: 'SUBDOMAINS',
-        asset: { id: 'a1', value: 'example.com' },
-        command: 'subfinder -d example.com',
-        tool: { id: 'tool-bi', name: 'subfinder' },
+    it('S2 edge: urls undefined → payload [] (no throw)', async () => {
+      const result = await controller.resultUrlDiscovery({
+        workerId: 'worker-uuid',
+        jobId: 'job-uuid',
+        error: false,
+      });
+
+      const [, passedDto] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(passedDto.payload).toEqual([]);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('S3 regression: updatePortsResult still delegates with PORTS_SCANNER', async () => {
+      const dto = { jobId: 'job-uuid', error: false, payload: [80, 443] } as any;
+
+      await controller.updatePortsResult({ workerId: 'worker-uuid' }, dto);
+
+      const [, passedDto, category] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(passedDto).toBe(dto);
+      expect(category).toBe(ToolCategory.PORTS_SCANNER);
+    });
+  });
+
+  // ── vulnerability result: severity case normalization at gRPC boundary ──
+
+  describe('vulnerability result endpoints', () => {
+    let controller: JobsRegistryController;
+    let mockJobsRegistryService: any;
+
+    beforeEach(async () => {
+      mockJobsRegistryService = {
+        updateResultByCategory: jest.fn().mockResolvedValue({
+          jobId: 'bull-job-id',
+          queueId: 'job-result',
+        }),
       };
-      mockJobsRegistryService.getNextJob.mockResolvedValue(mockJob);
-      // Connector entry exists but no image → treated as legacy
-      mockConnectorRegistry.getConnector.mockReturnValue({
-        name: 'subfinder',
-        image: null,
+
+      const module: TestingModule = await Test.createTestingModule({
+        controllers: [JobsRegistryController],
+        providers: [
+          { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          {
+            provide: ConnectorRegistryService,
+            useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
+          },
+          {
+            provide: IntegrationsService,
+            useValue: { getIntegrationWithDecryptedConfig: jest.fn() },
+          },
+          {
+            provide: ToolConfigProfilesService,
+            useValue: { resolveConfigForJob: jest.fn() },
+          },
+          { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
+          { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
+          { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
+        ],
+      }).compile();
+
+      controller = module.get(JobsRegistryController);
+    });
+
+    it('lowercases proto enum severity names before persisting', async () => {
+      const vulnerabilities = {
+        values: [
+          { name: 'CVE-1', severity: 'HIGH' },
+          { name: 'CVE-2', severity: 'Critical' },
+          { name: 'CVE-3', severity: 'info' },
+        ],
+      } as any;
+
+      const result = await controller.resultVulnerabilities({
+        workerId: 'worker-uuid',
+        jobId: 'job-uuid',
+        error: false,
+        vulnerabilities,
       });
 
-      const result = await controller.next({ id: 'worker-1' });
+      const [, passedDto, category] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(
+        (passedDto.payload as { severity: string }[]).map((v) => v.severity),
+      ).toEqual(['high', 'critical', 'info']);
+      expect(category).toBe(ToolCategory.VULNERABILITIES);
+      expect(result).toEqual({ success: true });
+    });
 
-      expect(result).toEqual({
-        id: 'job-8',
-        asset: { id: 'a1', value: 'example.com' },
-        command: 'subfinder -d example.com',
-        category: 'SUBDOMAINS',
+    it('falls back to info for unrecognized severity', async () => {
+      const vulnerabilities = {
+        values: [{ name: 'CVE-1', severity: 'SEVERITY_UNSPECIFIED' }],
+      } as any;
+
+      await controller.resultVulnerabilities({
+        workerId: 'worker-uuid',
+        jobId: 'job-uuid',
+        error: false,
+        vulnerabilities,
       });
+
+      const [, passedDto] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(passedDto.payload[0].severity).toBe('info');
     });
   });
 });

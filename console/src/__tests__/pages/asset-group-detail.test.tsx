@@ -83,6 +83,15 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
   >();
   return {
     ...actual,
+    getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey: (id: string) => [
+      `/api/asset-group/${id}/assets`,
+    ],
+    getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey: (id: string) => [
+      `/api/asset-group/${id}/assets/not-in-group`,
+    ],
+    getAssetGroupControllerGetByIdQueryKey: (id: string) => [
+      `/api/asset-group/${id}`,
+    ],
     useAssetGroupControllerGetById: () => ({
       data: mockGroup,
       refetch: vi.fn(),
@@ -154,11 +163,12 @@ describe('AssetGroupDetail page', () => {
   });
 
   it('removes a single host through the row action', async () => {
-    const { user } = renderWithProviders(<AssetGroupDetail />, {
+    const { user, queryClient } = renderWithProviders(<AssetGroupDetail />, {
       routePath: '/groups/$id',
       initialEntries: ['/groups/group-1'],
     });
     await screen.findByText('https://example.com');
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     // The action button lives in the first data row (row 0 is the header).
     const firstRow = screen.getAllByRole('row')[1];
@@ -173,6 +183,13 @@ describe('AssetGroupDetail page', () => {
         { groupId: 'group-1', data: { assetIds: ['asset-1'] } },
         expect.anything(),
       );
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: ['/api/asset-group/group-1/assets'],
+      });
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: ['/api/asset-group/group-1'],
+        exact: true,
+      });
     });
   });
 });

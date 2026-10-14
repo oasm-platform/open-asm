@@ -10,11 +10,16 @@ import { JobErrorLog } from './job-error-log.entity';
 import { JobHistory } from './job-history.entity';
 
 @Entity('jobs')
-@Index('IDX_jobs_status_priority_createdAt', ['status', 'priority', 'createdAt'])
+// Dispatch index. Backs the claim query, which orders by
+// `priority DESC, "createdAt" ASC` — ascending `createdAt` is the FIFO
+// tie-breaker within a priority band. TypeORM cannot express per-column
+// direction in a decorator, so the columns are declared here without one and
+// the migration creates them as `"priority" DESC, "createdAt" ASC`.
+@Index('IDX_jobs_dispatch', ['status', 'priority', 'createdAt'])
 @Index('IDX_jobs_asset_status', ['asset', 'status'])
 @Index('IDX_jobs_tool', ['tool'])
 @Index('IDX_jobs_workerId_status', ['workerId', 'status'])
-@Index('IDX_jobs_jobHistoryId', ['jobHistory'])
+@Index('IDX_jobs_jobHistoryId_status', ['jobHistory', 'status'])
 @Index('IDX_jobs_assetServiceId', ['assetService'])
 @Index('IDX_jobs_category_status', ['category', 'status'])
 export class Job extends BaseEntity {

@@ -8,6 +8,13 @@ import {
   type ConversationResponseDto,
 } from '@/services/apis/gen/queries';
 import { orvalClient } from '@/services/apis/axios-client';
+import {
+  getApprovalMode,
+  getApprovalModeVersion,
+  isApprovalMode,
+  restoreApprovalMode,
+  syncApprovalMode,
+} from '@/hooks/use-approval-mode';
 import { useRemoteExecuteStream } from '@/hooks/use-remote-execute-stream';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -70,6 +77,49 @@ function isTransientError(error: Error): boolean {
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
+export interface ApprovalDecisionOptions {
+  /** Approve everything else in this conversation too */
+  allowConversation?: boolean;
+  /** Approve every later call of this tool in this conversation, any input */
+  allowTool?: boolean;
+  /** Plan approvals: run the plan without asking (auto) or per command (manual) */
+  mode?: PlanRunMode;
+  /** What the agent should do instead (rejections) */
+  feedback?: string;
+}
+
+/** How an approved plan runs */
+export type PlanRunMode = 'auto' | 'manual';
+
+export interface ApprovalToolMetadata {
+  source?: string;
+  server?: string;
+  name?: string;
+  title?: string;
+  annotations?: {
+    title?: string;
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    openWorldHint?: boolean;
+  };
+}
+
+export interface PendingApproval {
+  approvalId: string;
+  toolCallId: string;
+  /** `plan`: approve a whole plan and pick how it runs */
+  kind?: 'plan';
+  command: string;
+  mode: string;
+  tool?: string;
+  description?: string;
+  toolMetadata?: ApprovalToolMetadata;
+  input?: unknown;
+  /** The steps of the plan under review (`kind: 'plan'` only) */
+  plan?: string[];
+}
+
 interface SelectedModel {
   provider: string;
   model: string;
@@ -105,6 +155,13 @@ interface UseAgentChatReturn {
   onLoadMore: (() => void) | undefined;
   onAgentModeChange: (mode: string) => void;
   onWorkerSelect: (workerId: string | null) => void;
+  pendingApproval: PendingApproval | null;
+  pendingApprovalCount: number;
+  isDecidingApproval: boolean;
+  onDecideApproval: (
+    status: 'approved' | 'rejected',
+    options?: ApprovalDecisionOptions,
+  ) => void;
 }
 
 /**
@@ -228,6 +285,10 @@ export function useAgentChat({
   const [title, setTitle] = useState<string | null>(null);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
+  // Parallel tool calls can each need approval, so keep a queue
+  const [approvalQueue, setApprovalQueue] = useState<PendingApproval[]>([]);
+  const pendingApproval = approvalQueue[0] ?? null;
+  const [isDecidingApproval, setIsDecidingApproval] = useState(false);
   const { preferredProvider } = useLLMConfigs();
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(null);
   const selectedModelRef = useRef<SelectedModel | null>(selectedModel);
@@ -263,6 +324,17 @@ export function useAgentChat({
     agentModeRef.current = agentMode;
   }, [agentMode]);
 
+  // A chat started from the landing page gets its id on the client and only
+  // exists on the server once its first message streams. It has no history
+  // to load, and fetching it early just 404s (and retries), so skip that.
+  const [createdHereId] = useState(() =>
+    (location.state as { pendingMessage?: string } | null)?.pendingMessage
+      ? conversationId
+      : undefined,
+  );
+  const isNewConversation =
+    !!conversationId && conversationId === createdHereId;
+
   // Fetch messages with infinite scroll
   const {
     data: messagesData,
@@ -276,7 +348,8 @@ export function useAgentChat({
     {
       query: {
         queryKey: ['/api/agents/conversations', conversationId, 'messages'],
-        enabled: !!conversationId && !isStreamingRef.current,
+        enabled:
+          !!conversationId && !isNewConversation && !isStreamingRef.current,
         getNextPageParam: (lastPage) => {
           const page = lastPage.page ?? 1;
           const limit = lastPage.limit ?? 10;
@@ -323,6 +396,7 @@ export function useAgentChat({
                 provider: modelInfo.provider,
               }),
               agentMode: agentModeRef.current,
+              approvalMode: getApprovalMode(),
               workerId: selectedWorkerId,
             },
           };
@@ -374,6 +448,24 @@ export function useAgentChat({
           });
         }
       }
+      if (data.type === 'data-approval-required') {
+        const incoming = data.data as PendingApproval;
+        setApprovalQueue((q) =>
+          q.some((a) => a.approvalId === incoming.approvalId)
+            ? q
+            : [...q, incoming],
+        );
+      }
+      if (data.type === 'data-approval-resolved') {
+        // Answered some other way ("allow all", "allow tool", timeout)
+        const { approvalId } = data.data as { approvalId: string };
+        setApprovalQueue((q) => q.filter((a) => a.approvalId !== approvalId));
+      }
+      if (data.type === 'data-approval-mode-changed') {
+        // The user approved a plan and picked how it runs
+        const mode = (data.data as { mode?: unknown } | undefined)?.mode;
+        if (isApprovalMode(mode)) syncApprovalMode(mode);
+      }
       if (data.type === 'data-remote-execute-output') {
         const event = data.data as import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent;
         appendEvent(event);
@@ -388,6 +480,59 @@ export function useAgentChat({
   }, [chatMessages, status]);
 
   const isStreaming = status === 'submitted' || status === 'streaming';
+
+  // A pending approval can never outlive its stream
+  useEffect(() => {
+    if (!isStreaming) setApprovalQueue([]);
+  }, [isStreaming]);
+
+  const handleDecideApproval = useCallback(
+    async (
+      decision: 'approved' | 'rejected',
+      options?: ApprovalDecisionOptions,
+    ) => {
+      if (!pendingApproval) return;
+      setIsDecidingApproval(true);
+      try {
+        if (pendingApproval.kind === 'plan') {
+          await orvalClient({
+            url: `/api/agents/plan-approvals/${pendingApproval.approvalId}`,
+            method: 'PATCH',
+            data: {
+              status: decision,
+              mode: options?.mode,
+              feedback: options?.feedback,
+            },
+          });
+          // Reflect the chosen mode right away; the stream confirms it too
+          if (decision === 'approved' && options?.mode) {
+            syncApprovalMode(options.mode);
+          }
+        } else {
+          await orvalClient({
+            url: `/api/agents/command-approvals/${pendingApproval.approvalId}`,
+            method: 'PATCH',
+            data: {
+              status: decision,
+              allowConversation: options?.allowConversation,
+              allowTool: options?.allowTool,
+              feedback: options?.feedback,
+            },
+          });
+        }
+        setStreamError(null);
+        setApprovalQueue((q) =>
+          q.filter((a) => a.approvalId !== pendingApproval.approvalId),
+        );
+      } catch (error) {
+        console.error('[Chat] Failed to submit approval decision', error);
+        setStreamError('Could not submit approval decision. Please try again.');
+      } finally {
+        setIsDecidingApproval(false);
+      }
+    },
+    [pendingApproval],
+  );
 
   // Keep setMessages in a ref to avoid re-triggering the history sync effect
   const setMessagesRef = useRef(setMessages);
@@ -550,11 +695,16 @@ export function useAgentChat({
   useEffect(() => {
     if (!conversationId) {
       setTodos([]);
+      restoreApprovalMode();
       return;
     }
 
+    // Nothing to load yet: its settings are the ones it was started with
+    if (isNewConversation) return;
+
     // Use a flag to prevent setting state after unmount
     let cancelled = false;
+    const approvalVersionAtStart = getApprovalModeVersion();
 
     orvalClient<ConversationResponseDto>({
       url: `/api/agents/conversations/${conversationId}`,
@@ -576,6 +726,16 @@ export function useAgentChat({
         if (!cancelled && data.createdAt) {
           setCreatedAt(data.createdAt as string);
         }
+        const savedApprovalMode = (data as { approvalMode?: string })
+          .approvalMode;
+        // Never clobber a mode the user picked while this request was pending
+        if (
+          !cancelled &&
+          isApprovalMode(savedApprovalMode) &&
+          getApprovalModeVersion() === approvalVersionAtStart
+        ) {
+          syncApprovalMode(savedApprovalMode);
+        }
         if (!cancelled && data.agentMode) {
           setAgentMode(data.agentMode);
           agentModeRef.current = data.agentMode;
@@ -588,7 +748,7 @@ export function useAgentChat({
     return () => {
       cancelled = true;
     };
-  }, [conversationId]);
+  }, [conversationId, isNewConversation]);
 
   // Keep handleSendMessage in a ref to avoid re-triggering the auto-send effect
   const handleSendMessageRef = useRef(handleSendMessage);
@@ -652,5 +812,9 @@ export function useAgentChat({
     onLoadMore: onLoadMoreAction,
     onAgentModeChange: setAgentMode,
     onWorkerSelect: setSelectedWorkerId,
+    pendingApproval,
+    pendingApprovalCount: approvalQueue.length,
+    isDecidingApproval,
+    onDecideApproval: handleDecideApproval,
   };
 }

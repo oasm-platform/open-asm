@@ -1,4 +1,5 @@
 import { AssetsModule } from '@/modules/assets/assets.module';
+import { ConnectorsModule } from '@/modules/connectors/connectors.module';
 import { StatisticModule } from '@/modules/statistic/statistic.module';
 import { TargetsModule } from '@/modules/targets/targets.module';
 import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
@@ -8,6 +9,8 @@ import { Global, Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsController } from './agents.controller';
+import { AgentsApprovalsService } from './agents.approvals';
+import { AgentCommandApproval } from './entities/agent-command-approval.entity';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentsService } from './agents.service';
 import { AgentTool } from './agents.tools';
@@ -35,6 +38,7 @@ import { HttpModule } from '@nestjs/axios';
       AgentWorkspaceMemory,
       AgentMCPConfig,
       AgentSkill,
+      AgentCommandApproval,
     ]),
     AssetsModule,
     TargetsModule,
@@ -43,6 +47,7 @@ import { HttpModule } from '@nestjs/axios';
     RemoteExecuteModule,
     HttpModule,
     WorkersModule,
+    ConnectorsModule,
   ],
   controllers: [AgentsController],
   providers: [
@@ -52,6 +57,7 @@ import { HttpModule } from '@nestjs/axios';
     AgentsMcpService,
     AgentsMemoriesService,
     AgentsSkillsService,
+    AgentsApprovalsService,
   ],
   exports: [
     AgentsService,
@@ -60,6 +66,7 @@ import { HttpModule } from '@nestjs/axios';
     AgentsMemoriesService,
     AgentsMcpService,
     AgentsSkillsService,
+    AgentsApprovalsService,
   ],
 })
 export class AgentsModule {}

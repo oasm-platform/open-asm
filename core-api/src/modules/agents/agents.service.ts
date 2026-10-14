@@ -3,7 +3,7 @@ import {
   GetManyBaseResponseDto,
   SortOrder,
 } from '@/common/dtos/get-many-base.dto';
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode, WorkerScope } from '@/common/enums/enum';
 import { encrypt } from '@/common/utils/encryption.util';
 import {
   decryptWithDEK,
@@ -24,6 +24,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
 import { In, Repository } from 'typeorm';
+import { AgentsApprovalsService } from './agents.approvals';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentModeDto, GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
@@ -80,6 +81,7 @@ export class AgentsService {
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly httpService: HttpService,
     private readonly workersService: WorkersService,
+    private readonly approvals: AgentsApprovalsService,
   ) {}
 
   private maskApiKey(apiKey: string): string {
@@ -116,6 +118,7 @@ export class AgentsService {
       sortBy: '"createdAt"',
       sortOrder: SortOrder.DESC,
       workspaceId,
+      scope: WorkerScope.WORKSPACE,
       enabledAgentMode: true,
     });
     return {
@@ -186,9 +189,7 @@ export class AgentsService {
     }
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
-    const apiKey = dek
-      ? encryptWithDEK(dto.apiKey, dek)
-      : encrypt(dto.apiKey);
+    const apiKey = dek ? encryptWithDEK(dto.apiKey, dek) : encrypt(dto.apiKey);
 
     const config = this.llmConfigRepository.create({
       workspaceId,
@@ -253,9 +254,7 @@ export class AgentsService {
         (p) => p.id === config.provider,
       );
       const apiKey = config.apiKey ? decryptWithDEK(config.apiKey, dek) : '';
-      const apiKeyMasked = config.apiKey
-        ? this.maskApiKey(apiKey)
-        : '****';
+      const apiKeyMasked = config.apiKey ? this.maskApiKey(apiKey) : '****';
       return {
         providerId: config.provider,
         providerName: providerMeta?.name ?? config.provider,
@@ -429,6 +428,7 @@ export class AgentsService {
       llmConfigId: conversation.llmConfigId,
       title: conversation.title,
       agentMode: conversation.agentMode,
+      approvalMode: conversation.approvalMode,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       todos,
@@ -471,6 +471,7 @@ export class AgentsService {
         llmConfigId: c.llmConfigId,
         title: c.title,
         agentMode: c.agentMode,
+        approvalMode: c.approvalMode,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
       })),
@@ -502,6 +503,7 @@ export class AgentsService {
       llmConfigId: saved.llmConfigId,
       title: saved.title,
       agentMode: saved.agentMode,
+      approvalMode: saved.approvalMode,
       createdAt: saved.createdAt,
       updatedAt: saved.updatedAt,
     };
@@ -522,6 +524,7 @@ export class AgentsService {
 
     await this.conversationRepository.remove(conversation);
     await this.agentsMemories.stmClear(id);
+    await this.approvals.forgetConversations([id], workspaceId, userId);
   }
 
   async deleteAllConversations(
@@ -538,6 +541,11 @@ export class AgentsService {
     });
     await Promise.all(
       conversations.map((c) => this.agentsMemories.stmClear(c.id)),
+    );
+    await this.approvals.forgetConversations(
+      conversations.map((c) => c.id),
+      workspaceId,
+      userId,
     );
   }
 

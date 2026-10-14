@@ -3,12 +3,7 @@
 import { useState } from 'react';
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ChartContainer,
   ChartTooltip,
@@ -17,6 +12,7 @@ import {
 } from '@/components/ui/chart';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTimelineStatistics } from '@/services/apis/gen/queries';
+import { AssetTrendsSkeleton } from './dashboard-skeleton';
 import { TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -41,7 +37,7 @@ export function AssetTrends() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
-  const { data } = useStatisticControllerGetTimelineStatistics({
+  const { data, isLoading } = useStatisticControllerGetTimelineStatistics({
     query: {
       enabled: !!selectedWorkspaceId,
       queryKey: ['/api/statistics/timeline', selectedWorkspaceId],
@@ -73,6 +69,8 @@ export function AssetTrends() {
       [metric]: !prev[metric],
     }));
   };
+
+  if (isLoading) return <AssetTrendsSkeleton />;
 
   return (
     <Card className="flex flex-col h-full">

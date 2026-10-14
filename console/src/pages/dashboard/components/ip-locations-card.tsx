@@ -1,4 +1,5 @@
 import { useTheme } from '@/components/ui/theme-provider';
+import { IpLocationsSkeleton } from './dashboard-skeleton';
 import countriesData from '@/data/countries.json';
 import type { IpLocationData } from '@/hooks/useIpLocationData';
 import ReactEChartsCore from 'echarts-for-react/esm/core';
@@ -31,6 +32,7 @@ interface IpLocationsCardProps {
   totalIps: number;
   selectedCountry?: string | null;
   onCountrySelect?: (countryCode: string | null) => void;
+  isLoading?: boolean;
 }
 
 export default function IpLocationsCard({
@@ -38,6 +40,7 @@ export default function IpLocationsCard({
   totalIps,
   selectedCountry,
   onCountrySelect,
+  isLoading = false,
 }: IpLocationsCardProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
@@ -182,6 +185,8 @@ export default function IpLocationsCard({
     }),
     [onCountrySelect],
   );
+
+  if (isLoading) return <IpLocationsSkeleton />;
 
   return (
     <div

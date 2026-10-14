@@ -35,6 +35,23 @@ var (
 	bridge   = make(map[string]*bridgeEntry) // executionID → entry
 )
 
+// findExecutionByJob resolves the execution currently running a job.
+//
+// core-api correlates a cancellation by jobId — it owns no execution id — so the
+// mapping lives here, in the bridge map, which every in-flight execution is
+// registered in. Connector (container) jobs only: a legacy in-process job has no
+// bridge entry, so cancelling one is a no-op and it ends on its own.
+func findExecutionByJob(jobID string) (string, bool) {
+	bridgeMu.Lock()
+	defer bridgeMu.Unlock()
+	for execID, entry := range bridge {
+		if entry != nil && entry.jobID == jobID {
+			return execID, true
+		}
+	}
+	return "", false
+}
+
 // imageBackoff gates container starts per image. Failures (submit error,
 // early exit, connect timeout) push the next allowed start out exponentially
 // (min(30s*2^fails, 10m)); success resets the counter. In-memory only — a
@@ -64,11 +81,22 @@ func newDetachedCleanupContext() (context.Context, context.CancelFunc) {
 // health. A var (not const) so tests can shrink it.
 var healthPollInterval = 5 * time.Second
 
+// imageBackoffWaitBudget caps how long a single job waits out an image's
+// backoff window before failing once. A var (not const) so tests can shrink it.
+var imageBackoffWaitBudget = 5 * time.Minute
+
 // Container log tail budget attached to failure payloads sent to Core.
 const (
 	tailMaxLines = 100
 	tailMaxBytes = 32 * 1024
 )
+
+// tailGrace bounds the final log drain after the result stream closes. The
+// connector's terminal lines ("execution done", the adapter error) are written
+// to stderr just before Done, and Docker delivers them slightly after the
+// result stream ends; without this grace the failure payload would miss exactly
+// the lines that explain the failure. A var so tests can shrink it.
+var tailGrace = 150 * time.Millisecond
 
 // tailBuffer is a bounded ring buffer of container log lines. append drops the
 // oldest lines once the budget (100 lines / 32KB) is exceeded.
@@ -112,13 +140,13 @@ func splitLogChunk(chunk []byte) []string {
 	return out
 }
 
-func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
-	job, err := grpcClient.NextJob(ctx)
-	if err != nil {
-		NewTuiLogger(events, "Jobs").ErrorE("Failed to pull job", err)
-		return false, false
-	}
-	if job == nil || job.Id == "" {
+// processJob runs one already-claimed job.
+//
+// The caller owns the claim: the poll loop claims a batch up front so it can
+// fill every free concurrency slot with a single round-trip, and passing the
+// job in keeps this function free of any transport concern.
+func processJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client, getBrowser func() (*rod.Browser, error), toolPath string, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, releaseSem func()) (bool, bool) {
+	if job == nil || job.GetId() == "" {
 		return false, false
 	}
 
@@ -202,21 +230,52 @@ func processJob(ctx context.Context, grpcClient *grpcclient.Client, getBrowser f
 		}
 		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
 		if err != nil {
+			// A page that will not render is the TARGET's condition, not the
+			// tool's failure, so this must not fail the job. Report an empty
+			// screenshot and let it complete: core's screenshot adapter returns
+			// early on an empty image, so nothing is written. The reason stays
+			// on the worker's activity log for diagnosis.
 			completed = true
 			Emit(events, TuiEvent{
 				Type:          EventActivity,
 				Source:        "Jobs",
 				ActivityLevel: "warning",
-				Message:       fmt.Sprintf("Screenshot failed: %v", err),
+				Message:       fmt.Sprintf("Screenshot skipped (%s): %s", formatURL(url), trimRodStack(err.Error())),
 			})
+
+			emptyPayload, marshalErr := emptyScreenshotPayload(url)
+			if marshalErr != nil {
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: fmt.Sprintf("Screenshot error: %v", marshalErr),
+					Duration: time.Since(startTime),
+				})
+				submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", marshalErr))
+				return true, false
+			}
+
+			if submitErr := submitCategoryResult(ctx, grpcClient, job.Id, category, false, emptyPayload); submitErr != nil {
+				// Reporting the empty result is an infrastructure concern — if
+				// the submission itself fails the job genuinely did not finish.
+				NewTuiLogger(events, "Jobs").ErrorE(fmt.Sprintf("[%s] Failed to submit empty screenshot result", job.Id), submitErr)
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: submitErr.Error(),
+					Duration: time.Since(startTime),
+				})
+				return true, false
+			}
+
 			Emit(events, TuiEvent{
 				Type:     EventJobCompleted,
 				JobID:    job.Id,
-				Success:  false,
-				ErrorMsg: fmt.Sprintf("Screenshot error: %v", err),
+				Success:  true,
 				Duration: time.Since(startTime),
 			})
-			submitCategoryError(ctx, grpcClient, events, job.Id, category, fmt.Sprintf("Screenshot error: %v", err))
 			return true, false
 		}
 
@@ -329,6 +388,11 @@ func submitCategoryResult(ctx context.Context, grpcClient *grpcclient.Client, jo
 		return grpcClient.SubmitVulnerabilitiesResult(ctx, jobID, isError, raw, nil)
 	case "screenshot":
 		return grpcClient.SubmitScreenshotResult(ctx, jobID, isError, raw)
+	case "url_discovery":
+		// Per-chunk path (used for errors / partial drains): the connector's
+		// URLs travel in the structured payload at finalization, so the raw
+		// string is the only thing to forward here.
+		return grpcClient.SubmitUrlDiscoveryResult(ctx, jobID, isError, raw, nil)
 	default:
 		// Unknown category — use the deprecated generic endpoint
 		payload := &pb.DataPayloadResult{
@@ -347,27 +411,59 @@ func submitCategoryError(ctx context.Context, grpcClient *grpcclient.Client, eve
 }
 
 // findingToVulnerability maps one connector Finding onto the jobs_registry
-// Vulnerability model consumed by Core. Fields with no counterpart in
-// Vulnerability (matched_at, timestamp) are intentionally dropped. A nil
-// finding yields nil (skipped by the caller).
+// Vulnerability model consumed by Core. matched_at becomes the vulnerability's
+// affected URL; only the finding timestamp has no counterpart and is dropped.
+// A nil finding yields nil (skipped by the caller).
 func findingToVulnerability(f *connectorpb.Finding) *pb.Vulnerability {
 	if f == nil {
 		return nil
 	}
 	return &pb.Vulnerability{
-		Name:       f.GetName(),
-		Severity:   severityFromString(f.GetSeverity()),
-		Tags:       f.GetTags(),
-		References: f.GetReferences(),
-		CveId:      f.GetCveId(),
-		CweId:      f.GetCweId(),
-		CvssScore:  float32(f.GetCvssScore()),
-		CvssMetric: f.GetCvssMetrics(),
-		EpssScore:  float32(f.GetEpssScore()),
-		Solution:   f.GetSolution(),
-		Host:       f.GetHost(),
-		IpAddress:  f.GetIp(),
+		Name:             f.GetName(),
+		Description:      f.GetDescription(),
+		Synopsis:         f.GetSynopsis(),
+		Severity:         severityFromString(f.GetSeverity()),
+		Tags:             f.GetTags(),
+		References:       f.GetReferences(),
+		Authors:          f.GetAuthors(),
+		AffectedUrl:      f.GetMatchedAt(),
+		Ports:            f.GetPorts(),
+		CvssScore:        float32(f.GetCvssScore()),
+		CvssMetric:       f.GetCvssMetrics(),
+		EpssScore:        float32(f.GetEpssScore()),
+		VprScore:         float32(f.GetVprScore()),
+		CveId:            f.GetCveId(),
+		BidId:            f.GetBidId(),
+		CweId:            f.GetCweId(),
+		CeaId:            f.GetCeaId(),
+		Iava:             f.GetIava(),
+		Solution:         f.GetSolution(),
+		Host:             f.GetHost(),
+		IpAddress:        f.GetIp(),
+		PublicationDate:  f.GetPublicationDate(),
+		ModificationDate: f.GetModificationDate(),
+
+		// Code findings (repository scanners); empty for host scanners.
+		FilePath:         f.GetFilePath(),
+		LineStart:        f.GetLineStart(),
+		LineEnd:          f.GetLineEnd(),
+		Commit:           f.GetCommit(),
+		PackageName:      f.GetPackageName(),
+		InstalledVersion: f.GetInstalledVersion(),
+		FixedVersion:     f.GetFixedVersion(),
+		Fingerprint:      f.GetFingerprint(),
 	}
+}
+
+// findingToDiscoveredUrl maps one connector Finding onto the jobs_registry
+// DiscoveredUrl model. The gau (url_discovery) adapter encodes the discovered
+// URL in Finding.Name (one finding per URL, per the SDK's Finding-only
+// contract); a nil finding yields nil (skipped by the caller).
+func findingToDiscoveredUrl(f *connectorpb.Finding) *pb.DiscoveredUrl {
+	if f == nil {
+		return nil
+	}
+	return &pb.DiscoveredUrl{Url: f.GetName()}
 }
 
 // severityFromString maps the connector's lowercase severity string onto the
@@ -413,6 +509,9 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		Inputs: inputsMap,
 		Config: configMap,
 		JobID:  job.Id,
+		// Ownership fingerprint for the oasm.worker_id label — lets the NEXT
+		// boot's ReconcileOrphans recognize this worker's own containers.
+		WorkerID: grpcClient.OwnerID(),
 	}
 
 	// Attach manifest resource limits (scheduling context from core-api) when
@@ -427,20 +526,56 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		}
 	}
 
-	// Per-image backoff gate: while the image is backing off, fail fast
-	// WITHOUT creating a container (no exec-N waste, no pending ExecuteJob).
-	if ok, retryIn := imageBackoff.Allow(spec.Image); !ok {
-		failMsg := fmt.Sprintf("image backing off, retry in %s (image=%s)", retryIn.Round(time.Second), spec.Image)
-		log.Warning("[%s] %s", job.Id, failMsg)
+	// Per-image backoff gate: a prior job for this image failed to launch or
+	// the connector never completed it, so the image is cooling down. WAIT out
+	// the remaining window instead of reporting a job failure: reporting made
+	// Core treat the rejection as a terminal error and requeue the job, so
+	// every retry surfaced another spurious "image backing off" failure and
+	// burned the job's retry budget. Waiting keeps the job alive and lets it
+	// run the moment the window expires, so the UI only ever sees the real
+	// outcome of the scan.
+	// The wait is bounded by imageBackoffWaitBudget: a permanently broken image
+	// fails once at the end instead of holding the concurrency slot forever.
+	failBackoff := func(msg string) (bool, bool) {
+		log.Warning("[%s] %s", job.Id, msg)
 		Emit(events, TuiEvent{
 			Type:     EventJobCompleted,
 			JobID:    job.Id,
 			Success:  false,
-			ErrorMsg: failMsg,
+			ErrorMsg: msg,
 			Duration: time.Since(startTime),
 		})
-		submitCategoryError(ctx, grpcClient, events, job.Id, category, failMsg)
+		cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+		submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
+		cleanupCancel()
 		return true, false // hadJob=true (job was pulled), caller releases semaphore
+	}
+	waitUntil := time.Now().Add(imageBackoffWaitBudget)
+	for {
+		ok, retryIn := imageBackoff.Allow(spec.Image)
+		if ok {
+			break
+		}
+		if time.Now().After(waitUntil) {
+			return failBackoff(fmt.Sprintf("image still backing off after %s (image=%s)", imageBackoffWaitBudget, spec.Image))
+		}
+		wait := retryIn
+		if remaining := time.Until(waitUntil); remaining < wait {
+			wait = remaining
+		}
+		reason := imageBackoff.LastFailureReason(spec.Image)
+		if reason == "" {
+			reason = "-"
+		}
+		log.Info("[%s] image backing off, retrying in %s (image=%s, last failure: %s)",
+			job.Id, retryIn.Round(time.Second), spec.Image, reason)
+		select {
+		case <-ctx.Done():
+			// Session ended while waiting (worker reconnect/cancel). Finalize as
+			// failed on a detached context so Core can re-queue the job.
+			return failBackoff(fmt.Sprintf("image backing off, session ended before retry (image=%s)", spec.Image))
+		case <-time.After(wait):
+		}
 	}
 
 	// Phase 3 replica quota: when every pooled container of this image is
@@ -448,7 +583,17 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	// of creating another replica. Back off and retry — the job is NOT
 	// failed to Core, the semaphore slot stays held, and imageBackoff is NOT
 	// penalized (quota pressure is not an image failure).
+	// poolRetryDelay is how often a queued job re-asks for a container slot.
 	const poolRetryDelay = 2 * time.Second
+
+	// poolWaitBudget caps how long one job waits for a free container slot of its
+	// image before it is reported back to Core. Queue pressure is normal, but a slot
+	// held by a wedged container must not hold a worker concurrency slot forever.
+	// The deadline is armed once per job — re-arming it per submit attempt would
+	// double the real bound (attempt 0 could burn the whole budget, then attempt 1
+	// would start a fresh one).
+	var poolWaitBudget = 10 * time.Minute
+	poolWaitUntil := time.Now().Add(poolWaitBudget)
 
 	// The ExecuteJob payload is identical across retries, so build it once.
 	inputs := make(map[string]string, len(spec.Inputs))
@@ -478,13 +623,15 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	for attempt := 0; attempt < 2; attempt++ {
 		execID, err = mgr.Submit(ctx, spec)
 		for err != nil && errors.Is(err, execution.ErrPoolExhausted) {
-			log.Info("[%s] Pool at replica cap for image %s, waiting for an idle pooled container (retry in %s)", job.Id, spec.Image, poolRetryDelay)
-			select {
-			case <-ctx.Done():
-				// The wait outlived the job context — finalize as failed so Core
-				// can re-queue the job elsewhere.
-				msg := fmt.Sprintf("Submit failed: timed out waiting for a pooled container: %v", err)
-				imageBackoff.RecordFailure(spec.Image)
+			if time.Now().After(poolWaitUntil) {
+				// Local scheduling gave up on this job: report it so Core can
+				// requeue it, and leave the image alone (a full pool is not an
+				// image defect).
+				msg := fmt.Sprintf(
+					"Submit failed: no free container slot for %s after %s",
+					spec.Image,
+					poolWaitBudget,
+				)
 				log.ErrorE(fmt.Sprintf("[%s] %s", job.Id, msg), err)
 				Emit(events, TuiEvent{
 					Type:     EventJobCompleted,
@@ -493,14 +640,48 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 					ErrorMsg: msg,
 					Duration: time.Since(startTime),
 				})
-				submitCategoryError(ctx, grpcClient, events, job.Id, category, msg)
+				// Reported on a DETACHED context, like failBackoff above: this
+				// branch is reached after the queue stayed full, which is exactly
+				// when a worker reconnect has cancelled the session ctx. Reporting
+				// on a cancelled ctx silently fails and leaves the job
+				// IN_PROGRESS in Core although the semaphore slot was released.
+				cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+				submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
+				cleanupCancel()
+				return true, false // hadJob=true (job was pulled), caller releases semaphore
+			}
+			// Quota pressure is normal queueing, not an incident: the job stays
+			// queued in the TUI jobs table and retries silently. Logging it per
+			// retry produced one line every 2s per waiting job, which drowned
+			// the activity feed for zero added information.
+			select {
+			case <-ctx.Done():
+				// The wait outlived the job context — finalize as failed so Core
+				// can re-queue the job elsewhere. Quota pressure is local
+				// scheduling, not an image defect, so the image must NOT be
+				// indicted here (that would back off every future job).
+				msg := fmt.Sprintf("Submit failed: timed out waiting for a pooled container: %v", err)
+				log.ErrorE(fmt.Sprintf("[%s] %s", job.Id, msg), err)
+				Emit(events, TuiEvent{
+					Type:     EventJobCompleted,
+					JobID:    job.Id,
+					Success:  false,
+					ErrorMsg: msg,
+					Duration: time.Since(startTime),
+				})
+				// Detached: ctx is already cancelled in this branch, so reporting
+				// on it can never reach Core and the job would stay
+				// IN_PROGRESS after the semaphore was released.
+				cleanupCtx, cleanupCancel := newDetachedCleanupContext()
+				submitCategoryError(cleanupCtx, grpcClient, events, job.Id, category, msg)
+				cleanupCancel()
 				return true, false // hadJob=true (job was pulled), caller releases semaphore
 			case <-time.After(poolRetryDelay):
 			}
 			execID, err = mgr.Submit(ctx, spec)
 		}
 		if err != nil {
-			imageBackoff.RecordFailure(spec.Image)
+			imageBackoff.RecordFailure(spec.Image, err.Error())
 			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector job", job.Id), err)
 			Emit(events, TuiEvent{
 				Type:     EventJobCompleted,
@@ -569,7 +750,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		// Both attempts produced a container whose stream died before the
 		// send — out of options, fail the job.
 		msg := fmt.Sprintf("Failed to send ExecuteJob (stream died on reuse): %v", sendErr)
-		imageBackoff.RecordFailure(spec.Image)
+		imageBackoff.RecordFailure(spec.Image, sendErr.Error())
 		log.ErrorE(fmt.Sprintf("[%s] %s", job.Id, msg), sendErr)
 		Emit(events, TuiEvent{
 			Type:     EventJobCompleted,
@@ -648,10 +829,11 @@ func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcc
 	var timerC <-chan time.Time = timer.C
 	submittedAny := false
 
-	// Accumulated structured findings for the vulnerabilities category: chunks
-	// are aggregated and submitted ONCE at drain end (see finalization below).
-	// Other categories keep the per-chunk raw submission path.
+	// Accumulated structured findings for the vulnerabilities and url_discovery
+	// categories: chunks are aggregated and submitted ONCE at drain end (see
+	// finalization below). Other categories keep the per-chunk raw path.
 	var vulns []*pb.Vulnerability
+	var urls []*pb.DiscoveredUrl
 
 	// Drain results from connector until channel closes (Done or disconnect)
 	// or the connector fails to connect within connectTimeout.
@@ -672,6 +854,15 @@ drain:
 				// Per-chunk log kept (bytes + findings count) even though the
 				// submission itself is deferred to the single drain-end call.
 				log.Info("[%s] connector result chunk: exec=%s bytes=%d findings=%d", entry.jobID, execID, len(msg.Data), len(msg.Findings))
+			} else if entry.category == "url_discovery" {
+				for _, f := range msg.Findings {
+					if u := findingToDiscoveredUrl(f); u != nil {
+						urls = append(urls, u)
+					}
+				}
+				// Same aggregation contract as vulnerabilities: per-chunk log
+				// only, the single submission happens at drain end below.
+				log.Info("[%s] connector result chunk: exec=%s bytes=%d urls=%d", entry.jobID, execID, len(msg.Data), len(msg.Findings))
 			} else if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(msg.Data)); err != nil {
 				log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector result", entry.jobID), err)
 			} else {
@@ -794,35 +985,104 @@ drain:
 	// OnConnectorDown already ran.
 	proxy.OnConnectorDown(execID)
 
+	// Drain the connector's last log lines before finalizing: the terminal
+	// trace (execution identity, progress, the adapter error) is written to
+	// stderr immediately before Done and reaches Docker just after the result
+	// stream closes. Bounded by tailGrace; a pooled container whose log stream
+	// never ends costs that grace once per job.
+	if tail != nil && logsCh != nil {
+		grace := time.NewTimer(tailGrace)
+		graceC := grace.C
+	finalTail:
+		for {
+			select {
+			case chunk, ok := <-logsCh:
+				if !ok {
+					break finalTail
+				}
+				for _, line := range splitLogChunk(chunk) {
+					tail.append(line)
+				}
+			case <-graceC:
+				break finalTail
+			}
+		}
+		grace.Stop()
+	}
+
 	// Check if connector reported an error via Done message.
 	errMsg, hasError := proxy.PopError(execID)
 	hadDone := proxy.PopDone(execID)
+
+	// A stop imposed by the PLATFORM (worker timeout cancel, container kill,
+	// stream death, worker restart) after results already arrived is not a
+	// tool failure: the findings are real, the platform ended the scan. An
+	// error result carries no payload to Core, so reporting one here would
+	// discard every finding the connector already streamed — deliver them as
+	// a success instead and record the reason in the log. With zero results
+	// the same stop stays a failure: nothing to preserve, reason still
+	// matters (e.g. "did not connect within 5m0s").
+	partialOK := (hasError || !hadDone) && (len(vulns) > 0 || len(urls) > 0)
 
 	// Terminal lifecycle line: execution identity + outcome + duration.
 	errDetail := errMsg
 	if errDetail == "" {
 		errDetail = "-"
 	}
+	succeeded := !hasError || partialOK
 	finishedMsg := fmt.Sprintf("[%s] connector job finished: exec=%s success=%t error=%s duration=%s",
-		entry.jobID, execID, !hasError, errDetail, time.Since(startTime))
-	if hasError {
-		log.Warning("%s", finishedMsg)
-	} else {
+		entry.jobID, execID, succeeded, errDetail, time.Since(startTime))
+	if succeeded {
 		log.Success("%s", finishedMsg)
+	} else {
+		log.Warning("%s", finishedMsg)
 	}
 
 	Emit(events, TuiEvent{
 		Type:     EventJobCompleted,
 		JobID:    entry.jobID,
-		Success:  !hasError,
+		Success:  succeeded,
 		ErrorMsg: errMsg,
 		Duration: time.Since(startTime),
 	})
 
 	switch {
+	case partialOK:
+		// Platform stopped a scan that had already produced results: submit
+		// them as a success so Core persists them (its error path would drop
+		// the payload) and the job is not marked failed.
+		reason := errMsg
+		if reason == "" {
+			reason = "connector disconnected before Done"
+		}
+		if entry.category == "url_discovery" {
+			if err := grpcClient.SubmitUrlDiscoveryResult(ctx, entry.jobID, false, "", urls); err != nil {
+				log.ErrorE(fmt.Sprintf("[%s] Failed to submit partial url discovery", entry.jobID), err)
+			} else {
+				log.Warning("[%s] Connector stopped early (%s): submitted %d url(s) collected so far", entry.jobID, reason, len(urls))
+			}
+		} else {
+			if err := grpcClient.SubmitVulnerabilitiesResult(ctx, entry.jobID, false, "", vulns); err != nil {
+				log.ErrorE(fmt.Sprintf("[%s] Failed to submit partial vulnerabilities", entry.jobID), err)
+			} else {
+				log.Warning("[%s] Connector stopped early (%s): submitted %d finding(s) collected so far", entry.jobID, reason, len(vulns))
+			}
+		}
 	case hasError && errMsg != "":
-		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, errMsg)
+		// Attach the connector's own container log tail to the failure. Those
+		// lines are the SDK's tracing output (execution/job identity, inputs,
+		// progress, error) and they are the only record of WHY the job failed
+		// once the container is gone — without this the platform stores the
+		// Done string alone and the evidence never leaves the worker.
+		failMsg := errMsg
+		if tail != nil && tail.String() != "" {
+			failMsg += "\n--- container logs (last " + fmt.Sprintf("%d lines) ---", tailMaxLines) + "\n" + tail.String()
+		}
+		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, failMsg)
 		log.Warning("[%s] Connector job failed: execID=%s error=%s", entry.jobID, execID, errMsg)
+		if tail != nil && tail.String() != "" {
+			log.Warning("[%s] container logs for failed job %s (last %d lines):\n%s", entry.jobID, execID, tailMaxLines, tail.String())
+		}
 	case !hadDone:
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, true, "connector disconnected before Done")
 		log.Warning("[%s] Connector disconnected without Done: execID=%s", entry.jobID, execID)
@@ -834,6 +1094,16 @@ drain:
 		} else {
 			log.Info("[%s] connector vulnerabilities result submitted: exec=%s findings=%d", entry.jobID, execID, len(vulns))
 		}
+	case entry.category == "url_discovery":
+		// Clean Done: submit the aggregated URLs exactly once (raw is "" per
+		// contract — URLs travel in the structured payload). Placed before the
+		// !submittedAny branch so a Done with zero URLs still submits an empty
+		// list exactly once, mirroring the vulnerabilities contract.
+		if err := grpcClient.SubmitUrlDiscoveryResult(ctx, entry.jobID, false, "", urls); err != nil {
+			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector url discovery", entry.jobID), err)
+		} else {
+			log.Info("[%s] connector url discovery result submitted: exec=%s urls=%d", entry.jobID, execID, len(urls))
+		}
 	case !submittedAny:
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, "")
 		log.Info("[%s] Connector job completed with no results: execID=%s", entry.jobID, execID)
@@ -841,12 +1111,22 @@ drain:
 		log.Info("[%s] Connector job completed: execID=%s", entry.jobID, execID)
 	}
 
-	// Per-image backoff bookkeeping: any failed outcome (crash, timeout,
-	// disconnect, connector error) backs the image off; a clean Done with
-	// success resets it. Fail-fast jobs never reach this point (no exec).
+	// Per-image backoff bookkeeping: the image is indicted only when the
+	// connector never reached Done AND delivered nothing (crash, stream death
+	// before any result) — that is an image/pool problem. A Done carrying an
+	// error means the connector ran fine and the failure belongs to the job
+	// target (e.g. wpscan "scan aborted: not WordPress"), so the image must
+	// not be penalised; likewise a platform-side stop that still delivered
+	// findings (partialOK) proved the image works — indicting it after a long
+	// legitimate scan would fail every future job for that image.
+	// Fail-fast jobs never reach this point (no exec).
 	if entry.image != "" {
-		if hasError || !hadDone {
-			imageBackoff.RecordFailure(entry.image)
+		if !hadDone && !partialOK {
+			reason := errMsg
+			if reason == "" {
+				reason = "connector disconnected before Done"
+			}
+			imageBackoff.RecordFailure(entry.image, reason)
 		} else {
 			imageBackoff.RecordSuccess(entry.image)
 		}

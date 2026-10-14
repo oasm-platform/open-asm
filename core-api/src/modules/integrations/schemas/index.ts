@@ -1,3 +1,6 @@
+export { awsSchema } from './aws.schema';
+export { githubSchema } from './github.schema';
+export { gitlabSchema } from './gitlab.schema';
 export { jiraSchema } from './jira.schema';
 export { slackSchema } from './slack.schema';
 export { telegramSchema } from './telegram.schema';

@@ -34,12 +34,12 @@ export class AssetGroupAssetService {
   async addManyAssets(
     groupId: string,
     assetIds: string[],
-    workspaceId?: string,
+    workspaceId: string,
   ): Promise<DefaultMessageResponseDto> {
     try {
       // Verify that the asset group exists
       const assetGroup = await this.assetGroupRepo.findOne({
-        where: { id: groupId },
+        where: { id: groupId, workspace: { id: workspaceId } },
         relations: ['workspace'],
       });
       if (!assetGroup) {
@@ -48,14 +48,13 @@ export class AssetGroupAssetService {
           `Asset group with ID "${groupId}" not found`,
         );
       }
-      if (workspaceId && assetGroup.workspace?.id !== workspaceId) {
-        throw new ForbiddenException(
-          'Group does not belong to this workspace',
-        );
-      }
 
-      // Verify that all assets exist
-      const assets = await this.assetRepo.findByIds(assetIds);
+      // Verify that all assets exist AND belong to the same workspace — a bare
+      // findByIds would let a caller attach another tenant's assets to their own
+      // group, and the group-assets listing only constrains the group's tenant.
+      const assets = await this.assetRepo.find({
+        where: { id: In(assetIds), target: { workspaceId } },
+      });
       if (assets.length !== assetIds.length) {
         const foundAssetIds = assets.map((asset) => asset.id);
         const missingAssetIds = assetIds.filter(

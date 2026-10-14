@@ -16,7 +16,10 @@ type TLSConfig struct {
 }
 
 type Config struct {
-	ApiKey         string    `mapstructure:"api_key"`
+	ApiKey string `mapstructure:"api_key"`
+	// MaxConcurrency is the max number of concurrent jobs. 0 (default) = auto:
+	// ResolveMaxConcurrency sizes it from the CPU/RAM available to the worker.
+	// A positive value is an explicit operator override.
 	MaxConcurrency int       `mapstructure:"max_concurrency"`
 	GrpcHost       string    `mapstructure:"grpc_host"`
 	GrpcPort       int       `mapstructure:"grpc_port"`
@@ -64,7 +67,7 @@ func LoadConfig() (*Config, error) {
 
 	viper.SetDefault("api_key", "")
 	viper.SetDefault("network", "")
-	viper.SetDefault("max_concurrency", 10)
+	viper.SetDefault("max_concurrency", 0) // 0 = auto-size from available CPU/RAM
 	viper.SetDefault("grpc_host", "localhost")
 	viper.SetDefault("grpc_port", 16276)
 	viper.SetDefault("tool_path", "oasm-tools")
@@ -83,6 +86,12 @@ func LoadConfig() (*Config, error) {
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, err
 	}
+
+	// 0/unset means auto: resolve to a positive count here because the job
+	// semaphore is sized directly from MaxConcurrency — a non-positive value
+	// would build an unbuffered channel and stall every job. An explicit
+	// positive value is the operator's override and passes through untouched.
+	cfg.MaxConcurrency = ResolveMaxConcurrency(cfg.MaxConcurrency)
 
 	return &cfg, nil
 }

@@ -1,12 +1,12 @@
-import { ToolCategory } from '@/common/enums/enum';
-import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
+import { JobRunType } from '@/common/enums/enum';
+import { WorkflowRunnerService } from '@/modules/jobs-registry/workflow-runner.service';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
-import { ToolsService } from '../tools/tools.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { Workflow } from './entities/workflow.entity';
+import { jobEntries } from './workflow-graph';
 
 export interface TriggerWorkflowResult {
   workflowId: string;
@@ -18,9 +18,8 @@ export interface TriggerWorkflowResult {
 export class TriggerWorkflowService implements OnModuleInit {
   private readonly logger = new Logger(TriggerWorkflowService.name);
   constructor(
-    private jobRegistryService: JobsRegistryService,
     private workspaceService: WorkspacesService,
-    private toolsService: ToolsService,
+    private workflowRunnerService: WorkflowRunnerService,
     private dataSource: DataSource,
     private eventEmitter: EventEmitter2,
   ) {}
@@ -38,6 +37,12 @@ export class TriggerWorkflowService implements OnModuleInit {
 
   /**
    * Triggers the workflow matching an event for a target.
+   *
+   * The run itself (which steps start now, which wait on `needs`, which are
+   * skipped because the workspace has assets discovery disabled) is the
+   * workflow engine's decision — this method only resolves the workflow and
+   * hands the run over to it.
+   *
    * Returns { success, error } instead of swallowing failures — callers
    * (scheduler, webhook) persist the result to the job log.
    */
@@ -47,18 +52,11 @@ export class TriggerWorkflowService implements OnModuleInit {
       return { workflowId: '', success: true };
     }
 
-    try {
-      const workspaceConfig =
-        await this.workspaceService.getWorkspaceConfigValue(
-          workflow.workspace.id,
-        );
-      const isAssetsDiscovery = workspaceConfig.isAssetsDiscovery;
+    const jobs = jobEntries(workflow.content.jobs);
+    const firstProfileId = jobs[0]?.[1]?.configProfileId ?? 'none';
 
-      // Resolve all job tool names to build name→category map
-      const allJobToolNames = workflow.content.jobs
-        .map((j) => j.run)
-        .filter(Boolean);
-      if (allJobToolNames.length === 0) {
+    try {
+      if (jobs.length === 0) {
         const error = 'Workflow does not have any jobs defined.';
         this.logger.warn(
           `Trigger failed for workflow ${workflow.id}: ${error}`,
@@ -66,46 +64,21 @@ export class TriggerWorkflowService implements OnModuleInit {
         return { workflowId: workflow.id, success: false, error };
       }
 
-      const tools = await this.toolsService.getToolByNames({
-        names: allJobToolNames,
-      });
-      const toolMap = new Map(tools.map((t) => [t.name, t]));
-
-      // When assets discovery is off, skip SUBDOMAINS jobs
-      let startIndex = 0;
-      if (!isAssetsDiscovery) {
-        startIndex = workflow.content.jobs.findIndex((j) => {
-          const tool = toolMap.get(j.run);
-          return tool && tool.category !== ToolCategory.SUBDOMAINS;
-        });
-        if (startIndex === -1) {
-          this.logger.warn(
-            'Asset discovery disabled and all jobs are SUBDOMAINS. Skipping workflow.',
-          );
-          return { workflowId: workflow.id, success: true };
-        }
-      }
-
-      const startJob = workflow.content.jobs[startIndex];
-      const tool = toolMap.get(startJob.run);
-      if (!tool) {
-        const error = `Tool "${startJob.run}" not found.`;
-        this.logger.warn(
-          `Trigger failed for workflow ${workflow.id}: ${error}`,
-        );
-        return { workflowId: workflow.id, success: false, error };
-      }
-
-      await this.jobRegistryService.createNewJob({
-        tool,
-        config: startJob?.config,
-        configProfileId: startJob?.configProfileId,
-        targetIds: [payload.id],
+      const { jobHistory } = await this.workflowRunnerService.startRun({
         workflow,
-        priority: tool.priority,
         workspaceId: workflow.workspace.id,
         jobName: `${workflow.name} - ${payload.value}`,
+        jobRunType: JobRunType.MANUAL,
+        targetIds: [payload.id],
       });
+
+      if (!jobHistory) {
+        // Every step was filtered out (assets discovery off and nothing but
+        // subdomain steps left) or the workflow had no runnable steps.
+        this.logger.warn(
+          `Workflow ${workflow.id} produced no runnable steps for event "${event}"; nothing was started.`,
+        );
+      }
 
       return { workflowId: workflow.id, success: true };
     } catch (error) {
@@ -113,7 +86,7 @@ export class TriggerWorkflowService implements OnModuleInit {
       // and server logs identify the orphan reference.
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Trigger failed for workflow ${workflow.id} (profileId=${workflow.content.jobs[0]?.configProfileId ?? 'none'}): ${message}`,
+        `Trigger failed for workflow ${workflow.id} (profileId=${firstProfileId}): ${message}`,
       );
       return { workflowId: workflow.id, success: false, error: message };
     }

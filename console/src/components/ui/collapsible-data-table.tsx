@@ -215,7 +215,10 @@ export function CollapsibleDataTable<TData, TValue>({
               ))
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <Collapsible asChild key={row.id}>
+                // No `asChild` here: Radix would clone a Fragment child and
+                // inject `data-state` onto it, which React rejects. `contents`
+                // keeps the wrapper out of the table layout.
+                <Collapsible key={row.id} className="contents">
                   <>
                     <CollapsibleTrigger asChild>
                       <TableRow

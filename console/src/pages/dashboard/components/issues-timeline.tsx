@@ -6,12 +6,7 @@ import { Bug } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ChartContainer,
   ChartTooltip,
@@ -20,6 +15,7 @@ import {
 } from '@/components/ui/chart';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetIssuesTimeline } from '@/services/apis/gen/queries';
+import { IssuesTimelineSkeleton } from './dashboard-skeleton';
 
 const chartConfig = {
   vuls: {
@@ -46,6 +42,8 @@ export default function IssuesTimeline() {
     })) || [];
 
   const hasData = chartData.length > 0;
+
+  if (isLoading) return <IssuesTimelineSkeleton />;
 
   return (
     <Card className="flex flex-col h-full">

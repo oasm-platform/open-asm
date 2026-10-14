@@ -5,13 +5,14 @@ import { StorageService } from '@/modules/storage/storage.service';
 import { builtInTools } from '@/modules/tools/tools-provider/built-in-tools';
 import { RedisService } from '@/services/redis/redis.service';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { BadGatewayException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job as BullJob } from 'bullmq';
 import { Repository } from 'typeorm';
 import { DataPayloadResult } from '../dto/jobs-registry.dto';
 import { Job } from '../entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry.service';
+import { WorkflowRunnerService } from '../workflow-runner.service';
 
 /** Shape of result JSON stored on S3 by the new category-specific endpoint. */
 interface CategoryResultData {
@@ -19,6 +20,71 @@ interface CategoryResultData {
   error?: boolean;
   raw?: string | null;
   payload?: unknown;
+}
+
+/**
+ * The worker's failure report travels in `raw` when `error` is set. Returns it
+ * trimmed, or undefined when it carries nothing usable (a built-in tool that
+ * failed before producing output), so the caller can fall back to a generic
+ * message instead of persisting an empty error.
+ */
+function normalizeFailureReason(
+  raw: string | null | undefined,
+): string | undefined {
+  const reason = raw?.trim();
+  if (!reason) {
+    return undefined;
+  }
+  return reason;
+}
+
+/**
+ * A job failure carrying the partial result the worker had already collected.
+ *
+ * The console's error dialog renders the error log's payload next to the
+ * message, and the processor used to pass a hardcoded `{}` — the dialog showed
+ * an empty "Payload" box that told an operator nothing. The staged result
+ * document still holds whatever the connector produced before it failed (open
+ * ports, findings), so it rides along on the error instead of being dropped.
+ */
+class WithFailurePayload extends Error {
+  constructor(
+    message: string,
+    readonly payload: unknown,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * Built-in CLIs report "this target has nothing to scan" as an error — naabu
+ * exits non-zero with a fatal line when the host does not resolve. That is the
+ * target's condition, not a tool defect: failing the job burned its retries and
+ * failed the whole step, which then skipped every step that needed it.
+ *
+ * Matched on the captured output, so a genuine tool error still fails.
+ */
+const BENIGN_BUILT_IN_OUTCOMES: {
+  tool: RegExp;
+  pattern: RegExp;
+  reason: string;
+}[] = [
+  {
+    tool: /^naabu$/i,
+    pattern: /no valid ipv[46] or ipv[46] targets were found/i,
+    reason: 'the host does not resolve to any address',
+  },
+];
+
+/** @returns why the output is a benign "nothing to scan", if it is. */
+function benignBuiltInReason(
+  toolName: string,
+  output?: string | null,
+): string | undefined {
+  if (!output) return undefined;
+  return BENIGN_BUILT_IN_OUTCOMES.find(
+    (entry) => entry.tool.test(toolName) && entry.pattern.test(output),
+  )?.reason;
 }
 
 @Processor(BullMQName.JOB_RESULT, {
@@ -29,6 +95,7 @@ export class JobResultProcessor extends WorkerHost {
 
   constructor(
     private readonly jobsRegistryService: JobsRegistryService,
+    private readonly workflowRunnerService: WorkflowRunnerService,
     private readonly dataAdapterService: DataAdapterService,
     private readonly redis: RedisService,
     private readonly storageService: StorageService,
@@ -57,10 +124,13 @@ export class JobResultProcessor extends WorkerHost {
       jobId,
     );
     if (!job) {
-      // The job row is gone (e.g. workflow deleted or job created on another
-      // instance). Nothing can be processed — delete the staged result file so
-      // it does not accumulate in storage as an orphan.
-      this.logger.error(`Job not found: ${jobId} for worker: ${workerId}`);
+      // The job is no longer ours: deleted, or (the common case) cancelled or
+      // re-run while the worker was still executing it — the lookup only
+      // matches IN_PROGRESS. Nothing can be processed — delete the staged
+      // result file so it does not accumulate in storage as an orphan.
+      this.logger.warn(
+        `Job ${jobId} is no longer in progress for worker ${workerId} (cancelled, re-run or deleted); discarding result`,
+      );
       try {
         await this.storageService.deleteFile(fileName, bucket);
       } catch (error) {
@@ -83,9 +153,27 @@ export class JobResultProcessor extends WorkerHost {
           bucket,
         );
 
-      // Check error flag BEFORE syncing data — avoid wasting work on failed jobs
-      if (rawResult?.error) {
-        throw new Error('Job reported error');
+      // Check error flag BEFORE syncing data — avoid wasting work on failed jobs.
+      // The worker writes its failure report into `raw` (executor error, adapter
+      // error and the tail of the container log). Surfacing that instead of a
+      // fixed string is the whole difference between an actionable failure and
+      // "Job reported error" — the message lands on the job row AND in the
+      // error-log entry the console renders.
+      //
+      // A built-in tool's "nothing to scan here" outcome takes the opposite
+      // path: it is the target's condition, so the job completes with an empty
+      // result instead of failing (and retrying, and failing its step).
+      const benignReason = benignBuiltInReason(job.tool.name, rawResult?.raw);
+      if (rawResult?.error && !benignReason) {
+        throw new WithFailurePayload(
+          normalizeFailureReason(rawResult.raw) ?? 'Job reported error',
+          rawResult.payload,
+        );
+      }
+      if (benignReason) {
+        this.logger.log(
+          `Built-in tool ${job.tool.name} found nothing to scan for job ${job.id} (${benignReason}); completing with an empty result`,
+        );
       }
 
       const raw = rawResult.raw ?? undefined;
@@ -103,19 +191,27 @@ export class JobResultProcessor extends WorkerHost {
           throw new Error(`Built-in step not found for tool: ${job.tool.name}`);
         }
 
-        if (!raw) {
-          throw new BadGatewayException(
-            `Raw CLI output is required for built-in tool: ${job.tool.name}`,
-          );
-        }
-
         if (!builtInStep.parser) {
           throw new Error(
             `Parser function not found for built-in tool: ${job.tool.name}`,
           );
         }
 
-        dataForSync = builtInStep.parser(raw);
+        if (benignReason || !raw) {
+          // No output is a result, not a failure: the built-in CLIs exit 0 and
+          // print nothing when they find nothing (a host with no open port, a
+          // name that does not resolve, or a target dropping the probes). Failing
+          // here turned a normal "nothing found" into a failed step, which then
+          // skipped every job that needed it.
+          if (!benignReason) {
+            this.logger.log(
+              `Built-in tool ${job.tool.name} produced no output; treating job ${job.id} as an empty result`,
+            );
+          }
+          dataForSync = undefined;
+        } else {
+          dataForSync = builtInStep.parser(raw);
+        }
       } else {
         // External/custom tool — use the structured payload directly.
         // For the new category-specific endpoint the category is available
@@ -137,18 +233,38 @@ export class JobResultProcessor extends WorkerHost {
         });
       }
 
-      const completedJob = await this.jobRepo.save({
-        ...job,
-        status: JobStatus.COMPLETED,
-        completedAt: new Date(),
-      });
+      const completedAt = new Date();
+      // Conditional write: the run may have been cancelled (or the job
+      // re-run) while this result was being processed. Only the transition
+      // IN_PROGRESS → COMPLETED is ours to make — an unconditional save would
+      // overwrite the CANCELLED status and let the workflow keep spawning.
+      const completion = await this.jobRepo.update(
+        { id: job.id, status: JobStatus.IN_PROGRESS },
+        { status: JobStatus.COMPLETED, completedAt },
+      );
 
-      const nextStepJobCount =
-        await this.jobsRegistryService.getNextStepForJob(completedJob);
-
-      if (nextStepJobCount === 0) {
-        await this.jobsRegistryService.markWorkflowDone(job.jobHistory.id);
+      if (!completion.affected) {
+        this.logger.warn(
+          `Job ${job.id} left IN_PROGRESS before its result was applied; discarding result`,
+        );
+        try {
+          await this.storageService.deleteFile(fileName, bucket);
+        } catch (error) {
+          this.logger.error(
+            `Failed to delete discarded result file ${resultRef}:`,
+            error,
+          );
+        }
+        return;
       }
+
+      const completedJob = { ...job, status: JobStatus.COMPLETED, completedAt };
+
+      // Hand the terminal job to the workflow engine: it dispatches every step
+      // whose `needs` are now satisfied and marks the run done when nothing is
+      // left to run. A step that spawns no jobs is a no-input skip, not the end
+      // of the run — the engine decides.
+      await this.workflowRunnerService.onJobTerminal(completedJob);
 
       if (job.isPublishEvent) {
         await this.redis.publish(
@@ -171,11 +287,21 @@ export class JobResultProcessor extends WorkerHost {
         bullJob.attemptsMade + 1 >= (bullJob.opts.attempts || 1);
 
       if (isLastAttempt) {
+        // `data` is a DataPayloadResult whose `payload` is the only field read
+        // back (handleJobError stores it verbatim in the error log); here it is
+        // just the array the connector had collected, hence the cast.
+        const partial = e instanceof WithFailurePayload ? e.payload : undefined;
+
         await this.jobsRegistryService.handleJobError(
-          { jobId, data: {} as DataPayloadResult },
+          { jobId, data: { payload: partial } as DataPayloadResult },
           job,
           e,
         );
+
+        // A permanently failed job is a terminal outcome for its step: let the
+        // engine skip the dependents and finish the run (previously a failed
+        // step left the run "incomplete" forever).
+        await this.workflowRunnerService.onJobTerminal(job);
 
         // Final failure: delete the result file
         try {

@@ -197,11 +197,14 @@ export class ToolsService {
    * @throws BadRequestException if the tool already exists in this workspace.
    * @returns The newly created workspace-tool entry.
    */
-  async addToolToWorkspace(dto: AddToolToWorkspaceDto): Promise<WorkspaceTool> {
+  async addToolToWorkspace(
+    dto: AddToolToWorkspaceDto,
+    workspaceId: string,
+  ): Promise<WorkspaceTool> {
     const existingEntry = await this.workspaceToolRepository.findOne({
       where: {
         tool: { id: dto.toolId },
-        workspace: { id: dto.workspaceId },
+        workspace: { id: workspaceId },
       },
     });
 
@@ -211,7 +214,7 @@ export class ToolsService {
 
     const newWorkspaceTool = this.workspaceToolRepository.create({
       tool: { id: dto.toolId },
-      workspace: { id: dto.workspaceId },
+      workspace: { id: workspaceId },
     });
     return this.workspaceToolRepository.save(newWorkspaceTool);
   }
@@ -221,12 +224,15 @@ export class ToolsService {
    * @throws BadRequestException if the tool already exists in this workspace.
    * @returns The newly created workspace-tool entry.
    */
-  async installTool(dto: InstallToolDto): Promise<WorkspaceTool> {
+  async installTool(
+    dto: InstallToolDto,
+    workspaceId: string,
+  ): Promise<WorkspaceTool> {
     // Check if the tool already exists in this workspace
     const existingEntry = await this.workspaceToolRepository.findOne({
       where: {
         tool: { id: dto.toolId },
-        workspace: { id: dto.workspaceId },
+        workspace: { id: workspaceId },
       },
     });
 
@@ -239,7 +245,7 @@ export class ToolsService {
     // Create and save the new workspace-tool entry
     const newWorkspaceTool = this.workspaceToolRepository.create({
       tool: { id: dto.toolId },
-      workspace: { id: dto.workspaceId },
+      workspace: { id: workspaceId },
     });
     return this.workspaceToolRepository.save(newWorkspaceTool);
   }
@@ -249,11 +255,14 @@ export class ToolsService {
    * @param dto The uninstall tool data containing toolId and workspaceId.
    * @returns A boolean indicating success.
    */
-  async uninstallTool(dto: InstallToolDto): Promise<DefaultMessageResponseDto> {
+  async uninstallTool(
+    dto: InstallToolDto,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
     const existingEntry = await this.workspaceToolRepository.findOne({
       where: {
         tool: { id: dto.toolId },
-        workspace: { id: dto.workspaceId },
+        workspace: { id: workspaceId },
       },
     });
 
@@ -268,7 +277,7 @@ export class ToolsService {
     await this.workspaceToolRepository.manager.transaction(async (manager) => {
       await manager.remove(existingEntry);
       await manager.delete(ToolConfigProfile, {
-        workspace: { id: dto.workspaceId },
+        workspace: { id: workspaceId },
         tool: { id: dto.toolId },
       });
     });
@@ -555,8 +564,8 @@ export class ToolsService {
         },
       });
 
-      // Add isInstalled flag to the tool
-      tool.isInstalled = !!workspaceTool;
+      // A disabled workspace tool is not installed, as in the tool listing.
+      tool.isInstalled = !!workspaceTool?.isEnabled;
 
       // Add hasConfigProfile and isReady flags
       const hasConfigProfile = await this.hasProfile(workspaceId, tool.id!);
@@ -564,7 +573,7 @@ export class ToolsService {
       // Connector without a config schema needs no config → installed means ready.
       const needsConfig =
         this.connectorRegistry.getConnectorSchema(tool.name) !== null;
-      tool.isReady = needsConfig ? hasConfigProfile : tool.isInstalled;
+      tool.isReady = tool.isInstalled && (needsConfig ? hasConfigProfile : true);
     } else {
       // Without workspaceId, profile status is unknown
       tool.hasConfigProfile = null;

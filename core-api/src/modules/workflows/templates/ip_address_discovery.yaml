@@ -3,12 +3,20 @@ name: ip_address_discovery
 on:
   target: [cidr.create, cidr.re-scan, ip.create, ip.re-scan]
 
+# Jobs are keyed by a unique id and `needs` lists the ids that must finish
+# first (like GitHub Actions). A job without `needs` is a root and starts in
+# parallel with the other roots, so the recon chain below is explicit.
 jobs:
-  - name: Port Scan
+  port_scan:
+    name: Port Scan
     run: naabu
 
-  - name: HTTP Probe
+  http_probe:
+    name: HTTP Probe
     run: httpx
+    needs: [port_scan]
 
-  - name: Take Screenshot
+  take_screenshot:
+    name: Take Screenshot
     run: screenshot
+    needs: [http_probe]

@@ -1,9 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { createHash } from 'crypto';
-import {
-  STORAGE_BASE_PATH,
-  WEBAPP_ANALYZER_SRC_URL,
-} from '../../common/constants/app.constants';
+import { WEBAPP_ANALYZER_SRC_URL } from '../../common/constants/app.constants';
 import { RedisService } from '../../services/redis/redis.service';
 import { StorageService } from '../storage/storage.service';
 import {
@@ -49,6 +46,12 @@ export class TechnologyForwarderService implements OnModuleInit {
    */
 
   async onModuleInit(): Promise<void> {
+    // The e2e harness boots the app once per spec file against a throwaway
+    // redis. Without this the first suite would kick off 26 sequential HTTP
+    // fetches of the technology catalogue, none of which any spec asserts on,
+    // and the surviving promises would race `app.close()`.
+    if (process.env.E2E === '1') return;
+
     // Check if initialization has already been logged globally
     const isAlreadyLogged = await this.redisService.cacheClient.get(
       this.INITIALIZATION_FLAG_KEY,
@@ -63,34 +66,49 @@ export class TechnologyForwarderService implements OnModuleInit {
     // Run data fetching asynchronously without awaiting to avoid blocking app startup
     this.fetchAndCacheAllTechnologies()
       .then(async () => {
-        // Double-check flag to prevent race conditions
-        const currentFlag = await this.redisService.cacheClient.get(
-          this.INITIALIZATION_FLAG_KEY,
-        );
-        if (currentFlag !== this.STATUS_TRUE) {
-          await this.redisService.cacheClient.set(
+        // Double-check flag to prevent race conditions. Guarded for the same
+        // reason as the failure path below: the redis client can be gone by the
+        // time a long background fetch finally settles.
+        try {
+          const currentFlag = await this.redisService.cacheClient.get(
             this.INITIALIZATION_FLAG_KEY,
-            this.STATUS_TRUE,
           );
-          this.logger.log(
-            'Technology data initialization completed successfully',
-          );
+          if (currentFlag !== this.STATUS_TRUE) {
+            await this.redisService.cacheClient.set(
+              this.INITIALIZATION_FLAG_KEY,
+              this.STATUS_TRUE,
+            );
+            this.logger.log(
+              'Technology data initialization completed successfully',
+            );
+          }
+        } catch {
+          // Losing the flag costs one redundant refresh on the next boot.
         }
       })
       .catch(async (error) => {
-        // Double-check flag to prevent race conditions
-        const currentFlag = await this.redisService.cacheClient.get(
-          this.INITIALIZATION_FLAG_KEY,
+        this.logger.error(
+          'Error during technology data initialization:',
+          error,
         );
-        if (currentFlag !== this.STATUS_TRUE) {
-          await this.redisService.cacheClient.set(
+        // Recording the failure flag is best-effort. If the redis client is
+        // already gone (process shutdown, or a test tearing the app down
+        // while this background fetch is still in flight) the re-check itself
+        // rejects, and because nothing awaits this chain that becomes an
+        // unhandled rejection that takes the process down with it.
+        try {
+          const currentFlag = await this.redisService.cacheClient.get(
             this.INITIALIZATION_FLAG_KEY,
-            this.STATUS_TRUE,
           );
-          this.logger.error(
-            'Error during technology data initialization:',
-            error,
-          );
+          if (currentFlag !== this.STATUS_TRUE) {
+            await this.redisService.cacheClient.set(
+              this.INITIALIZATION_FLAG_KEY,
+              this.STATUS_TRUE,
+            );
+          }
+        } catch {
+          // The flag only guards a redundant retry on the next boot; losing it
+          // is preferable to crashing the process from a shutdown race.
         }
       });
   }
@@ -339,10 +357,12 @@ export class TechnologyForwarderService implements OnModuleInit {
   ): Promise<void> {
     try {
       const key = `${this.CACHE_KEY_PREFIX}${techName}`;
+      const rawTechInfo = { ...techInfo };
+      delete rawTechInfo.iconUrl;
       await this.redisService.cacheClient.setex(
         key,
         this.CACHE_TTL,
-        JSON.stringify(techInfo),
+        JSON.stringify(rawTechInfo),
       );
     } catch (error) {
       this.logger.error(
@@ -554,7 +574,7 @@ export class TechnologyForwarderService implements OnModuleInit {
     // (CACHE_TTL) serves all workspaces and all viewers. The key never
     // includes the workspace id, so it cannot collide with the
     // workspace-scoped `technology:` cache.
-    const iconCacheKey = `icon:${iconName}`;
+    const iconCacheKey = `icon:v2:${iconName}`;
 
     // Redis is a cache, never a dependency: a read failure degrades to a
     // direct forward + upload (uncached), so icons keep working while Redis
@@ -568,8 +588,9 @@ export class TechnologyForwarderService implements OnModuleInit {
         error,
       );
     }
-    if (cachedPath) {
-      return cachedPath;
+    const rawPath = this.asRawIconPath(cachedPath);
+    if (rawPath) {
+      return (await this.storageService.signStoragePath(rawPath)) ?? '';
     }
 
     try {
@@ -580,9 +601,9 @@ export class TechnologyForwarderService implements OnModuleInit {
         buffer,
         this.ICONS_BUCKET,
       );
-      const iconPath = `${STORAGE_BASE_PATH}/${uploadResult.path}`;
+      const iconPath = uploadResult.path;
 
-      // Miss: persist the resulting path so the remote fetch + upload happen
+      // Miss: persist the raw bucket/key so the remote fetch + upload happen
       // once per icon instead of on every graph poll. A failed write is
       // non-fatal — the icon is served and simply re-uploaded next poll.
       try {
@@ -598,11 +619,22 @@ export class TechnologyForwarderService implements OnModuleInit {
         );
       }
 
-      return iconPath;
+      return (await this.storageService.signStoragePath(iconPath)) ?? '';
     } catch (error) {
       this.logger.error(`Error processing icon ${iconName}:`, error);
       return '';
     }
+  }
+
+  private asRawIconPath(cached: string | null): string | null {
+    if (!cached || cached.includes('/api/')) {
+      return null;
+    }
+    const slashIndex = cached.indexOf('/');
+    if (slashIndex <= 0 || slashIndex === cached.length - 1) {
+      return null;
+    }
+    return cached.startsWith(`${this.ICONS_BUCKET}/`) ? cached : null;
   }
 
   /**

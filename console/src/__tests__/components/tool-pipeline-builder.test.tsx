@@ -70,8 +70,16 @@ describe('ToolPipelineBuilder — tool click opens its panel', () => {
       await screen.findByRole('button', { name: 'Configure Nuclei' }),
     );
 
-    expect(await screen.findByText('#1 of 1')).toBeInTheDocument();
-    expect(screen.getByText('Inline config')).toBeInTheDocument();
+    // The selected panel opens with its config actions. It carries no position
+    // counter any more: the pipeline is an unordered set (no `needs` on the
+    // saved jobs, and jsonb does not preserve the map's key order).
+    expect(await screen.findByText('Inline config')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Close Nuclei panel' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^Move Nuclei/ }),
+    ).not.toBeInTheDocument();
     await expectPopoverAnchored();
   });
 });

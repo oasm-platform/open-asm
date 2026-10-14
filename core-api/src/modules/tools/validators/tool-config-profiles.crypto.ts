@@ -109,6 +109,18 @@ export function decryptProfile(
 }
 
 /**
+ * Detects a masked secret placeholder as produced by maskProfile:
+ * `****` (value had ≤4 chars) or `****` + last 4 characters.
+ *
+ * Used by update() to distinguish "client echoed back the masked value" from
+ * "client supplied a new secret", so the stored ciphertext can be carried over
+ * unchanged instead of being overwritten with the mask.
+ */
+export function isMaskedValue(value: unknown): boolean {
+  return typeof value === 'string' && /^\*{4}/.test(value);
+}
+
+/**
  * Masks sensitive fields for safe return in API responses.
  * Replaces values with `****` + last 4 characters.
  */

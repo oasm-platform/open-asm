@@ -76,12 +76,12 @@ export class WorkerInstance extends BaseEntity {
   internalNetwork?: Relation<InternalNetwork>;
 
   /**
-   * Active tools on this worker.oin
-   * For BUILT_IN workers: returns all built-in tools (array).
-   * For PROVIDER workers: returns the current tool (array with single element).
+   * Number of tools available on this worker.
+   * For node-mode workers: built-in tools + Docker connectors.
+   * For cli/legacy workers: built-in tools only.
    */
-  @ApiProperty({ isArray: true, type: () => Tool })
-  tools?: Tool[];
+  @ApiProperty({ required: false })
+  toolsCount?: number;
 
   @OneToMany(() => NetworkInterface, (ni) => ni.worker)
   networkInterfaces: Relation<NetworkInterface[]>;

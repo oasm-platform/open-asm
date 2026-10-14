@@ -6,6 +6,7 @@ import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflo
 import { IssueComment } from '../issues/entities/issue-comment.entity';
 import { Issue } from '../issues/entities/issue.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { ToolConfigProfile } from '../tools/entities/tool-config-profiles.entity';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { JobErrorLog } from './entities/job-error-log.entity';
@@ -14,11 +15,14 @@ import { Job } from './entities/job.entity';
 import { JobsRegistryController } from './jobs-registry.controller';
 import { JobsRegistryService } from './jobs-registry.service';
 import { JobResultCleanupService } from './job-result-cleanup.service';
+import { JobRetentionService } from './job-retention.service';
 import { JobResultProcessor } from './processors/job-result.processor';
 import {
   AssetGroupsScheduleConsumer,
   AssetsDiscoveryScheduleConsumer,
 } from './processors/scan-schedule.processor';
+import { WorkflowRunReconcilerService } from './workflow-run-reconciler.service';
+import { WorkflowRunnerService } from './workflow-runner.service';
 
 @Global()
 @Module({
@@ -33,6 +37,7 @@ import {
       ToolConfigProfile,
     ]),
     ConnectorsModule,
+    IntegrationsModule,
     WorkspacesModule,
     BullModule.registerQueue({
       name: BullMQName.JOB_RESULT,
@@ -44,12 +49,15 @@ import {
   controllers: [JobsRegistryController],
   providers: [
     JobsRegistryService,
+    WorkflowRunnerService,
+    WorkflowRunReconcilerService,
     AssetsDiscoveryScheduleConsumer,
     AssetGroupsScheduleConsumer,
     JobResultProcessor,
     JobResultCleanupService,
+    JobRetentionService,
     // IssueCreationProcessor,
   ],
-  exports: [JobsRegistryService],
+  exports: [JobsRegistryService, WorkflowRunnerService],
 })
 export class JobsRegistryModule {}

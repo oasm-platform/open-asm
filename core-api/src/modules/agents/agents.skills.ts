@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import type { Tool } from 'ai';
 import { tool } from 'ai';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -171,11 +172,11 @@ export class AgentsSkillsService {
     return null;
   }
 
-  createLoadSkillTool(workspaceId: string) {
+  createLoadSkillTool(workspaceId: string): Tool {
     const toolConfig = {
       description:
         "Load a skill to get specialized instructions. Call this when the user's request matches a skill description and you need detailed guidance.",
-      parameters: z.object({
+      inputSchema: z.object({
         name: z.string().describe('The skill name to load'),
       }),
       execute: async ({ name }: { name: string }) => {

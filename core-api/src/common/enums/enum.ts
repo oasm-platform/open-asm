@@ -48,6 +48,7 @@ export enum ToolCategory {
   PORTS_SCANNER = 'ports_scanner',
   VULNERABILITIES = 'vulnerabilities',
   SCREENSHOT = 'screenshot',
+  URL_DISCOVERY = 'url_discovery',
 }
 
 /**
@@ -152,11 +153,11 @@ export enum ApiKeyType {
 export enum BullMQName {
   ASSETS_DISCOVERY_SCHEDULE = 'assets-discovery-schedule',
   ASSET_GROUPS_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
-  NOTIFICATION = 'notification',
   JOB_RESULT = 'job-result',
   ISSUE_CREATION = 'issue-creation',
   VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
   INTEGRATION_SYNC_SCHEDULE = 'integration-sync-schedule',
+  REPOSITORY_SYNC = 'repository-sync',
   AUDIT_RETENTION = 'audit-retention',
 }
 
@@ -176,6 +177,9 @@ export enum NotificationType {
   WORKSPACE_CREATED = 'WORKSPACE_CREATED',
   VULNERABILITY_ANALYSIS_COMPLETED = 'VULNERABILITY_ANALYSIS_COMPLETED',
   ASSET_NEW_DETECT = 'ASSET_NEW_DETECT',
+  /** A scan ended without running its whole workflow (a step failed, or a step
+   * that needed it was skipped). */
+  SCAN_INCOMPLETE = 'SCAN_INCOMPLETE',
   NEW_VULNERABILITY_FOUND = 'NEW_VULNERABILITY_FOUND',
   WORKSPACE_INVITATION = 'WORKSPACE_INVITATION',
 }
@@ -232,6 +236,7 @@ export const CATEGORY_DATA_SOURCE_MAP: Record<ToolCategory, DataSource> = {
   [ToolCategory.PORTS_SCANNER]: DataSource.ASSET,
   [ToolCategory.VULNERABILITIES]: DataSource.ASSET,
   [ToolCategory.SCREENSHOT]: DataSource.ASSET_SERVICE,
+  [ToolCategory.URL_DISCOVERY]: DataSource.ASSET_SERVICE,
 };
 
 export enum VulnerabilityAnalyzeStatus {
@@ -260,6 +265,8 @@ export enum DefaultWorkflow {
   DOMAIN_DISCOVERY = 'domain_discovery.yaml',
   IP_ADDRESS_DISCOVERY = 'ip_address_discovery.yaml',
   VULNERABILITY_SCAN_BASIC = 'vulnerability_scan_basic.yaml',
+  // Git organization targets: scans every repository after each sync.
+  REPOSITORY_SCAN = 'repository_scan.yaml',
 }
 
 export enum EventTriggerType {
@@ -267,13 +274,79 @@ export enum EventTriggerType {
   WORKFLOW_END = 'WORKFLOW_END',
 }
 
+/**
+ * Enum representing the type of target.
+ * Lives here rather than in target.entity.ts so entities that sit on the
+ * Target import cycle (Tool) can reference it at class-decoration time.
+ */
+export enum TargetType {
+  DOMAIN = 'DOMAIN',
+  CIDR = 'CIDR',
+  IP = 'IP',
+  /**
+   * A GitHub organization/user or GitLab group bound to a SOURCE_CODE
+   * integration. Its assets are the repositories, synced from the provider.
+   */
+  GIT_ORG = 'GIT_ORG',
+}
+
+/**
+ * What an integration can do. Each value is a CAPABILITY backed by one
+ * connector method (see `CAPABILITY_METHOD_MAP` in connector.factory.ts).
+ *
+ * Single-capability apps (Slack, Telegram, AWS, …) store their one value in
+ * `integrations.category`. Multi-capability apps (GitHub, GitLab) declare
+ * `x-capabilities` in their schema and store the enabled subset in
+ * `integrations.capabilities`; `category` then holds the primary one.
+ */
 export enum IntegrationType {
   TICKETING = 'TICKETING',
   NOTIFICATION = 'NOTIFICATION',
   CLOUD_PROVIDER = 'CLOUD_PROVIDER',
+  SOURCE_CODE = 'SOURCE_CODE',
+}
+
+/**
+ * Event-bus consumer groups — one Redis consumer group per lane.
+ *
+ * An enum rather than four exported string constants: a group name is a Redis
+ * key suffix that both the producer-side config and the consumer loop must
+ * agree on, and a typo in a bare string only shows up as a lane that silently
+ * never fires. Enum members make the compiler refuse it, and `Object.values`
+ * gives an exhaustive list for the wiring tests without a second declaration
+ * to keep in sync.
+ *
+ * An `email` member is deliberately absent: there is no mail transport behind
+ * it, so the group would claim events it cannot deliver. Add it here and the
+ * matching sink together, never one without the other.
+ */
+export enum EventBusGroup {
+  /** Materializes the stream into `audit_events`; strictly ordered. */
+  Audit = 'audit',
+  /** Read models. */
+  Projection = 'projection',
+  /** In-app notification rows + SSE. */
+  Notifications = 'notifications',
+  /** Outbound webhooks, Slack, ticketing systems. */
+  Integrations = 'integrations',
 }
 
 export enum TelegramConnectStatus {
   PENDING = 'PENDING',
   CONNECTED = 'CONNECTED',
+}
+
+export enum AgentApprovalMode {
+  /** Run every command without asking */
+  AUTO = 'auto',
+  /** Ask once for the whole plan, then run commands automatically */
+  PLAN = 'plan',
+  /** Ask for every command that has not been approved before */
+  MANUAL = 'manual',
+}
+
+export enum AgentCommandApprovalStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
 }

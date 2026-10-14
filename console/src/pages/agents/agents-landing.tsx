@@ -5,6 +5,7 @@ import TypewriterText from '@/components/typewriter-text';
 
 import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
 import { Button } from '@/components/ui/button';
+import { restoreApprovalMode } from '@/hooks/use-approval-mode';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -88,6 +89,11 @@ export default function AgentsLandingPage() {
     },
     [isSending, navigate, selectedModel, agentMode, selectedWorkerId],
   );
+
+  // A new chat starts from the user's last explicit choice, not a past conversation's
+  useEffect(() => {
+    restoreApprovalMode();
+  }, []);
 
   useEffect(() => {
     if (queryText && !isSending) {

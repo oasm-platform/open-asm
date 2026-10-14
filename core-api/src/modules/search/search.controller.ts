@@ -1,4 +1,5 @@
 import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
+import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Controller, Delete, Get, Param, Query } from '@nestjs/common';
@@ -28,6 +29,7 @@ export class SearchController {
       getWorkspaceId: true,
     },
   })
+  @WorkspaceAccess('asset.read', 'target.read')
   @Get()
   searchAssetsTargets(
     @UserContext() user: User,

@@ -1,26 +1,30 @@
 import { Reflector } from '@nestjs/core';
-import type { AuditLogConfig } from '../audit/audit-log.decorator';
-import { AUDIT_LOG_KEY } from '../audit/audit-log.decorator';
+import type { PublishEventConfig } from '../event-bridge/publishing/publish-event.decorator';
+import { PUBLISH_EVENT_KEY } from '../event-bridge/publishing/publish-event.decorator';
 import { IntegrationsController } from './integrations.controller';
 import type { CreateIntegrationDto } from './dto/create-integration.dto';
 import type { UpdateIntegrationDto } from './dto/update-integration.dto';
 
-type WiredConfig = { action: string } & AuditLogConfig;
+type WiredConfig = { event: { name: string } } & PublishEventConfig;
 
 const reflector = new Reflector();
 
-const wired = (method: unknown): WiredConfig => {
-  const config = reflector.get<WiredConfig>(AUDIT_LOG_KEY, method);
+const wired = (method: (...args: unknown[]) => unknown): WiredConfig => {
+  const config = reflector.get<WiredConfig>(PUBLISH_EVENT_KEY, method);
   if (!config) {
-    throw new Error('no AUDIT_LOG_KEY metadata');
+    throw new Error('no PUBLISH_EVENT_KEY metadata');
   }
   return config;
 };
 
+/** The wire name the decorator was handed, e.g. `integration.connected`. */
+const eventName = (method: (...args: unknown[]) => unknown): string =>
+  wired(method).event.name;
+
 describe('IntegrationsController audit wiring', () => {
   describe('createIntegration (#30 integration.connected)', () => {
     it('is wired with action integration.connected', () => {
-      expect(wired(IntegrationsController.prototype.createIntegration).action).toBe(
+      expect(eventName(IntegrationsController.prototype.createIntegration)).toBe(
         'integration.connected',
       );
     });
@@ -50,7 +54,7 @@ describe('IntegrationsController audit wiring', () => {
 
   describe('deleteIntegration (#31 integration.disconnected)', () => {
     it('is wired with action integration.disconnected', () => {
-      expect(wired(IntegrationsController.prototype.deleteIntegration).action).toBe(
+      expect(eventName(IntegrationsController.prototype.deleteIntegration)).toBe(
         'integration.disconnected',
       );
     });
@@ -62,7 +66,7 @@ describe('IntegrationsController audit wiring', () => {
 
   describe('updateIntegration (#32 integration.settings.updated)', () => {
     it('is wired with action integration.settings.updated', () => {
-      expect(wired(IntegrationsController.prototype.updateIntegration).action).toBe(
+      expect(eventName(IntegrationsController.prototype.updateIntegration)).toBe(
         'integration.settings.updated',
       );
     });
@@ -93,6 +97,35 @@ describe('IntegrationsController audit wiring', () => {
     it('resolves the resource id from the updated integration', () => {
       const resourceId = wired(IntegrationsController.prototype.updateIntegration).resourceId?.({ id: 'i-2' });
       expect(resourceId).toBe('i-2');
+    });
+  });
+
+  describe('AWS SSO endpoints', () => {
+    it('startAwsSsoDevice carries no audit metadata (it connects nothing)', () => {
+      const config = reflector.get(
+        PUBLISH_EVENT_KEY,
+        IntegrationsController.prototype.startAwsSsoDevice,
+      );
+      expect(config).toBeUndefined();
+    });
+
+    it('pollAwsSsoDevice carries no audit metadata (poll repeats, connects nothing)', () => {
+      const config = reflector.get(
+        PUBLISH_EVENT_KEY,
+        IntegrationsController.prototype.pollAwsSsoDevice,
+      );
+      expect(config).toBeUndefined();
+    });
+
+    it('completeAwsSso is the only SSO step wired with integration.connected', () => {
+      expect(
+        eventName(IntegrationsController.prototype.completeAwsSso),
+      ).toBe('integration.connected');
+      expect(
+        wired(IntegrationsController.prototype.completeAwsSso).resourceId?.({
+          id: 'i-3',
+        }),
+      ).toBe('i-3');
     });
   });
 });

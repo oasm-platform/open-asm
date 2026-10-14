@@ -55,6 +55,14 @@ type metricsMsg struct {
 	maxConcurrency int
 }
 
+// imagePullMsg carries one image pull progress tick.
+type imagePullMsg struct {
+	id     string // job id
+	image  string
+	pulled float64
+	done   bool
+}
+
 type sessionCreatedMsg struct {
 	id        string
 	createdAt time.Time

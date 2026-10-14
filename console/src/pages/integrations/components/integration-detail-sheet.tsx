@@ -1,9 +1,3 @@
-import {
-  SchemaForm,
-  type SchemaProperty,
-  defaultsFromSchema,
-  groupProperties,
-} from '@/components/schema-form';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
@@ -23,7 +17,10 @@ import {
   useIntegrationsControllerTestIntegration,
   useIntegrationsControllerUpdateIntegration,
 } from '@/services/apis/gen/queries';
-import type { GetIntegrationDto } from '@/services/apis/gen/queries';
+import type {
+  GetIntegrationDto,
+  IntegrationType,
+} from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   buildCronExpression,
@@ -35,11 +32,45 @@ import {
 import { Loader2, Pencil, Play, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  capabilityLabel,
+  CLOUD_PROVIDER_CAPABILITY,
+  getCapabilityMeta,
+  getIntegrationCapabilities,
+  isDiscriminatorKey,
+} from '../capabilities';
 import type { SchemaOneOfItem } from '../index';
+import { CapabilityPicker } from './capability-picker';
+import { getEffectiveRequired } from './connect-integration-sheet';
 import { IntegrationLogo } from './integration-logo';
+import { RepositoryList } from './repository-list';
+import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
 import { TelegramConnect } from './telegram-connect';
 
-const CLOUD_PROVIDER_CATEGORY = 'CLOUD_PROVIDER';
+const SOURCE_CODE_CAPABILITY = 'SOURCE_CODE';
+
+const SSO_SECRET_FIELDS = ['clientId', 'clientSecret', 'refreshToken'];
+
+/**
+ * Payload config: keeps only currently-visible entries (drops stale values
+ * from a previously selected connection method) plus the always-hidden SSO
+ * credentials, which the schema hides forever but the connector requires.
+ */
+function buildDetailConfig(
+  schema: { properties?: Record<string, unknown>; [key: string]: unknown },
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  for (const [key, prop] of Object.entries(schema.properties ?? {})) {
+    if (isDiscriminatorKey(key)) continue;
+    if (!(key in values)) continue;
+    const keep =
+      isPropertyVisible(prop as SchemaProperty, values) ||
+      SSO_SECRET_FIELDS.includes(key);
+    if (keep) config[key] = values[key];
+  }
+  return config;
+}
 
 /**
  * Fallback cron used when the schedule toggle is on but no cron was captured
@@ -64,6 +95,9 @@ export function IntegrationDetailSheet({
 }: IntegrationDetailSheetProps) {
   const queryClient = useQueryClient();
 
+  const capabilityMeta = getCapabilityMeta(schema);
+  const integrationCapabilities = getIntegrationCapabilities(integration);
+
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
@@ -85,18 +119,26 @@ export function IntegrationDetailSheet({
       setEditSchedule(
         scheduleOn && integration.syncSchedule ? integration.syncSchedule : '',
       );
-      const filteredProps = Object.fromEntries(
-        Object.entries(schema.properties ?? {}).filter(
-          ([key]) => key !== 'app_type' && key !== 'category',
-        ),
-      );
-      // Stored config wins; defaults apply only where config is absent.
-      const existingConfig = Object.fromEntries(
-        Object.entries(
-          (integration.config as Record<string, unknown>) ?? {},
-        ).filter(([, value]) => value !== undefined && value !== null),
-      );
-      setFormValues(defaultsFromSchema(filteredProps, existingConfig));
+      // Enabled capabilities live in form values so `ui:capability` fields
+      // show/hide as they are toggled.
+      const values: Record<string, unknown> = {
+        capabilities: integrationCapabilities,
+      };
+      for (const [key, prop] of Object.entries(schema.properties ?? {})) {
+        if (isDiscriminatorKey(key)) continue;
+        const configVal = (integration.config as Record<string, unknown>)[key];
+        if (configVal !== undefined && configVal !== null) {
+          values[key] = configVal;
+        } else {
+          const typedProp = prop as SchemaProperty;
+          if (typedProp.default !== undefined) {
+            values[key] = typedProp.default;
+          } else if (typedProp.type === 'array') {
+            values[key] = [''];
+          }
+        }
+      }
+      setFormValues(values);
     }
   }, [isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -155,8 +197,30 @@ export function IntegrationDetailSheet({
     });
 
   const formProperties = Object.entries(schema.properties ?? {}).filter(
-    ([key]) => key !== 'app_type' && key !== 'category',
+    ([key]) => !isDiscriminatorKey(key),
   ) as [string, SchemaProperty][];
+
+  const editCapabilities = capabilityMeta
+    ? ((formValues.capabilities as string[] | undefined) ?? integrationCapabilities)
+    : integrationCapabilities;
+  const supportsSync = integrationCapabilities.includes(CLOUD_PROVIDER_CAPABILITY);
+
+  // The detail sheet never runs the SSO device flow, so switching an existing
+  // integration to `sso` would store no clientId/clientSecret/refreshToken and
+  // the connector would reject it at execute time. Omit the `sso` option unless
+  // the integration is already SSO.
+  const storedConnectionMethod = (integration.config as Record<string, unknown>)
+    ?.connectionMethod;
+  const editPropFor = (key: string, prop: SchemaProperty): SchemaProperty => {
+    if (
+      key !== 'connectionMethod' ||
+      storedConnectionMethod === 'sso' ||
+      !Array.isArray(prop.enum)
+    ) {
+      return prop;
+    }
+    return { ...prop, enum: prop.enum.filter((option) => option !== 'sso') };
+  };
 
   const configValue = (key: string) => {
     const val = (integration.config as Record<string, unknown>)[key];
@@ -175,9 +239,41 @@ export function IntegrationDetailSheet({
     ? formatNextRun(new Date(integration.lastRunAt), getLocalTimezone())
     : '—';
 
-  // Group properties by ui:form:group
-  const [ungroupedProperties, propertyGroups] =
-    groupProperties(formProperties);
+  // VIEW mode has no form state; resolve conditions against the stored config
+  // (plus the enabled capabilities, for `ui:capability`-scoped fields).
+  const conditionValues = isEditing
+    ? formValues
+    : {
+        ...(integration.config as Record<string, unknown>),
+        capabilities: integrationCapabilities,
+      };
+
+  // Group properties by ui:form:group. Hidden fields are dropped first so a
+  // group whose fields are all hidden leaves no empty heading.
+  const grouped = formProperties
+    .filter(([key, prop]) =>
+      isPropertyVisible(isEditing ? editPropFor(key, prop) : prop, conditionValues),
+    )
+    .reduce<
+    [
+      ungrouped: [string, SchemaProperty][],
+      groups: Record<string, [string, SchemaProperty][]>,
+    ]
+  >(
+    ([ungrouped, groups], entry) => {
+      const group = entry[1]['ui:form:group'];
+      if (group) {
+        groups[group] ??= [];
+        groups[group].push(entry);
+      } else {
+        ungrouped.push(entry);
+      }
+      return [ungrouped, groups];
+    },
+    [[], {}],
+  );
+
+  const [ungroupedProperties, propertyGroups] = grouped;
 
   const handleValueChange = (key: string, value: unknown) => {
     setFormValues((prev) => ({ ...prev, [key]: value }));
@@ -190,12 +286,32 @@ export function IntegrationDetailSheet({
       return;
     }
 
+    // Multi-capability apps: enabling a capability can make new fields
+    // required (e.g. TICKETING → issue repository); catch that here instead
+    // of a generic server toast. Legacy apps keep their existing behaviour.
+    const missing = !capabilityMeta
+      ? []
+      : getEffectiveRequired(schema, formValues).filter((key) => {
+          const prop = schema.properties?.[key] as SchemaProperty | undefined;
+          if (prop && !isPropertyVisible(prop, formValues)) return false;
+          const value = formValues[key];
+          if (typeof value === 'string') return value.trim() === '';
+          return value === undefined || value === null;
+        });
+    if (missing.length > 0) {
+      toast.error('Please fill in required fields: ' + missing.join(', '));
+      return;
+    }
+
     updateIntegration({
       id: integration.id,
       data: {
         name: editName.trim(),
-        config: formValues as Record<string, unknown>,
-        ...(integration.category === CLOUD_PROVIDER_CATEGORY
+        config: buildDetailConfig(schema, formValues),
+        ...(capabilityMeta
+          ? { capabilities: editCapabilities as IntegrationType[] }
+          : {}),
+        ...(supportsSync
           ? {
               syncSchedule: scheduleEnabled
                 ? editSchedule || getDefaultSchedule()
@@ -226,13 +342,71 @@ export function IntegrationDetailSheet({
           onSubmit={isEditing ? handleSave : undefined}
         >
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="shrink-0">
-              <span className="capitalize">
-                {integration.category.replace(/_/g, ' ')}
-              </span>
-            </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            {integrationCapabilities.map((capability) => (
+              <Badge key={capability} variant="secondary" className="shrink-0">
+                <span className="capitalize">
+                  {capabilityMeta
+                    ? capabilityLabel(capability, schema)
+                    : capability.replace(/_/g, ' ')}
+                </span>
+              </Badge>
+            ))}
           </div>
+
+          {/* Multi-capability apps: toggle capabilities (edit) or test each
+              one individually (view). */}
+          {capabilityMeta && isEditing && (
+            <CapabilityPicker
+              capabilities={capabilityMeta}
+              value={editCapabilities}
+              onChange={(value) => handleValueChange('capabilities', value)}
+              disabled={isSaving}
+            />
+          )}
+          {capabilityMeta && !isEditing && (
+            <div className="space-y-2 rounded-lg border p-3">
+              <Label className="text-sm font-medium">Capabilities</Label>
+              {integrationCapabilities.map((capability) => (
+                <div
+                  key={capability}
+                  className="flex items-center justify-between gap-2 border-t pt-2"
+                >
+                  <div className="space-y-0.5">
+                    <p className="text-sm">
+                      {capabilityLabel(capability, schema)}
+                    </p>
+                    {capabilityMeta[capability]?.description && (
+                      <p className="text-xs text-muted-foreground">
+                        {capabilityMeta[capability].description}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    disabled={isTesting || isSyncing}
+                    onClick={() =>
+                      testIntegration({
+                        id: integration.id,
+                        data: { capability: capability as IntegrationType },
+                      })
+                    }
+                  >
+                    <Play className="size-3.5" />
+                    Test
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!isEditing &&
+            integrationCapabilities.includes(SOURCE_CODE_CAPABILITY) && (
+              <RepositoryList integrationId={integration.id} />
+            )}
 
           {formProperties.length === 0 && (
             <p className="text-sm text-muted-foreground">
@@ -254,51 +428,60 @@ export function IntegrationDetailSheet({
             </div>
           )}
 
-          {/* Ungrouped properties: edit mode renders via shared SchemaForm */}
-          {isEditing ? (
-            <SchemaForm
-              schema={{
-                properties: Object.fromEntries(formProperties),
-                required: schema.required ?? [],
-              }}
-              values={formValues}
-              onChange={handleValueChange}
-              enableGroups
-              emptyMessage=""
-            />
-          ) :
-            ungroupedProperties.map(([key, prop]) => {
+          {/* Ungrouped properties */}
+          {isEditing
+            ? ungroupedProperties.map(([key, prop]) => {
+                const editProp = editPropFor(key, prop);
+                if (!isPropertyVisible(editProp, conditionValues)) return null;
                 const label = prop.title ?? key;
-                const value = configValue(key);
+                const required = schema.required?.includes(key);
+                const textColor = prop['ui:text-color'];
+
+                return (
+                  <div key={key} className="space-y-2">
+                    <Label
+                      htmlFor={key}
+                      {...(textColor ? { style: { color: textColor } } : {})}
+                    >
+                      {label}
+                      {required && (
+                        <span className="ml-1 text-destructive">*</span>
+                      )}
+                    </Label>
+                    <SchemaField
+                      fieldKey={key}
+                      prop={editProp}
+                      value={formValues[key] ?? ''}
+                      onChange={(val) => handleValueChange(key, val)}
+                      mode="edit"
+                      autoComplete="off"
+                      visible={isPropertyVisible(editProp, conditionValues)}
+                    />
+                    {prop.description && (
+                      <p className="text-xs text-muted-foreground">
+                        {prop.description}
+                      </p>
+                    )}
+                  </div>
+                );
+              })
+            : ungroupedProperties.map(([key, prop]) => {
+                if (!isPropertyVisible(prop, conditionValues)) return null;
+                const label = prop.title ?? key;
 
                 return (
                   <div key={key} className="space-y-1.5">
                     <Label className="text-sm font-medium text-foreground">
                       {label}
                     </Label>
-                    {prop.type === 'boolean' ? (
-                      <div className="flex h-9 items-center rounded-md border bg-muted/30 px-3 py-2">
-                        <Switch
-                          checked={value === true || value === 'true'}
-                          disabled
-                        />
-                      </div>
-                    ) : prop.format === 'password' ||
-                      prop['ui:widget'] === 'password' ? (
-                      // Never reveal the raw secret in view mode (U6): mask
-                      // it client-side even if the backend already masks.
-                      <div className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                        <span className="text-foreground break-words">
-                          {'****' + String(value).slice(-4)}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                        <span className="text-foreground break-words">
-                          {String(value)}
-                        </span>
-                      </div>
-                    )}
+                    <SchemaField
+                      fieldKey={key}
+                      prop={prop}
+                      value={configValue(key)}
+                      onChange={() => undefined}
+                      mode="view"
+                      visible={isPropertyVisible(prop, conditionValues)}
+                    />
                     {prop.description && (
                       <p className="text-xs text-muted-foreground">
                         {prop.description}
@@ -308,46 +491,52 @@ export function IntegrationDetailSheet({
                 );
               })}
 
-          {/* Grouped properties: view mode only (edit mode renders them via SchemaForm) */}
-          {!isEditing &&
-            Object.entries(propertyGroups).map(([groupKey, fields]) => {
-              const groupLabel =
-                groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
+          {/* Grouped properties */}
+          {Object.entries(propertyGroups).map(([groupKey, fields]) => {
+            const groupLabel =
+              groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
 
-              return (
-                <div key={groupKey} className="space-y-3">
-                  <Label className="text-sm font-semibold">
-                    {groupLabel}
-                  </Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {fields.map(([key, prop]) => {
-                      const textColor = prop['ui:text-color'];
-                      const value = configValue(key);
+            return (
+              <div key={groupKey} className="space-y-3">
+                <Label className="text-sm font-semibold">
+                  {groupLabel}
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {fields.map(([key, prop]) => {
+                    if (!isPropertyVisible(prop, conditionValues)) return null;
+                    const textColor = prop['ui:text-color'];
 
-                      return (
-                        <div key={key} className="flex items-center gap-2">
-                          <Switch
-                            name={key}
-                            id={key}
-                            checked={value === true || value === 'true'}
-                            disabled
-                          />
-                          <Label
-                            htmlFor={key}
-                            {...(textColor
-                              ? { style: { color: textColor } }
-                              : {})}
-                            className="text-sm font-normal"
-                          >
-                            {prop.title ?? key}
-                          </Label>
-                        </div>
-                      );
-                    })}
-                  </div>
+                    return (
+                      <div key={key} className="space-y-2">
+                        <Label
+                          htmlFor={key}
+                          {...(textColor
+                            ? { style: { color: textColor } }
+                            : {})}
+                          className="text-sm font-normal"
+                        >
+                          {prop.title ?? key}
+                        </Label>
+                        <SchemaField
+                          fieldKey={key}
+                          prop={prop}
+                          value={
+                            isEditing
+                              ? (formValues[key] ?? '')
+                              : configValue(key)
+                          }
+                          onChange={(val) => handleValueChange(key, val)}
+                          mode={isEditing ? 'edit' : 'view'}
+                          autoComplete="off"
+                          visible={isPropertyVisible(prop, conditionValues)}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
 
           {/* Telegram pairing section — only for telegram integrations */}
           {integration.appType === 'telegram' && !isEditing && (
@@ -363,7 +552,7 @@ export function IntegrationDetailSheet({
           )}
 
           {/* Sync section — only for cloud provider integrations */}
-          {integration.category === CLOUD_PROVIDER_CATEGORY && (
+          {supportsSync && (
             <div className="space-y-3 rounded-lg border p-3">
               {isEditing ? (
                 <>

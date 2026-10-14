@@ -9,6 +9,7 @@ import {
   SendMessageDtoAgentMode,
   useAgentsControllerGetAgentModes,
 } from '@/services/apis/gen/queries';
+import { ApprovalModeSelect } from '@/components/ui/approval-mode-select';
 import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { CheckIcon, InfinityIcon, MonitorIcon } from 'lucide-react';
 import { memo } from 'react';
@@ -59,6 +60,8 @@ export const AgentModeSelect = memo(function AgentModeSelect({
 
   return (
     <>
+      <ApprovalModeSelect />
+
       {isAgent && (
         <PromptInputActionMenu>
           <PromptInputActionMenuTrigger tooltip="Connected workers">

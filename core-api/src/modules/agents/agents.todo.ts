@@ -65,6 +65,7 @@ export function formatTodosToPrompt(todos: AgentTodoItem[]): string {
     '# FORBIDDEN ACTIONS:',
     '',
     '- DO NOT call formulate_plan while this plan has pending/in_progress steps — it will be REJECTED.',
+    '- If the user cancels or replaces the task, call scrap_plan first — that is the ONLY way to drop this plan.',
     '- DO NOT call append_step to add steps you "forgot" — execute what is listed above first.',
     '- DO NOT reorder steps based on what seems "easier" or "more important".',
     '- DO NOT skip a step because you think it can be done later.',

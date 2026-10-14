@@ -7,6 +7,7 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { AgentCommandApprovalStatus } from '@/common/enums/enum';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -29,7 +30,15 @@ import { ApiTags } from '@nestjs/swagger';
 
 import type { Response } from 'express';
 import { AgentsCompletionsService } from './agents.completions';
+import { AgentsApprovalsService } from './agents.approvals';
 import { AgentsService } from './agents.service';
+import { AgentCommandApproval } from './entities/agent-command-approval.entity';
+import {
+  CommandApprovalResponseDto,
+  DecideCommandApprovalDto,
+  DecidePlanApprovalDto,
+  GetCommandApprovalsQueryDto,
+} from './dto/command-approval.dto';
 import { AgentsSkillsService } from './agents.skills';
 import { GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
@@ -68,6 +77,7 @@ export class AgentsController {
     private readonly agentsService: AgentsService,
     private readonly agentsCompletionsService: AgentsCompletionsService,
     private readonly agentsSkillsService: AgentsSkillsService,
+    private readonly agentsApprovalsService: AgentsApprovalsService,
   ) {}
 
   @WorkspaceAccess('agent.read')
@@ -82,6 +92,102 @@ export class AgentsController {
     @WorkspaceId() workspaceId: string,
   ): Promise<GetAgentModesResponseDto> {
     return this.agentsService.getAgentModesWithWorkers(workspaceId);
+  }
+
+  @WorkspaceAccess('agent.read')
+  @Get('command-approvals')
+  @Doc({
+    summary: 'List command approvals',
+    description:
+      'Paginated history of commands the current user approved or rejected, newest first',
+    request: { getWorkspaceId: true },
+    response: {
+      serialization: GetManyResponseDto(CommandApprovalResponseDto),
+    },
+  })
+  listCommandApprovals(
+    @Query() query: GetCommandApprovalsQueryDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<GetManyBaseResponseDto<CommandApprovalResponseDto>> {
+    return this.agentsApprovalsService.list(workspaceId, userId, query);
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Patch('command-approvals/:id')
+  @Doc({
+    summary: 'Approve or reject a command',
+    description: 'Decide a pending agent command; unblocks the running agent',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Approval ID' }],
+    },
+    response: { serialization: AgentCommandApproval },
+  })
+  decideCommandApproval(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: DecideCommandApprovalDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<AgentCommandApproval> {
+    return this.agentsApprovalsService.decide(
+      id,
+      dto.status,
+      workspaceId,
+      userId,
+      {
+        allowConversation: dto.allowConversation,
+        allowTool: dto.allowTool,
+        feedback: dto.feedback,
+      },
+    );
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Patch('plan-approvals/:id')
+  @Doc({
+    summary: 'Approve or reject a plan',
+    description:
+      'Decide a plan the agent is waiting on (PLAN approval mode); approving picks whether it runs in auto or manual mode',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Approval ID' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  decidePlanApproval(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: DecidePlanApprovalDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): DefaultMessageResponseDto {
+    const allowed = dto.status === AgentCommandApprovalStatus.APPROVED;
+    this.agentsApprovalsService.decidePlan(id, workspaceId, userId, {
+      allowed,
+      mode: dto.mode,
+      feedback: dto.feedback,
+    });
+    return { message: allowed ? 'Plan approved' : 'Plan rejected' };
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Delete('command-approvals/:id')
+  @Doc({
+    summary: 'Revoke a command approval',
+    description: 'Forget a remembered decision so the command asks again',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Approval ID' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async revokeCommandApproval(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsApprovalsService.revoke(id, workspaceId, userId);
+    return { message: 'Approval revoked' };
   }
 
   @WorkspaceAccess('agent.write')
@@ -345,16 +451,15 @@ export class AgentsController {
     // Create an AbortController that will be triggered when client disconnects
     const abortController = new AbortController();
 
-    // Detect client disconnect via req.on('close')
-    const req = res.req;
+    // Detect client disconnect. Listen on the response: the request has
+    // already emitted 'close' once the body parser consumed it, so a listener
+    // on req would never fire and a stopped/closed chat would never abort.
     const onClientDisconnect = () => {
       if (!res.writableEnded) {
         abortController.abort();
       }
     };
-    if (req?.on) {
-      req.on('close', onClientDisconnect);
-    }
+    res.on('close', onClientDisconnect);
 
     try {
       const { stream, conversationId } =
@@ -447,9 +552,7 @@ export class AgentsController {
         });
       }
     } finally {
-      if (req?.off) {
-        req.off('close', onClientDisconnect);
-      }
+      res.off('close', onClientDisconnect);
     }
   }
 

@@ -16,6 +16,23 @@ updates:
         patterns: ['react', 'react-dom', '@types/react*']
       eslint:
         patterns: ['eslint', '@eslint/*', 'typescript-eslint']
+      # Everything not caught above: one weekly PR for minor/patch, majors stay separate.
+      npm-minor-patch:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    commit-message:
+      prefix: 'chore'
+
+  - package-ecosystem: 'gomod'
+    directory: '/worker'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 5
+    groups:
+      go-minor-patch:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
     commit-message:
       prefix: 'chore'
 
@@ -30,10 +47,23 @@ updates:
     commit-message:
       prefix: 'chore'
 
+  - package-ecosystem: 'docker-compose'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore'
+
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
       interval: 'daily'
     open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
     commit-message:
       prefix: 'chore'

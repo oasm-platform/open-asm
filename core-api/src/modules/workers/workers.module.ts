@@ -15,6 +15,11 @@ import { WorkersController } from './workers.controller';
 import { WorkersService } from './workers.service';
 import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
+import { RedisWorkerTelemetryStore } from './redis-worker-telemetry.store';
+import { WorkerTelemetryService } from './worker-telemetry.service';
+import { WorkerTelemetryStore } from './worker-telemetry.store';
+import { WorkerStreamController } from './worker-stream.controller';
+import { WorkerStreamRegistry } from './worker-stream-registry.service';
 
 @Global()
 @Module({
@@ -32,18 +37,27 @@ import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
     forwardRef(() => ToolsModule),
     ConnectorsModule,
   ],
-  controllers: [WorkersController],
+  controllers: [WorkersController, WorkerStreamController],
   providers: [
     WorkersService,
     RemoteExecuteSubscribeService,
     GrpcWorkerContext,
     AliveStreamManager,
+    RedisWorkerTelemetryStore,
+    {
+      provide: WorkerTelemetryStore,
+      useExisting: RedisWorkerTelemetryStore,
+    },
+    WorkerTelemetryService,
+    WorkerStreamRegistry,
   ],
   exports: [
     WorkersService,
     RemoteExecuteSubscribeService,
     GrpcWorkerContext,
     AliveStreamManager,
+    WorkerTelemetryService,
+    WorkerStreamRegistry,
   ],
 })
 export class WorkersModule {}

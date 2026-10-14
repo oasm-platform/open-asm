@@ -648,12 +648,20 @@ type fakeDockerEngine struct {
 	createNames    []string          // every create attempt name, in order
 	createConflict bool              // fail the next create with HTTP 409, then clear
 	health         string            // State.Health.Status, "" = no healthcheck
+	status         string            // State.Status
 	exitCode       int               // State.ExitCode
+	oomKilled      bool              // State.OOMKilled
+	startedAt      string            // State.StartedAt (RFC3339)
+	finishedAt     string            // State.FinishedAt (RFC3339)
 	logOutput      string            // payload for the container logs stream
 	logRaw         []byte            // verbatim bytes for the logs stream (raw/TTY); when set, served without a multiplex header
 	labels         map[string]string // Config.Labels of the created container
 	exists         bool              // a container currently exists in the engine (inspect/list 404 when false)
 	imageLabels    map[string]string // Config.Labels returned by ImageInspectWithRaw; nil = 404 (image absent)
+	list           []types.Container // seeded GET /containers/json response (orphan reconcile)
+	listCalls      int               // ContainerList requests served
+	listFilters    string            // filters query param of the last list request
+	removeIDs      []string          // container IDs from DELETE requests, in order
 }
 
 func newFakeDockerEngine() *fakeDockerEngine {
@@ -715,12 +723,36 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 			f.running = false
 			f.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && path == "/containers/json":
+			// ContainerList (startup orphan reconcile). MUST precede the
+			// inspect case below: "/containers/json" also matches its
+			// "/containers/" prefix + "/json" suffix.
+			f.mu.Lock()
+			f.listCalls++
+			f.listFilters = r.URL.Query().Get("filters")
+			seeded := f.list
+			f.mu.Unlock()
+			items := applyLabelFilter(seeded, f.listFilters)
+			if items == nil {
+				items = []types.Container{}
+			}
+			b, mErr := json.Marshal(items)
+			if mErr != nil {
+				http.Error(w, mErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(b)
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/json"):
 			f.mu.Lock()
 			running := f.running
 			id := f.containerID
 			health := f.health
+			status := f.status
 			exitCode := f.exitCode
+			oomKilled := f.oomKilled
+			startedAt := f.startedAt
+			finishedAt := f.finishedAt
 			labels := f.labels
 			f.mu.Unlock()
 			healthJSON := ""
@@ -733,7 +765,7 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 				labelsJSON = string(b)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"Id":%q,"State":{"Running":%t,"ExitCode":%d%s},"Config":{"Labels":%s}}`, id, running, exitCode, healthJSON, labelsJSON)
+			fmt.Fprintf(w, `{"Id":%q,"State":{"Running":%t,"Status":%q,"ExitCode":%d,"OOMKilled":%t,"StartedAt":%q,"FinishedAt":%q%s},"Config":{"Labels":%s}}`, id, running, status, exitCode, oomKilled, startedAt, finishedAt, healthJSON, labelsJSON)
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/containers/") && strings.HasSuffix(path, "/logs"):
 			// ContainerLogs with ShowStdout+ShowStderr returns a multiplexed
 			// stream (8-byte header: stream byte + uint32 BE length, then
@@ -764,6 +796,7 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 		case r.Method == http.MethodDelete && strings.HasPrefix(path, "/containers/"):
 			f.mu.Lock()
 			f.removed++
+			f.removeIDs = append(f.removeIDs, strings.TrimPrefix(path, "/containers/"))
 			removeErr := f.removeErr
 			f.mu.Unlock()
 			if removeErr != nil {
@@ -831,25 +864,30 @@ func TestCreateLogsLifecycleSteps(t *testing.T) {
 	}
 
 	lines := log.all()
-	if len(lines) != 3 {
-		t.Fatalf("expected exactly 3 lifecycle log lines, got %d: %v", len(lines), lines)
+	if len(lines) != 4 {
+		t.Fatalf("expected exactly 4 lifecycle log lines, got %d: %v", len(lines), lines)
 	}
 
-	// 1: image pull done.
-	if !strings.Contains(lines[0], "docker: image pull done:") || !strings.Contains(lines[0], "ghcr.io/open-asm/nuclei:1.0") {
-		t.Fatalf("pull line = %q", lines[0])
+	// 1: pull start — the operator sees the pull begin instead of a silent gap
+	// between job start and container created.
+	if !strings.Contains(lines[0], "docker: pulling image:") || !strings.Contains(lines[0], "ghcr.io/open-asm/nuclei:1.0") {
+		t.Fatalf("pull-start line = %q", lines[0])
 	}
-	// 2: container created — carries exec/job/tool/grpc identity.
+	// 2: image pull done.
+	if !strings.Contains(lines[1], "docker: image pull done:") || !strings.Contains(lines[1], "ghcr.io/open-asm/nuclei:1.0") {
+		t.Fatalf("pull line = %q", lines[1])
+	}
+	// 3: container created — carries exec/job/tool/grpc identity.
 	for _, want := range []string{
 		"docker: container created:", "exec=", "job=job-1", "tool=nuclei", "grpc=172.18.0.3:50051",
 	} {
-		if !strings.Contains(lines[1], want) {
-			t.Fatalf("created line %q missing %q", lines[1], want)
+		if !strings.Contains(lines[2], want) {
+			t.Fatalf("created line %q missing %q", lines[2], want)
 		}
 	}
-	// 3: container started — same exec identity as created.
-	if !strings.Contains(lines[2], "docker: container started:") || !strings.Contains(lines[2], "job=job-1") {
-		t.Fatalf("started line = %q", lines[2])
+	// 4: container started — same exec identity as created.
+	if !strings.Contains(lines[3], "docker: container started:") || !strings.Contains(lines[3], "job=job-1") {
+		t.Fatalf("started line = %q", lines[3])
 	}
 	execOf := func(line string) string {
 		start := strings.Index(line, "exec=")
@@ -862,10 +900,10 @@ func TestCreateLogsLifecycleSteps(t *testing.T) {
 		}
 		return rest
 	}
-	if execOf(lines[1]) == "" || execOf(lines[1]) != execOf(lines[2]) {
-		t.Fatalf("started line must reuse the created exec identity: %q vs %q", lines[1], lines[2])
+	if execOf(lines[2]) == "" || execOf(lines[2]) != execOf(lines[3]) {
+		t.Fatalf("started line must reuse the created exec identity: %q vs %q", lines[2], lines[3])
 	}
-	execID := execOf(lines[2])
+	execID := execOf(lines[3])
 	if len(execID) != 32 {
 		t.Fatalf("exec identity %q must be a 32-hex execution id", execID)
 	}
@@ -1026,7 +1064,11 @@ func TestStartStartsStoppedContainer(t *testing.T) {
 func TestInspectReadsHealthAndExitCode(t *testing.T) {
 	engine := newFakeDockerEngine()
 	engine.health = "unhealthy"
+	engine.status = "exited"
 	engine.exitCode = 42
+	engine.oomKilled = true
+	engine.startedAt = "2026-09-24T08:00:00Z"
+	engine.finishedAt = "2026-09-24T08:05:00Z"
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
 
@@ -1039,6 +1081,12 @@ func TestInspectReadsHealthAndExitCode(t *testing.T) {
 	}
 	if res.ExitCode != 42 {
 		t.Fatalf("expected ExitCode=42, got %d", res.ExitCode)
+	}
+	if res.Status != "exited" || !res.OOMKilled {
+		t.Fatalf("expected exited/OOM state, got status=%q oom=%t", res.Status, res.OOMKilled)
+	}
+	if res.StartedAt.IsZero() || res.FinishedAt.IsZero() {
+		t.Fatalf("expected inspect timestamps, got started=%v finished=%v", res.StartedAt, res.FinishedAt)
 	}
 
 	// A container without a healthcheck must report empty Health (unknown).
@@ -1233,9 +1281,9 @@ func TestCreateUsesOasmPrefixName(t *testing.T) {
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
 
-	// Phase 2 pooled naming: oasm-<tool>-<poolShort8>-<rand4>. The tool short
-	// comes from the POOL KEY (normalized image, sanitized, 8 chars), NOT the
-	// exec id — same-image containers share the prefix for docker ps grouping.
+	// Naming: oasm-<tool-slug>-<registry-slug>-<rand4> — the tool slug reads
+	// well in `docker ps`, the registry slug groups by source, and the exec id
+	// is deliberately absent (pooled containers are reused across executions).
 	if _, err := r.Create(context.Background(), JobSpec{
 		Tool:    "Nuclei Scanner",
 		Image:   "ghcr.io/open-asm/nuclei:1.0",
@@ -1257,14 +1305,14 @@ func TestCreateUsesOasmPrefixName(t *testing.T) {
 		t.Fatalf("container name %q must contain the sanitized tool name", name)
 	}
 	if !strings.Contains(name, "ghcr-io") {
-		t.Fatalf("container name %q must contain the sanitized pool-short (first 8 chars of the pool key)", name)
+		t.Fatalf("container name %q must contain the registry slug (ghcr.io → ghcr-io)", name)
 	}
 	if strings.Contains(name, "exec-7") {
 		t.Fatalf("container name %q must NOT carry the exec id (pooled naming by pool key)", name)
 	}
 }
 
-func TestCreateUsesPoolKeyShortInName(t *testing.T) {
+func TestCreateUsesRegistrySlugInName(t *testing.T) {
 	engine := newFakeDockerEngine()
 	log := &captureLogger{}
 	r := newFakeDockerRuntime(t, engine, log)
@@ -1279,8 +1327,12 @@ func TestCreateUsesPoolKeyShortInName(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	if !strings.Contains(engine.createName, "library-") {
-		t.Fatalf("name %q must carry the 8-char pool-short of the pool key (library/nuclei → library-)", engine.createName)
+	// A bare "library/nuclei" carries no registry host → Docker Hub.
+	if !strings.Contains(engine.createName, "docker-io") {
+		t.Fatalf("name %q must carry the registry slug (library/nuclei → docker-io)", engine.createName)
+	}
+	if strings.Contains(engine.createName, "library-") {
+		t.Fatalf("name %q must not embed the image repository path", engine.createName)
 	}
 }
 

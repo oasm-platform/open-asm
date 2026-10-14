@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -18,6 +19,14 @@ import (
 const (
 	JobCPUKey    = "cpu"
 	JobMemoryKey = "memory"
+)
+
+// Fallback per-container admission requests when a job carries no explicit
+// limits. Connector jobs always carry the manifest resourceDefaults, so this is
+// only a safety net; the values mirror the manifest's DEFAULT_RESOURCE_DEFAULTS.
+const (
+	defaultCPURequestMillis = 500
+	defaultMemRequestBytes  = 512 << 20
 )
 
 // Logger receives error notifications from Manager when background
@@ -152,6 +161,31 @@ func (m *Manager) logInfo(msg string, args ...any) {
 	l.Info(msg, args...)
 }
 
+// poolExhaustedLogInterval rate-limits the per-image "no free slot" report.
+const poolExhaustedLogInterval = 30 * time.Second
+
+var (
+	poolExhaustedLogMu sync.Mutex
+	poolExhaustedLogAt = map[string]time.Time{}
+)
+
+// logPoolExhausted reports a full container pool at most once per interval per
+// image. Waiting behind a busy replica is expected queueing, and the submit path
+// retries every couple of seconds — one line per attempt (measured: 7,000+ lines
+// in twenty minutes) drowned the activity feed for no added information.
+func (m *Manager) logPoolExhausted(poolKey, line string) {
+	poolExhaustedLogMu.Lock()
+	now := time.Now()
+	last, seen := poolExhaustedLogAt[poolKey]
+	if seen && now.Sub(last) < poolExhaustedLogInterval {
+		poolExhaustedLogMu.Unlock()
+		return
+	}
+	poolExhaustedLogAt[poolKey] = now
+	poolExhaustedLogMu.Unlock()
+	m.logInfo("%s", line)
+}
+
 // generateExecToken mints the per-execution single-use connector auth token:
 // 32 random bytes encoded as 64 hex chars. crypto/rand is used so container
 // dial-backs cannot guess or replay another execution's token.
@@ -164,6 +198,10 @@ func generateExecToken() string {
 	}
 	return hex.EncodeToString(b)
 }
+
+// ErrMaxConcurrency is Submit's refusal when maxConcurrency executions are
+// already tracked: a worker capacity limit, not an image defect.
+var ErrMaxConcurrency = errors.New("max concurrency reached")
 
 // Submit enforces maxConcurrency, calls rt.Create+Start, and tracks the execution.
 // Image is required and passed through to the runtime (resolved by Core ConnectorRegistry 1.5).
@@ -178,7 +216,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	// concurrent Submit overshoot the cap during a slow image pull.
 	if m.maxConcurrency > 0 && len(m.execs)+m.pending >= m.maxConcurrency {
 		m.mu.Unlock()
-		return "", fmt.Errorf("max concurrency reached")
+		return "", ErrMaxConcurrency
 	}
 	// Timeout contract: the connect deadline must stay below the manifest job
 	// timeout, otherwise the connect timer cancels the execution before the
@@ -224,7 +262,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 
 	// Pool key: normalized (lowercase) image — the acquire key for warm
 	// container reuse.
-	poolKey := normalizePoolKey(spec.Image)
+	poolKey := poolKeyFor(spec)
 
 	// Connector wiring is configured once at startup (SetPool/SetStreamBinder/
 	// SetEvictor before the first Submit) — snapshot it under the lock and use
@@ -251,10 +289,24 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	var poolLogs []string
 	var adoptEvicted string
 	var adoptErr error
+	// Declared resources for admission: the manifest limits core-api attached to
+	// the job, as numbers. Fall back to conservative defaults if a job carries
+	// none (should not happen for connector jobs).
+	cpuStr, memStr := limitsCPUandMemory(spec.Limits)
+	cpuRequestMillis, memRequestBytes := defaultCPURequestMillis, defaultMemRequestBytes
+	if v, err := resource.ParseCPU(cpuStr); err == nil && v > 0 {
+		cpuRequestMillis = v
+	}
+	if v, err := resource.ParseMemoryToBytes(memStr); err == nil && v > 0 {
+		memRequestBytes = v
+	}
+
 	var h runtime.Handle
+	reserved := false
 	if p != nil {
-		if cid, ok := p.Acquire(id, poolKey); ok {
-			h = runtime.Handle{ID: cid}
+		if acquired, ok := p.AcquireHandle(id, poolKey); ok {
+			h = acquired
+			cid := h.ID
 			poolLogs = append(poolLogs, fmt.Sprintf("pool reuse: container %s pool_key=%s", cid, poolKey))
 			// Warm-pool reuse: the container's connector stream is already
 			// live under the PREVIOUS execution's ID (the SDK loops on Recv
@@ -281,25 +333,39 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 					poolLogs = append(poolLogs, fmt.Sprintf("pool adopt: container=%s exec=%s", cid, id))
 				}
 			}
-		} else if p.AtCapacity(poolKey) {
-			// Phase 3 replica quota: no idle container AND the image's busy
-			// count is at the cap — refuse instead of creating a replica. The
-			// caller (job.go) backs off and retries; no container is created,
-			// no Core failure is recorded.
-			busy, max := p.busyCount(poolKey), p.maxReplicasPerImage
-			poolLogs = append(poolLogs, fmt.Sprintf("pool exhausted: pool_key=%s busy=%d max=%d", poolKey, busy, max))
-			// No execution was created — drop the token so a stray connector
-			// can never authenticate against a ghost execution, and release
-			// the reserved slot.
-			m.pending--
-			m.tokenMu.Lock()
-			delete(m.tokens, id)
-			m.tokenMu.Unlock()
-			m.mu.Unlock()
-			for _, line := range poolLogs {
-				m.logInfo("%s", line)
+		}
+		if h.ID == "" {
+			// A fresh container is needed. Reserve a replica slot BEFORE the
+			// slow, lock-free runtime Create so concurrent Submits cannot each
+			// pass the capacity check and spawn a container — the race that
+			// started 12 nuclei containers for a cap of 1. The reservation is
+			// released on Create/Start failure and after Add on success.
+			if reserveErr := p.reserveReplica(id, poolKey, cpuRequestMillis, memRequestBytes); reserveErr != nil {
+				// Per-image quota or the node resource budget is reached: refuse
+				// instead of creating a replica. The caller (job.go) backs off
+				// and retries; no container is created, no Core failure is
+				// recorded.
+				busy, max := p.busyCount(poolKey), p.maxReplicasPerImage
+				line := fmt.Sprintf("pool exhausted: pool_key=%s busy=%d max=%d (node budget cpu=%dm mem=%dB, request cpu=%dm mem=%dB)",
+					poolKey, busy, max, p.cpuBudgetMillis, p.memBudgetBytes, cpuRequestMillis, memRequestBytes)
+				// No execution was created — drop the token so a stray
+				// connector can never authenticate against a ghost execution,
+				// and release the reserved concurrency slot.
+				m.pending--
+				m.tokenMu.Lock()
+				delete(m.tokens, id)
+				m.tokenMu.Unlock()
+				m.mu.Unlock()
+				for _, logLine := range poolLogs {
+					m.logInfo("%s", logLine)
+				}
+				// Waiting for a free slot is normal queueing, not an incident:
+				// the retry loop asks again every couple of seconds, so this is
+				// rate-limited per image instead of flooding the activity feed.
+				m.logPoolExhausted(poolKey, line)
+				return "", fmt.Errorf("%w: %s", reserveErr, poolKey)
 			}
-			return "", fmt.Errorf("%w: %s", ErrPoolExhausted, poolKey)
+			reserved = true
 		}
 	}
 	// The runtime spec is built under the lock; the Docker calls (Create
@@ -324,6 +390,10 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			ExecID: id,
 			// Pooled container identity for name + labels (docker runtime).
 			PoolKey: poolKey,
+			// Ownership fingerprint (grpcclient.OwnerID) — forwarded verbatim
+			// so DockerRuntime.Create can stamp oasm.worker_id. Dropping it
+			// here would silently disable the startup orphan reconcile.
+			WorkerID: spec.WorkerID,
 			// Single-use auth: the connector's Register must present this
 			// token (WORKER_TOKEN env); the connector server validates it
 			// per-execution.
@@ -337,13 +407,16 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		if err != nil {
 			// No execution was created — drop the token so a stray connector
 			// can never authenticate against a ghost execution, and release
-			// the reserved concurrency slot.
+			// the reserved concurrency slot and replica reservation.
 			m.mu.Lock()
 			m.pending--
 			m.mu.Unlock()
 			m.tokenMu.Lock()
 			delete(m.tokens, id)
 			m.tokenMu.Unlock()
+			if reserved {
+				p.ReleaseReplica(id)
+			}
 			return "", err
 		}
 		h = created
@@ -353,18 +426,29 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		// runtime call inside.
 		m.mu.Lock()
 		if p != nil {
-			cpu, mem := limitsCPUandMemory(spec.Limits)
 			p.Add(poolEntry{
-				ID:      h.ID,
-				Image:   spec.Image,
-				PoolKey: poolKey,
-				CPU:     cpu,
-				Memory:  mem,
-				State:   PoolStateBusy,
-				ExecID:  id,
+				ID:               h.ID,
+				Name:             h.Name,
+				Image:            spec.Image,
+				ImageVersion:     spec.Version,
+				Tool:             spec.Tool,
+				PoolKey:          poolKey,
+				CPU:              cpuStr,
+				Memory:           memStr,
+				CPURequestMillis: cpuRequestMillis,
+				MemRequestBytes:  memRequestBytes,
+				State:            PoolStateBusy,
+				ExecID:           id,
+				LastJobID:        spec.JobID,
+				LastTraceID:      spec.TraceID,
+				CreatedAt:        h.CreatedAt,
 			})
 			poolLogs = append(poolLogs, fmt.Sprintf("pool miss: created replica container %s pool_key=%s busy=%d max=%d",
 				h.ID, poolKey, p.busyCount(poolKey), p.maxReplicasPerImage))
+			if reserved {
+				// The pending creation is now a tracked busy container.
+				p.ReleaseReplica(id)
+			}
 		}
 		// Bind BEFORE Start: the connector can dial back as soon as the
 		// container boots. Routing the execution to its container first
@@ -386,6 +470,9 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 				if cid := p.Evict(id); cid != "" && evictor != nil {
 					evictor.RemoveContainer(cid)
 				}
+				if reserved {
+					p.ReleaseReplica(id)
+				}
 			}
 			if binder != nil {
 				binder.ReleaseExec(id)
@@ -400,7 +487,16 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 		}
 	}
 	m.mu.Lock()
-	m.execs[id] = &Execution{ID: id, Spec: spec, State: StateRunning, Handle: h}
+	now := time.Now().UTC()
+	m.execs[id] = &Execution{
+		ID:             id,
+		Spec:           spec,
+		State:          StateRunning,
+		Handle:         h,
+		CreatedAt:      now,
+		StartedAt:      now,
+		StateChangedAt: now,
+	}
 	// Route this execution to its container in the proxy. On a pool hit the
 	// stream may already be live — BindExec pre-closes the registration signal
 	// so the drain skips the connect timer.

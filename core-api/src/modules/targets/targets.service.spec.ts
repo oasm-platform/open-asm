@@ -1,5 +1,5 @@
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
-import { AuditOutcome } from '@/common/enums/enum';
+import { AuditOutcome, IntegrationType } from '@/common/enums/enum';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -11,6 +11,7 @@ import { AssetsService } from '../assets/assets.service';
 import type { Asset } from '../assets/entities/assets.entity';
 import type { AuditContext } from '../audit/audit.service';
 import { AuditService } from '../audit/audit.service';
+import { Integration } from '../integrations/entities/integration.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   Target,
@@ -27,6 +28,7 @@ describe('TargetsService', () => {
   let mockEventEmitter: Partial<EventEmitter2>;
   let mockQueue: Partial<Queue>;
   let mockAuditService: { auditSafely: jest.Mock };
+  let mockIntegrationRepository: { find: jest.Mock };
 
   beforeEach(async () => {
     mockTargetRepository = {
@@ -73,12 +75,18 @@ describe('TargetsService', () => {
       auditSafely: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockIntegrationRepository = { find: jest.fn().mockResolvedValue([]) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TargetsService,
         {
           provide: getRepositoryToken(Target),
           useValue: mockTargetRepository,
+        },
+        {
+          provide: getRepositoryToken(Integration),
+          useValue: mockIntegrationRepository,
         },
         {
           provide: WorkspacesService,
@@ -737,6 +745,123 @@ describe('TargetsService', () => {
       expect(ips[255]).toBe('8.8.8.255');
     });
 
+    it('should accept a private non-/24 CIDR from AWS source and create 2^16 assets', async () => {
+      // Arrange
+      const dto = {
+        targets: [{ value: '10.0.0.0/16', type: TargetType.CIDR }],
+      };
+      const createdTargets = [
+        {
+          id: randomUUID(),
+          value: '10.0.0.0/16',
+          type: TargetType.CIDR,
+          scanSchedule: 'DISABLED',
+        },
+      ] as unknown as Target[];
+
+      const mockManager = createMockEntityManager({
+        existingTargets: [],
+        createdTargets,
+      });
+
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(mockManager),
+        );
+
+      // Act
+      const result = await service.createMultipleTargets(
+        dto,
+        workspaceId,
+        userContext,
+        undefined,
+        TargetSource.AWS,
+      );
+
+      // Assert: target created with source 'aws'
+      expect(result.created).toHaveLength(1);
+      const targetRows = (mockManager as any).createQueryBuilder().values.mock
+        .calls[0][0] as Array<Record<string, unknown>>;
+      expect(targetRows[0]).toMatchObject({
+        value: '10.0.0.0/16',
+        type: TargetType.CIDR,
+        source: 'aws',
+      });
+
+      // Assert: 65536 assets flushed in chunks (first value() call is the target insert)
+      const assetValueCalls = (
+        mockManager as any
+      ).createQueryBuilder().values.mock.calls
+        .slice(1)
+        .map((call: unknown[]) => call[0] as Array<Record<string, unknown>>);
+      const assetRows = assetValueCalls.flat();
+      expect(assetRows).toHaveLength(65536);
+      expect(assetValueCalls.length).toBe(66); // ceil(65536 / 1000)
+      expect(assetRows[0]).toMatchObject({
+        value: '10.0.0.0',
+        isPrimary: true,
+      });
+      expect(assetRows[1]).toMatchObject({
+        value: '10.0.0.1',
+        isPrimary: false,
+      });
+    });
+
+    it('should still reject a private non-/24 CIDR when the source is NOT AWS', async () => {
+      // Arrange
+      const dto = {
+        targets: [{ value: '10.0.0.0/16', type: TargetType.CIDR }],
+      };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "10.0.0.0/16" must use /24 prefix. Only /24 CIDR ranges are supported.',
+      );
+    });
+
+    it('should reject an AWS CIDR with a prefix outside 1..32', async () => {
+      // Arrange
+      const dto = {
+        targets: [{ value: '10.0.0.0/33', type: TargetType.CIDR }],
+      };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(
+          dto,
+          workspaceId,
+          userContext,
+          undefined,
+          TargetSource.AWS,
+        ),
+      ).rejects.toThrow(
+        'Invalid CIDR: "10.0.0.0/33" contains an invalid prefix. Prefix must be 1-32.',
+      );
+    });
+
+    it('should expand any CIDR prefix, not just /24', () => {
+      const slash24 = (service as any).expandCIDRToIPs('8.8.8.0/24');
+      expect(slash24).toHaveLength(256);
+      expect(slash24[0]).toBe('8.8.8.0');
+      expect(slash24[255]).toBe('8.8.8.255');
+
+      const slash30 = (service as any).expandCIDRToIPs('10.0.0.0/30');
+      expect(slash30).toEqual([
+        '10.0.0.0',
+        '10.0.0.1',
+        '10.0.0.2',
+        '10.0.0.3',
+      ]);
+
+      expect((service as any).expandCIDRToIPs('10.0.0.0/16')).toHaveLength(
+        65536,
+      );
+    });
+
     it('should default to DOMAIN type when type is not specified', async () => {
       // Arrange
       const dto = { targets: [{ value: 'example.com' }] };
@@ -862,6 +987,202 @@ describe('TargetsService', () => {
       ).rejects.toThrow(
         'Invalid IP: "127.0.0.1" is a private/reserved IP address. Only public IP addresses are allowed.',
       );
+    });
+  });
+
+  describe('createMultipleTargets — GIT_ORG', () => {
+    const workspaceId = randomUUID();
+    const userContext = { id: randomUUID() } as unknown as UserContextPayload;
+    const integrationId = randomUUID();
+
+    const githubIntegration = (overrides: Record<string, unknown> = {}) => ({
+      id: integrationId,
+      name: 'GitHub',
+      appType: 'github',
+      category: IntegrationType.SOURCE_CODE,
+      capabilities: [IntegrationType.SOURCE_CODE],
+      config: { apiToken: 'encrypted' },
+      workspaceId,
+      ...overrides,
+    });
+
+    let insertedRows: Array<Record<string, unknown>>;
+    let assetInsert: jest.Mock;
+
+    const arrangeTransaction = (created: Target[]) => {
+      insertedRows = [];
+      assetInsert = jest.fn();
+      const insertQB: Record<string, jest.Mock> = {
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn((rows: Array<Record<string, unknown>>): unknown => {
+          insertedRows = rows;
+          return insertQB;
+        }),
+        orIgnore: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          identifiers: created.map((t) => ({ id: t.id })),
+        }),
+      };
+      const manager = {
+        getRepository: jest.fn((entity: { name: string }): unknown =>
+          entity.name === 'Target'
+            ? {
+                createQueryBuilder: jest.fn(() => ({
+                  where: jest.fn().mockReturnThis(),
+                  andWhere: jest.fn().mockReturnThis(),
+                  select: jest.fn().mockReturnThis(),
+                  getRawMany: jest.fn().mockResolvedValue([]),
+                })),
+                findByIds: jest.fn().mockResolvedValue(created),
+              }
+            : {},
+        ),
+        createQueryBuilder: jest.fn((): unknown => {
+          // Second call onward = asset inserts.
+          return manager.createQueryBuilder.mock.calls.length > 1
+            ? { ...insertQB, execute: assetInsert }
+            : insertQB;
+        }),
+      } as unknown as EntityManager & { createQueryBuilder: jest.Mock };
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (m: EntityManager) => Promise<unknown>) => callback(manager),
+        );
+    };
+
+    beforeEach(() => {
+      mockWorkspacesService.getWorkspaceByIdAndOwner = jest
+        .fn()
+        .mockResolvedValue({ id: workspaceId });
+      mockEventEmitter.emit = jest.fn();
+    });
+
+    it('stores the integration, settings and provider source, creates no host asset and emits git_org.create', async () => {
+      mockIntegrationRepository.find.mockResolvedValue([githubIntegration()]);
+      const created = [
+        { id: randomUUID(), value: 'github.com/acme', type: TargetType.GIT_ORG },
+      ] as unknown as Target[];
+      arrangeTransaction(created);
+
+      await service.createMultipleTargets(
+        {
+          targets: [
+            {
+              value: 'GitHub.com/Acme/',
+              type: TargetType.GIT_ORG,
+              integrationId,
+              settings: { includeForks: true },
+            },
+          ],
+        },
+        workspaceId,
+        userContext,
+      );
+
+      expect(mockIntegrationRepository.find).toHaveBeenCalledWith({
+        where: { id: expect.anything(), workspaceId },
+      });
+      expect(insertedRows[0]).toMatchObject({
+        value: 'github.com/acme',
+        type: TargetType.GIT_ORG,
+        source: TargetSource.GITHUB,
+        integrationId,
+        settings: { includeArchived: false, includeForks: true },
+      });
+      expect(assetInsert).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.git_org.create',
+        created[0],
+      );
+    });
+
+    it('requires an integration', async () => {
+      await expect(
+        service.createMultipleTargets(
+          { targets: [{ value: 'github.com/acme', type: TargetType.GIT_ORG }] },
+          workspaceId,
+          userContext,
+        ),
+      ).rejects.toThrow(/needs a source-code integration/);
+    });
+
+    it('rejects an integration from another workspace', async () => {
+      mockIntegrationRepository.find.mockResolvedValue([]);
+
+      await expect(
+        service.createMultipleTargets(
+          {
+            targets: [
+              { value: 'github.com/acme', type: TargetType.GIT_ORG, integrationId },
+            ],
+          },
+          workspaceId,
+          userContext,
+        ),
+      ).rejects.toThrow(/not found in this workspace/);
+    });
+
+    it('rejects an integration without the SOURCE_CODE capability', async () => {
+      mockIntegrationRepository.find.mockResolvedValue([
+        githubIntegration({
+          category: IntegrationType.TICKETING,
+          capabilities: [IntegrationType.TICKETING],
+        }),
+      ]);
+
+      await expect(
+        service.createMultipleTargets(
+          {
+            targets: [
+              { value: 'github.com/acme', type: TargetType.GIT_ORG, integrationId },
+            ],
+          },
+          workspaceId,
+          userContext,
+        ),
+      ).rejects.toThrow(/SOURCE_CODE capability/);
+    });
+
+    it('rejects an organization on another host than the integration', async () => {
+      mockIntegrationRepository.find.mockResolvedValue([githubIntegration()]);
+
+      await expect(
+        service.createMultipleTargets(
+          {
+            targets: [
+              { value: 'gitlab.com/acme', type: TargetType.GIT_ORG, integrationId },
+            ],
+          },
+          workspaceId,
+          userContext,
+        ),
+      ).rejects.toThrow(/is not on github.com/);
+    });
+
+    it('rejects a malformed organization value', async () => {
+      await expect(
+        service.createMultipleTargets(
+          {
+            targets: [
+              { value: 'not a path', type: TargetType.GIT_ORG, integrationId },
+            ],
+          },
+          workspaceId,
+          userContext,
+        ),
+      ).rejects.toThrow(/Invalid Git organization/);
+    });
+
+    it('rejects an integration on a host target', async () => {
+      await expect(
+        service.createMultipleTargets(
+          { targets: [{ value: 'example.com', integrationId }] },
+          workspaceId,
+          userContext,
+        ),
+      ).rejects.toThrow(/only applies to GIT_ORG/);
     });
   });
 

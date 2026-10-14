@@ -1,11 +1,14 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
+import { DefaultWorkflow } from '@/common/enums/enum';
+import type { Job } from '../jobs-registry/entities/job.entity';
 import { StatisticService } from './statistic.service';
 import { DataSource } from 'typeorm';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 
 describe('StatisticService', () => {
@@ -57,8 +60,8 @@ describe('StatisticService', () => {
     getMemberOfWorkspaceByJobId: jest.fn(),
   };
 
-  const mockNotificationsService = {
-    createNotification: jest.fn(),
+  const mockEventBridge = {
+    publishSafely: jest.fn(),
   };
 
   const mockTechnologyForwarderService = {
@@ -73,7 +76,7 @@ describe('StatisticService', () => {
         { provide: GeoIpService, useValue: mockGeoIpService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: WorkspacesService, useValue: mockWorkspacesService },
-        { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: EventBridgeService, useValue: mockEventBridge },
         {
           provide: TechnologyForwarderService,
           useValue: mockTechnologyForwarderService,
@@ -147,9 +150,10 @@ describe('StatisticService', () => {
       // per (host, assetServiceId) — otherwise a cert served on several ports
       // of the same host is counted once per service and the dashboard card
       // no longer matches the TLS tab total after clicking through.
-      expect(sql).toMatch(/DISTINCT ON\s*\(\s*hr\.tls->>'host'/);
-      expect(sql).toContain("hr.tls->>'sni'");
-      expect(sql).toContain("hr.tls->>'subject_an'");
+      expect(sql).toMatch(/DISTINCT ON\s*\(\s*tc\."host"/);
+      expect(sql).toContain('tc."sni"');
+      expect(sql).toContain('tc."subjectAn"');
+      expect(sql).toContain('FROM "tls_certificates" tc');
       expect(sql).not.toContain('assetServiceId)');
     });
 
@@ -163,6 +167,162 @@ describe('StatisticService', () => {
         wontExpireAnytimeSoon: 0,
         newCertificatesDiscovered: 4,
       });
+    });
+  });
+
+  describe('handleWorkflowEnd', () => {
+    interface SnapshotLike {
+      hosts: number;
+      ports: number;
+      services: number;
+      techs: number;
+    }
+
+    const targetJob = (steps: Record<string, unknown>): Job =>
+      ({
+        id: 'job-1',
+        asset: { target: { id: 'target-1', value: 'cline.bot' } },
+        jobHistory: {
+          workflow: { filePath: DefaultWorkflow.DOMAIN_DISCOVERY },
+          steps,
+        },
+      }) as unknown as Job;
+
+    const snapshotSpy = () =>
+      jest.spyOn(
+        service as unknown as {
+          takeSnapshotStatisticTarget: (id: string) => Promise<SnapshotLike>;
+        },
+        'takeSnapshotStatisticTarget',
+      );
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockRedisService.get.mockResolvedValue(null);
+      mockRedisService.del.mockResolvedValue(undefined);
+      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([
+        { user: { id: 'user-1' }, workspace: { id: 'workspace-1' } },
+      ]);
+    });
+
+    /** The single `workflow.run.completed` publish the service made. */
+    const publishedPayload = () =>
+      mockEventBridge.publishSafely.mock.calls.at(-1)?.[1] as
+        | {
+            workspaceId: string;
+            outcome: string;
+            payload: Record<string, unknown>;
+          }
+        | undefined;
+
+    it('publishes the run outcome instead of deciding who is notified', async () => {
+      snapshotSpy().mockResolvedValue({
+        hosts: 1,
+        ports: 0,
+        services: 3,
+        techs: 0,
+      });
+
+      await service.handleWorkflowEnd(
+        targetJob({
+          scan_subdomain: { status: 'done' },
+          port_scan: { status: 'failed' },
+          http_probe: { status: 'skipped', reason: 'blocked-by-failure' },
+        }),
+      );
+
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledTimes(1);
+      expect(mockEventBridge.publishSafely.mock.calls[0][0]).toBe(
+        EVENT_CATALOG.workflow.run.completed,
+      );
+      const data = publishedPayload();
+      expect(data.workspaceId).toBe('workspace-1');
+      expect(data.payload).toMatchObject({
+        targetValue: 'cline.bot',
+        services: 3,
+        hosts: 1,
+      });
+    });
+
+    it('marks a partial run as a failure outcome', async () => {
+      // The run did not finish its graph, so the envelope says so — that is how
+      // the `notifications` lane knows to send the "scan stopped halfway"
+      // message without having to re-derive the step states.
+      snapshotSpy().mockResolvedValue({
+        hosts: 0,
+        ports: 0,
+        services: 0,
+        techs: 0,
+      });
+
+      await service.handleWorkflowEnd(
+        targetJob({ port_scan: { status: 'failed' } }),
+      );
+
+      const data = publishedPayload();
+      expect(data.outcome).toBe('failure');
+      expect(data.payload.failedSteps).toEqual(['port_scan']);
+    });
+
+    it('names what never ran, so the notice is actionable', async () => {
+      snapshotSpy().mockResolvedValue({
+        hosts: 0,
+        ports: 0,
+        services: 0,
+        techs: 0,
+      });
+
+      await service.handleWorkflowEnd(
+        targetJob({
+          scan_subdomain: { status: 'done' },
+          port_scan: { status: 'failed' },
+          http_probe: { status: 'skipped', reason: 'blocked-by-failure' },
+        }),
+      );
+
+      // Raw step ids, not a sentence: the wording is the consumers' job.
+      expect(publishedPayload()?.payload).toMatchObject({
+        failedSteps: ['port_scan'],
+        blockedSteps: ['http_probe'],
+        cancelledSteps: [],
+      });
+    });
+
+    it('reports empty step lists for a clean run', async () => {
+      snapshotSpy().mockResolvedValue({
+        hosts: 2,
+        ports: 4,
+        services: 4,
+        techs: 1,
+      });
+
+      await service.handleWorkflowEnd(
+        targetJob({
+          scan_subdomain: { status: 'done' },
+          port_scan: { status: 'done' },
+          http_probe: { status: 'done' },
+          take_screenshot: { status: 'done' },
+        }),
+      );
+
+      const data = publishedPayload();
+      expect(data.outcome).toBe('success');
+      expect(data.payload).toMatchObject({
+        failedSteps: [],
+        blockedSteps: [],
+        cancelledSteps: [],
+      });
+    });
+
+    it('publishes nothing when the workspace cannot be resolved', async () => {
+      // The event bus requires a workspace on every event; an unresolvable run
+      // is skipped rather than published with a sentinel workspace.
+      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([]);
+      snapshotSpy().mockResolvedValue({ hosts: 1, ports: 0, services: 0, techs: 0 });
+
+      await service.handleWorkflowEnd(targetJob({ port_scan: { status: 'done' } }));
+
+      expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
     });
   });
 });

@@ -38,8 +38,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
-# Create tool directory
-RUN mkdir -p /app/oasm-tools
+# Create tool directory and persistent state directory (worker token file —
+# survives container recreation so the join identity, and therefore orphan
+# ownership, stays stable). Owned by the worker user via the chown below.
+RUN mkdir -p /app/oasm-tools /app/state
 
 # Copy binary from builder
 COPY --from=builder /app/oasm-worker .

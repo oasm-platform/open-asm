@@ -2,9 +2,12 @@ package execution
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
+
+	"oasm-worker/internal/runtime"
 )
 
 // ErrPoolExhausted is returned by Manager.Submit (Phase 3 replica policy)
@@ -12,6 +15,11 @@ import (
 // pooled container of the image is busy. The caller backs off and retries;
 // the job is never failed to Core on this error.
 var ErrPoolExhausted = errors.New("pool exhausted: max replicas reached for image")
+
+// ErrNodeBudgetExhausted is the node CPU/RAM budget refusal. It wraps
+// ErrPoolExhausted so existing errors.Is(err, ErrPoolExhausted) wait loops
+// still match; it is the only refusal the agent lane can hit.
+var ErrNodeBudgetExhausted = fmt.Errorf("%w: node cpu/mem budget exhausted", ErrPoolExhausted)
 
 // ---------------------------------------------------------------------------
 // Warm-pool container reuse (Phase 2).
@@ -39,15 +47,25 @@ const (
 // poolEntry is one pooled container. Keyed by container ID in byID; idle
 // entries are additionally indexed by PoolKey for Acquire.
 type poolEntry struct {
-	ID         string    // docker container ID (runtime Handle.ID)
-	Image      string    // container image
-	PoolKey    string    // normalized image (lowercase) — the acquire key
-	Stream     string    // connector stream identity; set once the SDK registers
-	State      PoolState // idle | busy
-	LastUsedAt time.Time // last transition time; Sweep evicts idle entries past the idle timeout
-	ExecID     string    // owner execution ("" when idle)
-	CPU        string    // manifest cpu the container was created with (informational)
-	Memory     string    // manifest memory the container was created with (informational)
+	ID             string    // docker container ID (runtime Handle.ID)
+	Name           string    // human-readable OASM container name
+	Image          string    // container image
+	ImageVersion   string    // resolved connector version
+	Tool           string    // connector/tool slug
+	PoolKey        string    // normalized image (lowercase) — the acquire key
+	Stream         string    // connector stream identity; set once the SDK registers
+	State          PoolState // idle | busy
+	CreatedAt      time.Time
+	StateChangedAt time.Time
+	LastUsedAt     time.Time // last transition time; Sweep evicts idle entries past the idle timeout
+	ExecID         string    // owner execution ("" when idle)
+	LastJobID      string
+	LastTraceID    string
+	CPU            string // manifest cpu the container was created with (informational)
+	Memory         string // manifest memory the container was created with (informational)
+	// Declared limits as numbers, reserved against the node budget while busy.
+	CPURequestMillis int
+	MemRequestBytes  int
 }
 
 // PoolManager tracks pooled containers and hands them out for reuse. It is
@@ -56,16 +74,39 @@ type poolEntry struct {
 type PoolManager struct {
 	mu                  sync.Mutex
 	idleTimeout         time.Duration
-	maxReplicasPerImage int // Phase 3 replica policy: busy containers per image cap, enforced via AtCapacity
+	maxReplicasPerImage int // Phase 3 replica policy: busy containers per image cap, enforced via ReserveReplica
 	maxJobsPerContainer int // concurrency cap per container (1 in Phase 2)
-	byID                map[string]*poolEntry
-	idleByKey           map[string][]string // poolKey -> ordered container IDs (oldest LastUsedAt first)
+	// Resource budget: allocatable CPU (millicores) and memory (bytes) the node
+	// may reserve for connector containers; 0 disables that dimension. Admission
+	// sums each running container's DECLARED limit (the manifest resourceDefaults
+	// carried by its job) and admits a new container only while it still fits — a
+	// per-image count cap alone cannot stop a burst of large-memory images (e.g.
+	// nuclei requests 4GiB) from exhausting RAM.
+	cpuBudgetMillis int
+	memBudgetBytes  int
+	byID            map[string]*poolEntry
+	idleByKey       map[string][]string // poolKey -> ordered container IDs (oldest LastUsedAt first)
 	// owner maps execID → container ID for IsIdle lookups: ReleaseToIdle
 	// clears the entry's ExecID (its execution is over) but the container is
 	// still the same one backing that execID while it sits idle.
 	owner map[string]string
+	// pendingReplicas maps a reservation token (the execution ID) to the
+	// resources it claims. ReserveReplica records it under mu BEFORE the slow
+	// runtime Create so concurrent Submits cannot all pass the capacity check and
+	// each spawn a replica (the race that started 12 nuclei containers for a cap
+	// of 1). ReleaseReplica drops it on Create/Start failure or after Add.
+	pendingReplicas map[string]replicaRequest
 	// now is injectable for deterministic Sweep tests; defaults to time.Now.
 	now func() time.Time
+}
+
+// replicaRequest is one in-flight container creation: the pool key and the
+// declared resources it reserves until the container is created (Add) or the
+// attempt fails.
+type replicaRequest struct {
+	poolKey   string
+	cpuMillis int
+	memBytes  int
 }
 
 // NewPoolManager creates an empty pool.
@@ -77,6 +118,7 @@ func NewPoolManager(idleTimeout time.Duration, maxReplicasPerImage, maxJobsPerCo
 		byID:                map[string]*poolEntry{},
 		idleByKey:           map[string][]string{},
 		owner:               map[string]string{},
+		pendingReplicas:     map[string]replicaRequest{},
 		now:                 time.Now,
 	}
 }
@@ -86,6 +128,24 @@ func normalizePoolKey(image string) string {
 	return strings.ToLower(strings.TrimSpace(image))
 }
 
+// AgentLane is JobSpec.Lane for jobs dispatched by an AI agent.
+const AgentLane = "agent"
+
+// poolKeyFor is the warm-pool acquire key: the normalized image, suffixed on
+// the agent lane so agent and registry jobs never share a container.
+func poolKeyFor(spec JobSpec) string {
+	key := normalizePoolKey(spec.Image)
+	if spec.Lane == AgentLane {
+		key += agentPoolSuffix
+	}
+	return key
+}
+
+const agentPoolSuffix = "#" + AgentLane
+
+// isAgentPoolKey reports whether key was built by poolKeyFor for an agent job.
+func isAgentPoolKey(key string) bool { return strings.HasSuffix(key, agentPoolSuffix) }
+
 // Add records a freshly created container in the pool as idle.
 func (p *PoolManager) Add(entry poolEntry) {
 	p.mu.Lock()
@@ -94,8 +154,15 @@ func (p *PoolManager) Add(entry poolEntry) {
 	if entry.State == "" {
 		entry.State = PoolStateIdle
 	}
+	now := p.now()
+	if entry.CreatedAt.IsZero() {
+		entry.CreatedAt = now
+	}
+	if entry.StateChangedAt.IsZero() {
+		entry.StateChangedAt = now
+	}
 	if entry.LastUsedAt.IsZero() {
-		entry.LastUsedAt = p.now()
+		entry.LastUsedAt = now
 	}
 	e := entry
 	p.byID[e.ID] = &e
@@ -135,6 +202,14 @@ func (p *PoolManager) unindexIdle(cid, key string) {
 // caller then creates a fresh container). MaxJobsPerContainer=1 is enforced
 // structurally: busy entries are not in the idle queue.
 func (p *PoolManager) Acquire(execID, image string) (string, bool) {
+	handle, ok := p.AcquireHandle(execID, image)
+	return handle.ID, ok
+}
+
+// AcquireHandle is Acquire with the stable container handle preserved. The
+// manager needs the name after a warm-pool reuse so telemetry can identify the
+// container even though the original Create call is no longer in the execution.
+func (p *PoolManager) AcquireHandle(execID, image string) (runtime.Handle, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	key := normalizePoolKey(image)
@@ -151,6 +226,7 @@ func (p *PoolManager) Acquire(execID, image string) (string, bool) {
 		e.State = PoolStateBusy
 		e.ExecID = execID
 		e.LastUsedAt = p.now()
+		e.StateChangedAt = e.LastUsedAt
 		// Re-acquire takes the container over from its previous execution.
 		// ReleaseToIdle deliberately KEEPS the previous owner mapping (for
 		// IsIdle) and clears the entry's ExecID, so the stale mapping is only
@@ -161,9 +237,9 @@ func (p *PoolManager) Acquire(execID, image string) (string, bool) {
 		p.purgeOwnerByContainer(cid)
 		p.owner[execID] = cid
 		p.unindexIdle(cid, key)
-		return cid, true
+		return runtime.Handle{ID: e.ID, Name: e.Name}, true
 	}
-	return "", false
+	return runtime.Handle{}, false
 }
 
 // ReleaseToIdle returns the container owned by execID to the idle queue.
@@ -181,6 +257,7 @@ func (p *PoolManager) ReleaseToIdle(execID string) {
 		e.State = PoolStateIdle
 		e.ExecID = ""
 		e.LastUsedAt = p.now()
+		e.StateChangedAt = e.LastUsedAt
 		p.indexIdle(e.ID, e.PoolKey)
 	}
 }
@@ -260,20 +337,16 @@ func (p *PoolManager) IsIdle(execID string) bool {
 	return ok && e.State == PoolStateIdle
 }
 
-// AtCapacity reports whether the image's replica quota is reached: every
-// pooled container of the pool key is busy and no more may be created.
-// Manager.Submit consults it after an Acquire miss to refuse the job with
-// ErrPoolExhausted instead of creating another replica.
-func (p *PoolManager) AtCapacity(poolKey string) bool {
-	return p.busyCount(poolKey) >= p.maxReplicasPerImage
-}
-
 // busyCount reports how many containers of a pool key are currently busy.
-// The Phase 3 replica policy caps this per image (AtCapacity).
+// The Phase 3 replica policy caps this per image (ReserveReplica).
 func (p *PoolManager) busyCount(poolKey string) int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	key := normalizePoolKey(poolKey)
+	return p.busyCountLocked(normalizePoolKey(poolKey))
+}
+
+// busyCountLocked counts busy containers of one pool key (must hold mu).
+func (p *PoolManager) busyCountLocked(key string) int {
 	n := 0
 	for _, e := range p.byID {
 		if e.PoolKey == key && e.State == PoolStateBusy {
@@ -281,4 +354,92 @@ func (p *PoolManager) busyCount(poolKey string) int {
 		}
 	}
 	return n
+}
+
+// pendingCountLocked counts in-flight creations for one pool key (must hold mu).
+func (p *PoolManager) pendingCountLocked(key string) int {
+	n := 0
+	for _, r := range p.pendingReplicas {
+		if r.poolKey == key {
+			n++
+		}
+	}
+	return n
+}
+
+// busyResourcesLocked sums the declared limits of every busy container — the
+// capacity already reserved on the node (must hold mu).
+func (p *PoolManager) busyResourcesLocked() (cpuMillis, memBytes int) {
+	for _, e := range p.byID {
+		if e.State == PoolStateBusy {
+			cpuMillis += e.CPURequestMillis
+			memBytes += e.MemRequestBytes
+		}
+	}
+	return cpuMillis, memBytes
+}
+
+// pendingResourcesLocked sums the reservations still in flight (must hold mu).
+func (p *PoolManager) pendingResourcesLocked() (cpuMillis, memBytes int) {
+	for _, r := range p.pendingReplicas {
+		cpuMillis += r.cpuMillis
+		memBytes += r.memBytes
+	}
+	return cpuMillis, memBytes
+}
+
+// SetResourceBudget sets the node's allocatable CPU (millicores) and memory
+// (bytes) available to connector containers; 0 disables that dimension. The
+// caller passes a headroom-adjusted share of the node total (leaving room for
+// the worker, its legacy tool processes and the OS). Call once at startup,
+// before Submit.
+func (p *PoolManager) SetResourceBudget(cpuMillis, memBytes int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.cpuBudgetMillis = cpuMillis
+	p.memBudgetBytes = memBytes
+}
+
+// ReserveReplica atomically checks the per-image replica quota AND the node
+// resource budget, then reserves a creation slot for token (the execution ID).
+//
+// Admission is resource-based: the declared limits of every running container
+// plus the candidate must fit within the node budget, so a burst of large-memory
+// images cannot exhaust RAM. Reserving under mu BEFORE the slow, lock-free
+// runtime Create is what closes the race that let every concurrent Submit pass
+// the old check-then-create window and each spawn a container. Returns false
+// when a limit is reached; the caller refuses with ErrPoolExhausted.
+func (p *PoolManager) ReserveReplica(token, poolKey string, cpuMillis, memBytes int) bool {
+	return p.reserveReplica(token, poolKey, cpuMillis, memBytes) == nil
+}
+
+// reserveReplica is ReserveReplica with the refusal reason: ErrPoolExhausted
+// for the per-image cap, ErrNodeBudgetExhausted for the node budget. Agent-lane
+// keys skip the per-image cap; only the node budget guards them.
+func (p *PoolManager) reserveReplica(token, poolKey string, cpuMillis, memBytes int) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	key := normalizePoolKey(poolKey)
+	if !isAgentPoolKey(key) && p.maxReplicasPerImage > 0 &&
+		p.busyCountLocked(key)+p.pendingCountLocked(key) >= p.maxReplicasPerImage {
+		return ErrPoolExhausted
+	}
+	busyCPU, busyMem := p.busyResourcesLocked()
+	pendCPU, pendMem := p.pendingResourcesLocked()
+	if p.cpuBudgetMillis > 0 && busyCPU+pendCPU+cpuMillis > p.cpuBudgetMillis {
+		return ErrNodeBudgetExhausted
+	}
+	if p.memBudgetBytes > 0 && busyMem+pendMem+memBytes > p.memBudgetBytes {
+		return ErrNodeBudgetExhausted
+	}
+	p.pendingReplicas[token] = replicaRequest{poolKey: key, cpuMillis: cpuMillis, memBytes: memBytes}
+	return nil
+}
+
+// ReleaseReplica releases the reservation held by token — whether the creation
+// succeeded (Add recorded the busy container) or Create/Start failed.
+func (p *PoolManager) ReleaseReplica(token string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.pendingReplicas, token)
 }

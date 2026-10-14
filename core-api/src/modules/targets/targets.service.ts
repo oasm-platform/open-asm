@@ -1,5 +1,12 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { AuditOutcome, BullMQName, CronSchedule, JobStatus, TargetScopeType } from '@/common/enums/enum';
+import {
+  AuditOutcome,
+  BullMQName,
+  CronSchedule,
+  IntegrationType,
+  JobStatus,
+  TargetScopeType,
+} from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -13,8 +20,11 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job, Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
+import { hasCapability } from '../integrations/capabilities';
+import { Integration } from '../integrations/entities/integration.entity';
+import { sourceCodeHost } from '../integrations/repository-sync.plan';
 import { Asset } from '../assets/entities/assets.entity';
 import type { AuditContext } from '../audit/audit.service';
 import { AuditService } from '../audit/audit.service';
@@ -22,17 +32,45 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   BulkTargetResultDto,
   CreateMultipleTargetsDto,
+  type CreateTargetDto,
+  type GetTargetRepositoriesQueryDto,
+  type TargetRepositoryDto,
   GetManyWorkspaceQueryParamsDto,
   UpdateTargetDto,
 } from './dto/targets.dto';
 import { Target, TargetSource, TargetType } from './entities/target.entity';
 import { TargetSourceDto, toTargetSourceDto } from './target-source.dto';
 
+/** Rows per INSERT — 4 bind params each, well under PostgreSQL's 65535 limit. */
+export const ASSET_INSERT_CHUNK = 1000;
+
+/**
+ * GIT_ORG value: `<host>[:port]/<owner>[/<subgroup>…]`, lower-case — e.g.
+ * `github.com/acme`, `gitlab.example.com/platform/backend`.
+ */
+const GIT_ORG_VALUE_REGEX =
+  /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:\d{1,5})?(\/[a-z0-9_.-]+)+$/;
+
+/** Provider of a GIT_ORG target, recorded as its source. */
+const GIT_ORG_SOURCES: Record<string, TargetSource> = {
+  github: TargetSource.GITHUB,
+  gitlab: TargetSource.GITLAB,
+};
+
+/** Strips trailing slashes in linear time (`/\/+$/` backtracks on many '/'). */
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end--;
+  return value.slice(0, end);
+}
+
 @Injectable()
 export class TargetsService implements OnModuleInit {
   constructor(
     @InjectRepository(Target)
     private readonly repo: Repository<Target>,
+    @InjectRepository(Integration)
+    private readonly integrationRepo: Repository<Integration>,
     private readonly workspacesService: WorkspacesService,
     public assetService: AssetsService,
     private eventEmitter: EventEmitter2,
@@ -48,18 +86,31 @@ export class TargetsService implements OnModuleInit {
   /**
    * Validates a target value based on its type.
    * For DOMAIN: Must be a valid root domain (not an IP address).
-   * For CIDR: Must be a valid CIDR notation with /24 prefix only and public IP.
+   * For CIDR: Must be a valid CIDR notation with /24 prefix only and public IP —
+   *   EXCEPT for AWS-sourced CIDRs (`isTrustedCidrSource`), where private
+   *   ranges and any prefix 1..32 are allowed (VPC/subnet CIDRs are private).
    * For IP: Must be a valid public IPv4 address.
    *
    * @param value - The target value to validate.
    * @param type - The type of target (DOMAIN, CIDR, or IP).
+   * @param isInternalNetwork - Whether the target belongs to an internal network.
+   * @param isTrustedCidrSource - Whether the source is trusted to supply private/any-prefix CIDRs.
    * @throws BadRequestException if validation fails.
    */
   private validateTargetValue(
     value: string,
     type: TargetType,
     isInternalNetwork: boolean = false,
+    isTrustedCidrSource: boolean = false,
   ): void {
+    if (type === TargetType.GIT_ORG) {
+      if (!GIT_ORG_VALUE_REGEX.test(value)) {
+        throw new BadRequestException(
+          `Invalid Git organization: "${value}" must look like github.com/<owner> or gitlab.example.com/<group>[/<subgroup>].`,
+        );
+      }
+      return;
+    }
     if (type === TargetType.DOMAIN) {
       // Validate root domain: must not be an IP address
       const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -103,16 +154,25 @@ export class TargetsService implements OnModuleInit {
         }
       }
 
-      // Validate prefix is exactly /24
+      // Validate prefix is exactly /24, unless the source is trusted (AWS).
       const prefix = parseInt(match[5]);
-      if (prefix !== 24) {
+      if (!isTrustedCidrSource && prefix !== 24) {
         throw new BadRequestException(
           `Invalid CIDR: "${value}" must use /24 prefix. Only /24 CIDR ranges are supported.`,
         );
       }
+      if (isTrustedCidrSource && (prefix < 1 || prefix > 32)) {
+        throw new BadRequestException(
+          `Invalid CIDR: "${value}" contains an invalid prefix. Prefix must be 1-32.`,
+        );
+      }
 
       // Validate IP is public (not private/localhost/reserved) unless it's an internal network
-      if (!isInternalNetwork && this.isPrivateIP(octets[0], octets[1])) {
+      if (
+        !isInternalNetwork &&
+        !isTrustedCidrSource &&
+        this.isPrivateIP(octets[0], octets[1])
+      ) {
         throw new BadRequestException(
           `Invalid CIDR: "${value}" is a private/reserved IP range. Only public IP ranges are allowed.`,
         );
@@ -189,28 +249,43 @@ export class TargetsService implements OnModuleInit {
   }
 
   /**
-   * Expands a CIDR /24 notation to an array of 256 IP addresses.
+   * Expands a CIDR notation to every address in the range.
    *
-   * @param cidr - CIDR notation (e.g., "192.168.1.0/24")
-   * @returns Array of 256 IP addresses
+   * ponytail: allocates the full array — AWS VPC/subnet CIDRs are /16../28, so
+   * the widest is 65536 entries. If arbitrary-source wide CIDRs are ever
+   * allowed, switch to streaming generation instead.
+   *
+   * @param cidr - CIDR notation (e.g., "10.0.0.0/16")
+   * @returns Array of IP addresses in the range
    */
   private expandCIDRToIPs(cidr: string): string[] {
     const match = cidr.match(
-      /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/24$/,
+      /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/,
     );
     if (!match) {
       throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
     }
 
-    const baseOctets = [
-      parseInt(match[1]),
-      parseInt(match[2]),
-      parseInt(match[3]),
-    ];
+    const o0 = parseInt(match[1]);
+    const o1 = parseInt(match[2]);
+    const o2 = parseInt(match[3]);
+    const o3 = parseInt(match[4]);
+    const prefix = parseInt(match[5]);
+    if (prefix < 0 || prefix > 32) {
+      throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
+    }
+
+    const base = ((o0 << 24) | (o1 << 16) | (o2 << 8) | o3) >>> 0;
+    const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+    const network = (base & mask) >>> 0;
+    const count = 2 ** (32 - prefix);
 
     const ips: string[] = [];
-    for (let i = 0; i < 256; i++) {
-      ips.push(`${baseOctets[0]}.${baseOctets[1]}.${baseOctets[2]}.${i}`);
+    for (let i = 0; i < count; i++) {
+      const n = (network + i) >>> 0;
+      ips.push(
+        `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`,
+      );
     }
 
     return ips;
@@ -239,7 +314,10 @@ export class TargetsService implements OnModuleInit {
         'targets.source as source',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         `COALESCE(COUNT(DISTINCT "assetService"."id"), 0) AS "totalAssetServices"`,
+        `CAST(COUNT(DISTINCT asset.id) FILTER (WHERE asset."isEnabled") AS INTEGER) AS "totalAssets"`,
         'targets.scanSchedule as "scanSchedule"',
+        'targets.integrationId as "integrationId"',
+        'targets.settings as settings',
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
@@ -248,7 +326,7 @@ export class TargetsService implements OnModuleInit {
       END AS status`,
       ])
       .groupBy(
-        'targets.id, targets.value, targets.type, targets.source, targets.lastDiscoveredAt, targets.scanSchedule',
+        'targets.id, targets.value, targets.type, targets.source, targets.lastDiscoveredAt, targets.scanSchedule, targets.integrationId, targets.settings',
       )
       .getRawOne()) as Target;
 
@@ -272,16 +350,36 @@ export class TargetsService implements OnModuleInit {
   ): Promise<BulkTargetResultDto> {
     const { targets } = dto;
 
+    const trustedCidrSource = source === TargetSource.AWS;
+
+    // GIT_ORG values are case-insensitive paths; store them lower-case so
+    // the (workspace, value) uniqueness check cannot be dodged by casing.
+    for (const target of targets) {
+      if (target.type === TargetType.GIT_ORG) {
+        target.value = trimTrailingSlashes(target.value.trim().toLowerCase());
+      }
+    }
+
     // Validate all targets before processing
     for (const target of targets) {
       const type = target.type || TargetType.DOMAIN;
-      this.validateTargetValue(target.value, type, !!internalNetworkId);
+      this.validateTargetValue(
+        target.value,
+        type,
+        !!internalNetworkId,
+        trustedCidrSource,
+      );
     }
 
     // Check if the workspace exists and the user is the owner
     await this.workspacesService.getWorkspaceByIdAndOwner(
       workspaceId,
       userContext,
+    );
+
+    const gitOrgSources = await this.resolveGitOrgIntegrations(
+      targets,
+      workspaceId,
     );
 
     const targetValues = targets.map((t) => t.value);
@@ -360,7 +458,17 @@ export class TargetsService implements OnModuleInit {
               type: t.type || TargetType.DOMAIN,
               internalNetworkId: internalNetworkId,
               workspaceId: workspaceId,
-              source: source ?? TargetSource.MANUAL,
+              source:
+                gitOrgSources.get(t.value) ?? source ?? TargetSource.MANUAL,
+              ...(t.type === TargetType.GIT_ORG
+                ? {
+                    integrationId: t.integrationId,
+                    settings: {
+                      includeArchived: t.settings?.includeArchived ?? false,
+                      includeForks: t.settings?.includeForks ?? false,
+                    },
+                  }
+                : {}),
             })),
           )
           .execute();
@@ -382,8 +490,12 @@ export class TargetsService implements OnModuleInit {
         }> = [];
 
         for (const target of createdTargetEntities) {
+          // A Git organization has no host to probe: its assets are the
+          // repositories, created by the repository sync (queued on the
+          // `target.git_org.create` event below).
+          if (target.type === TargetType.GIT_ORG) continue;
           if (target.type === TargetType.CIDR) {
-            // Generate 256 IPs for CIDR /24
+            // Expand the CIDR range to one asset per IP.
             const ips = this.expandCIDRToIPs(target.value);
             ips.forEach((ip, index) => {
               assetValues.push({
@@ -412,13 +524,15 @@ export class TargetsService implements OnModuleInit {
           }
         }
 
-        await transactionalEntityManager
-          .createQueryBuilder()
-          .insert()
-          .into(Asset)
-          .values(assetValues)
-          .orIgnore()
-          .execute();
+        for (let i = 0; i < assetValues.length; i += ASSET_INSERT_CHUNK) {
+          await transactionalEntityManager
+            .createQueryBuilder()
+            .insert()
+            .into(Asset)
+            .values(assetValues.slice(i, i + ASSET_INSERT_CHUNK))
+            .orIgnore()
+            .execute();
+        }
 
         return {
           created: createdTargetEntities,
@@ -448,6 +562,71 @@ export class TargetsService implements OnModuleInit {
    * @param values - Target values to match against.
    * @returns The matching targets (id + value).
    */
+  /**
+   * Validates the integration binding of every GIT_ORG target in a request
+   * and returns the source to record per target value.
+   *
+   * A GIT_ORG target must name a SOURCE_CODE integration of the SAME
+   * workspace (the id comes from the client — never trust it across tenants),
+   * and its value must live on that integration's host. Other target types
+   * must not carry an integration.
+   */
+  private async resolveGitOrgIntegrations(
+    targets: CreateTargetDto[],
+    workspaceId: string,
+  ): Promise<Map<string, TargetSource>> {
+    const sources = new Map<string, TargetSource>();
+    for (const target of targets) {
+      if (target.type !== TargetType.GIT_ORG && target.integrationId) {
+        throw new BadRequestException(
+          `integrationId only applies to GIT_ORG targets ("${target.value}")`,
+        );
+      }
+    }
+
+    const gitOrgs = targets.filter((t) => t.type === TargetType.GIT_ORG);
+    if (gitOrgs.length === 0) return sources;
+
+    const missing = gitOrgs.filter((t) => !t.integrationId);
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `A Git organization needs a source-code integration: ${missing.map((t) => t.value).join(', ')}`,
+      );
+    }
+
+    const ids = [...new Set(gitOrgs.map((t) => t.integrationId!))];
+    const integrations = await this.integrationRepo.find({
+      where: { id: In(ids), workspaceId },
+    });
+    const byId = new Map(integrations.map((i) => [i.id, i]));
+
+    for (const target of gitOrgs) {
+      const integration = byId.get(target.integrationId!);
+      if (!integration) {
+        throw new BadRequestException(
+          `Integration ${target.integrationId} not found in this workspace`,
+        );
+      }
+      if (!hasCapability(integration, IntegrationType.SOURCE_CODE)) {
+        throw new BadRequestException(
+          `Integration "${integration.name}" does not have the SOURCE_CODE capability`,
+        );
+      }
+      // baseUrl is not a secret, so the stored config is readable as-is.
+      const host = sourceCodeHost(integration.appType, integration.config);
+      if (!target.value.startsWith(`${host}/`)) {
+        throw new BadRequestException(
+          `"${target.value}" is not on ${host}, the host of integration "${integration.name}"`,
+        );
+      }
+      sources.set(
+        target.value,
+        GIT_ORG_SOURCES[integration.appType] ?? TargetSource.MANUAL,
+      );
+    }
+    return sources;
+  }
+
   public async findByWorkspaceAndValues(
     workspaceId: string,
     values: string[],
@@ -481,7 +660,8 @@ export class TargetsService implements OnModuleInit {
       }
     >
   > {
-    const { limit, page, sortBy, sortOrder, value, type, status, scope } = query;
+    const { limit, page, sortBy, sortOrder, value, type, status, scope } =
+      query;
 
     const offset = (page - 1) * limit;
 
@@ -503,6 +683,8 @@ export class TargetsService implements OnModuleInit {
         'targets.scanSchedule as "scanSchedule"',
         'targets.internalNetworkId as "internalNetworkId"',
         `CAST(COUNT(DISTINCT "assetService"."id") AS INTEGER) AS "totalAssetServices"`,
+        `CAST(COUNT(DISTINCT asset.id) FILTER (WHERE asset."isEnabled") AS INTEGER) AS "totalAssets"`,
+        'targets.integrationId as "integrationId"',
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
@@ -522,7 +704,7 @@ export class TargetsService implements OnModuleInit {
       queryBuilder.andWhere('targets.type = :type', { type });
     }
 
-if (status) {
+    if (status) {
       // Filter by computed status using HAVING clause
       const statusCase = `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -541,7 +723,7 @@ if (status) {
       }
     }
 
-if (scope !== undefined) {
+    if (scope !== undefined) {
       if (scope === TargetScopeType.INTERNAL) {
         queryBuilder.andWhere('targets.internalNetworkId IS NOT NULL');
       } else {
@@ -562,10 +744,14 @@ if (scope !== undefined) {
     const targets = await queryBuilder.limit(limit).offset(offset).getRawMany();
 
     // Enrich each raw source value into its display DTO (label + icon).
-    const data = targets.map((row: Omit<Target, 'source'> & { source: unknown; duration: number }) => ({
-      ...row,
-      source: toTargetSourceDto(String(row.source)),
-    }));
+    const data = targets.map(
+      (
+        row: Omit<Target, 'source'> & { source: unknown; duration: number },
+      ) => ({
+        ...row,
+        source: toTargetSourceDto(String(row.source)),
+      }),
+    );
 
     return getManyResponse({ query, data, total });
   }
@@ -632,10 +818,20 @@ if (scope !== undefined) {
    * @throws NotFoundException if the target is not found.
    * @returns The updated target entity.
    */
-  public async updateTarget(id: string, dto: UpdateTargetDto) {
-    const target = await this.repo.findOneBy({ id });
+  public async updateTarget(
+    id: string,
+    dto: UpdateTargetDto,
+    workspaceId: string,
+  ) {
+    const target = await this.repo.findOneBy({ id, workspaceId });
     if (!target) {
       throw new NotFoundException('Target not found');
+    }
+
+    if (dto.settings !== undefined && target.type !== TargetType.GIT_ORG) {
+      throw new BadRequestException(
+        'settings only apply to Git organization targets',
+      );
     }
 
     let jobId: string | undefined;
@@ -652,11 +848,84 @@ if (scope !== undefined) {
 
     // Update the target in the database
     const result = await this.repo.update(id, {
-      ...dto,
+      ...(dto.scanSchedule !== undefined
+        ? { scanSchedule: dto.scanSchedule }
+        : {}),
+      ...(dto.settings !== undefined
+        ? {
+            settings: {
+              ...(target.settings ?? {}),
+              ...dto.settings,
+            },
+          }
+        : {}),
       jobId,
     });
 
+    // New filters (archived/forks) take effect on the next sync — run it now
+    // so the repository list reflects them immediately.
+    if (dto.settings !== undefined) {
+      this.eventEmitter.emit('target.git_org.re-scan', target);
+    }
+
     return result;
+  }
+
+  /**
+   * Repositories (assets) of a GIT_ORG target, newest-pushed first, with the
+   * provider details flattened out of `metadata`.
+   */
+  public async getTargetRepositories(
+    id: string,
+    workspaceId: string,
+    query: GetTargetRepositoriesQueryDto,
+  ): Promise<GetManyBaseResponseDto<TargetRepositoryDto>> {
+    const target = await this.repo.findOneBy({ id, workspaceId });
+    if (!target) {
+      throw new NotFoundException('Target not found');
+    }
+    if (target.type !== TargetType.GIT_ORG) {
+      throw new BadRequestException(
+        'Repositories only exist on Git organization targets',
+      );
+    }
+
+    const { page, limit, search, isEnabled } = query;
+    const qb = this.repo.manager
+      .getRepository(Asset)
+      .createQueryBuilder('asset')
+      .where('asset.targetId = :id', { id });
+    if (search) {
+      qb.andWhere('asset.value ILIKE :search', { search: `%${search}%` });
+    }
+    if (isEnabled !== undefined) {
+      qb.andWhere('asset.isEnabled = :isEnabled', { isEnabled });
+    }
+    qb.orderBy('asset.isEnabled', 'DESC')
+      .addOrderBy(`asset.metadata->>'pushedAt'`, 'DESC', 'NULLS LAST')
+      .addOrderBy('asset.value', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [assets, total] = await qb.getManyAndCount();
+    const data = assets.map((asset): TargetRepositoryDto => {
+      const meta = asset.metadata ?? {};
+      return {
+        id: asset.id,
+        value: asset.value,
+        isEnabled: asset.isEnabled,
+        fullName:
+          typeof meta.fullName === 'string' ? meta.fullName : asset.value,
+        url: typeof meta.url === 'string' ? meta.url : `https://${asset.value}`,
+        defaultBranch: (meta.defaultBranch as string | null) ?? null,
+        private: meta.private === true,
+        archived: meta.archived === true,
+        fork: meta.fork === true,
+        pushedAt: (meta.pushedAt as string | null) ?? null,
+        createdAt: asset.createdAt,
+      };
+    });
+    return getManyResponse({ query, data, total });
   }
 
   /**

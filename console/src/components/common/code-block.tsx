@@ -6,11 +6,14 @@ import type { ComponentPropsWithoutRef } from 'react';
 interface CodeBlockProps extends ComponentPropsWithoutRef<'div'> {
   language?: string;
   value: string;
+  /** Number the lines in a gutter. Off by default. */
+  showLine?: boolean;
 }
 
 export function CodeBlock({
   language,
   value,
+  showLine = false,
   className,
   ...props
 }: CodeBlockProps) {
@@ -26,18 +29,18 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        'rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden w-full bg-zinc-50 dark:bg-zinc-950/50 shadow-sm',
+        'w-full overflow-hidden rounded-lg border bg-background shadow-sm',
         className,
       )}
       {...props}
     >
-      <div className="flex items-center justify-between bg-zinc-100/50 dark:bg-zinc-900/50 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
-        <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
+      <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {language || 'text'}
         </span>
         <button
           onClick={copyToClipboard}
-          className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors bg-transparent hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 px-2 py-1 rounded-md"
+          className="flex items-center gap-1.5 rounded-md bg-transparent px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           {isCopied ? (
             <>
@@ -53,9 +56,25 @@ export function CodeBlock({
         </button>
       </div>
       <div className="relative p-0">
-        <pre className="p-4 text-sm font-mono leading-relaxed text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap break-all">
-          {value}
-        </pre>
+        {/* The gutter is a separate pre with the same line height as the code,
+            so the numbers stay aligned however the text wraps. */}
+        {showLine ? (
+          <div className="flex text-sm font-mono leading-relaxed">
+            <span
+              aria-hidden
+              className="shrink-0 self-stretch whitespace-pre border-r bg-muted/40 px-3 py-4 text-right text-muted-foreground"
+            >
+              {value.split('\n').map((_, i) => i + 1).join('\n')}
+            </span>
+            <pre className="min-w-0 flex-1 whitespace-pre-wrap break-all p-4">
+              {value}
+            </pre>
+          </div>
+        ) : (
+          <pre className="whitespace-pre-wrap break-all p-4 font-mono text-sm leading-relaxed">
+            {value}
+          </pre>
+        )}
       </div>
     </div>
   );

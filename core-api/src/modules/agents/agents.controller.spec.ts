@@ -40,12 +40,15 @@ describe('AgentsController workspace permission guards', () => {
     ['updateSkill', 'PATCH /skills/:id'],
     ['deleteSkill', 'DELETE /skills/:id'],
     ['toggleSkill', 'PATCH /skills/:id/toggle'],
+    ['decideCommandApproval', 'PATCH /command-approvals/:id'],
+    ['revokeCommandApproval', 'DELETE /command-approvals/:id'],
+    ['decidePlanApproval', 'PATCH /plan-approvals/:id'],
   ];
 
   it.each(read)('%s (%s) requires agent.read', (method, _route) => {
-    const handler = (AgentsController.prototype as Record<string, unknown>)[
+    const handler = (AgentsController.prototype as unknown as Record<string, () => unknown>)[
       method
-    ] as object;
+    ];
     const required = reflector.getAllAndOverride(WorkspacePermissions, [
       handler,
       AgentsController,
@@ -54,9 +57,9 @@ describe('AgentsController workspace permission guards', () => {
   });
 
   it.each(write)('%s (%s) requires agent.write', (method, _route) => {
-    const handler = (AgentsController.prototype as Record<string, unknown>)[
+    const handler = (AgentsController.prototype as unknown as Record<string, () => unknown>)[
       method
-    ] as object;
+    ];
     const required = reflector.getAllAndOverride(WorkspacePermissions, [
       handler,
       AgentsController,
@@ -69,9 +72,9 @@ describe('AgentsController workspace permission guards', () => {
   ];
 
   it.each(execute)('%s (%s) requires agent.read', (method, _route) => {
-    const handler = (AgentsController.prototype as Record<string, unknown>)[
+    const handler = (AgentsController.prototype as unknown as Record<string, () => unknown>)[
       method
-    ] as object;
+    ];
     const required = reflector.getAllAndOverride(WorkspacePermissions, [
       handler,
       AgentsController,

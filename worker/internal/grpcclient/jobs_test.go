@@ -206,6 +206,73 @@ func TestSubmitVulnerabilitiesResult(t *testing.T) {
 	}
 }
 
+func TestSubmitUrlDiscoveryResult(t *testing.T) {
+	srv := newTestServer(t)
+	srv.jobsSrv.resultUrlDiscFn = func(ctx context.Context, req *jobsRegistry.UrlDiscoveryResultRequest) (*jobsRegistry.JobResponse, error) {
+		if req.WorkerId != "" {
+			t.Errorf("expected empty worker id (not joined), got %q", req.WorkerId)
+		}
+		if req.JobId != "job-1" {
+			t.Errorf("expected job-1, got %q", req.JobId)
+		}
+		if req.Error {
+			t.Error("expected error=false")
+		}
+		if req.Raw == nil || *req.Raw != "gau.txt" {
+			t.Errorf("expected raw=gau.txt, got %v", req.Raw)
+		}
+		// Urls is a PLAIN repeated field (not a wrapper list).
+		if len(req.Urls) != 2 {
+			t.Fatalf("expected 2 urls, got %d: %v", len(req.Urls), req.Urls)
+		}
+		if req.Urls[0].GetUrl() != "https://example.com/a" || req.Urls[1].GetUrl() != "https://example.com/b" {
+			t.Errorf("unexpected urls: %v", req.Urls)
+		}
+		return &jobsRegistry.JobResponse{Success: true}, nil
+	}
+
+	urls := []*jobsRegistry.DiscoveredUrl{
+		{Url: "https://example.com/a"},
+		{Url: "https://example.com/b"},
+	}
+	err := srv.client.SubmitUrlDiscoveryResult(context.Background(), "job-1", false, "gau.txt", urls)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSubmitUrlDiscoveryResult_EmptyRawOmitsField(t *testing.T) {
+	srv := newTestServer(t)
+	srv.jobsSrv.resultUrlDiscFn = func(ctx context.Context, req *jobsRegistry.UrlDiscoveryResultRequest) (*jobsRegistry.JobResponse, error) {
+		if req.Raw != nil {
+			t.Errorf("expected nil raw for empty raw string, got %q", *req.Raw)
+		}
+		if len(req.Urls) != 0 {
+			t.Errorf("expected no urls, got %v", req.Urls)
+		}
+		return &jobsRegistry.JobResponse{Success: true}, nil
+	}
+
+	if err := srv.client.SubmitUrlDiscoveryResult(context.Background(), "job-1", false, "", nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSubmitUrlDiscoveryResult_ServerRejects(t *testing.T) {
+	srv := newTestServer(t)
+	srv.jobsSrv.resultUrlDiscFn = func(ctx context.Context, req *jobsRegistry.UrlDiscoveryResultRequest) (*jobsRegistry.JobResponse, error) {
+		return &jobsRegistry.JobResponse{Success: false}, nil
+	}
+
+	err := srv.client.SubmitUrlDiscoveryResult(context.Background(), "job-1", false, "", nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "rejected") {
+		t.Errorf("expected rejected error, got %v", err)
+	}
+}
+
 func TestSubmitScreenshotResult(t *testing.T) {
 	srv := newTestServer(t)
 	srv.jobsSrv.resultScreenshotFn = func(ctx context.Context, req *jobsRegistry.ScreenshotResultRequest) (*jobsRegistry.JobResponse, error) {

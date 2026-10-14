@@ -1,4 +1,5 @@
 import Image from '@/components/ui/image';
+import LogoFrame from '@/components/ui/logo-frame';
 
 interface IntegrationLogoProps {
   url: string;
@@ -6,8 +7,8 @@ interface IntegrationLogoProps {
 
 export function IntegrationLogo({ url }: IntegrationLogoProps) {
   return (
-    <div className="light:bg-black dark:bg-white rounded-lg p-[3px]">
+    <LogoFrame>
       <Image url={url} height={24} width={24} />
-    </div>
+    </LogoFrame>
   );
 }

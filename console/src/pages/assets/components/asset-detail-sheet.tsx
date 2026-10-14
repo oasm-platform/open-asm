@@ -25,7 +25,7 @@ export default function AssetDetailSheet({ open, setOpen, id }: Props) {
 
   const handleViewDetail = () => {
     setOpen(false);
-    navigate({ to: `/assets/${id}` });
+    navigate({ to: `/assets/services/${id}` });
   };
 
   return (

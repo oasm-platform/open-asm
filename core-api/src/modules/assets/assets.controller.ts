@@ -18,6 +18,7 @@ import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
+import { GetUrlAssetsDTO } from './dto/get-url-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { ToggleAssetDto } from './dto/toggle-asset.dto';
@@ -32,6 +33,7 @@ import {
   GenerateServiceTagsResponseDto,
 } from './dto/generate-service-tags.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
+import { GetTagAssetsDTO } from './dto/get-tag-assets.dto';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -115,6 +117,26 @@ export class AssetsController {
   }
 
   @Doc({
+    summary: 'Get urls along with number of assets',
+    description:
+      'Retrieves a list of discovered urls with number of asset services.',
+    response: {
+      serialization: GetManyResponseDto(GetUrlAssetsDTO),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('asset.read')
+  @Get('/url')
+  getUrlAssets(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getUrlAssets(query, workspaceId);
+  }
+
+  @Doc({
     summary: 'Get technologies along with number of assets',
     description: 'Retrieves a list of technologies with number of assets.',
     response: {
@@ -170,6 +192,26 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetsService.getManyTls(query, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get tags along with number of assets',
+    description:
+      'Retrieves distinct service tags in the workspace with number of assets.',
+    response: {
+      serialization: GetManyResponseDto(GetTagAssetsDTO),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('asset.read')
+  @Get('/tags')
+  getTagAssets(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getTagAssets(query, workspaceId);
   }
 
   @Doc({
@@ -284,10 +326,14 @@ export class AssetsController {
   })
   @WorkspaceAccess('asset.write')
   @Post('/toggle')
-  toggleAsset(@Body() toggleAssetDto: ToggleAssetDto) {
+  toggleAsset(
+    @Body() toggleAssetDto: ToggleAssetDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.assetsService.toggleAsset(
       toggleAssetDto.assetId,
       toggleAssetDto.isEnabled,
+      workspaceId,
     );
   }
 

@@ -6,7 +6,7 @@ import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, Index, ManyToOne, OneToMany, Relation, Unique } from 'typeorm';
 import { AssetService } from './asset-services.entity';
-import { IpAssetsView } from './ip-assets.entity';
+import { DnsRecord } from './dns-record.entity';
 
 @Entity('assets')
 @Unique(['value', 'target'])
@@ -55,10 +55,42 @@ export class Asset extends BaseEntity {
   })
   assetGroupAssets?: Relation<AssetGroupAsset[]>;
 
-  @OneToMany(() => IpAssetsView, (ipAssets) => ipAssets.asset)
-  ipAssets?: Relation<IpAssetsView[]>;
+  @OneToMany(() => DnsRecord, (dns) => dns.asset, {
+    onDelete: 'CASCADE',
+  })
+  dnsRecordRows?: Relation<DnsRecord[]>;
 
   @ApiProperty()
   @Column({ default: true })
   isEnabled: boolean;
+
+  /**
+   * Kind-specific attributes. For a repository asset (GIT_ORG target):
+   * {@link RepositoryAssetMetadata}. Null for host assets.
+   */
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: Object,
+    additionalProperties: true,
+  })
+  @Column({ type: 'jsonb', nullable: true })
+  metadata?: Record<string, unknown> | null;
+}
+
+/**
+ * Metadata of a repository asset. `remoteId` is the provider's stable id: a
+ * renamed repository keeps its asset (and its findings) instead of turning
+ * into a new one.
+ */
+export interface RepositoryAssetMetadata {
+  provider: string;
+  remoteId: string;
+  fullName: string;
+  url: string;
+  defaultBranch: string | null;
+  private: boolean;
+  archived: boolean;
+  fork: boolean;
+  pushedAt: string | null;
 }

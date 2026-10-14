@@ -97,7 +97,13 @@ describe('AssetGroupService', () => {
   const mockToolsService = {
     getProfileToolIds: jest.fn().mockResolvedValue(new Set()),
   };
-
+  /** getAssetGroupById counts its join rows through its own query builder. */
+  const mockAssetGroupCountBuilder = {
+    select: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    getRawOne: jest.fn().mockResolvedValue({ totalAssets: '0' }),
+  };
   const mockJobsRegistryService = {};
 
   const mockConnectorRegistryService = {
@@ -126,6 +132,12 @@ describe('AssetGroupService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockAssetGroupCountBuilder.getRawOne.mockResolvedValue({
+      totalAssets: '0',
+    });
+    mockAssetGroupRepo.createQueryBuilder.mockReturnValue(
+      mockAssetGroupCountBuilder,
+    );
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         { provide: getRepositoryToken(AssetGroup), useValue: mockAssetGroupRepo },
@@ -241,18 +253,20 @@ describe('AssetGroupService', () => {
       expect(mockAssetAssetService.addManyAssets).toHaveBeenCalledWith(
         groupId,
         ['asset-1', 'asset-2'],
+        'workspace-uuid',
       );
 
-      // Workflow created with one job per tool
+      // Workflow created with one job per tool, keyed by tool name and with no
+      // `needs` (tools selected in a group run in parallel)
       expect(mockWorkflowRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           name: `Group Workflow - ${groupId}`,
           content: {
             on: { schedule: '0 0 * * *', target: [] },
-            jobs: [
-              { name: 'nmap', run: 'nmap' },
-              { name: 'gobuster', run: 'gobuster' },
-            ],
+            jobs: {
+              nmap: { run: 'nmap' },
+              gobuster: { run: 'gobuster' },
+            },
             name: `Group Workflow - ${groupId}`,
           },
           filePath: `group-${groupId}.yaml`,
@@ -322,62 +336,6 @@ describe('AssetGroupService', () => {
       expect(mockWorkflowRepo.save).not.toHaveBeenCalled();
     });
 
-    // ── Connector profile validation ─────────────────────────────────
-    it('should throw BadRequestException when connector tool lacks config profile', async () => {
-      const connectorTool = {
-        id: 'tool-connector',
-        name: 'nuclei',
-        type: 'connector',
-        isBuiltIn: false,
-      };
-      const dto = {
-        name: 'Web Servers',
-        toolIds: ['tool-connector'],
-      } as CreateAssetGroupDto;
-
-      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined); // name check
-      mockManager.find.mockResolvedValue([connectorTool]);
-
-      // Mock toolsService batched profile lookup to report no profile
-      (mockToolsService as any).getProfileToolIds = jest
-        .fn()
-        .mockResolvedValue(new Set());
-
-      await expect(service.create(dto, workspaceId)).rejects.toThrow(
-        /requires a configuration profile/i,
-      );
-    });
-
-    it('should allow connector tool with config profile', async () => {
-      const connectorTool = {
-        id: 'tool-connector',
-        name: 'nuclei',
-        type: 'connector',
-        isBuiltIn: false,
-      };
-      const dto = {
-        name: 'Web Servers',
-        toolIds: ['tool-connector'],
-      } as CreateAssetGroupDto;
-
-      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined); // name check
-      mockAssetGroupRepo.findOne.mockResolvedValue({ id: groupId });
-      mockManager.find.mockResolvedValue([connectorTool]);
-      mockWorkflowRepo.create.mockImplementation((data) => data);
-      mockWorkflowRepo.save.mockResolvedValue({ id: 'workflow-1' });
-      mockWorkflowService.addManyWorkflows.mockResolvedValue({
-        message: '1 workflows successfully added to asset group "group-1"',
-      });
-
-      // Mock toolsService batched profile lookup to report a profile
-      (mockToolsService as any).getProfileToolIds = jest
-        .fn()
-        .mockResolvedValue(new Set(['tool-connector']));
-
-      const result = await service.create(dto, workspaceId);
-      expect(result.id).toBe(groupId);
-    });
-
     it('should allow built-in tool without config profile', async () => {
       const builtInTool = {
         id: 'tool-builtin',
@@ -401,36 +359,6 @@ describe('AssetGroupService', () => {
 
       const result = await service.create(dto, workspaceId);
       expect(result.id).toBe(groupId);
-    });
-
-    it('should query config profiles once for multiple connector tools', async () => {
-      const connectorA = { id: 'tool-a', name: 'nuclei', type: 'connector', isBuiltIn: false };
-      const connectorB = { id: 'tool-b', name: 'wpscan', type: 'connector', isBuiltIn: false };
-      const dto = {
-        name: 'Web Servers',
-        toolIds: ['tool-a', 'tool-b'],
-      } as CreateAssetGroupDto;
-
-      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined); // name check
-      mockAssetGroupRepo.findOne.mockResolvedValue({ id: groupId });
-      mockManager.find.mockResolvedValue([connectorA, connectorB]);
-      mockWorkflowRepo.create.mockImplementation((data) => data);
-      mockWorkflowRepo.save.mockResolvedValue({ id: 'workflow-1' });
-      mockWorkflowService.addManyWorkflows.mockResolvedValue({
-        message: '1 workflows successfully added to asset group "group-1"',
-      });
-      (mockToolsService as any).getProfileToolIds = jest
-        .fn()
-        .mockResolvedValue(new Set(['tool-a', 'tool-b']));
-
-      const result = await service.create(dto, workspaceId);
-      expect(result.id).toBe(groupId);
-      // Single batched profile lookup for both connector ids
-      expect((mockToolsService as any).getProfileToolIds).toHaveBeenCalledTimes(1);
-      expect((mockToolsService as any).getProfileToolIds).toHaveBeenCalledWith(
-        workspaceId,
-        ['tool-a', 'tool-b'],
-      );
     });
   });
 
@@ -537,6 +465,44 @@ describe('AssetGroupService', () => {
 
       expect(result.assetGroupWorkflows).toEqual([]);
       expect(mockWorkflowService.getLastRunForWorkflows).toHaveBeenCalledWith([]);
+    });
+
+    it('should count the group hosts into totalAssets', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'Web Servers',
+        assetGroupWorkflows: [],
+      });
+      mockWorkflowService.getLastRunForWorkflows.mockResolvedValue(new Map());
+      mockAssetGroupCountBuilder.getRawOne.mockResolvedValue({
+        totalAssets: '7',
+      });
+
+      const result = await service.getAssetGroupById(groupId, workspaceId);
+
+      expect(result.totalAssets).toBe(7);
+      expect(mockAssetGroupCountBuilder.select).toHaveBeenCalledWith(
+        'COUNT(aga.id)',
+        'totalAssets',
+      );
+      expect(mockAssetGroupCountBuilder.where).toHaveBeenCalledWith(
+        'assetGroup.id = :id',
+        { id: groupId },
+      );
+    });
+
+    it('should default totalAssets to 0 when the count is empty', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'Web Servers',
+        assetGroupWorkflows: [],
+      });
+      mockWorkflowService.getLastRunForWorkflows.mockResolvedValue(new Map());
+      mockAssetGroupCountBuilder.getRawOne.mockResolvedValue(undefined);
+
+      const result = await service.getAssetGroupById(groupId, workspaceId);
+
+      expect(result.totalAssets).toBe(0);
     });
 
     it('should set lastRun to null when no job history exists', async () => {

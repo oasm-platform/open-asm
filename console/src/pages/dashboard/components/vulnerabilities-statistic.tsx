@@ -2,13 +2,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
+import { VulnerabilityStatisticSkeleton } from './dashboard-skeleton';
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import Score from './score';
 
 export default function VulnerabilityStatistic() {
-  const { statistics } = useStatistics();
+  const { statistics, isLoading } = useStatistics();
   const { calculateTrend } = useTimelineTrend();
+
+  if (isLoading) return <VulnerabilityStatisticSkeleton />;
 
   if (!statistics) return null;
 
@@ -103,9 +106,7 @@ export default function VulnerabilityStatistic() {
           {vulnerabilityStats.map((stat) => (
             <div key={stat.severity} className="text-center px-4 py-2">
               <p className="text-sm text-muted-foreground">{stat.label}</p>
-              <p
-                className={`text-2xl font-bold font-mono ${stat.colorClass}`}
-              >
+              <p className={`text-2xl font-bold font-mono ${stat.colorClass}`}>
                 <NumberAnimate value={stat.count} />
               </p>
             </div>

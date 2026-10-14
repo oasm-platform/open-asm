@@ -29,6 +29,11 @@ export class GetMetadataDto {
 
   @ApiProperty({ description: 'Current system version' })
   currentVersion: string | null;
+
+  @ApiProperty({
+    description: 'TTL in seconds for storage presigned URLs',
+  })
+  storagePresignTtlSeconds: number;
 }
 
 export class GetVersionDto {

@@ -49,7 +49,6 @@ const ToolInstallButton = ({
       {
         data: {
           toolId: tool.id,
-          workspaceId: workspaceId,
         },
       },
       {
@@ -79,7 +78,6 @@ const ToolInstallButton = ({
       {
         data: {
           toolId: tool.id,
-          workspaceId: workspaceId,
         },
       },
       {

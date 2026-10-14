@@ -20,6 +20,41 @@ func (c *Client) NextJob(ctx context.Context) (*jobsRegistry.Job, error) {
 	return job, nil
 }
 
+// NextJobs claims up to `limit` jobs in a single request.
+//
+// The batched claim exists so a worker filling N free concurrency slots makes
+// one round-trip and costs Core one claim transaction, instead of paying both N
+// times. Returns an empty slice (never nil-with-error) when nothing is
+// claimable, so callers can treat "empty" as "no work" exactly like NextJob
+// returns nil.
+func (c *Client) NextJobs(ctx context.Context, limit int) ([]*jobsRegistry.Job, error) {
+	if limit < 1 {
+		return nil, nil
+	}
+
+	resp, err := c.jobs.NextBatch(ctx, &jobsRegistry.NextBatchRequest{
+		Id:    c.WorkerID(),
+		Limit: int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch next jobs: %w", err)
+	}
+	if resp == nil {
+		return nil, nil
+	}
+
+	// A zero-id entry is not a runnable job; drop it rather than hand the
+	// caller something it cannot start or report a result for.
+	jobs := make([]*jobsRegistry.Job, 0, len(resp.Values))
+	for _, job := range resp.Values {
+		if job == nil || job.GetId() == "" {
+			continue
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs, nil
+}
+
 // SubmitSubdomainsResult submits subdomain discovery results for a job.
 func (c *Client) SubmitSubdomainsResult(ctx context.Context, jobID string, isError bool, raw string, assets []*jobsRegistry.Asset) error {
 	req := &jobsRegistry.SubdomainResultRequest{
@@ -104,6 +139,32 @@ func (c *Client) SubmitVulnerabilitiesResult(ctx context.Context, jobID string, 
 	}
 	if !resp.Success {
 		return fmt.Errorf("server rejected the vulnerabilities result submission")
+	}
+	return nil
+}
+
+// SubmitUrlDiscoveryResult submits URL discovery results for a job.
+//
+// Urls is a PLAIN repeated proto field on UrlDiscoveryResultRequest — unlike
+// the other category results it is NOT wrapped in a list message, so it is
+// passed through directly (never build a UrlDiscoveryList).
+func (c *Client) SubmitUrlDiscoveryResult(ctx context.Context, jobID string, isError bool, raw string, urls []*jobsRegistry.DiscoveredUrl) error {
+	req := &jobsRegistry.UrlDiscoveryResultRequest{
+		WorkerId: c.WorkerID(),
+		JobId:    jobID,
+		Error:    isError,
+		Urls:     urls,
+	}
+	if raw != "" {
+		req.Raw = &raw
+	}
+
+	resp, err := c.jobs.ResultUrlDiscovery(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to submit url-discovery result: %w", err)
+	}
+	if !resp.Success {
+		return fmt.Errorf("server rejected the url-discovery result submission")
 	}
 	return nil
 }

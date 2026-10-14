@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { generateToken } from '@/utils/genToken';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { StorageService } from '@/modules/storage/storage.service';
@@ -74,14 +73,21 @@ export class ReportsService {
     const total = await qb.getCount();
     const reports = await qb.limit(limit).offset(offset).getMany();
 
-    const data = reports.map((report) => {
-      const idx = report.path.indexOf('/');
-      const bucket = report.path.slice(0, idx);
-      const filePath = report.path.slice(idx + 1);
-      const token = this.storageService.generateDownloadToken(filePath, bucket);
-      const downloadUrl = `${STORAGE_BASE_PATH}/${bucket}/${encodeURIComponent(filePath)}/download?token=${token}`;
-      return { ...report, downloadUrl };
-    });
+    const data = await Promise.all(
+      reports.map(async (report) => {
+        const idx = report.path.indexOf('/');
+        const bucket = report.path.slice(0, idx);
+        const filePath = report.path.slice(idx + 1);
+        const { url: downloadUrl, expiresIn } =
+          await this.storageService.getPresignedDownloadUrl({
+            bucket,
+            key: filePath,
+            fileName: report.fileName,
+            contentType: 'application/pdf',
+          });
+        return { ...report, downloadUrl, downloadExpiresIn: expiresIn };
+      }),
+    );
 
     return getManyResponse({ query, data, total });
   }

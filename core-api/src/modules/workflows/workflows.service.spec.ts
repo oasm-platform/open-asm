@@ -5,6 +5,8 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import type { User } from '../auth/entities/user.entity';
+import { TargetType } from '@/common/enums/enum';
+import { Tool } from '../tools/entities/tools.entity';
 import type { CreateWorkflowDto } from './dto/create-workflow.dto';
 import type { GetManyWorkflowsQueryDto } from './dto/get-many-workflows.dto';
 import { Workflow } from './entities/workflow.entity';
@@ -13,6 +15,7 @@ import { WorkflowsService } from './workflows.service';
 describe('WorkflowsService', () => {
   let service: WorkflowsService;
   let workflowRepository: Repository<Workflow>;
+  const toolRepository = { find: jest.fn() };
 
   const mockWorkflow = {
     id: '123e4567-e89b-12d3-a456-42614174000',
@@ -30,9 +33,11 @@ describe('WorkflowsService', () => {
   };
 
   beforeEach(async () => {
+    toolRepository.find.mockReset().mockResolvedValue([]);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkflowsService,
+        { provide: getRepositoryToken(Tool), useValue: toolRepository },
         {
           provide: getRepositoryToken(Workflow),
           useValue: {
@@ -92,6 +97,77 @@ describe('WorkflowsService', () => {
         workspace,
       );
       expect(result).toEqual(mockWorkflow);
+    });
+
+    it('rejects content whose needs reference an unknown step', async () => {
+      const createWorkflowDto = {
+        name: 'Broken Workflow',
+        content: {
+          on: { target: ['test'] },
+          jobs: [
+            { name: 'Port Scan', run: 'naabu', needs: ['ghost'] },
+          ],
+          name: 'Broken Workflow Content',
+        },
+      } as unknown as CreateWorkflowDto;
+
+      await expect(
+        service.createWorkflow(createWorkflowDto, { id: 'user-1' }, {
+          id: 'workspace-1',
+        }),
+      ).rejects.toThrow(/Invalid workflow content/);
+
+      expect(workflowRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects content with a dependency cycle', async () => {
+      const createWorkflowDto = {
+        name: 'Cyclic Workflow',
+        content: {
+          on: { target: ['test'] },
+          jobs: [
+            { name: 'A', run: 'naabu', needs: ['B'] },
+            { name: 'B', run: 'httpx', needs: ['A'] },
+          ],
+          name: 'Cyclic Workflow Content',
+        },
+      } as unknown as CreateWorkflowDto;
+
+      await expect(
+        service.createWorkflow(createWorkflowDto, { id: 'user-1' }, {
+          id: 'workspace-1',
+        }),
+      ).rejects.toThrow(/cycle/i);
+    });
+
+    // The stored shape is canonical: a legacy array is converted on write, so
+    // the database converges on the jobs map instead of holding both shapes.
+    it('stores legacy array content as a jobs map', async () => {
+      const createWorkflowDto = {
+        name: 'Legacy Pipeline',
+        content: {
+          on: { target: ['test'] },
+          jobs: [
+            { name: 'Scan Subdomain', run: 'subfinder' },
+            { name: 'Port Scan', run: 'naabu', needs: ['Scan Subdomain'] },
+          ],
+          name: 'Legacy Pipeline Content',
+        },
+      } as unknown as CreateWorkflowDto;
+      jest
+        .spyOn(workflowRepository, 'save')
+        .mockImplementation((workflow) => Promise.resolve(workflow as Workflow));
+
+      const result = await service.createWorkflow(
+        createWorkflowDto,
+        { id: 'user-1' },
+        { id: 'workspace-1' },
+      );
+
+      expect(result.content.jobs).toEqual({
+        'Scan Subdomain': { run: 'subfinder' },
+        'Port Scan': { run: 'naabu', needs: ['Scan Subdomain'] },
+      });
     });
   });
 
@@ -181,6 +257,68 @@ describe('WorkflowsService', () => {
 
       expect(result.data).toEqual(mockWorkflows);
       expect(result.total).toBe(1);
+    });
+  });
+
+  describe('tool target types vs. triggers', () => {
+    const workspace = { id: 'workspace-1' };
+    const user = { id: 'user-1' };
+    const dto = (target: string[], run: string): CreateWorkflowDto =>
+      ({
+        name: 'Custom',
+        content: {
+          name: 'Custom',
+          on: { target },
+          jobs: { scan: { name: 'Scan', run } },
+        },
+      });
+
+    beforeEach(() => {
+      jest
+        .spyOn(workflowRepository, 'save')
+        .mockImplementation((w) => Promise.resolve(w as Workflow));
+    });
+
+    it('rejects a tool that supports none of the triggered target types', async () => {
+      toolRepository.find.mockResolvedValue([
+        { name: 'subfinder', targetTypes: [TargetType.DOMAIN] },
+      ]);
+
+      await expect(
+        service.createWorkflow(dto(['ip.create'], 'subfinder'), user, workspace),
+      ).rejects.toThrow(/"subfinder" can only scan DOMAIN targets/);
+      expect(workflowRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('allows partial overlap — the job is skipped at run time for other types', async () => {
+      toolRepository.find.mockResolvedValue([
+        { name: 'subfinder', targetTypes: [TargetType.DOMAIN] },
+      ]);
+
+      await expect(
+        service.createWorkflow(
+          dto(['domain.create', 'ip.create'], 'subfinder'),
+          user,
+          workspace,
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it('treats a tool without declared target types as a host scanner', async () => {
+      toolRepository.find.mockResolvedValue([{ name: 'legacy', targetTypes: [] }]);
+
+      await expect(
+        service.createWorkflow(dto(['cidr.create'], 'legacy'), user, workspace),
+      ).resolves.toBeDefined();
+    });
+
+    it('skips the check for workflows without target triggers', async () => {
+      await service.createWorkflow(
+        { name: 'Scheduled', content: { name: 'Scheduled', jobs: { a: { name: 'A', run: 'nuclei' } } } },
+        user,
+        workspace,
+      );
+      expect(toolRepository.find).not.toHaveBeenCalled();
     });
   });
 });

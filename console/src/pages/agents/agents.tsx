@@ -1,3 +1,4 @@
+import { CommandApprovalPrompt } from './components/command-approval-prompt';
 import { AgentTodoPanel } from './components/agent-todo-panel';
 import { useAgentChat } from '@/hooks/use-agent-chat';
 import { useParams } from '@tanstack/react-router';
@@ -43,6 +44,10 @@ export default function AgentsChatPage() {
     onLoadMore,
     onAgentModeChange,
     onWorkerSelect,
+    pendingApproval,
+    pendingApprovalCount,
+    isDecidingApproval,
+    onDecideApproval,
   } = useAgentChat({ conversationId });
 
   const [selectedToolCallId, setSelectedToolCallId] = useState<string | null>(
@@ -108,6 +113,17 @@ export default function AgentsChatPage() {
           showTodoAboveInput={!isLargeScreen}
           selectedToolCallId={selectedToolCallId}
           remoteExecuteEvents={remoteExecuteEvents}
+          approvalPrompt={
+            pendingApproval && (
+              <CommandApprovalPrompt
+                key={pendingApproval.approvalId}
+                approval={pendingApproval}
+                queueSize={pendingApprovalCount}
+                isSubmitting={isDecidingApproval}
+                onDecide={onDecideApproval}
+              />
+            )
+          }
         />
       </div>
 

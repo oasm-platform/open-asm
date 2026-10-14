@@ -11,6 +11,7 @@ import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
 import { StorageService } from '../storage/storage.service';
 import { DataSource } from 'typeorm';
+import { parseManifestTargetTypes, sameTargetTypes } from './tool-target-types';
 import { builtInTools } from './tools-provider/built-in-tools';
 
 /**
@@ -43,8 +44,8 @@ export class ToolSyncService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.syncAll();
-    } catch (error) {
-      this.logger.error('Error initializing tools:', error);
+    } catch {
+      // Startup sync is best-effort; failures must not block module init.
     }
   }
 
@@ -99,7 +100,8 @@ export class ToolSyncService implements OnModuleInit {
         existing.logoUrl !== tool.logoUrl ||
         existing.version !== tool.version ||
         existing.priority !== tool.priority ||
-        existing.category !== tool.category;
+        existing.category !== tool.category ||
+        !sameTargetTypes(existing.targetTypes, tool.targetTypes);
       if (needsUpdate) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
         builtInToUpsert.push({ ...tool, id: existing.id! } as ToolInsert);
@@ -111,7 +113,7 @@ export class ToolSyncService implements OnModuleInit {
         .insert()
         .orUpdate({
           conflict_target: ['name'],
-          overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'type', 'isBuiltIn', 'isOfficialSupport'],
+          overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'targetTypes', 'type', 'isBuiltIn', 'isOfficialSupport'],
         })
         .values(builtInToUpsert)
         .execute();
@@ -142,12 +144,23 @@ export class ToolSyncService implements OnModuleInit {
       case 'ports_scanner':
       case 'port_scanner':
         return ToolCategory.PORTS_SCANNER;
+      // Repository scanners (secrets/sca/sast) report findings too: they share
+      // the vulnerabilities result path, and their `targetTypes` (git_org) is
+      // what keeps them apart from host scanners.
       case 'vulnerabilities':
+      case 'secrets':
+      case 'sca':
+      case 'sast':
         return ToolCategory.VULNERABILITIES;
       case 'screenshot':
         return ToolCategory.SCREENSHOT;
+      case 'url_discovery':
+        return ToolCategory.URL_DISCOVERY;
       default:
-        return ToolCategory.VULNERABILITIES;
+        // Unknown capability: the connector is not synced rather than being
+        // silently treated as a vulnerability scanner (the manifest builder
+        // rejects unknown capabilities, so this means a newer manifest).
+        return undefined;
     }
   }
 
@@ -170,7 +183,6 @@ export class ToolSyncService implements OnModuleInit {
       () => this.syncConnectorToolsLocked(),
     );
     if (synced === null) {
-      this.logger.warn('Connector tools sync: another instance holds the "connector-sync" lock, skipping');
       return [];
     }
     return synced;
@@ -192,7 +204,6 @@ export class ToolSyncService implements OnModuleInit {
     try {
       raw = await fs.readFile(manifestPath, 'utf-8');
     } catch {
-      this.logger.warn(`Connector manifest not found at ${manifestPath} — skipping connector sync`);
       return [];
     }
 
@@ -200,13 +211,11 @@ export class ToolSyncService implements OnModuleInit {
     try {
       manifest = JSON.parse(raw) as { connectors?: Array<Record<string, unknown>> };
     } catch {
-      this.logger.warn(`Connector manifest at ${manifestPath} contains invalid JSON — skipping connector sync`);
       return [];
     }
 
     const connectors = manifest.connectors;
     if (!Array.isArray(connectors) || connectors.length === 0) {
-      this.logger.warn(`Connector manifest at ${manifestPath} has no connectors — skipping`);
       return [];
     }
 
@@ -238,16 +247,38 @@ export class ToolSyncService implements OnModuleInit {
       const logoBase64 = rawEntry['logo'] as string | undefined;
       const capabilities = rawEntry['capabilities'] as string[] | undefined;
       const category = ToolSyncService.mapConnectorCapabilityToCategory(capabilities);
+      if (!category) {
+        this.logger.warn(
+          `Connector "${slug}" skipped: unknown capability ${JSON.stringify(capabilities)}`,
+        );
+        continue;
+      }
+      // Manifests predating `targetTypes` (or a platform that does not know a
+      // newer type yet) fall back to the host default — the old behaviour.
+      const { targetTypes, unknown: unknownTargetTypes } = parseManifestTargetTypes(
+        rawEntry['targetTypes'],
+      );
+      if (unknownTargetTypes.length > 0) {
+        this.logger.warn(
+          `Connector "${slug}" declares target types this platform does not support yet: ${unknownTargetTypes.join(', ')}`,
+        );
+      }
       const author = String((rawEntry['author'] as string) ?? '').trim().toLowerCase();
       const isOfficialSupport = author === 'oasm';
 
-      const logoUrl = `/connectors/${name}.png`;
+      // logoUrl must mirror the manifest's logo presence exactly: a missing/empty
+      // logo maps to SQL NULL (never a stale /connectors/<slug>.png path). The
+      // value is assigned as `null` explicitly (not omitted) so TypeORM's INSERT
+      // and `orUpdate` both write NULL rather than falling back to a DEFAULT.
+      const hasLogo = typeof logoBase64 === 'string' && logoBase64.length > 0;
+      const logoUrl = (hasLogo ? `/connectors/${name}.png` : null) as unknown as string;
 
       const insert: ToolInsert = {
         id: randomUUID(),
         name,
         description,
         category,
+        targetTypes,
         version,
         logoUrl,
         isBuiltIn: false,
@@ -321,7 +352,6 @@ export class ToolSyncService implements OnModuleInit {
             void 0; // ignore if asset_tags table/col not exists (legacy DB)
           }
           await this.toolsRepository.delete(dupId);
-          this.logger.log(`Deduped tool "${name}": kept ${keepId} (${keeper.type}), removed ${dupId} (${dup.type})`);
         }
       }
     });
@@ -338,6 +368,7 @@ export class ToolSyncService implements OnModuleInit {
           existing.isOfficialSupport !== entry.insert.isOfficialSupport ||
           existing.description !== entry.insert.description ||
           existing.category !== entry.insert.category ||
+          !sameTargetTypes(existing.targetTypes, entry.insert.targetTypes) ||
           existing.version !== entry.insert.version ||
           existing.logoUrl !== entry.insert.logoUrl ||
           existing.priority !== entry.insert.priority;
@@ -352,23 +383,25 @@ export class ToolSyncService implements OnModuleInit {
         existing.isOfficialSupport = entry.insert.isOfficialSupport;
         existing.description = entry.insert.description;
         existing.category = entry.insert.category;
+        existing.targetTypes = entry.insert.targetTypes;
         existing.version = entry.insert.version;
+        const staleLogoUrl = existing.logoUrl;
         existing.logoUrl = entry.insert.logoUrl;
         existing.priority = entry.insert.priority;
         await this.toolsRepository.save(existing);
-        this.logger.log(`Overrode tool "${slug}" with connector data (id=${existing.id})`);
+        // Logo removed from the manifest: purge the now-orphaned stored object.
+        // Best-effort — a storage failure must not abort the sync.
+        if (staleLogoUrl && !entry.logoBase64) {
+          await this.storageService.deleteFile(`connectors/${slug}.png`, 'system').catch(() => undefined);
+        }
         if (entry.logoBase64) {
           try {
-            const cleanBase64 = entry.logoBase64.includes(',') ? entry.logoBase64.split(',').pop()! : entry.logoBase64;
-            const buffer = Buffer.from(cleanBase64, 'base64');
-            if (buffer.length > 0) {
-              await this.storageService
-                .uploadFile(`connectors/${slug}.png`, buffer, 'system')
-                .then(() => this.logger.log(`Uploaded connector logo for ${slug} -> connectors/${slug}.png`))
-                .catch((err) => this.logger.warn(`Failed to upload connector logo for ${slug}: ${err instanceof Error ? err.message : String(err)}`));
+            const buffer = this.decodeLogo(entry.logoBase64);
+            if (buffer) {
+              await this.storageService.uploadFile(`connectors/${slug}.png`, buffer, 'system').catch(() => undefined);
             }
-          } catch (err) {
-            this.logger.warn(`Failed to decode logo for ${slug}: ${err instanceof Error ? err.message : String(err)}`);
+          } catch {
+            // ignore malformed logo payload — DB row already saved
           }
         }
         const idx = connectorEntries.findIndex((e) => e.insert.name === slug);
@@ -388,7 +421,6 @@ export class ToolSyncService implements OnModuleInit {
     }
 
     if (toUpsert.length === 0) {
-      this.logger.log('Connector tools sync: no changes detected');
       // Still cleanup orphans (use original manifest names to avoid false orphans after takeover splice)
       await this.redisLockService.withLock('connector-tools-sync', 10_000, () =>
         this.removeOrphanConnectorTools(allConnectorNames),
@@ -405,7 +437,7 @@ export class ToolSyncService implements OnModuleInit {
       .insert()
       .orUpdate({
         conflict_target: ['name'],
-        overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'type', 'isBuiltIn', 'isOfficialSupport'],
+        overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'targetTypes', 'type', 'isBuiltIn', 'isOfficialSupport'],
       })
       .values(toUpsert)
       .execute();
@@ -423,19 +455,12 @@ export class ToolSyncService implements OnModuleInit {
       const base64 = logoMap.get(tool.name);
       if (!base64) continue;
       try {
-        // Strip data URI prefix if present
-        const cleanBase64 = base64.includes(',') ? base64.split(',').pop()! : base64;
-        const buffer = Buffer.from(cleanBase64, 'base64');
-        if (buffer.length === 0) continue;
+        const buffer = this.decodeLogo(base64);
+        if (!buffer) continue;
         const fileName = `connectors/${tool.name}.png`;
-        uploads.push(
-          this.storageService
-            .uploadFile(fileName, buffer, 'system')
-            .then(() => this.logger.log(`Uploaded connector logo for ${tool.name} -> ${fileName}`))
-            .catch((err) => this.logger.warn(`Failed to upload connector logo for ${tool.name}: ${err instanceof Error ? err.message : String(err)}`)),
-        );
-      } catch (err) {
-        this.logger.warn(`Failed to decode logo for ${tool.name}: ${err instanceof Error ? err.message : String(err)}`);
+        uploads.push(this.storageService.uploadFile(fileName, buffer, 'system').catch(() => undefined));
+      } catch {
+        // ignore malformed logo payload — DB row already saved
       }
     }
 
@@ -453,8 +478,18 @@ export class ToolSyncService implements OnModuleInit {
       this.removeOrphanProviderTools(allConnectorNames),
     );
 
-    this.logger.log(`Connector tools sync: committed ${committedTools.length} tool(s)`);
     return committedTools;
+  }
+
+  /**
+   * Decodes a manifest `logo` payload, stripping an optional data-URI prefix.
+   * Returns null when the payload holds no bytes, so callers can skip the write
+   * instead of storing an empty object.
+   */
+  private decodeLogo(base64: string): Buffer | null {
+    const cleanBase64 = base64.includes(',') ? base64.split(',').pop()! : base64;
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    return buffer.length > 0 ? buffer : null;
   }
 
   private async removeOrphanConnectorTools(currentNames: string[]): Promise<void> {
@@ -473,10 +508,6 @@ export class ToolSyncService implements OnModuleInit {
       .execute();
 
     await this.toolsRepository.delete({ id: In(orphanIds) });
-
-    this.logger.log(
-      `Removed ${orphans.length} orphan connector tool(s): ${orphans.map((t) => t.name).join(', ')}`,
-    );
   }
 
   /**
@@ -512,13 +543,8 @@ export class ToolSyncService implements OnModuleInit {
 
       // Delete orphaned provider tools (jobs/vulnerabilities/asset_tags cascade)
       await this.toolsRepository.delete({ id: In(orphanIds) });
-
-      this.logger.log(
-        `Removed ${orphans.length} orphan provider tool(s): ${orphans.map((t) => t.name).join(', ')}`,
-      );
-    } catch (err) {
-      // Warn, not error — legacy cleanup is non-critical and should not ceil startup
-      this.logger.warn(`Failed to remove orphan provider tools: ${err instanceof Error ? err.message : String(err)}`);
+    } catch {
+      // Best-effort legacy cleanup — must not block startup.
     }
   }
 
@@ -549,9 +575,5 @@ export class ToolSyncService implements OnModuleInit {
 
     // Then delete the orphaned tools
     await this.toolsRepository.delete({ id: In(orphanIds) });
-
-    this.logger.log(
-      `Removed ${orphanTools.length} built-in tool(s) no longer declared: ${orphanTools.map((t) => t.name).join(', ')}`,
-    );
   }
 }

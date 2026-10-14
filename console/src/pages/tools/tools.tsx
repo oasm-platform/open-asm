@@ -17,11 +17,14 @@ import { Search } from 'lucide-react';
 import useDebounce from '@/hooks/use-debounce';
 import Marketplace from './components/marketplace';
 
+const TAB_VALUES = ['all', 'builtin', 'connector', 'installed'];
+
 const TAB_TO_TYPE: Record<string, ToolsControllerGetManyToolsType | undefined> =
   {
     all: undefined,
     builtin: 'built_in',
     connector: 'connector',
+    installed: undefined,
   };
 
 const CATEGORY_OPTIONS = [
@@ -40,12 +43,13 @@ const Tools = () => {
   const [activeTab, setActiveTab] = useQueryTab({
     tabParam: 'tab',
     defaultValue: 'all',
-    validValues: ['all', 'builtin', 'connector'],
+    validValues: TAB_VALUES,
   });
   const searchInput = search.search ?? '';
   const categoryParam = search.category;
   const debouncedSearch = useDebounce(searchInput.trim(), 300);
 
+  const isInstalledTab = activeTab === 'installed';
   const toolType = TAB_TO_TYPE[activeTab];
 
   const handleSearchChange = (value: string) => {
@@ -76,6 +80,7 @@ const Tools = () => {
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="builtin">Built-in</TabsTrigger>
           <TabsTrigger value="connector">Connector</TabsTrigger>
+          <TabsTrigger value="installed">Installed</TabsTrigger>
         </TabsList>
       </Tabs>
       <div className="flex items-center gap-2 mb-4">
@@ -111,6 +116,7 @@ const Tools = () => {
         </Select>
       </div>
       <Marketplace
+        installed={isInstalledTab}
         toolType={toolType}
         search={debouncedSearch}
         category={categoryParam as ToolsControllerGetManyToolsCategory | undefined}

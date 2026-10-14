@@ -1,3 +1,4 @@
+import { CACHE_STATIC_RESOURCE } from '@/common/constants/app.constants';
 import { Public } from '@/common/decorators/app.decorator';
 import { Controller, Get, Param, Res, StreamableFile } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
@@ -19,16 +20,17 @@ export class ConnectorLogoController {
   ): Promise<StreamableFile> {
     // file is like nuclei.png — stored as connectors/nuclei.png in system bucket
     const key = `connectors/${file}`;
-    const stream = await this.storageService.getFile(key, 'system');
+    const { file: stream } = await this.storageService.getFile(key, 'system');
+    const cacheControl = `public, max-age=${CACHE_STATIC_RESOURCE}, no-transform`;
     const extension = file.split('.').pop()?.toLowerCase();
     if (extension === 'png') {
-      res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'max-age=1209600, no-transform' });
+      res.set({ 'Content-Type': 'image/png', 'Cache-Control': cacheControl });
     } else if (extension === 'jpg' || extension === 'jpeg') {
-      res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=1209600, no-transform' });
+      res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': cacheControl });
     } else if (extension === 'svg') {
-      res.set({ 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=1209600, no-transform' });
+      res.set({ 'Content-Type': 'image/svg+xml', 'Cache-Control': cacheControl });
     } else if (extension === 'webp') {
-      res.set({ 'Content-Type': 'image/webp', 'Cache-Control': 'max-age=1209600, no-transform' });
+      res.set({ 'Content-Type': 'image/webp', 'Cache-Control': cacheControl });
     }
     return stream;
   }

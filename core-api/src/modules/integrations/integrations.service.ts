@@ -2,6 +2,8 @@ import {
   decryptSensitiveConfigFields,
   encryptSensitiveConfigFields,
   maskSensitiveConfigFields,
+  omitDiscriminatorFields,
+  restoreMaskedSecrets,
   validateConfigOrThrow,
 } from './validators/integration.validator';
 
@@ -18,12 +20,28 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { Repository } from 'typeorm';
 
+import {
+  hasCapability,
+  isMultiCapabilityApp,
+  normalizeCapabilities,
+  resolveCapabilities,
+} from './capabilities';
 import type { ConnectorTestResult } from './connectors/connector.factory';
-import { runConnector } from './connectors/connector.factory';
+import {
+  resolveSourceCodeConnector,
+  runConnector,
+  testConnectorConnection,
+} from './connectors/connector.factory';
 import { GetIntegrationDto } from './dto/get-integration.dto';
 import { GetManyIntegrationsDto } from './dto/get-many-integrations.dto';
+import type {
+  ListRepositoriesQueryDto,
+  ListRepositoriesResponseDto,
+  SourceOrganizationDto,
+} from './dto/list-repositories.dto';
 import type { TestIntegrationDto } from './dto/test-integration.dto';
 import type { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { Integration } from './entities/integration.entity';
@@ -34,6 +52,38 @@ import {
   severityProperties,
   universalIntegrationSchema,
 } from './schemas';
+
+/**
+ * Derives the Telegram webhook `secret_token` from the bot token.
+ *
+ * The webhook is a @Public() route, so Telegram's shared-secret header is the
+ * only thing distinguishing a genuine update from anyone who guesses the
+ * integration id. Deriving it (rather than storing it) keeps this fix free of a
+ * schema change: both `setWebhook` and the inbound controller compute the same
+ * value from the same bot token. Telegram accepts 1-256 chars from
+ * [A-Za-z0-9_-], which a hex digest satisfies.
+ */
+export function deriveTelegramWebhookSecret(botToken: string): string {
+  return createHmac('sha256', 'oasm.telegram.webhook')
+    .update(botToken)
+    .digest('hex');
+}
+
+/**
+ * Constant-time comparison of the inbound Telegram secret header against the
+ * expected value derived from the stored bot token.
+ */
+export function verifyTelegramWebhookSecret(
+  provided: string | undefined,
+  botToken: string,
+): boolean {
+  if (!provided) return false;
+  const expected = Buffer.from(deriveTelegramWebhookSecret(botToken), 'utf8');
+  const received = Buffer.from(provided, 'utf8');
+  return (
+    expected.length === received.length && timingSafeEqual(expected, received)
+  );
+}
 
 @Injectable()
 export class IntegrationsService {
@@ -68,7 +118,10 @@ export class IntegrationsService {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: webhookUrl }),
+          body: JSON.stringify({
+            url: webhookUrl,
+            secret_token: deriveTelegramWebhookSecret(botToken),
+          }),
         },
       );
       const data = (await res.json()) as { ok: boolean; description?: string };
@@ -96,6 +149,23 @@ export class IntegrationsService {
     return universalIntegrationSchema;
   }
 
+  private assertAwsWorkloadIdentityScheduleAllowed(args: {
+    appType: string;
+    connectionMethod: unknown;
+    syncSchedule?: string;
+  }): void {
+    if (
+      args.appType === 'aws' &&
+      args.connectionMethod === 'workloadIdentity' &&
+      typeof args.syncSchedule === 'string' &&
+      args.syncSchedule !== 'disabled'
+    ) {
+      throw new BadRequestException(
+        'AWS workloadIdentity integrations do not support scheduled syncs; the OIDC token is short-lived. Set syncSchedule to "disabled" and run manual syncs.',
+      );
+    }
+  }
+
   /**
    * Creates a new integration in the specified workspace.
    * Validates config against JSON Schema, encrypts sensitive fields, then persists.
@@ -105,12 +175,23 @@ export class IntegrationsService {
     description?: string;
     appType: string;
     category: string;
+    capabilities?: string[];
     config: Record<string, unknown>;
     workspaceId: string;
     userId: string;
     syncSchedule?: string;
   }): Promise<GetIntegrationDto> {
-    validateConfigOrThrow(args);
+    // Legacy apps resolve to [category] exactly as before; multi-capability
+    // apps get their enabled subset plus a primary `category` inside it.
+    const { category, capabilities } = normalizeCapabilities(args);
+    const config = omitDiscriminatorFields(args.config);
+
+    validateConfigOrThrow({
+      appType: args.appType,
+      category,
+      capabilities,
+      config,
+    });
 
     // Periodic syncs only make sense for cloud providers: the scheduler
     // dispatches runConnector with CLOUD_PROVIDER, which notification/
@@ -118,21 +199,31 @@ export class IntegrationsService {
     if (
       args.syncSchedule &&
       args.syncSchedule !== 'disabled' &&
-      args.category !== (IntegrationType.CLOUD_PROVIDER as string)
+      !capabilities.includes(IntegrationType.CLOUD_PROVIDER)
     ) {
       throw new BadRequestException(
         'syncSchedule is only supported for CLOUD_PROVIDER integrations',
       );
     }
 
+    // AWS workloadIdentity relies on a short-lived OIDC token; a recurring
+    // sync would fail once the token expires, so only manual/disabled sync
+    // is allowed.
+    this.assertAwsWorkloadIdentityScheduleAllowed({
+      appType: args.appType,
+      connectionMethod: config.connectionMethod,
+      syncSchedule: args.syncSchedule,
+    });
+
     const dek = await this.workspaceEncryption.getDEK(args.workspaceId);
-    const encryptedConfig = encryptSensitiveConfigFields(args.config, dek);
+    const encryptedConfig = encryptSensitiveConfigFields(config, dek);
 
     const entity = this.integrationRepository.create({
       name: args.name,
       description: args.description,
       appType: args.appType,
-      category: args.category,
+      category,
+      capabilities,
       config: encryptedConfig,
       workspaceId: args.workspaceId,
       createdById: args.userId,
@@ -162,7 +253,7 @@ export class IntegrationsService {
     }
 
     // Fire welcome message for notification integrations (best-effort)
-    if (args.category === (IntegrationType.NOTIFICATION as string)) {
+    if (hasCapability(saved, IntegrationType.NOTIFICATION)) {
       this.sendConnectedMessage(saved).catch((err: Error) => {
         this.logger.warn(
           `Failed to send connected message for integration ${saved.id}: ${err.message}`,
@@ -208,7 +299,12 @@ export class IntegrationsService {
     }
 
     if (category) {
-      qb.andWhere('integration.category = :category', { category });
+      // Matches the primary category OR any enabled capability, so filtering
+      // by TICKETING also finds a GitHub row whose primary is SOURCE_CODE.
+      qb.andWhere(
+        '(integration.category = :category OR :category = ANY(integration.capabilities))',
+        { category },
+      );
     }
 
     // Guard against invalid sort columns
@@ -298,8 +394,13 @@ export class IntegrationsService {
    * Tests an integration by executing its connector with the stored config.
    *
    * Decrypts sensitive config, injects a test payload, looks up the correct
-   * connector class by appType, and dispatches the appropriate method by category.
-   * No if/else chains — all dispatch is data-driven via the connector factory.
+   * connector class by appType, and dispatches the appropriate method by
+   * capability. No if/else chains — all dispatch is data-driven via the
+   * connector factory.
+   *
+   * Tested capability: `dto.capability` when given (must be enabled);
+   * otherwise the category for single-capability apps (unchanged behaviour)
+   * and a plain connection check for multi-capability apps.
    */
   async testIntegration(
     id: string,
@@ -314,11 +415,22 @@ export class IntegrationsService {
       throw new NotFoundException('Integration not found');
     }
 
+    if (dto?.capability && !hasCapability(integration, dto.capability)) {
+      throw new BadRequestException(
+        `Capability ${dto.capability} is not enabled on this integration`,
+      );
+    }
+    const capability: string | undefined =
+      dto?.capability ??
+      (isMultiCapabilityApp(integration.appType)
+        ? undefined
+        : integration.category);
+
     // Cloud providers are tested with a dry-run sync: fetch + count only, no
     // DB writes and no lastRunAt update (SC-API-3). A failed dry run is a
     // normal test outcome (e.g. bad token) — reported as success:false
     // instead of surfacing as an unhandled 400 (SC-TEST-2b).
-    if (integration.category === (IntegrationType.CLOUD_PROVIDER as string)) {
+    if (capability === (IntegrationType.CLOUD_PROVIDER as string)) {
       try {
         const sync = await this.integrationSyncService.runSync(id, workspaceId, {
           dryRun: true,
@@ -349,6 +461,17 @@ export class IntegrationsService {
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
     const decryptedConfig = decryptSensitiveConfigFields(integration.config, dek);
 
+    // Only NOTIFICATION has a harmless "send something" action. Ticketing
+    // would open a real ticket and source-code has no action at all, so they
+    // (and the bare connection) are checked via testConnection() instead.
+    if (capability !== (IntegrationType.NOTIFICATION as string)) {
+      return testConnectorConnection(
+        integration.appType,
+        capability,
+        decryptedConfig,
+      );
+    }
+
     // Merge stored config with a test message text
     const testConfig: Record<string, unknown> = {
       ...decryptedConfig,
@@ -358,7 +481,73 @@ export class IntegrationsService {
       integrationId: integration.id,
     };
 
-    return runConnector(integration.appType, integration.category, testConfig);
+    return runConnector(
+      integration.appType,
+      IntegrationType.NOTIFICATION,
+      testConfig,
+    );
+  }
+
+  /**
+   * Lists the namespaces (GitHub orgs/user, GitLab groups/user) a SOURCE_CODE
+   * integration can read — the choices for a new GIT_ORG target.
+   */
+  async listOrganizations(
+    id: string,
+    workspaceId: string,
+  ): Promise<SourceOrganizationDto[]> {
+    const { integration, decryptedConfig } =
+      await this.getIntegrationWithDecryptedConfig(id, workspaceId);
+
+    if (!hasCapability(integration, IntegrationType.SOURCE_CODE)) {
+      throw new BadRequestException(
+        'Organizations can only be listed for integrations with the SOURCE_CODE capability',
+      );
+    }
+
+    const connector = resolveSourceCodeConnector(integration.appType);
+    try {
+      return await connector.listOrganizations(decryptedConfig);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to list organizations',
+      );
+    }
+  }
+
+  /**
+   * Lists the repositories visible to a SOURCE_CODE integration, straight
+   * from the provider (nothing is cached or persisted). The console uses it
+   * to let a user pick repositories to link.
+   */
+  async listRepositories(
+    id: string,
+    workspaceId: string,
+    query: ListRepositoriesQueryDto,
+  ): Promise<ListRepositoriesResponseDto> {
+    const { integration, decryptedConfig } =
+      await this.getIntegrationWithDecryptedConfig(id, workspaceId);
+
+    if (!hasCapability(integration, IntegrationType.SOURCE_CODE)) {
+      throw new BadRequestException(
+        'Repositories can only be listed for integrations with the SOURCE_CODE capability',
+      );
+    }
+
+    const connector = resolveSourceCodeConnector(integration.appType);
+    try {
+      return await connector.listRepositories(decryptedConfig, {
+        search: query.search,
+        page: query.page,
+        limit: query.limit,
+      });
+    } catch (error) {
+      // Provider failures (bad token, missing scope) are the user's to fix —
+      // a 400 with the provider message, not an opaque 500.
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to list repositories',
+      );
+    }
   }
 
   /**
@@ -416,27 +605,71 @@ export class IntegrationsService {
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
 
-    if (dto.config !== undefined) {
+    let capabilitiesChanged = false;
+    if (dto.capabilities !== undefined) {
+      const previous = resolveCapabilities(integration);
+      const normalized = normalizeCapabilities({
+        appType: integration.appType,
+        category: integration.category,
+        capabilities: dto.capabilities,
+      });
+      capabilitiesChanged =
+        previous.length !== normalized.capabilities.length ||
+        normalized.capabilities.some((cap) => !previous.includes(cap));
+      integration.category = normalized.category;
+      integration.capabilities = normalized.capabilities;
+    }
+
+    // A capability change alone can make the stored config invalid (enabling
+    // TICKETING requires ticketRepository), so re-validate whenever either
+    // changes — against the new config, or the stored one.
+    if (dto.config !== undefined || capabilitiesChanged) {
+      const storedConfig = decryptSensitiveConfigFields(integration.config, dek);
+      const config =
+        dto.config !== undefined
+          ? restoreMaskedSecrets(omitDiscriminatorFields(dto.config), storedConfig)
+          : storedConfig;
+
       validateConfigOrThrow({
         appType: integration.appType,
         category: integration.category,
-        config: dto.config,
+        capabilities: resolveCapabilities(integration),
+        config,
       });
 
-      integration.config = encryptSensitiveConfigFields(dto.config, dek);
+      if (dto.config !== undefined) {
+        integration.config = encryptSensitiveConfigFields(config, dek);
+      }
     }
+
+    // Reject an effective AWS workloadIdentity + schedule combination even
+    // when syncSchedule is omitted: a config-only update that switches an
+    // already-scheduled integration to workloadIdentity would otherwise leave
+    // the cron active for a connection method that cannot renew its token.
+    const effectiveConnectionMethod =
+      dto.config?.connectionMethod ??
+      decryptSensitiveConfigFields(integration.config, dek).connectionMethod;
+    const effectiveSyncSchedule =
+      dto.syncSchedule ?? integration.syncSchedule;
+
+    this.assertAwsWorkloadIdentityScheduleAllowed({
+      appType: integration.appType,
+      connectionMethod: effectiveConnectionMethod,
+      syncSchedule: effectiveSyncSchedule,
+    });
 
     // Re-register the periodic sync scheduler when the schedule changed
     // (SC-SCHED-3/4). Only cloud providers support schedules (F3).
     if (dto.syncSchedule !== undefined) {
       if (
         dto.syncSchedule !== 'disabled' &&
-        integration.category !== (IntegrationType.CLOUD_PROVIDER as string)
+        !hasCapability(integration, IntegrationType.CLOUD_PROVIDER)
       ) {
         throw new BadRequestException(
           'syncSchedule is only supported for CLOUD_PROVIDER integrations',
         );
       }
+
       await this.integrationSyncService.applySchedule(
         integration,
         dto.syncSchedule,
@@ -458,32 +691,42 @@ export class IntegrationsService {
   }
 
   /**
-   * Fetches all integrations for a workspace filtered by category.
+   * Fetches all integrations for a workspace that have `capability` enabled.
    * Returns decrypted & masked integration DTOs.
    */
   async getIntegrationByWorkspaceId(
     workspaceId: string,
-    category: string,
+    capability: string,
   ): Promise<GetIntegrationDto[]> {
-    const integrations = await this.integrationRepository.find({
-      where: { workspaceId, category },
-    });
+    const integrations = await this.getIntegrationEntitiesByCapability(
+      workspaceId,
+      capability,
+    );
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
     return integrations.map((i) => this.toResponse(i, dek));
   }
 
   /**
-   * Returns raw Integration entities for a workspace + category with decrypted config.
-   * Intended for internal service-to-service use (e.g. notification processor).
+   * Returns raw Integration entities for a workspace that have `capability`
+   * enabled (config still encrypted). Intended for internal
+   * service-to-service use (e.g. the integrations event lane).
+   *
+   * Matches `category` too: a legacy row's capability IS its category, so a
+   * row whose `capabilities` array was never filled still matches.
    */
-  async getIntegrationEntitiesByCategory(
+  async getIntegrationEntitiesByCapability(
     workspaceId: string,
-    category: string,
+    capability: string,
   ): Promise<Integration[]> {
-    return this.integrationRepository.find({
-      where: { workspaceId, category },
-    });
+    return this.integrationRepository
+      .createQueryBuilder('integration')
+      .where('integration.workspaceId = :workspaceId', { workspaceId })
+      .andWhere(
+        '(integration.category = :capability OR :capability = ANY(integration.capabilities))',
+        { capability },
+      )
+      .getMany();
   }
 
   /**
@@ -498,7 +741,7 @@ export class IntegrationsService {
     // the stored config. This ensures newly added notification type / severity
     // toggles work for existing integrations without requiring re-configuration.
     let config = maskedConfig;
-    if (integration.category === (IntegrationType.NOTIFICATION as string)) {
+    if (hasCapability(integration, IntegrationType.NOTIFICATION)) {
       const toggleKeys = new Set([
         ...Object.keys(notificationTypeProperties),
         ...Object.keys(severityProperties),
@@ -517,6 +760,7 @@ export class IntegrationsService {
       description: integration.description,
       appType: integration.appType,
       category: integration.category,
+      capabilities: resolveCapabilities(integration),
       config,
       workspaceId: integration.workspaceId,
       createdById: integration.createdById,
@@ -539,7 +783,7 @@ export class IntegrationsService {
     workspaceId: string,
   ): Promise<{ jobId: string }> {
     const integration = await this.getIntegrationById(id, workspaceId);
-    if (integration.category !== (IntegrationType.CLOUD_PROVIDER as string)) {
+    if (!hasCapability(integration, IntegrationType.CLOUD_PROVIDER)) {
       throw new BadRequestException(
         'syncSchedule is only supported for CLOUD_PROVIDER integrations',
       );
@@ -559,7 +803,7 @@ export class IntegrationsService {
 
     const result = await runConnector(
       integration.appType,
-      integration.category,
+      IntegrationType.NOTIFICATION,
       {
         ...config,
         text,

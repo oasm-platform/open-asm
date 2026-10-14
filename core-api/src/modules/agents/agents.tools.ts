@@ -10,17 +10,28 @@ import { Repository } from 'typeorm';
 import { z } from 'zod';
 
 import { AssetsService } from '@/modules/assets/assets.service';
+import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { IssuesService } from '@/modules/issues/issues.service';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
+import { RedisService } from '@/services/redis/redis.service';
+import { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
+import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { AgentMode } from '@/common/enums/enum';
+import {
+  AgentsApprovalsService,
+  type ApprovalContext,
+  type ApprovalDecision,
+  type ApprovalSettings,
+  type PlanRunMode,
+} from './agents.approvals';
+import { AgentApprovalMode, AgentMode, WorkerScope } from '@/common/enums/enum';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -50,6 +61,82 @@ const webFetchSchema = z.object({
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolType = any;
 
+function rejectionMessage(what: string, feedback?: string): string {
+  const base = `${what} was not approved by the user and was not executed.`;
+  return feedback ? `${base} The user says: ${feedback}` : base;
+}
+
+/** Matched by the console (chat-helpers.tsx) to show the call as "Needs plan" */
+const PLAN_REQUIRED_MESSAGE =
+  'Not executed: this conversation needs an approved plan first. Call formulate_plan with the full plan (put this work in its steps) and wait for the user to approve it before calling other tools.';
+
+/** Plans exist only in PLAN mode; AUTO and MANUAL just do the work. */
+const PLANNING_OFF_MESSAGE =
+  'Not executed: planning is off in this conversation (only plan mode makes plans). Do the work directly with the other tools, without a plan.';
+
+function deniedMessage(what: string, decision: ApprovalDecision): string {
+  return decision.planRequired
+    ? PLAN_REQUIRED_MESSAGE
+    : rejectionMessage(what, decision.feedback);
+}
+
+/** Tools that gate themselves (on the raw command) instead of via withApproval. */
+const SELF_GATED_TOOLS = new Set(['execute_remote_command']);
+
+/**
+ * Built-in tools that only read OASM data, so MANUAL runs them without
+ * asking. Not retrieve_web_page: a URL it fetches can carry data out.
+ */
+const READ_ONLY_TOOLS = new Set([
+  'enumerate_assets',
+  'discover_vulnerabilities',
+  'retrieve_targets',
+  'gather_statistics',
+  'inspect_asset',
+  'examine_target_assets',
+  'investigate_vulnerability',
+  'list_network_ports',
+  'fingerprint_technologies',
+  'verify_tls_settings',
+  'enumerate_open_issues',
+  'inspect_issue',
+  'display_available_tools',
+  'list_active_workers',
+  'review_jobs',
+  'read_tool_output',
+]);
+
+/**
+ * An MCP tool counts as read-only when its server says so and does not say
+ * it reaches the outside world (same reason as retrieve_web_page).
+ */
+function isReadOnlyMcpTool(metadata: unknown): boolean {
+  const annotations = (metadata as { annotations?: Record<string, unknown> })
+    ?.annotations;
+  return (
+    annotations?.readOnlyHint === true && annotations.openWorldHint !== true
+  );
+}
+
+/**
+ * JSON with object keys sorted at every level, so the same arguments match
+ * the same approval whatever order the model wrote them in.
+ */
+export function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.entries(v as Record<string, unknown>).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        )
+      : v,
+  );
+}
+
+/** Longer plans are rarely followed through and bloat every system prompt. */
+const MAX_PLAN_STEPS = 20;
+
 function isPrivateIp(ip: string): boolean {
   const parts = ip.split('.').map(Number);
   if (parts.length !== 4 || parts.some(isNaN)) return false;
@@ -62,6 +149,89 @@ function isPrivateIp(ip: string): boolean {
   if (a === 100 && b >= 64 && b <= 127) return true;
   if (a === 0) return true;
   return false;
+}
+
+/** The worker's whole budget for one run_tool, connect included. */
+export const AGENT_TOOL_RUN_TIMEOUT_MS = 5 * 60_000;
+/** Core waits this much past the budget for the worker's final event. */
+const AGENT_TOOL_RESULT_GRACE_MS = 30_000;
+/** What one run_tool / read_tool_output answer puts into the LLM context. */
+const AGENT_TOOL_OUTPUT_PAGE = 8 * 1024;
+/** Full output kept for read_tool_output: Redis only, never the database. */
+const AGENT_TOOL_OUTPUT_STORE_MAX = 10 * 1024 * 1024;
+const AGENT_TOOL_OUTPUT_TTL_SECONDS = 3600;
+
+const toolOutputKey = (conversationId: string, runId: string) =>
+  `agent:tool-output:${conversationId}:${runId}`;
+
+/** Output lines; a trailing newline ends the last line, it opens no new one. */
+function outputLines(raw: string): string[] {
+  if (raw === '') return [];
+  const lines = raw.split('\n');
+  if (lines[lines.length - 1] === '') lines.pop();
+  return lines;
+}
+
+/** Required config fields of a connector that `config` leaves empty. */
+function missingRequiredConfig(
+  schema: Record<string, unknown> | undefined,
+  config: Record<string, unknown> | undefined,
+): string[] {
+  const required = Array.isArray(schema?.required)
+    ? (schema.required as unknown[]).filter(
+        (key): key is string => typeof key === 'string',
+      )
+    : [];
+  return required.filter((key) => {
+    const value = config?.[key];
+    return value === undefined || value === null || value === '';
+  });
+}
+
+/**
+ * One page of a stored tool output: lines from `offset` (into the matching
+ * lines when `pattern` is set, a case-insensitive substring), at most `limit`
+ * lines and AGENT_TOOL_OUTPUT_PAGE characters. Lines are numbered 1-based as
+ * in the full output.
+ */
+export function pageToolOutput(
+  raw: string,
+  {
+    offset,
+    limit,
+    pattern,
+  }: { offset: number; limit: number; pattern?: string },
+) {
+  const lines = outputLines(raw);
+  const needle = pattern?.toLowerCase();
+  const picked: number[] = [];
+  lines.forEach((line, i) => {
+    if (!needle || line.toLowerCase().includes(needle)) picked.push(i);
+  });
+
+  let output = '';
+  let next = offset;
+  for (const i of picked.slice(offset, offset + limit)) {
+    const row = `${i + 1}: ${lines[i]}\n`;
+    const room = AGENT_TOOL_OUTPUT_PAGE - output.length;
+    if (row.length > room) {
+      // A single oversized line still advances, cut, so paging cannot stall.
+      if (output === '') {
+        output = `${row.slice(0, room - 15)} …[line cut]\n`;
+        next++;
+      }
+      break;
+    }
+    output += row;
+    next++;
+  }
+  return {
+    totalLines: lines.length,
+    ...(needle ? { matchedLines: picked.length } : {}),
+    offset,
+    nextOffset: next < picked.length ? next : null,
+    output,
+  };
 }
 
 @Injectable()
@@ -88,6 +258,11 @@ export class AgentTool {
     @InjectRepository(AgentConversationTodo)
     private readonly todoRepository: Repository<AgentConversationTodo>,
     private readonly agentsMemories: AgentsMemoriesService,
+    private readonly approvals: AgentsApprovalsService,
+    private readonly connectorRegistry: ConnectorRegistryService,
+    private readonly toolConfigProfiles: ToolConfigProfilesService,
+    private readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
+    private readonly redisService: RedisService,
   ) {}
 
   get getAssetsTool(): (workspaceId: string) => any {
@@ -95,7 +270,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List discovered assets (domains, IPs, URLs) in the workspace. Params: page, limit, value (filter text).',
-        parameters: getAssetsSchema,
+        inputSchema: getAssetsSchema,
         execute: async (params: z.infer<typeof getAssetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.assetsService.getManyAsssetServices(
@@ -123,7 +298,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List security vulnerabilities with severity. Params: page, limit, q (search e.g. "XSS", "CVE-2024").',
-        parameters: getVulnerabilitiesSchema,
+        inputSchema: getVulnerabilitiesSchema,
         execute: async (params: z.infer<typeof getVulnerabilitiesSchema>) => {
           const { page, limit, q } = params;
           const response = await this.vulnerabilitiesService.getVulnerabilities(
@@ -155,7 +330,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Show scanning scope (root domains, IP ranges added by user). Params: page, limit, value (filter text).',
-        parameters: getTargetsSchema,
+        inputSchema: getTargetsSchema,
         execute: async (params: z.infer<typeof getTargetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.targetsService.getTargetsInWorkspace(
@@ -183,7 +358,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Return security dashboard summary: asset/vulnerability counts, severity breakdown, security score. No params.',
-        parameters: z.object({}),
+        inputSchema: z.object({}),
         execute: async () =>
           this.statisticService.getStatistics({ workspaceId }),
       };
@@ -195,7 +370,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description: 'Get full technical details of a single asset by assetId.',
-        parameters: detailAssetSchema,
+        inputSchema: detailAssetSchema,
         execute: async (params: z.infer<typeof detailAssetSchema>) => {
           const { assetId } = params;
           return this.assetsService.getAssetById(assetId, workspaceId);
@@ -210,7 +385,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter).',
-        parameters: listAssetsInTargetSchema,
+        inputSchema: listAssetsInTargetSchema,
         execute: async (params: z.infer<typeof listAssetsInTargetSchema>) => {
           const { targetId, limit, page, value } = params;
           return this.assetsService.getManyAsssetServices(
@@ -235,7 +410,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'Get full vulnerability report with CVSS, PoC, remediation steps. Params: vulnId.',
-        parameters: detailVulnSchema,
+        inputSchema: detailVulnSchema,
         execute: async (params: z.infer<typeof detailVulnSchema>) => {
           const vulnId: string = (params.vulnId ?? params.id) as string;
           return this.vulnerabilitiesService.getVulnerability(
@@ -253,7 +428,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List open network ports with asset counts. Params: page, limit, value (port number filter).',
-        parameters: getPortsSchema,
+        inputSchema: getPortsSchema,
         execute: async (params: z.infer<typeof getPortsSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getPortAssets(
@@ -277,7 +452,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List detected technologies (software, frameworks, servers). Params: page, limit, value (filter by name).',
-        parameters: getTechnologiesSchema,
+        inputSchema: getTechnologiesSchema,
         execute: async (params: z.infer<typeof getTechnologiesSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getTechnologyAssets(
@@ -301,7 +476,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List TLS/SSL certificates with issuer, subject, expiry. Params: page, limit, search (host name filter).',
-        parameters: getTlsSchema,
+        inputSchema: getTlsSchema,
         execute: async (params: z.infer<typeof getTlsSchema>) => {
           const { page, limit, search } = params;
           return this.assetsService.getManyTls(
@@ -325,18 +500,28 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'HTTP GET to any public URL. Returns statusCode + body. Params: url.',
-        parameters: webFetchSchema,
+        inputSchema: webFetchSchema,
         execute: async (params: z.infer<typeof webFetchSchema>) => {
           const { url: rawUrl } = params;
           try {
             const parsedUrl = new URL(rawUrl);
-            if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-              return { error: 'Only http and https protocols are allowed', url: rawUrl };
+            if (
+              parsedUrl.protocol !== 'http:' &&
+              parsedUrl.protocol !== 'https:'
+            ) {
+              return {
+                error: 'Only http and https protocols are allowed',
+                url: rawUrl,
+              };
             }
             const addresses = await dns.resolve4(parsedUrl.hostname);
             for (const ip of addresses) {
               if (isPrivateIp(ip)) {
-                return { error: 'Request blocked: target address is not publicly accessible', url: rawUrl };
+                return {
+                  error:
+                    'Request blocked: target address is not publicly accessible',
+                  url: rawUrl,
+                };
               }
             }
             const response = await fetch(rawUrl, {
@@ -361,7 +546,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List security issues with status. Params: page, limit, search, status (OPEN/IN_PROGRESS/RESOLVED).',
-        parameters: listIssuesSchema,
+        inputSchema: listIssuesSchema,
         execute: async (params: z.infer<typeof listIssuesSchema>) => {
           const { page, limit, search, status } = params;
           const response = await this.issuesService.getMany(
@@ -394,7 +579,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description: 'Get full details of a single issue by issueId.',
-        parameters: detailIssueSchema,
+        inputSchema: detailIssueSchema,
         execute: async (params: z.infer<typeof detailIssueSchema>) => {
           const { issueId } = params;
           return this.issuesService.getById(issueId, workspaceId);
@@ -409,7 +594,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List installed security tools/scanners. Params: page, limit, q (search filter).',
-        parameters: listToolsSchema,
+        inputSchema: listToolsSchema,
         execute: async (params: z.infer<typeof listToolsSchema>) => {
           const { page, limit, q } = params;
           const response = await this.toolsService.getManyTools({
@@ -421,7 +606,12 @@ export class AgentTool {
           });
           return {
             ...response,
-            data: response.data.map((i) => ({ id: i.id, name: i.name })),
+            data: response.data.map((i) => ({
+              id: i.id,
+              name: i.name,
+              agentTool:
+                this.connectorRegistry.getConnector(i.name)?.agentTool === true,
+            })),
           };
         },
       };
@@ -434,7 +624,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List connected worker nodes. Params: page, limit, q (search query).',
-        parameters: listWorkersSchema,
+        inputSchema: listWorkersSchema,
         execute: async (params: z.infer<typeof listWorkersSchema>) => {
           const { page, limit, q } = params;
           const response = await this.workersService.getWorkers({
@@ -444,6 +634,7 @@ export class AgentTool {
             sortOrder: SortOrder.DESC,
             search: q,
             workspaceId,
+            scope: WorkerScope.WORKSPACE,
             enabledAgentMode: true,
           });
           return {
@@ -461,7 +652,7 @@ export class AgentTool {
       const toolConfig: any = {
         description:
           'List background scan jobs with status. Params: page, limit, jobHistoryId, jobStatus (completed/failed/active).',
-        parameters: listJobsSchema,
+        inputSchema: listJobsSchema,
         execute: async (params: z.infer<typeof listJobsSchema>) => {
           const { page, limit, jobHistoryId, jobStatus } = params;
           const response = await this.jobsRegistryService.getManyJobs(
@@ -489,6 +680,7 @@ export class AgentTool {
     workspaceId: string,
     conversationId: string,
     emitter?: EventEmitter,
+    approval?: ApprovalSettings,
   ): ToolType {
     const toolConfig: any = {
       description: [
@@ -496,22 +688,51 @@ export class AgentTool {
         'Params: command (required shell command string).',
         'Output: stdout, stderr, exitCode, error, timedOut.',
         'Warning: OS-level permissions, no PTY, strict timeout.',
+        'The user may reject a command; if so, do not retry it and propose an alternative.',
       ].join('\n'),
-      parameters: z.object({
+      inputSchema: z.object({
         command: z.string().min(1).describe('Shell command to execute'),
       }),
       execute: async (
         params: { command: string },
-        options: { toolCallId: string },
+        options: { toolCallId: string; abortSignal?: AbortSignal },
       ) => {
         const { command } = params;
         const { toolCallId } = options;
         const sessionId = randomUUID();
 
+        // Without an approval context (e.g. system-driven runs) nobody can
+        // approve, so refuse rather than run unreviewed commands.
+        const decision = approval
+          ? await this.approvals.authorize(
+              command,
+              toolCallId,
+              { ...approval, workspaceId, conversationId },
+              emitter,
+              {
+                tool: 'execute_remote_command',
+                description: 'Run a shell command on a connected worker',
+              },
+              options.abortSignal,
+            )
+          : ({ allowed: false } satisfies ApprovalDecision);
+        if (!decision.allowed) {
+          return {
+            id: sessionId,
+            command,
+            stdout: '',
+            stderr: '',
+            exitCode: null,
+            error: deniedMessage('Command', decision),
+            timedOut: false,
+          };
+        }
+
         return this.remoteExecuteService.waitForResult(
           command,
           sessionId,
           conversationId,
+          workspaceId,
           60_000,
           (event) => {
             if (emitter) {
@@ -524,9 +745,17 @@ export class AgentTool {
     return tool(toolConfig);
   }
 
+  /**
+   * Plan tools. With `plan.approval` in PLAN mode, formulate_plan shows the
+   * new plan to the user and waits for them to approve it, choosing whether
+   * the rest of the run asks per command (MANUAL) or not (AUTO). Outside
+   * PLAN mode formulate_plan and append_step refuse: only transition_step and
+   * scrap_plan remain, to finish or drop a plan approved earlier.
+   */
   getTodoTools(
     conversationId: string,
     emitter?: EventEmitter,
+    plan?: { workspaceId: string; approval: ApprovalSettings },
   ): Record<string, ToolType> {
     const todoRepo = this.todoRepository;
 
@@ -629,13 +858,24 @@ export class AgentTool {
       }
     };
 
+    // Read at call time: approving a plan switches the run out of PLAN mode,
+    // and the plan it approved is the last one this run may make
+    const planningAllowed = () =>
+      !plan || plan.approval.mode === AgentApprovalMode.PLAN;
+
     const setPlanTool: any = {
       description:
         'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
-      parameters: z.object({
+      inputSchema: z.object({
         steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
       }),
-      execute: async (params: { steps: string[] }) => {
+      execute: async (
+        params: { steps: string[] },
+        options?: { toolCallId?: string; abortSignal?: AbortSignal },
+      ) => {
+        if (!planningAllowed()) {
+          return { success: false, message: PLANNING_OFF_MESSAGE };
+        }
         try {
           // Guard: reject if there are active (pending/in_progress) todos
           const existingTodos = await todoRepo.find({
@@ -662,8 +902,9 @@ export class AgentTool {
             };
           }
 
-          // Log raw params for debugging
-          this.logger.log('[formulate_plan] Raw params: ' + JSON.stringify(params, null, 2));
+          this.logger.debug(
+            '[formulate_plan] Raw params: ' + JSON.stringify(params),
+          );
 
           // Normalize steps: handle various formats AI might send
           let normalizedSteps: string[] = [];
@@ -692,7 +933,7 @@ export class AgentTool {
             const parsed = tryParseJsonArray(rawSteps);
             if (parsed) {
               stepsArray = parsed;
-              this.logger.log('[formulate_plan] Parsed from JSON string');
+              this.logger.debug('[formulate_plan] Parsed from JSON string');
             } else {
               stepsArray = [rawSteps];
             }
@@ -701,7 +942,9 @@ export class AgentTool {
               const parsed = tryParseJsonArray(rawSteps[0]!);
               if (parsed) {
                 stepsArray = parsed;
-                this.logger.log('[formulate_plan] Parsed from nested JSON string');
+                this.logger.debug(
+                  '[formulate_plan] Parsed from nested JSON string',
+                );
               } else {
                 stepsArray = rawSteps;
               }
@@ -709,8 +952,6 @@ export class AgentTool {
               stepsArray = rawSteps;
             }
           }
-
-          this.logger.log('[formulate_plan] Steps array: ' + JSON.stringify(stepsArray));
 
           // Clean each step
           for (const s of stepsArray) {
@@ -736,29 +977,83 @@ export class AgentTool {
             }
           }
 
-          this.logger.log('[formulate_plan] Normalized steps: ' + JSON.stringify(normalizedSteps));
-          this.logger.log('[formulate_plan] Normalized count: ' + normalizedSteps.length);
-
           if (normalizedSteps.length === 0) {
             return { success: false, message: 'No valid steps provided.' };
           }
+          if (normalizedSteps.length > MAX_PLAN_STEPS) {
+            return {
+              success: false,
+              message: `Too many steps (${normalizedSteps.length}). Keep the plan to at most ${MAX_PLAN_STEPS} steps by merging related work.`,
+            };
+          }
 
-          await todoRepo.delete({ conversationId });
-
-          const entities = normalizedSteps.map((step, index) =>
-            todoRepo.create({
-              conversationId,
-              content: step,
-              status: 'pending' as const,
-              sortOrder: index,
-            }),
-          );
-          await todoRepo.save(entities);
+          // Replace the old plan atomically: a failed insert must not leave
+          // the conversation with no plan at all
+          await todoRepo.manager.transaction(async (manager) => {
+            const repo = manager.getRepository(AgentConversationTodo);
+            await repo.delete({ conversationId });
+            await repo.save(
+              normalizedSteps.map((step, index) =>
+                repo.create({
+                  conversationId,
+                  content: step,
+                  status: 'pending' as const,
+                  sortOrder: index,
+                }),
+              ),
+            );
+          });
 
           const todos = await getAllTodos();
-          this.logger.log('[formulate_plan] Final todos: ' + JSON.stringify(todos, null, 2));
+          this.logger.debug(
+            `[formulate_plan] Plan set with ${todos.length} steps for ${conversationId}`,
+          );
 
+          // Show the plan right away, also while the user reviews it
           await emitTodos();
+
+          if (plan?.approval.mode === AgentApprovalMode.PLAN) {
+            const decision = await this.approvals.requestPlanApproval(
+              normalizedSteps,
+              options?.toolCallId ?? '',
+              {
+                ...plan.approval,
+                workspaceId: plan.workspaceId,
+                conversationId,
+              },
+              emitter,
+              options?.abortSignal,
+            );
+            if (!decision.allowed) {
+              await todoRepo.delete({ conversationId });
+              await emitTodos();
+              return {
+                success: false,
+                error: rejectionMessage('The plan', decision.feedback),
+                message: decision.feedback
+                  ? 'The plan was discarded. Revise it following what the user said, then call formulate_plan again.'
+                  : 'The plan was discarded. Do not run it; ask the user how they want to proceed.',
+              };
+            }
+            const mode = decision.mode ?? AgentApprovalMode.MANUAL;
+            await this.switchApprovalMode(
+              conversationId,
+              plan.approval,
+              mode,
+              emitter,
+            );
+            return {
+              success: true,
+              message:
+                `The user approved this ${todos.length}-step plan` +
+                (mode === AgentApprovalMode.AUTO
+                  ? ' and lets it run without asking.'
+                  : '; each command still asks for approval.') +
+                ' Start with step 1 now.',
+              todos,
+            };
+          }
+
           return {
             success: true,
             message: `Plan set with ${todos.length} steps.`,
@@ -767,7 +1062,7 @@ export class AgentTool {
         } catch (error) {
           const message =
             error instanceof Error ? error.message : String(error);
-          this.logger.error('[formulate_plan] Error: ' + (error instanceof Error ? error.message : String(error)));
+          this.logger.error(`[formulate_plan] Error: ${message}`);
           return { success: false, message: `Failed to set plan: ${message}` };
         }
       },
@@ -776,7 +1071,7 @@ export class AgentTool {
     const updateTodoStatusTool: any = {
       description:
         'Update the status of a specific step in the execution plan. You MUST call this at two points: (1) BEFORE starting work on a step — call transition_step(id, "in_progress"), and (2) AFTER finishing work on a step — call transition_step(id, "completed") or transition_step(id, "failed"). ALWAYS transition the current step before moving to the next sequential step. NEVER skip steps. NEVER call this for a step that is not your current step. Params: id (UUID of the step), status (pending/in_progress/completed/failed).',
-      parameters: z.object({
+      inputSchema: z.object({
         id: z.string().uuid().describe('Todo item ID'),
         status: z
           .enum(['pending', 'in_progress', 'completed', 'failed'])
@@ -854,10 +1149,14 @@ export class AgentTool {
     const addTodoTool: any = {
       description:
         'Append a new step to the plan. Params: content (string). ONLY use when you genuinely discover a new requirement during execution that was not part of the original plan. Do NOT use to re-create steps you forgot to add earlier — finish the current step first.',
-      parameters: z.object({
+      inputSchema: z.object({
         content: z.string().min(1).describe('Todo content'),
       }),
       execute: async (params: { content: string }) => {
+        // An approved plan is a contract: no unreviewed steps after the fact
+        if (!planningAllowed()) {
+          return { success: false, message: PLANNING_OFF_MESSAGE };
+        }
         try {
           const existingTodos = await todoRepo.find({
             where: { conversationId },
@@ -888,7 +1187,6 @@ export class AgentTool {
           });
           await todoRepo.save(newEntity);
 
-          await getAllTodos();
           await emitTodos();
           return {
             success: true,
@@ -912,7 +1210,7 @@ export class AgentTool {
     const clearPlanTool: any = {
       description:
         'Clear entire plan (irreversible). Then call formulate_plan to create a new one.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         try {
           await todoRepo.delete({ conversationId });
@@ -937,6 +1235,26 @@ export class AgentTool {
     };
   }
 
+  /**
+   * Apply the approval mode the user picked for an approved plan: to the
+   * running tools (they read `approval` at call time), the conversation
+   * (later turns) and the client's mode selector.
+   */
+  private async switchApprovalMode(
+    conversationId: string,
+    approval: ApprovalSettings,
+    mode: PlanRunMode,
+    emitter?: EventEmitter,
+  ): Promise<void> {
+    // "allow all" belonged to the previous mode
+    await this.approvals.resetConversation(conversationId);
+    await this.conversationRepository.update(conversationId, {
+      approvalMode: mode,
+    });
+    approval.mode = mode;
+    emitter?.emit('approval-mode-changed', { mode });
+  }
+
   getMemoryTools(
     workspaceId: string,
     userId: string,
@@ -948,7 +1266,7 @@ export class AgentTool {
       description:
         'Save a key-value pair to short-term memory (conversation scope). ' +
         'Use this to remember important findings during execution (e.g., discovered IPs, scan results, target info).',
-      parameters: z.object({
+      inputSchema: z.object({
         key: z
           .string()
           .min(1)
@@ -981,7 +1299,7 @@ export class AgentTool {
 
     const stmReadTool: any = {
       description: 'Read a value from short-term memory by key.',
-      parameters: z.object({
+      inputSchema: z.object({
         key: z.string().describe('Memory key to read'),
       }),
       execute: async (params: { key: string }) => {
@@ -1015,7 +1333,7 @@ export class AgentTool {
 
     const stmListTool: any = {
       description: 'List all short-term memory entries for this conversation.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         try {
           const entries = await memoriesService.stmGetAll(conversationId);
@@ -1042,7 +1360,7 @@ export class AgentTool {
       description:
         'Save important information to long-term memory (workspace scope, persists across conversations). ' +
         'Use this for persistent knowledge like target profiles, known vulnerabilities, organizational policies.',
-      parameters: z.object({
+      inputSchema: z.object({
         content: z
           .string()
           .min(1)
@@ -1066,7 +1384,7 @@ export class AgentTool {
     const ltmAppendTool: any = {
       description:
         'Append information to existing long-term memory (keeps previous content).',
-      parameters: z.object({
+      inputSchema: z.object({
         content: z
           .string()
           .min(1)
@@ -1096,7 +1414,7 @@ export class AgentTool {
 
     const ltmReadTool: any = {
       description: 'Read the current long-term memory content.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         try {
           const record = await memoriesService.ltmGet(workspaceId, userId);
@@ -1119,12 +1437,239 @@ export class AgentTool {
     };
   }
 
+  /**
+   * run_tool: runs one connector flagged `agentTool: true` against one target
+   * on the conversation's worker and returns the worker's raw output. Not a
+   * job: nothing goes through the job registry or the database. Agent-only,
+   * off the MCP surface, and approval-gated like any mutating tool (the
+   * target is free text).
+   */
+  runToolTool(workspaceId: string, conversationId: string): ToolType | null {
+    const slugs = this.connectorRegistry
+      .getAgentConnectors()
+      .map((entry) => entry.slug);
+    // Runs on the conversation's pinned worker, so none without a conversation.
+    if (!conversationId || slugs.length === 0) return null;
+
+    const inputSchema = z.object({
+      tool: z
+        .enum(slugs as [string, ...string[]])
+        .describe('Connector slug to run'),
+      target: z
+        .string()
+        .min(1)
+        .describe('Target passed to the tool: domain, IP, host:port or URL'),
+      configProfileId: z.string().uuid().optional(),
+    });
+    const catalog = this.connectorRegistry
+      .getAgentConnectors()
+      .map(
+        (entry) =>
+          `- ${entry.slug}: ${entry.shortDescription ?? entry.description ?? ''}`,
+      )
+      .join('\n');
+
+    const toolConfig: any = {
+      description: [
+        "Run one security tool against one target on this conversation's worker and get its raw output.",
+        'Nothing is saved: results are not stored as assets or vulnerabilities.',
+        `Waits up to ${AGENT_TOOL_RUN_TIMEOUT_MS / 60_000} minutes. Output: stdout (first ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB), exitCode, error, timedOut, truncated, totalLines.`,
+        'When truncated is true the full output is kept for 1 hour: read it with read_tool_output(runId), filtering with pattern instead of paging through everything.',
+        'Params: tool (slug), target, optional configProfileId.',
+        'Tools:',
+        catalog,
+      ].join('\n'),
+      inputSchema,
+      execute: async (
+        params: z.infer<typeof inputSchema>,
+        options: { toolCallId: string; abortSignal?: AbortSignal },
+      ) => {
+        const { tool: slug, target, configProfileId } = params;
+        const entry = this.connectorRegistry.getConnector(slug);
+        // Tool.name IS the connector slug; getToolById sets isInstalled from
+        // an enabled workspace_tools row, so a connector of another workspace
+        // (or one disabled here) cannot run.
+        const [toolRow] = await this.toolsService.getToolByNames({
+          names: [slug],
+        });
+        const installed = toolRow?.id
+          ? await this.toolsService.getToolById(toolRow.id, workspaceId)
+          : null;
+        if (!entry?.image || !installed?.isInstalled) {
+          return { error: `Tool ${slug} is not installed in this workspace.` };
+        }
+
+        const pick = await this.remoteExecuteSubscribe.pickConversationWorker(
+          conversationId,
+          workspaceId,
+        );
+        if (!pick) {
+          return {
+            error:
+              'No worker available for this workspace. Select a workspace worker for this conversation.',
+          };
+        }
+
+        let config: Record<string, unknown> | undefined;
+        try {
+          config = await this.toolConfigProfiles.resolveConfigForJob(
+            workspaceId,
+            installed.id!,
+            { configProfileId },
+          );
+        } catch (error) {
+          return {
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+        const missing = missingRequiredConfig(entry.configSchema, config);
+        if (missing.length > 0) {
+          return {
+            error: `Tool ${slug} needs configuration (${missing.join(', ')}). Add a config profile for it in this workspace.`,
+          };
+        }
+
+        const limits = this.connectorRegistry.getResourceDefaults(slug);
+        // The worker kills the run when core stops waiting, so the manifest
+        // timeout only ever shortens the budget.
+        const budgetSeconds = AGENT_TOOL_RUN_TIMEOUT_MS / 1000;
+        const timeoutSeconds = Math.min(
+          limits.timeoutSeconds || budgetSeconds,
+          budgetSeconds,
+        );
+        const runId = randomUUID();
+        let result: Awaited<ReturnType<RemoteExecuteService['waitForToolRun']>>;
+        try {
+          // No live stream: the chat renders no terminal for run_tool, so
+          // per-chunk events only cost re-renders.
+          result = await this.remoteExecuteService.waitForToolRun(
+            pick.workerId,
+            {
+              tool: slug,
+              image: entry.image,
+              target,
+              configJson:
+                config && Object.keys(config).length > 0
+                  ? JSON.stringify(config)
+                  : '',
+              cpu: limits.cpu,
+              memory: limits.memory,
+              timeoutSeconds,
+            },
+            runId,
+            timeoutSeconds * 1000 + AGENT_TOOL_RESULT_GRACE_MS,
+            {
+              abortSignal: options.abortSignal,
+              maxOutputChars: AGENT_TOOL_OUTPUT_STORE_MAX,
+              onPushed: pick.pin
+                ? () =>
+                    this.remoteExecuteSubscribe.pinConversationWorker(
+                      conversationId,
+                      pick.workerId,
+                    )
+                : undefined,
+            },
+          );
+        } catch (error) {
+          // The worker stream closed between resolving and pushing.
+          return {
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+        // stdout is already capped at AGENT_TOOL_OUTPUT_STORE_MAX, so
+        // totalLines matches what read_tool_output pages over.
+        const { stdout } = result;
+        const truncated = stdout.length > AGENT_TOOL_OUTPUT_PAGE;
+        let stored = false;
+        if (truncated) {
+          try {
+            await this.redisService.setex(
+              toolOutputKey(conversationId, runId),
+              AGENT_TOOL_OUTPUT_TTL_SECONDS,
+              stdout,
+            );
+            stored = true;
+          } catch (error) {
+            this.logger.warn(
+              `Failed to keep tool output ${runId}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }
+        return {
+          tool: slug,
+          target,
+          stdout: stdout.slice(0, AGENT_TOOL_OUTPUT_PAGE),
+          exitCode: result.exitCode,
+          error: result.error,
+          timedOut: result.timedOut,
+          truncated,
+          totalLines: outputLines(stdout).length,
+          ...(stored ? { runId } : {}),
+          ...(result.stdoutTruncated
+            ? { note: 'Output over 10MB: only the first 10MB is kept.' }
+            : {}),
+        };
+      },
+    };
+    return tool(toolConfig);
+  }
+
+  /** Pages through a run_tool output kept in Redis for this conversation. */
+  readToolOutputTool(conversationId: string): ToolType {
+    const inputSchema = z.object({
+      runId: z.string().uuid().describe('runId returned by run_tool'),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Line to start from (into the matching lines with pattern)'),
+      limit: z.number().int().min(1).max(1000).optional(),
+      pattern: z
+        .string()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Keep only lines containing this text (case-insensitive)'),
+    });
+    const toolConfig: any = {
+      description: [
+        'Read the full output of a run_tool call that came back truncated.',
+        `Returns at most ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB per call, lines numbered as in the full output; continue from nextOffset.`,
+        'Prefer pattern (e.g. "200", "admin") to pull only the relevant lines.',
+        'Params: runId, optional offset (default 0), limit (default 200), pattern.',
+      ].join('\n'),
+      inputSchema,
+      execute: async (params: z.infer<typeof inputSchema>) => {
+        const raw = await this.redisService.get(
+          toolOutputKey(conversationId, params.runId),
+        );
+        if (raw === null) {
+          return {
+            error:
+              'No stored output for this runId (expired after 1 hour or unknown). Run the tool again.',
+          };
+        }
+        return {
+          runId: params.runId,
+          ...pageToolOutput(raw, {
+            offset: params.offset ?? 0,
+            limit: params.limit ?? 200,
+            pattern: params.pattern,
+          }),
+        };
+      },
+    };
+    return tool(toolConfig);
+  }
+
   getTools(
     workspaceId: string,
     agentMode: AgentMode,
     emitter?: EventEmitter,
     conversationId?: string,
     mcpOnly = false,
+    approval?: ApprovalSettings,
   ): Record<string, ToolType> {
     const { AGENT, ASK } = AgentMode;
     const tools: Record<
@@ -1216,17 +1761,118 @@ export class AgentTool {
           workspaceId,
           conversationId ?? '',
           emitter,
+          approval,
         ),
         permissions: [AGENT],
         mcp: false,
       },
     };
+    const runTool = this.runToolTool(workspaceId, conversationId ?? '');
+    if (runTool) {
+      tools.run_tool = { method: runTool, permissions: [AGENT], mcp: false };
+      tools.read_tool_output = {
+        method: this.readToolOutputTool(conversationId ?? ''),
+        permissions: [AGENT],
+        mcp: false,
+      };
+    }
 
     return Object.fromEntries(
       Object.entries(tools)
         .filter(([, config]) => config.permissions.includes(agentMode))
         .filter(([, config]) => (mcpOnly ? config.mcp : true))
-        .map(([key, config]) => [key, config.method]),
+        .map(([key, config]) => [
+          key,
+          approval && !SELF_GATED_TOOLS.has(key)
+            ? this.withApproval(
+                key,
+                config.method,
+                // Read at call time: approving a plan switches the mode mid-run
+                () => ({
+                  ...approval,
+                  workspaceId,
+                  conversationId: conversationId ?? '',
+                }),
+                emitter,
+                READ_ONLY_TOOLS.has(key),
+              )
+            : config.method,
+        ]),
     ) as Record<string, ToolType>;
+  }
+
+  /** Applies the same approval gate to dynamically discovered MCP tools. */
+  wrapExternalToolsWithApproval(
+    tools: Record<string, ToolType>,
+    workspaceId: string,
+    conversationId: string,
+    approval: ApprovalSettings,
+    emitter?: EventEmitter,
+  ): Record<string, ToolType> {
+    return Object.fromEntries(
+      Object.entries(tools).map(([name, toolDef]) => [
+        name,
+        this.withApproval(
+          name,
+          toolDef,
+          () => ({
+            ...approval,
+            workspaceId,
+            conversationId,
+          }),
+          emitter,
+          isReadOnlyMcpTool(toolDef.metadata),
+        ),
+      ]),
+    ) as Record<string, ToolType>;
+  }
+
+  /**
+   * Wraps a tool so each call goes through the approval flow first, in any
+   * agent mode. (SELF_GATED_TOOLS gate themselves on the raw command.)
+   */
+  private withApproval(
+    name: string,
+    toolDef: ToolType,
+    ctx: () => ApprovalContext,
+    emitter?: EventEmitter,
+    readOnly = false,
+  ): ToolType {
+    const original = toolDef.execute as (
+      params: unknown,
+      options: { toolCallId: string; abortSignal?: AbortSignal },
+    ) => Promise<unknown>;
+    return {
+      ...toolDef,
+      execute: async (
+        params: unknown,
+        options: { toolCallId: string; abortSignal?: AbortSignal },
+      ) => {
+        const decision = await this.approvals.authorize(
+          `${name} ${stableStringify(params)}`,
+          options.toolCallId,
+          ctx(),
+          emitter,
+          {
+            tool: name,
+            description:
+              typeof toolDef.description === 'string'
+                ? toolDef.description
+                : undefined,
+            toolMetadata:
+              typeof toolDef.metadata === 'object' && toolDef.metadata !== null
+                ? (toolDef.metadata as Record<string, unknown>)
+                : undefined,
+            input: params,
+            readOnly,
+          },
+          options.abortSignal,
+        );
+        if (!decision.allowed) {
+          return { error: deniedMessage('Tool call', decision) };
+        }
+        return original(params, options);
+      },
+    };
   }
 }

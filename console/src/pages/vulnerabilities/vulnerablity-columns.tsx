@@ -12,7 +12,7 @@ import { AnalyzeStatusButton } from '@/components/vulnerabilities/analyze-status
 import type { Vulnerability } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
-import { BellOff, CircleCheck, Info } from 'lucide-react';
+import { BellOff, CircleCheck } from 'lucide-react';
 import BadgeList from '../assets/components/badge-list';
 
 export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
@@ -64,33 +64,19 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
   {
     accessorKey: 'name',
     header: 'Details',
-    size: 300,
+    size: 480,
     enableHiding: false,
     cell: ({ row }) => {
-      const data = row.original;
       const value: string = row.getValue('name');
       const cveIds: string[] = row.original.cveId;
       return (
-        <div className="flex flex-col gap-2 py-2 justify-center min-h-[60px]">
-          <div className="flex items-center gap-2">
-            <div className="font-medium">{value}</div>
+        <div className="flex flex-col gap-2 py-2 justify-center min-h-[60px] w-[480px] max-w-[480px]">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="font-medium truncate min-w-0 flex-1" title={value}>
+              {value}
+            </div>
             {Array.isArray(cveIds) && cveIds.length > 0 && (
               <BadgeList list={cveIds} maxDisplay={2} />
-            )}
-            {data.description && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info
-                      size={14}
-                      className="text-muted-foreground cursor-help"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-sm">
-                    {data.description}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             )}
           </div>
         </div>
@@ -243,10 +229,10 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Badge
-                    variant="secondary"
-                    className="bg-amber-500/10 h-7 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1"
+                    variant="outline"
+                    className="h-8 gap-1 border-transparent text-amber-500"
                   >
-                    <BellOff size={12} />
+                    <BellOff className="h-4 w-4" />
                     Dismissed
                   </Badge>
                 </TooltipTrigger>
@@ -271,10 +257,10 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
             </TooltipProvider>
           ) : (
             <Badge
-              variant="secondary"
-              className="bg-emerald-500/10 h-7 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1"
+              variant="outline"
+              className="h-8 gap-1 border-transparent text-green-500"
             >
-              <CircleCheck size={12} />
+              <CircleCheck className="h-4 w-4" />
               Open
             </Badge>
           )}

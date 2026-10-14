@@ -68,22 +68,38 @@ tasks:
 
   # Docker Compose orchestration
   # Starts all services using docker compose with environment variables
-  # Builds and recreates containers with 3 worker instances
+  # Builds and recreates the full stack with a single worker instance.
+  # NOTE: the compose service key is `oasm-worker` (not `worker`). The worker
+  # publishes the fixed connector port 26276 that spawned containers dial back
+  # on, so only ONE worker can run per host — do not add `--scale`.
   docker-compose:
     cmds:
       - |
-        docker compose --env-file ./core-api/.env up -d --build --force-recreate --scale worker=3
+        # The worker mounts /var/run/docker.sock, owned root:docker (0660) on
+        # native Linux. Its gid is host-specific, so derive it from the socket
+        # instead of hardcoding (Docker Desktop reports 0). Set
+        # WORKER_DOCKER_GID to override detection (e.g. a remote daemon whose
+        # socket is not visible here). A non-standard socket PATH also requires
+        # changing the worker's volume mount in docker-compose.yml, so it is
+        # not configurable from this task.
+        if [ -z "${WORKER_DOCKER_GID:-}" ]; then
+          WORKER_DOCKER_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || stat -f '%g' /var/run/docker.sock 2>/dev/null || echo 0)"
+        fi
+        export WORKER_DOCKER_GID
+        echo "Docker socket group gid for worker: ${WORKER_DOCKER_GID}"
+        docker compose --env-file ./core-api/.env up -d --build --force-recreate
 
   proto:
     cmds:
       - mkdir -p worker/internal/gen/jobs_registry worker/internal/gen/workers
       - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
       - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-      - cd core-api && pnpm exec protoc -I src/proto src/proto/*.proto --go_out=../worker/internal/gen --go-grpc_out=../worker/internal/gen
+      - cd core-api && pnpm exec protoc -I src/proto src/proto/*.proto --go_out=../worker/internal/gen --go_opt=module=oasm-worker/internal/gen --go-grpc_out=../worker/internal/gen --go-grpc_opt=module=oasm-worker/internal/gen
 
   # Project initialization
   # Sets up environment files and initializes the development environment
   # Enables pnpm via corepack, copies example env files, starts required infrastructure services
+  # Infrastructure: postgres (db), redis, geo-ip (ip), rustfs (storage)
   init:
     cmds:
       - |
@@ -96,7 +112,7 @@ tasks:
         pnpm --version > /dev/null 2>&1 ||
           corepack prepare pnpm@latest --activate 2>/dev/null || true
       - node -e "const fs=require('fs'); ['core-api','console'].forEach(d=>{const s=d+'/example.env',t=d+'/.env';if(!fs.existsSync(t))fs.copyFileSync(s,t)})"
-      - docker compose up -d postgres redis --force-recreate
+      - docker compose up -d postgres redis geo-ip rustfs --force-recreate
     deps:
       - install
 
@@ -111,8 +127,18 @@ tasks:
       - task: worker:clean
 
   # Generate migration with custom name
-  # Usage: task migration:generate MIGRATION_NAME=AddUserType
+  # Usage: task migration:generate name=AddUserType
+  #
+  # The variable is lowercase `name` (MIGRATION_NAME= is still accepted as an
+  # alias for backwards compatibility with older docs). If neither is set the
+  # task aborts instead of silently generating into an empty path.
+  #
+  # NEVER hand-write a file under core-api/src/database/migrations/ and never
+  # invoke the TypeORM CLI directly — the schema only changes through this task.
   migration:generate:
+    preconditions:
+      - sh: test -n "{{.name}}{{.MIGRATION_NAME}}"
+        msg: 'Migration name is required: task migration:generate name=AddUserType'
     cmds:
       - task: api:migration:generate
 
@@ -129,6 +155,38 @@ tasks:
       - task: api:migration:revert
 
   # Sync latest connectors manifest
+  # Pulls oasm-connectors/manifest.json into core-api/resources/connectors/manifest.json
+  # (the file the API reads to know which connector images exist). Set
+  # MANIFEST_PATH=<path> to read a local oasm-connectors checkout instead of main.
   sync-connectors:
     cmds:
       - node scripts/sync-tool-manifest.mjs
+
+  # Cut a release: validate, run the checks, tag, push — CI does the rest
+  #
+  #   task release -- v0.9.0            # the `--` is required, see below
+  #   task release VERSION=v0.9.0
+  #   task release -- v0.9.0 --dry-run
+  #   task release -- v0.9.0 --skip-checks
+  #   task release VERSION=v0.9.0 MESSAGE="Release v0.9.0" SKIP_CHECKS=1
+  #
+  # go-task reads a bare `task release v0.9.0` as a request for a task named
+  # `v0.9.0` and fails, so the separator (or the VERSION= form) is mandatory.
+  # Both are forwarded to scripts/release.mjs, which also accepts the env vars.
+  #
+  # Everything downstream keys off the tag: build-release.yml triggers on
+  # `push: tags: ['v*']`, so pushing the tag is what produces the binaries, the
+  # images and the draft release. The draft is published by hand afterwards —
+  # the workflow deliberately does not publish it.
+  release:
+    desc: Tag a release and push it, kicking off build-release.yml
+    preconditions:
+      - sh: test -n "{{.VERSION}}{{.CLI_ARGS}}"
+        msg: 'Version is required: task release -- v0.9.0'
+    env:
+      RELEASE_MESSAGE: '{{.MESSAGE}}'
+      RELEASE_DRY_RUN: '{{.DRY_RUN}}'
+      RELEASE_SKIP_CHECKS: '{{.SKIP_CHECKS}}'
+      RELEASE_BRANCH: '{{.BRANCH}}'
+    cmds:
+      - node scripts/release.mjs {{.VERSION}} {{.CLI_ARGS}}

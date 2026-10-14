@@ -6,9 +6,22 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Max,
   Min,
 } from 'class-validator';
+
+/**
+ * `sortBy` becomes a bare SQL identifier in `ORDER BY <alias>.<sortBy>` —
+ * TypeORM parameterises values, not column names. Every consumer therefore
+ * MUST treat it as an identifier: either allow-list it against the entity's
+ * columns, or rely on this pattern to guarantee it carries no SQL syntax.
+ *
+ * A single unquoted identifier is not enough to express an injection payload in
+ * Postgres: CASE expressions and subqueries both require parentheses or
+ * whitespace, both rejected here.
+ */
+export const SAFE_SORT_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export class GetManyBaseResponseDto<T> {
   @ApiProperty({ isArray: true, type: () => Object })
@@ -55,6 +68,9 @@ export class GetManyBaseQueryParams {
   @ApiProperty({ required: false, example: 'createdAt' })
   @IsOptional()
   @IsString()
+  @Matches(SAFE_SORT_IDENTIFIER, {
+    message: 'sortBy must be a plain column name',
+  })
   sortBy: string = 'createdAt';
 
   @ApiProperty({ required: false, example: SortOrder.DESC })

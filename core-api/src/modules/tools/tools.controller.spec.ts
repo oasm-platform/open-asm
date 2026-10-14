@@ -1,6 +1,6 @@
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
 import { Reflector } from '@nestjs/core';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { ToolsController } from './tools.controller';
 
 describe('ToolsController workspace permission guards', () => {
@@ -82,15 +82,6 @@ describe('ToolsController.getToolSchema', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  it('should throw BadRequestException for unknown connector slug', async () => {
-    mockToolsService.getToolSchema.mockRejectedValue(
-      new BadRequestException('Unknown connector slug "unknown-tool"'),
-    );
-
-    await expect(
-      controller.getToolSchema({ id: 'tool-3' } as any, 'ws-001'),
-    ).rejects.toThrow(BadRequestException);
-  });
 
   it('should return null schema for non-connector tool', async () => {
     mockToolsService.getToolSchema.mockResolvedValue({
@@ -101,57 +92,5 @@ describe('ToolsController.getToolSchema', () => {
     const result = await controller.getToolSchema({ id: 'tool-4' }, 'ws-001');
 
     expect(result).toEqual({ schema: null, source: null });
-  });
-});
-
-describe('ToolsController.getConnectorBySlug', () => {
-  let controller: ToolsController;
-  let mockConnectorRegistry: Record<string, jest.Mock>;
-
-  beforeEach(() => {
-    mockConnectorRegistry = {
-      getConnector: jest.fn(),
-    };
-
-    controller = new ToolsController({} as any, mockConnectorRegistry as any);
-  });
-
-  it('should return mapped connector metadata for a known slug', () => {
-    mockConnectorRegistry.getConnector.mockReturnValue({
-      name: 'Nessus',
-      slug: 'nessus',
-      version: '0.1.0',
-      image: 'ghcr.io/oasm-platform/connector-nessus:0.1.0',
-      author: 'oasm',
-      pricingTier: ['free'],
-      shortDescription: 'Tenable Nessus vulnerability scanner',
-      description: 'Connects to a Tenable Nessus instance.',
-      capabilities: ['vulnerabilities'],
-      inputsSchema: { type: 'object' },
-      configSchema: { type: 'object' },
-    });
-
-    const result = controller.getConnectorBySlug({ slug: 'nessus' });
-
-    expect(result).toEqual({
-      name: 'Nessus',
-      slug: 'nessus',
-      version: '0.1.0',
-      image: 'ghcr.io/oasm-platform/connector-nessus:0.1.0',
-      author: 'oasm',
-      pricingTier: ['free'],
-      shortDescription: 'Tenable Nessus vulnerability scanner',
-      description: 'Connects to a Tenable Nessus instance.',
-      capabilities: ['vulnerabilities'],
-    });
-    expect(mockConnectorRegistry.getConnector).toHaveBeenCalledWith('nessus');
-  });
-
-  it('should throw NotFoundException for an unknown slug', () => {
-    mockConnectorRegistry.getConnector.mockReturnValue(null);
-
-    expect(() => controller.getConnectorBySlug({ slug: 'ghost' })).toThrow(
-      NotFoundException,
-    );
   });
 });

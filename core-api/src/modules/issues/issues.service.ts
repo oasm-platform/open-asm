@@ -55,9 +55,14 @@ export class IssuesService {
     createCommentDto: CreateIssueCommentDto,
     issueId: string,
     userId: string,
+    workspaceId: string,
     isCanDelete = true,
     isCanEdit = true,
   ): Promise<IssueComment> {
+    // Load the parent first: the issue FK is taken from the URL, so without
+    // this check a caller could attach a comment to another tenant's issue.
+    await this.getById(issueId, workspaceId);
+
     const comment = this.issueCommentsRepository.create({
       content: createCommentDto.content,
       repCommentId: createCommentDto.repCommentId,
@@ -80,14 +85,20 @@ export class IssuesService {
     return savedComment;
   }
 
-  async getCommentsByIssueId(issueId: string, query: GetManyBaseQueryParams) {
+  async getCommentsByIssueId(
+    issueId: string,
+    query: GetManyBaseQueryParams,
+    workspaceId: string,
+  ) {
     const { limit, page } = query;
 
     const queryBuilder = this.issueCommentsRepository
       .createQueryBuilder('issueComments')
       .withDeleted()
       .leftJoinAndSelect('issueComments.createdBy', 'createdBy')
+      .innerJoin('issueComments.issue', 'issue')
       .where('issueComments.issueId = :issueId', { issueId })
+      .andWhere('issue.workspaceId = :workspaceId', { workspaceId })
       .andWhere('issueComments.deletedAt IS NULL')
       .select([
         'issueComments',
@@ -141,9 +152,10 @@ export class IssuesService {
     id: string,
     updateCommentDto: UpdateIssueCommentDto,
     userId: string,
+    workspaceId: string,
   ): Promise<IssueComment> {
     const comment = await this.issueCommentsRepository.findOne({
-      where: { id },
+      where: { id, issue: { workspaceId } },
       relations: ['createdBy', 'issue'],
     });
 
@@ -153,7 +165,9 @@ export class IssuesService {
 
     // Check if the user is the creator of the comment
     if (comment.createdBy.id !== userId) {
-      throw new Error('Only the creator of the comment can update it');
+      throw new ForbiddenException(
+        'Only the creator of the comment can update it',
+      );
     }
 
     // Update the comment content
@@ -176,10 +190,11 @@ export class IssuesService {
   async deleteCommentById(
     id: string,
     userId: string,
+    workspaceId: string,
   ): Promise<{ message: string }> {
     const comment = await this.issueCommentsRepository.findOne({
-      where: { id },
-      relations: ['createdBy'],
+      where: { id, issue: { workspaceId } },
+      relations: ['createdBy', 'issue'],
     });
 
     if (!comment) {
@@ -188,7 +203,9 @@ export class IssuesService {
 
     // Check if the user is the creator of the comment
     if (comment.createdBy.id !== userId) {
-      throw new Error('Only the creator of the comment can delete it');
+      throw new ForbiddenException(
+        'Only the creator of the comment can delete it',
+      );
     }
 
     await this.issueCommentsRepository.softDelete(id);
@@ -376,7 +393,15 @@ export class IssuesService {
     return getManyResponse({ query, data: issues, total });
   }
 
-  async getById(id: string, workspaceId?: string): Promise<Issue> {
+  /**
+   * Loads an issue and asserts it belongs to `workspaceId`.
+   *
+   * `workspaceId` is deliberately REQUIRED rather than optional: it was
+   * previously an optional parameter guarded by `if (workspaceId && ...)`, and
+   * three internal call sites omitted it, which silently skipped the tenant
+   * check entirely.
+   */
+  async getById(id: string, workspaceId: string): Promise<Issue> {
     const issue = await this.issuesRepository.findOne({
       where: { id },
       relations: ['createdBy'],
@@ -384,8 +409,7 @@ export class IssuesService {
     if (!issue) {
       throw new NotFoundException(`Issue with ID ${id} not found`);
     }
-    // If workspaceId is provided, check if the issue belongs to the workspace
-    if (workspaceId && issue.workspaceId !== workspaceId) {
+    if (issue.workspaceId !== workspaceId) {
       throw new ForbiddenException(
         'You do not have permission to access this issue',
       );
@@ -397,8 +421,9 @@ export class IssuesService {
     id: string,
     updateIssueDto: UpdateIssueDto,
     userId: string,
+    workspaceId: string,
   ): Promise<Issue> {
-    const issue = await this.getById(id);
+    const issue = await this.getById(id, workspaceId);
 
     // Check if the user is the creator of the issue
     if (issue.createdBy.id !== userId) {
@@ -424,8 +449,9 @@ export class IssuesService {
     id: string,
     changeIssueStatusDto: ChangeIssueStatusDto,
     userId: string,
+    workspaceId: string,
   ): Promise<Issue> {
-    const issue = await this.getById(id);
+    const issue = await this.getById(id, workspaceId);
     // Check if the user is the creator of the issue
     if (issue.createdBy.id !== userId) {
       throw new ForbiddenException(
@@ -465,8 +491,8 @@ export class IssuesService {
     return savedIssue;
   }
 
-  async delete(id: string): Promise<{ message: string }> {
-    const issue = await this.getById(id);
+  async delete(id: string, workspaceId: string): Promise<{ message: string }> {
+    const issue = await this.getById(id, workspaceId);
     await this.issuesRepository.remove(issue);
     return { message: 'Issue deleted successfully' };
   }

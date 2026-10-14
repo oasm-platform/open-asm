@@ -43,7 +43,7 @@ describe('VulnerabilitiesService', () => {
     mockWorkflowRepository.findOne.mockResolvedValue({
       id: 'workflow-1',
       content: {
-        jobs: [{ name: 'Vuls Scan', run: 'nuclei', config }],
+        jobs: { vuls_scan: { name: 'Vuls Scan', run: 'nuclei', config } },
       },
     });
 
@@ -66,7 +66,7 @@ describe('VulnerabilitiesService', () => {
     mockWorkflowRepository.findOne.mockResolvedValue({
       id: 'workflow-1',
       content: {
-        jobs: [{ name: 'Vuls Scan', run: 'nuclei' }],
+        jobs: { vuls_scan: { name: 'Vuls Scan', run: 'nuclei' } },
       },
     });
 
@@ -89,14 +89,40 @@ describe('VulnerabilitiesService', () => {
       'vulnerability_scan_basic.yaml',
     );
     const doc = yaml.load(fs.readFileSync(templatePath, 'utf8')) as {
-      jobs: { run: string; config?: { severity?: string[] } }[];
+      jobs: Record<string, { run: string; config?: { severity?: string[] } }>;
     };
 
-    const job = doc.jobs.find((j) => j.run === 'nuclei');
+    const job = Object.values(doc.jobs).find((j) => j.run === 'nuclei');
     expect(job).toBeDefined();
     // Full-coverage scan: nuclei must not skip any severity band.
     expect(new Set(job!.config?.severity)).toEqual(
       new Set(['info', 'low', 'medium', 'high', 'critical']),
     );
+  });
+
+  it('shipped vulnerability_scan_basic template matches the connector defaults (interactsh on, no redirects)', () => {
+    const templatePath = path.join(
+      __dirname,
+      '..',
+      'workflows',
+      'templates',
+      'vulnerability_scan_basic.yaml',
+    );
+    const doc = yaml.load(fs.readFileSync(templatePath, 'utf8')) as {
+      jobs: Record<
+        string,
+        {
+          run: string;
+          config?: { interactsh?: boolean; followRedirects?: boolean };
+        }
+      >;
+    };
+
+    const job = Object.values(doc.jobs).find((j) => j.run === 'nuclei');
+    expect(job).toBeDefined();
+    // OOB/blind detection stays on; redirects stay off (following them floods
+    // honeypot/echo targets with false positives).
+    expect(job!.config?.interactsh).toBe(true);
+    expect(job!.config?.followRedirects).toBe(false);
   });
 });

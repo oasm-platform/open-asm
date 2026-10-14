@@ -9,7 +9,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import Image from '@/components/ui/image';
+import LogoFrame from '@/components/ui/logo-frame';
+import ToolLogo from '@/components/ui/tool-logo';
 import {
   Table,
   TableBody,
@@ -32,10 +33,18 @@ import {
   type Tool,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import { useParams } from '@tanstack/react-router';
 import dayjs from 'dayjs';
-import { BadgeCheck, Box, Plus, Settings, Tag, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import {
+  BadgeCheck,
+  Box,
+  Crosshair,
+  Plus,
+  Settings,
+  Tag,
+  Trash2,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   ConfigProfilesSkeleton,
@@ -54,6 +63,17 @@ interface ProfileWithMeta {
 }
 
 /** Masked config values for display (API masks sensitive fields). */
+const TARGET_TYPE_LABELS: Record<string, string> = {
+  DOMAIN: 'Domain',
+  IP: 'IP',
+  CIDR: 'CIDR',
+  GIT_ORG: 'Git organization',
+};
+
+function formatTargetType(targetType: string): string {
+  return TARGET_TYPE_LABELS[targetType] ?? targetType;
+}
+
 function maskConfig(config: Record<string, unknown>): string {
   const entries = Object.entries(config);
   if (entries.length === 0) return '—';
@@ -103,32 +123,6 @@ export default function ToolDetail() {
     useToolsControllerGetConnectorBySlug(toolSlug ?? '', {
       query: { enabled: Boolean(toolSlug), retry: false },
     });
-
-  // Tabs are URL-driven (?tab=overview|configuration) via Tabs tabParam.
-  const navigate = useNavigate();
-  const search = useSearch({ strict: false }) as { tab?: string };
-
-  // Default to Overview once its metadata resolves — first flip only, so a
-  // tab the user already picked (or linked) is never overridden.
-  const overviewDefaultApplied = useRef(false);
-  useEffect(() => {
-    if (
-      toolSlug &&
-      connectorMeta &&
-      !connectorMetaLoading &&
-      !overviewDefaultApplied.current &&
-      !search.tab
-    ) {
-      overviewDefaultApplied.current = true;
-      navigate({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        search: { ...search, tab: 'overview' } as any,
-        replace: true,
-      });
-    }
-    // `search` intentionally omitted — avoids a navigate loop on back/forward.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toolSlug, connectorMeta, connectorMetaLoading, navigate]);
 
   // Update local state when tool data changes
   useEffect(() => {
@@ -206,12 +200,15 @@ export default function ToolDetail() {
           <CardContent>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
               <div className="flex min-w-0 flex-1 items-center gap-4">
-                <Image
-                  url={tool?.logoUrl}
-                  width={80}
-                  height={80}
-                  className="size-20 shrink-0 rounded-2xl"
-                />
+                {/* Same tile as the tools list: logos are drawn for light
+                    backgrounds, so a bare img disappears in dark mode. */}
+                <LogoFrame className="shrink-0 overflow-hidden">
+                  <ToolLogo
+                    name={tool.name}
+                    logoUrl={tool?.logoUrl}
+                    size={80}
+                  />
+                </LogoFrame>
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-semibold tracking-tight">
@@ -237,6 +234,16 @@ export default function ToolDetail() {
                         {formatType(tool.type)}
                       </Badge>
                     )}
+                    {tool.targetTypes?.length > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1"
+                        title="Target types this tool can scan"
+                      >
+                        <Crosshair />
+                        {tool.targetTypes.map(formatTargetType).join(', ')}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
@@ -253,8 +260,10 @@ export default function ToolDetail() {
         {tabs.length > 0 && (
           <Tabs
             tabParam="tab"
-            defaultValue="configuration"
-            validValues={['overview', 'configuration']}
+            // Valid values mirror the tabs that actually render, so a stale
+            // ?tab= (e.g. configuration after uninstalling) can't leave Radix
+            // with a value no trigger/content owns. Absent ?tab= -> first tab.
+            validValues={tabs.map((tab) => tab.id)}
             className="w-full"
           >
             <TabsList>

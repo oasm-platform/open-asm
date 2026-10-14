@@ -407,6 +407,16 @@ func (p *Proxy) HasStream(execID string) bool {
 	return ok && cs != nil && cs.stream != nil
 }
 
+// HasContainerStream reports whether a live connector stream is registered for
+// the container, including warm-pool containers that currently have no owner
+// execution index entry.
+func (p *Proxy) HasContainerStream(containerID string) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	cs, ok := p.containers[containerID]
+	return ok && cs != nil && cs.stream != nil
+}
+
 func (p *Proxy) Register(execID string, ch chan ResultMsg) {
 	p.mu.Lock()
 	p.chans[execID] = ch

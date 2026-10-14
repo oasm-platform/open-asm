@@ -36,7 +36,11 @@ export const auth: unknown = betterAuth({
     },
   },
   rateLimit: {
-    enabled: true,
+    // The limiter is 100 req / 60s in-memory. An e2e suite that signs up users
+    // and fires auth guard matrices trips it and then fails on rate limit
+    // instead of on the behaviour under test. Only the e2e harness sets this
+    // flag (core-api/test/pin-test-env.ts); no deployed environment does.
+    enabled: process.env.AUTH_RATE_LIMIT_DISABLED !== 'true',
     window: 60,
     max: 100,
     storage: 'memory',

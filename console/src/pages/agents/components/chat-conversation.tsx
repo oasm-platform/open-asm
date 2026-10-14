@@ -17,6 +17,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  type ReactNode,
 } from 'react';
 import { ChatMessage } from './chat-message';
 import { LoadingSkeleton } from './chat-skeletons';
@@ -51,6 +52,8 @@ interface ChatConversationProps {
   hasMoreMessages?: boolean;
   isLoadingMoreMessages?: boolean;
   agentMode?: string;
+  /** Inline permission prompt shown right above the input */
+  approvalPrompt?: ReactNode;
   onAgentModeChange?: (mode: string) => void;
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
@@ -82,6 +85,7 @@ export const ChatConversation = ({
   hasMoreMessages = false,
   isLoadingMoreMessages = false,
   agentMode = 'false',
+  approvalPrompt,
   onAgentModeChange,
   selectedWorkerId,
   onWorkerSelect,
@@ -325,32 +329,34 @@ export const ChatConversation = ({
             />
           )}
 
-          <AgentPromptInput
-            onSubmit={(content, options) =>
-              onSendMessage(content, { agentMode: options?.agentMode })
-            }
-            isSending={isStreaming}
-            onStop={onStop}
-            selectedModel={
-              selectedConfigId && selectedModel
-                ? {
-                    provider: '',
-                    model: selectedModel,
-                    configId: selectedConfigId,
-                  }
-                : null
-            }
-            onSelectModel={onSelectModel}
-            agentMode={agentMode}
-            onAgentModeChange={onAgentModeChange}
-            selectedWorkerId={selectedWorkerId}
-            onWorkerSelect={onWorkerSelect}
-            placeholder={
-              isStreaming
-                ? 'Waiting for response…'
-                : 'Ask anything about security…'
-            }
-          />
+          {approvalPrompt ?? (
+            <AgentPromptInput
+              onSubmit={(content, options) =>
+                onSendMessage(content, { agentMode: options?.agentMode })
+              }
+              isSending={isStreaming}
+              onStop={onStop}
+              selectedModel={
+                selectedConfigId && selectedModel
+                  ? {
+                      provider: '',
+                      model: selectedModel,
+                      configId: selectedConfigId,
+                    }
+                  : null
+              }
+              onSelectModel={onSelectModel}
+              agentMode={agentMode}
+              onAgentModeChange={onAgentModeChange}
+              selectedWorkerId={selectedWorkerId}
+              onWorkerSelect={onWorkerSelect}
+              placeholder={
+                isStreaming
+                  ? 'Waiting for response…'
+                  : 'Ask anything about security…'
+              }
+            />
+          )}
         </div>
       </div>
     </div>

@@ -2,12 +2,15 @@ package worker
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"oasm-worker/internal/connector"
+	"oasm-worker/internal/execution"
 	connectorpb "oasm-worker/internal/gen/connector"
 	pb "oasm-worker/internal/gen/jobs_registry"
+	"oasm-worker/internal/runtime"
 )
 
 // TestHandleConnectorResultAggregatesVulnerabilityChunks: N result chunks
@@ -36,7 +39,7 @@ func TestHandleConnectorResultAggregatesVulnerabilityChunks(t *testing.T) {
 
 	// Three chunks: 2 + 1 + 1 findings = 4 accumulated.
 	proxy.ForwardResult(execID, []byte(`{"template":"a"}`), []*connectorpb.Finding{
-		{Name: "CVE-2024-0001", Severity: "high", Tags: []string{"cve"}, References: []string{"https://nvd.nist.gov/vuln/detail/CVE-2024-0001"}, CveId: []string{"CVE-2024-0001"}, Host: "a.example.com", Ip: "10.0.0.1", CvssScore: 9.1, EpssScore: 0.5},
+		{Name: "CVE-2024-0001", Severity: "high", Tags: []string{"cve"}, References: []string{"https://nvd.nist.gov/vuln/detail/CVE-2024-0001"}, CveId: []string{"CVE-2024-0001"}, Host: "a.example.com", Ip: "10.0.0.1", CvssScore: 9.1, EpssScore: 0.5, Description: "long detail", Synopsis: "short summary", MatchedAt: "https://a.example.com/x", Ports: []string{"443"}, Authors: []string{"alice"}, VprScore: 7.2, BidId: []string{"12345"}, CeaId: []string{"CAE-1"}, Iava: []string{"2024-A-0001"}},
 		{Name: "CVE-2024-0002", Severity: "low", Host: "a.example.com", Ip: "10.0.0.1"},
 	})
 	proxy.ForwardResult(execID, []byte(`{"template":"b"}`), []*connectorpb.Finding{
@@ -115,6 +118,20 @@ func TestHandleConnectorResultAggregatesVulnerabilityChunks(t *testing.T) {
 	}
 	if got.vulns[2].GetSolution() != "upgrade" {
 		t.Fatalf("solution mapping: %q", got.vulns[2].GetSolution())
+	}
+	if f0.GetDescription() != "long detail" || f0.GetSynopsis() != "short summary" {
+		t.Fatalf("description/synopsis mapping: %q/%q", f0.GetDescription(), f0.GetSynopsis())
+	}
+	if f0.GetAffectedUrl() != "https://a.example.com/x" {
+		t.Fatalf("affected_url must come from matched_at: %q", f0.GetAffectedUrl())
+	}
+	if f0.GetVprScore() != 7.2 || len(f0.GetPorts()) != 1 || f0.GetPorts()[0] != "443" ||
+		len(f0.GetAuthors()) != 1 || f0.GetAuthors()[0] != "alice" ||
+		len(f0.GetBidId()) != 1 || f0.GetBidId()[0] != "12345" ||
+		len(f0.GetCeaId()) != 1 || f0.GetCeaId()[0] != "CAE-1" ||
+		len(f0.GetIava()) != 1 || f0.GetIava()[0] != "2024-A-0001" {
+		t.Fatalf("enrichment mapping: vpr=%v ports=%v authors=%v bid=%v cea=%v iava=%v",
+			f0.GetVprScore(), f0.GetPorts(), f0.GetAuthors(), f0.GetBidId(), f0.GetCeaId(), f0.GetIava())
 	}
 }
 
@@ -210,6 +227,364 @@ func TestHandleConnectorResultNonVulnCategoryKeepsPerChunkRawPath(t *testing.T) 
 // TestSeverityFromString: the enum mapping is case-insensitive over the
 // connector's closed set; anything else falls back to Core's default (INFO) —
 // the worker never invents enum values.
+// TestHandleConnectorResultAggregatesUrlDiscoveryChunks: a url_discovery
+// category job with N result chunks carrying URL findings must produce EXACTLY
+// ONE SubmitUrlDiscoveryResult (at drain end, on a clean Done) with all N URLs
+// accumulated — never a per-chunk submission — mirroring the vulnerabilities
+// aggregation path with raw "".
+func TestHandleConnectorResultAggregatesUrlDiscoveryChunks(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-url-1"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-url-1", category: "url_discovery", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 8)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	// Three chunks: 2 + 1 + 1 URL findings = 4 accumulated.
+	proxy.ForwardResult(execID, []byte(`{"url":"a"}`), []*connectorpb.Finding{
+		{Name: "https://example.com/a", Severity: "info", MatchedAt: "https://example.com/a", Host: "example.com"},
+		{Name: "https://example.com/b", Severity: "info", MatchedAt: "https://example.com/b", Host: "example.com"},
+	})
+	proxy.ForwardResult(execID, []byte(`{"url":"c"}`), []*connectorpb.Finding{
+		{Name: "https://example.com/c", Severity: "info", MatchedAt: "https://example.com/c", Host: "example.com"},
+	})
+	proxy.ForwardResult(execID, []byte(`{"url":"d"}`), []*connectorpb.Finding{
+		{Name: "https://example.com/d", Severity: "info", MatchedAt: "https://example.com/d", Host: "example.com"},
+	})
+
+	proxy.MarkDone(execID)
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 url_discovery submission, got %d", len(results))
+	}
+	got := results[0]
+	if got.jobID != "job-url-1" {
+		t.Fatalf("jobID: got %q, want job-url-1", got.jobID)
+	}
+	if got.isError {
+		t.Fatal("expected isError=false for a clean done")
+	}
+	if got.raw != "" {
+		t.Fatalf("expected raw \"\" for the aggregated submission, got %q", got.raw)
+	}
+	if len(got.urls) != 4 {
+		t.Fatalf("expected 4 accumulated urls, got %d: %+v", len(got.urls), got.urls)
+	}
+
+	// Order preserved: chunk order then finding order.
+	want := []string{"https://example.com/a", "https://example.com/b", "https://example.com/c", "https://example.com/d"}
+	for i, w := range want {
+		if got.urls[i].GetUrl() != w {
+			t.Fatalf("url[%d]: got %q, want %q (all: %+v)", i, got.urls[i].GetUrl(), w, got.urls)
+		}
+	}
+}
+
+// TestHandleConnectorResultEmptyUrlDiscoverySubmitsEmptyOnce: a clean Done with
+// zero chunks must still produce exactly one url_discovery submission carrying
+// raw "" and an empty URL list (the "empty" contract), not zero submissions.
+func TestHandleConnectorResultEmptyUrlDiscoverySubmitsEmptyOnce(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-url-empty"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-url-empty", category: "url_discovery", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	proxy.MarkDone(execID)
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 submission for an empty clean done, got %d", len(results))
+	}
+	if results[0].isError || results[0].raw != "" || len(results[0].urls) != 0 {
+		t.Fatalf("expected clean empty submission, got %+v", results[0])
+	}
+}
+
+// TestHandleConnectorResultErrorWithFindingsDeliversPartialSuccess: the
+// platform stopping a scan AFTER findings arrived (worker timeout cancel,
+// container kill, stream death with a Done error) must submit those findings
+// as a SUCCESS. An error result carries no payload to Core, so the old
+// behavior silently discarded every streamed finding and failed the job —
+// a long scan the platform ended is not a tool failure.
+func TestHandleConnectorResultErrorWithFindingsDeliversPartialSuccess(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-partial-1"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-partial-1", category: "vulnerabilities", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	// Findings streamed, THEN the platform stops the execution with an error.
+	proxy.ForwardResult(execID, []byte(`{}`), []*connectorpb.Finding{
+		{Name: "Partial finding 1", Severity: "high", Host: "slow.example.com"},
+		{Name: "Partial finding 2", Severity: "low", Host: "slow.example.com"},
+	})
+	proxy.SetError(execID, "context canceled")
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 submission, got %d", len(results))
+	}
+	got := results[0]
+	if got.isError {
+		t.Fatal("isError must be false: results already in hand must be delivered as success")
+	}
+	if got.raw != "" {
+		t.Fatalf("expected raw \"\" for the partial submission, got %q", got.raw)
+	}
+	if len(got.vulns) != 2 {
+		t.Fatalf("expected both streamed findings preserved, got %d: %+v", len(got.vulns), got.vulns)
+	}
+
+	// The lifecycle event must agree with the submission: not a failure.
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			if ev.Type != EventJobCompleted {
+				continue
+			}
+			if !ev.Success {
+				t.Fatalf("EventJobCompleted Success=false with %d findings delivered; error=%q", len(got.vulns), ev.ErrorMsg)
+			}
+			return
+		case <-deadline:
+			t.Fatal("expected an EventJobCompleted event")
+		}
+	}
+}
+
+// TestHandleConnectorResultDisconnectWithFindingsDeliversPartialSuccess: a
+// clean disconnect (no Done, no error) after findings arrived — worker
+// restart mid-scan — keeps the findings instead of failing the job with
+// "connector disconnected before Done".
+func TestHandleConnectorResultDisconnectWithFindingsDeliversPartialSuccess(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-partial-2"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-partial-2", category: "vulnerabilities", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	proxy.ForwardResult(execID, []byte(`{}`), []*connectorpb.Finding{
+		{Name: "Before restart", Severity: "medium", Host: "x.example.com"},
+	})
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 submission, got %d", len(results))
+	}
+	if results[0].isError {
+		t.Fatal("disconnect with findings must deliver them as success, not error")
+	}
+	if len(results[0].vulns) != 1 {
+		t.Fatalf("expected the streamed finding preserved, got %d", len(results[0].vulns))
+	}
+}
+
+// TestHandleConnectorResultUrlDiscoveryDisconnectKeepsUrls: same contract for
+// url_discovery — accumulated URLs survive a platform-side stop.
+func TestHandleConnectorResultUrlDiscoveryDisconnectKeepsUrls(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-partial-3"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-partial-3", category: "url_discovery", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	proxy.ForwardResult(execID, []byte(`{}`), []*connectorpb.Finding{
+		{Name: "https://example.com/kept", Severity: "info", MatchedAt: "https://example.com/kept", Host: "example.com"},
+	})
+	proxy.SetError(execID, "connector stopped")
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 submission, got %d", len(results))
+	}
+	if results[0].isError {
+		t.Fatal("url_discovery partial results must be delivered as success")
+	}
+	if len(results[0].urls) != 1 {
+		t.Fatalf("expected the streamed URL preserved, got %d", len(results[0].urls))
+	}
+}
+
+// TestFindingToDiscoveredUrl_Nil: a nil finding maps to nil (skipped by the
+// caller), matching findingToVulnerability's nil-safety.
+// TestHandleConnectorResultFailureCarriesContainerLogs: a failing connector job
+// must reach Core with the container's own trace attached. The SDK writes
+// execution identity, inputs, progress and the adapter error to stderr, and the
+// worker is the only writer of that payload — without this the platform stores
+// the Done string alone and the evidence never leaves the container.
+func TestHandleConnectorResultFailureCarriesContainerLogs(t *testing.T) {
+	resetWorkerGlobals()
+	prevGrace := tailGrace
+	tailGrace = 20 * time.Millisecond
+	t.Cleanup(func() { tailGrace = prevGrace })
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+	fakeRT.SetLogLines([][]byte{
+		[]byte("[runtime] [INFO] execution_id=exec-log job_id=job-log execute start: inputs=target=example.com\n"),
+		[]byte("[runtime] [ERROR] execution_id=exec-log adapter error after 0 result(s) in 3s: fatal: nmap: cannot resolve\n"),
+		[]byte("[runtime] [INFO] execution_id=exec-log execution done: results=0 elapsed=3s error=fatal\n"),
+	})
+	fakeRT.SetInspectFn(func() runtime.InspectResult { return runtime.InspectResult{Running: true} })
+	mgr := execution.NewManager(fakeRT, 0)
+
+	// Logs is keyed on a Manager execution, so the exec must exist in Manager.
+	execID, err := mgr.Submit(context.Background(), execution.JobSpec{Tool: "nmap", Image: "ghcr.io/oasm-platform/connector-nmap:7.97"})
+	if err != nil {
+		t.Fatalf("mgr.Submit: %v", err)
+	}
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-log", category: "ports_scanner", release: func() {}, image: "ghcr.io/oasm-platform/connector-nmap:7.97"}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, mgr, &tailBuffer{})
+		close(done)
+	}()
+
+	proxy.SetError(execID, "fatal: nmap: cannot resolve \"nope.invalid\"")
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 error submission, got %d", len(results))
+	}
+	got := results[0]
+	if !got.isError {
+		t.Fatal("expected the failure to be submitted as an error")
+	}
+	for _, want := range []string{
+		"fatal: nmap: cannot resolve",
+		"--- container logs (last",
+		"execution_id=exec-log",
+		"execute start: inputs=target=example.com",
+		"adapter error after 0 result(s)",
+		"execution done: results=0",
+	} {
+		if !strings.Contains(got.raw, want) {
+			t.Errorf("failure payload missing %q\n--- payload ---\n%s", want, got.raw)
+		}
+	}
+}
+
+func TestFindingToDiscoveredUrl_Nil(t *testing.T) {
+	if got := findingToDiscoveredUrl(nil); got != nil {
+		t.Fatalf("expected nil for nil finding, got %+v", got)
+	}
+}
+
 func TestSeverityFromString(t *testing.T) {
 	cases := []struct {
 		in   string

@@ -16,7 +16,14 @@ tasks:
       NODE_ENV: 'production'
   install: pnpm install
   lint: pnpm run lint
-  proto: pnpm run proto:generate
+  # Regenerate the Go gRPC stubs for core-api/src/proto/*.proto into
+  # worker/internal/gen/**. There is no Node-side `proto:generate` script (the old
+  # ts-proto one was dropped with the Go worker rewrite), so delegate to the root
+  # `proto` task, which owns the protoc invocation and the two Go plugins.
+  # Requires `protoc` (provided by @protobuf-ts/protoc) and protoc-gen-go[-grpc].
+  proto:
+    cmds:
+      - task: :proto
   # Run tests
   # Executes unit and integration tests for the core-api application
   test:
@@ -37,16 +44,39 @@ tasks:
   test:e2e:
     cmds:
       - pnpm run test:e2e
+  # Run a single e2e spec file, keeping the full config and RAM limits.
+  # Usage: task api:test:e2e:one SPEC=test/assets-url.e2e-spec.ts
+  test:e2e:one:
+    requires:
+      vars: [SPEC]
+    preconditions:
+      - sh: test -n "{{.SPEC}}"
+        msg: SPEC must identify one e2e spec file
+    cmds:
+      - pnpm run test:e2e -- --runTestsByPath {{.SPEC}}
+  # CI variant of the e2e suite (forces serial, capped memory, force exit).
+  test:e2e:ci:
+    cmds:
+      - pnpm run test:e2e:ci
   clean:
     cmds:
       - rm -rf ./husky
       - rm -rf ./node_modules
       - rm -rf ./dist
   # Generate migration with custom name
-  # Usage: task migration:generate MIGRATION_NAME=AddUserType
+  # Usage: task migration:generate name=AddUserType
+  #
+  # `name` is the canonical variable; MIGRATION_NAME is accepted as an alias.
+  # Hand-writing files in src/database/migrations/ is forbidden — always generate
+  # here so the DataSource, ts-node paths and dotenv wiring stay correct.
   migration:generate:
+    vars:
+      MIGRATION_PATH: '{{.name}}{{.MIGRATION_NAME}}'
+    preconditions:
+      - sh: test -n "{{.MIGRATION_PATH}}"
+        msg: 'Migration name is required: task migration:generate name=AddUserType'
     cmds:
-      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:generate -d src/database/database-config.ts src/database/migrations/{{.name}}
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:generate -d src/database/database-config.ts src/database/migrations/{{.MIGRATION_PATH}}
   # Run all pending migrations
   # Executes all pending database migrations
   migration:run:

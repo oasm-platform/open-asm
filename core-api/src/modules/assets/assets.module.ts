@@ -9,8 +9,13 @@ import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
+import { DiscoveredUrl } from './entities/discovered-url.entity';
+import { DnsRecord } from './entities/dns-record.entity';
 import { HttpResponse } from './entities/http-response.entity';
-import { TlsAssetsView } from './entities/tls-assets.entity';
+import { HttpResponseTechnology } from './entities/http-response-technology.entity';
+import { HttpStatusCode } from './entities/http-status-code.entity';
+import { IpObservation } from './entities/ip-observation.entity';
+import { TlsCertificate } from './entities/tls-certificate.entity';
 
 @Global()
 @Module({
@@ -20,8 +25,13 @@ import { TlsAssetsView } from './entities/tls-assets.entity';
       Job,
       Target,
       HttpResponse,
+      DiscoveredUrl,
       AssetService,
-      TlsAssetsView,
+      TlsCertificate,
+      HttpResponseTechnology,
+      IpObservation,
+      HttpStatusCode,
+      DnsRecord,
       AgentLLMConfig,
     ]),
     TechnologyModule,

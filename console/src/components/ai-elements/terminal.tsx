@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import Ansi from "ansi-to-react";
+import AnsiModule from "ansi-to-react";
 import { CheckIcon, CopyIcon, TerminalIcon, Trash2Icon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 import {
@@ -21,6 +21,13 @@ interface TerminalContextType {
   autoScroll: boolean;
   onClear?: () => void;
 }
+
+// ansi-to-react is CommonJS: under Vite's interop the default import can be
+// the module object ({ default: Component }) instead of the component, which
+// crashes the whole chat with "Element type is invalid".
+const Ansi =
+  (AnsiModule as unknown as { default?: typeof AnsiModule }).default ??
+  AnsiModule;
 
 const TerminalContext = createContext<TerminalContextType>({
   autoScroll: true,

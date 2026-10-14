@@ -8,7 +8,8 @@ import {
   UserContextPayload,
 } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { AuditLog } from '../audit/audit-log.decorator';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { AuditService } from '../audit/audit.service';
 import {
   Body,
@@ -29,6 +30,8 @@ import {
   CreateMultipleTargetsDto,
   GetManyTargetResponseDto,
   GetManyWorkspaceQueryParamsDto,
+  GetTargetRepositoriesQueryDto,
+  TargetRepositoryDto,
   UpdateTargetDto,
 } from './dto/targets.dto';
 import { Target } from './entities/target.entity';
@@ -52,7 +55,7 @@ export class TargetsController {
       getWorkspaceId: true,
     },
   })
-  @AuditLog('target.created', {
+  @PublishEvent(EVENT_CATALOG.target.created, {
     // Best-effort changes from the body — record the requested target values,
     // never echo back the full created entities.
     changes: (body) => {
@@ -156,6 +159,27 @@ export class TargetsController {
   }
 
   @Doc({
+    summary: 'List repositories of a Git organization target',
+    description:
+      'Lists the repositories synced into a GIT_ORG target (its assets), with provider details. Disabled repositories (archived, forks, or gone from the provider) are listed after the scanned ones.',
+    response: {
+      serialization: GetManyResponseDto(TargetRepositoryDto),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('target.read')
+  @Get(':id/repositories')
+  getTargetRepositories(
+    @Param() { id }: IdQueryParamDto,
+    @Query() query: GetTargetRepositoriesQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.getTargetRepositories(id, workspaceId, query);
+  }
+
+  @Doc({
     summary: 'Get a target by ID',
     description:
       'Fetches detailed information about a specific security testing target using its unique identifier, including configuration and assessment status.',
@@ -213,8 +237,11 @@ export class TargetsController {
   })
   @WorkspaceAccess('target.write')
   @Post(':id/re-scan')
-  reScanTarget(@Param() { id }: IdQueryParamDto) {
-    return this.targetsService.assetService.reScan(id);
+  reScanTarget(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.assetService.reScan(id, workspaceId);
   }
 
   @Doc({
@@ -225,7 +252,7 @@ export class TargetsController {
       serialization: Target,
     },
   })
-  @AuditLog('target.updated', {
+  @PublishEvent(EVENT_CATALOG.target.updated, {
     // Best-effort changes from the body — only fields present in the request.
     changes: (body) => {
       const dto = body as UpdateTargetDto | undefined;
@@ -238,7 +265,11 @@ export class TargetsController {
   })
   @WorkspaceAccess('target.write')
   @Patch(':id')
-  updateTarget(@Param() { id }: IdQueryParamDto, @Body() dto: UpdateTargetDto) {
-    return this.targetsService.updateTarget(id, dto);
+  updateTarget(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: UpdateTargetDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.updateTarget(id, dto, workspaceId);
   }
 }

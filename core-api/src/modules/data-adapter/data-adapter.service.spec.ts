@@ -1,28 +1,38 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
+import * as crypto from 'crypto';
 import type { InsertResult } from 'typeorm';
 import { DataSource } from 'typeorm';
-import {
-  NotificationType,
-  Severity,
-  ToolCategory,
-} from '../../common/enums/enum';
+import { Severity, ToolCategory } from '../../common/enums/enum';
 import type { Asset } from '../assets/entities/assets.entity';
+import { AssetService } from '../assets/entities/asset-services.entity';
+import { DnsRecord } from '../assets/entities/dns-record.entity';
+import { HttpResponseTechnology } from '../assets/entities/http-response-technology.entity';
+import { HttpStatusCode } from '../assets/entities/http-status-code.entity';
+import { IpObservation } from '../assets/entities/ip-observation.entity';
+import { TlsCertificate } from '../assets/entities/tls-certificate.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
 import { IssuesService } from '../issues/issues.service';
 import type { Job } from '../jobs-registry/entities/job.entity';
-import { NotificationsService } from '../notifications/notifications.service';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { DataAdapterService, mergeDnsRecords } from './data-adapter.service';
+import {
+  DataAdapterService,
+  mergeDnsRecords,
+  splitTechString,
+  toDnsFacetRows,
+  toTlsCertificateRow,
+} from './data-adapter.service';
 
 describe('DataAdapterService', () => {
   let service: DataAdapterService;
   let mockQueryRunner: any;
   let mockDataSource: any;
   let mockWorkspacesService: any;
-  let mockNotificationsService: any;
+  let mockEventBridge: any;
 
   beforeEach(async () => {
     mockQueryRunner = {
@@ -44,9 +54,15 @@ describe('DataAdapterService', () => {
         orIgnore: jest.fn().mockReturnThis(),
         orUpdate: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
         getRawOne: jest.fn().mockResolvedValue({
           id: 'asset-id',
           value: 'example.com',
+        }),
+        // id ↔ value lookup after the asset insert; default: none found.
+        getRawMany: jest.fn().mockResolvedValue([]),
+        getRepository: jest.fn().mockReturnValue({
+          save: jest.fn().mockResolvedValue({ id: 'hr-1' }),
         }),
       },
       commitTransaction: jest.fn(),
@@ -106,16 +122,16 @@ describe('DataAdapterService', () => {
           },
         },
         {
-          provide: NotificationsService,
+          provide: EventBridgeService,
           useValue: {
-            createNotification: jest.fn(),
+            publishSafely: jest.fn(),
           },
         },
       ],
     }).compile();
 
     service = module.get<DataAdapterService>(DataAdapterService);
-    mockNotificationsService = module.get(NotificationsService);
+    mockEventBridge = module.get(EventBridgeService);
 
     // Mock validateData method to return true for valid data and false for invalid data
     jest.spyOn(service, 'validateData').mockImplementation((data, cls) => {
@@ -212,6 +228,92 @@ describe('DataAdapterService', () => {
         A: ['1.2.3.4'],
       });
       expect(mergeDnsRecords(null, undefined)).toEqual({});
+    });
+  });
+
+  describe('splitTechString', () => {
+    it('splits on the first colon into name + version', () => {
+      expect(splitTechString('nginx:1.21')).toEqual({
+        name: 'nginx',
+        version: '1.21',
+      });
+    });
+
+    it('returns a null version when there is no colon', () => {
+      expect(splitTechString('react')).toEqual({
+        name: 'react',
+        version: null,
+      });
+    });
+
+    it('returns null for empty or whitespace-only input', () => {
+      expect(splitTechString('')).toBeNull();
+      expect(splitTechString('   ')).toBeNull();
+    });
+
+    it('keeps extra colons in the version (only the first splits)', () => {
+      expect(splitTechString('foo:1:2')).toEqual({
+        name: 'foo',
+        version: '1:2',
+      });
+    });
+
+    it('treats a trailing colon as an empty version and drops a nameless tech', () => {
+      expect(splitTechString('nginx:')).toEqual({
+        name: 'nginx',
+        version: null,
+      });
+      expect(splitTechString(':1.21')).toBeNull();
+    });
+  });
+
+  describe('toTlsCertificateRow', () => {
+    const keys = {
+      httpResponseId: 'hr-1',
+      assetServiceId: 'svc-1',
+      jobHistoryId: 'jh-1',
+    };
+
+    it('flattens the fingerprint_hash object into fingerprintMd5/Sha1/Sha256', () => {
+      const row = toTlsCertificateRow(
+        {
+          host: 'example.com',
+          fingerprint_hash: {
+            md5: 'a',
+            sha1: 'b',
+            sha256: 'c',
+          },
+        },
+        keys,
+      );
+      expect(row).toMatchObject({
+        ...keys,
+        host: 'example.com',
+        fingerprintMd5: 'a',
+        fingerprintSha1: 'b',
+        fingerprintSha256: 'c',
+      });
+    });
+
+    it('turns a malformed date into null/undefined without throwing', () => {
+      let row: Record<string, unknown> | null = null;
+      expect(() => {
+        row = toTlsCertificateRow(
+          {
+            host: 'example.com',
+            not_before: '2024-01T0:00:00Z',
+            not_after: 'not-a-date',
+          },
+          keys,
+        );
+      }).not.toThrow();
+      expect(row!.notBefore).toBeUndefined();
+      expect(row!.notAfter).toBeUndefined();
+    });
+
+    it('returns null for null or non-object input', () => {
+      expect(toTlsCertificateRow(null, keys)).toBeNull();
+      expect(toTlsCertificateRow(undefined, keys)).toBeNull();
     });
   });
 
@@ -372,9 +474,9 @@ describe('DataAdapterService', () => {
 
       // No apex value in the batch → primary dnsRecords must not be touched
       expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
-      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
 
-      // Returned count = number of identifiers in the insert result
+      // Returned count = number of rows actually inserted
       expect(inserted).toBe(2);
     });
 
@@ -460,7 +562,7 @@ describe('DataAdapterService', () => {
 
       // No apex entry in the batch → primary update must not run (no NULL clobber)
       expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
-      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
     });
 
     it('should merge apex dnsRecords when the primary existing dnsRecords are NULL', async () => {
@@ -584,9 +686,10 @@ describe('DataAdapterService', () => {
         { replaceDnsRecords: true },
       );
 
-      // orUpdate replaces orIgnore: conflict on (value, targetId), overwrite
-      // dnsRecords only — isEnabled of the existing row is untouched.
-      expect(mockQueryRunner.manager.orIgnore).not.toHaveBeenCalled();
+      // The asset upsert switches from orIgnore to orUpdate: conflict on
+      // (value, targetId), overwrite dnsRecords only — isEnabled of the
+      // existing row is untouched. (orIgnore is still used by the DnsRecord /
+      // IpObservation facet fan-out, so it is NOT asserted absent here.)
       expect(mockQueryRunner.manager.orUpdate).toHaveBeenCalledWith(
         ['dnsRecords'],
         ['value', 'targetId'],
@@ -681,6 +784,87 @@ describe('DataAdapterService', () => {
       expect(setCall).toEqual({
         isPrimary: true,
         dnsRecords: { A: ['1.2.3.4', '9.9.9.9'], SOA: ['ns1.example.com'] },
+      });
+    });
+
+    it('mirrors inserted assets into dns_records + ip_observations, resolving ids by value', async () => {
+      // orIgnore skipped sub0 (already exists): RETURNING only has a1/a2, so
+      // identifiers no longer line up with the batch by index.
+      const mockInsertResult = {
+        identifiers: [undefined, { id: 'a1' }, { id: 'a2' }],
+        generatedMaps: [],
+        raw: [],
+      } as unknown as InsertResult;
+      mockWorkspaceConfigs();
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValue(mockInsertResult);
+      mockQueryRunner.manager.getRawMany.mockResolvedValueOnce([
+        { id: 'a0', value: 'sub0.example.com' },
+        { id: 'a1', value: 'sub1.example.com' },
+        { id: 'a2', value: 'sub2.example.com' },
+      ]);
+
+      await service.upsertAssetsByTargetId(targetId, [
+        { value: 'sub0.example.com', dnsRecords: { A: ['192.0.2.9'] } },
+        {
+          value: 'sub1.example.com',
+          dnsRecords: { A: ['192.0.2.1'], AAAA: ['2001:db8::1'], MX: ['10 mx.example.com'] },
+        },
+        { value: 'sub2.example.com', dnsRecords: { A: ['192.0.2.2'] } },
+      ]);
+
+      const builder = mockQueryRunner.manager;
+      const intoCalls = (builder.into.mock.calls as unknown[][]).map(
+        (call) => call[0],
+      );
+      const valuesFor = (entity: unknown): Array<Record<string, unknown>> => {
+        const idx = intoCalls.indexOf(entity);
+        return builder.values.mock.calls[idx][0] as Array<
+          Record<string, unknown>
+        >;
+      };
+
+      // Only the inserted assets, each with its own records; the skipped
+      // sub0 keeps its stored json, so its facets are untouched.
+      expect(valuesFor(DnsRecord)).toEqual([
+        { assetId: 'a1', recordType: 'A', value: '192.0.2.1' },
+        { assetId: 'a1', recordType: 'AAAA', value: '2001:db8::1' },
+        { assetId: 'a1', recordType: 'MX', value: '10 mx.example.com' },
+        { assetId: 'a2', recordType: 'A', value: '192.0.2.2' },
+      ]);
+      // ip_observations only for A/AAAA rows that are real IPs.
+      expect(valuesFor(IpObservation)).toEqual([
+        { assetId: 'a1', ip: '192.0.2.1', source: 'dns_a' },
+        { assetId: 'a1', ip: '2001:db8::1', source: 'dns_aaaa' },
+        { assetId: 'a2', ip: '192.0.2.2', source: 'dns_a' },
+      ]);
+      // Stale facet rows of the synced assets are cleared first.
+      expect(builder.delete).toHaveBeenCalledTimes(2);
+      expect(builder.where).toHaveBeenCalledWith('"assetId" IN (:...assetIds)', {
+        assetIds: ['a1', 'a2'],
+      });
+    });
+
+    it('toDnsFacetRows uppercases record types, dedupes values and keeps only valid IPs', () => {
+      expect(
+        toDnsFacetRows('x', {
+          a: ['192.0.2.1', '192.0.2.1', '999.1.1.1'],
+          aaaa: ['2001:db8::1'],
+          txt: ['v=spf1', ''],
+          bogus: 'not-an-array',
+        }),
+      ).toEqual({
+        dnsRows: [
+          { assetId: 'x', recordType: 'A', value: '192.0.2.1' },
+          { assetId: 'x', recordType: 'A', value: '999.1.1.1' },
+          { assetId: 'x', recordType: 'AAAA', value: '2001:db8::1' },
+          { assetId: 'x', recordType: 'TXT', value: 'v=spf1' },
+        ],
+        ipRows: [
+          { assetId: 'x', ip: '192.0.2.1', source: 'dns_a' },
+          { assetId: 'x', ip: '2001:db8::1', source: 'dns_aaaa' },
+        ],
       });
     });
   });
@@ -802,9 +986,12 @@ describe('DataAdapterService', () => {
         job: mockJob,
       });
 
-      expect(mockQueryRunner.manager.createQueryBuilder).toHaveBeenCalledTimes(
-        3,
-      );
+      // A failed probe flips AssetService.isErrorPage; the core row save and
+      // the facet splits still run inside the same transaction.
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(AssetService);
+      expect(mockQueryRunner.manager.set).toHaveBeenCalledWith({
+        isErrorPage: true,
+      });
     });
 
     it('should rollback transaction on error', async () => {
@@ -822,6 +1009,312 @@ describe('DataAdapterService', () => {
 
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('saves a slim core row (no facet keys) and fans out tls/tech/ip/status child rows', async () => {
+      const response = {
+        ...mockHttpResponse,
+        tech: ['nginx:1.21', 'react'],
+        a: ['1.2.3.4', 'not-an-ip'],
+        resolvers: ['8.8.8.8'],
+        chain_status_codes: [301, 302],
+      } as unknown as HttpResponse;
+
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      const builder = mockQueryRunner.manager;
+      const saveMock = jest.fn().mockResolvedValue({ id: 'hr-1' });
+      builder.getRepository.mockReturnValue({ save: saveMock });
+      builder.createQueryBuilder().execute.mockResolvedValue(undefined);
+
+      await service.httpResponses({ data: response, job: mockJob });
+
+      // The core http_responses row must NOT carry the facet keys.
+      const savedCore = saveMock.mock.calls[0][0] as Record<string, unknown>;
+      for (const key of [
+        'tls',
+        'tech',
+        'a',
+        'resolvers',
+        'chain_status_codes',
+      ]) {
+        expect(savedCore).not.toHaveProperty(key);
+      }
+      expect(savedCore).toMatchObject({
+        assetServiceId: 'service-id',
+        jobHistoryId: 'history-id',
+      });
+
+      const intoCalls = (builder.into.mock.calls as unknown[][]).map(
+        (call) => call[0],
+      );
+      const valuesFor = (entity: unknown): unknown => {
+        const idx = intoCalls.indexOf(entity);
+        return builder.values.mock.calls[idx][0];
+      };
+
+      // TLS: one row via orUpdate on the unique httpResponseId.
+      expect(valuesFor(TlsCertificate)).toMatchObject({
+        httpResponseId: 'hr-1',
+        host: 'example.com',
+        tlsVersion: 'TLSv1.3',
+        fingerprintMd5: 'test-md5',
+      });
+      expect(builder.orUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ conflict_target: ['httpResponseId'] }),
+      );
+
+      // Tech: split name/version on the first colon.
+      expect(valuesFor(HttpResponseTechnology)).toEqual([
+        {
+          name: 'nginx',
+          version: '1.21',
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+        {
+          name: 'react',
+          version: undefined,
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+      ]);
+
+      // IP: only valid IPs survive, tagged by source.
+      expect(valuesFor(IpObservation)).toEqual([
+        {
+          ip: '1.2.3.4',
+          source: 'httpx_a',
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+        {
+          ip: '8.8.8.8',
+          source: 'resolver',
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+      ]);
+
+      // Status: primary row + chain rows.
+      expect(valuesFor(HttpStatusCode)).toEqual([
+        {
+          statusCode: 200,
+          isPrimary: true,
+          chainIndex: undefined,
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+        {
+          statusCode: 301,
+          isPrimary: false,
+          chainIndex: 0,
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+        {
+          statusCode: 302,
+          isPrimary: false,
+          chainIndex: 1,
+          httpResponseId: 'hr-1',
+          assetServiceId: 'service-id',
+        },
+      ]);
+    });
+  });
+
+  describe('urlDiscovery', () => {
+    const mockJob = {
+      id: 'job-id',
+      asset: {
+        id: 'asset-id',
+        value: 'example.com',
+        target: { id: 'target-id' },
+        targetId: 'target-id',
+        isEnabled: true,
+        dnsRecords: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      assetServiceId: 'service-id',
+      jobHistory: { id: 'history-id' },
+      tool: { id: 'tool-id', category: ToolCategory.URL_DISCOVERY },
+      assetService: { id: 'service-id' },
+      category: ToolCategory.URL_DISCOVERY,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as Job;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockQueryRunner.manager.createQueryBuilder.mockReturnThis();
+      mockQueryRunner.manager.insert.mockReturnThis();
+      mockQueryRunner.manager.into.mockReturnThis();
+      mockQueryRunner.manager.values.mockReturnThis();
+      mockQueryRunner.manager.orIgnore.mockReturnThis();
+      mockQueryRunner.manager.execute.mockResolvedValue(undefined);
+    });
+
+    it('S1: inserts one row per unique url with assetServiceId + jobHistoryId in a transaction', async () => {
+      const data = [
+        { url: 'https://a.example.com' },
+        { url: 'https://b.example.com' },
+      ] as any;
+
+      await service.urlDiscovery({ data, job: mockJob });
+
+      expect(mockQueryRunner.connect).toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.insert).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.orIgnore).toHaveBeenCalled();
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg).toHaveLength(2);
+      expect(valuesArg).toEqual([
+        {
+          url: 'https://a.example.com',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+        {
+          url: 'https://b.example.com',
+          assetServiceId: 'service-id',
+          jobHistoryId: 'history-id',
+        },
+      ]);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('S2a: empty payload commits without insert and without throw', async () => {
+      await service.urlDiscovery({ data: [], job: mockJob });
+
+      expect(mockQueryRunner.manager.insert).not.toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('S2b: duplicate urls collapse to one row via Set + orIgnore', async () => {
+      const data = [
+        { url: 'https://dup.example.com' },
+        { url: 'https://dup.example.com' },
+        { url: 'https://dup.example.com' },
+      ] as any;
+
+      await service.urlDiscovery({ data, job: mockJob });
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg).toHaveLength(1);
+      expect(valuesArg[0].url).toBe('https://dup.example.com');
+      expect(mockQueryRunner.manager.orIgnore).toHaveBeenCalled();
+    });
+
+    it('S2c: missing assetServiceId skips insert with warn, no throw', async () => {
+      const noServiceJob = { ...mockJob, assetServiceId: undefined } as unknown as Job;
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => undefined);
+
+      await expect(
+        service.urlDiscovery({
+          data: [{ url: 'https://a.example.com' }] as any,
+          job: noServiceJob,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(mockQueryRunner.manager.insert).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('rolls back and rethrows on error', async () => {
+      mockQueryRunner.manager.execute.mockRejectedValue(new Error('DB error'));
+
+      await expect(
+        service.urlDiscovery({
+          data: [{ url: 'https://a.example.com' }] as any,
+          job: mockJob,
+        }),
+      ).rejects.toThrow('DB error');
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('F2: chunks inserts so a single statement never exceeds the PostgreSQL 65535 bind-parameter cap', async () => {
+      const data = Array.from({ length: 12000 }, (_, i) => ({
+        url: `https://h${i}.example.com`,
+      })) as any;
+
+      await service.urlDiscovery({ data, job: mockJob });
+
+      // 12000 rows / 5000-per-batch = 3 separate INSERT statements. Without
+      // chunking this is a single `.values(...)` call carrying 36000 params,
+      // which Postgres rejects with "bind message supplies N parameters".
+      const valuesCalls = mockQueryRunner.manager.values.mock.calls as Array<
+        [Array<Record<string, unknown>>]
+      >;
+      expect(valuesCalls).toHaveLength(3);
+      expect(valuesCalls[0][0]).toHaveLength(5000);
+      expect(valuesCalls[1][0]).toHaveLength(5000);
+      expect(valuesCalls[2][0]).toHaveLength(2000);
+      for (const [batch] of valuesCalls) {
+        expect(batch.length).toBeLessThanOrEqual(5000);
+      }
+      expect(mockQueryRunner.manager.execute).toHaveBeenCalledTimes(3);
+
+      // Every chunk stays inside the one transaction opened per call.
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalledTimes(1);
+    });
+
+    it('F5: drops over-long urls at the trust boundary but keeps normal ones', async () => {
+      const tooLongUrl = `https://a.example.com/${'x'.repeat(2048)}`;
+      expect(tooLongUrl.length).toBeGreaterThan(2048);
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => undefined);
+
+      await service.urlDiscovery({
+        data: [{ url: tooLongUrl }, { url: 'https://ok.example.com' }] as any,
+        job: mockJob,
+      });
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg).toHaveLength(1);
+      expect(valuesArg[0].url).toBe('https://ok.example.com');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('dropped 1 url(s) longer than 2048 chars'),
+      );
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it('F3: inserts the validated scalar assetServiceId when the relation is not loaded', async () => {
+      const jobWithoutRelation = {
+        ...mockJob,
+        assetService: undefined,
+      } as unknown as Job;
+
+      await service.urlDiscovery({
+        data: [{ url: 'https://c.example.com' }] as any,
+        job: jobWithoutRelation,
+      });
+
+      const valuesArg = mockQueryRunner.manager.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg[0].assetServiceId).toBe('service-id');
     });
   });
 
@@ -965,6 +1458,7 @@ describe('DataAdapterService', () => {
       // Mock the full query builder chain for vulnerabilities
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([]),
@@ -1004,6 +1498,108 @@ describe('DataAdapterService', () => {
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
+    it('chunks the bulk insert to stay under the Postgres 65535-parameter limit', async () => {
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      // 1201 distinct findings → 1201 distinct fingerprints (the name drives
+      // the fingerprint). A single INSERT would declare ~1201 × N columns of
+      // parameters and overflow Postgres' 65535 cap, so the service must split
+      // it across several statements.
+      const many = Array.from(
+        { length: 1201 },
+        (_, i) =>
+          ({ name: `Vuln ${i}`, severity: Severity.HIGH }) as unknown as Vulnerability,
+      );
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ raw: [], identifiers: [] }),
+      };
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.vulnerabilities({ data: many, job: mockJob });
+
+      const chunkSizes = mockQueryBuilder.values.mock.calls.map(
+        (call) => (call[0] as unknown[]).length,
+      );
+      expect(chunkSizes.length).toBeGreaterThan(1);
+      expect(Math.max(...chunkSizes)).toBeLessThanOrEqual(500);
+      expect(chunkSizes.reduce((sum, n) => sum + n, 0)).toBe(1201);
+    });
+
+    it('should preserve stored enrichment fields the incoming finding omits', async () => {
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback(mockQueryRunner.manager);
+          return undefined;
+        },
+      );
+
+      const incoming = {
+        name: 'Test Vulnerability',
+        severity: Severity.HIGH,
+        fingerprint: 'preserve-fingerprint',
+      } as unknown as Vulnerability;
+
+      const fingerprint = crypto
+        .createHash('md5')
+        .update('Test Vulnerability-asset-id-tool-id')
+        .digest('hex');
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          {
+            fingerprint,
+            description: 'stored description',
+            solution: 'stored solution',
+            cvssScore: 9.1,
+          },
+        ]),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: [incoming],
+          identifiers: [],
+        }),
+      };
+
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
+
+      await service.vulnerabilities({ data: [incoming], job: mockJob });
+
+      const valuesArg = mockQueryBuilder.values.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(valuesArg[0].description).toBe('stored description');
+      expect(valuesArg[0].solution).toBe('stored solution');
+      expect(valuesArg[0].cvssScore).toBe(9.1);
+    });
+
     it('should not create issues for vulnerabilities (creation logic is disabled)', async () => {
       // Issue creation from vulnerabilities is commented out in the service.
       // This test verifies no issue-related methods are called.
@@ -1021,6 +1617,7 @@ describe('DataAdapterService', () => {
 
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([]),
@@ -1099,6 +1696,7 @@ describe('DataAdapterService', () => {
 
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: getRawManyMock,
@@ -1122,12 +1720,13 @@ describe('DataAdapterService', () => {
         job: mockJob,
       });
 
-      // Should have called createNotification with count=1 (only new vuln)
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
+      // Should publish vulnerability.detected carrying only the new vuln
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.vulnerability.detected,
         expect.objectContaining({
-          type: NotificationType.NEW_VULNERABILITY_FOUND,
-          metadata: expect.objectContaining({
-            count: '1',
+          workspaceId: 'workspace-id',
+          payload: expect.objectContaining({
+            vulnerabilities: [expect.objectContaining({ name: newVuln.name })],
           }),
         }),
       );
@@ -1155,6 +1754,7 @@ describe('DataAdapterService', () => {
 
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: getRawManyMock,
@@ -1180,7 +1780,7 @@ describe('DataAdapterService', () => {
 
       // Should NOT have called createNotification
       expect(
-        mockNotificationsService.createNotification,
+        mockEventBridge.publishSafely,
       ).not.toHaveBeenCalled();
     });
 
@@ -1205,6 +1805,7 @@ describe('DataAdapterService', () => {
 
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([]), // no existing fingerprints
@@ -1228,14 +1829,12 @@ describe('DataAdapterService', () => {
         job: mockJob,
       });
 
-      // Should have called createNotification (low severity now triggers notification)
-      expect(
-        mockNotificationsService.createNotification,
-      ).toHaveBeenCalledWith(
+      // Should publish the event (low severity now triggers it)
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.vulnerability.detected,
         expect.objectContaining({
-          type: NotificationType.NEW_VULNERABILITY_FOUND,
-          metadata: expect.objectContaining({
-            count: '1',
+          payload: expect.objectContaining({
+            vulnerabilities: [expect.objectContaining({ name: lowVuln.name })],
           }),
         }),
       );
@@ -1479,6 +2078,58 @@ describe('DataAdapterService', () => {
       expect(service.vulnerabilities).toHaveBeenCalledWith({
         data: mockData,
         job: mockJob,
+      });
+    });
+
+    it('S3: syncData routes URL_DISCOVERY to urlDiscovery and HTTP_PROBE to httpResponses', async () => {
+      const urlDiscoveryJob = {
+        asset: {
+          id: 'asset-id',
+          value: 'example.com',
+          target: { id: 'target-id' },
+          targetId: 'target-id',
+          isEnabled: true,
+          dnsRecords: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        assetServiceId: 'service-id',
+        assetService: { id: 'service-id' },
+        jobHistory: { id: 'history-id' },
+        tool: { id: 'tool-id', category: ToolCategory.URL_DISCOVERY },
+        category: ToolCategory.URL_DISCOVERY,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Job;
+
+      const urlData = [{ url: 'https://a.example.com' }] as any;
+
+      const urlDiscoverySpy = jest
+        .spyOn(service, 'urlDiscovery')
+        .mockResolvedValue();
+
+      await service.syncData({ data: urlData, job: urlDiscoveryJob });
+
+      expect(urlDiscoverySpy).toHaveBeenCalledWith({
+        data: urlData,
+        job: urlDiscoveryJob,
+      });
+
+      const httpProbeJob = {
+        ...urlDiscoveryJob,
+        tool: { id: 'tool-id', category: ToolCategory.HTTP_PROBE },
+        category: ToolCategory.HTTP_PROBE,
+      } as unknown as Job;
+      const httpData = { url: 'https://example.com' } as unknown as HttpResponse;
+      const httpSpy = jest
+        .spyOn(service, 'httpResponses')
+        .mockResolvedValue();
+
+      await service.syncData({ data: httpData, job: httpProbeJob });
+
+      expect(httpSpy).toHaveBeenCalledWith({
+        data: httpData,
+        job: httpProbeJob,
       });
     });
 

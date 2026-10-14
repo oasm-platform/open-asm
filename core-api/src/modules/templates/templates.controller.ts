@@ -4,6 +4,7 @@ import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator'
 import { Doc } from '@/common/doc/doc.decorator';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { PresignUploadResponseDto } from '../storage/dto/presign-storage.dto';
 import {
   Body,
   Controller,
@@ -17,10 +18,6 @@ import {
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
 import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
 import { RenameTemplateDTO } from './dto/renameTemplate.dto';
-import {
-  UploadTemplateDTO,
-  UploadTemplateResponseDTO,
-} from './dto/uploadTemplate.dto';
 import { Template } from './entities/templates.entity';
 import { TemplatesService } from './templates.service';
 
@@ -47,16 +44,25 @@ export class TemplatesController {
   }
 
   @Doc({
-    summary: 'Template upload',
-    description: 'Upload a template to the storage',
-    response: { serialization: UploadTemplateResponseDTO },
+    summary: 'Presign a template upload',
+    description:
+      'Create a presigned URL the client PUTs the template YAML to directly',
+    response: { serialization: PresignUploadResponseDto },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @WorkspaceAccess('template.write')
-  @Post('upload')
-  uploadFile(@Body() template: UploadTemplateDTO) {
-    return this.templateService.uploadFile(
-      template.templateId,
-      template.fileContent,
+  @Post(':templateId/presign')
+  presignTemplate(
+    @WorkspaceId() workspaceId: string,
+    @UserContext() userContext: UserContextPayload,
+    @Param('templateId') templateId: string,
+  ) {
+    return this.templateService.presignTemplate(
+      templateId,
+      workspaceId,
+      userContext,
     );
   }
 

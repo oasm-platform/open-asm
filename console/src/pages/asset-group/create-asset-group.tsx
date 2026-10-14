@@ -5,6 +5,7 @@ import {
   ToolPipelineBuilder,
   type PipelineToolEntry,
 } from '@/pages/asset-group/components/tool-pipeline-builder';
+import { NoInstalledToolsState } from '@/pages/asset-group/components/no-installed-tools-state';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -30,6 +31,7 @@ import {
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { cn } from '@/lib/utils';
 import {
+  ToolCategory,
   useAssetGroupControllerCreate,
   useAssetsControllerGetHostAssets,
   useToolsControllerGetInstalledTools,
@@ -47,7 +49,7 @@ import {
   WrenchIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 const STEPS = [
   { title: 'Info', icon: <FileTextIcon className="size-4" /> },
@@ -98,9 +100,19 @@ export function CreateAssetGroup() {
     { query: { queryKey: ['create-group-hosts', page, pageSize, sortBy, sortOrder, filter] } },
   );
 
-  const toolsQuery = useToolsControllerGetInstalledTools({
-    category: 'vulnerabilities',
-  });
+  const toolsQuery = useToolsControllerGetInstalledTools();
+
+  // Pipeline-capable tool categories. url_discovery connectors (e.g. gau)
+  // run in the group pipeline alongside vulnerability scanners.
+  const pipelineTools = useMemo(
+    () =>
+      (toolsQuery.data?.data ?? []).filter(
+        (tool) =>
+          tool.category === ToolCategory.vulnerabilities ||
+          tool.category === ToolCategory.url_discovery,
+      ),
+    [toolsQuery.data?.data],
+  );
 
   const { mutate: createAssetGroup, isPending } = useAssetGroupControllerCreate();
 
@@ -307,14 +319,24 @@ export function CreateAssetGroup() {
             />
           )}
 
-          {step === 2 && (
-            <ToolPipelineBuilder
-              tools={toolsQuery.data?.data ?? []}
-              value={pipeline}
-              onChange={setPipeline}
-              emptyMessage="No tools found"
-            />
-          )}
+          {step === 2 &&
+            (toolsQuery.isLoading ? (
+              <div
+                className="flex min-h-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted-foreground"
+                role="status"
+              >
+                <LoaderCircleIcon className="size-4 animate-spin" />
+                Loading installed tools...
+              </div>
+            ) : pipelineTools.length === 0 ? (
+              <NoInstalledToolsState />
+            ) : (
+              <ToolPipelineBuilder
+                tools={pipelineTools}
+                value={pipeline}
+                onChange={setPipeline}
+              />
+            ))}
 
           {step === 3 && (
             <div className="max-w-2xl">

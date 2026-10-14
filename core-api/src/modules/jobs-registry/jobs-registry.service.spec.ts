@@ -1,24 +1,28 @@
 import {
   BullMQName,
   JobPriority,
+  JobRunType,
   JobStatus,
+  TargetType,
   ToolCategory,
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
-import { RedisService } from '@/services/redis/redis.service';
 import { getQueueToken } from '@nestjs/bullmq';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflows.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { ToolsService } from '../tools/tools.service';
+import { WorkerStreamRegistry } from '../workers/worker-stream-registry.service';
+import { WorkerInstance } from '../workers/entities/worker.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
@@ -48,6 +52,7 @@ describe('JobsRegistryService', () => {
     getOne: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
     count: jest.fn(),
     exists: jest.fn(),
   };
@@ -66,6 +71,18 @@ describe('JobsRegistryService', () => {
     save: jest.fn(),
   };
 
+  const mockAssetGroupWorkflowRepository = {
+    createQueryBuilder: jest.fn(),
+  };
+
+  let mockAssetGroupWorkflowQB: {
+    select: jest.Mock;
+    innerJoin: jest.Mock;
+    where: jest.Mock;
+    andWhere: jest.Mock;
+    getOne: jest.Mock;
+  };
+
   const mockDataSource = {
     createQueryRunner: jest.fn(),
     getRepository: jest.fn(),
@@ -77,17 +94,6 @@ describe('JobsRegistryService', () => {
 
   const mockStorageService = {
     upload: jest.fn(),
-  };
-
-  const mockRedisService = {
-    publish: jest.fn(),
-    client: {
-      incr: jest.fn(),
-      decr: jest.fn(),
-      del: jest.fn(),
-      get: jest.fn(),
-      set: jest.fn(),
-    },
   };
 
   const mockToolsService = {
@@ -110,7 +116,24 @@ describe('JobsRegistryService', () => {
     resolveConfigForJob: jest.fn(),
   };
 
+  const mockWorkerStreamRegistry = {
+    publishCancel: jest.fn().mockResolvedValue(undefined),
+    register: jest.fn(),
+    unregister: jest.fn(),
+  };
+
   beforeEach(async () => {
+    mockAssetGroupWorkflowQB = {
+      select: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    };
+    mockAssetGroupWorkflowRepository.createQueryBuilder.mockReturnValue(
+      mockAssetGroupWorkflowQB,
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {
@@ -126,6 +149,10 @@ describe('JobsRegistryService', () => {
           useValue: mockJobErrorLogRepository,
         },
         {
+          provide: getRepositoryToken(AssetGroupWorkflow),
+          useValue: mockAssetGroupWorkflowRepository,
+        },
+        {
           provide: DataSource,
           useValue: mockDataSource,
         },
@@ -136,10 +163,6 @@ describe('JobsRegistryService', () => {
         {
           provide: StorageService,
           useValue: mockStorageService,
-        },
-        {
-          provide: RedisService,
-          useValue: mockRedisService,
         },
         {
           provide: ToolsService,
@@ -165,6 +188,10 @@ describe('JobsRegistryService', () => {
           provide: ToolConfigProfilesService,
           useValue: mockToolConfigProfilesService,
         },
+        {
+          provide: WorkerStreamRegistry,
+          useValue: mockWorkerStreamRegistry,
+        },
         JobsRegistryService,
       ],
     }).compile();
@@ -172,6 +199,8 @@ describe('JobsRegistryService', () => {
     service = module.get<JobsRegistryService>(JobsRegistryService);
     // Manually set optional toolsService since @Optional() dependencies may not be injected in tests
     (service as any).toolsService = mockToolsService;
+    // The mocks are module-scoped, so cancel pushes must not leak between tests.
+    mockWorkerStreamRegistry.publishCancel.mockClear();
   });
 
   describe('reRunJob', () => {
@@ -323,6 +352,95 @@ describe('JobsRegistryService', () => {
       });
     });
 
+    it('publishes a cancel to the worker stream when the job was running', async () => {
+      // Given: a job that a worker is executing right now
+      const runningJob = {
+        id: mockJobId,
+        status: JobStatus.IN_PROGRESS,
+        workerId: 'worker-uuid',
+        retryCount: 0,
+        asset: { target: { id: 'target-uuid' } },
+      };
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: { save: jest.fn().mockResolvedValue(runningJob) },
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(runningJob);
+      mockWorkerStreamRegistry.publishCancel.mockClear();
+
+      // When: the job is cancelled from the console
+      await service.cancelJob(mockWorkspaceId, mockJobId);
+
+      // Then: the owning worker is told to stop, after the DB commit
+      expect(mockWorkerStreamRegistry.publishCancel).toHaveBeenCalledWith({
+        workerId: 'worker-uuid',
+        jobId: mockJobId,
+        reason: 'cancelled by user',
+      });
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it('does not publish a cancel when no worker was running the job', async () => {
+      // Given: a queued job that no worker has picked up
+      const pendingJob = {
+        id: mockJobId,
+        status: JobStatus.PENDING,
+        retryCount: 0,
+        asset: { target: { id: 'target-uuid' } },
+      };
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: { save: jest.fn().mockResolvedValue(pendingJob) },
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(pendingJob);
+      mockWorkerStreamRegistry.publishCancel.mockClear();
+
+      // When
+      await service.cancelJob(mockWorkspaceId, mockJobId);
+
+      // Then: nobody is told to stop anything
+      expect(mockWorkerStreamRegistry.publishCancel).not.toHaveBeenCalled();
+    });
+
+    it('still reports success when publishing the cancel fails', async () => {
+      // Given: a running job whose stream cannot be reached
+      const runningJob = {
+        id: mockJobId,
+        status: JobStatus.IN_PROGRESS,
+        workerId: 'worker-uuid',
+        retryCount: 0,
+        asset: { target: { id: 'target-uuid' } },
+      };
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: { save: jest.fn().mockResolvedValue(runningJob) },
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(runningJob);
+      mockWorkerStreamRegistry.publishCancel.mockRejectedValueOnce(
+        new Error('redis down'),
+      );
+
+      // When / Then: the cancellation itself still succeeds (best-effort push)
+      await expect(
+        service.cancelJob(mockWorkspaceId, mockJobId),
+      ).resolves.toEqual({ message: 'Job cancelled successfully' });
+    });
+
     it('should throw NotFoundException when job not found in workspace', async () => {
       const mockQueryRunner = {
         connect: jest.fn(),
@@ -373,6 +491,170 @@ describe('JobsRegistryService', () => {
         service.cancelJob(mockWorkspaceId, mockJobId),
       ).rejects.toThrow('Database error');
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+    });
+  });
+
+  describe('cancelJobHistory', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+    const mockHistoryId = 'history-uuid';
+
+    const buildQueryRunner = ({
+      belongsToWorkspace = true,
+      affected = 3,
+      running = [] as { jobId: string; workerId: string }[],
+      steps = {},
+    } = {}) => {
+      const ownershipBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(belongsToWorkspace),
+      };
+      const runningBuilder = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue(running),
+      };
+      const updateBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected }),
+      };
+      const findOne = jest.fn().mockResolvedValue({
+        id: mockHistoryId,
+        steps,
+        isCompleted: false,
+      });
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      const manager = {
+        // Three shapes: the 'jobHistory' alias is the ownership lookup, the
+        // 'job' alias is the "which jobs are executing right now" lookup, and
+        // no alias is the bulk update.
+        createQueryBuilder: jest.fn((entity?: unknown, alias?: string) => {
+          if (alias === 'job') return runningBuilder;
+          return entity ? ownershipBuilder : updateBuilder;
+        }),
+        findOne,
+        update,
+      };
+
+      return {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager,
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+        ownershipBuilder,
+        runningBuilder,
+        updateBuilder,
+        findOne,
+        update,
+      };
+    };
+
+    it('cancels every job of the run, keeping the completion time of finished ones', async () => {
+      const qr = buildQueryRunner({ affected: 100 });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      const result = await service.cancelJobHistory(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      // COALESCE keeps the real completedAt so an already-finished job does not
+      // look like it completed at cancel time.
+      expect(qr.updateBuilder.set).toHaveBeenCalledWith({
+        status: JobStatus.CANCELLED,
+        completedAt: expect.any(Function),
+      });
+      expect(qr.updateBuilder.where).toHaveBeenCalledWith(
+        '"jobHistoryId" = :jobHistoryId',
+        { jobHistoryId: mockHistoryId },
+      );
+      expect(qr.commitTransaction).toHaveBeenCalled();
+      expect(result.message).toContain('100');
+      // Nothing was executing, so no worker is told to stop.
+      expect(mockWorkerStreamRegistry.publishCancel).not.toHaveBeenCalled();
+    });
+
+    it('stops every job of the run that a worker was executing', async () => {
+      const qr = buildQueryRunner({
+        affected: 2,
+        running: [
+          { jobId: 'job-a', workerId: 'worker-1' },
+          { jobId: 'job-b', workerId: 'worker-2' },
+        ],
+      });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+      mockWorkerStreamRegistry.publishCancel.mockClear();
+
+      await service.cancelJobHistory(mockWorkspaceId, mockHistoryId);
+
+      expect(mockWorkerStreamRegistry.publishCancel).toHaveBeenCalledTimes(2);
+      expect(mockWorkerStreamRegistry.publishCancel).toHaveBeenCalledWith({
+        workerId: 'worker-1',
+        jobId: 'job-a',
+        reason: 'run cancelled by user',
+      });
+      expect(mockWorkerStreamRegistry.publishCancel).toHaveBeenCalledWith({
+        workerId: 'worker-2',
+        jobId: 'job-b',
+        reason: 'run cancelled by user',
+      });
+    });
+
+    it('closes the run so no further step can ever be dispatched', async () => {
+      const qr = buildQueryRunner({
+        steps: {
+          'Port Scan': { status: 'pending', jobs: 0 },
+          'HTTP Probe': { status: 'dispatched', jobs: 2 },
+          'Vuln Scan': { status: 'done', jobs: 1 },
+        },
+      });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      await service.cancelJobHistory(mockWorkspaceId, mockHistoryId);
+
+      const [, , patch]: [unknown, unknown, Record<string, unknown>] = qr
+        .update.mock.calls[0] as [unknown, unknown, Record<string, unknown>];
+      expect(qr.update).toHaveBeenCalledWith(
+        JobHistory,
+        { id: mockHistoryId },
+        expect.objectContaining({ isCompleted: true }),
+      );
+      expect(patch.steps).toMatchObject({
+        'Port Scan': { status: 'skipped', reason: 'run-cancelled' },
+        'HTTP Probe': { status: 'skipped', reason: 'run-cancelled' },
+        'Vuln Scan': { status: 'done' },
+      });
+    });
+
+    it('throws NotFoundException and rolls back for a history outside the workspace', async () => {
+      const qr = buildQueryRunner({ belongsToWorkspace: false });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      await expect(
+        service.cancelJobHistory(mockWorkspaceId, mockHistoryId),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(qr.rollbackTransaction).toHaveBeenCalled();
+      expect(qr.updateBuilder.execute).not.toHaveBeenCalled();
+      expect(qr.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a history that does not exist', async () => {
+      const qr = buildQueryRunner({ belongsToWorkspace: false });
+      mockDataSource.createQueryRunner.mockReturnValue(qr);
+
+      await expect(
+        service.cancelJobHistory(mockWorkspaceId, 'missing-history'),
+      ).rejects.toThrow(NotFoundException);
+      expect(qr.commitTransaction).not.toHaveBeenCalled();
     });
   });
 
@@ -486,10 +768,11 @@ describe('JobsRegistryService', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       jobs: mockJobs,
+      steps: {},
       workflow: {
         name: 'test-workflow',
         content: {
-          jobs: [{ run: 'test-tool' }],
+          jobs: { test_step: { name: 'Test Step', run: 'test-tool' } },
         },
       },
       jobHistoryName: 'test-job-history',
@@ -554,6 +837,19 @@ describe('JobsRegistryService', () => {
             status: JobStatus.COMPLETED,
           },
         ],
+        steps: [
+          {
+            id: 'test_step',
+            name: 'Test Step',
+            run: 'test-tool',
+            needs: [],
+            // Derived from the job rows for a run created before the engine.
+            status: 'done',
+            jobs: 0,
+            toolId: 'tool-uuid',
+            logoUrl: 'http://example.com/logo.png',
+          },
+        ],
       });
       // Bandwidth contract: tools must expose only id/name/logoUrl/status
       expect(Object.keys(result.tools![0]).sort()).toEqual([
@@ -562,6 +858,32 @@ describe('JobsRegistryService', () => {
         'name',
         'status',
       ]);
+    });
+
+    it('should report a tool as cancelled rather than completed once the run was cancelled', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({ data: [] });
+
+      await service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId);
+
+      const selectCalls = (mockJobRepository.select).mock.calls;
+      const selectArgs = selectCalls[selectCalls.length - 1][0] as string[];
+      const statusExpr = selectArgs.find((s) => s.includes('CASE'))!;
+      // Regression: a tool whose jobs finished before the cancel used to keep a
+      // green check, because the COMPLETED branch was reached first.
+      expect(statusExpr).toContain(
+        `WHEN COUNT(CASE WHEN job.status = '${JobStatus.CANCELLED}' THEN 1 END) > 0`,
+      );
+      expect(statusExpr.indexOf(JobStatus.CANCELLED)).toBeLessThan(
+        statusExpr.indexOf(JobStatus.COMPLETED),
+      );
     });
 
     it('should return detail for a history whose jobs were all deleted (ownership proven via workflow, tool status undefined)', async () => {
@@ -603,7 +925,120 @@ describe('JobsRegistryService', () => {
             status: undefined,
           },
         ],
+        steps: [
+          {
+            id: 'test_step',
+            name: 'Test Step',
+            run: 'test-tool',
+            needs: [],
+            status: 'pending',
+            jobs: 0,
+            toolId: 'tool-uuid',
+            logoUrl: 'http://example.com/logo.png',
+          },
+        ],
       });
+    });
+
+    it('exposes the persisted step state of a DAG run', async () => {
+      const dagHistory = {
+        ...mockJobHistory,
+        steps: {
+          scan_subdomain: {
+            status: 'done',
+            jobs: 1,
+            dispatchedAt: '2026-01-01T00:00:00.000Z',
+            finishedAt: '2026-01-01T00:05:00.000Z',
+          },
+          port_scan: { status: 'dispatched', jobs: 3, failed: 1 },
+          http_probe: {
+            status: 'skipped',
+            jobs: 0,
+            reason: 'blocked-by-failure',
+          },
+        },
+        workflow: {
+          name: 'test-workflow',
+          content: {
+            // Stored in jsonb key order, NOT authored order, exactly as Postgres
+            // hands it back — the response must still come out dependencies-first.
+            jobs: {
+              http_probe: {
+                name: 'HTTP Probe',
+                run: 'httpx',
+                needs: ['port_scan'],
+              },
+              take_screenshot: {
+                name: 'Take Screenshot',
+                run: 'screenshot',
+                needs: ['http_probe'],
+              },
+              scan_subdomain: {
+                name: 'Scan Subdomain',
+                run: 'subfinder',
+              },
+              port_scan: {
+                name: 'Port Scan',
+                run: 'naabu',
+                needs: ['scan_subdomain'],
+              },
+            },
+          },
+        },
+      };
+      mockJobHistoryRepository.findOne.mockResolvedValue(dagHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({ data: [] });
+
+      const result = await service.getJobHistoryDetail(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(result.steps).toEqual([
+        {
+          id: 'scan_subdomain',
+          name: 'Scan Subdomain',
+          run: 'subfinder',
+          needs: [],
+          status: 'done',
+          jobs: 1,
+          dispatchedAt: new Date('2026-01-01T00:00:00.000Z'),
+          finishedAt: new Date('2026-01-01T00:05:00.000Z'),
+        },
+        {
+          id: 'port_scan',
+          name: 'Port Scan',
+          run: 'naabu',
+          needs: ['scan_subdomain'],
+          status: 'dispatched',
+          jobs: 3,
+          failed: 1,
+        },
+        {
+          id: 'http_probe',
+          name: 'HTTP Probe',
+          run: 'httpx',
+          needs: ['port_scan'],
+          status: 'skipped',
+          reason: 'blocked-by-failure',
+          jobs: 0,
+        },
+        {
+          id: 'take_screenshot',
+          name: 'Take Screenshot',
+          run: 'screenshot',
+          needs: ['http_probe'],
+          status: 'pending',
+          jobs: 0,
+        },
+      ]);
     });
 
     it('should throw NotFoundException when job history not found', async () => {
@@ -649,6 +1084,83 @@ describe('JobsRegistryService', () => {
 
       expect(result.workflowName).toBeUndefined();
       expect(result.tools).toEqual([]);
+    });
+  });
+
+
+  describe('getJobHistoryWorkflow', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+    const mockHistoryId = 'history-uuid';
+    const mockJobHistory = {
+      id: mockHistoryId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      steps: {},
+      jobHistoryName: 'test-job-history',
+      workflow: {
+        id: 'workflow-uuid',
+        name: 'test-workflow',
+        content: {
+          name: 'test-workflow',
+          jobs: { test_step: { name: 'Test Step', run: 'test-tool' } },
+        },
+      },
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({ data: [] });
+    });
+
+    it('should return the workflow definition of the run as stored', async () => {
+      // Scrambled on purpose: jsonb returns object keys in its own order.
+      mockJobHistory.workflow.content = {
+        jobs: { test_step: { name: 'Test Step', run: 'test-tool' } },
+        name: 'test-workflow',
+      };
+      const result = await service.getJobHistoryWorkflow(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(result.workflowId).toBe('workflow-uuid');
+      expect(result.workflowName).toBe('test-workflow');
+      expect(result.content).toEqual(mockJobHistory.workflow.content);
+      // Regression: jsonb does not keep key order, so the code view used to
+      // print `jobs` before `name` — the opposite of every workflow template.
+      expect(Object.keys(result.content!)).toEqual(['name', 'jobs']);
+    });
+
+    it('should include the run steps so the page can show state next to the definition', async () => {
+      const result = await service.getJobHistoryWorkflow(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(result.steps).toEqual([
+        expect.objectContaining({ id: 'test_step', run: 'test-tool' }),
+      ]);
+    });
+
+    it('should throw NotFoundException when the run is not in the workspace', async () => {
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(false),
+      });
+
+      await expect(
+        service.getJobHistoryWorkflow(mockWorkspaceId, mockHistoryId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -810,6 +1322,65 @@ describe('JobsRegistryService', () => {
         'target',
       );
     });
+
+    it('should mask secrets in the returned job config', async () => {
+      mockJobRepository.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'job-1',
+            tool: { name: 'acunetix' },
+            config: {
+              url: 'https://acunetix.local',
+              apiKey: 'super-secret-key',
+            },
+          },
+        ],
+        1,
+      ]);
+      mockConnectorRegistryService.getConnector.mockReturnValue({
+        configSchema: {
+          properties: { apiKey: { type: 'string', 'ui:widget': 'password' } },
+        },
+      });
+
+      const result = await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(result.data[0].config).toEqual({
+        url: 'https://acunetix.local',
+        apiKey: '****-key',
+      });
+    });
+
+    it('should still mask secret-named config keys when no connector schema resolves', async () => {
+      mockJobRepository.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: 'job-2',
+            tool: { name: 'unknown-connector' },
+            config: { url: 'https://x.local', password: 'hunter2' },
+          },
+        ],
+        1,
+      ]);
+      mockConnectorRegistryService.getConnector.mockReturnValue(null);
+
+      const result = await service.getManyJobs(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      expect(result.data[0].config).toEqual({
+        url: 'https://x.local',
+        password: '****ter2',
+      });
+    });
   });
 
   describe('getManyJobHistories', () => {
@@ -819,9 +1390,11 @@ describe('JobsRegistryService', () => {
       innerJoin: jest.Mock<HistoryQueryBuilder>;
       leftJoin: jest.Mock<HistoryQueryBuilder>;
       where: jest.Mock<HistoryQueryBuilder>;
+      andWhere: jest.Mock<HistoryQueryBuilder>;
       select: (args: unknown[]) => HistoryQueryBuilder;
       groupBy: jest.Mock<HistoryQueryBuilder>;
       addGroupBy: jest.Mock<HistoryQueryBuilder>;
+      having: jest.Mock<HistoryQueryBuilder>;
       orderBy: jest.Mock<HistoryQueryBuilder>;
       addOrderBy: jest.Mock<HistoryQueryBuilder>;
       offset: jest.Mock<HistoryQueryBuilder>;
@@ -836,12 +1409,14 @@ describe('JobsRegistryService', () => {
         innerJoin: jest.fn().mockReturnThis(),
         leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         select: jest.fn((args: unknown[]) => {
           selectArgs.push(args);
           return qb;
         }),
         groupBy: jest.fn().mockReturnThis(),
         addGroupBy: jest.fn().mockReturnThis(),
+        having: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
         offset: jest.fn().mockReturnThis(),
@@ -852,15 +1427,39 @@ describe('JobsRegistryService', () => {
       return { qb, selectArgs };
     };
 
+    /**
+     * The method builds a SINGLE query builder. `total` used to require a
+     * second, distinct-id aggregate pass; it now rides on the paged select as a
+     * `COUNT(*) OVER ()` window, so tests drive one builder and the row count
+     * arrives in the same rows.
+     */
+    const stubHistoryQueryBuilder = () => {
+      const paged = buildHistoryQueryBuilder();
+      mockJobHistoryRepository.createQueryBuilder.mockReset();
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(paged.qb);
+      return { paged };
+    };
+
     beforeEach(() => {
       jest.clearAllMocks();
     });
 
     it('should compute totalJobs and status from joined jobs without correlated subqueries', async () => {
-      const { qb, selectArgs } = buildHistoryQueryBuilder();
-      qb.getRawMany.mockResolvedValue([]);
-      qb.getCount.mockResolvedValue(2);
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+      const { paged } = stubHistoryQueryBuilder();
+      const { qb, selectArgs } = paged;
+      qb.getRawMany.mockResolvedValue([
+        {
+          id: 'history-1',
+          createdAt: new Date('2024-01-01T00:00:00Z'),
+          updatedAt: new Date('2024-01-02T00:00:00Z'),
+          totalJobs: '4',
+          status: JobStatus.IN_PROGRESS,
+          workflowName: 'workflow-1',
+          jobHistoryName: 'run-1',
+          jobRunType: JobRunType.MANUAL,
+          total: '2',
+        },
+      ]);
 
       const result = await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -882,16 +1481,18 @@ describe('JobsRegistryService', () => {
       ) as string;
       expect(statusExpr).toContain(`job.status = '${JobStatus.FAILED}'`);
       expect(statusExpr).toContain(`job.status = '${JobStatus.IN_PROGRESS}'`);
-      // Separate count query is still executed (getCount would strip GROUP BY)
-      expect(qb.getCount).toHaveBeenCalled();
+      expect(selectArgs[0]).toContain('COUNT(*) OVER () as "total"');
+      // One query serves both the page and its total
+      expect(mockJobHistoryRepository.createQueryBuilder).toHaveBeenCalledTimes(
+        1,
+      );
       expect(result.total).toBe(2);
     });
 
     it('should aggregate terminal cancelled status when all jobs are cancelled', async () => {
-      const { qb, selectArgs } = buildHistoryQueryBuilder();
+      const { paged } = stubHistoryQueryBuilder();
+      const { qb, selectArgs } = paged;
       qb.getRawMany.mockResolvedValue([]);
-      qb.getCount.mockResolvedValue(0);
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -904,16 +1505,45 @@ describe('JobsRegistryService', () => {
         (s) => typeof s === 'string' && s.includes('FILTER'),
       ) as string;
       // All-cancelled histories must surface as cancelled, not pending
+      expect(statusExpr).toContain(`THEN '${JobStatus.CANCELLED}'`);
       expect(statusExpr).toContain(
-        `WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.CANCELLED}'`,
+        `job.status = '${JobStatus.CANCELLED}') > 0`,
+      );
+    });
+
+    it('should surface a cancelled run even when some jobs already completed', async () => {
+      const { paged } = stubHistoryQueryBuilder();
+      const { qb, selectArgs } = paged;
+      qb.getRawMany.mockResolvedValue([]);
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      } as any);
+
+      const statusExpr = selectArgs[0].find(
+        (s) => typeof s === 'string' && s.includes('FILTER'),
+      ) as string;
+      // Derived purely from the child jobs: a cancelled job with nothing left
+      // pending/in-progress means the user stopped the run. Without this branch
+      // a run cancelled after 30/100 jobs would fall through to "pending".
+      expect(statusExpr).toContain(
+        `WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.CANCELLED}') > 0`,
+      );
+      expect(statusExpr).toContain(
+        `COUNT(*) FILTER (WHERE job.status IN ('${JobStatus.PENDING}', '${JobStatus.IN_PROGRESS}')) = 0`,
+      );
+      expect(statusExpr.indexOf(JobStatus.CANCELLED)).toBeLessThan(
+        statusExpr.indexOf(JobStatus.FAILED),
       );
     });
 
     it('should aggregate terminal skipped status when all jobs are skipped', async () => {
-      const { qb, selectArgs } = buildHistoryQueryBuilder();
+      const { paged } = stubHistoryQueryBuilder();
+      const { qb, selectArgs } = paged;
       qb.getRawMany.mockResolvedValue([]);
-      qb.getCount.mockResolvedValue(0);
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -932,8 +1562,8 @@ describe('JobsRegistryService', () => {
     });
 
     it('should fall back to createdAt and append an id tiebreaker for unknown sortBy', async () => {
-      const { qb } = buildHistoryQueryBuilder();
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+      const { paged } = stubHistoryQueryBuilder();
+      const { qb } = paged;
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -947,8 +1577,8 @@ describe('JobsRegistryService', () => {
     });
 
     it('should pass through whitelisted sortBy values', async () => {
-      const { qb } = buildHistoryQueryBuilder();
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
+      const { paged } = stubHistoryQueryBuilder();
+      const { qb } = paged;
 
       await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -964,7 +1594,8 @@ describe('JobsRegistryService', () => {
     });
 
     it('should transform raw rows into the response DTO shape', async () => {
-      const { qb } = buildHistoryQueryBuilder();
+      const { paged } = stubHistoryQueryBuilder();
+      const { qb } = paged;
       qb.getRawMany.mockResolvedValue([
         {
           id: 'history-1',
@@ -977,7 +1608,6 @@ describe('JobsRegistryService', () => {
           jobRunType: 'manual',
         },
       ]);
-      mockJobHistoryRepository.createQueryBuilder.mockReturnValue(qb);
 
       const result = await service.getManyJobHistories(mockWorkspaceId, {
         page: 1,
@@ -997,1029 +1627,728 @@ describe('JobsRegistryService', () => {
         jobRunType: 'manual',
       });
     });
+
+    it('should apply the search predicate to the page query', async () => {
+      const { paged } = stubHistoryQueryBuilder();
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        search: 'nightly',
+      } as any);
+
+      expect(paged.qb.andWhere).toHaveBeenCalledWith(
+        '(jobHistory.jobHistoryName ILIKE :search OR workflow.name ILIKE :search)',
+        { search: '%nightly%' },
+      );
+    });
+
+    it('should filter on the status rollup via HAVING, and skip it for "all"', async () => {
+      const filtered = stubHistoryQueryBuilder();
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobStatus: JobStatus.FAILED,
+      } as any);
+
+      const [havingSql, havingParams] = filtered.paged.qb.having.mock.calls[0] as [
+        string,
+        { jobStatus: string },
+      ];
+      expect(havingSql).toContain('FILTER');
+      expect(havingParams).toEqual({ jobStatus: JobStatus.FAILED });
+
+      const unfiltered = stubHistoryQueryBuilder();
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobStatus: 'all',
+      } as any);
+      expect(unfiltered.paged.qb.having).not.toHaveBeenCalled();
+    });
+
+    it('should filter by run type and a creation-date range on the page query', async () => {
+      const { paged } = stubHistoryQueryBuilder();
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobRunType: JobRunType.SCHEDULED,
+        createdFrom: '2026-01-01',
+        createdTo: '2026-01-31',
+      } as any);
+
+      const ranged = (qb: typeof paged.qb) => {
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          'jobHistory.jobRunType = :jobRunType',
+          { jobRunType: JobRunType.SCHEDULED },
+        );
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          'jobHistory.createdAt >= :createdFrom',
+          { createdFrom: new Date('2026-01-01') },
+        );
+        const [, params] = qb.andWhere.mock.calls.find(
+          ([sql]) => sql === 'jobHistory.createdAt <= :createdTo',
+        ) as [string, { createdTo: Date }];
+        // A bare date means "through the end of that day".
+        expect(params.createdTo.getHours()).toBe(23);
+        expect(params.createdTo.getMilliseconds()).toBe(999);
+      };
+
+      ranged(paged.qb);
+    });
+
+    it('should skip run type and date filters for "all" / absent values', async () => {
+      const { paged } = stubHistoryQueryBuilder();
+
+      await service.getManyJobHistories(mockWorkspaceId, {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+        jobRunType: 'all',
+      } as any);
+
+      expect(paged.qb.andWhere).not.toHaveBeenCalled();
+    });
   });
 
-  describe('getNextStepForJob', () => {
-    const mockJob = {
-      id: 'job-uuid',
-      tool: { name: 'tool-a' },
-      asset: {
-        target: { id: 'target-uuid' },
-      },
-      jobHistory: {
-        workflow: {
-          content: {
-            jobs: [
-              { name: 'job-1', run: 'tool-a' },
-              { name: 'job-2', run: 'tool-b' },
-            ],
-          },
-          workspace: { id: 'workspace-uuid' },
-        },
-      },
+  // ── SCREENSHOT live asset-service filter ─────────────────────────────
+
+  describe('createNewJob — SCREENSHOT live asset-service filter', () => {
+    const mockJobRepo = {
+      create: jest
+        .fn()
+        .mockImplementation((partial: Record<string, unknown>) => ({
+          id: 'job-uuid',
+          ...partial,
+        })),
+      save: jest
+        .fn()
+        .mockImplementation((jobs: unknown) => Promise.resolve(jobs)),
     };
 
-    it('should return 0 when no workflow exists', async () => {
-      const jobNoWorkflow = { ...mockJob, jobHistory: { workflow: null } };
+    let mockAssetServiceQB: Record<string, jest.Mock>;
 
-      const result = await service.getNextStepForJob(jobNoWorkflow as any);
+    const screenshotTool = {
+      id: 'tool-ss',
+      name: 'screenshot',
+      category: ToolCategory.SCREENSHOT,
+      priority: 4,
+    } as any;
 
-      expect(result).toBe(0);
+    const httpProbeTool = {
+      id: 'tool-hp',
+      name: 'httpx',
+      category: ToolCategory.HTTP_PROBE,
+      priority: 4,
+    } as any;
+
+    const makeService = (id: string) => ({
+      id,
+      value: `${id}.example.com`,
+      port: 443,
+      asset: { id: `asset-${id}`, isPrimary: true },
     });
 
-    it('should return 0 when current tool not found in workflow', async () => {
-      const jobNoTool = {
-        ...mockJob,
-        tool: { name: 'unknown-tool' },
-      };
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJobHistoryRepository.create = jest
+        .fn()
+        .mockReturnValue({ id: 'jh-1' });
+      mockJobHistoryRepository.save = jest
+        .fn()
+        .mockResolvedValue({ id: 'jh-1' });
+      mockConnectorRegistryService.getConnector.mockReturnValue(null);
 
-      const result = await service.getNextStepForJob(jobNoTool as any);
-
-      expect(result).toBe(0);
-    });
-
-    it('should return 0 when current tool is last in workflow', async () => {
-      const lastToolJob = {
-        ...mockJob,
-        tool: { name: 'tool-b' },
-      };
-
-      const result = await service.getNextStepForJob(lastToolJob as any);
-
-      expect(result).toBe(0);
-    });
-
-    it('should return number of new jobs created when next step exists', async () => {
-      const jobWithNextStep = {
-        id: 'job-uuid',
-        tool: { name: 'tool-a' },
-        asset: {
-          target: { id: 'target-uuid' },
-        },
-        jobHistory: {
-          workflow: {
-            content: {
-              jobs: [
-                { name: 'job-1', run: 'tool-a' },
-                { name: 'job-2', run: 'tool-b' },
-              ],
-            },
-            workspace: { id: undefined },
-          },
-        },
-      };
-
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'tool-b', priority: 4, category: 'SUBDOMAINS' },
-      ]);
-
-      const mockQueryBuilder = {
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 'asset-1', isPrimary: true }]),
-      };
-      const mockJobRepo = {
-        create: jest.fn().mockReturnValue({}),
-        save: jest.fn().mockResolvedValue([{}]),
-        createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
-      };
-      mockDataSource.getRepository.mockReturnValue(mockJobRepo);
-
-      const result = await service.getNextStepForJob(jobWithNextStep as any);
-
-      expect(result).toBe(1);
-    });
-
-    it('should skip SUBDOMAINS and use next non-SUBDOMAINS when isAssetsDiscovery is false', async () => {
-      const jobWithSubdomainNext = {
-        id: 'job-uuid',
-        tool: { name: 'tool-a' },
-        asset: {
-          target: { id: 'target-uuid' },
-        },
-        jobHistory: {
-          workflow: {
-            content: {
-              jobs: [
-                { name: 'job-1', run: 'tool-a' },
-                { name: 'job-2', run: 'subfinder' },
-                { name: 'job-3', run: 'tool-c' },
-              ],
-            },
-            workspace: { id: 'workspace-uuid' },
-          },
-        },
-      };
-
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: false,
-      });
-
-      // toolsService.getToolByNames called twice:
-      // 1st call (batch-resolve remaining): subfinder + tool-c
-      // 2nd call (resolve nextTool): tool-c
-      mockToolsService.getToolByNames
-        .mockResolvedValueOnce([
-          { name: 'subfinder', category: ToolCategory.SUBDOMAINS },
-          { name: 'tool-c', category: ToolCategory.HTTP_PROBE },
-        ])
-        .mockResolvedValueOnce([
-          { name: 'tool-c', category: ToolCategory.HTTP_PROBE },
-        ]);
-
-      // tool-c is HTTP_PROBE => createNewJob calls findAssetServicesForJob => needs chained query builder
-      const mockAssetQueryBuilder = {
+      mockAssetServiceQB = {
         innerJoinAndSelect: jest.fn().mockReturnThis(),
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 'asset-service-1', value: 'example.com', port: 443, asset: { id: 'asset-1', isPrimary: true } }]),
+        distinct: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
       };
-      const mockJobQueryBuilder = {
-        leftJoinAndWhere: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 'asset-1', isPrimary: true }]),
-      };
-      const mockAssetRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(mockAssetQueryBuilder),
-      };
-      const mockJobRepo = {
-        create: jest.fn().mockReturnValue({}),
-        save: jest.fn().mockResolvedValue([{}]),
-        createQueryBuilder: jest.fn().mockReturnValue(mockJobQueryBuilder),
+      const mockAssetServiceRepo = {
+        createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB),
       };
       mockDataSource.getRepository.mockImplementation((entity: any) => {
         const name = entity?.name ?? entity;
-        if (name === 'AssetService') return mockAssetRepo;
+        if (name === 'AssetService') return mockAssetServiceRepo;
         return mockJobRepo;
       });
-
-      const result = await service.getNextStepForJob(
-        jobWithSubdomainNext as any,
-      );
-
-      expect(result).toBe(1);
-      // Should have skipped subfinder and resolved tool-c
-      expect(mockToolsService.getToolByNames).toHaveBeenCalledWith({
-        names: ['subfinder', 'tool-c'],
-      });
-      expect(mockToolsService.getToolByNames).toHaveBeenLastCalledWith({
-        names: ['tool-c'],
-      });
     });
 
-    it('should return 0 when all remaining tools are SUBDOMAINS and discovery is disabled', async () => {
-      const jobWithOnlySubdomainNext = {
-        id: 'job-uuid',
-        tool: { name: 'tool-a' },
-        asset: {
-          target: { id: 'target-uuid' },
-        },
-        jobHistory: {
-          workflow: {
-            content: {
-              jobs: [
-                { name: 'job-1', run: 'tool-a' },
-                { name: 'job-2', run: 'subfinder-1' },
-                { name: 'job-3', run: 'subfinder-2' },
-              ],
-            },
-            workspace: { id: 'workspace-uuid' },
-          },
-        },
-      };
+    // Returns the first andWhere() SQL call containing an EXISTS subquery.
+    const findExistsAndWhere = (): string | undefined => {
+      const call = mockAssetServiceQB.andWhere.mock.calls.find(
+        ([sql]) => typeof sql === 'string' && sql.includes('EXISTS'),
+      );
+      return call?.[0] as string | undefined;
+    };
 
-      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
-        isAssetsDiscovery: false,
+    it('SCREENSHOT: filters to live services via EXISTS(http_responses failed=false) and creates one job per live service', async () => {
+      const liveServices = [makeService('as-1'), makeService('as-2')];
+      mockAssetServiceQB.getMany.mockResolvedValue(liveServices);
+
+      const result = await service.createNewJob({
+        tool: screenshotTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
       });
 
-      mockToolsService.getToolByNames.mockResolvedValue([
-        { name: 'subfinder-1', category: ToolCategory.SUBDOMAINS },
-        { name: 'subfinder-2', category: ToolCategory.SUBDOMAINS },
-      ]);
+      // Authoritative "httpx confirmed live" predicate must be applied as an
+      // EXISTS subquery (no row multiplication => no DISTINCT required).
+      const existsSql = findExistsAndWhere();
+      expect(existsSql).toBeDefined();
+      expect(existsSql).toContain('http_responses');
+      expect(existsSql).toContain('hr."assetServiceId" = "assetServices"."id"');
+      expect(existsSql).toContain('hr.failed = false');
 
-      const result = await service.getNextStepForJob(
-        jobWithOnlySubdomainNext as any,
+      // The buggy innerJoin/DISTINCT approach must be gone.
+      expect(mockAssetServiceQB.innerJoin).not.toHaveBeenCalledWith(
+        'assetServices.httpResponses',
+        'httpResponse',
       );
+      expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
 
-      expect(result).toBe(0);
+      expect(result).toHaveLength(2);
+      expect(mockJobRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockJobRepo.save).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ category: ToolCategory.SCREENSHOT }),
+        ]),
+      );
+    });
+
+    it('SCREENSHOT edge (empty): no live services => 0 jobs inserted, no throw', async () => {
+      mockAssetServiceQB.getMany.mockResolvedValue([]);
+
+      const result = await service.createNewJob({
+        tool: screenshotTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(result).toHaveLength(0);
+      expect(mockJobRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('SCREENSHOT edge (dedup): EXISTS yields one job per service even with many http_responses', async () => {
+      // A service with N http_responses still surfaces ONCE from getMany()
+      // because EXISTS is a semi-join (no row multiplication); assert exactly
+      // one job per service and that DISTINCT is not needed.
+      mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
+
+      const result = await service.createNewJob({
+        tool: screenshotTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(findExistsAndWhere()).toBeDefined();
+      expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+    });
+
+    it('HTTP_PROBE regression: no live filter applied; every service still produces a job', async () => {
+      const allServices = [
+        makeService('as-1'),
+        makeService('as-2'),
+        makeService('as-3'),
+      ];
+      mockAssetServiceQB.getMany.mockResolvedValue(allServices);
+
+      const result = await service.createNewJob({
+        tool: httpProbeTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(mockAssetServiceQB.innerJoin).not.toHaveBeenCalledWith(
+        'assetServices.httpResponses',
+        'httpResponse',
+      );
+      expect(mockAssetServiceQB.andWhere).not.toHaveBeenCalledWith(
+        'httpResponse.failed = false',
+      );
+      // Non-live (HTTP_PROBE) path must NOT add the EXISTS live predicate.
+      expect(findExistsAndWhere()).toBeUndefined();
+      expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
+      expect(result).toHaveLength(3);
     });
   });
 
-  describe('markWorkflowDone', () => {
-    const mockJobHistoryId = 'history-uuid';
+  // ── url_discovery routing ────────────────────────────────────────────
 
-    beforeEach(() => {
-      jest.clearAllMocks();
-    });
+  describe('createNewJob — category routing', () => {
+    const mockJobRepo = {
+      create: jest
+        .fn()
+        .mockImplementation((partial: Record<string, unknown>) => ({
+          id: 'job-uuid',
+          ...partial,
+        })),
+      save: jest
+        .fn()
+        .mockImplementation((jobs: unknown) => Promise.resolve(jobs)),
+    };
 
-    it('should update job history isCompleted to true', async () => {
-      mockJobRepository.exists.mockResolvedValue(false);
-      mockJobHistoryRepository.update.mockResolvedValue({ affected: 1 });
-      mockJobHistoryRepository.findOne.mockResolvedValue({
-        id: mockJobHistoryId,
-        workflow: { name: 'test-workflow' },
-      });
+    let mockAssetServiceQB: Record<string, jest.Mock>;
+    let mockAssetQB: Record<string, jest.Mock>;
 
-      await service.markWorkflowDone(mockJobHistoryId);
-
-      expect(mockJobRepository.exists).toHaveBeenCalled();
-      expect(mockJobHistoryRepository.update).toHaveBeenCalledWith(
-        { id: mockJobHistoryId, isCompleted: false },
-        { isCompleted: true },
-      );
-    });
-
-    it('should not update when there are pending jobs', async () => {
-      mockJobRepository.exists.mockResolvedValue(true);
-
-      await service.markWorkflowDone(mockJobHistoryId);
-
-      expect(mockJobHistoryRepository.update).not.toHaveBeenCalled();
-    });
-
-    it('should not update when already completed', async () => {
-      mockJobRepository.exists.mockResolvedValue(false);
-      mockJobHistoryRepository.update.mockResolvedValue({ affected: 0 });
-
-      await service.markWorkflowDone(mockJobHistoryId);
-
-      expect(mockJobHistoryRepository.update).toHaveBeenCalled();
-    });
-  });
-
-  // ── Task 4.2: createNewJob connector semantics ────────────────────────
-
-  describe('createNewJob — connector jobs', () => {
-    const mockConnectorTool = {
-      id: 'tool-conn-1',
-      name: 'my-connector',
-      category: ToolCategory.VULNERABILITIES,
+    const urlDiscoveryTool = {
+      id: 'tool-ud',
+      name: 'katana',
+      category: ToolCategory.URL_DISCOVERY,
       priority: 4,
     } as any;
 
-    const mockBuiltInTool = {
-      id: 'tool-bi-1',
+    const screenshotTool = {
+      id: 'tool-ss',
+      name: 'screenshot',
+      category: ToolCategory.SCREENSHOT,
+      priority: 4,
+    } as any;
+
+    const httpProbeTool = {
+      id: 'tool-hp',
+      name: 'httpx',
+      category: ToolCategory.HTTP_PROBE,
+      priority: 4,
+    } as any;
+
+    const subdomainsTool = {
+      id: 'tool-sub',
       name: 'subfinder',
       category: ToolCategory.SUBDOMAINS,
       priority: 4,
-      command: 'subfinder -d {{value}}',
     } as any;
 
-    const mockAsset = {
-      id: 'asset-1',
-      value: 'example.com',
-      isPrimary: true,
+    const portsScannerTool = {
+      id: 'tool-ports',
+      name: 'naabu',
+      category: ToolCategory.PORTS_SCANNER,
+      priority: 3,
     } as any;
 
-    const mockJobRepo = {
-      create: jest.fn().mockImplementation((partial: Record<string, unknown>) => ({ id: 'random-uuid', ...partial })),
-      save: jest.fn().mockImplementation((jobs: unknown) => Promise.resolve(jobs)),
+    const makeService = (id: string) => ({
+      id,
+      value: `${id}.example.com`,
+      port: 443,
+      asset: { id: `asset-${id}`, isPrimary: true, value: `${id}.example.com` },
+    });
+
+    const existsPredicate = (): string | undefined => {
+      const call = mockAssetServiceQB.andWhere.mock.calls.find(
+        ([sql]) => typeof sql === 'string' && sql.includes('EXISTS'),
+      );
+      return call?.[0] as string | undefined;
     };
 
     beforeEach(() => {
       jest.clearAllMocks();
-      mockJobHistoryRepository.create = jest.fn().mockReturnValue({ id: 'jh-1' });
-      mockJobHistoryRepository.save = jest.fn().mockResolvedValue({ id: 'jh-1' });
-
-      mockDataSource.getRepository.mockImplementation((entity: any) => {
-        if (entity === Job) return mockJobRepo;
-        // Asset query builder chain for findAssetsForJob
-        return {
-          createQueryBuilder: jest.fn().mockReturnValue({
-            innerJoinAndSelect: jest.fn().mockReturnThis(),
-            innerJoin: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            andWhere: jest.fn().mockReturnThis(),
-            getMany: jest.fn().mockResolvedValue([mockAsset]),
-          }),
-        };
-      });
-    });
-
-    it('should skip command and set configProfileId for connector job', async () => {
-      mockConnectorRegistryService.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-
-      const result = await service.createNewJob({
-        tool: mockConnectorTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-        configProfileId: 'profile-1',
-      });
-
-      // Job was created
-      expect(result).toHaveLength(1);
-      const created = mockJobRepo.create.mock.calls[0][0];
-      expect(created.command).toBeUndefined();
-      expect(created.configProfileId).toBe('profile-1');
-      // assertProfileOwnership was called
-      expect(mockToolConfigProfilesService.assertProfileOwnership).toHaveBeenCalledWith(
-        'ws-1',
-        'profile-1',
-        'tool-conn-1',
-      );
-    });
-
-    it('should create connector job without configProfileId (omitted)', async () => {
-      mockConnectorRegistryService.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-
-      const result = await service.createNewJob({
-        tool: mockConnectorTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(result).toHaveLength(1);
-      const created = mockJobRepo.create.mock.calls[0][0];
-      expect(created.command).toBeUndefined();
-      expect(created.configProfileId).toBeUndefined();
-      expect(mockToolConfigProfilesService.assertProfileOwnership).not.toHaveBeenCalled();
-    });
-
-    it('should reject configProfileId for wrong tool', async () => {
-      mockConnectorRegistryService.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-      mockToolConfigProfilesService.assertProfileOwnership.mockRejectedValue(
-        new BadRequestException(
-          'Profile profile-1 does not belong to tool tool-conn-1',
-        ),
-      );
-
-      await expect(
-        service.createNewJob({
-          tool: mockConnectorTool,
-          targetIds: ['target-1'],
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-          configProfileId: 'profile-1',
-        }),
-      ).rejects.toThrow();
-      expect(mockToolConfigProfilesService.assertProfileOwnership).toHaveBeenCalled();
-    });
-
-    it('should build command for legacy/built-in job (not connector)', async () => {
+      mockJobHistoryRepository.create = jest
+        .fn()
+        .mockReturnValue({ id: 'jh-1' });
+      mockJobHistoryRepository.save = jest
+        .fn()
+        .mockResolvedValue({ id: 'jh-1' });
       mockConnectorRegistryService.getConnector.mockReturnValue(null);
 
+      mockAssetServiceQB = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        distinct: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockAssetQB = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockDataSource.getRepository.mockImplementation((entity: any) => {
+        const name = entity?.name ?? entity;
+        if (name === 'AssetService') {
+          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB) };
+        }
+        if (name === 'Asset') {
+          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetQB) };
+        }
+        return mockJobRepo;
+      });
+    });
+
+    it('S1: URL_DISCOVERY finds asset services (not assets) and creates one job per service with assetService + jobHistory', async () => {
+      mockAssetServiceQB.getMany.mockResolvedValue([
+        makeService('as-1'),
+        makeService('as-2'),
+      ]);
+
       const result = await service.createNewJob({
-        tool: mockBuiltInTool,
+        tool: urlDiscoveryTool,
         targetIds: ['target-1'],
         workspaceId: 'ws-1',
         workflow: { id: 'wf-1' } as any,
       });
 
-      expect(result).toHaveLength(1);
-      const created = mockJobRepo.create.mock.calls[0][0];
-      // Built-in tool: command should be set (bindingCommand applied)
-      expect(created.command).toBeDefined();
-      expect(typeof created.command).toBe('string');
-      expect(created.configProfileId).toBeUndefined();
+      expect(result).toHaveLength(2);
+      expect(mockAssetServiceQB.getMany).toHaveBeenCalled();
+      expect(mockAssetQB.getMany).not.toHaveBeenCalled();
+      for (const job of result) {
+        expect((job as any).assetService).toBeDefined();
+        expect((job as any).jobHistory).toBeDefined();
+        expect((job as any).category).toBe(ToolCategory.URL_DISCOVERY);
+      }
     });
 
-    // ── Orphan configProfileId: fail-fast, persist FAILED job + error log ──
+    it('S2 edge: URL_DISCOVERY applies liveOnly=true (EXISTS http_responses failed=false)', async () => {
+      mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
 
-    it('RED: orphan profileId → createNewJob throws AND persists FAILED job with error log', async () => {
-      mockConnectorRegistryService.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-      mockToolConfigProfilesService.resolveConfigForJob.mockRejectedValue(
-        new NotFoundException('ToolConfigProfile orphan-profile not found'),
-      );
-      // assertProfileOwnership passes (profile row may still exist at check
-      // time), resolve fails → orphan between check and dispatch.
-      mockToolConfigProfilesService.assertProfileOwnership.mockResolvedValue(
-        undefined,
-      );
-
-      await expect(
-        service.createNewJob({
-          tool: mockConnectorTool,
-          targetIds: ['target-1'],
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-          configProfileId: 'orphan-profile',
-        }),
-      ).rejects.toThrow('ToolConfigProfile orphan-profile not found');
-
-      // A FAILED job row must exist so the job-log UI surfaces the failure.
-      const failedJob = mockJobRepo.create.mock.calls.find(
-        (call) => (call[0] as Record<string, unknown>).status === 'failed',
-      );
-      expect(failedJob).toBeDefined();
-      expect(
-        (failedJob?.[0] as Record<string, unknown>).configProfileId,
-      ).toBe('orphan-profile');
-      // Error detail must be persisted (JobErrorLog), not just logged.
-      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          logMessage: expect.stringContaining('orphan-profile'),
-        }),
-      );
-    });
-
-    // ── assertProfileOwnership rejection (orphan between check & dispatch) ──
-
-    it('should create FAILED job + error log when assertProfileOwnership rejects NotFound (orphan profile)', async () => {
-      mockConnectorRegistryService.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-      });
-      mockToolConfigProfilesService.assertProfileOwnership.mockRejectedValue(
-        new NotFoundException('ToolConfigProfile orphan-profile not found'),
-      );
-
-      await expect(
-        service.createNewJob({
-          tool: mockConnectorTool,
-          targetIds: ['target-1'],
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-          configProfileId: 'orphan-profile',
-        }),
-      ).rejects.toThrow('ToolConfigProfile orphan-profile not found');
-
-      // FAILED job persisted
-      const failedJob = mockJobRepo.create.mock.calls.find(
-        (call) => (call[0] as Record<string, unknown>).status === 'failed',
-      );
-      expect(failedJob).toBeDefined();
-      expect(
-        (failedJob?.[0] as Record<string, unknown>).configProfileId,
-      ).toBe('orphan-profile');
-      // Error log contains profileId + tool
-      expect(mockJobErrorLogRepository.save).toHaveBeenCalledTimes(1);
-      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          logMessage: expect.stringContaining('orphan-profile'),
-        }),
-      );
-      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          logMessage: expect.stringContaining('my-connector'),
-        }),
-      );
-    });
-
-    // ── No profile + tool has schema → FAILED ──
-
-    it('should create FAILED job + error log when no profile found and tool requires config', async () => {
-      mockConnectorRegistryService.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-        configSchema: { type: 'object', properties: { url: { type: 'string' } } },
-      });
-      // resolveConfigForJob returns undefined (no profile + no default)
-      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue(undefined);
-
-      await expect(
-        service.createNewJob({
-          tool: mockConnectorTool,
-          targetIds: ['target-1'],
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-          // No configProfileId, no config
-        }),
-      ).rejects.toThrow(BadRequestException);
-
-      const failedJob = mockJobRepo.create.mock.calls.find(
-        (call) => (call[0] as Record<string, unknown>).status === 'failed',
-      );
-      expect(failedJob).toBeDefined();
-      expect(mockJobErrorLogRepository.save).toHaveBeenCalledTimes(1);
-      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          logMessage: expect.stringContaining('missing/default profile'),
-        }),
-      );
-      // Payload includes tool name + workspace
-      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          payload: expect.stringContaining('my-connector'),
-        }),
-      );
-    });
-
-    // ── No profile + no schema → PENDING, no error log ──
-
-    it('should create PENDING job without error log when connector has no schema and no profile', async () => {
-      mockConnectorRegistryService.getConnector.mockReturnValue({
-        name: 'my-connector',
-        image: 'my-connector:latest',
-        // No configSchema, no inputsSchema
-      });
-      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue(undefined);
-
-      const result = await service.createNewJob({
-        tool: mockConnectorTool,
+      await service.createNewJob({
+        tool: urlDiscoveryTool,
         targetIds: ['target-1'],
         workspaceId: 'ws-1',
         workflow: { id: 'wf-1' } as any,
       });
 
+      const existsSql = existsPredicate();
+      expect(existsSql).toBeDefined();
+      expect(existsSql).toContain('http_responses');
+      expect(existsSql).toContain('hr.failed = false');
+    });
+
+    it('S3 regression: SUBDOMAINS uses findAssetsForJob, not asset services', async () => {
+      mockAssetQB.getMany.mockResolvedValue([
+        { id: 'asset-1', value: 'example.com', isPrimary: true },
+      ]);
+
+      const result = await service.createNewJob({
+        tool: subdomainsTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(mockAssetQB.getMany).toHaveBeenCalled();
+      expect(mockAssetServiceQB.getMany).not.toHaveBeenCalled();
       expect(result).toHaveLength(1);
-      const created = mockJobRepo.create.mock.calls[0][0];
-      expect(created.status).toBe('pending');
-      expect(mockJobErrorLogRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('PORTS_SCANNER keeps the explicit asset scope supplied by a group workflow', async () => {
+      const selectedAssetIds = ['group-asset-1', 'group-asset-2'];
+      mockAssetQB.getMany.mockResolvedValue([
+        {
+          id: 'group-asset-1',
+          value: 'one.example.com',
+          isPrimary: true,
+        },
+        {
+          id: 'group-asset-2',
+          value: 'two.example.com',
+          isPrimary: true,
+        },
+      ]);
+
+      const result = await service.createNewJob({
+        tool: portsScannerTool,
+        assetIds: selectedAssetIds,
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(mockAssetQB.andWhere).toHaveBeenCalledWith(
+        'assets.id IN (:...assetIds)',
+        { assetIds: selectedAssetIds },
+      );
+      expect(mockAssetQB.andWhere).not.toHaveBeenCalledWith(
+        'assets.targetId IN (:...targetIds)',
+        expect.anything(),
+      );
+      expect(result.map((job) => job.asset.id)).toEqual(selectedAssetIds);
+    });
+
+    describe('target type filter', () => {
+      it('restricts assets to the target types the tool declares', async () => {
+        await service.createNewJob({
+          tool: { ...subdomainsTool, targetTypes: [TargetType.DOMAIN] },
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        expect(mockAssetQB.innerJoin).toHaveBeenCalledWith(
+          'assets.target',
+          'target',
+        );
+        expect(mockAssetQB.andWhere).toHaveBeenCalledWith(
+          'target.type IN (:...targetTypes)',
+          { targetTypes: [TargetType.DOMAIN] },
+        );
+      });
+
+      it('treats a tool without declared target types as a host scanner', async () => {
+        await service.createNewJob({
+          tool: portsScannerTool,
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        expect(mockAssetQB.andWhere).toHaveBeenCalledWith(
+          'target.type IN (:...targetTypes)',
+          {
+            targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR],
+          },
+        );
+      });
+
+      it('restricts asset services the same way', async () => {
+        await service.createNewJob({
+          tool: { ...httpProbeTool, targetTypes: [TargetType.IP] },
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        expect(mockAssetServiceQB.innerJoin).toHaveBeenCalledWith(
+          'asset.target',
+          'target',
+        );
+        expect(mockAssetServiceQB.andWhere).toHaveBeenCalledWith(
+          'target.type IN (:...targetTypes)',
+          { targetTypes: [TargetType.IP] },
+        );
+      });
+
+      it('creates no job when no asset of a supported type is in scope', async () => {
+        mockAssetQB.getMany.mockResolvedValue([]);
+
+        const result = await service.createNewJob({
+          tool: { ...subdomainsTool, targetTypes: [TargetType.DOMAIN] },
+          targetIds: ['ip-target'],
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        // The workflow runner marks a zero-job step as skipped ('no-inputs').
+        expect(result).toEqual([]);
+      });
+    });
+
+    it('S3 regression: SCREENSHOT uses asset services with liveOnly=true; HTTP_PROBE with liveOnly=false', async () => {
+      mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
+
+      await service.createNewJob({
+        tool: screenshotTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+      expect(existsPredicate()).toBeDefined();
+
+      jest.clearAllMocks();
+      mockJobHistoryRepository.create = jest.fn().mockReturnValue({ id: 'jh-1' });
+      mockJobHistoryRepository.save = jest.fn().mockResolvedValue({ id: 'jh-1' });
+      mockConnectorRegistryService.getConnector.mockReturnValue(null);
+      mockAssetServiceQB = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        distinct: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([makeService('as-1')]),
+      };
+      mockDataSource.getRepository.mockImplementation((entity: any) => {
+        const name = entity?.name ?? entity;
+        if (name === 'AssetService') {
+          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB) };
+        }
+        return mockJobRepo;
+      });
+
+      await service.createNewJob({
+        tool: httpProbeTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+      expect(existsPredicate()).toBeUndefined();
     });
   });
 
-  // ── Task 4.2: getNextJob connector metadata ──────────────────────────
+  describe('getNextJobs — batched claim', () => {
+    const buildWorker = (
+      overrides: Record<string, unknown> = {},
+    ): Record<string, unknown> => ({
+      id: 'worker-uuid',
+      type: WorkerType.BUILT_IN,
+      scope: WorkerScope.CLOUD,
+      runMode: 'node',
+      internalNetworkId: null,
+      workspace: { id: 'workspace-uuid' },
+      tool: null,
+      ...overrides,
+    });
 
-  describe('getNextJob — connector metadata', () => {
-    let mockQBGetOne: jest.Mock;
-    let mockQB: Record<string, any>;
-    let mockQueryRunner: any;
+    const buildQueryRunner = (jobs: unknown[]) => {
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(jobs),
+      };
 
-    beforeEach(() => {
-      jest.clearAllMocks();
-
-      // Reset getRepository mock (clears any mockImplementation from createNewJob tests)
-      mockQBGetOne = jest.fn();
-      mockDataSource.getRepository.mockReset();
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn(),
-      });
-
-      // Build a proper QB chain mock that returns itself from every chained method.
-      // Track join semantics faithfully: a plain leftJoin('jobs.tool', ...) may filter
-      // on the joined alias but must NOT hydrate job.tool, mirroring TypeORM's
-      // leftJoin vs leftJoinAndSelect distinction.
-      let toolJoinSelect: 'leftJoin' | 'leftJoinAndSelect' | undefined;
-      mockQB = {};
-      for (const method of [
-        'innerJoinAndSelect', 'innerJoin', 'leftJoin', 'leftJoinAndSelect',
-        'where', 'andWhere', 'orderBy', 'addOrderBy',
-        'setLock', 'limit',
-      ]) {
-        mockQB[method] = jest.fn().mockReturnValue(mockQB);
-      }
-      (mockQB.leftJoin as jest.Mock).mockImplementation((entity: string) => {
-        if (entity === 'jobs.tool') toolJoinSelect = 'leftJoin';
-        return mockQB;
-      });
-      (mockQB.leftJoinAndSelect as jest.Mock).mockImplementation((entity: string) => {
-        if (entity === 'jobs.tool') toolJoinSelect = 'leftJoinAndSelect';
-        return mockQB;
-      });
-      mockQB.getOne = jest.fn(async () => {
-        const job = (await mockQBGetOne()) as { tool?: unknown } | null | undefined;
-        if (job && toolJoinSelect !== 'leftJoinAndSelect') {
-          // Without leftJoinAndSelect the tool relation is not hydrated
-          delete job.tool;
-        }
-        return job;
-      });
-
-      mockQueryRunner = {
+      const queryRunner = {
         connect: jest.fn(),
         startTransaction: jest.fn(),
+        manager: {
+          createQueryBuilder: jest.fn().mockReturnValue(qb),
+          update: jest.fn().mockResolvedValue({ affected: jobs.length }),
+        },
         commitTransaction: jest.fn(),
         rollbackTransaction: jest.fn(),
         release: jest.fn(),
-        manager: {
-          createQueryBuilder: jest.fn().mockReturnValue(mockQB),
-          update: jest.fn().mockResolvedValue(undefined),
-        },
       };
 
-      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-    });
+      return { qb, queryRunner };
+    };
 
-    it('should include tool, workspaceId, configProfileId for non-built-in worker', async () => {
-      const mockWorker = {
-        id: 'worker-1',
-        type: WorkerType.PROVIDER,
-        workspace: { id: 'ws-1' },
-        tool: { id: 'tool-conn-1', name: 'my-connector' },
-      };
-      const mockJob = {
-        id: 'job-1',
-        category: ToolCategory.VULNERABILITIES,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 4,
-        command: undefined,
-        asset: { id: 'asset-1', value: 'example.com' },
-        configProfileId: 'profile-1',
-      };
-
+    const givenWorkerAndQueue = (worker: unknown, jobs: unknown[]) => {
+      const { qb, queryRunner } = buildQueryRunner(jobs);
       mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(mockJob);
+        findOne: jest.fn().mockResolvedValue(worker),
+      } as any);
+      mockDataSource.createQueryRunner.mockReturnValue(queryRunner as any);
+      return { qb, queryRunner };
+    };
 
-      const result = await service.getNextJob('worker-1');
-
-      expect(result).toMatchObject({
-        id: 'job-1',
-        tool: { id: 'tool-conn-1', name: 'my-connector' },
-        workspaceId: 'ws-1',
-        configProfileId: 'profile-1',
-      });
-      expect(result!.command).toBeUndefined();
+    beforeEach(() => {
+      mockConnectorRegistryService.getAllConnectors.mockReturnValue([]);
     });
 
-    it('should NOT include tool/workspaceId for built-in worker', async () => {
-      const mockWorker = {
-        id: 'worker-bi',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.LOCAL,
-        workspace: { id: 'ws-1' },
-        tool: null,
-      };
-      const mockJob = {
-        id: 'job-2',
-        category: ToolCategory.SUBDOMAINS,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 4,
-        command: 'subfinder -d example.com',
-        asset: { id: 'asset-1', value: 'example.com' },
-      };
+    it('claims up to `limit` jobs in one query and one update', async () => {
+      // Given: three pending jobs and a worker with three free slots
+      const jobs = [
+        { id: 'job-1', asset: { id: 'a1', value: 'x' } },
+        { id: 'job-2', asset: { id: 'a2', value: 'y' } },
+        { id: 'job-3', asset: { id: 'a3', value: 'z' } },
+      ];
+      const { qb, queryRunner } = givenWorkerAndQueue(buildWorker(), jobs);
 
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(mockJob);
+      // When
+      const result = await service.getNextJobs('worker-uuid', 3);
 
-      const result = await service.getNextJob('worker-bi');
-
-      expect(result).toMatchObject({
-        id: 'job-2',
-        command: 'subfinder -d example.com',
-      });
-      expect((result as any).tool).toBeUndefined();
-      expect((result as any).workspaceId).toBeUndefined();
-      expect((result as any).configProfileId).toBeUndefined();
+      // Then: a single claim replaces three per-slot claims
+      expect(result).toHaveLength(3);
+      expect(mockDataSource.getRepository).toHaveBeenCalledWith(WorkerInstance);
+      expect(qb.limit).toHaveBeenCalledWith(3);
+      expect(queryRunner.manager.update).toHaveBeenCalledTimes(1);
+      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
     });
 
-    it('should include tool/workspaceId/configProfileId for connector job picked up by BUILT_IN worker', async () => {
-      const mockWorker = {
-        id: 'worker-bi-conn',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.LOCAL,
-        workspace: { id: 'ws-2' },
-        tool: null,
-        runMode: 'node',
-      };
-      const mockJob = {
-        id: 'job-conn-1',
-        category: ToolCategory.VULNERABILITIES,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 4,
-        command: undefined, // Connector jobs have no command
-        asset: { id: 'asset-2', value: 'example.com', target: { workspaceId: 'ws-2' } },
-        tool: { id: 'tool-nuclei', name: 'nuclei' },
-        configProfileId: 'profile-conn-1',
-      };
+    it('caps the claim so a worker cannot drain the whole queue', async () => {
+      // Given: a worker asking for far more than the server-side ceiling
+      const { qb } = givenWorkerAndQueue(buildWorker(), []);
 
-      mockConnectorRegistryService.getConnector.mockReturnValue({ name: 'nuclei' });
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(mockJob);
+      // When
+      await service.getNextJobs('worker-uuid', 100000);
 
-      const result = await service.getNextJob('worker-bi-conn');
-
-      expect(result).toMatchObject({
-        id: 'job-conn-1',
-        tool: { id: 'tool-nuclei', name: 'nuclei' },
-        workspaceId: 'ws-2',
-        configProfileId: 'profile-conn-1',
-      });
-      expect(result!.command).toBeUndefined();
+      // Then
+      expect(qb.limit).toHaveBeenCalledWith(100);
     });
 
-    it('should include connector tool names in allowed filter for BUILT_IN workers', async () => {
-      const mockWorker = {
-        id: 'worker-bi-filter',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.CLOUD,
-        workspace: { id: 'ws-3' },
-        tool: null,
-        runMode: 'node',
-      };
+    it('returns an empty list and rolls back when nothing is claimable', async () => {
+      // Given: an idle queue
+      const { queryRunner } = givenWorkerAndQueue(buildWorker(), []);
 
-      // Registry fixtures mirror manifest.json entries: name is the display
-      // name, slug is the key the DB tool rows store as `name`.
+      // When
+      const result = await service.getNextJobs('worker-uuid', 5);
+
+      // Then: no work is claimed and nothing is written
+      expect(result).toEqual([]);
+      expect(queryRunner.manager.update).not.toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+    });
+
+    it('enforces job eligibility in SQL instead of dropping the whole claim', async () => {
+      // Given: a node worker that is allowed to run connectors
       mockConnectorRegistryService.getAllConnectors.mockReturnValue([
-        { name: 'nuclei', slug: 'nuclei' },
-        { name: 'wpscan', slug: 'wpscan' },
+        { slug: 'nuclei' },
+      ]);
+      const { qb } = givenWorkerAndQueue(buildWorker(), []);
+
+      // When
+      await service.getNextJobs('worker-uuid', 2);
+
+      // Then: "has a command or belongs to a connector" is a WHERE clause, so a
+      // command-less non-connector job at the head of the queue can no longer
+      // starve the rest of the batch (the previous post-query filter did).
+      const predicates = qb.andWhere.mock.calls.map((call) => String(call[0]));
+      expect(
+        predicates.some((sql) => sql.includes('jobs.command IS NOT NULL')),
+      ).toBe(true);
+      expect(predicates.some((sql) => sql.includes('connectorSlugs'))).toBe(
+        true,
+      );
+    });
+
+    it('does not require the connector clause on a cli-mode worker', async () => {
+      // Given: a CLI worker that has no Docker and therefore no connector tools
+      const { qb } = givenWorkerAndQueue(buildWorker({ runMode: 'cli' }), []);
+
+      // When
+      await service.getNextJobs('worker-uuid', 2);
+
+      // Then: only the command check applies
+      const predicates = qb.andWhere.mock.calls.map((call) => String(call[0]));
+      expect(
+        predicates.some((sql) => sql.includes('jobs.command IS NOT NULL')),
+      ).toBe(true);
+      expect(predicates.some((sql) => sql.includes('connectorSlugs'))).toBe(
+        false,
+      );
+    });
+
+    it('getNextJob delegates to the batched claim', async () => {
+      // Given: one claimable job
+      const { qb } = givenWorkerAndQueue(buildWorker(), [
+        { id: 'job-1', asset: { id: 'a1', value: 'x' } },
       ]);
 
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(null); // No jobs available
+      // When
+      const job = await service.getNextJob('worker-uuid');
 
-      await service.getNextJob('worker-bi-filter');
-
-      // Verify the query builder received the combined tool names (built-in + connector)
-      const andWhereCalls = mockQueryRunner.manager.createQueryBuilder().andWhere.mock.calls;
-      const namesFilter = andWhereCalls.find(
-        (call: any[]) => typeof call[0] === 'string' && call[0].includes('IN (:...names)'),
-      );
-      expect(namesFilter).toBeDefined();
-      expect(namesFilter![1].names).toEqual(
-        expect.arrayContaining(['subfinder', 'httpx', 'naabu', 'screenshot', 'nuclei', 'wpscan']),
-      );
+      // Then
+      expect(job?.id).toBe('job-1');
+      expect(qb.limit).toHaveBeenCalledWith(1);
     });
 
-    it('S1 — returns lowercase-slug connector job for node-mode built_in worker when registry name is capitalized', async () => {
-      // Pins THE bug: the DB tool row stores the connector SLUG as name
-      // ('nuclei'), while the registry's display name is capitalized
-      // ('Nuclei'). The `tool.name IN (:...names)` filter must be built from
-      // slugs, otherwise connector jobs never match and getNextJob returns null
-      // while the node worker polls forever.
-      const mockWorker = {
-        id: 'worker-bi-slug-s1',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.CLOUD,
-        workspace: { id: 'ws-1' },
-        tool: null,
-        runMode: 'node',
-      };
-      const mockJob = {
-        id: 'job-conn-slug-s1',
-        category: ToolCategory.VULNERABILITIES,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 4,
-        command: undefined, // Connector jobs have no command
-        asset: {
-          id: 'asset-slug-s1',
-          value: 'example.com',
-          target: { workspaceId: 'ws-1' },
-        },
-        tool: { id: 'tool-nuclei', name: 'nuclei' },
-        configProfileId: 'profile-slug-s1',
-      };
+    it('getNextJob returns null when the claim is empty', async () => {
+      givenWorkerAndQueue(buildWorker(), []);
 
-      // Registry fixture mirrors manifest.json: display name capitalized,
-      // slug lowercase (the key of the connectorsBySlug map).
-      mockConnectorRegistryService.getAllConnectors.mockReturnValue([
-        { name: 'Nuclei', slug: 'nuclei' },
-        { name: 'WPScan - WordPress Security Scanner', slug: 'wpscan' },
-      ]);
-      mockConnectorRegistryService.getConnector.mockImplementation(
-        (name: string) =>
-          name === 'nuclei'
-            ? { name: 'Nuclei', slug: 'nuclei', image: 'nuclei:latest' }
-            : null,
-      );
-
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-
-      // Faithfully simulate the SQL filter: getOne only returns the job when
-      // the job's tool name is present in the allowed names list.
-      mockQBGetOne.mockImplementation(() => {
-        const andWhereCalls = mockQueryRunner.manager
-          .createQueryBuilder()
-          .andWhere.mock.calls;
-        const namesFilter = andWhereCalls.find(
-          (call: any[]) =>
-            typeof call[0] === 'string' && call[0].includes('IN (:...names)'),
-        );
-        const allowed: string[] = namesFilter?.[1]?.names ?? [];
-        return allowed.includes(mockJob.tool.name) ? mockJob : null;
-      });
-
-      const result = await service.getNextJob('worker-bi-slug-s1');
-
-      // RED state (name-based list): allowed contains 'Nuclei' not 'nuclei'
-      // => job filtered out => null. GREEN (slug-based list): job returned.
-      expect(result).not.toBeNull();
-      expect(result!.tool).toEqual({ id: 'tool-nuclei', name: 'nuclei' });
-      expect(result!.workspaceId).toBe('ws-1');
-      expect(result!.configProfileId).toBe('profile-slug-s1');
-      expect(result!.command).toBeUndefined();
-    });
-
-    it('should NOT include connector tool names in allowed filter for cli-mode BUILT_IN worker', async () => {
-      const mockWorker = {
-        id: 'worker-bi-filter-cli',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.CLOUD,
-        workspace: { id: 'ws-3' },
-        tool: null,
-        runMode: 'cli',
-      };
-
-      mockConnectorRegistryService.getAllConnectors.mockReturnValue([
-        { name: 'nuclei' },
-        { name: 'wpscan' },
-      ]);
-
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(null); // No jobs available
-
-      await service.getNextJob('worker-bi-filter-cli');
-
-      const andWhereCalls = mockQueryRunner.manager.createQueryBuilder().andWhere.mock.calls;
-      const namesFilter = andWhereCalls.find(
-        (call: any[]) => typeof call[0] === 'string' && call[0].includes('IN (:...names)'),
-      );
-      expect(namesFilter).toBeDefined();
-      // CLI workers cannot run Docker connectors — only built-in tool names allowed
-      expect(namesFilter![1].names).toEqual(
-        expect.arrayContaining(['subfinder', 'httpx', 'naabu', 'screenshot']),
-      );
-      expect(namesFilter![1].names).not.toEqual(
-        expect.arrayContaining(['nuclei', 'wpscan']),
-      );
-    });
-
-    it('should NOT include connector tool names for BUILT_IN worker without runMode (legacy)', async () => {
-      const mockWorker = {
-        id: 'worker-bi-filter-legacy',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.CLOUD,
-        workspace: { id: 'ws-3' },
-        tool: null,
-      };
-
-      mockConnectorRegistryService.getAllConnectors.mockReturnValue([
-        { name: 'nuclei' },
-      ]);
-
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(null);
-
-      await service.getNextJob('worker-bi-filter-legacy');
-
-      const andWhereCalls = mockQueryRunner.manager.createQueryBuilder().andWhere.mock.calls;
-      const namesFilter = andWhereCalls.find(
-        (call: any[]) => typeof call[0] === 'string' && call[0].includes('IN (:...names)'),
-      );
-      expect(namesFilter).toBeDefined();
-      expect(namesFilter![1].names).not.toEqual(
-        expect.arrayContaining(['nuclei']),
-      );
-    });
-
-    it('getNextJob uses leftJoinAndSelect for tool relation', async () => {
-      // S4 — pins the join semantics: the query builder MUST hydrate the tool
-      // relation via leftJoinAndSelect, not plain leftJoin (which leaves
-      // job.tool undefined and silently breaks connector dispatch).
-      const mockWorker = {
-        id: 'worker-bi-join',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.CLOUD,
-        workspace: { id: 'ws-3' },
-        tool: null,
-      };
-
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(null); // Query is built before getOne runs
-
-      await service.getNextJob('worker-bi-join');
-
-      const toolViaLeftJoin = mockQB.leftJoin.mock.calls.some(
-        (call: any[]) => call[0] === 'jobs.tool',
-      );
-      const toolViaSelect = mockQB.leftJoinAndSelect.mock.calls.some(
-        (call: any[]) => call[0] === 'jobs.tool',
-      );
-      if (!toolViaSelect && toolViaLeftJoin) {
-        throw new Error(
-          "expected query builder to receive leftJoinAndSelect('jobs.tool','tool'), got leftJoin",
-        );
-      }
-      expect(mockQB.leftJoinAndSelect).toHaveBeenCalledWith('jobs.tool', 'tool');
-    });
-
-    it('getNextJob hydrates tool relation for connector jobs', async () => {
-      // S1 — happy path: a BUILT_IN worker picking a connector job must see the
-      // hydrated job.tool so the connector gate recognizes it and returns the job
-      // with tool metadata.
-      const mockWorker = {
-        id: 'worker-bi-conn-s1',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.CLOUD,
-        workspace: { id: 'ws-1' },
-        tool: null,
-        runMode: 'node',
-      };
-      const mockJob = {
-        id: 'job-conn-s1',
-        category: ToolCategory.VULNERABILITIES,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 4,
-        command: undefined, // Connector jobs have no command
-        asset: { id: 'asset-s1', value: 'example.com', target: { workspaceId: 'ws-1' } },
-        tool: { id: 'tool-nuclei', name: 'nuclei' },
-        configProfileId: 'profile-s1',
-      };
-
-      mockConnectorRegistryService.getConnector.mockImplementation((name: string) =>
-        name === 'nuclei' ? { name: 'nuclei' } : null,
-      );
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(mockJob);
-
-      const result = await service.getNextJob('worker-bi-conn-s1');
-
-      expect(result).not.toBeNull();
-      expect(result!.tool).toEqual({ id: 'tool-nuclei', name: 'nuclei' });
-      expect(result!.tool!.name).toBe('nuclei');
-      expect(result!.workspaceId).toBe('ws-1');
-      expect(result!.configProfileId).toBe('profile-s1');
-      expect(result!.command).toBeUndefined();
-    });
-
-    it('getNextJob returns matching built-in tool job for non-connector', async () => {
-      // S2 — regression: an ordinary built-in tool job (command present) picked by
-      // a matching BUILT_IN worker is still returned with its core fields, and the
-      // hydrated tool now flows into the response mapping.
-      const mockWorker = {
-        id: 'worker-bi-s2',
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.CLOUD,
-        workspace: { id: 'ws-1' },
-        tool: null,
-      };
-      const mockJob = {
-        id: 'job-bi-s2',
-        category: ToolCategory.SUBDOMAINS,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 4,
-        command: 'subfinder -d example.com',
-        asset: { id: 'asset-s2', value: 'example.com', target: { workspaceId: 'ws-1' } },
-        tool: { id: 'tool-subfinder', name: 'subfinder' },
-      };
-
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(mockJob);
-
-      const result = await service.getNextJob('worker-bi-s2');
-
-      expect(result).not.toBeNull();
-      expect(result!.id).toBe('job-bi-s2');
-      expect(result!.command).toBe('subfinder -d example.com');
-      expect(result!.category).toBe(ToolCategory.SUBDOMAINS);
-      expect(result!.asset).toEqual({ id: 'asset-s2', value: 'example.com', target: { workspaceId: 'ws-1' } });
-      expect(result!.tool).toEqual({ id: 'tool-subfinder', name: 'subfinder' });
-    });
-
-    it('getNextJob returns connector job for connector worker', async () => {
-      // S3 — regression: a CONNECTOR (non-built-in) worker picking a connector job
-      // still gets the job back with its tool metadata derived from the worker.
-      const mockWorker = {
-        id: 'worker-conn-s3',
-        type: WorkerType.PROVIDER,
-        workspace: { id: 'ws-1' },
-        tool: { id: 'tool-conn-1', name: 'my-connector' },
-      };
-      const mockJob = {
-        id: 'job-conn-s3',
-        category: ToolCategory.VULNERABILITIES,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priority: 4,
-        command: undefined,
-        asset: { id: 'asset-s3', value: 'example.com', target: { workspaceId: 'ws-1' } },
-        tool: { id: 'tool-nuclei', name: 'nuclei' },
-        configProfileId: 'profile-s3',
-      };
-
-      mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(mockWorker),
-      });
-      mockQBGetOne.mockResolvedValue(mockJob);
-
-      const result = await service.getNextJob('worker-conn-s3');
-
-      expect(result).not.toBeNull();
-      expect(result!.tool).toEqual({ id: 'tool-conn-1', name: 'my-connector' });
-      expect(result!.workspaceId).toBe('ws-1');
-      expect(result!.configProfileId).toBe('profile-s3');
-      expect(result!.command).toBeUndefined();
+      await expect(service.getNextJob('worker-uuid')).resolves.toBeNull();
     });
   });
+
 });

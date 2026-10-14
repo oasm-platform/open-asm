@@ -4,13 +4,7 @@ import {
   ToolPipelineBuilder,
   type PipelineToolEntry,
 } from '@/pages/asset-group/components/tool-pipeline-builder';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { NoInstalledToolsState } from '@/pages/asset-group/components/no-installed-tools-state';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -44,12 +38,11 @@ import {
 import {
   CalendarClockIcon,
   HistoryIcon,
-  MoveUpRight,
+  LoaderCircleIcon,
   Settings,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
-import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 export default function AssetGroupWorkflow({
@@ -61,8 +54,10 @@ export default function AssetGroupWorkflow({
   workflows: AssetGroupWorkflowRelation[];
   onRefetch: () => void;
 }) {
-  const { data: workspaceToolsInstalled } =
-    useToolsControllerGetInstalledTools();
+  const {
+    data: workspaceToolsInstalled,
+    isLoading: isLoadingWorkspaceTools,
+  } = useToolsControllerGetInstalledTools();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSetScheduleOpen, setIsSetScheduleOpen] = useState(false);
@@ -79,13 +74,16 @@ export default function AssetGroupWorkflow({
   const addWorkflowsMutation = useAssetGroupControllerAddManyWorkflows();
   const removeWorkflowsMutation = useAssetGroupControllerRemoveManyWorkflows();
 
-  // Filter tools with category "vulnerabilities"
+  // Tools rendered in the group workflow: providers + pipeline-capable
+  // categories (vulnerabilities, url_discovery, ports_scanner)
   const toolProviders = useMemo(
     () =>
       workspaceToolsInstalled?.data?.filter(
         (tool) =>
           tool.type === ToolsControllerGetManyToolsType.provider ||
-          tool.category === ToolCategory.vulnerabilities,
+          tool.category === ToolCategory.vulnerabilities ||
+          tool.category === ToolCategory.url_discovery ||
+          tool.category === ToolCategory.ports_scanner,
       ) || [],
     [workspaceToolsInstalled?.data],
   );
@@ -123,30 +121,49 @@ export default function AssetGroupWorkflow({
     [nextRun],
   );
 
-  // ---- Pipeline value derived from workflow jobs[] order ----
-  // jobs[] order IS the execution order (scheduler runs jobs[0], chain uses
-  // index). The builder's value array preserves that order 1:1, and every
-  // mutation below writes the array back with the same ordering.
+  // ---- Pipeline value derived from the workflow jobs map ----
+  // `jobs` is keyed by a unique job id (the tool name for group workflows) and
+  // a job without `needs` runs in parallel, so the map order is presentation
+  // only. Every mutation below writes the map back.
   const jobs = useMemo(
-    () => currentWorkflow?.workflow.content?.jobs ?? [],
+    () => currentWorkflow?.workflow.content?.jobs ?? {},
     [currentWorkflow],
   );
   const jobsJson = useMemo(() => JSON.stringify(jobs), [jobs]);
   const pipeline: PipelineToolEntry[] = useMemo(() => {
-    const jobs = currentWorkflow?.workflow.content?.jobs ?? [];
-    return jobs.map((job) => {
-      const tool = toolByName.get(job.run);
-      return {
-        toolId: tool?.id ?? job.run,
-        ...(job.config ? { config: job.config as Record<string, unknown> } : {}),
-        ...(job.configProfileId
-          ? { configProfileId: job.configProfileId }
-          : {}),
-      };
-    });
-    // jobsJson captures order + per-job config changes; toolByName covers id mapping.
+    // `Object.values`, not `Object.entries`: a workflow created before the
+    // map switch still stores `jobs` as an array, which the API still serves —
+    // its values are the job definitions either way.
+    const jobs = (currentWorkflow?.workflow.content?.jobs ?? {}) as Record<
+      string,
+      {
+        run?: string;
+        config?: Record<string, unknown>;
+        configProfileId?: string;
+      }
+    >;
+    const nameOf = (toolId: string) => toolById.get(toolId)?.name ?? toolId;
+    return Object.values(jobs)
+      .map((job) => {
+        const tool = job.run ? toolByName.get(job.run) : undefined;
+        return {
+          toolId: tool?.id ?? job.run ?? '',
+          ...(job.config
+            ? { config: job.config as Record<string, unknown> }
+            : {}),
+          ...(job.configProfileId
+            ? { configProfileId: job.configProfileId }
+            : {}),
+        };
+      })
+      // Sorted by tool name so the grid stays stable: `content` is stored as
+      // jsonb, which does not preserve the map's key order. Sorting on the tool
+      // name (not the map key) also keeps a legacy array-shaped `jobs` from
+      // sorting its index keys lexically, which puts "10" before "2".
+      .sort((a, b) => nameOf(a.toolId).localeCompare(nameOf(b.toolId)));
+    // jobsJson captures per-job config changes; the tool maps cover id mapping.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobsJson, toolByName]);
+  }, [jobsJson, toolByName, toolById]);
 
   const toolNameOf = useCallback(
     (entry: PipelineToolEntry): string =>
@@ -154,24 +171,28 @@ export default function AssetGroupWorkflow({
     [toolById],
   );
 
-  /** Persist the full ordered pipeline as jobs[] (append/update, order preserved). */
+  /** Persist the full pipeline as a jobs map keyed by tool name (no needs → parallel). */
   const persistPipeline = useCallback(async (next: PipelineToolEntry[]) => {
     const existingWorkflow = currentWorkflow?.workflow ?? null;
     try {
       setIsProcessing(true);
-      const jobs = next.map((entry) => {
-        const name = toolNameOf(entry);
-        return {
-          name,
-          run: name,
-          ...(entry.config ? { config: entry.config } : {}),
-          ...(entry.configProfileId
-            ? { configProfileId: entry.configProfileId }
-            : {}),
-        };
-      });
+      const jobs = Object.fromEntries(
+        next.map((entry) => {
+          const name = toolNameOf(entry);
+          return [
+            name,
+            {
+              run: name,
+              ...(entry.config ? { config: entry.config } : {}),
+              ...(entry.configProfileId
+                ? { configProfileId: entry.configProfileId }
+                : {}),
+            },
+          ];
+        }),
+      );
       if (existingWorkflow) {
-        if (jobs.length === 0) {
+        if (next.length === 0) {
           await removeWorkflowsMutation.mutateAsync({
             groupId: assetGroupId,
             data: { workflowIds: [existingWorkflow.id] },
@@ -189,7 +210,7 @@ export default function AssetGroupWorkflow({
           });
           toast.success('Pipeline saved successfully!');
         }
-      } else if (jobs.length > 0) {
+      } else if (next.length > 0) {
         const createdWorkflow = await createWorkflowMutation.mutateAsync({
           data: {
             name: `Group Workflow - ${assetGroupId}`,
@@ -225,7 +246,6 @@ export default function AssetGroupWorkflow({
     assetGroupId,
     onRefetch,
   ]);
-
   const handleOpenSchedule = useCallback(() => {
     setIsSetScheduleOpen(true);
   }, []);
@@ -280,14 +300,14 @@ export default function AssetGroupWorkflow({
   }, [workflowId, draftSchedule, updateAssetGroupWorkflow, onRefetch]);
 
   return (
-    <div className="space-y-4 mb-4">
-      <Card className="py-2 gap-2">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 px-2 md:px-4 py-2">
+    <div className="flex flex-col gap-2">
+      <section className="flex flex-col gap-2 border-t pt-2">
+        <div className="flex flex-row items-center justify-between gap-4 px-2 py-2 md:px-4">
           <div>
-            <CardTitle>Schedule</CardTitle>
-            <CardDescription className="hidden md:block">
+            <div className="leading-none font-semibold">Schedule</div>
+            <div className="hidden text-sm text-muted-foreground md:block">
               Configure the scan frequency and run the workflow on demand.
-            </CardDescription>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {lastRun && (
@@ -312,8 +332,8 @@ export default function AssetGroupWorkflow({
               <Settings className="size-4" />
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-4 py-2">
+        </div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-4 py-2">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
               <div className="flex items-center gap-3">
@@ -392,16 +412,16 @@ export default function AssetGroupWorkflow({
               </SheetFooter>
             </SheetContent>
           </Sheet>
-        </CardContent>
-      </Card>
-      <Card className="py-2 gap-2">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 px-2 md:px-4 py-2">
+        </div>
+      </section>
+      <section className="flex flex-col gap-2 border-t pt-2">
+        <div className="flex flex-row items-center justify-between gap-4 px-2 py-2 md:px-4">
           <div>
-            <CardTitle>Tools</CardTitle>
-            <CardDescription className="hidden md:block">
+            <div className="leading-none font-semibold">Tools</div>
+            <div className="hidden text-sm text-muted-foreground md:block">
               Scanning tools assigned to this group. Click a tool to add or
               remove it.
-            </CardDescription>
+            </div>
           </div>
           <RunWorkflowButton
             id={workflowId}
@@ -413,20 +433,18 @@ export default function AssetGroupWorkflow({
             }
             onSuccess={onRefetch}
           />
-        </CardHeader>
-        <CardContent className="px-2 md:px-4 py-2">
-          {toolProviders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                No scanning tools installed yet
-              </p>
-              <Link
-                className="text-blue-500 italic flex items-center gap-1 hover:underline"
-                to="/tools"
-              >
-                Open Marketplace <MoveUpRight className="w-4 h-4" />
-              </Link>
+        </div>
+        <div className="px-2 py-2 md:px-4">
+          {isLoadingWorkspaceTools ? (
+            <div
+              className="flex min-h-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted-foreground"
+              role="status"
+            >
+              <LoaderCircleIcon className="size-4 animate-spin" />
+              Loading installed tools...
             </div>
+          ) : toolProviders.length === 0 ? (
+            <NoInstalledToolsState />
           ) : (
             <ToolPipelineBuilder
               tools={toolProviders as Tool[]}
@@ -435,8 +453,8 @@ export default function AssetGroupWorkflow({
               disabled={isProcessing}
             />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   );
 }
