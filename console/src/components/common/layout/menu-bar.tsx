@@ -18,8 +18,10 @@ import {
 } from '@/components/ui/sidebar';
 import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
 import { usePermission } from '@/hooks/usePermission';
+import { cn } from '@/lib/utils';
 import { useSession } from '@/utils/authClient';
 import {
+  ArrowLeft,
   Bug,
   CirclePlay,
   CloudCheck,
@@ -45,7 +47,7 @@ interface SubMenuItem {
   permission?: string;
 }
 
-interface NavGroup {
+export interface NavGroup {
   title: string;
   url: string;
   items: SubMenuItem[];
@@ -63,9 +65,9 @@ export const menu: NavGroup[] = [
         url: '/',
       },
       {
-        title: 'New Chat',
+        title: 'AI Studio',
         icon: <Sparkles />,
-        url: '/agents',
+        url: '/aistudio',
         permission: 'agent.read',
       },
     ],
@@ -167,83 +169,156 @@ export const menu: NavGroup[] = [
   },
 ];
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+// Set after the first sidebar mounts, so later mounts (menu switches) animate.
+let hasMountedSidebar = false;
+
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  /** Menu groups to render. Defaults to the main app menu. */
+  groups?: NavGroup[];
+  /** Primary menu shows the app logo; a secondary menu shows a back button in its place. */
+  primary?: boolean;
+  /** Where the back button navigates to when `primary` is false. */
+  backUrl?: string;
+  /** Page name shown below the back button when `primary` is false. */
+  title?: string;
+  /** Show the workspace switcher in the header. */
+  showSwitchWorkspace?: boolean;
+  /** Extra content rendered after the menu groups (e.g. dynamic lists). */
+  children?: React.ReactNode;
+}
+
+export function AppSidebar({
+  groups = menu,
+  primary = true,
+  backUrl = '/',
+  title,
+  showSwitchWorkspace = true,
+  children,
+  ...props
+}: AppSidebarProps) {
   const location = useLocation();
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { data } = useSession();
   const { hasPermission } = usePermission();
+  // Animate only when switching menus, not on the first page load.
+  const [shouldAnimate] = React.useState(() => hasMountedSidebar);
+  React.useEffect(() => {
+    hasMountedSidebar = true;
+  }, []);
 
   return (
     <Sidebar {...props} collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center justify-between">
-          <AppLogo type="large" />
-        </div>
-        {(state === 'expanded' || (state === 'collapsed' && isMobile)) && (
-          <WorkspaceSwitcher />
-        )}
-      </SidebarHeader>
-      <SidebarContent className="gap-1 px-2 py-2 md:gap-2">
-        {menu
-          .map((group) => ({
-            ...group,
-            items: group.items.filter(
-              (sub) => !sub.permission || hasPermission(sub.permission),
-            ),
-          }))
-          .filter(
-            (group) =>
-              group.items.length > 0 &&
-              (!group.roles ||
-                group.roles.length === 0 ||
-                (data?.user.role != null &&
-                  group.roles.includes(data.user.role))),
-          )
-          .map((group) => (
-            <SidebarGroup key={group.title} className="p-0">
-              <SidebarGroupContent>
-                <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
-                  {group.title}
-                </SidebarGroupLabel>
-                <SidebarMenu className="mt-1 gap-0.5">
-                  {group.items.map((item) => {
-                    // Ensure all URLs are absolute for comparison
-                    const toUrl = item.url;
-                    const isActive =
-                      toUrl === '/'
-                        ? location.pathname === '/'
-                        : location.pathname === toUrl ||
-                          location.pathname.startsWith(toUrl + '/');
-                    return (
-                      <SidebarMenuItem key={item.title} className="relative">
-                        <SidebarMenuButton
-                          asChild
-                          isActive={isActive}
-                          tooltip={item.title}
-                          className="group h-9 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1/2 data-[active=true]:before:h-5 data-[active=true]:before:w-[3px] data-[active=true]:before:-translate-y-1/2 data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary"
-                        >
-                          <Link
-                            to={toUrl}
-                            onClick={() => setOpenMobile(false)}
-                            className="flex w-full items-center justify-start"
+      {/* Clips the sliding menu so it doesn't spill over the page. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div
+          className={cn(
+            'flex min-h-0 flex-1 flex-col',
+            shouldAnimate &&
+              (primary ? 'sidebar-stack-pop' : 'sidebar-stack-push'),
+          )}
+        >
+          <SidebarHeader>
+            {primary ? (
+              <div className="flex items-center justify-between">
+                <AppLogo type="large" />
+              </div>
+            ) : (
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip="Back"
+                    className="h-10 items-center rounded-lg text-[15px] font-semibold hover:cursor-pointer"
+                  >
+                    <Link
+                      to={backUrl}
+                      onClick={() => setOpenMobile(false)}
+                      className="flex items-center"
+                    >
+                      <ArrowLeft className="size-5!" />
+                      <span>Back</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            )}
+            {!primary && title && (
+              <h2 className="truncate px-2 pt-1 text-lg font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
+                {title}
+              </h2>
+            )}
+            {showSwitchWorkspace &&
+              (state === 'expanded' || (state === 'collapsed' && isMobile)) && (
+                <WorkspaceSwitcher />
+              )}
+          </SidebarHeader>
+          <SidebarContent className="gap-1 px-2 py-2 md:gap-2">
+            {groups
+              .map((group) => ({
+                ...group,
+                items: group.items.filter(
+                  (sub) => !sub.permission || hasPermission(sub.permission),
+                ),
+              }))
+              .filter(
+                (group) =>
+                  group.items.length > 0 &&
+                  (!group.roles ||
+                    group.roles.length === 0 ||
+                    (data?.user.role != null &&
+                      group.roles.includes(data.user.role))),
+              )
+              .map((group) => (
+                <SidebarGroup key={group.title} className="p-0">
+                  <SidebarGroupContent>
+                    <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+                      {group.title}
+                    </SidebarGroupLabel>
+                    <SidebarMenu className="mt-1 gap-0.5">
+                      {group.items.map((item) => {
+                        // Ensure all URLs are absolute for comparison
+                        const toUrl = item.url;
+                        const isActive =
+                          toUrl === '/'
+                            ? location.pathname === '/'
+                            : location.pathname === toUrl ||
+                              location.pathname.startsWith(toUrl + '/');
+                        return (
+                          <SidebarMenuItem
+                            key={item.title}
+                            className="relative"
                           >
-                            {item.icon}{' '}
-                            <span className="truncate">{item.title}</span>
-                            {item.isNew && (
-                              <span className="ml-auto">
-                                <NewBadge />
-                              </span>
-                            )}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
-      </SidebarContent>
+                            <SidebarMenuButton
+                              asChild
+                              isActive={isActive}
+                              tooltip={item.title}
+                              className="group h-9 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1/2 data-[active=true]:before:h-5 data-[active=true]:before:w-[3px] data-[active=true]:before:-translate-y-1/2 data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary"
+                            >
+                              <Link
+                                to={toUrl}
+                                onClick={() => setOpenMobile(false)}
+                                className="flex w-full items-center justify-start"
+                              >
+                                {item.icon}{' '}
+                                <span className="truncate">{item.title}</span>
+                                {item.isNew && (
+                                  <span className="ml-auto">
+                                    <NewBadge />
+                                  </span>
+                                )}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              ))}
+            {children}
+          </SidebarContent>
+        </div>
+      </div>
       <SidebarRail />
       <SidebarFooter>
         <NavUser />
