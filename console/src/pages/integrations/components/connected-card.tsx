@@ -19,6 +19,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { MoreHorizontal, Unplug } from 'lucide-react';
 import { useState } from 'react';
+import { getIntegrationCapabilities } from '../capabilities';
 import { IntegrationLogo } from './integration-logo';
 
 dayjs.extend(relativeTime);
@@ -52,9 +53,11 @@ export function ConnectedCard({
           <h3 className="text-base font-semibold capitalize truncate">
             {integration.name}
           </h3>
-          <Badge variant="secondary" className="shrink-0">
-            <span>{formatCategory(integration.category)}</span>
-          </Badge>
+          {getIntegrationCapabilities(integration).map((capability) => (
+            <Badge key={capability} variant="secondary" className="shrink-0">
+              <span>{formatCategory(capability)}</span>
+            </Badge>
+          ))}
         </div>
         <p className="text-sm text-muted-foreground">
           Connected {dayjs(integration.createdAt).fromNow()}

@@ -39,9 +39,21 @@ const PUSHABLE_EVENTS = new Set<EventName>([
  */
 const FAILURE_IS_A_RESULT = new Set<EventName>(['workflow.run.completed']);
 
+/**
+ * The subset of {@link PUSHABLE_EVENTS} that opens a ticket. A ticket is
+ * work assigned to someone, so only findings qualify — a "scan completed" or
+ * "ticket created" ticket would be noise (the latter a feedback loop).
+ */
+const TICKETABLE_EVENTS = new Set<EventName>(['vulnerability.detected']);
+
 /** Lane filter on the name alone — checked before the envelope is decoded. */
 export function isPushable(name: EventName): boolean {
   return PUSHABLE_EVENTS.has(name);
+}
+
+/** Whether TICKETING integrations receive this event. */
+export function isTicketable(name: EventName): boolean {
+  return TICKETABLE_EVENTS.has(name);
 }
 
 /**

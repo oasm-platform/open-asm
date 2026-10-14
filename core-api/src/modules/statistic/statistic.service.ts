@@ -9,6 +9,7 @@ import {
   DefaultWorkflow,
   EventTriggerType,
   Severity,
+  TargetType,
 } from '@/common/enums/enum';
 import { GeoIp, GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
@@ -101,11 +102,14 @@ export class StatisticService {
    * @returns A promise that resolves to the total count of assets.
    */
   private async countAssets(workspaceId: string): Promise<number> {
+    // Repositories of Git organization targets are not part of the host
+    // attack surface this number describes.
     return this.dataSource
       .getRepository(Asset)
       .createQueryBuilder('asset')
       .innerJoin('asset.target', 'target')
       .where('target.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('target.type != :gitOrg', { gitOrg: TargetType.GIT_ORG })
       .getCount();
   }
 
@@ -388,7 +392,8 @@ export class StatisticService {
       .leftJoin('asset.target', 'target')
       .select('target.workspaceId', 'workspaceId')
       .addSelect('COUNT(asset.id)', 'count')
-      .where('1=1');
+      // Host assets only — repositories are counted on their own target.
+      .where('target.type != :gitOrg', { gitOrg: TargetType.GIT_ORG });
 
     if (workspaceIds?.length) {
       query.andWhere('target.workspaceId IN (:...workspaceIds)', {

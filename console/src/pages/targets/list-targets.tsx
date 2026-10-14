@@ -85,6 +85,14 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     accessorKey: 'totalAssetServices',
     header: 'Services',
     cell: ({ row }) => {
+      // A Git organization has no services; its size is its repositories.
+      if (row.original.type === TargetType.GIT_ORG) {
+        return (
+          <div className="text-muted-foreground font-medium">
+            {row.original.totalAssets} repositories
+          </div>
+        );
+      }
       const value: string = row.getValue('totalAssetServices');
       return (
         <div className="text-muted-foreground font-medium">
