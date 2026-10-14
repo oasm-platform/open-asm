@@ -21,3 +21,9 @@ export enum LLMProvider {
   OPENCODE_GO = 'opencode_go',
   CUSTOM = 'custom',
 }
+
+export enum SearchProvider {
+  EXA = 'exa',
+  FIRECRAWL = 'firecrawl',
+  TINYFISH = 'tinyfish',
+}

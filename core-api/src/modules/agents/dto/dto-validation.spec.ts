@@ -96,18 +96,17 @@ describe('Agent DTO validation', () => {
     );
   });
 
-  it('requires an API key and validates LLM limits', async () => {
+  it('requires an API key and validates the API URL', async () => {
     const dto = plainToInstance(CreateLLMConfigDto, {
       provider: LLMProvider.OPENAI,
       model: 'gpt-5',
       apiUrl: 'not-a-url',
-      contextWindow: 1.5,
     });
 
     const errors = await validate(dto);
 
     expect(errors.map((error) => error.property)).toEqual(
-      expect.arrayContaining(['apiKey', 'apiUrl', 'contextWindow']),
+      expect.arrayContaining(['apiKey', 'apiUrl']),
     );
   });
 

@@ -2339,6 +2339,7 @@ export type ConnectorDto = {
   repositoryUrl?: string;
   supportUrl?: string;
   capabilities: string[];
+  agentTool?: boolean;
 };
 
 export type ToolConfigProfile = {
@@ -2798,13 +2799,7 @@ export type LLMConfigResponseDto = {
    * @nullable
    */
   apiUrl?: string | null;
-  /**
-   * Custom context window size in tokens
-   * @minimum 1
-   * @nullable
-   */
-  contextWindow?: number | null;
-  /** Whether this is the preferred configuration */
+  /** Whether this is the default model connection */
   isPreferred: boolean;
   /** Masked API key showing only its final characters */
   apiKeyMasked: string;
@@ -2852,11 +2847,6 @@ export type CreateLLMConfigDto = {
    * @maxLength 500
    */
   apiUrl?: string;
-  /**
-   * Custom context window size in tokens
-   * @minimum 1
-   */
-  contextWindow?: number;
 };
 
 /**
@@ -2980,12 +2970,7 @@ export type UpdateLLMConfigDto = {
    * @maxLength 500
    */
   apiUrl?: string;
-  /**
-   * Custom context window size in tokens
-   * @minimum 1
-   */
-  contextWindow?: number;
-  /** Whether this is the preferred configuration for new conversations */
+  /** Make this connection the default model for new conversations */
   isPreferred?: boolean;
 };
 
