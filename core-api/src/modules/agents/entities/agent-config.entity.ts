@@ -3,7 +3,7 @@ import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
-import { SearchProvider } from '../enums/agent.enums';
+import { ReasoningEffort, SearchProvider } from '../enums/agent.enums';
 
 /** A model on one of the user's LLM connections, with its own limits. */
 export interface AgentModelRef {
@@ -12,6 +12,8 @@ export interface AgentModelRef {
   /** Overrides the default context window (128k) */
   contextWindow?: number;
   maxOutputTokens?: number;
+  /** Unset: the provider's default */
+  reasoningEffort?: ReasoningEffort;
 }
 
 export interface AgentModelsConfig {

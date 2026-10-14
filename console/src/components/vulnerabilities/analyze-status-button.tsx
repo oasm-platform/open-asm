@@ -1,10 +1,10 @@
 import { Button } from '@/components/ui/button';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
   VulnerabilityAnalyzeStatus,
   useVulnerabilitiesControllerAnalyzeVulnerability,
 } from '@/services/apis/gen/queries';
-import { useNavigate } from '@tanstack/react-router';
 import { CheckCircle2, Loader2, Play, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -65,7 +65,7 @@ export function AnalyzeStatusButton({
   onView,
 }: AnalyzeStatusButtonProps) {
   const { hasProviderConnected, isLoading: llmLoading } = useLLMConfigs();
-  const navigate = useNavigate();
+  const { open: openAgentSettings } = useAgentSettingsDialog();
   const { mutate: analyzeVulnerability } =
     useVulnerabilitiesControllerAnalyzeVulnerability();
 
@@ -76,9 +76,9 @@ export function AnalyzeStatusButton({
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // If no LLM provider is connected, redirect to AI Studio providers
+    // If no LLM provider is connected, redirect to agent settings
     if (!llmLoading && !hasProviderConnected) {
-      void navigate({ to: '/aistudio/providers' });
+      openAgentSettings('provider');
       return;
     }
 

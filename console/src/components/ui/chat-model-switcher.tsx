@@ -1,4 +1,5 @@
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import type {
   ProviderModelDto,
 } from '@/services/apis/gen/queries';
@@ -7,7 +8,6 @@ import {
   useAgentsControllerUpdateLLMConfig,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
 import { Check, ChevronsUpDown, Loader2, Settings } from 'lucide-react';
 import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -116,6 +116,7 @@ export function ChatModelSwitcher({
   selectedModel,
   onSelectModel,
 }: ChatModelSwitcherProps) {
+  const { open: openSettings } = useAgentSettingsDialog();
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -214,13 +215,14 @@ export function ChatModelSwitcher({
 
   if (connectedConfigs.length === 0) {
     return (
-      <Link
-        to="/aistudio/providers"
+      <button
+        type="button"
+        onClick={() => openSettings('provider')}
         className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
       >
         <Settings className="h-3.5 w-3.5" />
         Connect LLM
-      </Link>
+      </button>
     );
   }
 
@@ -272,13 +274,14 @@ export function ChatModelSwitcher({
             </PopoverContent>
           </Popover>
         </div>
-        <Link
-          to="/aistudio/providers"
-          aria-label="Manage providers"
+        <button
+          type="button"
+          onClick={() => openSettings('provider')}
+          aria-label="Agent settings"
           className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
         >
           <Settings className="h-3.5 w-3.5" />
-        </Link>
+        </button>
       </div>
     </>
   );

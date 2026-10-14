@@ -3331,6 +3331,18 @@ export type MCPServerPingResponseDto = {
   latency?: number;
 };
 
+/**
+ * Reasoning effort; unset uses the provider's default (saved, not used yet)
+ */
+export type AgentModelRefDtoReasoningEffort =
+  (typeof AgentModelRefDtoReasoningEffort)[keyof typeof AgentModelRefDtoReasoningEffort];
+
+export const AgentModelRefDtoReasoningEffort = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
 export type AgentModelRefDto = {
   /** LLM connection the model runs on */
   llmConfigId: string;
@@ -3348,6 +3360,8 @@ export type AgentModelRefDto = {
    * @maximum 10000000
    */
   maxOutputTokens?: number;
+  /** Reasoning effort; unset uses the provider's default (saved, not used yet) */
+  reasoningEffort?: AgentModelRefDtoReasoningEffort;
 };
 
 export type AgentModelsConfigDto = {

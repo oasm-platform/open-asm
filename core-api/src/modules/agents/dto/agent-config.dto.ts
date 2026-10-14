@@ -16,7 +16,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { SearchProvider } from '../enums/agent.enums';
+import { ReasoningEffort, SearchProvider } from '../enums/agent.enums';
 
 export const AGENT_INSTRUCTION_MAX_LENGTH = 20_000;
 /** Upper bound for token limits (fits the int columns of a migration revert) */
@@ -60,6 +60,16 @@ export class AgentModelRefDto {
   @Min(1)
   @Max(AGENT_MAX_TOKENS)
   maxOutputTokens?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Reasoning effort; unset uses the provider's default (saved, not used yet)",
+    enum: ReasoningEffort,
+    example: ReasoningEffort.MEDIUM,
+  })
+  @IsOptional()
+  @IsEnum(ReasoningEffort)
+  reasoningEffort?: ReasoningEffort;
 }
 
 export class AgentModelsConfigDto {

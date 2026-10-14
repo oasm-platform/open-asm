@@ -6,6 +6,7 @@ import TypewriterText from '@/components/typewriter-text';
 import { Button } from '@/components/ui/button';
 import { restoreApprovalMode } from '@/hooks/use-approval-mode';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { Plus, Sparkles } from 'lucide-react';
@@ -22,6 +23,7 @@ const routeApi = getRouteApi('/_authed/aistudio/');
 
 export default function AgentsLandingPage() {
   const navigate = useNavigate();
+  const { open: openSettings } = useAgentSettingsDialog();
   const { text: queryText } = routeApi.useSearch();
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
@@ -108,7 +110,7 @@ export default function AgentsLandingPage() {
               </p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => void navigate({ to: '/aistudio/providers' })}>
+          <Button variant="outline" onClick={() => openSettings('provider')}>
             <Plus className="h-4 w-4" />
             Connect
           </Button>
