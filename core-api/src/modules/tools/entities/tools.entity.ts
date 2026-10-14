@@ -158,4 +158,8 @@ export class Tool {
 
   @ApiProperty({ required: false })
   isReady?: boolean;
+
+  /** From the connector manifest: the AI agent exposes this tool as a callable tool. */
+  @ApiProperty({ required: false })
+  agentTool?: boolean;
 }
