@@ -71,7 +71,7 @@
     "express": "^5.2.1",
     "intl-messageformat": "^11.2.7",
     "ioredis": "^5.8.2",
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^4.3.2",
     "mustache": "^4.2.0",
     "nanoid": "^3.3.18",
     "nestjs-i18n": "^10.8.5",
