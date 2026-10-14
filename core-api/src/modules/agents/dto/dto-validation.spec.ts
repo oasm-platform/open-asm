@@ -43,7 +43,11 @@ import {
 } from './mcp-config.dto';
 import { CreateSkillDto, SkillResponseDto, ToggleSkillDto, UpdateSkillDto } from './skill.dto';
 import { WorkspaceMemoryResponseDto } from './workspace-memory.dto';
-import { LLMProvider, SearchProvider } from '../enums/agent.enums';
+import {
+  LLMProvider,
+  ReasoningEffort,
+  SearchProvider,
+} from '../enums/agent.enums';
 import {
   AGENT_INSTRUCTION_MAX_LENGTH,
   AGENT_MAX_STEPS,
@@ -141,6 +145,7 @@ describe('Agent DTO validation', () => {
             llmConfigId: randomUUID(),
             model: 'x',
             maxOutputTokens: AGENT_MAX_TOKENS + 1,
+            reasoningEffort: 'extreme',
           },
         ],
       },
@@ -171,6 +176,7 @@ describe('Agent DTO validation', () => {
         'modelsConfig.default.llmConfigId',
         'modelsConfig.small.contextWindow',
         'modelsConfig.subagents.0.maxOutputTokens',
+        'modelsConfig.subagents.0.reasoningEffort',
         'searchProviders.0.provider',
         'searchProviders.1.apiKey',
       ].sort(),
@@ -179,7 +185,16 @@ describe('Agent DTO validation', () => {
 
   it('accepts a partial agent config that clears fields with null', async () => {
     const dto = plainToInstance(UpsertAgentConfigDto, {
-      modelsConfig: { default: { llmConfigId: randomUUID(), model: 'gpt-5' } },
+      modelsConfig: {
+        default: { llmConfigId: randomUUID(), model: 'gpt-5' },
+        subagents: [
+          {
+            llmConfigId: randomUUID(),
+            model: 'mini',
+            reasoningEffort: ReasoningEffort.LOW,
+          },
+        ],
+      },
       searchProviders: [{ provider: SearchProvider.EXA, isDefault: true }],
       instruction: null,
       maxSteps: null,

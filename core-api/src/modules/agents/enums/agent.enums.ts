@@ -22,6 +22,12 @@ export enum LLMProvider {
   CUSTOM = 'custom',
 }
 
+export enum ReasoningEffort {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+}
+
 export enum SearchProvider {
   EXA = 'exa',
   FIRECRAWL = 'firecrawl',
