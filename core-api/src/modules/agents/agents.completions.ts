@@ -33,6 +33,7 @@ import {
   formatUserInstructions,
   type ResolvedLLMConfig,
   withAgentConfig,
+  withoutDisabledTools,
 } from './agents.config';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsMemoriesService } from './agents.memories';
@@ -496,7 +497,10 @@ export class AgentsCompletionsService {
       });
 
       const model = await this.createLanguageModel(llmConfig, workspaceId);
-      const tools = this.agentTool.getTools(workspaceId, AgentMode.AGENT);
+      const tools = withoutDisabledTools(
+        this.agentTool.getTools(workspaceId, AgentMode.AGENT),
+        await this.agentsConfig.find(workspaceId, userId),
+      );
 
       let accumulatedText = '';
 
@@ -1988,8 +1992,12 @@ export class AgentsCompletionsService {
     };
 
     // Step 12: Build the combined stream with auto-continuation
+    const enabledTools = withoutDisabledTools(
+      tools,
+      await this.agentsConfig.find(workspaceId, userId),
+    );
     const toolSetArg: ToolSet | undefined =
-      Object.keys(tools).length > 0 ? tools : undefined;
+      Object.keys(enabledTools).length > 0 ? enabledTools : undefined;
 
     const stream = this.createContinuationStream({
       llmConfig,

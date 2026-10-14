@@ -21,6 +21,7 @@ describe('AgentsController workspace permission guards', () => {
     ['pingMCPServer', 'GET /mcp-configs/:name/ping'],
     ['getWorkspaceMemory', 'GET /workspace-memory'],
     ['getSkills', 'GET /skills'],
+    ['getAgentConfig', 'GET /config'],
   ];
 
   const write: Array<[string, string]> = [
@@ -43,6 +44,7 @@ describe('AgentsController workspace permission guards', () => {
     ['decideCommandApproval', 'PATCH /command-approvals/:id'],
     ['revokeCommandApproval', 'DELETE /command-approvals/:id'],
     ['decidePlanApproval', 'PATCH /plan-approvals/:id'],
+    ['upsertAgentConfig', 'PUT /config'],
   ];
 
   it.each(read)('%s (%s) requires agent.read', (method, _route) => {

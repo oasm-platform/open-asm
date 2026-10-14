@@ -1,6 +1,10 @@
 import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import { plainToInstance } from 'class-transformer';
-import { getMetadataStorage, validate } from 'class-validator';
+import {
+  getMetadataStorage,
+  validate,
+  type ValidationError,
+} from 'class-validator';
 import { randomUUID } from 'node:crypto';
 import { AgentModeDto, GetAgentModesResponseDto } from './agent-mode.dto';
 import {
@@ -39,7 +43,18 @@ import {
 } from './mcp-config.dto';
 import { CreateSkillDto, SkillResponseDto, ToggleSkillDto, UpdateSkillDto } from './skill.dto';
 import { WorkspaceMemoryResponseDto } from './workspace-memory.dto';
-import { LLMProvider } from '../enums/agent.enums';
+import { LLMProvider, SearchProvider } from '../enums/agent.enums';
+import {
+  AGENT_INSTRUCTION_MAX_LENGTH,
+  AGENT_MAX_STEPS,
+  AGENT_MAX_TOKENS,
+  AgentConfigResponseDto,
+  AgentModelRefDto,
+  AgentModelsConfigDto,
+  AgentSearchProviderInputDto,
+  AgentSearchProviderResponseDto,
+  UpsertAgentConfigDto,
+} from './agent-config.dto';
 
 type DtoClass = abstract new (...args: never[]) => object;
 
@@ -78,6 +93,12 @@ const describedDtos: DtoClass[] = [
   SkillResponseDto,
   ToggleSkillDto,
   WorkspaceMemoryResponseDto,
+  AgentModelRefDto,
+  AgentModelsConfigDto,
+  AgentSearchProviderInputDto,
+  AgentSearchProviderResponseDto,
+  UpsertAgentConfigDto,
+  AgentConfigResponseDto,
 ];
 
 describe('Agent DTO validation', () => {
@@ -108,6 +129,63 @@ describe('Agent DTO validation', () => {
     expect(errors.map((error) => error.property)).toEqual(
       expect.arrayContaining(['apiKey', 'apiUrl']),
     );
+  });
+
+  it('validates agent config models, limits and search providers', async () => {
+    const dto = plainToInstance(UpsertAgentConfigDto, {
+      modelsConfig: {
+        default: { llmConfigId: 'not-a-uuid', model: 'gpt-5' },
+        small: { llmConfigId: randomUUID(), model: 'mini', contextWindow: 1.5 },
+        subagents: [
+          {
+            llmConfigId: randomUUID(),
+            model: 'x',
+            maxOutputTokens: AGENT_MAX_TOKENS + 1,
+          },
+        ],
+      },
+      searchProviders: [
+        { provider: 'bing' },
+        { provider: SearchProvider.EXA, apiKey: '' },
+      ],
+      maxSteps: AGENT_MAX_STEPS + 1,
+      instruction: 'x'.repeat(AGENT_INSTRUCTION_MAX_LENGTH + 1),
+      defaultApprovalMode: 'sometimes',
+    });
+
+    // Nested failures only show up as children of their parent property
+    const paths = (errs: ValidationError[], prefix = ''): string[] =>
+      errs.flatMap((e) => {
+        const path = prefix ? `${prefix}.${e.property}` : e.property;
+        return [
+          ...(e.constraints ? [path] : []),
+          ...paths(e.children ?? [], path),
+        ];
+      });
+
+    expect(paths(await validate(dto)).sort()).toEqual(
+      [
+        'defaultApprovalMode',
+        'instruction',
+        'maxSteps',
+        'modelsConfig.default.llmConfigId',
+        'modelsConfig.small.contextWindow',
+        'modelsConfig.subagents.0.maxOutputTokens',
+        'searchProviders.0.provider',
+        'searchProviders.1.apiKey',
+      ].sort(),
+    );
+  });
+
+  it('accepts a partial agent config that clears fields with null', async () => {
+    const dto = plainToInstance(UpsertAgentConfigDto, {
+      modelsConfig: { default: { llmConfigId: randomUUID(), model: 'gpt-5' } },
+      searchProviders: [{ provider: SearchProvider.EXA, isDefault: true }],
+      instruction: null,
+      maxSteps: null,
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
   });
 
   it('accepts a valid LLM config without an explicit model', async () => {

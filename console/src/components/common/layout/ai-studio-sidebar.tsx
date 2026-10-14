@@ -1,5 +1,12 @@
 import { Link, useLocation } from '@tanstack/react-router';
-import { Loader2, MessageSquare, SquarePen } from 'lucide-react';
+import {
+  BookOpen,
+  Brain,
+  KeyRound,
+  Loader2,
+  MessageSquare,
+  SquarePen,
+} from 'lucide-react';
 import { useMemo } from 'react';
 
 import {
@@ -16,6 +23,12 @@ import { useAgentsControllerGetConversationsInfinite } from '@/services/apis/gen
 import { AppSidebar } from './menu-bar';
 
 const CONVERSATION_PATH_PREFIX = '/aistudio/conversations/';
+
+const settingsItems = [
+  { to: '/aistudio/providers', label: 'Providers', icon: KeyRound },
+  { to: '/aistudio/skills', label: 'Skills', icon: BookOpen },
+  { to: '/aistudio/memory', label: 'Memory', icon: Brain },
+] as const;
 
 const itemClassName =
   'h-9 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold';
@@ -86,6 +99,21 @@ export function AiStudioSidebar() {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {settingsItems.map((item) => (
+              <SidebarMenuItem key={item.to}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.to}
+                  tooltip={item.label}
+                  className={itemClassName}
+                >
+                  <Link to={item.to} onClick={() => setOpenMobile(false)}>
+                    <item.icon />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>

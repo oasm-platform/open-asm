@@ -30,10 +30,6 @@ vi.mock('@/hooks/use-llm-configs', () => ({
   })),
 }));
 
-vi.mock('@/components/agent-settings-dialog', () => ({
-  AgentSettingsDialog: () => <div data-testid="agent-settings-dialog">AgentSettingsDialog</div>,
-}));
-
 vi.mock('@/components/typewriter-text', () => ({
   default: ({ texts }: { texts: string[] }) => (
     <div data-testid="typewriter-text">{texts[0]}</div>
