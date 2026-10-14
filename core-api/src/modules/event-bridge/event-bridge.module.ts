@@ -4,40 +4,50 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../auth/entities/user.entity';
 import { AuditEvent } from '../audit/entities/audit-event.entity';
-import { Notification } from '../notifications/entities/notification.entity';
-import { NotificationRecipient } from '../notifications/entities/notification-recipient.entity';
-import { EVENT_CATALOG, EVENT_CATALOG_TOKEN } from '../connectors/event';
 import { IntegrationsModule } from '../integrations/integrations.module';
-import { AuditSinkService } from './audit-sink.service';
-import { EventBridgeService } from './event-bridge.service';
-import { EventPublishInterceptor } from './event-publish.interceptor';
-
-import { IntegrationsSinkService } from './integrations.sink.service';
-import { NotificationsSinkService } from './notifications.sink.service';
-import { ProjectionSinkService } from './projection.sink.service';
+import { NotificationRecipient } from '../notifications/entities/notification-recipient.entity';
+import { Notification } from '../notifications/entities/notification.entity';
+import { EventConsumersService } from './consuming/event-consumers.service';
+import { EVENT_SINKS, type EventSink } from './consuming/event-sink';
+import { EVENT_CATALOG, EVENT_CATALOG_TOKEN } from './contracts/event-catalog';
+import { EventBridgeService } from './publishing/event-bridge.service';
+import { EventPublishInterceptor } from './publishing/event-publish.interceptor';
+import { AuditSink } from './sinks/audit/audit.sink';
+import { IntegrationsSink } from './sinks/integrations/integrations.sink';
+import { NotificationsSink } from './sinks/notifications/notifications.sink';
+import { ProjectionSink } from './sinks/projection/projection.sink';
 
 /**
- * Bridges domain events onto a Redis Stream and consumes it back.
+ * Every lane, one per `EventBusGroup`. Adding a lane = a sink class here plus
+ * its `SUBSCRIPTIONS` entry; the consumer runtime picks it up from
+ * `EVENT_SINKS`.
+ */
+export const SINKS = [
+  AuditSink,
+  ProjectionSink,
+  NotificationsSink,
+  IntegrationsSink,
+] as const;
+
+/**
+ * The event bus: publish domain events onto a Redis Stream and consume them
+ * back through one consumer group per lane.
  *
- * `@Global()` for the same reason `AuditModule` is: the bridge is published FROM
- * a dozen modules (controllers, job lifecycle, worker lifecycle, schedulers) and
- * imported INTO none of them. Making it global keeps every emit site a one-line
- * DI of `EventBridgeService` instead of an import edit in that module's
- * `imports` array.
+ *   publishing/   producer side — `EventBridgeService`, `@PublishEvent` + its
+ *                 interceptor, secret redaction
+ *   contracts/    the wire contract — catalog, envelope, payload shapes
+ *   routing/      per-event policy and per-lane domain subscriptions
+ *   transport/    stream entry encode/decode
+ *   consuming/    the consumer-group runtime — loop, retry, DLQ, idempotency
+ *   sinks/        what each lane does with an event
  *
- * Producer and consumers live in one module because they share the stream key
- * and the group names — splitting them would only move that coupling to a
- * second import.
+ * `@Global()` because the bridge is published FROM a dozen modules and
+ * imported INTO none of them: every emit site stays a one-line DI of
+ * `EventBridgeService`.
  *
- * The consumer groups are separate providers, not one worker with several
- * handlers, because a consumer group is Redis-side state with its OWN read
- * position: each lane must advance independently or the slowest one holds back
- * the audit trail. What they share is the loop itself (`StreamConsumerService`),
- * so they cannot drift in their retry or dead-letter behaviour.
- *
- * `IntegrationsModule` is imported for the outbound lanes (decrypting a
- * workspace's integration config); `Notification`/`NotificationRecipient` are
- * registered here because the notifications lane materializes those rows.
+ * `IntegrationsModule` is imported for the outbound lane (decrypting a
+ * workspace's integration config); the entities are registered for the audit
+ * and notifications lanes that materialize them.
  */
 @Global()
 @Module({
@@ -52,27 +62,20 @@ import { ProjectionSinkService } from './projection.sink.service';
     ]),
   ],
   providers: [
+    // Publishing
     EventBridgeService,
-    AuditSinkService,
-    ProjectionSinkService,
-    NotificationsSinkService,
-    IntegrationsSinkService,
+    { provide: EVENT_CATALOG_TOKEN, useValue: EVENT_CATALOG },
+    { provide: APP_INTERCEPTOR, useClass: EventPublishInterceptor },
+
+    // Consuming
+    ...SINKS,
     {
-      provide: EVENT_CATALOG_TOKEN,
-      useValue: EVENT_CATALOG,
+      provide: EVENT_SINKS,
+      useFactory: (...sinks: EventSink[]) => sinks,
+      inject: [...SINKS],
     },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: EventPublishInterceptor,
-    },
+    EventConsumersService,
   ],
-  exports: [
-    EventBridgeService,
-    AuditSinkService,
-    ProjectionSinkService,
-    NotificationsSinkService,
-    IntegrationsSinkService,
-    EVENT_CATALOG_TOKEN,
-  ],
+  exports: [EventBridgeService, EVENT_CATALOG_TOKEN, NotificationsSink],
 })
 export class EventBridgeModule {}

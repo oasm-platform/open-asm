@@ -16,6 +16,8 @@ describe('RemoteExecuteService', () => {
   let mockRemoteExecuteSubscribeService: {
     pushCommandWithSession: jest.Mock;
     pushCommandWithConversation: jest.Mock;
+    pushToolRun: jest.Mock;
+    pushCancelToolRun: jest.Mock;
     removeSession: jest.Mock;
   };
 
@@ -28,6 +30,8 @@ describe('RemoteExecuteService', () => {
     mockRemoteExecuteSubscribeService = {
       pushCommandWithSession: jest.fn(),
       pushCommandWithConversation: jest.fn(),
+      pushToolRun: jest.fn(),
+      pushCancelToolRun: jest.fn(),
       removeSession: jest.fn(),
     };
 
@@ -65,6 +69,7 @@ describe('RemoteExecuteService', () => {
   describe('runCommand', () => {
     const testCommand = 'whoami';
     const testSessionId = 'session-abc';
+    const testWorkspaceId = 'ws-1';
 
     it('should return RemoteCommandPayload when worker is available', () => {
       mockRemoteExecuteSubscribeService.pushCommandWithSession.mockReturnValue({
@@ -72,7 +77,11 @@ describe('RemoteExecuteService', () => {
         workerId: 'worker-1',
       });
 
-      const result = service.runCommand(testCommand, testSessionId);
+      const result = service.runCommand(
+        testCommand,
+        testSessionId,
+        testWorkspaceId,
+      );
 
       expect(result).toEqual({
         id: 'cmd-1',
@@ -88,7 +97,7 @@ describe('RemoteExecuteService', () => {
       );
 
       expect(() =>
-        service.runCommand(testCommand, testSessionId),
+        service.runCommand(testCommand, testSessionId, testWorkspaceId),
       ).toThrow(ServiceUnavailableException);
     });
 
@@ -98,11 +107,11 @@ describe('RemoteExecuteService', () => {
         workerId: 'worker-1',
       });
 
-      service.runCommand(testCommand, testSessionId);
+      service.runCommand(testCommand, testSessionId, testWorkspaceId);
 
       expect(
         mockRemoteExecuteSubscribeService.pushCommandWithSession,
-      ).toHaveBeenCalledWith(testSessionId, testCommand);
+      ).toHaveBeenCalledWith(testSessionId, testCommand, testWorkspaceId);
     });
 
     it('should accept optional user context without using it', () => {
@@ -114,11 +123,11 @@ describe('RemoteExecuteService', () => {
       const user = { id: 'u1', name: 'test', workspaceId: 'ws1' } as any;
 
       expect(() =>
-        service.runCommand(testCommand, testSessionId, user),
+        service.runCommand(testCommand, testSessionId, testWorkspaceId, user),
       ).not.toThrow();
       expect(
         mockRemoteExecuteSubscribeService.pushCommandWithSession,
-      ).toHaveBeenCalledWith(testSessionId, testCommand);
+      ).toHaveBeenCalledWith(testSessionId, testCommand, testWorkspaceId);
     });
   });
 
@@ -310,6 +319,7 @@ describe('RemoteExecuteService', () => {
     const testCommand = 'whoami';
     const testSessionId = 'session-abc';
     const testConversationId = 'conv-123';
+    const testWorkspaceId = 'ws-1';
     const channel = `remote-execute:results:${testSessionId}`;
 
     function setupCapturedSubscribe() {
@@ -360,14 +370,25 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
       await new Promise((r) => setTimeout(r, 10));
       const cb = getCallback();
 
-      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_STDOUT', 'output line 1\n');
-      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_STDOUT', 'output line 2\n');
+      fireMessage(
+        cb,
+        channel,
+        'REMOTE_EXECUTE_RESULT_STDOUT',
+        'output line 1\n',
+      );
+      fireMessage(
+        cb,
+        channel,
+        'REMOTE_EXECUTE_RESULT_STDOUT',
+        'output line 2\n',
+      );
       fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_EXIT', '', 0);
 
       const result = await resultPromise;
@@ -389,6 +410,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -419,6 +441,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -445,6 +468,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -481,6 +505,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -509,6 +534,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         50,
       );
 
@@ -534,6 +560,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         50,
       );
 
@@ -556,6 +583,7 @@ describe('RemoteExecuteService', () => {
           testCommand,
           testSessionId,
           testConversationId,
+          testWorkspaceId,
           5000,
         ),
       ).rejects.toThrow(ServiceUnavailableException);
@@ -572,6 +600,7 @@ describe('RemoteExecuteService', () => {
           testCommand,
           testSessionId,
           testConversationId,
+          testWorkspaceId,
           5000,
         );
       } catch {
@@ -592,6 +621,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         50,
       );
 
@@ -623,6 +653,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -636,12 +667,7 @@ describe('RemoteExecuteService', () => {
         'wrong',
         0,
       );
-      fireMessage(
-        cb,
-        channel,
-        'REMOTE_EXECUTE_RESULT_STDOUT',
-        'correct\n',
-      );
+      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_STDOUT', 'correct\n');
       fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_EXIT', '', 0);
 
       const result = await resultPromise;
@@ -662,6 +688,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
         onEvent,
       );
@@ -705,6 +732,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
         onEvent,
       );
@@ -735,6 +763,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -758,19 +787,14 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
       await new Promise((r) => setTimeout(r, 10));
       const cb = getCallback();
 
-      fireMessage(
-        cb,
-        channel,
-        'REMOTE_EXECUTE_RESULT_ERROR',
-        'exec failed',
-        1,
-      );
+      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_ERROR', 'exec failed', 1);
 
       await resultPromise;
 
@@ -787,6 +811,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         50,
       );
 
@@ -806,6 +831,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -844,6 +870,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -902,6 +929,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -934,6 +962,7 @@ describe('RemoteExecuteService', () => {
         testCommand,
         testSessionId,
         testConversationId,
+        testWorkspaceId,
         5000,
       );
 
@@ -949,6 +978,161 @@ describe('RemoteExecuteService', () => {
 
       expect(result.stdout).toBe('before exit\n');
       expect(result.timedOut).toBe(false);
+    });
+  });
+
+  describe('waitForToolRun', () => {
+    const sessionId = 'run-1';
+    const channel = `remote-execute:results:${sessionId}`;
+    const toolRun = {
+      tool: 'nmap',
+      image: 'img',
+      target: 'example.com',
+      configJson: '',
+    };
+
+    let cb: SubscribeCallback;
+    beforeEach(() => {
+      mockRedisService.subscribe.mockImplementation(
+        (_ch: string, fn: SubscribeCallback) => {
+          cb = fn;
+          return Promise.resolve();
+        },
+      );
+      mockRemoteExecuteSubscribeService.pushToolRun.mockReturnValue({
+        id: 'cmd-9',
+        workerId: 'wk-1',
+      });
+    });
+
+    it('pushes the tool run to the worker and returns the raw output', async () => {
+      const promise = service.waitForToolRun('wk-1', toolRun, sessionId, 5000);
+      await new Promise((r) => setTimeout(r, 10));
+      cb(channel, JSON.stringify({ type: 1, data: 'open 80\n' }));
+      cb(channel, JSON.stringify({ type: 3, data: '', exitCode: 0 }));
+
+      const result = await promise;
+      expect(
+        mockRemoteExecuteSubscribeService.pushToolRun,
+      ).toHaveBeenCalledWith('wk-1', sessionId, toolRun);
+      expect(result).toMatchObject({
+        command: 'nmap example.com',
+        stdout: 'open 80\n',
+        exitCode: 0,
+        error: null,
+        timedOut: false,
+      });
+    });
+
+    it('stops waiting when the call is aborted and cancels the worker run', async () => {
+      const controller = new AbortController();
+      const promise = service.waitForToolRun(
+        'wk-1',
+        toolRun,
+        sessionId,
+        60_000,
+        {
+          abortSignal: controller.signal,
+        },
+      );
+      await new Promise((r) => setTimeout(r, 10));
+      controller.abort();
+
+      const result = await promise;
+      expect(result.error).toBe('Cancelled by user');
+      expect(result.timedOut).toBe(false);
+      expect(mockRedisService.unsubscribe).toHaveBeenCalledWith(channel);
+      expect(
+        mockRemoteExecuteSubscribeService.pushCancelToolRun,
+      ).toHaveBeenCalledWith('wk-1', sessionId);
+    });
+
+    it('never pushes a run that was aborted before it started', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await service.waitForToolRun(
+        'wk-1',
+        toolRun,
+        sessionId,
+        60_000,
+        { abortSignal: controller.signal },
+      );
+      expect(result.error).toBe('Cancelled by user');
+      expect(
+        mockRemoteExecuteSubscribeService.pushToolRun,
+      ).not.toHaveBeenCalled();
+      expect(mockRedisService.unsubscribe).toHaveBeenCalledWith(channel);
+    });
+
+    it('cancels the worker run when core times out', async () => {
+      const result = await service.waitForToolRun(
+        'wk-1',
+        toolRun,
+        sessionId,
+        20,
+      );
+      expect(result.timedOut).toBe(true);
+      expect(
+        mockRemoteExecuteSubscribeService.pushCancelToolRun,
+      ).toHaveBeenCalledWith('wk-1', sessionId);
+    });
+
+    it('does not cancel a run that finished', async () => {
+      const promise = service.waitForToolRun('wk-1', toolRun, sessionId, 5000);
+      await new Promise((r) => setTimeout(r, 10));
+      cb(channel, JSON.stringify({ type: 3, data: '', exitCode: 0 }));
+      await promise;
+      expect(
+        mockRemoteExecuteSubscribeService.pushCancelToolRun,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('keeps at most maxOutputChars of stdout', async () => {
+      const promise = service.waitForToolRun('wk-1', toolRun, sessionId, 5000, {
+        maxOutputChars: 10,
+      });
+      await new Promise((r) => setTimeout(r, 10));
+      cb(channel, JSON.stringify({ type: 1, data: '1234567' }));
+      cb(channel, JSON.stringify({ type: 1, data: '89abcdef' }));
+      cb(channel, JSON.stringify({ type: 1, data: 'ghij' }));
+      cb(channel, JSON.stringify({ type: 3, data: '', exitCode: 0 }));
+
+      const result = await promise;
+      expect(result.stdout).toBe('123456789a');
+      expect(result.stdoutTruncated).toBe(true);
+    });
+
+    it('runs onPushed after the push, and still sees a fast EXIT', async () => {
+      const order: string[] = [];
+      mockRemoteExecuteSubscribeService.pushToolRun.mockImplementation(() => {
+        order.push('push');
+        return { id: 'cmd-9', workerId: 'wk-1' };
+      });
+      const result = await service.waitForToolRun(
+        'wk-1',
+        toolRun,
+        sessionId,
+        5000,
+        {
+          onPushed: async () => {
+            order.push('pin');
+            // The run finishes while the pin is being written.
+            cb(channel, JSON.stringify({ type: 3, data: '', exitCode: 0 }));
+            await new Promise((r) => setTimeout(r, 5));
+          },
+        },
+      );
+      expect(order).toEqual(['push', 'pin']);
+      expect(result.exitCode).toBe(0);
+      expect(result.timedOut).toBe(false);
+    });
+
+    it('throws when the worker stream is gone', async () => {
+      mockRemoteExecuteSubscribeService.pushToolRun.mockReturnValue(null);
+      await expect(
+        service.waitForToolRun('wk-1', toolRun, sessionId, 5000),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
 });

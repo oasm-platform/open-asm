@@ -3,7 +3,9 @@
 # QEMU aborts with SIGILL. Only the final nginx stage targets the requested arch.
 FROM --platform=$BUILDPLATFORM node:26-alpine AS base
 RUN apk add --no-cache curl bash
-RUN npm install -g corepack && corepack enable && corepack prepare pnpm@10.33.2 --activate
+COPY package.json /tmp/pm/package.json
+RUN npm install -g corepack && corepack enable \
+  && corepack prepare "$(node -p "require('/tmp/pm/package.json').packageManager")" --activate
 ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 

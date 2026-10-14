@@ -6,7 +6,7 @@ import { NotificationRecipient } from './entities/notification-recipient.entity'
 import { Notification } from './entities/notification.entity';
 
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { NotificationsSinkService } from '../event-bridge/notifications.sink.service';
+import { NotificationsSink } from '../event-bridge/sinks/notifications/notifications.sink';
 import { RedisService } from '@/services/redis/redis.service';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { I18nService } from 'nestjs-i18n';
@@ -22,7 +22,7 @@ export class NotificationsService {
     private notificationRepo: Repository<Notification>,
     private readonly i18n: I18nService,
     private readonly redisService: RedisService,
-    private readonly sink: NotificationsSinkService,
+    private readonly sink: NotificationsSink,
   ) {}
 
   /**

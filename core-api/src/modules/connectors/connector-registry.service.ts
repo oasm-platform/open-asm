@@ -15,6 +15,8 @@ export interface ConnectorManifestEntry {
   repositoryUrl?: string;
   supportUrl?: string;
   capabilities: string[];
+  /** When true the AI agent exposes this connector as its own callable tool. */
+  agentTool?: boolean;
   inputsSchema?: Record<string, unknown>;
   configSchema?: Record<string, unknown>;
   [key: string]: unknown;
@@ -134,6 +136,17 @@ export class ConnectorRegistryService implements OnModuleInit {
 
   getAllConnectors(): ConnectorManifestEntry[] {
     return Array.from(this.connectorsBySlug.values());
+  }
+
+  /**
+   * Connectors opt-in to the AI agent as callable tools. Requires both the
+   * `agentTool` flag and an image — a flag without an image would advertise a
+   * tool that can never dispatch to a worker.
+   */
+  getAgentConnectors(): ConnectorManifestEntry[] {
+    return this.getAllConnectors().filter(
+      (entry) => entry.agentTool === true && !!entry.image,
+    );
   }
 
   /**

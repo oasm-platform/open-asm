@@ -738,7 +738,7 @@ Some workflows can be tested faster by running the tasks directly:
 | `frontend-tests.yml` | `task console:test:run` |
 | `worker-ci.yml` | `task worker:format && task worker:lint && task worker:check` |
 
-CI toolchain, for reference: Node.js 22, pnpm 10.33.2, Go 1.26.
+CI toolchain, for reference: Node.js 22 (`.nvmrc`), pnpm 10.33.2, Go 1.26.
 
 ### Notes
 

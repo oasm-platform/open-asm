@@ -8,8 +8,8 @@ import {
   UserContextPayload,
 } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { EVENT_CATALOG } from '../connectors/event';
-import { PublishEvent } from '../event-bridge/publish-event.decorator';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { AuditService } from '../audit/audit.service';
 import {
   Body,
@@ -30,6 +30,8 @@ import {
   CreateMultipleTargetsDto,
   GetManyTargetResponseDto,
   GetManyWorkspaceQueryParamsDto,
+  GetTargetRepositoriesQueryDto,
+  TargetRepositoryDto,
   UpdateTargetDto,
 } from './dto/targets.dto';
 import { Target } from './entities/target.entity';
@@ -154,6 +156,27 @@ export class TargetsController {
 
     // Send CSV content
     res.send(csvRows.join('\n'));
+  }
+
+  @Doc({
+    summary: 'List repositories of a Git organization target',
+    description:
+      'Lists the repositories synced into a GIT_ORG target (its assets), with provider details. Disabled repositories (archived, forks, or gone from the provider) are listed after the scanned ones.',
+    response: {
+      serialization: GetManyResponseDto(TargetRepositoryDto),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('target.read')
+  @Get(':id/repositories')
+  getTargetRepositories(
+    @Param() { id }: IdQueryParamDto,
+    @Query() query: GetTargetRepositoriesQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.getTargetRepositories(id, workspaceId, query);
   }
 
   @Doc({

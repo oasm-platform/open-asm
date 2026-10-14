@@ -29,8 +29,8 @@ import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
-import { EVENT_CATALOG } from '../connectors/event';
-import { PublishEvent } from '../event-bridge/publish-event.decorator';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { VulnerabilitiesService } from './vulnerabilities.service';
 
 @Controller('vulnerabilities')

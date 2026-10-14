@@ -14,6 +14,7 @@ describe('AssetsController workspace permission guards', () => {
     ['getTechnologyAssets', 'GET /tech', ['asset.read']],
     ['getStatusCodeAssets', 'GET /status-code', ['asset.read']],
     ['getTlsAssets', 'GET /tls', ['asset.read']],
+    ['getTagAssets', 'GET /tags', ['asset.read']],
     ['generateServiceTags', 'POST /service/tag/generate', ['asset.write']],
     ['getAssetById', 'GET /:id', ['asset.read']],
     ['updateAssetById', 'PATCH /:id', ['asset.write']],

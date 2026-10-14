@@ -1,5 +1,6 @@
 import { forwardRef, Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Tool } from '../tools/entities/tools.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { Workflow } from './entities/workflow.entity';
@@ -10,7 +11,7 @@ import { WorkflowTemplateService } from './workflow-template.service';
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Workflow, Workspace]),
+    TypeOrmModule.forFeature([Workflow, Workspace, Tool]),
     forwardRef(() => WorkspacesModule),
   ],
   controllers: [WorkflowsController],

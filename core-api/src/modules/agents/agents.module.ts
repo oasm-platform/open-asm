@@ -1,4 +1,5 @@
 import { AssetsModule } from '@/modules/assets/assets.module';
+import { ConnectorsModule } from '@/modules/connectors/connectors.module';
 import { StatisticModule } from '@/modules/statistic/statistic.module';
 import { TargetsModule } from '@/modules/targets/targets.module';
 import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
@@ -46,6 +47,7 @@ import { HttpModule } from '@nestjs/axios';
     RemoteExecuteModule,
     HttpModule,
     WorkersModule,
+    ConnectorsModule,
   ],
   controllers: [AgentsController],
   providers: [

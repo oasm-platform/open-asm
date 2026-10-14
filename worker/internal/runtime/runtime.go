@@ -27,6 +27,10 @@ type JobSpec struct {
 	// (oasm-<tool-slug>-<registry-slug>-<rand4>). Empty for direct runtime
 	// users, which fall back to the image.
 	PoolKey string
+	// Lane is "agent" for jobs an AI agent pushed over the agent stream, empty
+	// for registry jobs. Agent jobs get their own warm-pool key so the two lanes
+	// never share containers or per-image replica counts.
+	Lane string
 	// ConnectorToken is the per-execution single-use connector auth token. It
 	// is injected as the container's WORKER_TOKEN env so the Register
 	// handshake authenticates against this execution only. Empty keeps the

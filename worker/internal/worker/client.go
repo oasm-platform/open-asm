@@ -150,6 +150,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
 	var wg sync.WaitGroup
+	toolRuns := newAgentToolRuns()
 
 	pollLoop := func(pollerCtx, sessionCtx context.Context) {
 		policy := newPollPolicy()
@@ -311,7 +312,20 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 				return nil, nil
 			}
 
-			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events)
+			runTool := func(sessionID string, run *workers.ToolRun, send toolResultSender) {
+				runCtx, done, ok := toolRuns.start(sessionCtx, sessionID)
+				if !ok {
+					_ = send(workers.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR, []byte("worker is shutting down"), 0)
+					return
+				}
+				// mgr/proxy are read at call time: they are set after the
+				// connector server starts, which may be after this setup runs.
+				go func() {
+					defer done()
+					runAgentTool(runCtx, sessionID, grpcClient.OwnerID(), run, events, mgr, proxy, send)
+				}()
+			}
+			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events, runTool, toolRuns.cancel)
 			return sessionCtx, sessionCancel
 		},
 		startPoller: func(sessionCtx context.Context) context.CancelFunc {
@@ -552,6 +566,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	log.Info("Poller stopped, waiting for jobs...")
 
 	wg.Wait()
+	toolRuns.stopAndWait()
 	log.Info("All jobs finished")
 
 	if lazyBrowser != nil {

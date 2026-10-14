@@ -456,7 +456,7 @@ describe('AssetsService', () => {
         .map((call) => String(call[0]))
         .find((c) => c.includes('ip_observations'));
       expect(clause).toContain(`io.source IN ('dns_a', 'dns_aaaa')`);
-      expect(clause).toContain('io."ip" = ANY(CAST(:ipAddresses AS inet[]))');
+      expect(clause).toContain('io."ip" = ANY(CAST(:lf0 AS inet[]))');
       expect(clause).not.toContain('host(');
     });
 
@@ -480,10 +480,10 @@ describe('AssetsService', () => {
       // The URL list is sourced from `discovered_urls` only; http_responses
       // entries are httpx probe targets, not discovered urls.
       expect(urlsClause).toContain('discovered_urls du');
-      expect(urlsClause).toContain('du.url = ANY(:urls)');
+      expect(urlsClause).toContain('du.url = ANY(:lf0)');
       expect(urlsClause).not.toContain('http_responses');
       expect(andWhere).toHaveBeenCalledWith(urlsClause, {
-        urls: ['https://a.com/probe'],
+        lf0: ['https://a.com/probe'],
       });
       // The join-based filter is gone: no discoveredUrls join may remain.
       expect(
@@ -942,6 +942,51 @@ describe('AssetsService', () => {
       });
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         'target.domain.re-scan',
+        mockTarget,
+      );
+    });
+
+    it('emits the re-scan trigger of the target type (IP runs IP discovery, not domain discovery)', async () => {
+      const mockTarget = {
+        id: targetId,
+        reScanCount: 2,
+        type: 'IP',
+        value: '203.0.113.10',
+      };
+
+      mockAssetRepository.findOne = jest
+        .fn()
+        .mockResolvedValue({ id: 'asset-uuid', isPrimary: true });
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
+      mockTargetRepository.update = jest.fn().mockResolvedValue({});
+      mockEventEmitter.emit = jest.fn();
+
+      await service.reScan(targetId);
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.ip.re-scan',
+        mockTarget,
+      );
+    });
+
+    it('re-syncs a Git organization instead of requiring a primary host asset', async () => {
+      const mockTarget = {
+        id: targetId,
+        reScanCount: 0,
+        type: 'GIT_ORG',
+        value: 'github.com/acme',
+      };
+      mockAssetRepository.findOne = jest.fn().mockResolvedValue(null);
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
+      mockTargetRepository.update = jest.fn().mockResolvedValue({});
+      mockEventEmitter.emit = jest.fn();
+
+      const result = await service.reScan(targetId);
+
+      expect(result).toEqual({ message: 'Repository sync started' });
+      expect(mockAssetRepository.findOne).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.git_org.re-scan',
         mockTarget,
       );
     });
@@ -1719,6 +1764,47 @@ describe('AssetsService', () => {
 
       expect(result.nodes).toEqual([]);
       expect(result.edges).toEqual([]);
+    });
+  });
+
+  describe('buildBaseQuery filter tree', () => {
+    it('ANDs legacy params and the filter tree after the workspace scope', () => {
+      const qb = mockAssetServiceRepository as unknown as {
+        where: jest.Mock;
+        andWhere: jest.Mock;
+      };
+      qb.where.mockClear();
+      qb.andWhere.mockClear();
+      (
+        service as unknown as {
+          buildBaseQuery: (q: unknown, ws: string) => unknown;
+        }
+      ).buildBaseQuery(
+        {
+          hosts: ['a.com'],
+          filter: {
+            logic: 'or',
+            items: [
+              { field: 'port', op: 'eq', value: '80' },
+              { field: 'tag', op: 'eq', value: 'prod' },
+            ],
+          },
+        },
+        'ws-1',
+      );
+      expect(qb.where).toHaveBeenCalledWith(
+        'targets.workspaceId = :workspaceId',
+        { workspaceId: 'ws-1' },
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith('((asset.value = ANY(:lf0)))', {
+        lf0: ['a.com'],
+      });
+      const [orSql, orParams] = qb.andWhere.mock.calls.at(-1) as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(orSql).toMatch(/^\(.* OR .*\)$/); // whole OR wrapped, so it cannot escape the workspace AND
+      expect(orParams).toEqual({ af0: ['80'], af1: ['prod'] });
     });
   });
 });
