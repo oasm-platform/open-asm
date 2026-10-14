@@ -1359,7 +1359,7 @@
       "shortDescription": "Finds vulnerable dependencies and IaC misconfigurations in Git repositories",
       "description": "Scans the repositories of a Git organization with Aqua Security Trivy. Reports known vulnerabilities (CVE, GHSA) in the dependencies declared by lockfiles and manifests — npm, pip, Go, Maven, Cargo, Composer, NuGet, RubyGems and more — with the installed and fixed versions, and misconfigurations in Dockerfiles, Kubernetes manifests, Helm charts and Terraform. Secret scanning can be turned on in the profile; secret values are never reported.",
       "capabilities": [
-        "sca"
+        "vulnerabilities"
       ],
       "targetTypes": [
         "git_org"
