@@ -69,7 +69,7 @@ func (s *sessionSandbox) close() error {
 	return os.RemoveAll(s.rootPath)
 }
 
-func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender)) {
+func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
 	log := NewTuiLogger(events, "RemoteExec")
 	remoteSem := make(chan struct{}, 16)
 
@@ -199,6 +199,11 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 					defer cancel()
 					return h.SendResultFor(sendCtx, sessionID, cmdID, t, data, exitCode)
 				})
+
+			case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL:
+				if cancelTool(resp.SessionId) {
+					log.Info("Agent tool run cancelled: %s", resp.SessionId)
+				}
 
 			default:
 				log.Warning("Unknown remote execute event type: %v", resp.Type)

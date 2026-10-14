@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -132,5 +133,120 @@ func TestAgentToolConnectorErrorIsReported(t *testing.T) {
 	got := sender.get()
 	if len(got) != 1 || got[0] != (sentEvent{pb.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR, "target unreachable"}) {
 		t.Fatalf("unexpected events %+v", got)
+	}
+}
+
+// Core cancelling a run kills it and reports a cancel, not a session end.
+func TestAgentToolCancelledByCore(t *testing.T) {
+	oldBackoff := swapImageBackoff(execution.NewImageBackoff())
+	t.Cleanup(func() { imageBackoff = oldBackoff })
+
+	runs := newAgentToolRuns()
+	ctx, done, ok := runs.start(context.Background(), "sess-4")
+	if !ok {
+		t.Fatal("start refused before shutdown")
+	}
+	proxy := connector.NewProxy()
+	execID := "exec-tool-4"
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+	sender := &captureSender{}
+
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		defer done()
+		drainAgentTool(ctx, "sess-4", execID, "img", time.Minute, time.Minute, nil, proxy, resultCh, sender.send, NewTuiLogger(make(chan TuiEvent, 64), "t"))
+	}()
+
+	if !runs.cancel("sess-4") {
+		t.Fatal("cancel did not find the run")
+	}
+	select {
+	case <-finished:
+	case <-time.After(2 * time.Second):
+		t.Fatal("drain did not stop on cancel")
+	}
+	got := sender.get()
+	if len(got) != 1 || got[0] != (sentEvent{pb.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR, "tool run cancelled"}) {
+		t.Fatalf("unexpected events %+v", got)
+	}
+	if runs.cancel("sess-4") {
+		t.Fatal("a finished run must be forgotten")
+	}
+}
+
+// A run budget no longer than the connect timeout ends on the deadline and
+// never backs the image off.
+func TestAgentToolShortBudgetDoesNotBackOffImage(t *testing.T) {
+	oldBackoff := swapImageBackoff(execution.NewImageBackoff())
+	t.Cleanup(func() { imageBackoff = oldBackoff })
+
+	proxy := connector.NewProxy()
+	execID := "exec-tool-5"
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+	sender := &captureSender{}
+
+	drainAgentTool(context.Background(), "sess-5", execID, "img-5", 50*time.Millisecond, 50*time.Millisecond, nil, proxy, resultCh, sender.send, NewTuiLogger(make(chan TuiEvent, 64), "t"))
+
+	got := sender.get()
+	if len(got) != 1 || !strings.Contains(got[0].data, "exceeded") {
+		t.Fatalf("expected a deadline error, got %+v", got)
+	}
+	if ok, _ := imageBackoff.Allow("img-5"); !ok {
+		t.Fatal("deadline must not back off the image")
+	}
+}
+
+// Once shutdown begins no run starts, and stopAndWait waits for live ones.
+func TestAgentToolRunsStopAndWait(t *testing.T) {
+	runs := newAgentToolRuns()
+	_, done, ok := runs.start(context.Background(), "sess-6")
+	if !ok {
+		t.Fatal("start refused before shutdown")
+	}
+	stopped := make(chan struct{})
+	go func() {
+		runs.stopAndWait()
+		close(stopped)
+	}()
+	// stopAndWait must block on the live run.
+	select {
+	case <-stopped:
+		t.Fatal("stopAndWait returned with a run in flight")
+	case <-time.After(50 * time.Millisecond):
+	}
+	if _, _, ok := runs.start(context.Background(), "sess-7"); ok {
+		t.Fatal("start accepted a run after shutdown began")
+	}
+	done()
+	select {
+	case <-stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stopAndWait did not return after the run ended")
+	}
+}
+
+func TestIsImageSubmitFailure(t *testing.T) {
+	live := context.Background()
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	cases := []struct {
+		name string
+		ctx  context.Context
+		err  error
+		want bool
+	}{
+		{"image pull", live, errors.New("pull access denied"), true},
+		{"max concurrency", live, execution.ErrMaxConcurrency, false},
+		{"node budget", live, execution.ErrNodeBudgetExhausted, false},
+		{"ctx cancelled", live, context.Canceled, false},
+		{"session ended", cancelled, errors.New("docker: context canceled"), false},
+	}
+	for _, c := range cases {
+		if got := isImageSubmitFailure(c.ctx, c.err); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
 	}
 }

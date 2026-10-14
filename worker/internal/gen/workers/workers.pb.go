@@ -80,6 +80,9 @@ const (
 	// An AI agent runs one connector tool against one target. Not a job: the
 	// worker streams the raw output back over RemoteExecuteResult.
 	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL RemoteExecuteSubscribeEventType = 3
+	// Core stopped waiting on a RUN_TOOL (user cancel or timeout): the worker
+	// kills the run of that session_id.
+	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL RemoteExecuteSubscribeEventType = 4
 )
 
 // Enum value maps for RemoteExecuteSubscribeEventType.
@@ -89,12 +92,14 @@ var (
 		1: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED",
 		2: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND",
 		3: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL",
+		4: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL",
 	}
 	RemoteExecuteSubscribeEventType_value = map[string]int32{
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN":   0,
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED": 1,
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND":   2,
-		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL":  3,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN":     0,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED":   1,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND":     2,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL":    3,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL": 4,
 	}
 )
 
@@ -2875,12 +2880,13 @@ const file_workers_proto_rawDesc = "" +
 	"\rWorkerRunMode\x12\x1b\n" +
 	"\x17WORKER_RUN_MODE_UNKNOWN\x10\x00\x12\x17\n" +
 	"\x13WORKER_RUN_MODE_CLI\x10\x01\x12\x18\n" +
-	"\x14WORKER_RUN_MODE_NODE\x10\x02*\xd4\x01\n" +
+	"\x14WORKER_RUN_MODE_NODE\x10\x02*\x84\x02\n" +
 	"\x1fRemoteExecuteSubscribeEventType\x12*\n" +
 	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN\x10\x00\x12,\n" +
 	"(REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED\x10\x01\x12*\n" +
 	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND\x10\x02\x12+\n" +
-	"'REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL\x10\x03*\xc6\x01\n" +
+	"'REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL\x10\x03\x12.\n" +
+	"*REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL\x10\x04*\xc6\x01\n" +
 	"\x1cRemoteExecuteResultEventType\x12!\n" +
 	"\x1dREMOTE_EXECUTE_RESULT_UNKNOWN\x10\x00\x12 \n" +
 	"\x1cREMOTE_EXECUTE_RESULT_STDOUT\x10\x01\x12 \n" +

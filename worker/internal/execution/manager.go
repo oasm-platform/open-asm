@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -198,6 +199,10 @@ func generateExecToken() string {
 	return hex.EncodeToString(b)
 }
 
+// ErrMaxConcurrency is Submit's refusal when maxConcurrency executions are
+// already tracked: a worker capacity limit, not an image defect.
+var ErrMaxConcurrency = errors.New("max concurrency reached")
+
 // Submit enforces maxConcurrency, calls rt.Create+Start, and tracks the execution.
 // Image is required and passed through to the runtime (resolved by Core ConnectorRegistry 1.5).
 // If spec.Limits[JobTimeoutSecondsKey] is set (>0), a timer auto-cancels the execution.
@@ -211,7 +216,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	// concurrent Submit overshoot the cap during a slow image pull.
 	if m.maxConcurrency > 0 && len(m.execs)+m.pending >= m.maxConcurrency {
 		m.mu.Unlock()
-		return "", fmt.Errorf("max concurrency reached")
+		return "", ErrMaxConcurrency
 	}
 	// Timeout contract: the connect deadline must stay below the manifest job
 	// timeout, otherwise the connect timer cancels the execution before the

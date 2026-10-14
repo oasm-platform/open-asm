@@ -258,7 +258,10 @@ describe('AgentTool run_tool', () => {
           .mockResolvedValue({ id: 't1', isInstalled: true }),
       },
       remoteExecuteSubscribe: {
-        resolveConversationWorker: jest.fn().mockResolvedValue('wk-1'),
+        pickConversationWorker: jest
+          .fn()
+          .mockResolvedValue({ workerId: 'wk-1', pin: false }),
+        pinConversationWorker: jest.fn().mockResolvedValue(undefined),
       },
       toolConfigProfiles: {
         resolveConfigForJob: jest.fn().mockResolvedValue({ rate: 10 }),
@@ -311,12 +314,16 @@ describe('AgentTool run_tool', () => {
         configJson: '{"rate":10}',
         cpu: '500m',
         memory: '512Mi',
-        timeoutSeconds: 600,
+        // The manifest's 600s is capped to the 5-minute agent budget.
+        timeoutSeconds: 300,
       },
       expect.any(String),
-      expect.any(Number),
-      undefined,
-      signal,
+      300_000 + 30_000,
+      {
+        abortSignal: signal,
+        maxOutputChars: 10 * 1024 * 1024,
+        onPushed: undefined,
+      },
     );
     expect(result).toEqual({
       tool: 'nmap',
@@ -350,6 +357,67 @@ describe('AgentTool run_tool', () => {
     ).resolves.toEqual({
       error: 'Tool nmap is not installed in this workspace.',
     });
+  });
+
+  it('pins a fallback worker once the run is pushed', async () => {
+    const agentTool = createAgentTool();
+    const subscribe = (agentTool as any).remoteExecuteSubscribe;
+    subscribe.pickConversationWorker.mockResolvedValue({
+      workerId: 'wk-2',
+      pin: true,
+    });
+    await runnable(agentTool).execute(
+      { tool: 'nmap', target: 'example.com' },
+      { toolCallId: 'call-1' },
+    );
+
+    const wait = (agentTool as any).remoteExecuteService
+      .waitForToolRun as jest.Mock;
+    const opts = wait.mock.calls[0][4] as { onPushed: () => Promise<void> };
+    expect(subscribe.pinConversationWorker).not.toHaveBeenCalled();
+    await opts.onPushed();
+    expect(subscribe.pinConversationWorker).toHaveBeenCalledWith('c1', 'wk-2');
+  });
+
+  it('refuses a tool whose required config is missing', async () => {
+    const agentTool = createAgentTool({
+      toolConfigProfiles: {
+        resolveConfigForJob: jest.fn().mockResolvedValue(undefined),
+      },
+    });
+    (agentTool as any).connectorRegistry.getConnector = jest.fn(() => ({
+      ...connector,
+      configSchema: { required: ['apiToken'] },
+    }));
+    const result = (await runnable(agentTool).execute(
+      { tool: 'nmap', target: 'example.com' },
+      { toolCallId: 'call-1' },
+    )) as { error: string };
+
+    expect(result.error).toContain('apiToken');
+    expect(
+      (agentTool as any).remoteExecuteService.waitForToolRun,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('counts lines without a phantom line after a trailing newline, and flags the 10MB cut', async () => {
+    const agentTool = createAgentTool();
+    (agentTool as any).remoteExecuteService.waitForToolRun = jest
+      .fn()
+      .mockResolvedValue({
+        stdout: 'a\nb\n',
+        exitCode: 0,
+        error: null,
+        timedOut: false,
+        stdoutTruncated: true,
+      });
+    const result = (await runnable(agentTool).execute(
+      { tool: 'nmap', target: 'example.com' },
+      { toolCallId: 'call-1' },
+    )) as { totalLines: number; note?: string };
+
+    expect(result.totalLines).toBe(2);
+    expect(result.note).toContain('10MB');
   });
 
   it('keeps a truncated output in Redis and pages it with read_tool_output', async () => {
@@ -411,6 +479,13 @@ describe('pageToolOutput', () => {
       output: '2: b\n3: c\n',
     });
     expect(pageToolOutput(raw, { offset: 3, limit: 10 }).nextOffset).toBeNull();
+  });
+
+  it('does not count a trailing newline as a line', () => {
+    expect(pageToolOutput(`${raw}\n`, { offset: 0, limit: 10 })).toMatchObject({
+      totalLines: 5,
+      nextOffset: null,
+    });
   });
 
   it('cuts an oversized line but still advances', () => {

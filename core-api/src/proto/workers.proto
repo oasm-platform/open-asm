@@ -92,6 +92,9 @@ enum RemoteExecuteSubscribeEventType {
   // An AI agent runs one connector tool against one target. Not a job: the
   // worker streams the raw output back over RemoteExecuteResult.
   REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL      = 3;
+  // Core stopped waiting on a RUN_TOOL (user cancel or timeout): the worker
+  // kills the run of that session_id.
+  REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL   = 4;
 }
 
 message ToolRun {

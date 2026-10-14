@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"oasm-worker/internal/connector"
@@ -16,15 +17,90 @@ import (
 // toolResultSender streams one raw result event of an agent tool run to core.
 type toolResultSender func(eventType pb.RemoteExecuteResultEventType, data []byte, exitCode int32) error
 
-// agentToolMaxRun bounds a run whose manifest sets no timeout, so a wedged
+// agentToolMaxRun bounds a run that carries no timeout, so a wedged
 // connector cannot hold a container forever.
 const agentToolMaxRun = 15 * time.Minute
+
+// errToolCancelled is the cancel cause when core stops waiting on a run.
+var errToolCancelled = errors.New("cancelled by core")
+
+// agentToolRuns tracks in-flight agent tool runs so core can cancel one by
+// session id, and so shutdown can wait for them without racing a late
+// RUN_TOOL: once stopping is set no run starts, and Add only happens under mu.
+type agentToolRuns struct {
+	mu       sync.Mutex
+	wg       sync.WaitGroup
+	stopping bool
+	cancels  map[string]*agentToolRun
+}
+
+type agentToolRun struct{ cancel context.CancelCauseFunc }
+
+func newAgentToolRuns() *agentToolRuns {
+	return &agentToolRuns{cancels: map[string]*agentToolRun{}}
+}
+
+// start registers a run under sessionID and returns its context and the done
+// func the run must call when it ends. ok is false once shutdown has begun.
+func (r *agentToolRuns) start(parent context.Context, sessionID string) (ctx context.Context, done func(), ok bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stopping || parent.Err() != nil {
+		return nil, nil, false
+	}
+	ctx, cancel := context.WithCancelCause(parent)
+	run := &agentToolRun{cancel: cancel}
+	r.cancels[sessionID] = run
+	r.wg.Add(1)
+	return ctx, func() {
+		r.mu.Lock()
+		if r.cancels[sessionID] == run {
+			delete(r.cancels, sessionID)
+		}
+		r.mu.Unlock()
+		cancel(nil)
+		r.wg.Done()
+	}, true
+}
+
+// cancel stops the run of sessionID, if one is in flight.
+func (r *agentToolRuns) cancel(sessionID string) bool {
+	r.mu.Lock()
+	run := r.cancels[sessionID]
+	r.mu.Unlock()
+	if run == nil {
+		return false
+	}
+	run.cancel(errToolCancelled)
+	return true
+}
+
+// stopAndWait refuses new runs, then waits for the in-flight ones.
+func (r *agentToolRuns) stopAndWait() {
+	r.mu.Lock()
+	r.stopping = true
+	r.mu.Unlock()
+	r.wg.Wait()
+}
+
+// isImageSubmitFailure reports whether a Submit error says something about
+// the image. Capacity refusals and a cancelled run say nothing about it and
+// must not back off an image that registry jobs share.
+func isImageSubmitFailure(ctx context.Context, err error) bool {
+	return ctx.Err() == nil &&
+		!errors.Is(err, context.Canceled) &&
+		!errors.Is(err, context.DeadlineExceeded) &&
+		!errors.Is(err, execution.ErrPoolExhausted) &&
+		!errors.Is(err, execution.ErrMaxConcurrency)
+}
 
 // runAgentTool runs one connector tool against one target for an AI agent.
 // It is not a job: nothing goes to the job registry. Every result chunk is
 // streamed back raw as STDOUT, then EXIT 0 on Done or ERROR on failure.
 // It runs on the agent lane — no MaxConcurrency slot, refused at once when
 // the node has no free CPU/RAM, since the agent is waiting on the call.
+// run.TimeoutSeconds is the whole wall-clock budget, connect included: core
+// sizes it to how long it waits, so the container never outlives the call.
 func runAgentTool(ctx context.Context, sessionID, ownerID string, run *pb.ToolRun, events chan<- TuiEvent, mgr *execution.Manager, proxy *connector.Proxy, send toolResultSender) {
 	log := NewTuiLogger(events, "AgentTool")
 	fail := func(msg string) {
@@ -53,11 +129,12 @@ func runAgentTool(ctx context.Context, sessionID, ownerID string, run *pb.ToolRu
 		WorkerID: ownerID,
 		Lane:     execution.AgentLane,
 	}
+	// No JobTimeoutSecondsKey: the manager requires it above the connect
+	// timeout, while the agent budget is shorter. drainAgentTool enforces it.
 	if run.GetCpu() != "" || run.GetMemory() != "" {
 		spec.Limits = map[string]any{
-			execution.JobCPUKey:            run.GetCpu(),
-			execution.JobMemoryKey:         run.GetMemory(),
-			execution.JobTimeoutSecondsKey: int(run.GetTimeoutSeconds()),
+			execution.JobCPUKey:    run.GetCpu(),
+			execution.JobMemoryKey: run.GetMemory(),
 		}
 	}
 
@@ -67,7 +144,9 @@ func runAgentTool(ctx context.Context, sessionID, ownerID string, run *pb.ToolRu
 		return
 	}
 	if err != nil {
-		imageBackoff.RecordFailure(spec.Image, err.Error())
+		if isImageSubmitFailure(ctx, err) {
+			imageBackoff.RecordFailure(spec.Image, err.Error())
+		}
 		fail(fmt.Sprintf("submit failed: %v", err))
 		return
 	}
@@ -95,7 +174,7 @@ func runAgentTool(ctx context.Context, sessionID, ownerID string, run *pb.ToolRu
 
 	maxRun := agentToolMaxRun
 	if secs := run.GetTimeoutSeconds(); secs > 0 {
-		maxRun = time.Duration(secs)*time.Second + execution.ConnectorConnectTimeout
+		maxRun = time.Duration(secs) * time.Second
 	}
 	drainAgentTool(ctx, sessionID, execID, spec.Image, maxRun, execution.ConnectorConnectTimeout, mgr, proxy, resultCh, send, log)
 }
@@ -113,6 +192,11 @@ func drainAgentTool(ctx context.Context, sessionID, execID, image string, maxRun
 	connect := time.NewTimer(connectTimeout)
 	defer connect.Stop()
 	connectC := (<-chan time.Time)(connect.C)
+	if connectTimeout >= maxRun {
+		// The run deadline fires first: a budget too short to connect in is
+		// not an image defect, so no connect timer (and no backoff).
+		connectC = nil
+	}
 	regCh := proxy.WaitRegistered(execID)
 
 	for {
@@ -144,7 +228,12 @@ func drainAgentTool(ctx context.Context, sessionID, execID, image string, maxRun
 			releaseAgentExec(mgr, proxy, execID, true)
 			return
 		case <-ctx.Done():
-			fail("worker session ended")
+			if errors.Is(context.Cause(ctx), errToolCancelled) {
+				log.Info("[%s] tool run cancelled by core", sessionID)
+				_ = send(pb.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR, []byte("tool run cancelled"), 0)
+			} else {
+				fail("worker session ended")
+			}
 			releaseAgentExec(mgr, proxy, execID, true)
 			return
 		}

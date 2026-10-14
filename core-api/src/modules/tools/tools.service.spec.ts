@@ -373,6 +373,32 @@ describe('ToolsService — readiness flags', () => {
       expect((result as any).isReady).toBe(true);
     });
 
+    it('treats a disabled workspace tool as not installed and not ready', async () => {
+      toolsRepo.findOne.mockResolvedValue(
+        makeTool({ id: 't1', name: 'nuclei', type: WorkerType.CONNECTOR }),
+      );
+      workspaceToolRepo.findOne.mockResolvedValue({ id: 'wt1', isEnabled: false });
+      profilesRepo.findOne.mockResolvedValue({ id: 'prof-1' });
+      connectorRegistry.getConnectorSchema.mockReturnValue({ type: 'object' });
+
+      const result = await service.getToolById('t1', 'ws-001');
+
+      expect(result.isInstalled).toBe(false);
+      expect(result.isReady).toBe(false);
+    });
+
+    it('treats an enabled workspace tool as installed', async () => {
+      toolsRepo.findOne.mockResolvedValue(
+        makeTool({ id: 't1', name: 'nuclei', type: WorkerType.CONNECTOR }),
+      );
+      workspaceToolRepo.findOne.mockResolvedValue({ id: 'wt1', isEnabled: true });
+      connectorRegistry.getConnectorSchema.mockReturnValue(null);
+
+      const result = await service.getToolById('t1', 'ws-001');
+
+      expect(result.isInstalled).toBe(true);
+      expect(result.isReady).toBe(true);
+    });
   });
 
   describe('getToolSchema — schema endpoint semantics', () => {

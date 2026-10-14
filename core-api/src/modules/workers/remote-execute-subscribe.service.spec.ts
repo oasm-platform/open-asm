@@ -29,6 +29,7 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     get: jest.fn().mockResolvedValue(null),
     setex: jest.fn().mockResolvedValue('OK'),
     del: jest.fn().mockResolvedValue(1),
+    publish: jest.fn().mockResolvedValue(1),
   };
   let service: RemoteExecuteSubscribeService;
 
@@ -54,7 +55,7 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
 
     await expect(
-      service.resolveConversationWorker('c1', 'ws-1'),
+      service.pickConversationWorker('c1', 'ws-1'),
     ).resolves.toBeNull();
   });
 
@@ -63,23 +64,54 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
 
     await expect(
-      service.resolveConversationWorker('c1', 'ws-1'),
+      service.pickConversationWorker('c1', 'ws-1'),
     ).resolves.toBeNull();
     expect(workersService.enableAgentMode).not.toHaveBeenCalled();
   });
 
-  it('falls back to a connected worker of the same workspace and pins it', async () => {
+  it('falls back to a connected worker of the same workspace, pinned only after the push', async () => {
     connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
     conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
 
-    await expect(service.resolveConversationWorker('c1', 'ws-1')).resolves.toBe(
-      'w-own',
+    await expect(service.pickConversationWorker('c1', 'ws-1')).resolves.toEqual(
+      { workerId: 'w-own', pin: true },
     );
+    // Picking persists nothing: a failed push must not pin a dead worker.
+    expect(qb.execute).not.toHaveBeenCalled();
+    expect(redis.setex).not.toHaveBeenCalled();
+
+    await service.pinConversationWorker('c1', 'w-own');
+    expect(qb.set).toHaveBeenCalledWith({ workerId: 'w-own' });
     expect(redis.setex).toHaveBeenCalledWith(
       'agent:conv:worker:c1',
       expect.any(Number),
       'w-own',
     );
+  });
+
+  it('pushCommandWithConversation does not pin when the push fails', async () => {
+    connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
+    conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
+    jest.spyOn(service, 'pushCommand').mockReturnValue(null);
+
+    await expect(
+      service.pushCommandWithConversation('c1', 'ws-1', 's1', 'id'),
+    ).resolves.toBeNull();
+    expect(qb.execute).not.toHaveBeenCalled();
+  });
+
+  it('keeps an in-scope offline pin and serves this push from a fallback', async () => {
+    connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
+    conversationRepo.findOne.mockResolvedValue({
+      id: 'c1',
+      workerId: 'w-chosen',
+    });
+    workersService.isAgentWorkerForWorkspace.mockResolvedValue(true);
+
+    await expect(service.pickConversationWorker('c1', 'ws-1')).resolves.toEqual(
+      { workerId: 'w-own', pin: false },
+    );
+    expect(qb.execute).not.toHaveBeenCalled();
   });
 
   it('clears a pre-existing cloud pin and uses a workspace worker', async () => {
@@ -90,13 +122,12 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
       id: 'c1',
       workerId: 'w-cloud',
     });
+    workersService.isAgentWorkerForWorkspace.mockResolvedValue(false);
 
-    await expect(service.resolveConversationWorker('c1', 'ws-1')).resolves.toBe(
-      'w-own',
+    await expect(service.pickConversationWorker('c1', 'ws-1')).resolves.toEqual(
+      { workerId: 'w-own', pin: true },
     );
     expect(redis.del).toHaveBeenCalledWith('agent:conv:worker:c1');
-    expect(qb.execute).toHaveBeenCalled(); // DB pin rewritten
-    expect(qb.set).toHaveBeenCalledWith({ workerId: 'w-own' });
   });
 
   it('keeps an in-scope pin whose worker is offline, with no fallback', async () => {
@@ -107,7 +138,7 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     workersService.isAgentWorkerForWorkspace.mockResolvedValue(true);
 
     await expect(
-      service.resolveConversationWorker('c1', 'ws-1'),
+      service.pickConversationWorker('c1', 'ws-1'),
     ).resolves.toBeNull();
     expect(workersService.isAgentWorkerForWorkspace).toHaveBeenCalledWith(
       'w-offline',
@@ -125,7 +156,7 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     workersService.isAgentWorkerForWorkspace.mockResolvedValue(false);
 
     await expect(
-      service.resolveConversationWorker('c1', 'ws-1'),
+      service.pickConversationWorker('c1', 'ws-1'),
     ).resolves.toBeNull();
     expect(qb.set).toHaveBeenCalledWith({ workerId: null });
     expect(qb.execute).toHaveBeenCalled();
@@ -147,5 +178,38 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     });
     expect(seen.at(-1)).toMatchObject({ type: 3, toolRun });
     expect(service.pushToolRun('w-gone', 'call-1', toolRun)).toBeNull();
+  });
+
+  it('pushCancelToolRun emits a CANCEL_TOOL event for the session', () => {
+    const seen = connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
+    service.pushCancelToolRun('w-own', 'call-1');
+    expect(seen.at(-1)).toMatchObject({ type: 4, sessionId: 'call-1' });
+  });
+
+  it('fails an in-flight tool run at once when its worker disconnects', () => {
+    const reg = service.registerWorker(
+      worker('w-own', 'ws-1', WorkerScope.WORKSPACE),
+    );
+    const sub = reg.observable.subscribe();
+    service.pushToolRun('w-own', 'call-1', {
+      tool: 'nmap',
+      image: 'img',
+      target: 'example.com',
+      configJson: '',
+    });
+    service.pushToolRun('w-own', 'call-done', {
+      tool: 'nmap',
+      image: 'img',
+      target: 'example.com',
+      configJson: '',
+    });
+    service.removeSession('call-done');
+
+    sub.unsubscribe();
+
+    expect(redis.publish).toHaveBeenCalledTimes(1);
+    const [channel, raw] = redis.publish.mock.calls[0] as [string, string];
+    expect(channel).toBe('remote-execute:results:call-1');
+    expect(JSON.parse(raw)).toMatchObject({ sessionId: 'call-1', type: 4 });
   });
 });

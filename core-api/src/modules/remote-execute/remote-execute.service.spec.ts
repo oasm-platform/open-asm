@@ -17,6 +17,7 @@ describe('RemoteExecuteService', () => {
     pushCommandWithSession: jest.Mock;
     pushCommandWithConversation: jest.Mock;
     pushToolRun: jest.Mock;
+    pushCancelToolRun: jest.Mock;
     removeSession: jest.Mock;
   };
 
@@ -30,6 +31,7 @@ describe('RemoteExecuteService', () => {
       pushCommandWithSession: jest.fn(),
       pushCommandWithConversation: jest.fn(),
       pushToolRun: jest.fn(),
+      pushCancelToolRun: jest.fn(),
       removeSession: jest.fn(),
     };
 
@@ -1022,15 +1024,16 @@ describe('RemoteExecuteService', () => {
       });
     });
 
-    it('stops waiting when the call is aborted', async () => {
+    it('stops waiting when the call is aborted and cancels the worker run', async () => {
       const controller = new AbortController();
       const promise = service.waitForToolRun(
         'wk-1',
         toolRun,
         sessionId,
         60_000,
-        undefined,
-        controller.signal,
+        {
+          abortSignal: controller.signal,
+        },
       );
       await new Promise((r) => setTimeout(r, 10));
       controller.abort();
@@ -1039,6 +1042,90 @@ describe('RemoteExecuteService', () => {
       expect(result.error).toBe('Cancelled by user');
       expect(result.timedOut).toBe(false);
       expect(mockRedisService.unsubscribe).toHaveBeenCalledWith(channel);
+      expect(
+        mockRemoteExecuteSubscribeService.pushCancelToolRun,
+      ).toHaveBeenCalledWith('wk-1', sessionId);
+    });
+
+    it('never pushes a run that was aborted before it started', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await service.waitForToolRun(
+        'wk-1',
+        toolRun,
+        sessionId,
+        60_000,
+        { abortSignal: controller.signal },
+      );
+      expect(result.error).toBe('Cancelled by user');
+      expect(
+        mockRemoteExecuteSubscribeService.pushToolRun,
+      ).not.toHaveBeenCalled();
+      expect(mockRedisService.unsubscribe).toHaveBeenCalledWith(channel);
+    });
+
+    it('cancels the worker run when core times out', async () => {
+      const result = await service.waitForToolRun(
+        'wk-1',
+        toolRun,
+        sessionId,
+        20,
+      );
+      expect(result.timedOut).toBe(true);
+      expect(
+        mockRemoteExecuteSubscribeService.pushCancelToolRun,
+      ).toHaveBeenCalledWith('wk-1', sessionId);
+    });
+
+    it('does not cancel a run that finished', async () => {
+      const promise = service.waitForToolRun('wk-1', toolRun, sessionId, 5000);
+      await new Promise((r) => setTimeout(r, 10));
+      cb(channel, JSON.stringify({ type: 3, data: '', exitCode: 0 }));
+      await promise;
+      expect(
+        mockRemoteExecuteSubscribeService.pushCancelToolRun,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('keeps at most maxOutputChars of stdout', async () => {
+      const promise = service.waitForToolRun('wk-1', toolRun, sessionId, 5000, {
+        maxOutputChars: 10,
+      });
+      await new Promise((r) => setTimeout(r, 10));
+      cb(channel, JSON.stringify({ type: 1, data: '1234567' }));
+      cb(channel, JSON.stringify({ type: 1, data: '89abcdef' }));
+      cb(channel, JSON.stringify({ type: 1, data: 'ghij' }));
+      cb(channel, JSON.stringify({ type: 3, data: '', exitCode: 0 }));
+
+      const result = await promise;
+      expect(result.stdout).toBe('123456789a');
+      expect(result.stdoutTruncated).toBe(true);
+    });
+
+    it('runs onPushed after the push, and still sees a fast EXIT', async () => {
+      const order: string[] = [];
+      mockRemoteExecuteSubscribeService.pushToolRun.mockImplementation(() => {
+        order.push('push');
+        return { id: 'cmd-9', workerId: 'wk-1' };
+      });
+      const result = await service.waitForToolRun(
+        'wk-1',
+        toolRun,
+        sessionId,
+        5000,
+        {
+          onPushed: async () => {
+            order.push('pin');
+            // The run finishes while the pin is being written.
+            cb(channel, JSON.stringify({ type: 3, data: '', exitCode: 0 }));
+            await new Promise((r) => setTimeout(r, 5));
+          },
+        },
+      );
+      expect(order).toEqual(['push', 'pin']);
+      expect(result.exitCode).toBe(0);
+      expect(result.timedOut).toBe(false);
     });
 
     it('throws when the worker stream is gone', async () => {

@@ -37,6 +37,13 @@ export interface ToolRunPayload {
   timeoutSeconds?: number;
 }
 
+/** The worker picked for a conversation's next push. */
+export interface ConversationWorkerPick {
+  workerId: string;
+  /** Persist it as the conversation's pin once the push succeeded. */
+  pin: boolean;
+}
+
 export interface WorkerRegistration {
   subject: ReplaySubject<RemoteExecuteCommand>;
   observable: ReturnType<ReplaySubject<RemoteExecuteCommand>['asObservable']>;
@@ -52,6 +59,9 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   >();
 
   private readonly sessionWorkerMap = new Map<string, string>();
+
+  /** In-flight tool runs (session id → worker), failed fast on disconnect. */
+  private readonly toolRunWorkerMap = new Map<string, string>();
 
   /** Who each connected worker may serve. Cloud workers never serve agents. */
   private readonly workerScope = new Map<
@@ -242,7 +252,21 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       toolRun,
     };
     subject.next(payload);
+    this.toolRunWorkerMap.set(sessionId, workerId);
     return payload;
+  }
+
+  /** Tells the worker to kill the tool run of this session. */
+  pushCancelToolRun(workerId: string, sessionId: string): void {
+    const subject = this.workers.get(workerId);
+    if (!subject || subject.closed) return;
+    subject.next({
+      id: nanoid(),
+      workerId,
+      type: 4, // REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL
+      sessionId,
+      command: '',
+    });
   }
 
   pushCommandWithSession(
@@ -263,26 +287,32 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     if (!conversationId) {
       return this.pushCommandWithSession(sessionId, command, workspaceId);
     }
-    const workerId = await this.resolveConversationWorker(
-      conversationId,
-      workspaceId,
-    );
-    return workerId ? this.pushCommand(workerId, sessionId, command) : null;
+    const pick = await this.pickConversationWorker(conversationId, workspaceId);
+    if (!pick) return null;
+    const pushed = this.pushCommand(pick.workerId, sessionId, command);
+    if (pushed && pick.pin) {
+      await this.pinConversationWorker(conversationId, pick.workerId);
+    }
+    return pushed;
   }
 
   /**
-   * The worker serving a conversation: Redis pin → Postgres pin → any
-   * connected worker of the workspace. A pin that no longer qualifies (other
-   * workspace, cloud, disconnected) is cleared. A new fallback is pinned.
+   * The worker to serve a conversation's next push: Redis pin → Postgres pin
+   * → any connected worker of the workspace. Nothing new is persisted here:
+   * when `pin` is set the caller pins the fallback with pinConversationWorker
+   * once its push succeeded, so a failed push never pins a dead worker.
+   * A pin that fails the scope rule (other workspace, cloud) is cleared; an
+   * in-scope pin whose worker is merely offline is kept — a fallback serves
+   * this push only.
    */
-  async resolveConversationWorker(
+  async pickConversationWorker(
     conversationId: string,
     workspaceId: string,
-  ): Promise<string | null> {
+  ): Promise<ConversationWorkerPick | null> {
     const cachedWorkerId =
       await this.getCachedConversationWorker(conversationId);
     if (cachedWorkerId && this.canServe(cachedWorkerId, workspaceId)) {
-      return cachedWorkerId;
+      return { workerId: cachedWorkerId, pin: false };
     }
     if (cachedWorkerId) {
       await this.deleteCachedConversationWorker(conversationId);
@@ -292,46 +322,55 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       where: { id: conversationId },
       select: ['id', 'workerId'],
     });
-    if (
-      conversation?.workerId &&
-      this.canServe(conversation.workerId, workspaceId)
-    ) {
-      void this.cacheConversationWorker(conversationId, conversation.workerId);
-      return conversation.workerId;
+    const pinned = conversation?.workerId;
+    if (pinned && this.canServe(pinned, workspaceId)) {
+      void this.cacheConversationWorker(conversationId, pinned);
+      return { workerId: pinned, pin: false };
     }
 
+    const pinInScope =
+      !!pinned &&
+      (await this.workersService.isAgentWorkerForWorkspace(
+        pinned,
+        workspaceId,
+      ));
     const workerId = this.getNextAvailableWorker(workspaceId);
-    // Rewrite the pin for a new fallback. With none, clear it only when it fails
-    // the scope rule — an in-scope worker that is merely offline stays pinned.
-    const stalePin = conversation?.workerId;
-    const shouldWrite =
-      !!conversation &&
-      stalePin !== workerId &&
-      (!!workerId ||
-        (!!stalePin &&
-          !(await this.workersService.isAgentWorkerForWorkspace(
-            stalePin,
-            workspaceId,
-          ))));
-    if (shouldWrite) {
-      await this.conversationRepo
-        .createQueryBuilder()
-        .update(AgentConversation)
-        .set({ workerId: (workerId ?? null) as string })
-        .where('id = :id', { id: conversationId })
-        .execute();
+    if (!workerId) {
+      if (pinned && !pinInScope) {
+        await this.writeConversationPin(conversationId, null);
+      }
+      return null;
     }
-    if (workerId) {
-      void this.cacheConversationWorker(conversationId, workerId);
-      this.logger.log(
-        `[StickyWorker] Assigned worker ${workerId} to conversation ${conversationId}`,
-      );
-    }
-    return workerId;
+    return { workerId, pin: !!conversation && !pinInScope };
+  }
+
+  /** Persists workerId as the conversation's pin (Postgres + Redis). */
+  async pinConversationWorker(
+    conversationId: string,
+    workerId: string,
+  ): Promise<void> {
+    await this.writeConversationPin(conversationId, workerId);
+    void this.cacheConversationWorker(conversationId, workerId);
+    this.logger.log(
+      `[StickyWorker] Assigned worker ${workerId} to conversation ${conversationId}`,
+    );
+  }
+
+  private async writeConversationPin(
+    conversationId: string,
+    workerId: string | null,
+  ): Promise<void> {
+    await this.conversationRepo
+      .createQueryBuilder()
+      .update(AgentConversation)
+      .set({ workerId: workerId as string })
+      .where('id = :id', { id: conversationId })
+      .execute();
   }
 
   removeSession(sessionId: string): void {
     this.sessionWorkerMap.delete(sessionId);
+    this.toolRunWorkerMap.delete(sessionId);
   }
 
   getSessionWorkerId(sessionId: string): string | undefined {
@@ -353,6 +392,29 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
         `Session ${sessionId} lost its worker ${workerId} due to disconnection`,
       );
     }
+
+    // A tool run's waiter would otherwise block until its timeout: end it now
+    // with the same ERROR event the worker would have sent.
+    for (const [sessionId, wId] of this.toolRunWorkerMap) {
+      if (wId !== workerId) continue;
+      this.toolRunWorkerMap.delete(sessionId);
+      void this.redisService
+        .publish(
+          `remote-execute:results:${sessionId}`,
+          JSON.stringify({
+            id: '',
+            sessionId,
+            type: 4, // REMOTE_EXECUTE_RESULT_ERROR
+            data: 'worker disconnected during the tool run',
+            exitCode: 0,
+          }),
+        )
+        .catch((err: unknown) => {
+          this.logger.warn(
+            `Failed to fail tool run ${sessionId} on disconnect: ${String(err)}`,
+          );
+        });
+    }
   }
 
   onModuleDestroy() {
@@ -362,5 +424,6 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     this.workers.clear();
     this.workerScope.clear();
     this.sessionWorkerMap.clear();
+    this.toolRunWorkerMap.clear();
   }
 }

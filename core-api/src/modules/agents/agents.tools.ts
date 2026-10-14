@@ -151,7 +151,10 @@ function isPrivateIp(ip: string): boolean {
   return false;
 }
 
+/** The worker's whole budget for one run_tool, connect included. */
 export const AGENT_TOOL_RUN_TIMEOUT_MS = 5 * 60_000;
+/** Core waits this much past the budget for the worker's final event. */
+const AGENT_TOOL_RESULT_GRACE_MS = 30_000;
 /** What one run_tool / read_tool_output answer puts into the LLM context. */
 const AGENT_TOOL_OUTPUT_PAGE = 8 * 1024;
 /** Full output kept for read_tool_output: Redis only, never the database. */
@@ -160,6 +163,30 @@ const AGENT_TOOL_OUTPUT_TTL_SECONDS = 3600;
 
 const toolOutputKey = (conversationId: string, runId: string) =>
   `agent:tool-output:${conversationId}:${runId}`;
+
+/** Output lines; a trailing newline ends the last line, it opens no new one. */
+function outputLines(raw: string): string[] {
+  if (raw === '') return [];
+  const lines = raw.split('\n');
+  if (lines[lines.length - 1] === '') lines.pop();
+  return lines;
+}
+
+/** Required config fields of a connector that `config` leaves empty. */
+function missingRequiredConfig(
+  schema: Record<string, unknown> | undefined,
+  config: Record<string, unknown> | undefined,
+): string[] {
+  const required = Array.isArray(schema?.required)
+    ? (schema.required as unknown[]).filter(
+        (key): key is string => typeof key === 'string',
+      )
+    : [];
+  return required.filter((key) => {
+    const value = config?.[key];
+    return value === undefined || value === null || value === '';
+  });
+}
 
 /**
  * One page of a stored tool output: lines from `offset` (into the matching
@@ -175,7 +202,7 @@ export function pageToolOutput(
     pattern,
   }: { offset: number; limit: number; pattern?: string },
 ) {
-  const lines = raw.split('\n');
+  const lines = outputLines(raw);
   const needle = pattern?.toLowerCase();
   const picked: number[] = [];
   lines.forEach((line, i) => {
@@ -1460,7 +1487,8 @@ export class AgentTool {
         const { tool: slug, target, configProfileId } = params;
         const entry = this.connectorRegistry.getConnector(slug);
         // Tool.name IS the connector slug; getToolById sets isInstalled from
-        // workspace_tools, so a connector of another workspace cannot run.
+        // an enabled workspace_tools row, so a connector of another workspace
+        // (or one disabled here) cannot run.
         const [toolRow] = await this.toolsService.getToolByNames({
           names: [slug],
         });
@@ -1471,12 +1499,11 @@ export class AgentTool {
           return { error: `Tool ${slug} is not installed in this workspace.` };
         }
 
-        const workerId =
-          await this.remoteExecuteSubscribe.resolveConversationWorker(
-            conversationId,
-            workspaceId,
-          );
-        if (!workerId) {
+        const pick = await this.remoteExecuteSubscribe.pickConversationWorker(
+          conversationId,
+          workspaceId,
+        );
+        if (!pick) {
           return {
             error:
               'No worker available for this workspace. Select a workspace worker for this conversation.',
@@ -1495,13 +1522,28 @@ export class AgentTool {
             error: error instanceof Error ? error.message : String(error),
           };
         }
+        const missing = missingRequiredConfig(entry.configSchema, config);
+        if (missing.length > 0) {
+          return {
+            error: `Tool ${slug} needs configuration (${missing.join(', ')}). Add a config profile for it in this workspace.`,
+          };
+        }
 
         const limits = this.connectorRegistry.getResourceDefaults(slug);
+        // The worker kills the run when core stops waiting, so the manifest
+        // timeout only ever shortens the budget.
+        const budgetSeconds = AGENT_TOOL_RUN_TIMEOUT_MS / 1000;
+        const timeoutSeconds = Math.min(
+          limits.timeoutSeconds || budgetSeconds,
+          budgetSeconds,
+        );
         const runId = randomUUID();
         let result: Awaited<ReturnType<RemoteExecuteService['waitForToolRun']>>;
         try {
+          // No live stream: the chat renders no terminal for run_tool, so
+          // per-chunk events only cost re-renders.
           result = await this.remoteExecuteService.waitForToolRun(
-            workerId,
+            pick.workerId,
             {
               tool: slug,
               image: entry.image,
@@ -1512,14 +1554,21 @@ export class AgentTool {
                   : '',
               cpu: limits.cpu,
               memory: limits.memory,
-              timeoutSeconds: limits.timeoutSeconds,
+              timeoutSeconds,
             },
             runId,
-            AGENT_TOOL_RUN_TIMEOUT_MS,
-            // No live stream: the chat renders no terminal for run_tool, so
-            // per-chunk events only cost re-renders.
-            undefined,
-            options.abortSignal,
+            timeoutSeconds * 1000 + AGENT_TOOL_RESULT_GRACE_MS,
+            {
+              abortSignal: options.abortSignal,
+              maxOutputChars: AGENT_TOOL_OUTPUT_STORE_MAX,
+              onPushed: pick.pin
+                ? () =>
+                    this.remoteExecuteSubscribe.pinConversationWorker(
+                      conversationId,
+                      pick.workerId,
+                    )
+                : undefined,
+            },
           );
         } catch (error) {
           // The worker stream closed between resolving and pushing.
@@ -1527,6 +1576,8 @@ export class AgentTool {
             error: error instanceof Error ? error.message : String(error),
           };
         }
+        // stdout is already capped at AGENT_TOOL_OUTPUT_STORE_MAX, so
+        // totalLines matches what read_tool_output pages over.
         const { stdout } = result;
         const truncated = stdout.length > AGENT_TOOL_OUTPUT_PAGE;
         let stored = false;
@@ -1535,7 +1586,7 @@ export class AgentTool {
             await this.redisService.setex(
               toolOutputKey(conversationId, runId),
               AGENT_TOOL_OUTPUT_TTL_SECONDS,
-              stdout.slice(0, AGENT_TOOL_OUTPUT_STORE_MAX),
+              stdout,
             );
             stored = true;
           } catch (error) {
@@ -1552,9 +1603,9 @@ export class AgentTool {
           error: result.error,
           timedOut: result.timedOut,
           truncated,
-          totalLines: stdout.split('\n').length,
+          totalLines: outputLines(stdout).length,
           ...(stored ? { runId } : {}),
-          ...(stdout.length > AGENT_TOOL_OUTPUT_STORE_MAX
+          ...(result.stdoutTruncated
             ? { note: 'Output over 10MB: only the first 10MB is kept.' }
             : {}),
         };
