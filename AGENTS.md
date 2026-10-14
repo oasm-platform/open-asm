@@ -188,7 +188,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 ## Git Hooks & CI
 
 - Husky v9. `pre-commit` — **fully commented out**, nothing is enforced locally. `commit-msg` — Conventional Commits required: `feat|fix|hot-fix|perf|chore|docs|style|refactor|test|ci(<scope>):`, merges allowed.
-- CI (`.github/workflows/`, all path-filtered): `check-lint` (core-api + console matrix), `check-test` (core-api only), `check-build`, `frontend-tests` (console, `main` only), `worker-ci` (go fmt check + vet + build cli/app), `build-release` / `build-nightly`. `pr-size` is the exception: it runs on every PR via `pull_request_target`, posts a sticky bot comment and fails above 1,000 lines / 40 files. It must never check out PR code. Toolchain: Node **22**, pnpm **10.33.2**, Go **1.26**.
+- CI (`.github/workflows/`, all path-filtered; the required checks `check-lint` / `check-test` filter inside the job so they always report on PRs): `check-lint` (core-api + console matrix), `check-test` (core-api only), `check-build`, `frontend-tests` (console, `main` only), `worker-ci` (go fmt check + vet + build cli/app), `build-release` / `build-nightly`. `pr-size` is the exception: it runs on every PR via `pull_request_target`, posts a sticky bot comment and fails above 1,000 lines / 40 files. It must never check out PR code. Toolchain: Node **22** (`.nvmrc`), pnpm **10.33.2** (`packageManager` in root `package.json` — the only place to bump it), Go **1.26**. Dependabot PRs for patch/minor get auto-merged by `dependabot-auto-merge.yml` once required checks pass.
 - Since pre-commit is inert, **you** must run `task lint` and `task test` before declaring a change done.
 - Local CI rehearsal: `bash .github/scripts/test-local.sh <workflow>` (needs Docker + `act`).
 
@@ -217,4 +217,4 @@ Volumes worth knowing: `pgdata`, `redis-data`, `geoip-data`, `rustfs-data`, `wor
 10. **`task lint` is sequential by design** (two type-aware ESLint processes exhaust RAM). Never run `api:lint` and `console:lint` in parallel/background.
 11. **RustFS/S3 (`RUSTFS_*`) is not optional** — it backs storage, PDF reports, *and* the worker tool registry (`BuiltinToolRegistry` serves the tool archives). Compose only waits for `rustfs` to be *started*, not healthy, so a slow first boot can fail the first worker tool download.
 12. **The worker needs the Docker socket**; without the right group id the daemon returns "permission denied" and API-version negotiation silently falls back to 1.24.
-13. **CI is Node 22 / pnpm 10.33.2 / Go 1.26** — mismatched local versions produce failures that look like code bugs.
+13. **CI is Node 22 (`.nvmrc`) / pnpm 10.33.2 / Go 1.26** — mismatched local versions produce failures that look like code bugs.

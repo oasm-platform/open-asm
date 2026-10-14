@@ -90,7 +90,7 @@ jobs:
             ./${{ matrix.service == 'worker' && 'worker' || '.' }}
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: '${{ env.IMAGE_NAME }}-${{ matrix.service }}:dev'
           format: 'sarif'
