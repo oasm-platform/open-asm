@@ -17,3 +17,12 @@ jobs:
     # profile in the workspace or a config here.
     config:
       scanHistory: false
+
+  # No `needs`: runs in parallel with secret_scan. Secrets stay with gitleaks,
+  # so Trivy only looks for vulnerable dependencies and IaC misconfigurations.
+  dependency_scan:
+    name: Dependency & IaC Scan
+    run: trivy
+    config:
+      scanners: [vuln, misconfig]
+      ignoreUnfixed: false
