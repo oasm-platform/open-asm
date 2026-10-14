@@ -4,6 +4,7 @@ import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { ToolProvider } from '@/modules/providers/entities/provider.entity';
+import { TargetType } from '@/common/enums/enum';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { ApiProperty } from '@nestjs/swagger';
@@ -21,6 +22,7 @@ import {
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
+import { DEFAULT_TOOL_TARGET_TYPES } from '../tool-target-types';
 import { WorkspaceTool } from './workspace_tools.entity';
 
 @Entity('tools')
@@ -63,6 +65,24 @@ export class Tool {
   @IsEnum(ToolCategory)
   @Column({ type: 'varchar' })
   category?: ToolCategory;
+
+  /**
+   * Target types whose assets this tool may scan. Jobs are only ever created
+   * for assets of these target types, whichever workflow runs the tool.
+   * Connector tools take it from the manifest `targetTypes`; built-in tools
+   * declare it in built-in-tools.ts. Read through `resolveToolTargetTypes()`.
+   */
+  @ApiProperty({
+    enum: TargetType,
+    enumName: 'TargetType',
+    isArray: true,
+    description: 'Target types whose assets this tool can scan',
+  })
+  @Column('text', {
+    array: true,
+    default: () => `'{${DEFAULT_TOOL_TARGET_TYPES.join(',')}}'`,
+  })
+  targetTypes?: TargetType[];
 
   @ApiProperty()
   @IsOptional()

@@ -1,0 +1,41 @@
+name: Dependabot Auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+# Dependabot PRs get a read-only token by default; enabling auto-merge needs write.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    env:
+      # Dependabot-triggered runs only see *Dependabot* secrets, not Actions secrets.
+      AUTOMERGE_APP_CLIENT_ID: ${{ secrets.AUTOMERGE_APP_CLIENT_ID }}
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v3
+
+      # A merge performed with GITHUB_TOKEN does not fire `push` workflows, so
+      # build-nightly would skip Dependabot merges. A GitHub App token does fire
+      # them; fall back to GITHUB_TOKEN when the App secrets are not configured.
+      - name: Generate GitHub App token
+        id: app-token
+        if: env.AUTOMERGE_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.AUTOMERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
+
+      # Major bumps stay manual. Auto-merge only fires once the required checks on main pass.
+      - name: Enable auto-merge for patch/minor updates
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}

@@ -107,3 +107,11 @@ func (f *FakeRuntime) CancelCallCount() int {
 	defer f.mu.Unlock()
 	return len(f.CancelCalls)
 }
+
+// CreateCallCount is the lock-guarded read of CreateCount for tests that poll
+// while a Create may still be running on another goroutine.
+func (f *FakeRuntime) CreateCallCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.CreateCount
+}

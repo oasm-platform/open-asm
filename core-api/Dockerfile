@@ -1,6 +1,8 @@
 FROM node:26-alpine AS base
 RUN apk add --no-cache curl
-RUN npm install -g corepack && corepack enable && corepack prepare pnpm@10.33.2 --activate
+COPY package.json /tmp/pm/package.json
+RUN npm install -g corepack && corepack enable \
+  && corepack prepare "$(node -p "require('/tmp/pm/package.json').packageManager")" --activate
 ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 
@@ -10,7 +12,9 @@ FROM --platform=$BUILDPLATFORM node:26-alpine AS builder
 ARG APP_VERSION
 ENV APP_VERSION=$APP_VERSION
 
-RUN npm install -g corepack && corepack enable && corepack prepare pnpm@10.33.2 --activate
+COPY package.json /tmp/pm/package.json
+RUN npm install -g corepack && corepack enable \
+  && corepack prepare "$(node -p "require('/tmp/pm/package.json').packageManager")" --activate
 ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 

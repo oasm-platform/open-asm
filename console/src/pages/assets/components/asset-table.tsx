@@ -10,7 +10,9 @@ import AssetDetailSheet from './asset-detail-sheet';
 export function AssetTable({
   filter,
 }: {
-  filter: Partial<AssetContextType['queryParams']>;
+  // Row drill-downs still deep-link with legacy array params (server accepts them).
+  filter: Partial<AssetContextType['queryParams']> &
+    Partial<Record<'ipAddresses' | 'ports' | 'hosts' | 'techs' | 'statusCodes' | 'tlsHosts' | 'urls', string[]>>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [rowID, setRowID] = useState('');

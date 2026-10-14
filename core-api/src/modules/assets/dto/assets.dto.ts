@@ -1,6 +1,8 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { TechnologyDetailDTO } from '@/modules/technology/dto/technology-detail.dto';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsAssetFilter, parseFilterParam } from '../asset-filter';
+import type { AssetFilter } from '../asset-filter';
 import { Transform } from 'class-transformer';
 import {
   IsDateString,
@@ -138,6 +140,17 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
     Array.isArray(value) ? value : [value],
   )
   urls?: string[];
+
+  @ApiProperty({
+    required: false,
+    type: String,
+    description:
+      'JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => parseFilterParam(value))
+  @IsAssetFilter()
+  filter?: AssetFilter;
 
   @ApiProperty({ required: false, description: 'Filter assets created on or after this date (YYYY-MM-DD)' })
   @IsOptional()

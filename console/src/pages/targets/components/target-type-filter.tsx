@@ -1,7 +1,7 @@
 /**
  * TargetTypeFilter Component
  *
- * A dropdown select component for filtering targets by type (DOMAIN/CIDR/IP/All).
+ * A dropdown select component for filtering targets by type (DOMAIN/CIDR/IP/GIT_ORG/All).
  * Used in the targets list page toolbar.
  */
 
@@ -23,6 +23,7 @@ const TYPE_OPTIONS = [
   { value: TargetType.DOMAIN, label: 'DOMAIN', color: 'bg-blue-500' },
   { value: TargetType.CIDR, label: 'CIDR', color: 'bg-green-500' },
   { value: TargetType.IP, label: 'IP', color: 'bg-orange-500' },
+  { value: TargetType.GIT_ORG, label: 'GIT ORG', color: 'bg-purple-500' },
 ] as const;
 
 interface TargetTypeFilterProps {

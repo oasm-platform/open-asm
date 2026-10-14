@@ -7,7 +7,7 @@ import { I18nService } from 'nestjs-i18n';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
 import { Notification } from './entities/notification.entity';
 import { NotificationsService } from './notifications.service';
-import { NotificationsSinkService } from '../event-bridge/notifications.sink.service';
+import { NotificationsSink } from '../event-bridge/sinks/notifications/notifications.sink';
 
 function buildQueryBuilderMock() {
   const qb: Record<string, jest.Mock> = {
@@ -74,7 +74,7 @@ describe('NotificationsService', () => {
           useValue: {},
         },
         {
-          provide: NotificationsSinkService,
+          provide: NotificationsSink,
           useValue: { deliver: jest.fn() },
         },
       ],

@@ -20,7 +20,18 @@ Before substantial work:
 4. **Never hand-edit generated code**: `console/src/services/apis/gen/`, `console/src/routeTree.gen.ts`, `worker/internal/gen/`, `.open-api/*`, `core-api/resources/connectors/manifest.json`. Change the source, re-run the generator. (`.open-api/` is generated *and* git-tracked — see gotcha 7.)
 5. **Never commit `.env`** (gitignored). Copy from `*/example.env` / `worker/.example.env` via `task init` (the worker one is manual).
 6. **Ask before scope-creep.** Schema changes, new public API contracts, dependency bumps, and CI/workflow edits need explicit user sign-off — do not add them "while you're in there".
-7. **`.agents/skills/*` is third-party and hash-pinned in `skills-lock.json`** (synced by `npx @tanstack/intent`). Several of those skills tell you to run `npm run test` / `npm run lint` — ignore that, hard rule 1 wins. Never edit files under `.agents/skills/`; they are overwritten on the next sync.
+7. **Keep every PR small and single-purpose.** Target ≤ 400 changed lines; CI (`pr-size`) fails above 1,000 lines or 40 files. See [Pull Request Size](#pull-request-size) — plan the split *before* writing code, not after.
+8. **`.agents/skills/*` is third-party and hash-pinned in `skills-lock.json`** (synced by `npx @tanstack/intent`). Several of those skills tell you to run `npm run test` / `npm run lint` — ignore that, hard rule 1 wins. Never edit files under `.agents/skills/`; they are overwritten on the next sync.
+
+## Pull Request Size
+
+Reviewers can't review large AI-generated diffs properly, so size is a hard constraint, not a style preference. The `pr-size` workflow counts additions + deletions. It skips lockfiles, generated code, migrations, snapshots and deleted files. At > 400 lines a bot posts a warning comment. At > 1,000 lines or > 40 files the check fails.
+
+1. **Estimate before you start.** If the task will clearly go past ~400 lines or touch more than one concern, stop. Propose a split into an ordered sequence of PRs, each with a one-line goal and rough size, and wait for the user to pick. Do not build the whole thing and leave the split to someone else.
+2. **One logical change per PR.** Typical split order: prep refactor (no behaviour change) → backend + tests → `task gen-api` client regen → console UI. Schema changes, new public contracts and dependency bumps always get their own PR (they need sign-off anyway, hard rule 6).
+3. **No drive-by edits.** Do not reformat untouched code, rename unrelated symbols, "tidy up" neighbouring files or fix unrelated lint. Mention them to the user as follow-ups instead.
+4. **Check the diff size before declaring done:** `git diff --shortstat origin/main...HEAD` (this count includes generated files; CI excludes them). If you are over budget, tell the user and suggest where to cut. Don't quietly hand over an oversized change.
+5. **Never apply the `size/override` label yourself.** Only a maintainer decides that a large PR is acceptable.
 
 ## Repository Layout
 
@@ -177,7 +188,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 ## Git Hooks & CI
 
 - Husky v9. `pre-commit` — **fully commented out**, nothing is enforced locally. `commit-msg` — Conventional Commits required: `feat|fix|hot-fix|perf|chore|docs|style|refactor|test|ci(<scope>):`, merges allowed.
-- CI (`.github/workflows/`, all path-filtered): `check-lint` (core-api + console matrix), `check-test` (core-api only), `check-build`, `frontend-tests` (console, `main` only), `worker-ci` (go fmt check + vet + build cli/app), `build-release` / `build-nightly`. Toolchain: Node **22**, pnpm **10.33.2**, Go **1.26**.
+- CI (`.github/workflows/`, all path-filtered; the required checks `check-lint` / `check-test` filter inside the job so they always report on PRs): `check-lint` (core-api + console matrix), `check-test` (core-api only), `check-build`, `frontend-tests` (console, `main` only), `worker-ci` (go fmt check + vet + build cli/app), `build-release` / `build-nightly`. `pr-size` is the exception: it runs on every PR via `pull_request_target`, posts a sticky bot comment and fails above 1,000 lines / 40 files. It must never check out PR code. Toolchain: Node **22** (`.nvmrc`), pnpm **10.33.2** (`packageManager` in root `package.json` — the only place to bump it), Go **1.26**. Dependabot PRs for patch/minor get auto-merged by `dependabot-auto-merge.yml` once required checks pass.
 - Since pre-commit is inert, **you** must run `task lint` and `task test` before declaring a change done.
 - Local CI rehearsal: `bash .github/scripts/test-local.sh <workflow>` (needs Docker + `act`).
 
@@ -206,4 +217,4 @@ Volumes worth knowing: `pgdata`, `redis-data`, `geoip-data`, `rustfs-data`, `wor
 10. **`task lint` is sequential by design** (two type-aware ESLint processes exhaust RAM). Never run `api:lint` and `console:lint` in parallel/background.
 11. **RustFS/S3 (`RUSTFS_*`) is not optional** — it backs storage, PDF reports, *and* the worker tool registry (`BuiltinToolRegistry` serves the tool archives). Compose only waits for `rustfs` to be *started*, not healthy, so a slow first boot can fail the first worker tool download.
 12. **The worker needs the Docker socket**; without the right group id the daemon returns "permission denied" and API-version negotiation silently falls back to 1.24.
-13. **CI is Node 22 / pnpm 10.33.2 / Go 1.26** — mismatched local versions produce failures that look like code bugs.
+13. **CI is Node 22 (`.nvmrc`) / pnpm 10.33.2 / Go 1.26** — mismatched local versions produce failures that look like code bugs.

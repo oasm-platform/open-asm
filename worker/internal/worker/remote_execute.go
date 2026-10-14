@@ -69,7 +69,7 @@ func (s *sessionSandbox) close() error {
 	return os.RemoveAll(s.rootPath)
 }
 
-func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent) {
+func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
 	log := NewTuiLogger(events, "RemoteExec")
 	remoteSem := make(chan struct{}, 16)
 
@@ -182,6 +182,27 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 				default:
 					log.Warning("remote exec concurrency limit reached")
 					_ = handler.SendErrorFor(ctx, sessionID, cmdID, cmdWorkerID, "server busy")
+				}
+
+			case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL:
+				run := resp.GetToolRun()
+				sessionID, cmdID := resp.SessionId, resp.Id
+				if sessionID == "" || run == nil {
+					log.Warning("Agent tool run event without a session or tool")
+					continue
+				}
+				log.Info("Agent tool run received: %s -> %s", run.GetTool(), run.GetTarget())
+				h := handler
+				runTool(sessionID, run, func(t pb.RemoteExecuteResultEventType, data []byte, exitCode int32) error {
+					// Detached: the result must reach core even if this stream reconnects.
+					sendCtx, cancel := newDetachedCleanupContext()
+					defer cancel()
+					return h.SendResultFor(sendCtx, sessionID, cmdID, t, data, exitCode)
+				})
+
+			case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL:
+				if cancelTool(resp.SessionId) {
+					log.Info("Agent tool run cancelled: %s", resp.SessionId)
 				}
 
 			default:

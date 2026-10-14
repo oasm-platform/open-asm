@@ -37,10 +37,27 @@ export class Integration extends BaseEntity {
   @Column('text')
   appType: string;
 
-  @ApiProperty({ example: 'ticketing', description: 'Integration category' })
+  @ApiProperty({
+    example: 'TICKETING',
+    description:
+      'Primary capability. For single-capability apps this is the only one.',
+  })
   @IsString()
   @Column('text')
   category: string;
+
+  /**
+   * Enabled capabilities (IntegrationType values). Always contains `category`.
+   * Legacy single-capability rows hold `[category]` (backfilled by migration);
+   * read it through `resolveCapabilities()`, which also covers an empty array.
+   */
+  @ApiProperty({
+    type: [String],
+    example: ['SOURCE_CODE', 'TICKETING'],
+    description: 'Enabled capabilities of this integration',
+  })
+  @Column('text', { array: true, default: () => "'{}'" })
+  capabilities: string[];
 
   @ApiProperty({
     description: 'App-specific configuration validated via JSON Schema',

@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from '../assets/entities/assets.entity';
+import { Integration } from '../integrations/entities/integration.entity';
 import { TriggerWorkflowService } from '../workflows/trigger-workflow.service';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { Target } from './entities/target.entity';
@@ -13,7 +14,7 @@ import { TargetsService } from './targets.service';
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Target, Workspace, Asset]),
+    TypeOrmModule.forFeature([Target, Workspace, Asset, Integration]),
     WorkspacesModule,
     BullModule.registerQueue({
       name: BullMQName.ASSETS_DISCOVERY_SCHEDULE,

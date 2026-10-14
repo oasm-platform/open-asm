@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T02:48:47.8311108Z",
+  "generatedAt": "2026-10-13T09:17:11.9248168Z",
   "connectors": [
     {
       "name": "Acunetix",
@@ -17,6 +17,11 @@
       "description": "Connects to an Acunetix instance, runs a scan against a target, and streams the discovered vulnerabilities back to the Worker.",
       "capabilities": [
         "vulnerabilities"
+      ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
       ],
       "inputsSchema": {
         "additionalProperties": false,
@@ -109,6 +114,152 @@
       "logo": "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAIAAABMXPacAAASSklEQVR42ux9C3gURbb/qernzGRmMkkIz4SVhIdgYEVAfPz/CCI+ltWFBVeXe/l2V2EVVPQqXkQuuKiIb0TjxsUnXlSEhVVRdl1AuHqF4KrIQ0ACSiCJJCGPeXd3dZ/7VYigZBICZDoJ9O+bj49M9UzXnF/VqTqnzjktIiI4aD1QRwQOAQ4BDhwCHAIcOAQ4BDhwCHAIcOAQ4BDgwCHAIcCBQ4BDgIPkQ2wHfTQM1HWrusYsr7Cqq61gCIO1GIujYSAzAYCIApEk4lKJz099XhoICJkdaCCVyDJIkkPAyUPXzbJD+s5dbO8+/tq/3ywts2qDqOvAGDIGzETLArQAEQCAECCUUAqiQEQRRJHIMvX7hC6dxZ91F3NzxHPOkc/tI3TuCLLc1n4raSsnYqZllpRohZ9pn39hbNvB9n1rRSIYjwMAEQSgFAjhL4D6f3/8HwBA/Ml/EPnLstA0AYCoKvV4xB7nSHn9lAsGKhcOFrp1BUodAgBM09j9TXzd+vj/fGJs/9qqrUXD4KOYCkDJ8VI+NSACAFgIlomMEUmigYDUt4/6/y9VR1wm9e4FgnA2EmCWlMZWfxhb/Xd923arNkQIgCjWj/Skom5mcFWGQP1eOe8819VXua4eJXTtcnYQgKht2hxZulxbv8H8/hAAAUk8pl7s7Ql/GQwAhU4dlcuGeX4zThk6xOae2EgAY7EP10SWvKV9usmKRPgWxYbx3uw5gbpOPR7l4qGeCTe4Ro0EUTyDCLCs2Idrwn95Sdv8L2AMJKmNLIAN+wmGAaKoDBmUMvkmTgOl7Z4AbeOm4DPPa598CswAWW4TQ/6EE0LXQZSUSy/2TZuqXHRheyXA3F8cXJgfXfkORmPtQ/QNaCBut3vMtb47pgrds9sVAYiR198ILsxnxQeIorRRhdMcWBZqmpid5Zs21fNvv03GGGp5AljR3pq58+Jr1tXvcM4A1O2U1JEjUmfPFHNz2jQB0WUrah95jJWU8oHfvnRO00DkU6FrF/9997rHj22LBGAwVPPw/MiSt8DCM2TgJ5wKlHgm3JB6/wzi87YhAtieourpM+OfbiKK3I41fnNXBV29eGjg8Xliz9w2QYC24eOq6fex/cVnmtppWh11z057/BFl2P87zS873dEaXfbXyslTzQMlRFXPCukDACFEVc0DJZWTp0aX/bU1Z0B40cu1D81Hxmwz3NsWGCOi6J81I2XSH1qBgNAz+bWPPwUArevObWWYJgD4773be8cUWwkIPr0w+MQCIOSslv5RDhB90+/y3Xm7TWtAKL8g+OQzQKgj/XoFQGjwiQWh/BfsICCyeEnt/CcAAAQnouIHCBQAauc/Hlm8JLkqKPb+6qo77sa4BqIz9huAmURV0p59ynXNVUkhQN/yVeXEm6zKw20/1qPVYBg0Iz1j8Uvyzwc08xPNVSNWeUX1PTOs8gpH+k1Bko4JqiUJMM3q++foW3eAojhCPgEURd+6o/r+OWCaLUZAKL8g9t4HRHWk3ywQVYm990Eov6BlCNA2Fgaf/TOIwtniaTh9EAKiEHz2z9rGwtMlwKquqZnzIIbDzpb/5CAIGA7XzHnQqq45LQJC+QX6lq3OwnsqkCR9y9YTKqKmCNA2FoZffZ3IkqN8TgWEEFkKv/p604qocQI0Pfjok47yOX1FFHz0SdD0kyYgsnSZVri5DcZztzPIsla4ObJ02ckRYJVXhAoWtU7I5hmGOhmGChY1ZpolJiD8ymKjaB+IztrbEhAlo2hf+JXFzSXAPHAwsnQZkURwRn+LgACRxMjSZeaBg80iILx4CSspBaFNnjIeie43LTBNMBgYRt2L8T9Nize1zRJ4gshKSsOLl5zYG2qWlpX/ciyP3G9Tx7wWFy4ajFBCXC6iKsTtpj4fURQAQE2zgkGMxjAex1gMLeTTl9K2FSDDmNCpY+Z7K4QunX/89vFSjq58xzxYCorcVsa7aSEzqKoK3bOVQRdI/fOk3B5CdpaQngaiSAgFAEQLGDMPV5kHDhpFe41t27V/fWEWH7CiMc6E0DacKIJgHiyN/u1d75Q/NjoDMBQ6NHos21PU+qYvIjAGliV07eq66grXlaPkgQNISkpzPx2N6p9/GfvHmtiH/zSLDwClIIqtT4NhSL17Zb67nHi9iQmIrfrg8B9va/0hY5poGFJujue3N7h//SuhU8dTV13lFZEVf4u8/oZRtK9+NrTyhDbTX3jONfqaxAQcvumW6KoPiKq2Zhd1nQYCKb/795Sbfkcz0lvkW63Kw+GXXwu/stiqrm7dTAWMx92jr0l/qSABAWxPUfl146xgqNWGSV2GkHLRUP+c++Wf9295BbB1W83cR7RP/rc1c6RMk/q8me8sPxpXeqwfsbUfmYerWrFngJhyy6SMN15LhvQBQOqfl/HfL9evgc07rmp5UGoeroqt/ejYG0dHX3zdetJavgfGiKKkzp2d+sAs4kqiAiSq6p89M/Dwn/j+lbFW+KWEI75uPVgWAACA+IP+2at/ta11Nj+MEZcr8Ng899jrmnM5RqPswEFzf7FZXlFfy0BVhcwOQvdsMasbcbtP+A2eiROIz1c9fQZPXrPf3JEk/attbM9esXfPYwRohZsxGGwFAkyTSFJg3twTSh/D4fiGT+LrPtI++9z8/hBqGugGWCYAABVAloii8HzrwReoI4arwy5tes/q/tUvgRnV99yHjNm95hGCwaBWuPmnBGwsRMsihNjvV/Ddfaf7+l83dVUwGHlrWeTNpcaevajrpH4JJSCJR/sPFmIsxvbuM3btjixdLvXM8dz4G88N44nP1ygH48aah8prH37U7nxxQtCytI2FnokT6ndBVk3NoVGjzZJSm+cjxuOe8WPTnlvQxDXxf/yz9vGnjG1fg9BsY+qIEWdaUl5f//T/UK+8oolrq+64m3sebd55MyZ07dLxw1U0NZUCANu9h8e72bz/MQypT+/U2TMbFaOm1c6dVzlpirFjJyh1pZeaOU4J4RcrsrFjZ+WkKbVz53F91QhSZ/2n1Kc3GIatv51Sq/Iw270HACgA8HolkYit09BCEEX/vXfTzMzE7TW1VbfcHswvAMRTNJ0I4R9EDOYXVN1yu1VTm1gUmZn+GfeAKB7dltgBQqxIRN+2/RgBgGAnAahrrisud/0icRArhkJVU6ZF31/dAknelBJFib6/umrKNAyFEl7iuvpK1xWXo67bSQAg/ECAprFvioid0c6WRb1e762TE7ciVs+cHVuztsWSzupSumJr1lbPnN3YaYH31snU67VzEhBRYN8UgaZRs7qalZbauQCgrquXD5cHDUzYGip4Mbp8ZQun/NVxEF2+MlTwYqJmkAcNVC8fbuskoJSVlprV1ZR9U8TtEdv0DyJRFM/14xI2Glu3hxbmA02CO5YQoEJoYb6xdXuiZuB7VkUBC23TQhiNsW+KKCsu5vakbQQwJvXuqVwyNGFjcOFz3B+VJH0oCubhquDC5xI2KhcP5dshk9lHQDzOioupWVIGhmEbAciYOuKyhPtubWNhfO16kszDOKLI8bXrE4aqEUVRhw9DZh8BYBhmSRnl5++E2Lf8ut3qJRcnbIy8+bYViSZ3NaLUikQjb76dsFG95CLqdtu3FBPCSkqpVVFh5wJA09OkvH4NW8yysviGj4mcdGcUkaX4ho/NsrKGTVJeP5qeZl9cBSFWRQXl8dO2bYGYKfXqSX3+hi3aps+syko7esKt0Ept02cJWnx+qVdPYHYdFVAufMpNRNsWANMUe/RImN+qf7kFdVuWIkJQN/QvtzRsAYGKPXqgbWc1hFg1tdQKh2wiABEICF07N2wB02R7iohdbmEiCDzyI5GgefcI2KSFCLHCIWqn9UEkicfzNABqGjtYYl/mt0DZwZKEHjohPY3YeCjCi5WCYePJHKXE7Wn4NjCGIbsmIgAQwm+XaMfJu2enV9hglKs8m1RQHQGJEg5Q09HeE1pkDBMlTfBtGKWAdo0D07TxMIgAICYWtCgCoXYSAIQmPH1CwwAL7QsLJ4RylWfbztc0MRpt+DYvKe9x29cNROpxJ9T13CtjmyGGyH84sbHCIRoG3+w3AFFkoVMn+365ZQmdOiX0eVgVlWjYuSsRKXG5bdt1ASL7/tCRv34CSRJzc2zbgHNzJDcnYQgI7x6ibfty4nJT6vPaNvf5Bvzb7xLeTh6QRwTBjp4gEkGQB+QlbGLffmebOQKI/JFDJNVvGwFQZwFhKNywRbnoQur32+GOt5D6/QlromMozA00GwkgqX4qpKfbdwpBqXmo3Ni1u2GLmJPDz8hY8qMTmCEPGijmJCgBbezabR4qt88OsFBIT6c8+h7tc8BiJHrkMLpBE/BjsmRrIUQQBH6jREpe37YdI1EbfcOW0KkjFTp2BEJtW4fRMnkEWCK4Ro2UB54PSXWN6Lo88Hz+aIxEMEtK0TJt9Ixx4VOhaxdiZ0YYpWbZ94mbVMU37TaQlWTtRy0L5LpbNFL4iHeM2mcP8s131y5U7Nb1SACTTXflLsBwYyJWRw733Dieu8lavDvIXX6eG8erI4c3Ro8VDhMbz6ZAlsVuXamQnUUUxc5jIG7uN347/4zpyuBBqMVb+PdqcWXwIP+M6U1IBG08Gz8SHSJkZ1GamsrXYRvtb+pyNTHTaSA1bcETUs9caDyg86ShaVLP3LQFT9BAaqPXUMo7hmijNd6RB+cSlyrn9UO7zuHQsmgg0PRAE3vmpP/lebF3L4zFTlciyMPWxd69+Bf2zGl6atJAAO0aiMhMOa8fcam0zgrtTyixiXwE/iDNE0Hq26fD4pfU4Zfx9eCUXRSmiZqmDr+sw+KXpL59Tng57xjapX8okQf0BwB6JDCPpw7b4wZQFalPr+ZcK3TPznhtkf+eu2hKCsZO0klpWRiL05QU/z13Zby2qJkPoZL69CKqYpMcvF550MB6AqTcHCmnhx3RAJZFU1ObX1WWqKpv+l0dlr/hGT+WuFxcIxlGoxU56vJtwDAwFiMul2f82A7L3/BNv6v5yRfyzwfQ1FQ7lkNmSjk9pLoHMokAAIqijhimfbGFoJTUswg0DGXQwOOqVZwQ0nn90vIXGDu+jr67Kr5uA/tuP0aj/Cj7aE4nIiASWSZut/iz7uqIYe5rR0v9+p5s94QunZVBA6Mf/D25/jgENE11xDBQlGOJ2sa2HeVjr8e4lkRLpC5zKC1/gXvMdaf+HfE42/utseNrnihZUcE9BwDE4xY6dBCzukn9+oo555xOvlF05TtVU+9MbmEJyyKKkrny7SMBavUEAMDhm2+Nvvd+ErOldF3KOy9z5dvE44a2CoxEy8dcb2zbnrxiebxawbWj0xc9DwAAQOEHeG+dRH2+ZKWQIwIh3pt/35alf2QyeW/+PZCk7Ql5qQKf95ZJAHA8AfIFA1MmTmjaTD0N2jX18uHucWOgzcM9bgxP1ohryRiFaBgpEyfIF5yfgAAA8E27TRkyGLWWvrdhiFndUufMah/PeKM0dc4sMatbi6dOoqYpQwZzb+CP8BOJEJ838NjDYnZWS/qEGSNud+CRuWJuD2gnEHN7BB6Zy6setGC0kq6L2VmBxx4+7hmIxw9J6dw+6c8+LXTu1DKuGMMgqhqY/5A6amSj17RJqKNGBuY/xLckLTIPNE3o3Cn92aelc483yGnDi+WhQ9JfLDhdVwwixjWakZG28Ml2ofobwj1uTNrCJ2lGBl8PEE/XGfVigTx0SIPmxp8hY5aW1TzwUOz91WBZJ5Gl/kNhLmRMGXph4ME5Uv/zoD3D2Lq9+r/+pG0qJOJJ1v9D5LOHUtcvrk59YFZj5mejBAAAAESXrwjlv2Ds3AVAQBKbKmaMWC960xSzsnjNsT9MbE7xmLYPjEbDLy8Ov/o6O3CACEI9DU3LwWBAuD73TpnsHtfU84dPQAAAYG0w+u6q6Ip3+Jl1KIyIRKDHKozU3Q/r6l1Rj0fM6eG+drR7/Fi+ipxZMMu+jy5bEX13Fdu770hlB/JjJuo8UWhahBDiTZHzznOPG+MefQ3x+5r+2hMTAAAAAIwZO3dpGzfrO3aw7/Zb5RU8oY7HdqlCRrqQnS2f20cZOlga0L81a/4lHxiPG19t1TZ9pu/cZRYXm5WHuaeWEOpx08wO4s+6y/36KRcN4Ytt80rPnNKzJHUdjxRLQgChLrz37Hy6kqZxu9W0gABQgcjSKTgwWv6h/g5OCs7zIB0CHAIcOAQ4BDhwCHAIcOAQ4BDgwCHAIcCBQ4BDgAOHAIcABzbg/wYAd/aWjK14uhgAAAAASUVORK5CYII="
     },
     {
+      "name": "Arjun - Parameter Discovery",
+      "slug": "arjun",
+      "version": "2.2.7",
+      "image": "ghcr.io/oasm-platform/connector-arjun:2.2.7",
+      "author": "oasm",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://github.com/s0md3v/Arjun",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
+      "shortDescription": "HTTP parameter discovery",
+      "description": "Discovers hidden HTTP parameters for a URL using Arjun, probing a wordlist of parameter names against the target and reporting every parameter the endpoint responds to.",
+      "capabilities": [
+        "url_discovery"
+      ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
+      "agentTool": true,
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "description": "URL to discover parameters for. Each discovered parameter is emitted as <url>?<param>=.",
+            "examples": [
+              "https://example.com/search"
+            ],
+            "format": "uri",
+            "title": "Target URL",
+            "type": "string",
+            "ui:placeholder": "https://example.com/search"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "chunkSize": {
+            "default": 250,
+            "description": "Parameters per request (Arjun -c). IGNORED whenever method != GET — upstream forces -c 500.",
+            "minimum": 1,
+            "title": "Chunk size",
+            "type": "integer"
+          },
+          "delay": {
+            "description": "Delay between requests in seconds (Arjun -d). Only passed when greater than 0.",
+            "minimum": 0,
+            "title": "Delay",
+            "type": "number"
+          },
+          "disableRedirects": {
+            "description": "Do not follow redirects (Arjun --disable-redirects).",
+            "title": "Disable redirects",
+            "type": "boolean"
+          },
+          "headers": {
+            "description": "Extra request headers, one per entry (Arjun --headers). Omitted entirely when empty.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "array",
+            "ui:placeholder": "Authorization: Bearer …"
+          },
+          "include": {
+            "description": "Comma-separated list of known parameters to include in every request (Arjun --include).",
+            "title": "Include params",
+            "type": "string",
+            "ui:placeholder": "status,debug"
+          },
+          "maxUrls": {
+            "default": 10000,
+            "description": "Adapter-level cap on the number of discovered parameters emitted. Default 10000.",
+            "minimum": 1,
+            "title": "Max URLs",
+            "type": "integer"
+          },
+          "method": {
+            "default": "GET",
+            "description": "HTTP method used to probe parameters (Arjun -m).",
+            "enum": [
+              "GET",
+              "POST",
+              "XML",
+              "JSON"
+            ],
+            "title": "HTTP method",
+            "type": "string",
+            "ui:placeholder": "GET"
+          },
+          "rateLimit": {
+            "default": 9999,
+            "description": "Maximum requests per second (Arjun --rate-limit).",
+            "minimum": 1,
+            "title": "Rate limit",
+            "type": "integer"
+          },
+          "stable": {
+            "description": "Prefer stability over speed (Arjun --stable). Forces threads to 1 upstream.",
+            "title": "Stable mode",
+            "type": "boolean"
+          },
+          "threads": {
+            "default": 5,
+            "description": "Number of concurrent workers (Arjun -t).",
+            "minimum": 1,
+            "title": "Threads",
+            "type": "integer"
+          },
+          "timeout": {
+            "default": 15,
+            "description": "Per-request timeout in seconds (Arjun -T).",
+            "minimum": 1,
+            "title": "Request timeout",
+            "type": "integer"
+          },
+          "wordlist": {
+            "default": "medium",
+            "description": "Bundled parameter wordlist passed verbatim to Arjun -w (small|medium|large).",
+            "enum": [
+              "small",
+              "medium",
+              "large"
+            ],
+            "title": "Wordlist",
+            "type": "string",
+            "ui:placeholder": "medium"
+          }
+        },
+        "type": "object"
+      },
+      "resourceDefaults": {
+        "cpu": "500m",
+        "memory": "512Mi",
+        "timeoutSeconds": 1800
+      },
+      "logo": "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"
+    },
+    {
       "name": "Gau - GetAllUrls",
       "slug": "gau",
       "version": "2.2.4",
@@ -125,6 +276,10 @@
       "capabilities": [
         "url_discovery"
       ],
+      "targetTypes": [
+        "domain"
+      ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -216,6 +371,88 @@
       }
     },
     {
+      "name": "Gitleaks - Secret Scanner",
+      "slug": "gitleaks",
+      "version": "8.30.1",
+      "image": "ghcr.io/oasm-platform/connector-gitleaks:8.30.1",
+      "author": "oasm",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://gitleaks.io",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
+      "shortDescription": "Finds secrets committed to Git repositories",
+      "description": "Scans the repositories of a Git organization for committed credentials — API keys, tokens, private keys, passwords — with Gitleaks rules. Secret values are redacted at the source: findings name the rule, file, line and commit, never the secret itself. Optionally scans recent history, where deleted secrets remain exposed.",
+      "capabilities": [
+        "secrets"
+      ],
+      "targetTypes": [
+        "git_org"
+      ],
+      "agentTool": true,
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "ref": {
+            "description": "Branch, tag or commit to scan. Empty scans the default branch.",
+            "title": "Ref",
+            "type": "string"
+          },
+          "repository": {
+            "description": "https clone URL of the repository to scan.",
+            "examples": [
+              "https://github.com/acme/web"
+            ],
+            "format": "uri",
+            "title": "Repository",
+            "type": "string"
+          },
+          "token": {
+            "description": "Access token for private repositories.",
+            "title": "Token",
+            "type": "string",
+            "ui:widget": "password"
+          },
+          "username": {
+            "description": "HTTP user for private repositories.",
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository"
+        ],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "historyDepth": {
+            "default": 100,
+            "description": "Number of most recent commits scanned when \"Scan history\" is on.",
+            "maximum": 5000,
+            "minimum": 1,
+            "title": "History depth",
+            "type": "integer"
+          },
+          "scanHistory": {
+            "default": false,
+            "description": "Also scan recent commits. A secret deleted from the code is still exposed in history.",
+            "title": "Scan history",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "resourceDefaults": {
+        "cpu": "500m",
+        "memory": "1024Mi",
+        "timeoutSeconds": 1800
+      },
+      "logo": "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"
+    },
+    {
       "name": "Katana - Web Crawler",
       "slug": "katana",
       "version": "1.7.0",
@@ -232,6 +469,10 @@
       "capabilities": [
         "url_discovery"
       ],
+      "targetTypes": [
+        "domain"
+      ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -405,6 +646,11 @@
       "capabilities": [
         "vulnerabilities"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -500,6 +746,12 @@
       "capabilities": [
         "vulnerabilities"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -662,6 +914,12 @@
       "capabilities": [
         "ports_scanner"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -747,6 +1005,12 @@
       "capabilities": [
         "vulnerabilities"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -886,6 +1150,12 @@
       "capabilities": [
         "vulnerabilities"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -993,6 +1263,12 @@
       "capabilities": [
         "ports_scanner"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1069,6 +1345,129 @@
       "logo": "iVBORw0KGgoAAAANSUhEUgAAAIAAAAB6CAYAAAB3N1u0AAAdfklEQVR42uydCZhdVZXvf2uf4Vbdqrq3boWEQEhCwhABmymKKDbYHwqNCZAA1WSQJw+Ftu3ngCittt1qt3Y3aPez7afPhraVhkxdLfggGBAajYLMQ4CAEiAMCWSsO9R07xn2et+5dYtUhkoqIUGq6v75Tm5xzp7OWv+19tr77LOPyzBwwgknfEBEPg8cIiKWOt62UFURkbK1dsmqVau+t6f0Mgzln+Y4zs+NMem6eEcW4jj+68cff/xvd5fG2VMhhx566D+6rnuiqgIQRTHJ3yIywDis1eqvqh10Hqy1b1yD7c8D1WuDmFv7/yT9tnNxbGtlD1wfXI6+kW5X+ccyano4NpfL/fvmzZv7hko3nC7g4H4BQxA0MW3a4VQqFdav31CtJJ1uxPe9KjE8z6VQKAJgjCGXa60p2lIolKq/juOQy2UpFruq6ZOyEiWnUj6NjSn6+spEUVRVZkNDilyuJWFyNY3rOuTzper1pM4kT7lcwXFMtS1Jncm1JP1gco01uG4vxkQAGaAN6HwzBFAAVeirCFd94TP84pe/4d+uX4rnu7S2ZTjqqGlVoVcqAa9teApFcR3DH0ydjue6hFFE9+o1dOYLNDa6HDZlOgeHISLCqlXP0lcu4zc0MuGQwxCBp5/6HUEY0tjUxJEzjiUMwmrZYRiyfsOzhCFgPKZOn1pVdLqxAasKUK1v3frXeWntuirZxiKa0tB/66IisltL2GMMcNJJJ/3SOM4ZnhFmvetojj5ictVKt24tIEYQASP9FphYeNVbAED1miAAaPKfgsAb1trvti0KSC3DQDmwLe3gbkKrhQhS8zLJ9eq52vVUQwq1tuoZEBlbbr8mr7tXvci6LSUcI73lcvn41atXv/BmPEC/YD2HT51/ONlcA9gmcMaDQu2fIXiluzg/VHodRv49XYNBbBp7pi+AEdZu3MBLG4sJAfaYxR1u2QqUQ0s2BmKFKKaOtycBYtVhOz9Tl9rYRp0AdQLUMZbhjshWOwLuPgZ5CkQWhprQ9sy+mYUFQlsnwAGHK/xqdZHFD2yh0dt7TanCZ846hGkTGyDWnZS//OGt3Pl0EXcvio5iZea0Zi49fQJYrRPgQFv/iicL/Out6yG1lxM9sWXKYWn+5oLJO48iPcPjz3dx8ffX0FsKweyFhwkt7z2+tZ8AMvQItU6A/QTPEUgZTMpsM+shIQAooIFy5dmHkGn1oGJ5AwZ6u0Ou+NGL9PZEmIa9MH8RrIGUNzLDqRFJgO1gLYOeHrEztP/fSDluWoaPJVYa6vb8MMLVHa/yyG8L/aQaztMkMaNipnFkEyAK4ZiT4NyFEEf9x3YQiGPUxmANXzr8UVqat0KkbEPIsuBEvjezHY7rGZ7rV6CxCVY9ALfeNJyHqnUCHDDrnzAJTjwewt3r63DTxznOA7AdR2KetwfzqeiP4ej0XnX7eMCm9aA6omedR0EXEENI/7GL6EsRAD7n/oo2yQPeG1diPP40msVmTWOivYzcRPrrHuG9wKifCFJgipT4iPMUqMM2WL4Wn8E99vD9okMjdQK87aAIAH/uPExOSoNuN+ZZPZhrovftt7o8V0akNzCj3frHSy8fc57Y4YrDDNnKMu8nHC+bUMC+We1p3QO87SBApzZyRTiLh+zhQFw7wKDMdZ7iQf+H/LN7J5OkC4u8eSLUCfD2gaBYhJvtOzgtuJT5UTuP6yQgAmJQjwZCPu3ex2P+9XzBuZ9mCcYUEUZ9ECgoBiXCsDQ+jvcGl3FpdCGrdSJIBFhQjwl0ca23goe9H7LAebqaxyIoUifAaICpEaGCww3x8ZwSfIxPhOezRseDhACgHu+QjSxy/4tf+DfyR+al/RMf1Anw9iNCLx7/Gp/MzPByPhOey1ptA2LAqR6nywvc491YDRSzUhm1JBizC0IGiNClPt+N380J4Z+yyJ4IRACACxKQIqas7qiVg8sYh0EBqkR4XZtBFBSQkLvidzA/vKDabRi07gFGKyzCVClymfMEqAsS8rCdyrzoAvpwR63y6x4AUASATzqP0CYlUOE5O5ELw/bqHMJoVn7dAwAKTJbSG7OFG2jlgrCdVzUz6pVfJwAAcIXzGOOkky5t5qLwIlbr+DGh/DFPAItwsPTwCedR0AYWhnO4z04eM8qvewDgcudxDpICl0XncZs9esy9UWjGsvWPk77qo+KvRGfzo/gEBJC9sf5BSYNIR+QTwTHtAS43j3Fz/A6+Gb0f9lb5AINfXa97gJFn/SrCZ6OzAfat33e9ES+LkU8Ax9nrlTgC9KnLP0enEGL2S9AXW2Ukbk408ieCZO85LCh9eOi+Wv6QBBh5+1KMAgLsm8T3y5P+QXXb+pKw3wNUoTkDDm99GCZAHIECUNsOr06At0zvADguPP0IbCqAL2/dq1qeQG8I998NRkBhXIuHuFInwFuBlCcQKeq68OKzcM1V8NjD4B7gBfoikBJYtw6+8xV48mHU9cAqHzouC46MuPHgyCNAqNUXPM8+ZRwaWKxxYcM6+Jevwk0/gL4+8GT/R2OOgAF+8fN+wq1+rKp8LcecemyWy8+YsMM7h3UCHBhY5ZBxKVZ8/hi+9ZHDSaccrBoU4I6OfuU8+zT4+8sbCPgChTxcdy38+7ehq4h1PDS2XPC+8dz6mRk0N7sjMhIckV0AsSICn59zGL/68nGccnQLGijWS8HLz8M/fRl+chOEEXhvggRGwAMefQj+4XNw352o42IjYVKbz02fPJqffGYG43P+iLR+RvQoQIGKZeZRLfzqS8fxxbmH4TiCFQeiEG75MfzTl+CltZDa2wBRwBMol2HxdfB/vgYbX8M6KTRS/uS0g3jwq3/Awg9MANWdt5qpE+AtRGhJpRz+fuHh3Pn5Y5gxKY0NFev58Nsn4NrPwx23AQxvYykR8IE1v4NvXQ0/W4YC1hpam12uv/xIln16BpPGp6oEHOlPjkfHkjCrEChnnpjj/qlNXL3sFf7tlxuxxsP09cBN34VnH4d5n4CJEyAcYjcRVyBSWP6T/o0f+nr6u5VA+cN3ZvnBpdM5dloTBCNf8aOLAAMILLmMx/VXHMGH3pnlysUv8drmCuJ5yCO/gpeeg4uvgPecDirbXLcIeMBrr8Pi78MT94PrYcXDGOGLF0zia3Mn4zU42+8tVCfA2xCxgsCf/OF43ntkC5++aS0/fWgr6vqY/Gb4wd/BM4/DhR+D1maIAQF+fQ90XA+dm1HPRwPliMMa+P7/mMZZJ7dBpCNyH8CxRwC2BYiTJ6S45bMz+N5dG/hyx6uUuhTxBLnnVnj+GVjwSTh0an/A+OsVgGAdH2LlI2dM4H8vmMpB41IQjN7PJI3uZeGRgsCff/hQTp+R4ZM3rOXe1UXUS2HWr4Xv/nX/Zk/5zf2TOqEyLufx7XlTufSMCf1ljGLlMyYWhNS8wR9Ma+aeLx7LX100GdcRrNaGi6XO/kmdUDnzhFbu/8o7ufTMg8GO7OFdnQA7IrR4nuFv5k3lrquP5ZjJaWxgsZHgu4a/vXgKP//CMRx1WOOoGN5BvQvYGbXh4geOb+U3f/XO6nDxiVd6uPbiqXzghFYIdcTO6NUJsDcILK0tHtd9/Ag06g8MR9vwrk6APaE2XBTDmLP6OgEGUP/AZP3NoDoB6qgToA6oxwDDgAz8K/XO8+0L2e8EEAAAHfi3rv+3se63+yK7+L4vb5YAZSNCXxBz1fUPVmfN6vp/+0KAFzd24zkG0Ki7u7vvzRLgZhE5y1rlqZfzdesfAXAdg+s6ydfW71mzZs36PRFmjzjppJO+LiJ/BrTUR88jArGq/nelUvnEM888s+FNEwAASAO5kSqRxsbGvUrf19c3Um9VgD5g67C8xdKlS0/2PG+66tBvthlj1PM8KyIjcsLccRy6urooFArDY3o6TWtr64g1f2utRFHkJL+7k0kYhj1uOp2+O5VK5VRHr2cXEeI4rv7KMJaHR1GUkL56jFT4vj+sNK6IZMIwZLQTwHXd6g3viQCqiud5VcJYa0e/XAA7oj98NwyoajUG2Js4IMkzmpU/cI/ucN3iaGH8cAUzVmTirlmzpnqzo53tdewabmdnJ8aYOgHGKNxE+WOpG6hjeyQxgJeMCeseYOyhOgpQ1eVxHJ+oqnFdJGNK+WKt7RFArr766ua6SMYe+vr6groUxjjqS8LqBKijToA66gSoo06AOuoEqKNOgDrqBKijToA66gSoYyxgOC+GOEOki4DdPUDyankDYFeriQXwAa2lGQKZNi9tJqtrvagiW6gUXx7i3QR/L5e5D93+htaprm/HS2TC0InX0dW1ddilNjcf5Fl3UrW9Yfg6fX3rh5lzoP2VPaQbkGt5N0btA1Ht2C32KDC3pe0zxnCVKpEILgCAoj0gz2HjW8Ku4iIg3O5usq0/ADMX+LOg2HnzzkLOTfFS3AHyUljsPG+nxjY2TvK9xq8hzBWRcQCqGgFPqOX/hl2dN2xTYKbNzzh3ITIBHTgHKoTVH8UDDKAACI2q+tmwlF+yHdNbcrMcI18CThERr1ZnHrhLia8Ni8VHh9RKNjtTcP4C+KCI5Gp5ywp3q0Zfj0qlR4bMm86ehOf8p6CNavXLYVfhP4ZkSbZtKXCGqi4LS/nP7mSt2ewHHZybVO1NYanw+T3pd49dgBidIMZMFsFT9FnQ36GsBTAi5xnX+5GXbbsVaGIQFDNFjJmgsOsF9n7sGzHHAEfuRMSG1qme3/hLcczHUbpUdZFa/SGq9wInGtf80M+2LdmWTxQoAoXBh8BUI3KUCjGwdeC8onmxNthegbnLXccsF5HTgAfV6r+p6mJFN4iYPzHiPuJlchfvUoEt2UsF5wExph2lqKpLq+1FnzIisx3jPew0ZT8wtE2bi4zIkSJmkoh8dPca0WlizEQR+ZSXzp64EwEgI8YcLMJh+6sLiAEUvSks5r/ENhg3k5kp4txgjPPHfqb1yqBU+AYD2GaJQ6000X6L1p3clO/L18WYI9XaxUGp8+NAHwNoaTnaU/cfBF21rexiPihx5uCyAfGzuQdB3q2xXhp25+/dgWg62NuIyrUIWGvnhaX8ssEy8rNt5wNXEdnndhJ4pu1sY+RHABpHfxmUCt8BegEAvExuHjA/1vC3u3HpF6jVJ1VYJyJnk8kcSan0/K6TS0z/olWD5/xFUvYO2rIYQCViGBh+EKg7faDPRqXSwxLbL6OAyGz2DxpBTkcVjfQftlM+QFfXc2Epf0FQKnxzxxYOOtjubyHe4ZxuRzg3NVMc06qq9+6gfIAoKHb+JCh2vj/sLT6+w7WUA9cigo3t14NS4e8GKx8gLOWXhqX8+fT2bth1F5t7lxHzDhVWYO0SMcZxMefsRhGOql2vVu8VkXluJvPuNyPsNz0KUDXPg6JIDvB581AEC2Cd4bmx3UB2+GVoqwKgDRjqe7A7BbJ+S+6DYuR4je3asCv/7X1qoMgcECzx3WEoK9VaNZiL9pDLVewPAATnS79XAojYI0EQ2Lr7aH7YKANJQIeDfD9xsRxgBDZ4WNVuFJFj/WzbDUmAOjynyAcRQUV/BnTvQ9UphDmqdmtc5BHK+VdBH0I43W9pmTFUtUAurOh9anWlMWau25I77cATQHbuq0llp2OcryGA2tv2m0KiylfVxg+LYw53jdzhZ9vu9VpaPwocmKVrPT2bgE+paijGzPdTPO1ncj92W9pO3QP73wFAbB/fl2rd5tZTjMjRwH9DsQCA6nIxBos7ayhFiIgPEKPXgCD9I5cDSwBBzvIybdd4mbZ/9DJt/+Rlcv/lN7hPiGNO0Dj+76BU+O7+VEhQzH/Q2ugaVd0ixpxmHPfHfqbtST/T9lc0NU3Y716g2NlhNXq/tfYOEdMijvNRx5H7/Uzubr85O3fXMtE2FATZsi91ijFz6X8p5/8BAP3eRBVj5MLd5fVcycSl/ApVe68RmeU0Zf/owBGgP+p8lzFytTHyOWPkSmOcC1HtVBtfHZTy5wI9+1knpbBY+GIQVY7TyF6paleLkWnimL/xXf8xJ5s9cz/XR1QqPRQWO8+Jbfhuje31qloSxzlTXPdmL5O7BbI7DGklBgDdl3crGxDO09gWQxv+HAAgLBYfU6urgPd5TbnjdqMTAxCrfhPAcc0XAfZ2B6/hEUCEZFxcKdsplbKdam18LQIqPBMU89/aKVIHdojG35w36Or8TlDsnKlRdIHGdpWIM8nBWUYqe/iB6BGSSZug1HlFEPQdZ6P466raaxxnjp8x391eB7oZASuy18Gq05R9rxE5AsH1HP8/vGzbz2rHbQgTRQziMmtP5cSl/B1q7T0i5iy3ufV0CwUUhvtt7GF3ASq6pRqklPOvhKXCN6y1LxiRc2rj3J0gQhkA1BuCwQ7gCGKHSZJK0F28JSh1nqFqnxJjxvkN5kIOJPr61oVd+a8Rxx9BFUQu3C5AVFYBGGP2OggzjhnoVsoCMwXeXTveAwgoIHOHU1Yc228CiGO+gJjK3tjcvs4DdKH2qyAg8rdAZmf96mu1v47YpQUYM0X630rdOJw560EoKno7gMIU3gIE3cXb1eorIpL2UnY8AIDCHagC/PFeeqMmQWaraqChPTModk4Linpk/9E5PQj6TlKt1neq19R6/B4J0FO8x6reYURmI5q85KOg+9cD7IiwVFik1v7SGHOk15K7aucU/AYFwZwLpHYigDoX9w+heGCHS2k/0/qXpLLThiYjRwKIlbX7Q8FuS8t7kmceQyZIZQ9FGJd0BWHFbAIAiLryv1G1d4kxGS9l/nFId5/NfjB5SPTG/2cy70viGeD+sLewCuiFfLH/oJu+vtfQ/qGwOAxrgk1j+3cABrl8x+cyB4QAAFb1K6giRq7acdwalvJ3WLUviDHH+pncD2hqOhgQoMlvabtSjHxcrQ0klkXbKSPT+j/Fcb/hNzj3uS2tn665XA9wkujfz7R91RhzkVrbGYR68/7QvzHudx3XfMfP5u7sn3fIttZk4yfz7X6Dc4MY04RqR7UbHASN+JzGtmAc54Kk//bS2ZMBHzA0Nh7qZXPfcMW9yzfeNQAAjjjV6B+rQw+dbbwcBcTMrcltt4i6C7+21v5UjJxcHSYOcz+n4TwL8BBhVzNkUVf+PpPJ/bs47mUWvg2cyzaULPGfitVbxHEu9SV1EdnUy8BBycMKVLFqr4y6C89sV6boYrHxsUbMJx3X/Wdj7Lc01fYyaCRI8oCpKRF4rHpJEo/svumSQmQg3hgKkbV81mD/RYxzlqt6lpN1tkDbRpR01VJFqA51iT+3kyfsyT/tNufONdgbjWNm48ts321bi9AHJA9uGq21z6vK9QD95JKLUEUtdwzZ7RDf61unIEbe5ba0nBJ1dT0IgJJCdm28qnINMAcRSEgwDOxx+OI2pNtUNQ16h62Un96p/5GGVY7DBIEgltQjROUiAIBWKmuN23gr4KtoVpBxQI9a+4uY+H/FpeJ/7lRhpVK2lfLPTMpfrpZeEVIC4wTTAPqSWntTKPYKLRUe2qN7a2iYpFY3GeJb4yAY8pm+Dcrr4krfj42fekZVQWgRpA2IFB7UWP8+7MpfTaXSM0T+V2LPWeQgeaAR0XFgGkHXYPV7odhP2FLheQBa/KkGc4QqPwu780uHDICDoNdJNYhCn2JWa6VczW/8hkkIG8OIWwfLur8dfescvzFWtFvV3mMr5Yd5G8EDMkDDPuRtPmCzgLtva+O+ZafpLW5vHXXsG+prAusEqKNOgDrGLPY4DDznnHPGp9PpVmOMCYKgUigU1mWz2cZbb721G9CFCxdmFi1aVJo1a1bOcZxxxhgNw7Dz9ttvz+9Y1kc/+tGGMAwbFy9enL/ssstaurq6tKOjo7u9vX2i7/vjgZeTspIye3p6JqZSqWDZsmWvAHb27NlpY8yhSflxHHffdtttG+fMmTPOcZw213XDWjrmzJmT++lPf7p15syZXnNzs7Ny5cqdVs+2t7c7cRxPdRzHhGGYT9IDLFiwYKqqNhcKhedXrFhRaW9vb7bWHuK6ri2VSutWrFgRzJ49e7Lrug2O42h3d3f3nXfe+fqu5Hb++ee3+r4/2XGcwtKlS1+tyTKTyWSm+L5fuvHGG6vtPeOMM9wJEyY0dXR0FGtta+vo6CgANqk/kc/8+fMPWrJkyRbAfOhDH2q86667es4999yDRaQlkUdPT8+G5Fx7e/sUa23KGNPV0dGxYb94gPXr1/fWNos+uKenJ79y5coonU6f2N7ebgBU9USqS/VajhCRSj6f37p169byrsoql8sTgfPp34/37HQ6PTW5YRE5olgsvg6cnAhEVac7juOFYWgWLFjwfgBgUhiGfqVS2VwqlXro3+v2qGTD4+TPefPmJXlNQ0PDh88555zUoYce2jZhwoSpu2qH53kZ3/cn9vb2bvV9/7iEcBdffPER1tq2crnc2draemqtvVPjOBZrbbl2TvP5fD6O47Yoirxyudy1q/KvuOIKr6Gh4cQgCF5VVSch3CWXXNKUyWROttZuDILAJPcJMG7cuCmq+j4AANd1T5s/f/7Rtft7JwDwofnz5x986qmnptra2mbU0iX3XtyyZUtnZ2dnkBDedd1pxWJxUyqVmt7e3j5pvxDgySef7PF9f5PjOJ133313sVZ5Q0NDw5R58+ZNFpEm+neflnQ63TBlyhT/gQce2OXadhEJoiiqLFy48LAoilygB5hWqVRWL1++fEsQBOsmTpx4mKqGvu9vufnmm1+01vYmJEmsMJ1Opw466KCGGTNmVADiOE68QZ+IdAPO5s2bTRzHr7S2th7puu6QT0TCMJQkz+233573PK/PGNNgjDnk9ddff+qWW255Pbm2YMGCXBzHNoqicnd3d5eIGID77rsvWaW8tbe3d8vKlSt3uQrouuuuixOjyWQyuWXLlr3U0dERR1GUEGxNR0fH5uTcypUro5rcMo7jvJZ4DABjzAYgN3v27LSq2pqxvCoih02YMMEdRBQnm802TJ482Xn00UfD6dOnizEmuvvuu3ustZWGhgZnv8UAruuaKIoGp3WMMelE+Y7jODVlGM/zmuM4bk4scVflJMyP4/hFY8x7ReSF2nbmTiaTCQeSGGO8mvUNeJiy67peTThNxpiW1157zasJL5VOp9/lOM57li5d+tD06dNda20+sVjgkKFe/Ojt7VUg8T4nWmsLN95446ZEoCtXroxrdYZhGLpJF+H7/jG5XO7DmzdvfmPiKekOPc/bnezskiVLkqnZxgULFvxRe3u7b611XdfdzjASz6Oqh5XL5Ybm5uajBkgNvNjU1HSUtdYCVQ8UhuGGpqamaYmSBwjgOE7LgAFu2rTJqmquvb39w0ldA13MfiFAYjGJhQPUGtl3ww03PLtkyZLfJv3xgNBE5NnFixe/uHLlyqGe7jlAd7lc/nUURZ2JF3BdNx9F0aE11zwxiqKtgDNgwa7rHvzcc891JmTZunXrmhtuuOGF5cuX99Yso6+jo+Me4PUFCxYMWJC3bNmyF1Kp1FRTI9MuuoBEh4llPrFkyZI1tXssz507dzwAkMvlcoXEih3HeUBVn2praxu4ltSbEHnI+fnEHV9yySWNixYtSmYW17muOzUIgtdVdXKtn/cBrLWTrbXPFAqF1dbadI3U7pIlSzYn8nYcZzyggN/R0bE+6aKSGKVmTD1J+YsXL36Z/m8cJITYANxujEkN9y2pYRFg8+bNQaVSGRzUbaxZefJhgo01ofR2d3efkFjVeeedd+gQHqCnXC4XkgDFWltyHKc7UYCqti1cuPA0x3F6Ozo6EmUnbuyoefPmvS8Igt8mLg7ozWazR82dO/eEWbNmTQcAtra3tycfg1itqgd1dXUFSR8OkJDRcZzKEASoxHFcGHwujuMn0+n0UUk7XNd95brrrgujKCpWKpXEmp8dPLMXBEExjuPePYjtnQsXLjzVGDOuUCi8Uuta4uSeHMc5KSFBEATBzTffvHblypXd1tqXk6Cvr69vE0CpVHouMY4aqTfVfp91XbenRp5wzpw5My+88MKTzj777LYVK1aEQRDkk+4mDMNX58+fP+73MaowtWOv950dCIoGYVdlyL6WP1wkAdv+KivxBMO4z9+LvOuoA+oTQXX8/wEA4iRpgJLBiswAAAAASUVORK5CYII="
     },
     {
+      "name": "Trivy - Dependency & IaC Scanner",
+      "slug": "trivy",
+      "version": "0.75.0",
+      "image": "ghcr.io/oasm-platform/connector-trivy:0.75.0",
+      "author": "oasm",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://trivy.dev",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
+      "shortDescription": "Finds vulnerable dependencies and IaC misconfigurations in Git repositories",
+      "description": "Scans the repositories of a Git organization with Aqua Security Trivy. Reports known vulnerabilities (CVE, GHSA) in the dependencies declared by lockfiles and manifests — npm, pip, Go, Maven, Cargo, Composer, NuGet, RubyGems and more — with the installed and fixed versions, and misconfigurations in Dockerfiles, Kubernetes manifests, Helm charts and Terraform. Secret scanning can be turned on in the profile; secret values are never reported.",
+      "capabilities": [
+        "sca"
+      ],
+      "targetTypes": [
+        "git_org"
+      ],
+      "agentTool": true,
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "ref": {
+            "description": "Branch, tag or commit to scan. Empty scans the default branch.",
+            "title": "Ref",
+            "type": "string"
+          },
+          "repository": {
+            "description": "https clone URL of the repository to scan.",
+            "examples": [
+              "https://github.com/acme/web"
+            ],
+            "format": "uri",
+            "title": "Repository",
+            "type": "string"
+          },
+          "token": {
+            "description": "Access token for private repositories.",
+            "title": "Token",
+            "type": "string",
+            "ui:widget": "password"
+          },
+          "username": {
+            "description": "HTTP user for private repositories.",
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository"
+        ],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "ignoreUnfixed": {
+            "default": false,
+            "description": "Skip vulnerabilities that have no fixed version yet.",
+            "title": "Ignore unfixed",
+            "type": "boolean"
+          },
+          "scanners": {
+            "default": [
+              "vuln",
+              "misconfig"
+            ],
+            "description": "What to look for: vulnerable dependencies (vuln), IaC misconfigurations (misconfig) and secrets (secret). Secrets are off by default because the Gitleaks job of the repository scan covers them.",
+            "items": {
+              "enum": [
+                "vuln",
+                "misconfig",
+                "secret"
+              ],
+              "type": "string"
+            },
+            "title": "Scanners",
+            "type": "array"
+          },
+          "severity": {
+            "default": [
+              "info",
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "description": "Severities to report. \"info\" is a vulnerability no vendor has rated yet.",
+            "items": {
+              "enum": [
+                "info",
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ],
+              "type": "string"
+            },
+            "title": "Severity",
+            "type": "array"
+          },
+          "skipDirs": {
+            "default": [],
+            "description": "Repository-relative directories or glob patterns not to scan, e.g. test fixtures.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Skip directories",
+            "type": "array",
+            "ui:placeholder": "testdata, **/fixtures"
+          }
+        },
+        "type": "object"
+      },
+      "resourceDefaults": {
+        "cpu": "1000m",
+        "memory": "2048Mi",
+        "timeoutSeconds": 1800
+      },
+      "logo": "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAIAAABMXPacAAAXRElEQVR42uydCVyN2f/HP8997r3dClnKvZKIsYfqoqJQCklDWcYWYx3blDHI9mMskz/GMhiMDMa+Dspaoilb1qi0Ce2S9u5tufc+5/+695JllMx0Uzyf1331qts55znnvM9+vuc8XEIIWH06cdgsYAGwAFixAFgArFgALABWLAAWACsWAAuAFQuABfBpVVRUzAL4NJLL5XsO+1o7uU+b+3NCUupnD4CqVsvRgSGhK9ZuD7l+lygUABEKDWZOcZ/y7dA6tWuxADSryOh47193HD5xHgT6LUxybB2YxATmahCRSNu1azl/5sThrv04HA4LoPKVnpG5ftveLbuOSAtLGjbQW+QxTujQxz0unxBCHsUq/I6T+3eJXG7Xw+p/s6f07CZmAVSaCguLdh08tWrTzpRnmXweZ/KYIbOnjTUyFF7KLHS+9pQGUfC0QAhz+wZz+gQTH0fTnBFDB8z3nNCmpQkL4L/q1PnLP6/zuRseC8K49rdb8MMk8w5tAAAIeF7w9Z30vvV5gxvV8Y598ZQjQG6OIjiQuXCapKfp1dWbNnGE5+RRBg3qfQ4ESJUr9E7416O/p4XmtMiiW3/3MwEh7zjwT88XnI8fdjOREJJZLF/8ML3huRhBYJLWvuu8MYvoptac+qYtOjtt232kqKiY1HBVKYAnCSlT56zgG4ppkbh55/4+e4+/NweVAPyiGpyJ+ulhek6JnBASk1807k6yzuloQUCC1lZ/7oCptMiC08DUqu+o0wHBNRpAFTVBuXn5W3cdWbdtb1ZOQW1dwfcTR3hMGqlfRhuibIJuJILLg5Z2M1Lo1crgW+O6AEIypcujn4cUMACYsNuM319MTBQIM9DZYdGPky06tmX7gPdIoVAcOnHee8OOmPgkEIX7MJd5HuNbf9WsHC9KALfTzHRpYx2e74ticHlW2mRhawMHA10A+5NyV8e9iCV8SAqYq0GKc74kJUlbV2f8aLfZ08YaGzVi+4DXCgwOtXedSIssaKFFnyHf/X3tdkV8qfsA99tJhJCTqXmWQfGCi4mC0zEjbyVF5BURQvJkipUxz43OxwouJWkdusWbuJxubkMLzUXt7VZv2pWXX8D2AeRhTPzoqQtooRktEnfoMfjQiXMKhaKCfpUAzsRZBsUnSUsIIYVyxab4TJMLMYJLKXVPR82PfCaRM4SQp5KSaWGptc9EC4JSW+4JGjV1Pt2wEy0Sm9q6HfzrLMMwXyiA9IzMecs31G3RnRZZGJr2XrN598cWSSWAU5GCs3FG52LWxr2QyBWEkNRC2dyIZ3qnowSByaef5Zc6vp4pcb2RuDQukxBy+cpNZYUTmtNCc8chk4Ov3/kSAUz38qZFYlpo3t7GNTruyb8IQQnAN0r/TJSOb6Tg72ff3kku/dfdnMLfn2TmlChmPkh1uPJEPUZ6R7P+94uq5inxpz57Xs0BVP7qirSwCIQBEB33ZMrs5WcvXvk3ofB49ga1/Ls3c+QXm+sJEqWy7U+ykgtl5nqCyc3q6/E4WSWKLJlC8banp4mpMxet3nngBECBMHKFQi5XVPM+uPIBcDgUKGr8qEFW4o4hoWFfj/ZwG/vDrXuRHzk6oyige30dXytjjxYNdiVme6YoegQ/2Z2YAwDA7+aNL9uY1OfRAABk5+R5b9hh2W/U5j+OAPCYNMLIUMgwjCqYLwwAAAAufXuGnN69ydurSWOhr3+IzYCxU+eseJyQXEHvICAgeKUxTeoO0ipKI/TP0c8lCgaAgEPV4XIAlJTIdh04adVv9OJV2zKzckYPcQq9sP+XpT/q6mgzTA0w/OZqKNziohKKoqaOGzbExXGjz/7fdh722XfyqK+/x6RR08YN0//IZRwTXf7BLk0CMyQ8Crr060JzJiDEe4NP6N1IEOLY03LhrMk2lubqZT6GYVATpKkagFd130C/3vL5M0Iv7B83wiUvX7JsrY+V0+jte459YNPxfS1HbwPdHvq6AADcvBvhOnbmQHfP0LuR5qatjvyx5tzhrercB1CDDj1U0RZHy+bGPuuWBPvtcnbo9jQxbZrXyp4Dx588d7lMDzwtRRkNyKMnid/9uNzW5Vs//ytNmzTavNIr2HeXm3Nv1Exxq/JhVuKOp/Zu9Lvwt/cGn1thUUPG/djPvtuCHyZ169IJb6ijnsC9Xq6z6N1m6kVm9qYdBzf/cSg3X1qnlvb3E0fMmDDCQL+GL0pX+sB2wswltMjiqG9AOW6Kiop37DvesusAWiTmCs3GeSwuf8YglRZu233EROxEi8T8RhaTZi2Ne5xQjnuJRNrG+uv6LW2TUp59cROxigBQKzMrZ/na3w3a9KRFYr3m3cIiol//T/7WDGvYhNnqyd1Ad48bdx58MOQaBID7CStf/Xp6i2ZNHjXEec3m3bfuRWjx+QCQL4H3bly8hUYN4DUG3TsBEAn1rSzae3mOd+nTE5+XuJ88BibGjbesXiiTyXk8LgDM3ojtfgADULgRgSs+aGW8YcVchmFomsZnp+pi6PEy959l4q/LAAMQ5c+MPJy5qp4Xf5a5X/0s4yjgHeMf7ueZ79UVgLABRvUDKDUKGBvAxebzBsCtDpG4eFZy+M88j3n1O5hrYeU0GOoj4Kby5w8j0MwQRI7khaC4aDQPdG0WQGUqN0exdlnWjk25HNS161usBKDFx+zRyk+pGAle7IVuGqL9YbwBtbuzTVDl6Mplqatdyh+biG4taskv3KHuZZRuWg+tfCG3BnUb0XZI+QmkiAXwnyQpYFbMfzGsb0pMBN+6V8mpv40medbl8SgAAFKfZbiN/WHPYV+USrcz2lyC3k8AkLcU0b0huckC+JcKvVLoZp+89RdGW8BZ4K118Gzjdh218IYePIz19Q85dOL82zEVoPEStLkMpgtwDQ97Im0lSAkL4CNUWEhW/5Q5xCE54p5Wl+4lf11qPH1OvdKCXyrlNhYpY9pVuzvaXkbt+UAJshcgpg+kYSyACuluaNEQh+Rff5ZzONSPi3mHLzTu1Fnwr6KsCyNvZYvEdAL+xkMbPFsLImcBlKniYvLryiw3++Swm/xOXUqOBzae9b/6Wlr/bbe2dk+0DYbOLOUYKXM2Yp1RGMkCeEOEAADw4G7xCKeU1YuVJgwe87nHLxp1ttaunEfQdWC8Fq0vgGkH4o+H3ZG+GSAsAAAUX1XAt/yS7WaXHBrCb9ep+Ih/Y69lDbR1KttMQa8P2oZAewaQi4zvEeuCkkc6Otrv39X8QiZiBPLwe8XHfssIPCcnYKbMomYtMqpVW2O1jVsfTTdBry8SZ4GcwcOb0nqLAEWNYMDVTLBk3Ypc7SK6lWnhT7807umgUxVJqTsAtSyRtADSHToZnpziNjRl+CU2QTKZHOAU8a/0cHl09ppxFeU+AABcA5j4SA12bjxlmJqlVaIoqf7mEZUPoE8va/16dYu0rgbGzFq+fkNa+osqSwwh5PjpQPtxlz23iHKllEsf2/r19Ko5AI2Ypz9NTPFY8H/aTbrQIrFRR8f12/bmF0gq7v38pau00HzAyBkf9dC/r93uO3SK+uiZjfPYsxdDSE2QBg9o3AuPVm6mvzwioLTZl8vlmgAQGf3IfdrLswhtrAfuPniquLiEEPKlA1DLP+h6r4HjlYdkRBb2rhMvBt+oRAApac/nLl1f28SaFomF7exW/rojOyeP1ChVxSlJuVy+/9gZU1s3lWmJ2fBJc+6FR/9HAHn5Beu27jHq6EiLxDrGXT0XrkpISiU1UFV3TDU3L3/tlj8NTXt/MMvKB6BQKA4cP9uhx0uc30yaExYRQ2qsqvqgdkra89lL1tZqZlVOo1EOgIvBN+wGTVA3aHaDJlSkQWMBvEcRUY9GTZlfVrf5XgBhEdHDJ80pPfV34HhFu3QWQJkKunqrz5Dv1APH7v3HlN5Z8A6AhKRUz4WrSge167bu+ahBLQugPDEMc/SUv4X9N2rTT9cxMx88jL0YfIMWmg8a4ymVFq7csEPU3o4WiWubWM9duj4l7Tn5vFQtLmySSAt3Hzy15rfdyWkvBFpciw5trt26b2zUqHYtnciYpyCKkYP7z/OY0K518w8G9Tgh2f/ytQJJoaW4g62VBV4p40X2ucCQtPQXpm1b9ullxePx8gskN+6Et2/dwlBkAEB9c1FYRExXc9N6deswDHMxODQsPFq/Qd1+9t0NRQ1r0kz43yk9I3Oh9yb1AWNlW6867tt36JQKnq8nhBzzDVB6F5qpvU/38lb3EzfvRrTo4kwLzXmNLNSNW36BJCLqEVdotuvAyVLvR30DaKH5ldB7crl8xHdepe4NTXsHBod+nk3QPxXz6Ol4z8XaTbpY2H9zzNe/4h4fPUmsY2JtYT/s6s2w2PiEGfO8aZHF738elclkprZuovb2vueDniSmrNm8mxaa/7Bo9cOYeK7QbOf+E+8ACL0TvmLddlposWTVlvinSf5B103ETs0s+j3PyPoiAKh1PzImJ/fj5rS/bt9HC81C74Sr/5TL5Wa9hjoMnqTuUfYc9i11OXzy3KbmfS9fucU3FO8+eOp1BfILoIVm/kHX29u49hs2pfR73wtBtND8mF+AJlJaTa/B69iulV6dj7NCzM7J5/N5pQ06TdOtWjTNzsnPeJENkDdvUWnfukV+gbREJlN3P3ilkhKZajldll8gMW5iiFdq1bwpoDxOUjOWoz+VupiblpTI/3zDnIumOQqFon2bFjwed8e+E6UHVxmVmjUxbGrUaM8Rv5zcfPXJ1t0HT+k3qNfFzLRD25Ynz16KjU8AAIDLpSmVatCO2CdQXztrN2f7Jau2BV+707yZEUVRITfu1a+n1751iznTv/X+dWfc44T2bVoMdXHkcrkMw+jXr7vUa5r7tIWWfUf16Ca+eTc8Mvrx+hWzDfTrzZ85se+wKTYDxvZ3sNXRFmRm5RCiqaOvlQ/g8Mnzfx7y5fN5AoHWmiWzmjQWVQ0AmqZ3blzW6qudx3wDwqPjQJQGXibGhgzDLJs3XWjQYOvuI2nPMqw6d7rzIApAcUnJCDcnPp+3fuveswEhRobCXRuXug9zAdC9q9mFI9u81/sEBocqGAWH4jQS6tfV04xhdqX3Kou8NytnVSILXiOL8Ki4qu/ApdLCzKwc9Sc37/XFNsXFJTKZjBCydM3WOibWKWnp6u8ZhsnKzn3vwkZObn5pUBq6ILDyawCXSwMEhBFoa1Ofwi5BW1ugrf0emzs+n/f6D+WFItTLXymqXt067w1Kr47Gr0yu1n1A0NVbuw6e4nJpDoczd8a4ls2NKyVYuVxRVFRSTbbrqzWAyOj4/cfPAwSEjB7iXFkAnBxsGurXr4LSXeMBaGjkZ925k3XnTtUkjdUaQCfT1pPdXdXD8CobTX1OAIi2ttZ/8K4cDnbvaobPWhoEIJMpfPYebyxqqHg1BZXLFV0tTNWrxIEhoWHhMRwOVUtXZ+Tg/rpKc1okJqc9eBiXkJTa177bVybG4VFxAUHXaVpZA4a4OBqKDPyDrj+IjOXxuHK5wtbKoquFaTkRKJBI9x87U6i6mIjP4435xiUrO/evM4EURSkUCsde1h3atiw/CUVFxQeOn83NL2AY0qalibOjrQZKaWXrp9VbX60nv1xSfv0RiWcuWq12Nt5zsXq6UO8rm/SMzOu3738zcY5+6x7qDbKjqnXQ3/44pHZDC82Drt4ihBw95a/604IWibv2GVm+/c+OfcfVfmmRuLfbREKI34W/1fvJtEi8ZefhD6Yl40WWsJ2d2v2gMZ41cTGOvPUhhPvq4BGfxwMICMPl0l7LNvR2m3TMLzA7Jw8gIER9PommOSAMCENRUL8+w21Ab1tLM4CAKO7cjzp59lJZD5ZICzf5HAQhasfzPCeUHn5Sf2j6w2mnKEqgxQchIIwqwpWvKl6MI28NbAgAZGXn7j1yuri4BGBenZF/d/xDCHkZXQ5n5pTRAAEAYMP2fSpb4PfoyMkLEdHxAAGovnbdHHpY/Zdo18g+QEuLv8l7XguTJvJX93syDDExNiw7hVSHtl8Nd+1n3rFtF7P2ZQU7wLGHjaX5ldAwQLnVdfLspaED+7zjprCwaKPPAQAACMjMKe6ortIgAJqme3Tr/JVJkwq6X/jDxHke49+7ivBOsDOnuF8JvQcAoH7dvt/V2Z7LfSshR075h0c9eln8e1k59rSqtgA02wSpGpaKiFrqNW2p17QP5v6rSmCrGp5SALlx58GJM5fKKv6o3sW/mmzIUDaWZvM8xn9EteVyPSaPAoja+4bt+9SbWQAAHPUNuB8ZCxCAcuxp1aeXNQvgA5owyvVj72Ma2K+XajmBAkjonQjf80EA1CP3TTteF38VJ3y5ACqymKOrK+hs1r48F2VUAs/vRr0eDv3+cjh0zC/gXngMQACqt62lU2+bKkhC9QJQGmOi0gfd62gLPnb/HQCAQU52luIOpT3BmYBgAG+2/p7fjf5H3D4uZ9XbNTUMQJ3auiAvW4OcvHzNRV1ZCSaXzgmozX8c3HXg5N0HUerib2fTxal393/A1i7N9qzs3A8+QiItetNsomYAMGlqBDAACMGtexEajf0gJzvVchAFkODrd39csvZ18Z88+p9l3MiwoY62NgDV7dPhHww/IvqR2maiJgHo1K5V6Q7fvqOnCws1eLkSn8+bOfllO8MwTF5+AQCA6tmt83sXzpoaGbZq0RSgAHIxJDQi+lH54avuLKppfUAzY8PetpYABZCwiNj/27hTowkY6GTXxbzd29lEZk4Z/d4mnsfjur665lsiKZq3bINcXuY1K/uPnTl++qKmL5/gaCLQ7yeNVG3NAyA/r/f5eb2PQqGpV4loafE9Jo3Ea1E9rMX9yx78fDv860ZCfYACyPlL18bOWPRek7f9x85MnbsCmpdGAHTvajbzu1GlgS9ZtdXedeKew35RsY/zCySV/jg3Zwdxp7YABagHP6PKmVUYihqumD8DIAAAcvikf3fnseu27gmLiElLz3ickHzy3OUh42aNnbFIKq2Km+k0tRa0zGt6QlLaUb+LIAxArt68f/XmfYAsmjX5p7lTNVEJxs74n3pSPcCxR/nuxw7/+tHTpJUb/gAIQB49SZq7dAOPx9XR1pLJ5ap8pwAAUP1SA5sgdfe4e9PyaeOGvpEMAopTIJFq4nFDXBzNTFsB1IyJIyoyqV4+b/qqxZ4CgVZp3GQyWW5ewatST1TfU9adO5ZlMlTdAagL5kbveaf2buxhbaHaTlEmqXR7UiaXg6JAcVQmOu8vZQoFA4oDKP2WPyHS0uJPHTess1nbgf3sKhi9H6eNvfTXjkFOvVQrgNTbH7RtZbJl9YLDO9Zo+nX2GreKcHa07Wff7V549LVb9yOj463FHQEAsOlqXlAgpbl0Pb06OmUsgrZpZTLExZ7H5VEURA31y3/Q0K/7WHRs9/IS8Iqpq4XpsV3romIfX7sVFhEdn5Obz+dxmzYxtBR3sLToUEtXJzsnT3PDBwDV6KX+1VOZWTlih+HJqekANXhA78M71tSkJogVC4AFUMNVIpOpTzIB4NAcFkBVKyklPSs7DwAoqlFDAxZAVcvvQtDL97ESYt6hNQugShUd98Rn318AUb3wqY6tlZgFUPkqa7k/OTV9nMfiF5k5AEBxBg9waGZsyAKoZN2PjLEZMHa6l/ejJ4l4pbz8ggPHz/Z2m6R6BzIBqEYNG3h9Px5gJ2KVqrsPooZNnP00MQ1A7Vo6Hdu1NGzUUCotjIyJf5qYClAAASgulz7ks3qQk52GosH9Yov/Rp8DT5PSAQIgv0CiWqx9UwSgaulqb/tlkeZy/4uuATm5+as379q660i+pBCEAKQ0TwAAxM6my8pFnv/CZIYF8BGKjU846usfGBz6JDGlQCLl8bgiA32LTm0HD3Do08u6Cl7fxy7GAYD6THaJTMahOLVr6aj2CapILIBPLHYixgJgAbBiAbAAWLEAWACsWAAsAFYsABYAKxbAl6P/HwBajd2bbPiM6gAAAABJRU5ErkJggg=="
+    },
+    {
       "name": "WPScan - WordPress Security Scanner",
       "slug": "wpscan",
       "version": "4.1.0",
@@ -1085,6 +1484,12 @@
       "capabilities": [
         "vulnerabilities"
       ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
+      "agentTool": true,
       "inputsSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1329,6 +1734,360 @@
         "timeoutSeconds": 600
       },
       "logo": "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"
+    },
+    {
+      "name": "dirsearch - Web Path Scanner",
+      "slug": "dirsearch",
+      "version": "0.5.0",
+      "image": "ghcr.io/oasm-platform/connector-dirsearch:0.5.0",
+      "author": "oasm",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://github.com/maurosoria/dirsearch",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
+      "shortDescription": "Brute-force web path and file discovery",
+      "description": "Discovers hidden files, directories and endpoints on a web target by brute-forcing paths from a wordlist with dirsearch, filtering by status code and file extension.",
+      "capabilities": [
+        "url_discovery"
+      ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
+      "agentTool": true,
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "description": "Base URL to scan. Scheme/path preserved; dirsearch is run with -u <target>.",
+            "examples": [
+              "https://example.com"
+            ],
+            "format": "uri",
+            "title": "Target URL",
+            "type": "string",
+            "ui:placeholder": "https://example.com"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "excludeExtensions": {
+            "description": "Extensions to exclude (dirsearch --exclude-extensions, comma-joined).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Exclude extensions",
+            "type": "array",
+            "ui:placeholder": "js, css"
+          },
+          "excludeStatus": {
+            "description": "Exclude responses with these status codes, comma-separated (dirsearch -x).",
+            "title": "Exclude status codes",
+            "type": "string",
+            "ui:placeholder": "404, 403"
+          },
+          "extensions": {
+            "description": "File extensions to append to each path (dirsearch -e, comma-joined).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Extensions",
+            "type": "array",
+            "ui:placeholder": "php, html, js"
+          },
+          "headers": {
+            "description": "Extra request headers, one -H per entry, e.g. \"X-Api-Key: abc\".",
+            "items": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "array",
+            "ui:placeholder": "Authorization: Bearer ..."
+          },
+          "includeStatus": {
+            "description": "Only show responses with these status codes, comma-separated (dirsearch -i).",
+            "title": "Include status codes",
+            "type": "string",
+            "ui:placeholder": "200, 301"
+          },
+          "maxRecursionDepth": {
+            "description": "Maximum recursion depth; only used when recursive is true (dirsearch -R).",
+            "minimum": 1,
+            "title": "Max recursion depth",
+            "type": "integer"
+          },
+          "maxTime": {
+            "description": "Maximum scan duration in seconds (dirsearch --max-time).",
+            "maximum": 1100,
+            "minimum": 1,
+            "title": "Max scan time",
+            "type": "integer"
+          },
+          "maxUrls": {
+            "default": 10000,
+            "description": "Adapter-level cap on emitted findings; defaults to 10000.",
+            "minimum": 1,
+            "title": "Max URLs",
+            "type": "integer"
+          },
+          "method": {
+            "description": "HTTP method to use (dirsearch -m).",
+            "title": "HTTP method",
+            "type": "string",
+            "ui:placeholder": "GET"
+          },
+          "proxy": {
+            "description": "Proxy URL, e.g. http://127.0.0.1:8080 or socks5://127.0.0.1:9050 (dirsearch -p).",
+            "title": "Proxy",
+            "type": "string",
+            "ui:placeholder": "http://127.0.0.1:8080"
+          },
+          "randomUserAgent": {
+            "description": "Use a random User-Agent per request (dirsearch --random-agent).",
+            "title": "Random user agent",
+            "type": "boolean"
+          },
+          "recursive": {
+            "description": "Enable recursive brute-force on discovered directories (dirsearch -r).",
+            "title": "Recursive",
+            "type": "boolean"
+          },
+          "threads": {
+            "default": 25,
+            "description": "Number of concurrent threads (dirsearch -t).",
+            "minimum": 1,
+            "title": "Threads",
+            "type": "integer"
+          },
+          "timeout": {
+            "description": "Per-request timeout in seconds (dirsearch --timeout).",
+            "minimum": 1,
+            "title": "Request timeout",
+            "type": "integer"
+          },
+          "wordlist": {
+            "default": "default",
+            "description": "Bundled wordlist preset under the dirsearch wordlist directory. default selects dicc.txt.",
+            "enum": [
+              "default",
+              "common",
+              "web",
+              "conf",
+              "extensions",
+              "backups",
+              "vcs",
+              "db",
+              "logs",
+              "keys"
+            ],
+            "title": "Wordlist",
+            "type": "string",
+            "ui:placeholder": "default"
+          }
+        },
+        "type": "object"
+      },
+      "resourceDefaults": {
+        "cpu": "500m",
+        "memory": "512Mi",
+        "timeoutSeconds": 1800
+      },
+      "logo": "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"
+    },
+    {
+      "name": "ffuf - Web Fuzzer",
+      "slug": "ffuf",
+      "version": "2.3.0",
+      "image": "ghcr.io/oasm-platform/connector-ffuf:2.3.0",
+      "author": "oasm",
+      "pricingTier": [
+        "free"
+      ],
+      "homepage": "https://github.com/ffuf/ffuf",
+      "repositoryUrl": "https://github.com/oasm-platform/oasm-connectors",
+      "supportUrl": "https://github.com/oasm-platform/oasm-connectors/issues",
+      "shortDescription": "Directory and file discovery via web fuzzing",
+      "description": "Fuzzes a target path base with ffuf wordlists to discover directories, files and endpoints, streaming every match as a finding for URL discovery.",
+      "capabilities": [
+        "url_discovery"
+      ],
+      "targetTypes": [
+        "domain",
+        "ip",
+        "cidr"
+      ],
+      "agentTool": true,
+      "inputsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "description": "Base URL to fuzz under. A missing scheme defaults to https://. The path (if any) is the fuzz base, i.e. FUZZ is appended to it.",
+            "examples": [
+              "example.com"
+            ],
+            "format": "uri",
+            "title": "Target URL",
+            "type": "string",
+            "ui:placeholder": "example.com"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "autoCalibration": {
+            "description": "Automatically calibrate filtering options to reduce false positives (ffuf -ac).",
+            "title": "Auto calibration",
+            "type": "boolean"
+          },
+          "data": {
+            "description": "POST data / request body (ffuf -d).",
+            "title": "Request body",
+            "type": "string",
+            "ui:placeholder": "a=b"
+          },
+          "delay": {
+            "description": "Delay between requests, either a number of seconds or a range, e.g. 0.1-2.0 (ffuf -p).",
+            "title": "Delay",
+            "type": "string",
+            "ui:placeholder": "0.1"
+          },
+          "extensions": {
+            "description": "Append these extensions to each wordlist entry (ffuf -e), e.g. php, html, bak.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Extensions",
+            "type": "array",
+            "ui:placeholder": "php, html"
+          },
+          "filterCodes": {
+            "description": "Colon/comma-separated HTTP status codes to filter out (ffuf -fc).",
+            "title": "Filter status codes",
+            "type": "string",
+            "ui:placeholder": "400,404"
+          },
+          "filterSize": {
+            "description": "Filter responses of this size in bytes (ffuf -fs).",
+            "title": "Filter response size",
+            "type": "string",
+            "ui:placeholder": "0"
+          },
+          "followRedirects": {
+            "description": "Follow HTTP redirects (ffuf -r).",
+            "title": "Follow redirects",
+            "type": "boolean"
+          },
+          "headers": {
+            "description": "Header lines in \"Name: Value\" form, sent on every request (ffuf -H).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "array",
+            "ui:placeholder": "X-Api-Key: …"
+          },
+          "matchCodes": {
+            "description": "Colon/comma-separated HTTP status codes to match (ffuf -mc).",
+            "title": "Match status codes",
+            "type": "string",
+            "ui:placeholder": "200,204,301,302,307,401,403"
+          },
+          "maxTime": {
+            "description": "Maximum running time in seconds (ffuf -maxtime). The adapter also enforces a hard 20 minute timeout.",
+            "maximum": 1100,
+            "minimum": 0,
+            "title": "Max time (seconds)",
+            "type": "integer"
+          },
+          "maxUrls": {
+            "default": 10000,
+            "description": "Hard cap on emitted findings. When reached, the scan is stopped and partial results are kept.",
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "Max URLs (adapter cap)",
+            "type": "integer"
+          },
+          "method": {
+            "description": "HTTP method to use (ffuf -X). Default: GET.",
+            "title": "HTTP method",
+            "type": "string",
+            "ui:placeholder": "POST"
+          },
+          "proxy": {
+            "description": "Proxy URL, e.g. http://127.0.0.1:8080 or socks5://127.0.0.1:9050 (ffuf -x).",
+            "title": "Proxy",
+            "type": "string",
+            "ui:placeholder": "http://127.0.0.1:8080"
+          },
+          "rate": {
+            "description": "Maximum requests per second (ffuf -rate). 0 = unlimited.",
+            "minimum": 0,
+            "title": "Rate limit",
+            "type": "integer"
+          },
+          "recursion": {
+            "description": "Recurse into matched directories (ffuf -recursion).",
+            "title": "Recursion",
+            "type": "boolean"
+          },
+          "recursionDepth": {
+            "description": "Maximum recursion depth (ffuf -recursion-depth). Only applied when recursion is on.",
+            "minimum": 1,
+            "title": "Recursion depth",
+            "type": "integer"
+          },
+          "threads": {
+            "default": 40,
+            "description": "Number of concurrent threads (ffuf -t).",
+            "minimum": 1,
+            "title": "Threads",
+            "type": "integer"
+          },
+          "timeout": {
+            "default": 10,
+            "description": "Per-request timeout in seconds (ffuf -timeout).",
+            "minimum": 1,
+            "title": "Request timeout",
+            "type": "integer"
+          },
+          "wordlist": {
+            "default": "common",
+            "description": "Bundled wordlist to fuzz with (ffuf -w). Resolved under FFUF_WORDLIST_DIR (default /opt/wordlists/ffuf).",
+            "enum": [
+              "common",
+              "raft-small-directories",
+              "raft-medium-directories",
+              "big",
+              "dirbuster-small",
+              "dirbuster-medium"
+            ],
+            "title": "Wordlist",
+            "type": "string",
+            "ui:placeholder": "common"
+          }
+        },
+        "type": "object"
+      },
+      "resourceDefaults": {
+        "cpu": "500m",
+        "memory": "512Mi",
+        "timeoutSeconds": 1800
+      },
+      "logo": "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"
     }
   ]
 }

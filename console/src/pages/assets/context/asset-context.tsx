@@ -4,10 +4,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
 import { type DateRange } from 'react-day-picker';
+import { decodeFilter, encodeFilter, type Filter } from '@/components/filter-builder/filter-model';
+import { LEGACY_FILTER_KEYS, legacyToFilter } from '../legacy-filter';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 
 export type AssetContextType = ReturnType<typeof useServerDataTable> & {
@@ -15,24 +18,12 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     targetIds?: string[];
     value?: string;
     limit: number;
-    ipAddresses?: string[];
-    ports?: string[];
-    urls?: string[];
-    techs?: string[];
-    tlsHosts?: string[];
-    statusCodes?: string[];
-    hosts?: string[];
+    filter?: string;
     startDate?: string;
     endDate?: string;
     page: number;
     sortBy: string;
     sortOrder: 'ASC' | 'DESC';
-  };
-  queryFilterParams: {
-    targetIds?: string[];
-    value?: string;
-    limit: number;
-    page: number;
   };
   queryOptions: {
     query: {
@@ -42,16 +33,8 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
   };
   refetchInterval?: number;
   targetId?: string;
-  filterParams: {
-    ipAddresses?: string[];
-    techs?: string[];
-    ports?: string[];
-    urls?: string[];
-    hosts?: string[];
-    statusCodes?: string[];
-    tlsHosts?: string[];
-  };
-  filterHandlers: (key: string, value: string[]) => void;
+  appliedFilter?: Filter;
+  setAppliedFilter: (f?: Filter) => void;
   dateRange: DateRange | undefined;
   setDateRange: (date: DateRange | undefined) => void;
   generatingAssets: Set<string>;
@@ -95,32 +78,34 @@ export default function AssetProvider({
     defaultSortOrder: 'ASC',
   });
 
-  const toArray = (value: string | string[] | undefined): string[] => {
-    if (Array.isArray(value)) return value;
-    if (value) return value.split(',');
-    return [];
-  };
+  const where = typeof search.where === 'string' ? search.where : undefined;
+  const appliedFilter = useMemo(() => decodeFilter(where), [where]);
 
-  const ipAddresses = toArray(search.ipAddresses);
-  const ports = toArray(search.ports);
-  const urls = toArray(search.urls);
-  const techs = toArray(search.techs);
-  const hosts = toArray(search.hosts);
-  const statusCodes = toArray(search.statusCodes);
-  const tlsHosts = toArray(search.tlsHosts);
+  // One-time migration of old links (?hosts=…&ports=…) into the tree.
+  useEffect(() => {
+    const legacy = legacyToFilter(search);
+    if (!legacy) return;
+    const merged: Filter = { logic: 'and', items: [...(appliedFilter?.items ?? []), ...legacy.items] };
+    navigate({
+      search: ((prev: Record<string, unknown>) => {
+        const next: Record<string, unknown> = { ...prev, where: encodeFilter(merged) };
+        for (const k of LEGACY_FILTER_KEYS) delete next[k];
+        return next;
+      }) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      replace: true,
+    });
+  }, [search, appliedFilter, navigate]);
 
-  const filterHandlers = useCallback(
-    (key: string, value: string[]) => {
+  const setAppliedFilter = useCallback(
+    (f?: Filter) => {
       navigate({
-        search: ((prev: Record<string, unknown>) => {
-          const next = { ...prev, page: 1 } as Record<string, unknown>;
-          if (value.length > 0) {
-            next[key] = value;
-          } else {
-            delete next[key];
-          }
-          return next;
-        }) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        search: ((prev: Record<string, unknown>) => ({
+          ...prev,
+          page: 1,
+          where: encodeFilter(f),
+          // A non-empty tree replaces the free-text search (the bar shows the tree instead).
+          filter: f?.items.length ? '' : prev.filter,
+        })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         replace: true,
       });
     },
@@ -166,13 +151,7 @@ export default function AssetProvider({
       targetIds: targetId ? [targetId] : undefined,
       value: tableParams.filter,
       limit: tableParams.pageSize,
-      ipAddresses: ipAddresses,
-      ports: ports,
-      urls: urls,
-      techs: techs,
-      hosts: hosts,
-      statusCodes: statusCodes,
-      tlsHosts: tlsHosts,
+      filter: where,
       startDate: urlDateFrom,
       endDate: urlDateTo,
       page: tableParams.page,
@@ -186,25 +165,10 @@ export default function AssetProvider({
       tableParams.page,
       tableParams.sortBy,
       tableParams.sortOrder,
-      ipAddresses,
-      ports,
-      urls,
-      techs,
-      hosts,
-      statusCodes,
-      tlsHosts,
+      where,
       urlDateFrom,
       urlDateTo,
     ],
-  );
-
-  const queryFilterParams = useMemo(
-    () => ({
-      targetIds: targetId ? [targetId] : undefined,
-      limit: 10,
-      page: 1,
-    }),
-    [targetId],
   );
 
   const queryOptions = useMemo(
@@ -218,13 +182,7 @@ export default function AssetProvider({
           tableParams.pageSize,
           tableParams.sortBy,
           tableParams.sortOrder,
-          ipAddresses,
-          ports,
-          urls,
-          techs,
-          hosts,
-          statusCodes,
-          tlsHosts,
+          where,
           urlDateFrom,
           urlDateTo,
         ],
@@ -238,13 +196,7 @@ export default function AssetProvider({
       tableParams.sortBy,
       tableParams.sortOrder,
       refetchInterval,
-      ipAddresses,
-      ports,
-      urls,
-      techs,
-      hosts,
-      statusCodes,
-      tlsHosts,
+      where,
       urlDateFrom,
       urlDateTo,
     ],
@@ -253,22 +205,13 @@ export default function AssetProvider({
   return (
     <AssetContext.Provider
       value={{
-        queryFilterParams,
         tableHandlers,
         tableParams,
         queryParams,
         queryOptions,
         refetchInterval,
-        filterParams: {
-          ipAddresses,
-          ports,
-          urls,
-          techs,
-          hosts,
-          statusCodes,
-          tlsHosts,
-        },
-        filterHandlers,
+        appliedFilter,
+        setAppliedFilter,
         dateRange,
         setDateRange: handleDateRangeChange,
         targetId,

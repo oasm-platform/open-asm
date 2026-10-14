@@ -22,6 +22,7 @@ export default function TlsAssetsTab() {
       sortBy: queryParams.sortBy,
       sortOrder: queryParams.sortOrder,
       search: queryParams.value,
+      filter: queryParams.filter,
       targetIds: queryParams.targetIds,
       startDate: queryParams.startDate,
       endDate: queryParams.endDate,

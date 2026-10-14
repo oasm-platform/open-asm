@@ -1578,7 +1578,16 @@ type Vulnerability struct {
 	FilePath         string                 `protobuf:"bytes,31,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
 	JobHistoryId     string                 `protobuf:"bytes,32,opt,name=job_history_id,json=jobHistoryId,proto3" json:"job_history_id,omitempty"`
 	IsArchived       bool                   `protobuf:"varint,33,opt,name=is_archived,json=isArchived,proto3" json:"is_archived,omitempty"`
-	Fingerprint      string                 `protobuf:"bytes,34,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	// Set by repository scanners: the connector's stable identity of the
+	// finding within its asset. Core keys deduplication on it when present.
+	Fingerprint string `protobuf:"bytes,34,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	// Code findings (repository scanners). Empty / 0 for host findings.
+	LineStart        int32  `protobuf:"varint,35,opt,name=line_start,json=lineStart,proto3" json:"line_start,omitempty"`
+	LineEnd          int32  `protobuf:"varint,36,opt,name=line_end,json=lineEnd,proto3" json:"line_end,omitempty"`
+	Commit           string `protobuf:"bytes,37,opt,name=commit,proto3" json:"commit,omitempty"`
+	PackageName      string `protobuf:"bytes,38,opt,name=package_name,json=packageName,proto3" json:"package_name,omitempty"`
+	InstalledVersion string `protobuf:"bytes,39,opt,name=installed_version,json=installedVersion,proto3" json:"installed_version,omitempty"`
+	FixedVersion     string `protobuf:"bytes,40,opt,name=fixed_version,json=fixedVersion,proto3" json:"fixed_version,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -1851,6 +1860,48 @@ func (x *Vulnerability) GetFingerprint() string {
 	return ""
 }
 
+func (x *Vulnerability) GetLineStart() int32 {
+	if x != nil {
+		return x.LineStart
+	}
+	return 0
+}
+
+func (x *Vulnerability) GetLineEnd() int32 {
+	if x != nil {
+		return x.LineEnd
+	}
+	return 0
+}
+
+func (x *Vulnerability) GetCommit() string {
+	if x != nil {
+		return x.Commit
+	}
+	return ""
+}
+
+func (x *Vulnerability) GetPackageName() string {
+	if x != nil {
+		return x.PackageName
+	}
+	return ""
+}
+
+func (x *Vulnerability) GetInstalledVersion() string {
+	if x != nil {
+		return x.InstalledVersion
+	}
+	return ""
+}
+
+func (x *Vulnerability) GetFixedVersion() string {
+	if x != nil {
+		return x.FixedVersion
+	}
+	return ""
+}
+
 type UrlDiscoveryResultRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
@@ -2113,7 +2164,7 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\tresolvers\x18\x1f \x03(\tR\tresolvers\x12,\n" +
 	"\x12chain_status_codes\x18  \x03(\tR\x10chainStatusCodes\x12(\n" +
 	"\x10asset_service_id\x18! \x01(\tR\x0eassetServiceId\x12$\n" +
-	"\x0ejob_history_id\x18\" \x01(\tR\fjobHistoryId\"\xb8\b\n" +
+	"\x0ejob_history_id\x18\" \x01(\tR\fjobHistoryId\"\xff\t\n" +
 	"\rVulnerability\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -2156,7 +2207,14 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\x0ejob_history_id\x18  \x01(\tR\fjobHistoryId\x12\x1f\n" +
 	"\vis_archived\x18! \x01(\bR\n" +
 	"isArchived\x12 \n" +
-	"\vfingerprint\x18\" \x01(\tR\vfingerprint\"\xb6\x01\n" +
+	"\vfingerprint\x18\" \x01(\tR\vfingerprint\x12\x1d\n" +
+	"\n" +
+	"line_start\x18# \x01(\x05R\tlineStart\x12\x19\n" +
+	"\bline_end\x18$ \x01(\x05R\alineEnd\x12\x16\n" +
+	"\x06commit\x18% \x01(\tR\x06commit\x12!\n" +
+	"\fpackage_name\x18& \x01(\tR\vpackageName\x12+\n" +
+	"\x11installed_version\x18' \x01(\tR\x10installedVersion\x12#\n" +
+	"\rfixed_version\x18( \x01(\tR\ffixedVersion\"\xb6\x01\n" +
 	"\x19UrlDiscoveryResultRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x15\n" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12\x14\n" +
@@ -2182,7 +2240,7 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\vResultPorts\x12!.jobs_registry.PortsResultRequest\x1a\x1a.jobs_registry.JobResponse\x12`\n" +
 	"\x15ResultVulnerabilities\x12+.jobs_registry.VulnerabilitiesResultRequest\x1a\x1a.jobs_registry.JobResponse\x12V\n" +
 	"\x10ResultScreenshot\x12&.jobs_registry.ScreenshotResultRequest\x1a\x1a.jobs_registry.JobResponse\x12Z\n" +
-	"\x12ResultUrlDiscovery\x12(.jobs_registry.UrlDiscoveryResultRequest\x1a\x1a.jobs_registry.JobResponseB\x11Z\x0f./jobs_registryb\x06proto3"
+	"\x12ResultUrlDiscovery\x12(.jobs_registry.UrlDiscoveryResultRequest\x1a\x1a.jobs_registry.JobResponseB(Z&oasm-worker/internal/gen/jobs_registryb\x06proto3"
 
 var (
 	file_jobs_registry_proto_rawDescOnce sync.Once

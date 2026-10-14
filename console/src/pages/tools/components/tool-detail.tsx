@@ -35,7 +35,15 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import dayjs from 'dayjs';
-import { BadgeCheck, Box, Plus, Settings, Tag, Trash2 } from 'lucide-react';
+import {
+  BadgeCheck,
+  Box,
+  Crosshair,
+  Plus,
+  Settings,
+  Tag,
+  Trash2,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -55,6 +63,17 @@ interface ProfileWithMeta {
 }
 
 /** Masked config values for display (API masks sensitive fields). */
+const TARGET_TYPE_LABELS: Record<string, string> = {
+  DOMAIN: 'Domain',
+  IP: 'IP',
+  CIDR: 'CIDR',
+  GIT_ORG: 'Git organization',
+};
+
+function formatTargetType(targetType: string): string {
+  return TARGET_TYPE_LABELS[targetType] ?? targetType;
+}
+
 function maskConfig(config: Record<string, unknown>): string {
   const entries = Object.entries(config);
   if (entries.length === 0) return '—';
@@ -213,6 +232,16 @@ export default function ToolDetail() {
                       <Badge variant="secondary" className="gap-1">
                         <Box />
                         {formatType(tool.type)}
+                      </Badge>
+                    )}
+                    {tool.targetTypes?.length > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1"
+                        title="Target types this tool can scan"
+                      >
+                        <Crosshair />
+                        {tool.targetTypes.map(formatTargetType).join(', ')}
                       </Badge>
                     )}
                   </div>
