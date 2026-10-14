@@ -3,7 +3,6 @@ package grpcclient
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -11,13 +10,13 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"oasm-worker/internal/config"
 	jobRegistryPb "oasm-worker/internal/gen/jobs_registry"
 	workerPb "oasm-worker/internal/gen/workers"
 )
 
-// tokenFileName is the default location of the persisted worker token,
-// relative to the process working directory (the worker workspace root).
-// Override with the WORKER_TOKEN_FILE environment variable.
+// tokenFileName is the persisted worker token's file name inside the per-user
+// data dir (~/.oasm). Override with the WORKER_TOKEN_FILE environment variable.
 const tokenFileName = ".worker-token"
 
 // Client wraps the gRPC connection to core-api and the generated service
@@ -121,16 +120,12 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 }
 
 // resolveTokenFilePath returns WORKER_TOKEN_FILE when set, otherwise the
-// workspace-root default (<cwd>/.worker-token).
+// per-user default (~/.oasm/.worker-token).
 func resolveTokenFilePath() string {
 	if p := os.Getenv("WORKER_TOKEN_FILE"); p != "" {
 		return p
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return tokenFileName
-	}
-	return filepath.Join(cwd, tokenFileName)
+	return config.DataPath(tokenFileName)
 }
 
 // readTokenFile returns the trimmed worker token from path, or "" when the

@@ -169,7 +169,7 @@ The worker runs in one of two modes, reported to core-api when it joins:
 	rootCmd.Flags().Int("grpc-port", 16276, "gRPC server port")
 	viper.BindPFlag("grpc_port", rootCmd.Flags().Lookup("grpc-port"))
 
-	rootCmd.Flags().String("tool-path", "oasm-tools", "Tool path")
+	rootCmd.Flags().String("tool-path", config.DataPath("oasm-tools"), "Tool path")
 	viper.BindPFlag("tool_path", rootCmd.Flags().Lookup("tool-path"))
 
 	rootCmd.Flags().String("network", "", "Network ID for internal network connection")
