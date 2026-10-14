@@ -2339,6 +2339,7 @@ export type ConnectorDto = {
   repositoryUrl?: string;
   supportUrl?: string;
   capabilities: string[];
+  agentTool?: boolean;
 };
 
 export type ToolConfigProfile = {
@@ -4499,6 +4500,10 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
    * Filter vulnerabilities by target ID
    */
   targetId?: string;
+  /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"severity","op":"in","value":["high","critical"]},{"logic":"or","conditions":[{"field":"cve","op":"contains","value":"2024"},{"field":"cvssScore","op":"gte","value":"7"}]}]}. Fields: name, severity, tag, host, ip, port, cve, cwe, target, tool, affectedUrl, cvssScore, epssScore. Ops: eq, neq, contains, notContains, in, notIn, gt, gte, lt, lte.
+   */
+  filter?: string;
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatus =
