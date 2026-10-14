@@ -2240,7 +2240,7 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\vResultPorts\x12!.jobs_registry.PortsResultRequest\x1a\x1a.jobs_registry.JobResponse\x12`\n" +
 	"\x15ResultVulnerabilities\x12+.jobs_registry.VulnerabilitiesResultRequest\x1a\x1a.jobs_registry.JobResponse\x12V\n" +
 	"\x10ResultScreenshot\x12&.jobs_registry.ScreenshotResultRequest\x1a\x1a.jobs_registry.JobResponse\x12Z\n" +
-	"\x12ResultUrlDiscovery\x12(.jobs_registry.UrlDiscoveryResultRequest\x1a\x1a.jobs_registry.JobResponseB\x11Z\x0f./jobs_registryb\x06proto3"
+	"\x12ResultUrlDiscovery\x12(.jobs_registry.UrlDiscoveryResultRequest\x1a\x1a.jobs_registry.JobResponseB(Z&oasm-worker/internal/gen/jobs_registryb\x06proto3"
 
 var (
 	file_jobs_registry_proto_rawDescOnce sync.Once

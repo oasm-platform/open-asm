@@ -564,8 +564,8 @@ export class ToolsService {
         },
       });
 
-      // Add isInstalled flag to the tool
-      tool.isInstalled = !!workspaceTool;
+      // A disabled workspace tool is not installed, as in the tool listing.
+      tool.isInstalled = !!workspaceTool?.isEnabled;
 
       // Add hasConfigProfile and isReady flags
       const hasConfigProfile = await this.hasProfile(workspaceId, tool.id!);
@@ -573,7 +573,7 @@ export class ToolsService {
       // Connector without a config schema needs no config → installed means ready.
       const needsConfig =
         this.connectorRegistry.getConnectorSchema(tool.name) !== null;
-      tool.isReady = needsConfig ? hasConfigProfile : tool.isInstalled;
+      tool.isReady = tool.isInstalled && (needsConfig ? hasConfigProfile : true);
     } else {
       // Without workspaceId, profile status is unknown
       tool.hasConfigProfile = null;

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package jobs_registry;
 
-option go_package = "./jobs_registry";
+option go_package = "oasm-worker/internal/gen/jobs_registry";
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";

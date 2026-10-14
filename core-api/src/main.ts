@@ -71,6 +71,7 @@ async function bootstrap() {
       ],
       url: `0.0.0.0:${grpcPort}`,
       loader: {
+        includeDirs: [join(__dirname, 'proto')],
         keepCase: false,
         longs: String,
         enums: String,

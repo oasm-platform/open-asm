@@ -1,3 +1,4 @@
+import { WorkerScope } from '@/common/enums/enum';
 import type { WrapperType } from '@/common/types/app.types';
 import { AgentConversation } from '@/modules/agents/entities/agent-conversation.entity';
 import { RedisService } from '@/services/redis/redis.service';
@@ -21,6 +22,26 @@ export interface RemoteExecuteCommand {
   type: number;
   sessionId: string;
   command: string;
+  /** RUN_TOOL only. */
+  toolRun?: ToolRunPayload;
+}
+
+/** One connector tool run for an agent (proto ToolRun). Not a job. */
+export interface ToolRunPayload {
+  tool: string;
+  image: string;
+  target: string;
+  configJson: string;
+  cpu?: string;
+  memory?: string;
+  timeoutSeconds?: number;
+}
+
+/** The worker picked for a conversation's next push. */
+export interface ConversationWorkerPick {
+  workerId: string;
+  /** Persist it as the conversation's pin once the push succeeded. */
+  pin: boolean;
 }
 
 export interface WorkerRegistration {
@@ -39,6 +60,15 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
 
   private readonly sessionWorkerMap = new Map<string, string>();
 
+  /** In-flight tool runs (session id → worker), failed fast on disconnect. */
+  private readonly toolRunWorkerMap = new Map<string, string>();
+
+  /** Who each connected worker may serve. Cloud workers never serve agents. */
+  private readonly workerScope = new Map<
+    string,
+    { workspaceId: string | null; scope: WorkerScope }
+  >();
+
   constructor(
     @Inject(forwardRef(() => WorkersService))
     private readonly workersService: WrapperType<WorkersService>,
@@ -48,7 +78,15 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   ) {}
 
   registerWorker(worker: WorkerInstance): WorkerRegistration {
-    void this.workersService.enableAgentMode(worker.id);
+    // Cloud workers never serve agents (cloud ToS): they keep the stream for
+    // protocol compatibility but are never marked agent-capable.
+    if (worker.scope !== WorkerScope.CLOUD) {
+      void this.workersService.enableAgentMode(worker.id);
+    }
+    this.workerScope.set(worker.id, {
+      workspaceId: worker.workspaceId ?? worker.workspace?.id ?? null,
+      scope: worker.scope,
+    });
 
     const subject = new ReplaySubject<RemoteExecuteCommand>(1);
     this.workers.set(worker.id, subject);
@@ -59,6 +97,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       if (currentSubject === subject) {
         this.handleWorkerDisconnect(workerId);
         this.workers.delete(workerId);
+        this.workerScope.delete(workerId);
         this.logger.log(`Worker ${workerId} disconnected, cleaned up`);
       } else {
         this.logger.verbose(
@@ -93,9 +132,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     conversationId: string,
   ): Promise<string | null> {
     try {
-      return await this.redisService.get(
-        `agent:conv:worker:${conversationId}`,
-      );
+      return await this.redisService.get(`agent:conv:worker:${conversationId}`);
     } catch (err) {
       this.logger.warn(
         `[RedisCache] Failed to read cached worker for ${conversationId}: ${err}`,
@@ -140,34 +177,36 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     }
   }
 
-  private getNextAvailableWorker(): string | null {
-    for (const [workerId, subject] of this.workers) {
-      if (!subject.closed) {
+  /** A connected workspace worker of this workspace — never cloud. */
+  private canServe(workerId: string, workspaceId: string): boolean {
+    const scope = this.workerScope.get(workerId);
+    return (
+      this.isWorkerAlive(workerId) &&
+      scope?.scope === WorkerScope.WORKSPACE &&
+      scope.workspaceId === workspaceId
+    );
+  }
+
+  private getNextAvailableWorker(workspaceId: string): string | null {
+    for (const workerId of this.workers.keys()) {
+      if (this.canServe(workerId, workspaceId)) {
         return workerId;
       }
     }
     return null;
   }
 
-  getOrAssignWorker(sessionId: string): string | null {
+  getOrAssignWorker(sessionId: string, workspaceId: string): string | null {
     const existingWorkerId = this.sessionWorkerMap.get(sessionId);
-
-    if (existingWorkerId) {
-      if (this.isWorkerAlive(existingWorkerId)) {
-        return existingWorkerId;
-      }
-
-      this.logger.warn(
-        `Worker ${existingWorkerId} for session ${sessionId} disconnected, reassigning...`,
-      );
-      this.sessionWorkerMap.delete(sessionId);
+    if (existingWorkerId && this.canServe(existingWorkerId, workspaceId)) {
+      return existingWorkerId;
     }
+    this.sessionWorkerMap.delete(sessionId);
 
-    const workerId = this.getNextAvailableWorker();
+    const workerId = this.getNextAvailableWorker(workspaceId);
     if (workerId) {
       this.sessionWorkerMap.set(sessionId, workerId);
     }
-
     return workerId;
   }
 
@@ -194,102 +233,144 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     return payload;
   }
 
+  pushToolRun(
+    workerId: string,
+    sessionId: string,
+    toolRun: ToolRunPayload,
+  ): RemoteExecuteCommand | null {
+    const subject = this.workers.get(workerId);
+    if (!subject || subject.closed) {
+      this.logger.warn(`Worker ${workerId} is not subscribed or stream closed`);
+      return null;
+    }
+    const payload: RemoteExecuteCommand = {
+      id: nanoid(),
+      workerId,
+      type: 3, // REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL
+      sessionId,
+      command: '',
+      toolRun,
+    };
+    subject.next(payload);
+    this.toolRunWorkerMap.set(sessionId, workerId);
+    return payload;
+  }
+
+  /** Tells the worker to kill the tool run of this session. */
+  pushCancelToolRun(workerId: string, sessionId: string): void {
+    const subject = this.workers.get(workerId);
+    if (!subject || subject.closed) return;
+    subject.next({
+      id: nanoid(),
+      workerId,
+      type: 4, // REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL
+      sessionId,
+      command: '',
+    });
+  }
+
   pushCommandWithSession(
     sessionId: string,
     command: string,
+    workspaceId: string,
   ): RemoteExecuteCommand | null {
-    const workerId = this.getOrAssignWorker(sessionId);
-
-    if (!workerId) {
-      return null;
-    }
-
-    return this.pushCommand(workerId, sessionId, command);
+    const workerId = this.getOrAssignWorker(sessionId, workspaceId);
+    return workerId ? this.pushCommand(workerId, sessionId, command) : null;
   }
 
   async pushCommandWithConversation(
     conversationId: string,
+    workspaceId: string,
     sessionId: string,
     command: string,
   ): Promise<RemoteExecuteCommand | null> {
     if (!conversationId) {
-      return this.pushCommandWithSession(sessionId, command);
+      return this.pushCommandWithSession(sessionId, command, workspaceId);
     }
+    const pick = await this.pickConversationWorker(conversationId, workspaceId);
+    if (!pick) return null;
+    const pushed = this.pushCommand(pick.workerId, sessionId, command);
+    if (pushed && pick.pin) {
+      await this.pinConversationWorker(conversationId, pick.workerId);
+    }
+    return pushed;
+  }
 
-    // 1. Try Redis cache first (fast path)
+  /**
+   * The worker to serve a conversation's next push: Redis pin → Postgres pin
+   * → any connected worker of the workspace. Nothing new is persisted here:
+   * when `pin` is set the caller pins the fallback with pinConversationWorker
+   * once its push succeeded, so a failed push never pins a dead worker.
+   * A pin that fails the scope rule (other workspace, cloud) is cleared; an
+   * in-scope pin whose worker is merely offline is kept — a fallback serves
+   * this push only.
+   */
+  async pickConversationWorker(
+    conversationId: string,
+    workspaceId: string,
+  ): Promise<ConversationWorkerPick | null> {
     const cachedWorkerId =
       await this.getCachedConversationWorker(conversationId);
-
-    if (cachedWorkerId && this.isWorkerAlive(cachedWorkerId)) {
-      this.logger.verbose(
-        `[StickyWorker][Redis] Using cached worker ${cachedWorkerId} for conversation ${conversationId}`,
-      );
-      return this.pushCommand(cachedWorkerId, sessionId, command);
+    if (cachedWorkerId && this.canServe(cachedWorkerId, workspaceId)) {
+      return { workerId: cachedWorkerId, pin: false };
     }
-
     if (cachedWorkerId) {
-      // Cached worker is dead — clear stale cache
-      this.logger.warn(
-        `[StickyWorker][Redis] Cached worker ${cachedWorkerId} dead, clearing for conversation ${conversationId}`,
-      );
       await this.deleteCachedConversationWorker(conversationId);
     }
 
-    // 2. Try Postgres (existing sticky logic)
     const conversation = await this.conversationRepo.findOne({
       where: { id: conversationId },
       select: ['id', 'workerId'],
     });
-
-    if (conversation?.workerId && this.isWorkerAlive(conversation.workerId)) {
-      this.logger.verbose(
-        `[StickyWorker][DB] Using pinned worker ${conversation.workerId} for conversation ${conversationId}`,
-      );
-      // Warm the Redis cache
-      void this.cacheConversationWorker(conversationId, conversation.workerId);
-      return this.pushCommand(conversation.workerId, sessionId, command);
+    const pinned = conversation?.workerId;
+    if (pinned && this.canServe(pinned, workspaceId)) {
+      void this.cacheConversationWorker(conversationId, pinned);
+      return { workerId: pinned, pin: false };
     }
 
-    // 3. Fallback to any available worker
-    const workerId = this.getNextAvailableWorker();
+    const pinInScope =
+      !!pinned &&
+      (await this.workersService.isAgentWorkerForWorkspace(
+        pinned,
+        workspaceId,
+      ));
+    const workerId = this.getNextAvailableWorker(workspaceId);
     if (!workerId) {
+      if (pinned && !pinInScope) {
+        await this.writeConversationPin(conversationId, null);
+      }
       return null;
     }
+    return { workerId, pin: !!conversation && !pinInScope };
+  }
 
-    // Push command FIRST — ensures the worker subject is still alive
-    // before updating the conversation record (TOCTOU race prevention).
-    const result = this.pushCommand(workerId, sessionId, command);
-    if (!result) {
-      this.logger.warn(
-        `[StickyWorker] Worker ${workerId} became unavailable before command could be pushed`,
-      );
-      return null;
-    }
-
-    // Persist assignment to both Postgres and Redis
-    if (conversation) {
-      await this.conversationRepo
-        .createQueryBuilder()
-        .update(AgentConversation)
-        .set({ workerId })
-        .where('id = :id AND ("workerId" IS NULL OR "workerId" != :workerId)', {
-          id: conversationId,
-          workerId,
-        })
-        .execute();
-
-      // Write to Redis cache (fire-and-forget)
-      void this.cacheConversationWorker(conversationId, workerId);
-    }
-
+  /** Persists workerId as the conversation's pin (Postgres + Redis). */
+  async pinConversationWorker(
+    conversationId: string,
+    workerId: string,
+  ): Promise<void> {
+    await this.writeConversationPin(conversationId, workerId);
+    void this.cacheConversationWorker(conversationId, workerId);
     this.logger.log(
       `[StickyWorker] Assigned worker ${workerId} to conversation ${conversationId}`,
     );
-    return result;
+  }
+
+  private async writeConversationPin(
+    conversationId: string,
+    workerId: string | null,
+  ): Promise<void> {
+    await this.conversationRepo
+      .createQueryBuilder()
+      .update(AgentConversation)
+      .set({ workerId: workerId as string })
+      .where('id = :id', { id: conversationId })
+      .execute();
   }
 
   removeSession(sessionId: string): void {
     this.sessionWorkerMap.delete(sessionId);
+    this.toolRunWorkerMap.delete(sessionId);
   }
 
   getSessionWorkerId(sessionId: string): string | undefined {
@@ -311,6 +392,29 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
         `Session ${sessionId} lost its worker ${workerId} due to disconnection`,
       );
     }
+
+    // A tool run's waiter would otherwise block until its timeout: end it now
+    // with the same ERROR event the worker would have sent.
+    for (const [sessionId, wId] of this.toolRunWorkerMap) {
+      if (wId !== workerId) continue;
+      this.toolRunWorkerMap.delete(sessionId);
+      void this.redisService
+        .publish(
+          `remote-execute:results:${sessionId}`,
+          JSON.stringify({
+            id: '',
+            sessionId,
+            type: 4, // REMOTE_EXECUTE_RESULT_ERROR
+            data: 'worker disconnected during the tool run',
+            exitCode: 0,
+          }),
+        )
+        .catch((err: unknown) => {
+          this.logger.warn(
+            `Failed to fail tool run ${sessionId} on disconnect: ${String(err)}`,
+          );
+        });
+    }
   }
 
   onModuleDestroy() {
@@ -318,6 +422,8 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       subject.complete();
     }
     this.workers.clear();
+    this.workerScope.clear();
     this.sessionWorkerMap.clear();
+    this.toolRunWorkerMap.clear();
   }
 }

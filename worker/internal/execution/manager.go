@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -198,6 +199,10 @@ func generateExecToken() string {
 	return hex.EncodeToString(b)
 }
 
+// ErrMaxConcurrency is Submit's refusal when maxConcurrency executions are
+// already tracked: a worker capacity limit, not an image defect.
+var ErrMaxConcurrency = errors.New("max concurrency reached")
+
 // Submit enforces maxConcurrency, calls rt.Create+Start, and tracks the execution.
 // Image is required and passed through to the runtime (resolved by Core ConnectorRegistry 1.5).
 // If spec.Limits[JobTimeoutSecondsKey] is set (>0), a timer auto-cancels the execution.
@@ -211,7 +216,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 	// concurrent Submit overshoot the cap during a slow image pull.
 	if m.maxConcurrency > 0 && len(m.execs)+m.pending >= m.maxConcurrency {
 		m.mu.Unlock()
-		return "", fmt.Errorf("max concurrency reached")
+		return "", ErrMaxConcurrency
 	}
 	// Timeout contract: the connect deadline must stay below the manifest job
 	// timeout, otherwise the connect timer cancels the execution before the
@@ -257,7 +262,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 
 	// Pool key: normalized (lowercase) image — the acquire key for warm
 	// container reuse.
-	poolKey := normalizePoolKey(spec.Image)
+	poolKey := poolKeyFor(spec)
 
 	// Connector wiring is configured once at startup (SetPool/SetStreamBinder/
 	// SetEvictor before the first Submit) — snapshot it under the lock and use
@@ -335,7 +340,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			// pass the capacity check and spawn a container — the race that
 			// started 12 nuclei containers for a cap of 1. The reservation is
 			// released on Create/Start failure and after Add on success.
-			if !p.ReserveReplica(id, poolKey, cpuRequestMillis, memRequestBytes) {
+			if reserveErr := p.reserveReplica(id, poolKey, cpuRequestMillis, memRequestBytes); reserveErr != nil {
 				// Per-image quota or the node resource budget is reached: refuse
 				// instead of creating a replica. The caller (job.go) backs off
 				// and retries; no container is created, no Core failure is
@@ -358,7 +363,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 				// the retry loop asks again every couple of seconds, so this is
 				// rate-limited per image instead of flooding the activity feed.
 				m.logPoolExhausted(poolKey, line)
-				return "", fmt.Errorf("%w: %s", ErrPoolExhausted, poolKey)
+				return "", fmt.Errorf("%w: %s", reserveErr, poolKey)
 			}
 			reserved = true
 		}

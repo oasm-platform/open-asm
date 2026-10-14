@@ -3,7 +3,7 @@ import {
   GetManyBaseResponseDto,
   SortOrder,
 } from '@/common/dtos/get-many-base.dto';
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode, WorkerScope } from '@/common/enums/enum';
 import { encrypt } from '@/common/utils/encryption.util';
 import {
   decryptWithDEK,
@@ -118,6 +118,7 @@ export class AgentsService {
       sortBy: '"createdAt"',
       sortOrder: SortOrder.DESC,
       workspaceId,
+      scope: WorkerScope.WORKSPACE,
       enabledAgentMode: true,
     });
     return {
@@ -188,9 +189,7 @@ export class AgentsService {
     }
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
-    const apiKey = dek
-      ? encryptWithDEK(dto.apiKey, dek)
-      : encrypt(dto.apiKey);
+    const apiKey = dek ? encryptWithDEK(dto.apiKey, dek) : encrypt(dto.apiKey);
 
     const config = this.llmConfigRepository.create({
       workspaceId,
@@ -255,9 +254,7 @@ export class AgentsService {
         (p) => p.id === config.provider,
       );
       const apiKey = config.apiKey ? decryptWithDEK(config.apiKey, dek) : '';
-      const apiKeyMasked = config.apiKey
-        ? this.maskApiKey(apiKey)
-        : '****';
+      const apiKeyMasked = config.apiKey ? this.maskApiKey(apiKey) : '****';
       return {
         providerId: config.provider,
         providerName: providerMeta?.name ?? config.provider,
