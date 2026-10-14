@@ -1,12 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router';
-import {
-  BookOpen,
-  Brain,
-  KeyRound,
-  Loader2,
-  MessageSquare,
-  SquarePen,
-} from 'lucide-react';
+import { Loader2, MessageSquare, Settings, SquarePen } from 'lucide-react';
 import { useMemo } from 'react';
 
 import {
@@ -18,17 +11,12 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useAgentsControllerGetConversationsInfinite } from '@/services/apis/gen/queries';
 import { AppSidebar } from './menu-bar';
 
 const CONVERSATION_PATH_PREFIX = '/aistudio/conversations/';
-
-const settingsItems = [
-  { to: '/aistudio/providers', label: 'Providers', icon: KeyRound },
-  { to: '/aistudio/skills', label: 'Skills', icon: BookOpen },
-  { to: '/aistudio/memory', label: 'Memory', icon: Brain },
-] as const;
 
 const itemClassName =
   'h-9 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold';
@@ -36,6 +24,7 @@ const itemClassName =
 export function AiStudioSidebar() {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
+  const { open: openSettings } = useAgentSettingsDialog();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -99,21 +88,19 @@ export function AiStudioSidebar() {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            {settingsItems.map((item) => (
-              <SidebarMenuItem key={item.to}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.to}
-                  tooltip={item.label}
-                  className={itemClassName}
-                >
-                  <Link to={item.to} onClick={() => setOpenMobile(false)}>
-                    <item.icon />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Settings"
+                className={itemClassName}
+                onClick={() => {
+                  setOpenMobile(false);
+                  openSettings();
+                }}
+              >
+                <Settings />
+                <span className="truncate">Settings</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>

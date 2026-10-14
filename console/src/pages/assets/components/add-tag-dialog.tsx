@@ -13,8 +13,8 @@ import {
   useAssetsControllerUpdateAssetById,
   type AssetTag,
 } from '@/services/apis/gen/queries';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
-import { useNavigate } from '@tanstack/react-router';
 import { Loader2, Plus, Sparkles, Tag } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
@@ -34,7 +34,7 @@ const AddTagDialog = (props: AddTagDialogProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { hasProviderConnected, isLoading: llmLoading } = useLLMConfigs();
-  const navigate = useNavigate();
+  const { open: openAgentSettings } = useAgentSettingsDialog();
   const { mutate } = useAssetsControllerUpdateAssetById();
   const { mutate: generateTags, isPending: isGenerating } =
     useAssetsControllerGenerateServiceTags();
@@ -52,7 +52,7 @@ const AddTagDialog = (props: AddTagDialogProps) => {
 
   const handleGenerateTags = () => {
     if (!llmLoading && !hasProviderConnected) {
-      void navigate({ to: '/aistudio/providers' });
+      openAgentSettings('provider');
       return;
     }
     generateTags(

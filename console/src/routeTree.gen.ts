@@ -23,9 +23,6 @@ import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
 import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
 import { Route as AuthedAgentsCreateRouteImport } from './routes/_authed/agents/create'
 import { Route as AuthedAistudioIndexRouteImport } from './routes/_authed/aistudio/index'
-import { Route as AuthedAistudioMemoryRouteImport } from './routes/_authed/aistudio/memory'
-import { Route as AuthedAistudioProvidersRouteImport } from './routes/_authed/aistudio/providers'
-import { Route as AuthedAistudioSkillsRouteImport } from './routes/_authed/aistudio/skills'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
 import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
 import { Route as AuthedGroupsIdRouteImport } from './routes/_authed/groups/$id'
@@ -128,21 +125,6 @@ const AuthedAgentsCreateRoute = AuthedAgentsCreateRouteImport.update({
 const AuthedAistudioIndexRoute = AuthedAistudioIndexRouteImport.update({
   id: '/aistudio/',
   path: '/aistudio/',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedAistudioMemoryRoute = AuthedAistudioMemoryRouteImport.update({
-  id: '/aistudio/memory',
-  path: '/aistudio/memory',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedAistudioProvidersRoute = AuthedAistudioProvidersRouteImport.update({
-  id: '/aistudio/providers',
-  path: '/aistudio/providers',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedAistudioSkillsRoute = AuthedAistudioSkillsRouteImport.update({
-  id: '/aistudio/skills',
-  path: '/aistudio/skills',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAssetsIndexRoute = AuthedAssetsIndexRouteImport.update({
@@ -339,9 +321,6 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
-  '/aistudio/memory': typeof AuthedAistudioMemoryRoute
-  '/aistudio/providers': typeof AuthedAistudioProvidersRoute
-  '/aistudio/skills': typeof AuthedAistudioSkillsRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
   '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -390,9 +369,6 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
-  '/aistudio/memory': typeof AuthedAistudioMemoryRoute
-  '/aistudio/providers': typeof AuthedAistudioProvidersRoute
-  '/aistudio/skills': typeof AuthedAistudioSkillsRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
   '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -444,9 +420,6 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/agents/create': typeof AuthedAgentsCreateRoute
-  '/_authed/aistudio/memory': typeof AuthedAistudioMemoryRoute
-  '/_authed/aistudio/providers': typeof AuthedAistudioProvidersRoute
-  '/_authed/aistudio/skills': typeof AuthedAistudioSkillsRoute
   '/_authed/groups/$id': typeof AuthedGroupsIdRoute
   '/_authed/groups/create': typeof AuthedGroupsCreateRoute
   '/_authed/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -498,9 +471,6 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/admin/users'
     | '/agents/create'
-    | '/aistudio/memory'
-    | '/aistudio/providers'
-    | '/aistudio/skills'
     | '/groups/$id'
     | '/groups/create'
     | '/internal-networks/$id'
@@ -549,9 +519,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/admin/users'
     | '/agents/create'
-    | '/aistudio/memory'
-    | '/aistudio/providers'
-    | '/aistudio/skills'
     | '/groups/$id'
     | '/groups/create'
     | '/internal-networks/$id'
@@ -602,9 +569,6 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/_authed/admin/users'
     | '/_authed/agents/create'
-    | '/_authed/aistudio/memory'
-    | '/_authed/aistudio/providers'
-    | '/_authed/aistudio/skills'
     | '/_authed/groups/$id'
     | '/_authed/groups/create'
     | '/_authed/internal-networks/$id'
@@ -749,27 +713,6 @@ declare module '@tanstack/react-router' {
       path: '/aistudio'
       fullPath: '/aistudio/'
       preLoaderRoute: typeof AuthedAistudioIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/aistudio/memory': {
-      id: '/_authed/aistudio/memory'
-      path: '/aistudio/memory'
-      fullPath: '/aistudio/memory'
-      preLoaderRoute: typeof AuthedAistudioMemoryRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/aistudio/providers': {
-      id: '/_authed/aistudio/providers'
-      path: '/aistudio/providers'
-      fullPath: '/aistudio/providers'
-      preLoaderRoute: typeof AuthedAistudioProvidersRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/aistudio/skills': {
-      id: '/_authed/aistudio/skills'
-      path: '/aistudio/skills'
-      fullPath: '/aistudio/skills'
-      preLoaderRoute: typeof AuthedAistudioSkillsRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/assets/': {
@@ -1019,9 +962,6 @@ interface AuthedRouteChildren {
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedAgentsCreateRoute: typeof AuthedAgentsCreateRoute
-  AuthedAistudioMemoryRoute: typeof AuthedAistudioMemoryRoute
-  AuthedAistudioProvidersRoute: typeof AuthedAistudioProvidersRoute
-  AuthedAistudioSkillsRoute: typeof AuthedAistudioSkillsRoute
   AuthedGroupsIdRoute: typeof AuthedGroupsIdRoute
   AuthedGroupsCreateRoute: typeof AuthedGroupsCreateRoute
   AuthedInternalNetworksIdRoute: typeof AuthedInternalNetworksIdRoute
@@ -1063,9 +1003,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedAgentsCreateRoute: AuthedAgentsCreateRoute,
-  AuthedAistudioMemoryRoute: AuthedAistudioMemoryRoute,
-  AuthedAistudioProvidersRoute: AuthedAistudioProvidersRoute,
-  AuthedAistudioSkillsRoute: AuthedAistudioSkillsRoute,
   AuthedGroupsIdRoute: AuthedGroupsIdRoute,
   AuthedGroupsCreateRoute: AuthedGroupsCreateRoute,
   AuthedInternalNetworksIdRoute: AuthedInternalNetworksIdRoute,
