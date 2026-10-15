@@ -37,7 +37,7 @@ export function FilterToolbar({ fields, value, onApply, search, onSearchChange }
                 {filterToText(value!, fields)}
               </button>
             ) : (
-              <input aria-label="Search assets" placeholder="Search value"
+              <input aria-label="Search" placeholder="Search value"
                 className="h-8 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"
                 value={search} onChange={(e) => onSearchChange(e.target.value)} />
             )}
