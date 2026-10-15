@@ -2326,6 +2326,11 @@ export type GetManyToolDto = {
   pageCount: number;
 };
 
+/**
+ * JSON Schema of the inputs OASM passes to the connector on each run.
+ */
+export type ConnectorDtoInputsSchema = { [key: string]: unknown };
+
 export type ConnectorDto = {
   name: string;
   slug: string;
@@ -2340,6 +2345,8 @@ export type ConnectorDto = {
   supportUrl?: string;
   capabilities: string[];
   agentTool?: boolean;
+  /** JSON Schema of the inputs OASM passes to the connector on each run. */
+  inputsSchema?: ConnectorDtoInputsSchema;
 };
 
 export type ToolConfigProfile = {
@@ -25087,7 +25094,7 @@ export function useToolsControllerGetInstalledTools<
 }
 
 /**
- * Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links) from the connector manifest.
+ * Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links, inputsSchema) from the connector manifest.
  * @summary Get connector metadata by slug
  */
 export const toolsControllerGetConnectorBySlug = (

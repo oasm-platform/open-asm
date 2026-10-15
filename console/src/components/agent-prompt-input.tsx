@@ -31,6 +31,10 @@ interface AgentPromptInputProps {
   showSettingsButton?: boolean;
   placeholder?: string;
   className?: string;
+  /** Controlled text value; falls back to internal state when omitted. */
+  value?: string;
+  /** Required with `value` to make the input controlled. */
+  onValueChange?: (value: string) => void;
 }
 
 export default function AgentPromptInput({
@@ -47,8 +51,15 @@ export default function AgentPromptInput({
   showSettingsButton = true,
   placeholder = 'Ask anything about security...',
   className,
+  value,
+  onValueChange,
 }: AgentPromptInputProps) {
-  const [input, setInput] = useState('');
+  const [internalInput, setInternalInput] = useState('');
+  const input = value ?? internalInput;
+  const setInput = (next: string) => {
+    if (onValueChange) onValueChange(next);
+    else setInternalInput(next);
+  };
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (message.text.trim()) {

@@ -166,3 +166,38 @@ describe('ToolConnectorConfigSheet preset hints (end-to-end)', () => {
     expect(named['templateIds[1]']).toBe('wordpress-rce');
   });
 });
+describe('ToolConnectorConfigSheet dismiss', () => {
+  const renderSheet = (props: { onOpenChange: () => void; onDismiss?: () => void }) =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ToolConnectorConfigSheet
+          open
+          tool={{ id: '1', name: 'nuclei' } as unknown as Tool}
+          {...props}
+        />
+      </QueryClientProvider>,
+    );
+
+  it('routes Cancel and Escape through onDismiss instead of closing', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    const onDismiss = vi.fn();
+    renderSheet({ onOpenChange, onDismiss });
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.keyboard('{Escape}');
+
+    expect(onDismiss).toHaveBeenCalledTimes(2);
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('closes through onOpenChange when no onDismiss is given', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    renderSheet({ onOpenChange });
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});

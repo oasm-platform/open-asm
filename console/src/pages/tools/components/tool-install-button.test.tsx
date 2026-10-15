@@ -26,21 +26,25 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
   };
 });
 
+// Both confirm dialogs render the trigger plus a button that fires onConfirm.
+const confirmMock = vi.hoisted(
+  () =>
+    ({ onConfirm, trigger }: { onConfirm: () => void; trigger: ReactNode }) => (
+      <div>
+        {trigger}
+        <button type="button" onClick={onConfirm}>
+          Confirm action
+        </button>
+      </div>
+    ),
+);
+
 vi.mock('@/components/ui/confirm-dialog', () => ({
-  ConfirmDialog: ({
-    onConfirm,
-    trigger,
-  }: {
-    onConfirm: () => void;
-    trigger: ReactNode;
-  }) => (
-    <div>
-      {trigger}
-      <button type="button" onClick={onConfirm}>
-        Confirm action
-      </button>
-    </div>
-  ),
+  ConfirmDialog: confirmMock,
+}));
+
+vi.mock('@/components/tools/tool-install-confirm-dialog', () => ({
+  ToolInstallConfirmDialog: confirmMock,
 }));
 
 vi.mock('sonner', () => ({
@@ -65,7 +69,11 @@ describe('ToolInstallButton request body contract', () => {
     const user = userEvent.setup();
     render(<ToolInstallButton tool={tool(false)} workspaceId="workspace-1" />);
 
-    await user.click(screen.getByRole('button', { name: 'Add' }));
+    // Install is confirm-gated: clicking the trigger alone must not install.
+    await user.click(screen.getByRole('button', { name: 'Install' }));
+    expect(mutationMocks.install).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Confirm action' }));
 
     expect(mutationMocks.install).toHaveBeenCalledWith(
       { data: { toolId: 'tool-1' } },

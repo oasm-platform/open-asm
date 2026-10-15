@@ -177,7 +177,7 @@ export class ToolsController {
   @Doc({
     summary: 'Get connector metadata by slug',
     description:
-      'Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links) from the connector manifest.',
+      'Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links, inputsSchema) from the connector manifest.',
     response: {
       serialization: ConnectorDto,
     },
@@ -205,6 +205,7 @@ export class ToolsController {
       repositoryUrl: connector.repositoryUrl,
       supportUrl: connector.supportUrl,
       capabilities: connector.capabilities,
+      inputsSchema: connector.inputsSchema,
     };
   }
 
