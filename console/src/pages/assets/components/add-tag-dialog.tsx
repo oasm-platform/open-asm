@@ -52,7 +52,7 @@ const AddTagDialog = (props: AddTagDialogProps) => {
 
   const handleGenerateTags = () => {
     if (!llmLoading && !hasProviderConnected) {
-      openAgentSettings();
+      openAgentSettings('provider');
       return;
     }
     generateTags(

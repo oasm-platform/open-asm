@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
 import { BadRequestException } from '@nestjs/common';
-import { AgentMode, WorkerScope } from '@/common/enums/enum';
+import {
+  AgentApprovalMode,
+  AgentMode,
+  WorkerScope,
+} from '@/common/enums/enum';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
 import { AgentTool } from './agents.tools';
@@ -12,7 +16,7 @@ const dto = {
   agentMode: AgentMode.ASK,
 } as unknown as SendMessageDto;
 
-function buildCompletions(allowed: boolean) {
+function buildCompletions(allowed: boolean, agentConfig: unknown = null) {
   const conversationRepository = {
     findOne: jest.fn(),
     create: jest.fn((v) => v),
@@ -23,6 +27,10 @@ function buildCompletions(allowed: boolean) {
     {
       llmConfigRepository: {
         findOne: jest.fn().mockResolvedValue({ id: 'llm-1' }),
+      },
+      agentsConfig: {
+        find: jest.fn().mockResolvedValue(agentConfig),
+        getDefaultLLMConfig: jest.fn().mockResolvedValue({ id: 'llm-1' }),
       },
       conversationRepository,
       workersService: {
@@ -55,6 +63,22 @@ describe('worker scope enforcement', () => {
       expect(conversationRepository.save).toHaveBeenCalledTimes(1);
       expect(conversationRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ workerId: 'worker-1', workspaceId: 'ws-1' }),
+      );
+    });
+
+    it("uses the user's default approval mode when the request has none", async () => {
+      const { service, conversationRepository } = buildCompletions(true, {
+        defaultApprovalMode: AgentApprovalMode.AUTO,
+      });
+
+      await service.getOrCreateConversation(dto, 'ws-1', 'user-1');
+
+      expect(conversationRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          llmConfigId: 'llm-1',
+          agentMode: AgentMode.ASK,
+          approvalMode: AgentApprovalMode.AUTO,
+        }),
       );
     });
   });

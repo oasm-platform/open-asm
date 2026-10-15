@@ -31,7 +31,12 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsApprovalsService } from './agents.approvals';
+import { AgentsConfigService } from './agents.config';
 import { AgentsService } from './agents.service';
+import {
+  AgentConfigResponseDto,
+  UpsertAgentConfigDto,
+} from './dto/agent-config.dto';
 import { AgentCommandApproval } from './entities/agent-command-approval.entity';
 import {
   CommandApprovalResponseDto,
@@ -78,6 +83,7 @@ export class AgentsController {
     private readonly agentsCompletionsService: AgentsCompletionsService,
     private readonly agentsSkillsService: AgentsSkillsService,
     private readonly agentsApprovalsService: AgentsApprovalsService,
+    private readonly agentsConfigService: AgentsConfigService,
   ) {}
 
   @WorkspaceAccess('agent.read')
@@ -672,6 +678,43 @@ export class AgentsController {
     @WorkspaceId() workspaceId: string,
   ): Promise<MCPServerPingResponseDto> {
     return this.agentsService.pingMCPServer(workspaceId, name);
+  }
+
+  // ==========================================
+  // Agent Config Endpoints
+  // ==========================================
+
+  @WorkspaceAccess('agent.read')
+  @Get('config')
+  @Doc({
+    summary: 'Get agent config',
+    description:
+      "Get the current user's agent settings in the workspace: models, web search providers and instructions",
+    request: { getWorkspaceId: true },
+    response: { serialization: AgentConfigResponseDto },
+  })
+  getAgentConfig(
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<AgentConfigResponseDto> {
+    return this.agentsConfigService.get(workspaceId, userId);
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Put('config')
+  @Doc({
+    summary: 'Update agent config',
+    description:
+      "Update the current user's agent settings in the workspace. Only the fields sent change",
+    request: { getWorkspaceId: true },
+    response: { serialization: AgentConfigResponseDto },
+  })
+  upsertAgentConfig(
+    @Body() dto: UpsertAgentConfigDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<AgentConfigResponseDto> {
+    return this.agentsConfigService.upsert(workspaceId, userId, dto);
   }
 
   // ==========================================

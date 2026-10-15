@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router';
-import { Loader2, MessageSquare, SquarePen } from 'lucide-react';
+import { Loader2, MessageSquare, Settings, SquarePen } from 'lucide-react';
 import { useMemo } from 'react';
 
 import {
@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useAgentsControllerGetConversationsInfinite } from '@/services/apis/gen/queries';
 import { AppSidebar } from './menu-bar';
@@ -23,6 +24,7 @@ const itemClassName =
 export function AiStudioSidebar() {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
+  const { open: openSettings } = useAgentSettingsDialog();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -84,6 +86,19 @@ export function AiStudioSidebar() {
                   <SquarePen />
                   <span className="truncate">New Chat</span>
                 </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Settings"
+                className={itemClassName}
+                onClick={() => {
+                  setOpenMobile(false);
+                  openSettings();
+                }}
+              >
+                <Settings />
+                <span className="truncate">Settings</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

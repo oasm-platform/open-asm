@@ -3,7 +3,6 @@ import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 import Page from '@/components/common/page';
 import TypewriterText from '@/components/typewriter-text';
 
-import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
 import { Button } from '@/components/ui/button';
 import { restoreApprovalMode } from '@/hooks/use-approval-mode';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
@@ -24,6 +23,7 @@ const routeApi = getRouteApi('/_authed/aistudio/');
 
 export default function AgentsLandingPage() {
   const navigate = useNavigate();
+  const { open: openSettings } = useAgentSettingsDialog();
   const { text: queryText } = routeApi.useSearch();
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
@@ -33,8 +33,6 @@ export default function AgentsLandingPage() {
   } | null>(null);
   const [agentMode, setAgentMode] = useState('ask');
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
-
-  const { setState: openSettings } = useAgentSettingsDialog();
 
   const {
     state: { selectedWorkspaceId },
@@ -112,12 +110,11 @@ export default function AgentsLandingPage() {
               </p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => openSettings(true)}>
+          <Button variant="outline" onClick={() => openSettings('provider')}>
             <Plus className="h-4 w-4" />
             Connect
           </Button>
         </div>
-        <AgentSettingsDialog />
       </Page>
     );
   }

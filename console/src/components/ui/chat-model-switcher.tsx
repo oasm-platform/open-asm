@@ -1,5 +1,4 @@
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
-import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import type {
   ProviderModelDto,
@@ -117,7 +116,7 @@ export function ChatModelSwitcher({
   selectedModel,
   onSelectModel,
 }: ChatModelSwitcherProps) {
-  const { setState: openDialog } = useAgentSettingsDialog();
+  const { open: openSettings } = useAgentSettingsDialog();
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -216,17 +215,14 @@ export function ChatModelSwitcher({
 
   if (connectedConfigs.length === 0) {
     return (
-      <>
-        <button
-          type="button"
-          onClick={() => openDialog(true)}
-          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
-        >
-          <Settings className="h-3.5 w-3.5" />
-          Connect LLM
-        </button>
-        <AgentSettingsDialog />
-      </>
+      <button
+        type="button"
+        onClick={() => openSettings('provider')}
+        className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
+      >
+        <Settings className="h-3.5 w-3.5" />
+        Connect LLM
+      </button>
     );
   }
 
@@ -280,13 +276,13 @@ export function ChatModelSwitcher({
         </div>
         <button
           type="button"
-          onClick={() => openDialog(true)}
+          onClick={() => openSettings('provider')}
+          aria-label="Agent settings"
           className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
         >
           <Settings className="h-3.5 w-3.5" />
         </button>
       </div>
-      <AgentSettingsDialog />
     </>
   );
 }

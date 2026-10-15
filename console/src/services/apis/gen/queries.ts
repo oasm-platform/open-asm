@@ -2339,6 +2339,7 @@ export type ConnectorDto = {
   repositoryUrl?: string;
   supportUrl?: string;
   capabilities: string[];
+  agentTool?: boolean;
 };
 
 export type ToolConfigProfile = {
@@ -2798,13 +2799,7 @@ export type LLMConfigResponseDto = {
    * @nullable
    */
   apiUrl?: string | null;
-  /**
-   * Custom context window size in tokens
-   * @minimum 1
-   * @nullable
-   */
-  contextWindow?: number | null;
-  /** Whether this is the preferred configuration */
+  /** Whether this is the default model connection */
   isPreferred: boolean;
   /** Masked API key showing only its final characters */
   apiKeyMasked: string;
@@ -2852,11 +2847,6 @@ export type CreateLLMConfigDto = {
    * @maxLength 500
    */
   apiUrl?: string;
-  /**
-   * Custom context window size in tokens
-   * @minimum 1
-   */
-  contextWindow?: number;
 };
 
 /**
@@ -2980,12 +2970,7 @@ export type UpdateLLMConfigDto = {
    * @maxLength 500
    */
   apiUrl?: string;
-  /**
-   * Custom context window size in tokens
-   * @minimum 1
-   */
-  contextWindow?: number;
-  /** Whether this is the preferred configuration for new conversations */
+  /** Make this connection the default model for new conversations */
   isPreferred?: boolean;
 };
 
@@ -3344,6 +3329,222 @@ export type MCPServerPingResponseDto = {
    * @minimum 0
    */
   latency?: number;
+};
+
+/**
+ * Reasoning effort; unset uses the provider's default (saved, not used yet)
+ */
+export type AgentModelRefDtoReasoningEffort =
+  (typeof AgentModelRefDtoReasoningEffort)[keyof typeof AgentModelRefDtoReasoningEffort];
+
+export const AgentModelRefDtoReasoningEffort = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export type AgentModelRefDto = {
+  /** LLM connection the model runs on */
+  llmConfigId: string;
+  /** Model identifier */
+  model: string;
+  /**
+   * Context window in tokens (default 128k)
+   * @minimum 1
+   * @maximum 10000000
+   */
+  contextWindow?: number;
+  /**
+   * Max output tokens per response
+   * @minimum 1
+   * @maximum 10000000
+   */
+  maxOutputTokens?: number;
+  /** Reasoning effort; unset uses the provider's default (saved, not used yet) */
+  reasoningEffort?: AgentModelRefDtoReasoningEffort;
+};
+
+export type AgentModelsConfigDto = {
+  /** Model for new conversations */
+  default?: AgentModelRefDto;
+  /** Cheap model for titles, summaries and reports (saved, not used yet) */
+  small?: AgentModelRefDto;
+  /** Models available to subagents (saved, not used yet) */
+  subagents?: AgentModelRefDto[];
+};
+
+/**
+ * Web search provider
+ */
+export type AgentSearchProviderResponseDtoProvider =
+  (typeof AgentSearchProviderResponseDtoProvider)[keyof typeof AgentSearchProviderResponseDtoProvider];
+
+export const AgentSearchProviderResponseDtoProvider = {
+  exa: 'exa',
+  firecrawl: 'firecrawl',
+  tinyfish: 'tinyfish',
+} as const;
+
+export type AgentSearchProviderResponseDto = {
+  /** Web search provider */
+  provider: AgentSearchProviderResponseDtoProvider;
+  /** Masked API key showing only its final characters */
+  apiKeyMasked: string;
+  /** Whether web search uses this provider first */
+  isDefault: boolean;
+};
+
+/**
+ * Agent mode for new conversations
+ * @nullable
+ */
+export type AgentConfigResponseDtoDefaultAgentMode =
+  | (typeof AgentConfigResponseDtoDefaultAgentMode)[keyof typeof AgentConfigResponseDtoDefaultAgentMode]
+  | null;
+
+export const AgentConfigResponseDtoDefaultAgentMode = {
+  ask: 'ask',
+  agent: 'agent',
+} as const;
+
+/**
+ * Approval mode for new conversations
+ * @nullable
+ */
+export type AgentConfigResponseDtoDefaultApprovalMode =
+  | (typeof AgentConfigResponseDtoDefaultApprovalMode)[keyof typeof AgentConfigResponseDtoDefaultApprovalMode]
+  | null;
+
+export const AgentConfigResponseDtoDefaultApprovalMode = {
+  auto: 'auto',
+  plan: 'plan',
+  manual: 'manual',
+} as const;
+
+export type AgentConfigResponseDto = {
+  /** Models used by the agent */
+  modelsConfig: AgentModelsConfigDto;
+  /** Web search providers */
+  searchProviders: AgentSearchProviderResponseDto[];
+  /**
+   * Custom instructions added to the system prompt
+   * @nullable
+   */
+  instruction: string | null;
+  /**
+   * Max tool call steps per run
+   * @nullable
+   */
+  maxSteps: number | null;
+  /**
+   * Agent mode for new conversations
+   * @nullable
+   */
+  defaultAgentMode: AgentConfigResponseDtoDefaultAgentMode;
+  /**
+   * Approval mode for new conversations
+   * @nullable
+   */
+  defaultApprovalMode: AgentConfigResponseDtoDefaultApprovalMode;
+  /** Built-in tool names the agent must not use */
+  disabledTools: string[];
+  /**
+   * Language the agent answers in
+   * @nullable
+   */
+  responseLanguage: string | null;
+};
+
+/**
+ * Web search provider
+ */
+export type AgentSearchProviderInputDtoProvider =
+  (typeof AgentSearchProviderInputDtoProvider)[keyof typeof AgentSearchProviderInputDtoProvider];
+
+export const AgentSearchProviderInputDtoProvider = {
+  exa: 'exa',
+  firecrawl: 'firecrawl',
+  tinyfish: 'tinyfish',
+} as const;
+
+export type AgentSearchProviderInputDto = {
+  /** Web search provider */
+  provider: AgentSearchProviderInputDtoProvider;
+  /** Provider API key; omit to keep the saved one */
+  apiKey?: string;
+  /** Whether web search uses this provider first */
+  isDefault?: boolean;
+};
+
+/**
+ * Agent mode for new conversations
+ * @nullable
+ */
+export type UpsertAgentConfigDtoDefaultAgentMode =
+  | (typeof UpsertAgentConfigDtoDefaultAgentMode)[keyof typeof UpsertAgentConfigDtoDefaultAgentMode]
+  | null;
+
+export const UpsertAgentConfigDtoDefaultAgentMode = {
+  ask: 'ask',
+  agent: 'agent',
+} as const;
+
+/**
+ * Approval mode for new conversations
+ * @nullable
+ */
+export type UpsertAgentConfigDtoDefaultApprovalMode =
+  | (typeof UpsertAgentConfigDtoDefaultApprovalMode)[keyof typeof UpsertAgentConfigDtoDefaultApprovalMode]
+  | null;
+
+export const UpsertAgentConfigDtoDefaultApprovalMode = {
+  auto: 'auto',
+  plan: 'plan',
+  manual: 'manual',
+} as const;
+
+export type UpsertAgentConfigDto = {
+  /**
+   * Models used by the agent; replaces the saved value
+   * @nullable
+   */
+  modelsConfig?: AgentModelsConfigDto | null;
+  /**
+   * Web search providers; replaces the whole list
+   * @nullable
+   */
+  searchProviders?: AgentSearchProviderInputDto[] | null;
+  /**
+   * Custom instructions added to the system prompt
+   * @maxLength 20000
+   * @nullable
+   */
+  instruction?: string | null;
+  /**
+   * Max tool call steps per run (default 20)
+   * @minimum 1
+   * @maximum 1000
+   * @nullable
+   */
+  maxSteps?: number | null;
+  /**
+   * Agent mode for new conversations
+   * @nullable
+   */
+  defaultAgentMode?: UpsertAgentConfigDtoDefaultAgentMode;
+  /**
+   * Approval mode for new conversations
+   * @nullable
+   */
+  defaultApprovalMode?: UpsertAgentConfigDtoDefaultApprovalMode;
+  /** Built-in tool names the agent must not use */
+  disabledTools?: string[];
+  /**
+   * Language the agent answers in
+   * @maxLength 16
+   * @nullable
+   */
+  responseLanguage?: string | null;
 };
 
 export type WorkspaceMemoryResponseDto = {
@@ -33497,6 +33698,255 @@ export function useAgentsControllerPingMCPServer<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+/**
+ * Get the current user's agent settings in the workspace: models, web search providers and instructions
+ * @summary Get agent config
+ */
+export const agentsControllerGetAgentConfig = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentConfigResponseDto>(
+    { url: `/api/agents/config`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetAgentConfigQueryKey = () => {
+  return [`/api/agents/config`] as const;
+};
+
+export const getAgentsControllerGetAgentConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetAgentConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>
+  > = ({ signal }) => agentsControllerGetAgentConfig(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetAgentConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>
+>;
+export type AgentsControllerGetAgentConfigQueryError = unknown;
+
+export function useAgentsControllerGetAgentConfig<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetAgentConfig<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetAgentConfig<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get agent config
+ */
+
+export function useAgentsControllerGetAgentConfig<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetAgentConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Update the current user's agent settings in the workspace. Only the fields sent change
+ * @summary Update agent config
+ */
+export const agentsControllerUpsertAgentConfig = (
+  upsertAgentConfigDto: UpsertAgentConfigDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentConfigResponseDto>(
+    {
+      url: `/api/agents/config`,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      data: upsertAgentConfigDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerUpsertAgentConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+    TError,
+    { data: UpsertAgentConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+  TError,
+  { data: UpsertAgentConfigDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpsertAgentConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+    { data: UpsertAgentConfigDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerUpsertAgentConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerUpsertAgentConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>
+>;
+export type AgentsControllerUpsertAgentConfigMutationBody =
+  UpsertAgentConfigDto;
+export type AgentsControllerUpsertAgentConfigMutationError = unknown;
+
+/**
+ * @summary Update agent config
+ */
+export const useAgentsControllerUpsertAgentConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+      TError,
+      { data: UpsertAgentConfigDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+  TError,
+  { data: UpsertAgentConfigDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpsertAgentConfigMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Get long-term memory records for the workspace (paginated, per user)

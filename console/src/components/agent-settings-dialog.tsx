@@ -1,14 +1,42 @@
 import LlmConnect from '@/pages/agents/components/llm-connect';
+import { InstructionManager } from '@/components/instruction-manager';
 import { MemoryManager } from '@/components/memory-manager';
+import { ModelsManager } from '@/components/models-manager';
 import { SkillsManager } from '@/components/skills-manager';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { WebSearchManager } from '@/components/web-search-manager';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Brain, KeyRound } from 'lucide-react';
+import {
+  BookOpen,
+  Brain,
+  Cpu,
+  Globe,
+  KeyRound,
+  ScrollText,
+  X,
+} from 'lucide-react';
 import { type ComponentType, type SVGProps } from 'react';
-import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
+import {
+  useAgentSettingsDialog,
+  type AgentSettingsTab,
+} from '@/hooks/useAgentSettingsDialog';
 
 interface TabConfig {
-  value: 'provider' | 'skills' | 'memory';
+  value: AgentSettingsTab;
   label: string;
   description: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
@@ -22,6 +50,27 @@ const tabs: TabConfig[] = [
     description: 'Manage your AI models and API connections',
     icon: KeyRound,
     component: LlmConnect,
+  },
+  {
+    value: 'models',
+    label: 'Models',
+    description: 'Choose the models the agent uses',
+    icon: Cpu,
+    component: ModelsManager,
+  },
+  {
+    value: 'web-search',
+    label: 'Web Search',
+    description: 'Search provider the agent uses to browse the web',
+    icon: Globe,
+    component: WebSearchManager,
+  },
+  {
+    value: 'instruction',
+    label: 'Instruction',
+    description: 'Custom instructions added to the agent system prompt',
+    icon: ScrollText,
+    component: InstructionManager,
   },
   {
     value: 'skills',
@@ -39,66 +88,112 @@ const tabs: TabConfig[] = [
   },
 ];
 
+const GROUP_LABEL = 'Agent settings';
+
 const triggerClassName =
-  'data-[state=active]:bg-sidebar-accent border-sidebar-accent data-[state=active]:text-sidebar-accent-foreground text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold border-0 shadow-none';
+  'data-[state=active]:bg-sidebar-accent data-[state=active]:text-sidebar-accent-foreground data-[state=active]:after:hidden text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 h-10 w-full flex-none justify-start gap-3 rounded-lg px-3 text-sm font-medium border-0 shadow-none';
 
-interface AgentSettingsDialogProps {
-  defaultTab?: 'provider' | 'skills' | 'memory';
-}
-
-export function AgentSettingsDialog({
-  defaultTab = 'provider',
-}: AgentSettingsDialogProps) {
-  const { state: open, setState: onOpenChange } = useAgentSettingsDialog();
+export function AgentSettingsDialog() {
+  const {
+    state: { isOpen, tab: activeTab },
+    open,
+    close,
+  } = useAgentSettingsDialog();
+  const active = tabs.find((tab) => tab.value === activeTab) ?? tabs[0];
+  const ActiveIcon = active.icon;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="inset-0 w-full h-full max-w-none rounded-none translate-x-0 translate-y-0 sm:max-w-3xl sm:w-full sm:h-[80vh] sm:rounded-xl sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] flex flex-col gap-0 px-4 py-4 overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={(next) => (next ? open(activeTab) : close())}>
+      <DialogContent
+        showCloseButton={false}
+        className="w-[calc(100%-2rem)] max-w-6xl h-[calc(100dvh-4rem)] sm:h-[85vh] rounded-xl flex flex-col gap-0 p-0 sm:p-0 overflow-hidden"
+      >
         <DialogTitle className="sr-only">Agent Settings</DialogTitle>
 
         <Tabs
-          defaultValue={defaultTab}
-          className="flex flex-col flex-1 min-h-0 gap-0"
+          value={activeTab}
+          onValueChange={(value) => open(value)}
+          orientation="vertical"
+          className="flex flex-col md:flex-row flex-1 min-h-0 gap-0"
         >
-          <TabsList className="shrink-0 p-0 h-auto w-fit gap-2 rounded-none bg-transparent">
+          {/* Desktop: vertical side nav */}
+          <div className="hidden md:flex md:flex-col w-64 shrink-0 border-r px-2.5 py-5 overflow-y-auto">
+            <p className="px-3 pb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {GROUP_LABEL}
+            </p>
+            <TabsList className="p-0 h-auto w-full flex-col items-stretch justify-start gap-0.5 rounded-none bg-transparent">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className={triggerClassName}
+                  >
+                    <Icon className="size-4.5 shrink-0" />
+                    {tab.label}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </div>
+
+          <div className="flex flex-col flex-1 min-h-0 min-w-0">
+            <div className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-3 md:px-6 md:py-4">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold tracking-tight">
+                  {active.label}
+                </h2>
+                <p className="truncate text-xs text-muted-foreground">
+                  {active.description}
+                </p>
+              </div>
+              <DialogClose className="shrink-0 rounded-xs opacity-70 transition-opacity hover:opacity-100 hover:cursor-pointer focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden">
+                <X className="size-4" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
+            </div>
+
+            {/* Mobile: section picker dropdown */}
+            <div className="shrink-0 border-b px-4 py-3 md:hidden">
+              <Select value={activeTab} onValueChange={(value) => open(value)}>
+                <SelectTrigger className="w-full h-10" aria-label="Settings section">
+                  <SelectValue>
+                    <ActiveIcon />
+                    {GROUP_LABEL} · {active.label}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel className="text-sm font-semibold text-foreground">
+                      {GROUP_LABEL}
+                    </SelectLabel>
+                    {tabs.map((tab) => {
+                      const Icon = tab.icon;
+                      return (
+                        <SelectItem key={tab.value} value={tab.value} className="h-9">
+                          <Icon />
+                          {tab.label}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
             {tabs.map((tab) => {
-              const Icon = tab.icon;
+              const Component = tab.component;
               return (
-                <TabsTrigger
+                <TabsContent
                   key={tab.value}
                   value={tab.value}
-                  className={triggerClassName}
+                  className="flex-1 min-h-0 overflow-y-auto mt-0 px-4 py-4 md:px-6 md:py-5"
                 >
-                  <Icon className="size-4.5 shrink-0" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </TabsTrigger>
+                  <Component />
+                </TabsContent>
               );
             })}
-          </TabsList>
-
-          {tabs.map((tab) => {
-            const Component = tab.component;
-            return (
-              <TabsContent
-                key={tab.value}
-                value={tab.value}
-                className="flex flex-col flex-1 min-h-0 gap-0 mt-0"
-              >
-                <div className="pt-2 pb-3 border-b shrink-0 flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <p className="text-lg font-bold tracking-tight">
-                      {tab.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {tab.description}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-y-auto py-4">
-                  <Component />
-                </div>
-              </TabsContent>
-            );
-          })}
+          </div>
         </Tabs>
       </DialogContent>
     </Dialog>

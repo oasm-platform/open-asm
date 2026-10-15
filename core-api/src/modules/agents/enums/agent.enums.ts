@@ -21,3 +21,15 @@ export enum LLMProvider {
   OPENCODE_GO = 'opencode_go',
   CUSTOM = 'custom',
 }
+
+export enum ReasoningEffort {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+}
+
+export enum SearchProvider {
+  EXA = 'exa',
+  FIRECRAWL = 'firecrawl',
+  TINYFISH = 'tinyfish',
+}

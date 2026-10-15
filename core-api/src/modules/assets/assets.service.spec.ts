@@ -18,6 +18,7 @@ import { HttpResponseTechnology } from './entities/http-response-technology.enti
 import { HttpStatusCode } from './entities/http-status-code.entity';
 import { IpObservation } from './entities/ip-observation.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
+import { AgentConfig } from '../agents/entities/agent-config.entity';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 
 describe('AssetsService', () => {
@@ -184,6 +185,10 @@ describe('AssetsService', () => {
         {
           provide: getRepositoryToken(AgentLLMConfig),
           useValue: mockLlmConfigRepository,
+        },
+        {
+          provide: getRepositoryToken(AgentConfig),
+          useValue: { findOne: jest.fn() },
         },
         {
           provide: EventEmitter2,

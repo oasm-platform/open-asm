@@ -1,11 +1,26 @@
 import createState from './createState';
 
-export const useAgentSettingsDialog = createState<boolean>(
+export type AgentSettingsTab =
+  | 'provider'
+  | 'models'
+  | 'web-search'
+  | 'instruction'
+  | 'skills'
+  | 'memory';
+
+interface AgentSettingsDialogState {
+  isOpen: boolean;
+  tab: AgentSettingsTab;
+}
+
+export const useAgentSettingsDialog = createState<AgentSettingsDialogState>(
   'agent-settings-dialog',
-  false,
+  { isOpen: false, tab: 'provider' },
   {
-    open: () => true,
-    close: () => false,
-    toggle: (prev) => !prev,
+    open: (_state, tab) => ({
+      isOpen: true,
+      tab: typeof tab === 'string' ? (tab as AgentSettingsTab) : 'provider',
+    }),
+    close: (state) => ({ ...state, isOpen: false }),
   },
 );
