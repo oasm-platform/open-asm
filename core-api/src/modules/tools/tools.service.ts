@@ -12,9 +12,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type {
+  FindOperator,
   FindOptionsWhere,
 } from 'typeorm';
-import { ILike, In, Repository } from 'typeorm';
+import { And, ILike, In, Not, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkersService } from '../workers/workers.service';
@@ -41,6 +42,13 @@ const ALLOWED_SORT_FIELDS = [
   'category',
   'type',
 ] as const;
+
+/** One OR-branch of the agentTool filter (see buildAgentToolWhere). */
+type AgentToolWhere = {
+  id?: FindOperator<string>;
+  name?: FindOperator<string>;
+  type?: WorkerType | FindOperator<WorkerType>;
+};
 
 @Injectable()
 export class ToolsService {
@@ -134,11 +142,46 @@ export class ToolsService {
   }
 
   /**
-   * Whether the connector manifest flags this tool as an AI agent tool.
-   * Built-in tools have no manifest entry → false.
+   * Whether the tool counts as an AI agent tool. Built-in tools always do;
+   * any other tool needs the `agentTool` flag on its connector manifest entry.
    */
-  private isAgentTool(toolName: string): boolean {
-    return this.connectorRegistry.getConnector(toolName)?.agentTool === true;
+  private isAgentTool(tool: Pick<Tool, 'name' | 'type'>): boolean {
+    return (
+      tool.type === WorkerType.BUILT_IN ||
+      this.connectorRegistry.getConnector(tool.name)?.agentTool === true
+    );
+  }
+
+  /**
+   * Where branches (OR-ed) for the agentTool filter — the query-side mirror of
+   * isAgentTool. `type` is the caller's own type filter: a branch only pins
+   * `type` where that cannot contradict it.
+   */
+  private buildAgentToolWhere(
+    agentTool: boolean,
+    type?: WorkerType,
+  ): AgentToolWhere[] {
+    const agentSlugs = this.connectorRegistry
+      .getAllConnectors()
+      .filter((entry) => entry.agentTool === true)
+      .map((entry) => entry.slug);
+
+    if (agentTool) {
+      const byManifest: AgentToolWhere = { name: In(agentSlugs) };
+      return type && type !== WorkerType.BUILT_IN
+        ? [byManifest]
+        : [{ type: WorkerType.BUILT_IN }, byManifest];
+    }
+    if (type === WorkerType.BUILT_IN) {
+      // Every built-in is an agent tool → match nothing (In([]) renders 0=1).
+      return [{ id: In([]) }];
+    }
+    return [
+      {
+        ...(!type && { type: Not(WorkerType.BUILT_IN) }),
+        name: Not(In(agentSlugs)),
+      },
+    ];
   }
 
   /**
@@ -317,7 +360,8 @@ export class ToolsService {
   /**
    * Builds a TypeORM where clause for getManyTools.
    * When search is provided, creates an OR branch matching name OR description
-   * (ILIKE, case-insensitive), combined (AND) with type/category/provider filters.
+   * (ILIKE, case-insensitive); agentTool adds its own OR branches. Every branch
+   * is combined (AND) with type/category/provider filters.
    */
   private buildToolsWhere(
     query: ToolsQueryDto,
@@ -328,16 +372,29 @@ export class ToolsService {
     if (query.providerId) base.provider = { id: query.providerId };
 
     const searchTerm = (query.search ?? '').trim().slice(0, MAX_SEARCH_LENGTH);
-    if (!searchTerm) {
-      return Object.keys(base).length ? base : undefined;
-    }
     // Escape LIKE wildcards so user input is matched literally; ILike()
     // keeps the value parameterized (no SQL injection).
     const pattern = `%${searchTerm.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-    return [
-      { ...base, name: ILike(pattern) },
-      { ...base, description: ILike(pattern) },
-    ];
+    const searchBranches: { name?: FindOperator<string>; description?: FindOperator<string> }[] =
+      searchTerm
+        ? [{ name: ILike(pattern) }, { description: ILike(pattern) }]
+        : [{}];
+    const agentBranches: AgentToolWhere[] =
+      query.agentTool === undefined
+        ? [{}]
+        : this.buildAgentToolWhere(query.agentTool, query.type);
+
+    const branches: FindOptionsWhere<Tool>[] = agentBranches.flatMap((agent) =>
+      searchBranches.map((search) => ({
+        ...base,
+        ...agent,
+        ...search,
+        // Both constrain the name (agent slugs vs. search pattern) → need both.
+        ...(agent.name && search.name && { name: And(agent.name, search.name) }),
+      })),
+    );
+    if (branches.length > 1) return branches;
+    return Object.keys(branches[0]).length ? branches[0] : undefined;
   }
 
   /**
@@ -471,7 +528,7 @@ export class ToolsService {
         query,
         data: toolsWithProfiles.map((tool) => ({
           ...tool,
-          agentTool: this.isAgentTool(tool.name),
+          agentTool: this.isAgentTool(tool),
         })),
         total,
       });
@@ -488,7 +545,7 @@ export class ToolsService {
         order,
       });
       for (const tool of data) {
-        tool.agentTool = this.isAgentTool(tool.name);
+        tool.agentTool = this.isAgentTool(tool);
       }
       return getManyResponse({ query, data, total });
     }
@@ -532,7 +589,7 @@ export class ToolsService {
       : new Set<string>();
 
     const enrichedTools = combinedTools.map((tool) => {
-      const agentTool = this.isAgentTool(tool.name);
+      const agentTool = this.isAgentTool(tool);
       if (tool.type === WorkerType.BUILT_IN) {
         return { ...tool, isReady: true, agentTool };
       }
@@ -572,7 +629,7 @@ export class ToolsService {
       throw new NotFoundException(`Tool with ID "${id}" not found.`);
     }
 
-    tool.agentTool = this.isAgentTool(tool.name);
+    tool.agentTool = this.isAgentTool(tool);
 
     // If tool is built-in, it's always considered installed and ready
     if (tool.type === WorkerType.BUILT_IN) {

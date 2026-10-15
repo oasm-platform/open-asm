@@ -25,6 +25,10 @@ interface AgentPromptInputProps {
   onAgentModeChange?: (mode: string) => void;
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
+  /** False when the page renders the Agent toggle outside the input. */
+  showAgentModeToggle?: boolean;
+  /** False hides the agent settings gear next to the model picker. */
+  showSettingsButton?: boolean;
   placeholder?: string;
   className?: string;
 }
@@ -39,6 +43,8 @@ export default function AgentPromptInput({
   onAgentModeChange,
   selectedWorkerId,
   onWorkerSelect,
+  showAgentModeToggle = true,
+  showSettingsButton = true,
   placeholder = 'Ask anything about security...',
   className,
 }: AgentPromptInputProps) {
@@ -69,6 +75,7 @@ export default function AgentPromptInput({
                 selectedConfigId={selectedModel?.configId ?? null}
                 selectedModel={selectedModel?.model ?? null}
                 onSelectModel={onSelectModel}
+                showSettingsButton={showSettingsButton}
               />
             )}
           </PromptInputTools>
@@ -79,6 +86,7 @@ export default function AgentPromptInput({
                 onChange={onAgentModeChange}
                 selectedWorkerId={selectedWorkerId}
                 onWorkerChange={onWorkerSelect}
+                showToggle={showAgentModeToggle}
               />
             )}
             <PromptInputSubmit

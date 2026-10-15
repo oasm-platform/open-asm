@@ -6,6 +6,7 @@ export type AgentSettingsTab =
   | 'web-search'
   | 'instruction'
   | 'skills'
+  | 'connectors'
   | 'memory';
 
 interface AgentSettingsDialogState {

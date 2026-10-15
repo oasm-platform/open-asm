@@ -7,6 +7,8 @@ import { BadgeCheck, Bot } from 'lucide-react';
 
 interface ToolCardProps {
   tool: Tool;
+  /** Runs before going to the tool detail page, e.g. to close a dialog. */
+  onNavigate?: () => void;
 }
 
 function formatCategory(category: string): string {
@@ -16,13 +18,16 @@ function formatCategory(category: string): string {
     .join(' ');
 }
 
-const ToolCard = ({ tool }: ToolCardProps) => {
+const ToolCard = ({ tool, onNavigate }: ToolCardProps) => {
   const navigate = useNavigate();
 
   return (
     <button
       type="button"
-      onClick={() => navigate({ to: '/tools/$id', params: { id: tool.id } })}
+      onClick={() => {
+        onNavigate?.();
+        void navigate({ to: '/tools/$id', params: { id: tool.id } });
+      }}
       className="flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:border-primary hover:bg-accent/50 cursor-pointer"
     >
       <div className="flex flex-wrap items-center gap-2">

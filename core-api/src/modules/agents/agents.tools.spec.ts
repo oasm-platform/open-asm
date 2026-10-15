@@ -1,4 +1,4 @@
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode, WorkerType } from '@/common/enums/enum';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { EventEmitter } from 'node:events';
 import { AgentsMcpService, getMcpToolMetadata } from './agents.mcp';
@@ -465,6 +465,106 @@ describe('AgentTool run_tool', () => {
         runId: '00000000-0000-4000-8000-000000000001',
       }),
     ).resolves.toHaveProperty('error');
+  });
+});
+
+describe('AgentTool display_available_tools', () => {
+  type Listing = {
+    inputSchema: { parse: (value: unknown) => unknown };
+    execute: (input: unknown) => Promise<{ data: unknown[] }>;
+  };
+  const listTools = (getManyTools: jest.Mock) =>
+    (
+      Object.assign(Object.create(AgentTool.prototype), {
+        toolsService: { getManyTools },
+      }) as AgentTool
+    ).listToolsTool('w1') as Listing;
+  const page = (data: unknown[]) => ({
+    data,
+    total: data.length,
+    page: 1,
+    limit: 100,
+  });
+
+  it('lists workspace tools with agentTool and readiness', async () => {
+    const getManyTools = jest.fn().mockResolvedValue(
+      page([
+        {
+          id: 't1',
+          name: 'subfinder',
+          type: WorkerType.BUILT_IN,
+          category: 'subdomains',
+          description: 'Subdomain discovery',
+          agentTool: true,
+          isInstalled: true,
+          isReady: true,
+          availableWorkersCount: 2,
+        },
+        {
+          id: 't2',
+          name: 'wpscan',
+          type: WorkerType.CONNECTOR,
+          category: 'vulnerabilities',
+          description: 'WordPress scanner',
+          agentTool: false,
+          isInstalled: false,
+          availableWorkersCount: 0,
+        },
+      ]),
+    );
+
+    const result = await listTools(getManyTools).execute({ q: 'scan' });
+
+    expect(getManyTools).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentTool: undefined,
+        workspaceId: 'w1',
+        search: 'scan',
+      }),
+    );
+    expect(result.data).toEqual([
+      {
+        id: 't1',
+        name: 'subfinder',
+        type: WorkerType.BUILT_IN,
+        category: 'subdomains',
+        description: 'Subdomain discovery',
+        agentTool: true,
+        isInstalled: true,
+        isReady: true,
+      },
+      {
+        id: 't2',
+        name: 'wpscan',
+        type: WorkerType.CONNECTOR,
+        category: 'vulnerabilities',
+        description: 'WordPress scanner',
+        agentTool: false,
+        isInstalled: false,
+        isReady: false,
+      },
+    ]);
+  });
+
+  it.each([true, false])(
+    'passes agentTool=%s through as the filter',
+    async (agentTool) => {
+      const getManyTools = jest.fn().mockResolvedValue(page([]));
+
+      await listTools(getManyTools).execute({ agentTool });
+
+      expect(getManyTools).toHaveBeenCalledWith(
+        expect.objectContaining({ agentTool, workspaceId: 'w1' }),
+      );
+    },
+  );
+
+  it('accepts a boolean agentTool in its input schema', () => {
+    const { inputSchema } = listTools(jest.fn());
+    expect(inputSchema.parse({ agentTool: true })).toMatchObject({
+      agentTool: true,
+    });
+    expect(() => inputSchema.parse({ agentTool: 'yes' })).toThrow();
   });
 });
 

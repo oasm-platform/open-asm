@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './components/agent-icon';
 
+import { AgentToolsTray } from './components/agent-tools-tray';
 import {
   ALL_QUICK_SUGGESTIONS,
   CONVERSATION_STARTERS,
@@ -121,9 +122,9 @@ export default function AgentsLandingPage() {
 
   return (
     <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto" permission="agent.read">
-      {/* The prompt input is the only in-flow element, so it sits at the
-          vertical centre (nudged up by the bottom padding); the hero and the
-          suggestions hang off it without shifting it. */}
+      {/* The prompt input and its tools tray are the only in-flow elements,
+          so they sit at the vertical centre (nudged up by the bottom padding);
+          the hero and the suggestions hang off them without shifting them. */}
       <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center pb-24">
         <div className="relative w-full max-w-2xl">
           {/* Hero */}
@@ -137,7 +138,8 @@ export default function AgentsLandingPage() {
             />
           </div>
 
-          {/* Input area */}
+          {/* Input area: rounder box and a round send button, with the
+              Agent toggle moved down into the tools tray */}
           <AgentPromptInput
             onSubmit={handleSendMessage}
             isSending={isSending}
@@ -149,6 +151,14 @@ export default function AgentsLandingPage() {
             onAgentModeChange={setAgentMode}
             selectedWorkerId={selectedWorkerId}
             onWorkerSelect={setSelectedWorkerId}
+            showAgentModeToggle={false}
+            showSettingsButton={false}
+            className="[&_[data-slot=input-group]]:rounded-2xl [&_button[type=submit]]:rounded-full"
+          />
+          <AgentToolsTray
+            agentMode={agentMode}
+            onAgentModeChange={setAgentMode}
+            onWorkerChange={setSelectedWorkerId}
           />
 
           {/* Quick suggestions */}
