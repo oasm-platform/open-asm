@@ -17,12 +17,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './components/agent-icon';
 
+import { AgentToolsTray } from './components/agent-tools-tray';
 import {
   AGENT_PROMPT_GROUPS,
   ASK_PROMPT_GROUPS,
   CONVERSATION_STARTERS,
 } from './components/landing-constants';
-import { AgentToolsTray } from './components/agent-tools-tray';
 import { PromptGroups } from './components/prompt-groups';
 
 const routeApi = getRouteApi('/_authed/aistudio/');
